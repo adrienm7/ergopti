@@ -1,0 +1,1468 @@
+{
+	"nom": "HyperTexte v1.0",
+	"auteur": "Adrien Moyaux",
+	"site": "https://hypertexte.beseven.fr",
+	"iso": [
+		{
+			"touche": "a",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "b",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "c",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "d",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "e",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "3",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "f",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "g",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "4",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "h",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "4",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "i",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "3",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "j",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "14",
+			"taille": "1"
+		},
+		{
+			"touche": "k",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "7",
+			"taille": "1"
+		},
+		{
+			"touche": "l",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "2",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "m",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "n",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "3",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "o",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "2",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "p",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "2",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "q",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "r",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "s",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "t",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "3",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "u",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "v",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "w",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "x",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "y",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "2",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "z",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "4",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": ",",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "6",
+			"taille": "1",
+			"type": "double"
+		},
+		{
+			"touche": ".",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "6",
+			"taille": "1",
+			"type": "double"
+		},
+		{
+			"touche": "\"",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "4",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "’",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "12",
+			"taille": "1",
+			"type": "double"
+		},
+		{
+			"touche": "!",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "14",
+			"taille": "1",
+			"type": "double"
+		},
+		{
+			"touche": "ê",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "é",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "è",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "à",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "%",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "1",
+			"taille": "1"
+		},
+		{
+			"touche": "=",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "€",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "14",
+			"taille": "1"
+		},
+		{
+			"touche": "1",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "2",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "1",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "3",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "1",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "4",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "5",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "6",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "7",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "8",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "1",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "9",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "1",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "0",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "LCtrl",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "0",
+			"taille": "1.25",
+			"type": "special"
+		},
+		{
+			"touche": "Win",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "1",
+			"taille": "1.25",
+			"type": "special"
+		},
+		{
+			"touche": "LAlt",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "5",
+			"colonne": "2",
+			"taille": "1.25",
+			"type": "special"
+		},
+		{
+			"touche": "Space",
+			"main": "",
+			"doigt": "pouce",
+			"ligne": "5",
+			"colonne": "4",
+			"taille": "7",
+			"type": "space"
+		},
+		{
+			"touche": "RAlt",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "5",
+			"colonne": "10",
+			"taille": "1.25",
+			"type": "special"
+		},
+		{
+			"touche": "RCtrl",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "11",
+			"taille": "1.25",
+			"type": "special"
+		},
+		{
+			"touche": "Option",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "12",
+			"taille": "1.5",
+			"type": "special"
+		},
+		{
+			"touche": "Tab",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "0",
+			"taille": "1.5",
+			"type": "special"
+		},
+		{
+			"touche": "CapsLock",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "0",
+			"taille": "1.75",
+			"type": "special"
+		},
+		{
+			"touche": "LShift",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "0",
+			"taille": "1.25",
+			"type": "special"
+		},
+		{
+			"touche": "RShift",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "13",
+			"taille": "2.5",
+			"type": "special"
+		},
+		{
+			"touche": "Enter",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "15",
+			"taille": "1.25",
+			"type": "enter"
+		},
+		{
+			"touche": "Delete",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "15",
+			"taille": "1.75",
+			"type": "special"
+		}
+	],
+	"ergodox": [
+		{
+			"touche": "a",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "b",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "c",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "d",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "e",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "3",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "f",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "g",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "4",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "h",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "4",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "i",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "3",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "j",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "k",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "5",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "l",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "2",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "m",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "n",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "3",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "o",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "2",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "p",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "2",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "q",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "r",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "s",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "t",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "3",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "u",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "v",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "w",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "2",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "x",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "y",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "2",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "z",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "4",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": ",",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "3",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": ".",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "\"",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "4",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "’",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "!",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "5",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "ê",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "é",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "è",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "à",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "%",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "1",
+			"taille": "1"
+		},
+		{
+			"touche": "=",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "€",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "0",
+			"taille": "1"
+		},
+		{
+			"touche": "1",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "2",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "1",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "3",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "1",
+			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": "4",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "5",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "6",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "7",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "1",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "8",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "1",
+			"colonne": "10",
+			"taille": "1"
+		},
+		{
+			"touche": "9",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "1",
+			"colonne": "11",
+			"taille": "1"
+		},
+		{
+			"touche": "0",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "1",
+			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "0",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "3",
+			"colonne": "0",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "0",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "13",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "0",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "1",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "5",
+			"colonne": "2",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "5",
+			"colonne": "6",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "5",
+			"colonne": "8",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "5",
+			"colonne": "9",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "majeur",
+			"ligne": "5",
+			"colonne": "10",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "annulaire",
+			"ligne": "5",
+			"colonne": "11",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "12",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "13",
+			"taille": "1",
+			"type": "vide"
+		}
+	],
+	"touches": [
+		{
+			"touche": "a",
+			"Primary": "a",
+			"Shift": "A",
+			"AltGr": "[",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "b",
+			"Primary": "b",
+			"Shift": "B",
+			"AltGr": "",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "c",
+			"Primary": "c",
+			"Shift": "C",
+			"AltGr": "ç",
+			"ShiftAltGr": "Ç"
+		},
+		{
+			"touche": "d",
+			"Primary": "d",
+			"Shift": "D",
+			"AltGr": "$",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "e",
+			"Primary": "e",
+			"Shift": "E",
+			"AltGr": "{",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "f",
+			"Primary": "f",
+			"Shift": "F",
+			"AltGr": "~",
+			"ShiftAltGr": "≈"
+		},
+		{
+			"touche": "g",
+			"Primary": "g",
+			"Shift": "G",
+			"AltGr": "« ",
+			"ShiftAltGr": "“"
+		},
+		{
+			"touche": "h",
+			"Primary": "h",
+			"Shift": "H",
+			"AltGr": "#",
+			"ShiftAltGr": "„"
+		},
+		{
+			"touche": "i",
+			"Primary": "i",
+			"Shift": "I",
+			"AltGr": "]",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "j",
+			"Primary": "j",
+			"Shift": "J",
+			"AltGr": "",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "k",
+			"Primary": "k",
+			"Shift": "K",
+			"AltGr": "…",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "l",
+			"Primary": "l",
+			"Shift": "L",
+			"AltGr": "=",
+			"ShiftAltGr": "≠"
+		},
+		{
+			"touche": "m",
+			"Primary": "m",
+			"Shift": "M",
+			"AltGr": "&",
+			"ShiftAltGr": "−"
+		},
+		{
+			"touche": "n",
+			"Primary": "n",
+			"Shift": "N",
+			"AltGr": ")",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "o",
+			"Primary": "o",
+			"Shift": "O",
+			"AltGr": "œ",
+			"ShiftAltGr": "Œ"
+		},
+		{
+			"touche": "p",
+			"Primary": "p",
+			"Shift": "P",
+			"AltGr": "+",
+			"ShiftAltGr": "±"
+		},
+		{
+			"touche": "q",
+			"Primary": "q",
+			"touche+": "qu",
+			"Shift": "Q",
+			"Shift+": "Qu",
+			"AltGr": "",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "r",
+			"Primary": "r",
+			"Shift": "R",
+			"AltGr": ">",
+			"ShiftAltGr": "⩾"
+		},
+		{
+			"touche": "s",
+			"Primary": "s",
+			"Shift": "S",
+			"AltGr": "(",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "t",
+			"Primary": "t",
+			"Shift": "T",
+			"AltGr": "<",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "u",
+			"Primary": "u",
+			"Shift": "U",
+			"AltGr": "}",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "v",
+			"Primary": "v",
+			"Shift": "V",
+			"AltGr": "|",
+			"ShiftAltGr": "¦"
+		},
+		{
+			"touche": "w",
+			"Primary": "w",
+			"Shift": "W",
+			"AltGr": "ù",
+			"AltGr+": "où",
+			"ShiftAltGr": "Ù",
+			"ShiftAltGr+": "Où"
+		},
+		{
+			"touche": "x",
+			"Primary": "x",
+			"Shift": "X",
+			"AltGr": " »",
+			"ShiftAltGr": "”"
+		},
+		{
+			"touche": "y",
+			"Primary": "y",
+			"Shift": "Y",
+			"AltGr": "@",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "z",
+			"Primary": "z",
+			"Shift": "Z",
+			"AltGr": "_",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": ",",
+			"Primary": ",",
+			"Shift": " ;",
+			"AltGr": ";",
+			"ShiftAltGr": "",
+			"type": "double"
+		},
+		{
+			"touche": ".",
+			"Primary": ".",
+			"Shift": " :",
+			"AltGr": ":",
+			"ShiftAltGr": "",
+			"type": "double"
+		},
+		{
+			"touche": "\"",
+			"Primary": "\"",
+			"Shift": "'",
+			"AltGr": "*",
+			"ShiftAltGr": "×"
+		},
+		{
+			"touche": "’",
+			"Primary": "’",
+			"Shift": " ?",
+			"AltGr": "?",
+			"ShiftAltGr": "¿",
+			"type": "double"
+		},
+		{
+			"touche": "!",
+			"Primary": "^",
+			"Shift": " !",
+			"AltGr": "!",
+			"ShiftAltGr": "",
+			"type": "double"
+		},
+		{
+			"touche": "ê",
+			"Primary": "ê",
+			"Shift": "Ê",
+			"AltGr": "^",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "é",
+			"Primary": "é",
+			"Shift": "É",
+			"AltGr": "/",
+			"ShiftAltGr": "÷"
+		},
+		{
+			"touche": "è",
+			"Primary": "è",
+			"Shift": "È",
+			"AltGr": "\\",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "à",
+			"Primary": "à",
+			"Shift": "À",
+			"AltGr": "`",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "%",
+			"Primary": "%",
+			"Shift": " %",
+			"AltGr": "‰",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "=",
+			"Primary": "=",
+			"Shift": "",
+			"AltGr": "",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "€",
+			"Primary": "€",
+			"Shift": " €",
+			"AltGr": "£",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "1",
+			"Primary": "1",
+			"Shift": "1",
+			"AltGr": "1",
+			"ShiftAltGr": "1"
+		},
+		{
+			"touche": "2",
+			"Primary": "2",
+			"Shift": "2",
+			"AltGr": "2",
+			"ShiftAltGr": "2"
+		},
+		{
+			"touche": "3",
+			"Primary": "3",
+			"Shift": "3",
+			"AltGr": "3",
+			"ShiftAltGr": "3"
+		},
+		{
+			"touche": "4",
+			"Primary": "4",
+			"Shift": "4",
+			"AltGr": "4",
+			"ShiftAltGr": "4"
+		},
+		{
+			"touche": "5",
+			"Primary": "5",
+			"Shift": "5",
+			"AltGr": "5",
+			"ShiftAltGr": "5"
+		},
+		{
+			"touche": "6",
+			"Primary": "6",
+			"Shift": "6",
+			"AltGr": "6",
+			"ShiftAltGr": "6"
+		},
+		{
+			"touche": "7",
+			"Primary": "7",
+			"Shift": "7",
+			"AltGr": "7",
+			"ShiftAltGr": "7"
+		},
+		{
+			"touche": "8",
+			"Primary": "8",
+			"Shift": "8",
+			"AltGr": "8",
+			"ShiftAltGr": "8"
+		},
+		{
+			"touche": "9",
+			"Primary": "9",
+			"Shift": "9",
+			"AltGr": "9",
+			"ShiftAltGr": "9"
+		},
+		{
+			"touche": "0",
+			"Primary": "0",
+			"Shift": "0",
+			"AltGr": "0",
+			"ShiftAltGr": "0"
+		},
+		{
+			"touche": "CapsLock",
+			"Primary": "⇪",
+			"Shift": "⇪",
+			"AltGr": "⇪",
+			"ShiftAltGr": "⇪"
+		},
+		{
+			"touche": "RShift",
+			"Primary": "⇧",
+			"Shift": "⇧",
+			"AltGr": "⇧",
+			"ShiftAltGr": "⇧"
+		},
+		{
+			"touche": "LShift",
+			"Primary": "⇧",
+			"Shift": "⇧",
+			"AltGr": "⇧",
+			"ShiftAltGr": "⇧"
+		},
+		{
+			"touche": "LCtrl",
+			"Primary": "Ctrl",
+			"Shift": "Ctrl",
+			"AltGr": "Ctrl",
+			"ShiftAltGr": "Ctrl"
+		},
+		{
+			"touche": "RCtrl",
+			"Primary": "Ctrl",
+			"Shift": "Ctrl",
+			"AltGr": "Ctrl",
+			"ShiftAltGr": "Ctrl"
+		},
+		{
+			"touche": "LAlt",
+			"Primary": "Alt",
+			"Shift": "Alt",
+			"AltGr": "Alt",
+			"ShiftAltGr": "Alt"
+		},
+		{
+			"touche": "RAlt",
+			"Primary": "AltGr",
+			"Shift": "AltGr",
+			"AltGr": "AltGr",
+			"ShiftAltGr": "AltGr"
+		},
+		{
+			"touche": "Win",
+			"Primary": "Win",
+			"Shift": "Win",
+			"AltGr": "Win",
+			"ShiftAltGr": "Win"
+		},
+		{
+			"touche": "Option",
+			"Primary": "Option",
+			"Shift": "Option",
+			"AltGr": "Option",
+			"ShiftAltGr": "Option"
+		},
+		{
+			"touche": "Space",
+			"Primary": "",
+			"Shift": "-",
+			"AltGr": "_",
+			"ShiftAltGr": ""
+		},
+		{
+			"touche": "Tab",
+			"Primary": "↹",
+			"Shift": "↹",
+			"AltGr": "↹",
+			"ShiftAltGr": "↹"
+		},
+		{
+			"touche": "Enter",
+			"Primary": "↩",
+			"Shift": "↩",
+			"AltGr": "↩",
+			"ShiftAltGr": "↩"
+		},
+		{
+			"touche": "Delete",
+			"Primary": "⌫",
+			"Shift": "⌫",
+			"AltGr": "⌫",
+			"ShiftAltGr": "⌫"
+		},
+		{
+			"touche": "vide",
+			"Primary": "",
+			"Shift": "",
+			"AltGr": "",
+			"ShiftAltGr": ""
+		}
+	]
+}

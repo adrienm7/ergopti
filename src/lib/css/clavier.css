@@ -1,0 +1,240 @@
+:root {
+    --taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
+    --marge-clavier: calc(var(--marge-touche) * 5);
+    --arrondi-clavier: calc(var(--marge-touche) * 7);
+    
+    --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
+    --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
+    --profondeur-touche: calc(var(--taille-clavier) * 0.25vw);
+    --profondeur-touche-pressee: calc(var(--taille-clavier) * 0.05vw);
+    --marge-touche: calc(var(--taille-clavier) * 0.35vw);
+    --arrondi-touche: 0.2em;
+    --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
+    --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
+
+    --couleur-doigt-saturation: 60%;
+    --couleur-doigt-luminosite: 80%;
+    
+    --couleur-doigt-gauche-index: 0deg;
+    --couleur-doigt-gauche-majeur: 25deg;
+    --couleur-doigt-gauche-annulaire: 50deg;
+    --couleur-doigt-gauche-auriculaire: 100deg;
+    --couleur-doigt-droite-index: -40deg;
+    --couleur-doigt-droite-majeur: -100deg;
+    --couleur-doigt-droite-annulaire: -140deg;
+    --couleur-doigt-droite-auriculaire: -170deg;
+}
+
+
+
+bloc-clavier {
+    display: block;
+    width: max-content;
+    margin: 0 auto;
+    padding: var(--marge-clavier);
+    background-color: hsl(0deg 0% 95%);
+    border: 1px solid hsl(0deg 0% 80%);
+    border-radius: var(--arrondi-clavier);
+}
+
+bloc-ligne {
+    display: flex;
+}
+
+
+
+bloc-touche {
+    --longueur-touche: calc(var(--taille-touche) * var(--taille) - 2 * var(--marge-touche));
+    --effet-3d: hsl(var(--couleur-touche) var(--couleur-doigt-saturation) calc(var(--couleur-doigt-luminosite) - 20%));
+    --ombres-touche: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d);
+    --couleur-fond-touche: hsl(var(--couleur-touche) var(--couleur-doigt-saturation) var(--couleur-doigt-luminosite));
+    --couleur-bordure-touche: hsl(var(--couleur-touche) var(--couleur-doigt-saturation) calc(var(--couleur-doigt-luminosite) - 40%));
+    --taille-bordure-touche: calc(var(--taille-clavier) * 0.1rem);
+    --taille-texte-touche: calc(var(--taille-touche) / 2.5);
+    
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    height: var(--hauteur-touche);
+    width: var(--longueur-touche);
+    margin: var(--marge-touche);
+    border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+    border-radius: var(--arrondi-touche);
+    background-color: var(--couleur-fond-touche);
+    box-shadow: var(--ombres-touche);
+    font-size: var(--taille-texte-touche);
+    color: #2e2e2e;
+    cursor: pointer;
+}
+
+bloc-touche:active,
+bloc-touche:hover {
+    position: relative;
+    top: var(--descente-touche);
+    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d);
+}
+
+
+
+
+
+bloc-touche[data-touche="LShift"],
+bloc-touche[data-touche="RShift"],
+bloc-touche[data-touche="CapsLock"] {
+    font-weight: bold;
+}
+
+bloc-touche[data-touche="LAlt"],
+bloc-touche[data-touche="RAlt"],
+bloc-touche[data-touche="LCtrl"],
+bloc-touche[data-touche="RCtrl"],
+bloc-touche[data-touche="Space"],
+bloc-touche[data-touche="Win"],
+bloc-touche[data-touche="Option"] {
+    font-size: calc(var(--taille-texte-touche) * 0.7);
+}
+
+
+
+
+
+bloc-touche[data-type="double"] div {
+    line-height: 1.1;
+    font-size: calc(var(--taille-texte-touche) * 0.7);
+}
+
+bloc-touche[data-touche="’"] div,
+bloc-touche[data-touche="!"] div {
+    line-height: 1.3;
+}
+
+
+
+
+
+
+/*
+=============================
+======= Touche Entrée =======
+=============================
+*/
+
+
+
+bloc-touche[data-type="enter"]{
+    top: 0;
+    position: relative;
+}
+
+bloc-touche[data-type="enter"] div {
+    z-index: 2;
+}
+
+bloc-touche[data-type="enter"]::before {
+    /* On cache la jonction entre l’élément et l’after avec un rectangle */
+    position: absolute;
+    top: calc(0% + 5px);
+    right: calc(var(--taille-bordure-touche) * -1 + 0.3%);
+    z-index: 1;
+    content: '';
+    height: var(--taille-touche);
+    width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 3px);
+    background-color: var(--couleur-fond-touche);
+    border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+}
+
+bloc-touche[data-type="enter"]::after {
+    position: absolute;
+    top: 100%;
+    right: calc(var(--taille-bordure-touche) * -1 + 0.3%);
+    content: '';
+    height: calc(var(--taille-touche) + var(--marge-touche) / 2);
+    width: calc(var(--taille-touche) - 2 * var(--marge-touche));
+    background-color: var(--couleur-fond-touche);
+    border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+    border-top: none;
+    border-radius: 0 0 var(--arrondi-touche) var(--arrondi-touche);
+    box-shadow: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d), -1px var(--profondeur-touche) 0 var(--effet-3d);
+}
+
+
+bloc-touche[data-type="enter"]:active,
+bloc-touche[data-type="enter"]:hover {
+    position: relative;
+    top: var(--descente-touche);
+}
+
+bloc-touche[data-type="enter"]:active::before,
+bloc-touche[data-type="enter"]:hover::before {
+    height: var(--taille-touche);
+    width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 2px);
+}
+
+bloc-touche[data-type="enter"]:active::after,
+bloc-touche[data-type="enter"]:hover::after {
+    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), 0 var(--profondeur-touche-pressee) 0 var(--effet-3d);
+}
+
+
+
+
+
+
+
+/*
+========================
+======= Couleurs =======
+========================
+*/
+
+
+
+bloc-clavier[data-couleur="non"] bloc-touche {
+    --couleur-touche: 0deg;
+    --couleur-doigt-saturation: 0%;
+    --couleur-doigt-luminosite: 100%;
+}
+
+
+
+bloc-touche[data-doigt="index"][data-main="gauche"]{
+    --couleur-touche: var(--couleur-doigt-gauche-index);
+}
+bloc-touche[data-doigt="majeur"][data-main="gauche"]{
+    --couleur-touche: var(--couleur-doigt-gauche-majeur);
+}
+bloc-touche[data-doigt="annulaire"][data-main="gauche"]{
+    --couleur-touche: var(--couleur-doigt-gauche-annulaire);
+}
+bloc-touche[data-doigt="auriculaire"][data-main="gauche"]{
+    --couleur-touche: var(--couleur-doigt-gauche-auriculaire);
+}
+bloc-touche[data-doigt="index"][data-main="droite"]{
+    --couleur-touche: var(--couleur-doigt-droite-index);
+}
+bloc-touche[data-doigt="majeur"][data-main="droite"]{
+    --couleur-touche: var(--couleur-doigt-droite-majeur);
+}
+bloc-touche[data-doigt="annulaire"][data-main="droite"]{
+    --couleur-touche: var(--couleur-doigt-droite-annulaire);
+}
+bloc-touche[data-doigt="auriculaire"][data-main="droite"]{
+    --couleur-touche: var(--couleur-doigt-droite-auriculaire);
+}
+
+
+bloc-touche[data-doigt="pouce"]{
+    --couleur-touche: 0deg;
+    --couleur-doigt-saturation: 0%;
+}
+
+
+bloc-touche[data-type="special"],
+bloc-touche[data-type="enter"],
+bloc-touche[data-type="enter"]::before,
+bloc-touche[data-type="enter"]::after {
+    background-color: hsl(0deg 0% 85%);
+    --couleur-touche: 0deg;
+    --couleur-doigt-saturation: 0%;
+}

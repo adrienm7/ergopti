@@ -1,0 +1,74 @@
+*, *:before, *:after {
+    -webkit-box-sizing: border-box;
+       -moz-box-sizing: border-box;
+            box-sizing: border-box; /* La width d’une div sera constante, même avec l’ajout de padding */
+}
+
+html, body {
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", Arial, sans-serif;
+    font-size: 110%;
+    font-size: clamp(16px, 1.5vw, 24px);
+    scroll-behavior: smooth;
+}
+
+
+
+/* Permet de toujours placer le footer en bas de la page */
+
+/* « Je vous conseille fortement d’utiliser un conteneur global, comme ici avec #page, pour réaliser ce genre de mise en page.
+ * En effet, définir un contexte flex directement sur <body> comme on peut le voir sur d’autres d’articles peut causer des problèmes avec les plugins
+ * qui créent des éléments en bas de page avant </body> (popup, autocomplete, etc.).
+ * Ces éléments risquent de ne pas s’afficher correctement, à cause du contexte flex hérité. Just saying. »
+ */
+
+#page {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	min-height: 100vh;
+	background-color: white;
+}
+
+main {
+    flex-grow: 1;
+}
+
+
+
+
+h1 {
+    text-align: center;
+    font-weight: normal;
+}
+
+.titre {
+    display: inline-block;
+    margin-top: 1rem;
+    font-size: 1.5rem;
+}
+
+.titre-hyper {
+    border: 3px solid black;
+    border-radius: 7px 0 0 7px;
+    padding: 5px;
+    background-color: black;
+    color: white;
+}
+
+.titre-texte {
+    padding: 5px;
+    border: 3px solid black;
+    border-radius: 0 7px 7px 0;
+}
+
+
+
+footer {
+    display: block;
+    margin: 0;
+    padding: 20px;
+    background-color: black;
+    color: white;
+    text-align: center;
+}
