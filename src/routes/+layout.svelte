@@ -3,6 +3,8 @@
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
+	import '$lib/css/typography.css';
+	import '$lib/css/miscellaneous.css';
 	import '$lib/css/clavier.css';
 
 	import '$lib/js/clavier.js';
@@ -71,7 +73,7 @@
 	const date = new Date().getFullYear();
 </script>
 
-<div class="app">
+<div id="page">
 	<main>
 		<slot />
 	</main>
@@ -80,40 +82,3 @@
 		<p>Copyright © {date} <strong>HyperTexte</strong></p>
 	</footer>
 </div>
-
-<style>
-	.app {
-		display: flex;
-		flex-direction: column;
-		min-height: 100vh;
-	}
-
-	main {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		padding: 1rem;
-		width: 100%;
-		max-width: 64rem;
-		margin: 0 auto;
-		box-sizing: border-box;
-	}
-
-	footer {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		padding: 12px;
-	}
-
-	footer a {
-		font-weight: bold;
-	}
-
-	@media (min-width: 480px) {
-		footer {
-			padding: 12px 0;
-		}
-	}
-</style>

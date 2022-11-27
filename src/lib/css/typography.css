@@ -1,0 +1,185 @@
+/* Titres */
+
+h1, h2, h3, h4 {
+    font-weight: bold;   
+}
+
+
+p,
+h1, h2, h3, h4 {
+    line-height: 1.35em;
+    max-width: 800px;
+    max-width: clamp(200px, 90vw, 800px);
+    margin: 0 auto;
+}
+
+
+h1 {
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+}
+
+h2 {
+	margin-top: 15vh;
+    margin-bottom: 5vh;
+    font-size: 2.3rem;
+}
+
+h3 {
+    margin-top: 10vh;
+    margin-bottom: 3vh;
+	font-size: 1.8rem;
+}
+
+h4 {
+	margin-top: 5vh;
+	margin-bottom: 1vh;
+    font-size: 1.5rem;
+}
+
+p {
+	text-align: justify;
+}
+
+@media (max-width: 600px) {
+	p {
+		text-align: left;
+	}
+}
+
+
+
+
+
+
+/* Mise en forme du texte */
+
+strong,
+.text-bold {
+    font-weight: bold;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-white {
+    color: white;
+}
+
+.text-black {
+    color: black;
+}
+
+.surlignage-blanc {
+    background-color: white;
+    color: black;
+    border-radius: 0.2em;
+    padding: 0 0.3em;
+}
+
+.font-logo {
+    font-family: 'Tele-Marines', system-ui, Helvetica, Arial, sans-serif;
+}
+
+.font-size-big {
+    font-size: 3.5rem;
+}
+
+.font-size-medium {
+    font-size: 1.7rem;
+}
+
+.no-max-width {
+    max-width: 90vw;
+}
+
+@media (max-width: 600px){
+    h2 {
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
+    }
+    .font-size-medium {
+        font-size: 1.5rem;
+    }
+}
+
+
+
+
+
+
+
+/* Couleurs de texte */
+
+
+.text-orange,
+.text-orange-gradient {
+    color: var(--color-orange);
+}
+
+.text-blue-light,
+.text-blue-gradient {
+    color: var(--color-blue-light);
+}
+
+.text-blue-dark {
+    color: var(--color-blue-dark);
+}
+
+.text-purple,
+.text-purple-gradient {
+    color: var(--color-purple);
+}
+
+.text-green,
+.text-green-gradient {
+    color: var(--color-green);
+}
+
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+    h3, .text-orange-gradient {
+        -webkit-background-clip: text;
+                background-clip: text;
+        -webkit-text-fill-color: transparent;
+                          color: transparent;
+        -webkit-box-decoration-break: clone;
+                box-decoration-break: clone;
+        background-image: linear-gradient(to right, var(--gradient-orange));
+    }
+    
+    
+    .text-blue-gradient {
+        -webkit-background-clip: text;
+                background-clip: text;
+        -webkit-text-fill-color: transparent;
+                          color: transparent;
+        -webkit-box-decoration-break: clone;
+                box-decoration-break: clone;
+        background-image: linear-gradient(to right, var(--gradient-blue));
+    }
+    
+    
+    h2, .text-purple-gradient {
+        -webkit-background-clip: text;
+                background-clip: text;
+        -webkit-text-fill-color: transparent;
+                          color: transparent;
+        -webkit-box-decoration-break: clone;
+                box-decoration-break: clone;
+        background-image: linear-gradient(to right, var(--gradient-purple));
+    }
+    
+    
+    .text-green-gradient {
+        -webkit-background-clip: text;
+                background-clip: text;
+        -webkit-text-fill-color: transparent;
+                          color: transparent;
+        -webkit-box-decoration-break: clone;
+                box-decoration-break: clone;
+        background-image: linear-gradient(to top right, var(--gradient-green));
+    }
+    
+}

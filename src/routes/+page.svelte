@@ -17,16 +17,25 @@
 
 <h2>Disposition clavier optimale</h2>
 
-<h3>Alternance des mains</h3>
+<h3>➀ Alternance des mains</h3>
 <p>
 	La première étape de la création d’<Nom /> a été d’essayer de classer les touches du clavier en deux
 	groupes : main gauche et main droite. Pour cela, les voyelles ont toutes été placées du côté gauche,
 	les voyelles étant majoritairement précédées et suivies de consonnes. Cette idée n’est pas nouvelle,
 	elle est déjà appliquée dans presque toutes les dispositions alternatives : Dvorak, BÉPO, etc.
 </p>
-<h3>Distance des doigts aux touches</h3>
+
+<h3>➁ Distance des doigts aux touches</h3>
 <p>
 	La deuxième étape est de placer les touches les plus souvent utilisées sur la rangée de repos du
 	clavier (la ligne du milieu).
 </p>
-<h3>Minimisation des SFB</h3>
+
+<h3>➂ Minimisation des SFB</h3>
+
+<h2>Pour aller plus loin</h2>
+
+<p>
+	<Nom /> + permet d’avoir une disposition encore meilleure. Le seul prix à payer est qu’il faut accepter
+	d’apprendre certains enchaînements de touches.
+</p>
