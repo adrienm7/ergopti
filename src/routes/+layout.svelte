@@ -1,4 +1,5 @@
 <script>
+	import Header from './Header.svelte';
 	import { onMount } from 'svelte';
 
 	import '$lib/css/normalize.css';
@@ -75,6 +76,7 @@
 
 <div id="page">
 	<main>
+		<Header />
 		<slot />
 	</main>
 
