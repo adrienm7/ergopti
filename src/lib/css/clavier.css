@@ -38,6 +38,14 @@ bloc-clavier {
     border-radius: var(--arrondi-clavier);
 }
 
+bloc-clavier[data-type="iso"] bloc-touche[data-colonne="6"] {
+	margin-right: 0;
+}
+bloc-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
+	margin-right: 5vw;
+}
+
+
 bloc-ligne {
     display: flex;
 }

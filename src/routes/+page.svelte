@@ -1,18 +1,13 @@
 <script>
 	import Nom from './Nom.svelte';
-
 	import data from '$lib/data/hypertexte.json';
 
-	export function genererClavier({ typeClavier, couche, couleur }) {
-		// creating all cells
+	function genererClavier({ emplacement, typeClavier, couche, couleur }) {
 		for (let i = 1; i <= 5; i++) {
 			const ligneClavier = document.createElement('bloc-ligne');
 			ligneClavier.dataset.ligne = i;
 
 			for (let j = 0; j <= 16; j++) {
-				// Create a <td> element and a text node, make the text
-				// node the contents of the <td>, and put the <td> at
-				// the end of the table row
 				var toucheClavier = document.createElement('bloc-touche');
 				var res = data[typeClavier].find((el) => (el.ligne == i) & (el.colonne == j));
 				if (res !== undefined) {
@@ -42,24 +37,23 @@
 					toucheClavier.dataset.main = res.main;
 					toucheClavier.dataset.type = res.type;
 					toucheClavier.style.setProperty('--taille', res.taille);
-					if ((typeClavier == 'ergodox') & (j == 6)) {
-						toucheClavier.style.marginRight = '5vw';
-					}
 					ligneClavier.appendChild(toucheClavier);
 				}
 			}
 
 			// add the row to the end of the table body
-			document.getElementById('bloc-clavier').appendChild(ligneClavier);
-			document.getElementById('bloc-clavier').dataset.couleur = couleur;
+			document.getElementById(emplacement).appendChild(ligneClavier);
+			document.getElementById(emplacement).dataset.couleur = couleur;
 		}
 	}
 
 	let couleur = 'oui';
+	let typeClavier = 'iso';
 
 	function handleClick() {
 		count += 1;
 		genererClavier({
+			emplacement: 'bloc-clavier',
 			typeClavier: 'iso',
 			couche: 'Visuel',
 			couleur: 'non'
@@ -74,6 +68,21 @@
 		}
 		document.getElementById('bloc-clavier').dataset.couleur = couleur;
 	}
+
+	function toggleIso() {
+		if (typeClavier == 'iso') {
+			typeClavier = 'ergodox';
+		} else {
+			typeClavier = 'iso';
+		}
+		document.getElementById('bloc-clavier').dataset.type = typeClavier;
+		genererClavier({
+			emplacement: 'bloc-clavier',
+			typeClavier: typeClavier,
+			couche: 'Visuel',
+			couleur: 'non'
+		});
+	}
 </script>
 
 <h1>
@@ -84,9 +93,14 @@
 </h1>
 
 <div style="height: 10vh;" />
+
 <button on:click={toggleCouleur}>
 	{couleur === 'oui' ? 'En couleur' : 'En noir et blanc'}
 </button>
+<button on:click={toggleIso}>
+	{typeClavier === 'iso' ? 'ISO' : 'Ergodox'}
+</button>
+
 <bloc-clavier id="bloc-clavier" />
 <div style="height: 50px;" />
 
@@ -116,3 +130,11 @@
 	<Nom /> + permet d’avoir une disposition encore meilleure. Le seul prix à payer est qu’il faut accepter
 	d’apprendre certains enchaînements de touches.
 </p>
+
+<h3>Optimisation pour l’utilisation à une main</h3>
+<p>
+	Le = a été placé à gauche pour permettre de faire facilement les raccourcis sur excel comme = et
+	Alt =
+</p>
+
+Rangée des chiffres en accès direct
