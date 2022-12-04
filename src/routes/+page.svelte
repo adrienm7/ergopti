@@ -1,18 +1,20 @@
 <script>
 	import Nom from './Nom.svelte';
+	import Clavier from './Clavier.svelte';
 	import data from '$lib/data/hypertexte.json';
+	import { onMount } from 'svelte';
 
-	function genererClavier({ emplacement, typeClavier, couche, couleur }) {
+	function majClavier({ emplacement, typeClavier, couche, couleur }) {
 		for (let i = 1; i <= 5; i++) {
-			const ligneClavier = document.createElement('bloc-ligne');
-			ligneClavier.dataset.ligne = i;
-
-			for (let j = 0; j <= 16; j++) {
-				var toucheClavier = document.createElement('bloc-touche');
-				var res = data[typeClavier].find((el) => (el.ligne == i) & (el.colonne == j));
+			for (let j = 0; j <= 15; j++) {
+				const toucheClavier = document
+					.getElementById(emplacement)
+					.querySelector("[data-ligne='" + i + "'][data-colonne='" + j + "']");
+				toucheClavier.dataset.touche = ''; // On nettoie le contenu de la touche
+				const res = data[typeClavier].find((el) => (el.ligne == i) & (el.colonne == j));
+				console.log(res);
 				if (res !== undefined) {
-					var touche = data.touches.find((el) => el.touche == res.touche);
-					console.log(touche);
+					const touche = data.touches.find((el) => el.touche == res.touche);
 					if (touche[couche] === '') {
 						toucheClavier.innerHTML = '<div> </div>';
 					} else {
@@ -37,47 +39,43 @@
 					toucheClavier.dataset.main = res.main;
 					toucheClavier.dataset.type = res.type;
 					toucheClavier.style.setProperty('--taille', res.taille);
-					ligneClavier.appendChild(toucheClavier);
 				}
 			}
-
-			// add the row to the end of the table body
-			document.getElementById(emplacement).appendChild(ligneClavier);
-			document.getElementById(emplacement).dataset.couleur = couleur;
 		}
 	}
 
 	let couleur = 'oui';
 	let typeClavier = 'iso';
 
-	function handleClick() {
-		count += 1;
-		genererClavier({
-			emplacement: 'bloc-clavier',
+	onMount(() => {
+		majClavier({
+			emplacement: 'clavier1',
 			typeClavier: 'iso',
 			couche: 'Visuel',
-			couleur: 'non'
+			couleur: 'oui'
 		});
-	}
+	});
 
 	function toggleCouleur() {
+		let emplacement = 'clavier1';
 		if (couleur == 'oui') {
 			couleur = 'non';
 		} else {
 			couleur = 'oui';
 		}
-		document.getElementById('bloc-clavier').dataset.couleur = couleur;
+		document.getElementById(emplacement).dataset.couleur = couleur;
 	}
 
 	function toggleIso() {
+		let emplacement = 'clavier1';
 		if (typeClavier == 'iso') {
 			typeClavier = 'ergodox';
 		} else {
 			typeClavier = 'iso';
 		}
-		document.getElementById('bloc-clavier').dataset.type = typeClavier;
-		genererClavier({
-			emplacement: 'bloc-clavier',
+		document.getElementById(emplacement).dataset.type = typeClavier;
+		majClavier({
+			emplacement: emplacement,
 			typeClavier: typeClavier,
 			couche: 'Visuel',
 			couleur: 'non'
@@ -95,13 +93,16 @@
 <div style="height: 10vh;" />
 
 <button on:click={toggleCouleur}>
-	{couleur === 'oui' ? 'En couleur' : 'En noir et blanc'}
+	{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
 </button>
 <button on:click={toggleIso}>
-	{typeClavier === 'iso' ? 'ISO' : 'Ergodox'}
+	{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
 </button>
 
-<bloc-clavier id="bloc-clavier" />
+<bloc-clavier id="clavier1">
+	<Clavier />
+</bloc-clavier>
+
 <div style="height: 50px;" />
 
 <p><Nom /> est une disposition clavier destinée à taper du français en de l’anglais.</p>
@@ -133,8 +134,14 @@
 
 <h3>Optimisation pour l’utilisation à une main</h3>
 <p>
-	Le = a été placé à gauche pour permettre de faire facilement les raccourcis sur excel comme = et
-	Alt =
+	Le = a été dupliqué à gauche en accès direct. Cela permet de faire facilement les raccourcis sur
+	excel comme = et Alt =. Normalement, le = se situe en AltGr + L.
 </p>
 
-Rangée des chiffres en accès direct
+<h3>Rangée des chiffres en accès direct</h3>
+<p>
+	Les chiffres sont en accès direct sur les dispositions QWERTY, mais pas en AZERTY. Chaque manière
+	de faire a ses avantages, car en AZERTY les symboles sont alors en accès direct et plus facilement
+	réalisables. En revanche, il devient alors compliqué d’écrire un chiffre ou un nombre en plein
+	milieu de phrase, car cela nécessite de passer en Shift.
+</p>

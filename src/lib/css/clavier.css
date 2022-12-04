@@ -38,13 +38,9 @@ bloc-clavier {
     border-radius: var(--arrondi-clavier);
 }
 
-bloc-clavier[data-type="iso"] bloc-touche[data-colonne="6"] {
-	margin-right: 0;
-}
 bloc-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
 	margin-right: 5vw;
 }
-
 
 bloc-ligne {
     display: flex;
@@ -86,7 +82,14 @@ bloc-touche:hover {
 
 
 
+bloc-touche[data-touche=""] {
+	display: none;
+}
 
+bloc-touche[data-touche="AltTab"] div {
+	font-size: 0.9rem;
+	line-height: 1.2rem;
+}
 
 bloc-touche[data-touche="LShift"],
 bloc-touche[data-touche="RShift"],
@@ -243,6 +246,7 @@ bloc-touche[data-doigt="pouce"]{
 
 
 bloc-touche[data-type="special"],
+bloc-touche[data-type="space"],
 bloc-touche[data-type="enter"],
 bloc-touche[data-type="enter"]::before,
 bloc-touche[data-type="enter"]::after {

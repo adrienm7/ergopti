@@ -585,7 +585,7 @@
 		{
 			"touche": "j",
 			"main": "droite",
-			"doigt": "auriculaire",
+			"doigt": "index",
 			"ligne": "5",
 			"colonne": "9",
 			"taille": "1"
@@ -755,8 +755,8 @@
 		},
 		{
 			"touche": "!",
-			"main": "gauche",
-			"doigt": "majeur",
+			"main": "droite",
+			"doigt": "auriculaire",
 			"ligne": "4",
 			"colonne": "13",
 			"taille": "1",
@@ -796,7 +796,7 @@
 		},
 		{
 			"touche": "%",
-			"main": "gauche",
+			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "1",
 			"colonne": "13",
@@ -804,7 +804,7 @@
 		},
 		{
 			"touche": "=",
-			"main": "droite",
+			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "1",
 			"colonne": "0",
@@ -815,7 +815,7 @@
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "5",
-			"colonne": "3",
+			"colonne": "13",
 			"taille": "1"
 		},
 		{
@@ -926,19 +926,19 @@
 			"type": "special"
 		},
 		{
+			"touche": "AltTab",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "0",
+			"taille": "1",
+			"type": "special"
+		},
+		{
 			"touche": "vide",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
-			"colonne": "0",
-			"taille": "1",
-			"type": "vide"
-		},
-		{
-			"touche": "vide",
-			"main": "gauche",
-			"doigt": "auriculaire",
-			"ligne": "5",
 			"colonne": "0",
 			"taille": "1",
 			"type": "vide"
@@ -958,6 +958,15 @@
 			"doigt": "annulaire",
 			"ligne": "5",
 			"colonne": "2",
+			"taille": "1",
+			"type": "vide"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "5",
+			"colonne": "3",
 			"taille": "1",
 			"type": "vide"
 		},
@@ -1012,15 +1021,6 @@
 			"doigt": "auriculaire",
 			"ligne": "5",
 			"colonne": "12",
-			"taille": "1",
-			"type": "vide"
-		},
-		{
-			"touche": "vide",
-			"main": "droite",
-			"doigt": "auriculaire",
-			"ligne": "5",
-			"colonne": "13",
 			"taille": "1",
 			"type": "vide"
 		}
@@ -1481,6 +1481,13 @@
 			"Shift": "Ⓧ",
 			"AltGr": "Ⓧ",
 			"ShiftAltGr": "Ⓧ"
+		},
+		{
+			"touche": "AltTab",
+			"Primary": "Alt<br>Tab",
+			"Shift": "Alt<br>Tab",
+			"AltGr": "Alt<br>Tab",
+			"ShiftAltGr": "Alt<br>Tab"
 		},
 		{
 			"touche": "vide",
