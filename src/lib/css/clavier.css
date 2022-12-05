@@ -210,6 +210,13 @@ bloc-clavier[data-couleur="non"] bloc-touche {
     --couleur-doigt-saturation: 0%;
     --couleur-doigt-luminosite: 100%;
 }
+bloc-clavier[data-couleur="freq"] bloc-touche {
+    --couleur-touche: 0deg;
+    --couleur-doigt-saturation: 0%;
+    --couleur-doigt-luminosite: 100%;
+	background-color: hsl( calc(0deg - var(--frequence-log) * 20deg), 100%, 80%);
+	/* calc( (1 - var(--frequence)) * 40% + 30%) */
+}
 
 
 

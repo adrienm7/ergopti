@@ -5,6 +5,9 @@
 	import { onMount } from 'svelte';
 
 	function majClavier({ emplacement, typeClavier, couche, couleur }) {
+		document.getElementById(emplacement).dataset.type = typeClavier;
+		document.getElementById(emplacement).dataset.couleur = couleur;
+		// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 		for (let i = 1; i <= 5; i++) {
 			for (let j = 0; j <= 15; j++) {
 				const toucheClavier = document
@@ -39,6 +42,11 @@
 					toucheClavier.dataset.main = res.main;
 					toucheClavier.dataset.type = res.type;
 					toucheClavier.style.setProperty('--taille', res.taille);
+					toucheClavier.style.setProperty('--frequence', mayzner[res.touche] / mayzner['max']);
+					toucheClavier.style.setProperty(
+						'--frequence-log',
+						Math.log(mayzner[res.touche] / mayzner['max'])
+					);
 				}
 			}
 		}
@@ -53,6 +61,12 @@
 			typeClavier: 'iso',
 			couche: 'Visuel',
 			couleur: 'oui'
+		});
+		majClavier({
+			emplacement: 'clavier-freq',
+			typeClavier: 'iso',
+			couche: 'Visuel',
+			couleur: 'freq'
 		});
 	});
 
@@ -81,6 +95,36 @@
 			couleur: 'non'
 		});
 	}
+
+	var mayzner = {
+		max: 12.49,
+		a: 8.04,
+		b: 1.48,
+		c: 3.34,
+		d: 3.82,
+		e: 12.49,
+		f: 2.4,
+		g: 1.87,
+		h: 5.05,
+		i: 7.57,
+		j: 0.16,
+		k: 0.54,
+		l: 4.07,
+		m: 2.51,
+		n: 7.23,
+		o: 7.64,
+		p: 2.14,
+		q: 0.12,
+		r: 6.28,
+		s: 6.51,
+		t: 9.28,
+		u: 2.73,
+		v: 1.05,
+		w: 1.68,
+		x: 0.23,
+		y: 1.66,
+		z: 0.09
+	};
 </script>
 
 <h1>
@@ -100,6 +144,11 @@
 </button>
 
 <bloc-clavier id="clavier1">
+	<Clavier />
+</bloc-clavier>
+
+<div style="height: 50px;" />
+<bloc-clavier id="clavier-freq">
 	<Clavier />
 </bloc-clavier>
 
