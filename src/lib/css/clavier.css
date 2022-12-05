@@ -1,12 +1,12 @@
 :root {
     --taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
-    --arrondi-clavier: calc(var(--marge-touche) * 7);
+    --arrondi-clavier: calc(var(--marge-touche) * 3);
     
     --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
     --profondeur-touche: calc(var(--taille-clavier) * 0.25vw);
-    --profondeur-touche-pressee: calc(var(--taille-clavier) * 0.05vw);
+    --profondeur-touche-pressee: calc(var(--taille-clavier) * 0.1vw);
     --marge-touche: calc(var(--taille-clavier) * 0.35vw);
     --arrondi-touche: 0.2em;
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
@@ -87,8 +87,8 @@ bloc-touche[data-touche=""] {
 }
 
 bloc-touche[data-touche="AltTab"] div {
-	font-size: 0.9rem;
-	line-height: 1.2rem;
+	font-size: calc(var(--taille-texte-touche) / 1.8);
+	line-height: 1.15;
 }
 
 bloc-touche[data-touche="LShift"],
@@ -211,11 +211,20 @@ bloc-clavier[data-couleur="non"] bloc-touche {
     --couleur-doigt-luminosite: 100%;
 }
 bloc-clavier[data-couleur="freq"] bloc-touche {
+	--couleur-touche: 0deg;
+	--couleur-doigt-saturation: 0%;
+	--couleur-doigt-luminosite: 100%;
+}
+bloc-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
     --couleur-touche: 0deg;
     --couleur-doigt-saturation: 0%;
     --couleur-doigt-luminosite: 100%;
 	background-color: hsl( calc(0deg - var(--frequence-log) * 20deg), 100%, 80%);
 	/* calc( (1 - var(--frequence)) * 40% + 30%) */
+}
+
+bloc-clavier[data-couleur="non"] bloc-touche[data-type="space"]{
+background-color: white;
 }
 
 
@@ -246,10 +255,7 @@ bloc-touche[data-doigt="auriculaire"][data-main="droite"]{
 }
 
 
-bloc-touche[data-doigt="pouce"]{
-    --couleur-touche: 0deg;
-    --couleur-doigt-saturation: 0%;
-}
+
 
 
 bloc-touche[data-type="special"],

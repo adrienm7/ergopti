@@ -33,14 +33,14 @@
 								toucheClavier.innerHTML = '<div>' + touche['Primary'].toUpperCase() + '</div>';
 							}
 						} else {
-							toucheClavier.innerHTML = touche[couche].toUpperCase();
+							toucheClavier.innerHTML = touche[couche];
 						}
 					}
 					toucheClavier.dataset.touche = res.touche;
 					toucheClavier.dataset.colonne = j;
 					toucheClavier.dataset.doigt = res.doigt;
 					toucheClavier.dataset.main = res.main;
-					toucheClavier.dataset.type = res.type;
+					toucheClavier.dataset.type = touche.type;
 					toucheClavier.style.setProperty('--taille', res.taille);
 					toucheClavier.style.setProperty('--frequence', mayzner[res.touche] / mayzner['max']);
 					toucheClavier.style.setProperty(
@@ -52,15 +52,16 @@
 		}
 	}
 
-	let couleur = 'oui';
 	let typeClavier = 'iso';
+	let couche = 'Visuel';
+	let couleur = 'oui';
 
 	onMount(() => {
 		majClavier({
 			emplacement: 'clavier1',
-			typeClavier: 'iso',
-			couche: 'Visuel',
-			couleur: 'oui'
+			typeClavier: typeClavier,
+			couche: couche,
+			couleur: couleur
 		});
 		majClavier({
 			emplacement: 'clavier-freq',
@@ -69,6 +70,20 @@
 			couleur: 'freq'
 		});
 	});
+
+	function changerCouche() {
+		if (couche == 'Visuel') {
+			couche = 'AltGr';
+		} else {
+			couche = 'Visuel';
+		}
+		majClavier({
+			emplacement: 'clavier1',
+			typeClavier: typeClavier,
+			couche: couche,
+			couleur: couleur
+		});
+	}
 
 	function toggleCouleur() {
 		let emplacement = 'clavier1';
@@ -136,6 +151,7 @@
 
 <div style="height: 10vh;" />
 
+<button on:click={changerCouche}> Couche </button>
 <button on:click={toggleCouleur}>
 	{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
 </button>

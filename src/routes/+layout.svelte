@@ -4,6 +4,7 @@
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
 	import '$lib/css/typography.css';
+	import '$lib/css/buttons.css';
 	import '$lib/css/miscellaneous.css';
 
 	const date = new Date().getFullYear();
