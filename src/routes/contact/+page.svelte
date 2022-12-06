@@ -1,6 +1,6 @@
 <svelte:head>
-	<title>HyperTexte +</title>
+	<title>Contact</title>
 	<meta name="description" content="About this app" />
 </svelte:head>
 
-<h1>HyperTexte +</h1>
+<h1>Contact</h1>

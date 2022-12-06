@@ -1,5 +1,5 @@
 :root {
-    --header-height: 80px; /* Fallback si clamp n'est pas supporté */
+    --hauteur-header: 60px; /* Fallback si clamp n'est pas supporté */
 
     --color-orange: #ff6300;
     --color-blue-light: #00cbff;
@@ -54,6 +54,7 @@ html, body {
 
 main {
     flex-grow: 1;
+	padding-top: var(--hauteur-header);
 }
 
 

@@ -11,8 +11,8 @@
 </script>
 
 <div id="page">
+	<Header />
 	<main>
-		<Header />
 		<slot />
 	</main>
 
