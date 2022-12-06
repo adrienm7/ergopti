@@ -1,6 +1,10 @@
-export function majClavier({ emplacement, data, typeClavier, couche, couleur }) {
+export function majClavier({ emplacement, data, config }) {
+	const typeClavier = config.type;
+	const coucheClavier = config.couche;
+	const couleurClavier = config.couleur;
+
 	document.getElementById(emplacement).dataset.type = typeClavier;
-	document.getElementById(emplacement).dataset.couleur = couleur;
+	document.getElementById(emplacement).dataset.couleurClavier = couleurClavier;
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 	for (let i = 1; i <= 5; i++) {
 		for (let j = 0; j <= 15; j++) {
@@ -12,10 +16,10 @@ export function majClavier({ emplacement, data, typeClavier, couche, couleur }) 
 			console.log(res);
 			if (res !== undefined) {
 				const touche = data.touches.find((el) => el.touche == res.touche);
-				if (touche[couche] === '') {
+				if (touche[coucheClavier] === '') {
 					toucheClavier.innerHTML = '<div> </div>';
 				} else {
-					if (couche == 'Visuel') {
+					if (coucheClavier == 'Visuel') {
 						if (touche.type == 'double') {
 							toucheClavier.innerHTML =
 								'<div>' +
@@ -27,7 +31,7 @@ export function majClavier({ emplacement, data, typeClavier, couche, couleur }) 
 							toucheClavier.innerHTML = '<div>' + touche['Primary'].toUpperCase() + '</div>';
 						}
 					} else {
-						toucheClavier.innerHTML = touche[couche];
+						toucheClavier.innerHTML = touche[coucheClavier];
 					}
 				}
 				toucheClavier.dataset.touche = res.touche;

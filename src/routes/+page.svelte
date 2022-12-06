@@ -13,16 +13,20 @@
 		majClavier({
 			emplacement: 'clavier-presentation',
 			data: data,
-			typeClavier: typeClavier,
-			couche: couche,
-			couleur: couleur
+			config: {
+				type: typeClavier,
+				couche: couche,
+				couleur: couleur
+			}
 		});
 		majClavier({
 			emplacement: 'clavier-freq',
 			data: data,
-			typeClavier: 'iso',
-			couche: 'Visuel',
-			couleur: 'freq'
+			config: {
+				type: 'iso',
+				couche: 'Visuel',
+				couleur: 'freq'
+			}
 		});
 	});
 
@@ -35,9 +39,11 @@
 		majClavier({
 			emplacement: 'clavier-presentation',
 			data: data,
-			typeClavier: typeClavier,
-			couche: couche,
-			couleur: couleur
+			config: {
+				type: typeClavier,
+				couche: couche,
+				couleur: couleur
+			}
 		});
 	}
 
@@ -62,9 +68,11 @@
 		majClavier({
 			emplacement: emplacement,
 			data: data,
-			typeClavier: typeClavier,
-			couche: 'Visuel',
-			couleur: 'non'
+			config: {
+				type: typeClavier,
+				couche: couche,
+				couleur: couleur
+			}
 		});
 	}
 </script>
