@@ -153,7 +153,11 @@
 			float: left;
 		}
 		.header li a {
-			padding: 20px 30px;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: var(--hauteur-header);
+			padding: 0 20px;
 		}
 		.header .menu {
 			clear: none;

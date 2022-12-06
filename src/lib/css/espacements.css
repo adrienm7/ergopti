@@ -1,0 +1,16 @@
+mini-espace {
+	display: block;
+	height: 5vh;
+}
+petit-espace {
+	display: block;
+	height: 10vh;
+}
+moyen-espace {
+	display: block;
+	height: 20vh;
+}
+grand-espace {
+	display: block;
+	height: 30vh;
+}
