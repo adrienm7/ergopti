@@ -4,7 +4,7 @@ export function majClavier({ emplacement, data, config }) {
 	const couleurClavier = config.couleur;
 
 	document.getElementById(emplacement).dataset.type = typeClavier;
-	document.getElementById(emplacement).dataset.couleurClavier = couleurClavier;
+	document.getElementById(emplacement).dataset.couleur = couleurClavier;
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 	for (let i = 1; i <= 5; i++) {
 		for (let j = 0; j <= 15; j++) {
@@ -17,21 +17,18 @@ export function majClavier({ emplacement, data, config }) {
 			if (res !== undefined) {
 				const touche = data.touches.find((el) => el.touche == res.touche);
 				if (touche[coucheClavier] === '') {
-					toucheClavier.innerHTML = '<div> </div>';
+					toucheClavier.getElementsByTagName('div')[0].innerHTML = ' ';
 				} else {
 					if (coucheClavier == 'Visuel') {
 						if (touche.type == 'double') {
-							toucheClavier.innerHTML =
-								'<div>' +
-								touche['Shift'].toUpperCase() +
-								'<br/>' +
-								touche['Primary'].toUpperCase() +
-								'</div>';
+							toucheClavier.getElementsByTagName('div')[0].innerHTML =
+								touche['Shift'].toUpperCase() + '<br/>' + touche['Primary'].toUpperCase();
 						} else {
-							toucheClavier.innerHTML = '<div>' + touche['Primary'].toUpperCase() + '</div>';
+							toucheClavier.getElementsByTagName('div')[0].innerHTML =
+								touche['Primary'].toUpperCase();
 						}
 					} else {
-						toucheClavier.innerHTML = touche[coucheClavier];
+						toucheClavier.getElementsByTagName('div')[0].innerHTML = touche[coucheClavier];
 					}
 				}
 				toucheClavier.dataset.touche = res.touche;
