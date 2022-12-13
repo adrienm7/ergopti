@@ -137,7 +137,7 @@
 	les meilleurs emplacements sont ceux sur la rangée de repos, en partant de l’index à l’annulaire.
 	Puis, la colonne au-dessus et en-dessous, en partant là aussi de l’index à l’annulaire.
 </p>
-
+a
 <h3>➂ Minimisation des SFB</h3>
 
 <h3>➃ Optimisation des roulements</h3>
