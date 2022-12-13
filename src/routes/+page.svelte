@@ -111,7 +111,7 @@
 <p>
 	<Nom /> est une disposition clavier destinée à taper majoritairement du français ainsi que de l’anglais.
 	Elle se veut la plus optimale possible. Comment atteindre cet objectif ? C’est ce qui vous sera présenté
-	plus bas.
+	sur cette page.
 </p>
 
 <h2>Disposition clavier optimale</h2>
