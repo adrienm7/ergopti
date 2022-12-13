@@ -114,7 +114,7 @@
 	sur cette page.
 </p>
 
-<h2>aaaDisposition clavier optimale</h2>
+<h2>aaabbbDisposition clavier optimale</h2>
 
 <h3>➀ Alternance des mains</h3>
 <p>
