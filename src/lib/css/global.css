@@ -31,39 +31,12 @@ html, body {
     font-size: clamp(16px, 1.5vw, 24px);
 	line-height: 1.35rem;
     scroll-behavior: smooth;
+	color: white;
 }
 
 
 
 
-
-
-
-
-h1 {
-    text-align: center;
-    font-weight: normal;
-}
-
-.titre {
-    display: inline-block;
-    margin-top: 1rem;
-    font-size: 1.5rem;
-}
-
-.titre-hyper {
-    border: 3px solid black;
-    border-radius: 7px 0 0 7px;
-    padding: 5px;
-    background-color: black;
-    color: white;
-}
-
-.titre-texte {
-    padding: 5px;
-    border: 3px solid black;
-    border-radius: 0 7px 7px 0;
-}
 
 
 

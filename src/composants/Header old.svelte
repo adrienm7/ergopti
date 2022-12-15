@@ -20,7 +20,7 @@
 				<a href="/">Home</a>
 			</li>
 			<li aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}>
-				<a href="/hypertexte-plus">HyperTexte+</a>
+				<a href="/hypertexte-plus">HyperTexte<span class="glow">+</span></a>
 			</li>
 			<li aria-current={$page.url.pathname === '/telechargement' ? 'page' : undefined}>
 				<a href="/telechargement">Téléchargement</a>

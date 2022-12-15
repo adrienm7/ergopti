@@ -3,7 +3,7 @@
 </script>
 
 <header class="header">
-	<div class="logo"><a href="">⌨</a></div>
+	<div class="logo"><a href="/">⌨</a></div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<ul class="menu">
@@ -13,8 +13,8 @@
 		<li aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}>
 			<a href="/hypertexte-plus">HyperTexte<b>+</b></a>
 		</li>
-		<li aria-current={$page.url.pathname === '/benchmark' ? 'page' : undefined}>
-			<a href="/benchmark">Benchmark</a>
+		<li aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}>
+			<a href="/benchmarks">Benchmarks</a>
 		</li>
 		<li aria-current={$page.url.pathname === '/telechargement' ? 'page' : undefined}>
 			<a href="/telechargements">Téléchargements</a>
@@ -28,6 +28,7 @@
 <style>
 	header a {
 		color: #000;
+		color: white;
 		text-decoration: none;
 	}
 
@@ -35,6 +36,8 @@
 
 	.header {
 		background-color: #fff;
+		background-color: transparent;
+		backdrop-filter: blur(60px);
 		box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.1);
 		position: fixed;
 		width: 100%;
@@ -48,18 +51,20 @@
 		list-style: none;
 		overflow: hidden;
 		background-color: #fff;
+		background-color: transparent;
 	}
 
 	.header li a {
 		display: block;
-		padding: 20px 20px;
-		border-right: 1px solid #f4f4f4;
+		margin: 0 20px;
 		text-decoration: none;
 	}
 
 	.header li a:hover,
 	.header .menu-btn:hover {
 		background-color: #f4f4f4;
+		color: black;
+		border-radius: 5px;
 	}
 
 	.header .logo {
@@ -82,7 +87,6 @@
 
 	.header .menu-icon {
 		cursor: pointer;
-		display: inline-block;
 		float: right;
 		padding: 28px 20px;
 		position: relative;
