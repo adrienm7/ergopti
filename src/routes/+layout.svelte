@@ -35,7 +35,12 @@
 		margin: 0;
 		padding: 0;
 		min-height: 100vh;
-		background-color: white;
+		background: linear-gradient(
+			90deg,
+			rgba(0, 2, 12, 1) 0%,
+			rgba(0, 3, 38, 1) 50%,
+			rgba(0, 0, 0, 1) 100%
+		);
 	}
 
 	main {

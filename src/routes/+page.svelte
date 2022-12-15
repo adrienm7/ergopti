@@ -114,6 +114,14 @@
 	sur cette page.
 </p>
 
+<h2>Genèse et raison des choix</h2>
+<ul class="paragraphe">
+	<li>Bépo, puis Optimot, puis Optim7 puis HyperTexte</li>
+	<li>E sur le majeur et non l’index à cause des roulements et SFB</li>
+	<li>Q puis P puis W sur l’index gauche</li>
+	<li>Comment retenir les symboles en AltGr</li>
+</ul>
+
 <h2>Disposition clavier optimale</h2>
 
 <h3>➀ Alternance des mains</h3>
@@ -142,6 +150,27 @@
 
 <h3>➃ Optimisation des roulements</h3>
 <p>Un roulement est…</p>
+
+<h4>Très bons digrammes</h4>
+<ul class="paragraphe">
+	<li>AI, IE, EU, AIE, IEU, OI, OU</li>
+	<li>CH</li>
+	<li>OW et WO</li>
+	<li>YOU</li>
+	<li>PL</li>
+	<li>LD</li>
+	<li>+=</li>
+	<li>/* et */</li>
+</ul>
+
+<h4>Points d’amélioration</h4>
+
+<ul class="paragraphe">
+	<li>SC mais parce que c’est à la moins pire position</li>
+	<li>PT</li>
+	<li>EO et OE pour l’anglais</li>
+	<li>K est assez loin, surtout pour l’anglais avec ses SK, CK, etc.</li>
+</ul>
 
 <h3>L’importance des compromis</h3>
 <p>
