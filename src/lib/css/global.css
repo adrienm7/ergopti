@@ -31,8 +31,9 @@ html, body {
     font-size: clamp(16px, 1.5vw, 24px);
 	line-height: 1.35rem;
     scroll-behavior: smooth;
-	color: white;
+	color: black;
 }
+
 
 
 
