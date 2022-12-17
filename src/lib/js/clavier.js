@@ -4,6 +4,7 @@ export function majClavier({ emplacement, data, config }) {
 	const couleurClavier = config.couleur;
 
 	document.getElementById(emplacement).dataset.type = typeClavier;
+	document.getElementById(emplacement).dataset.couche = coucheClavier;
 	document.getElementById(emplacement).dataset.couleur = couleurClavier;
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 	for (let i = 1; i <= 5; i++) {
@@ -22,10 +23,9 @@ export function majClavier({ emplacement, data, config }) {
 					if (coucheClavier == 'Visuel') {
 						if (touche.type == 'double') {
 							toucheClavier.getElementsByTagName('div')[0].innerHTML =
-								touche['Shift'].toUpperCase() + '<br/>' + touche['Primary'].toUpperCase();
+								touche['Shift'] + '<br/>' + touche['Primary'];
 						} else {
-							toucheClavier.getElementsByTagName('div')[0].innerHTML =
-								touche['Primary'].toUpperCase();
+							toucheClavier.getElementsByTagName('div')[0].innerHTML = touche['Primary'];
 						}
 					} else {
 						toucheClavier.getElementsByTagName('div')[0].innerHTML = touche[coucheClavier];

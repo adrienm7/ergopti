@@ -1,20 +1,21 @@
 :root {
     --taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
-    --arrondi-clavier: calc(var(--marge-touche) * 3);
+    --arrondi-clavier: calc(var(--marge-touche) * 2.5);
     
     --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
     --profondeur-touche: calc(var(--taille-clavier) * 0.25vw);
     --profondeur-touche-pressee: calc(var(--taille-clavier) * 0.1vw);
     --marge-touche: calc(var(--taille-clavier) * 0.35vw);
-    --arrondi-touche: 0.2em;
+    --arrondi-touche: 0.15em;
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
     --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
 
     --couleur-doigt-saturation: 60%;
     --couleur-doigt-luminosite: 80%;
-    --couleur-texte-touche: hsl(0, 0%, 20%);
+    --couleur-texte-touche: hsla(0, 100%, 100%, 70%);
+	--transparence-touche: 15%;
 
     --couleur-doigt-gauche-index: 0deg;
     --couleur-doigt-gauche-majeur: 25deg;
@@ -33,8 +34,8 @@ bloc-clavier {
     width: max-content;
     margin: 0 auto;
     padding: var(--marge-clavier);
-    background-color: rgba(0, 0, 100, 0.2);
-    border: 1px solid hsl(0deg 0% 80%);
+    background-color: rgba(46, 46, 46, 0.5);
+    border: 1px solid hsla(0deg, 0%, 80%, 70%);
     border-radius: var(--arrondi-clavier);
 }
 
@@ -50,10 +51,10 @@ bloc-ligne {
 
 bloc-touche {
     --longueur-touche: calc(var(--taille-touche) * var(--taille) - 2 * var(--marge-touche));
-    --effet-3d: hsl(var(--couleur-touche) var(--couleur-doigt-saturation) calc(var(--couleur-doigt-luminosite) - 20%));
+    --effet-3d: hsla(var(--couleur-touche), var(--couleur-doigt-saturation), calc(var(--couleur-doigt-luminosite) - 20%), 70%);
     --ombres-touche: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d);
-    --couleur-fond-touche: hsl(var(--couleur-touche) var(--couleur-doigt-saturation) var(--couleur-doigt-luminosite));
-    --couleur-bordure-touche: hsl(var(--couleur-touche) var(--couleur-doigt-saturation) calc(var(--couleur-doigt-luminosite) - 40%));
+    --couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-doigt-saturation), var(--couleur-doigt-luminosite), var(--transparence-touche));
+    --couleur-bordure-touche: hsla(var(--couleur-touche), var(--couleur-doigt-saturation), calc(var(--couleur-doigt-luminosite) - 40%), 30%);
     --taille-bordure-touche: calc(var(--taille-clavier) * 0.1rem);
     --taille-texte-touche: calc(var(--taille-touche) / 2.5);
     
@@ -81,6 +82,10 @@ bloc-touche:hover {
 }
 
 
+bloc-clavier[data-couche="Visuel"] bloc-touche[data-type="lettre"],
+bloc-clavier[data-couche="Visuel"] bloc-touche[data-type="français"] {
+	text-transform: uppercase;
+}
 
 bloc-touche[data-touche=""] {
 	display: none;
@@ -138,6 +143,7 @@ bloc-touche[data-touche="!"] div {
 
 
 bloc-touche[data-type="enter"]{
+	--correction-decalage-entree: 0.5%;
     top: 0;
     position: relative;
 }
@@ -150,7 +156,7 @@ bloc-touche[data-type="enter"]::before {
     /* On cache la jonction entre l’élément et l’after avec un rectangle */
     position: absolute;
     top: calc(0% + 5px);
-    right: calc(var(--taille-bordure-touche) * -1 + 0.3%);
+    right: calc(var(--taille-bordure-touche) * -1 + var(--correction-decalage-entree));
     z-index: 1;
     content: '';
     height: var(--taille-touche);
@@ -162,7 +168,7 @@ bloc-touche[data-type="enter"]::before {
 bloc-touche[data-type="enter"]::after {
     position: absolute;
     top: 100%;
-    right: calc(var(--taille-bordure-touche) * -1 + 0.3%);
+    right: calc(var(--taille-bordure-touche) * -1 + var(--correction-decalage-entree));
     content: '';
     height: calc(var(--taille-touche) + var(--marge-touche) / 2);
     width: calc(var(--taille-touche) - 2 * var(--marge-touche));
@@ -216,15 +222,16 @@ bloc-clavier[data-couleur="freq"] bloc-touche {
 	--couleur-doigt-luminosite: 100%;
 }
 bloc-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
-    --couleur-touche: 0deg;
-    --couleur-doigt-saturation: 0%;
+    --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
+    --couleur-doigt-saturation: 100%;
     --couleur-doigt-luminosite: 100%;
-	background-color: hsl( calc(0deg - var(--frequence-log) * 20deg), 100%, 80%);
+	background-color: hsla( var(--couleur-touche), 100%, 80%, var(--transparence-touche));
 	/* calc( (1 - var(--frequence)) * 40% + 30%) */
 }
 
 bloc-clavier[data-couleur="non"] bloc-touche[data-type="space"]{
-background-color: white;
+	background-color: var(--couleur-fond-touche);
+	/* background-color: white; */
 }
 
 
@@ -263,7 +270,7 @@ bloc-touche[data-type="space"],
 bloc-touche[data-type="enter"],
 bloc-touche[data-type="enter"]::before,
 bloc-touche[data-type="enter"]::after {
-    background-color: hsl(0deg 0% 85%);
+    background-color: rgb(22, 22, 22);
     --couleur-touche: 0deg;
     --couleur-doigt-saturation: 0%;
 }

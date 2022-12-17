@@ -56,10 +56,8 @@
 		padding: var(--hauteur-element-menu-mobile) 0;
 		padding-left: var(--marge-fenetre);
 		text-decoration: none;
-	}
-
-	header li a:hover,
-	header .menu-btn:hover {
+		/* font-family: 'Times New Roman', Times, serif; */
+		text-shadow: rgba(255, 255, 255, 0.8) 1px 0 10px;
 	}
 
 	header .logo {
@@ -188,7 +186,8 @@
 			padding: var(--espacement-items-menu);
 			margin: var(--espacement-items-menu);
 		}
-		header .menu li a:hover {
+		header .menu li a:hover,
+		header .menu li[aria-current='page'] a {
 			background-color: #f4f4f4;
 			color: black !important;
 			border-radius: 3px;

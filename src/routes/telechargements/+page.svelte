@@ -5,11 +5,14 @@
 
 <h1>Téléchargements</h1>
 <div class="paragraphe">
-	<a href="/downloads/HyperTexte.exe"><button>HyperTexte.exe</button></a>
-	<a href="/downloads/HyperTexte.kbe"><button>HyperTexte.kbe</button></a>
+	<div class="btn-group">
+		<button><a href="/downloads/HyperTexte.exe">HyperTexte.exe</a></button>
+		<button><a href="/downloads/HyperTexte.kbe">HyperTexte.kbe</a></button>
+	</div>
+
 	<!-- <a href="/downloads/HyperTextePlus.ahk"><button>HyperTextePlus.ahk</button></a> -->
 	<!-- <a href="/downloads/HyperTextePlus.exe"><button>HyperTextePlus.exe</button></a> -->
 </div>
 
 <h2>S’entraîner virtuellement</h2>
-Clavier virtuel ici qui remplace ce qu’on tape en azerty
+<div class="paragraphe">[Clavier virtuel ici qui remplace ce qu’on tape en azerty]</div>

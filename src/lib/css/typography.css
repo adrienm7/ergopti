@@ -10,7 +10,8 @@
 
 
 h2, h3, h4 {
-    font-weight: bold;   
+    /* font-weight: bold; */
+	font-weight: normal;
 }
 
 
@@ -27,7 +28,7 @@ h1, h2, h3, h4 {
 h1 {
     font-size: 3rem;
     margin-bottom: 1.5rem;
-    padding-top: 3vh;
+    padding-top: 5vh;
 	text-align: center;
 	-webkit-text-fill-color: transparent;
 	background-attachment: scroll;
@@ -39,9 +40,7 @@ h1 {
 	background-repeat: repeat;
 	background-size: auto;
 	box-decoration-break: clone;
-	color: unset;
-	font-weight: 500;
-	letter-spacing: -.02em;
+	font-weight: normal;
 }
 
 h2 {
@@ -69,6 +68,10 @@ p {
 @media (max-width: 600px) {
 	p {
 		text-align: left;
+	}
+
+	h1 {
+		font-size: 2.5rem;
 	}
 }
 
@@ -233,3 +236,27 @@ strong,
 	}
   }
   
+
+
+
+  .hypertexte {
+	font-style: italic;
+}
+.hyper {
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	color: transparent;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	background-image: linear-gradient(to right, var(--gradient-blue));
+}
+.texte {
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	color: transparent;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	background-image: linear-gradient(to left, var(--gradient-purple));
+}
