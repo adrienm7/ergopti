@@ -77,11 +77,8 @@
 	}
 </script>
 
-<h1>
-	Disposition clavier<br />
-	<span class="titre">
-		<span class="titre-hyper">Hyper</span><span class="titre-texte">Texte</span>
-	</span>
+<h1 class="titre">
+	Disposition clavier<br />— <b>HyperTexte</b> —
 </h1>
 
 <petit-espace />
@@ -97,12 +94,6 @@
 </div>
 <mini-espace />
 <bloc-clavier id="clavier-presentation">
-	<Clavier />
-</bloc-clavier>
-
-<moyen-espace />
-
-<bloc-clavier id="clavier-freq">
 	<Clavier />
 </bloc-clavier>
 
@@ -145,6 +136,14 @@
 	les meilleurs emplacements sont ceux sur la rangée de repos, en partant de l’index à l’annulaire.
 	Puis, la colonne au-dessus et en-dessous, en partant là aussi de l’index à l’annulaire.
 </p>
+
+<moyen-espace />
+
+<bloc-clavier id="clavier-freq">
+	<Clavier />
+</bloc-clavier>
+
+<grand-espace />
 
 <h3>➂ Minimisation des SFB</h3>
 
