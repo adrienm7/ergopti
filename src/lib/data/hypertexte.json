@@ -205,10 +205,10 @@
 		},
 		{
 			"touche": "z",
-			"main": "gauche",
-			"doigt": "annulaire",
-			"ligne": "4",
-			"colonne": "3",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "13",
 			"taille": "1"
 		},
 		{
@@ -253,10 +253,10 @@
 		},
 		{
 			"touche": "ê",
-			"main": "droite",
-			"doigt": "auriculaire",
-			"ligne": "2",
-			"colonne": "13",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "4",
+			"colonne": "3",
 			"taille": "1"
 		},
 		{
@@ -695,10 +695,10 @@
 		},
 		{
 			"touche": "z",
-			"main": "gauche",
-			"doigt": "annulaire",
-			"ligne": "4",
-			"colonne": "3",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "2",
+			"colonne": "13",
 			"taille": "1"
 		},
 		{
@@ -743,10 +743,10 @@
 		},
 		{
 			"touche": "ê",
-			"main": "droite",
-			"doigt": "auriculaire",
-			"ligne": "2",
-			"colonne": "13",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "4",
+			"colonne": "3",
 			"taille": "1"
 		},
 		{

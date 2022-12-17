@@ -1,6 +1,33 @@
 .btn-group {
+	--arrondi-bouton: 7px;
 	margin: 0 auto;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+.btn-group button:first-child {
+	border-radius: var(--arrondi-bouton) 0 0 var(--arrondi-bouton);
+	border-right: 0;
+}
+.btn-group button {
+	border-radius: 0;
+	background-color: rgba(255, 255, 255, 0.1);
+	color: white;
+	padding: 10px;
+	border: 2px solid rgba(255, 255, 255, 0.8)
+}
+
+.btn-group button a {
+	color: inherit;
+	text-decoration: none;
+}
+.btn-group button:last-child {
+	border-radius: 0 var(--arrondi-bouton) var(--arrondi-bouton) 0;
+	border-left: 0;
+}
+
+.btn-group button:hover {
+	background-color: rgba(255, 255, 255, 1);
+	color: rgba(0, 0, 0, 0.8);
 }

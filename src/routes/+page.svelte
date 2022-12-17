@@ -64,7 +64,6 @@
 		} else {
 			typeClavier = 'iso';
 		}
-		document.getElementById(emplacement).dataset.type = typeClavier;
 		majClavier({
 			emplacement: emplacement,
 			data: data,
@@ -78,13 +77,15 @@
 </script>
 
 <h1 class="titre">
-	Disposition clavier<br />— <b>HyperTexte</b> —
+	Disposition clavier<br /><span class="hyper">— Hyper</span><span class="texte">Texte —</span>
 </h1>
 
 <petit-espace />
 
 <div class="btn-group">
-	<button on:click={changerCouche}> Couche </button>
+	<button on:click={changerCouche}>
+		{couche === 'Visuel' ? 'Base ➜ AltGr' : 'AltGr ➜ Base'}
+	</button>
 	<button on:click={toggleCouleur}>
 		{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
 	</button>
