@@ -3,7 +3,11 @@
 </script>
 
 <header>
-	<div class="logo"><a href="/">⌨</a></div>
+	<div class="logo">
+		<a href="/"
+			>⌨ <p>Disposition optimisée HyperTexte</p></a
+		>
+	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<ul class="menu">
@@ -27,17 +31,9 @@
 
 <style>
 	/* header */
-	:root {
-		--couleur-header-mobile: white;
-		--couleur-header: rgba(0, 0, 0, 0.6);
-		--couleur-liens-header: white;
-		--hauteur-element-menu-mobile: 10px;
-	}
 	header {
-		--couleur-ombre: rgba(0, 0, 0, 0.1);
 		background-color: var(--couleur-header-mobile);
-		backdrop-filter: blur(60px);
-		box-shadow: 1px 1px 6px 0 var(--couleur-ombre);
+		box-shadow: 0px 3px 10px 3px var(--couleur-ombre);
 		position: fixed;
 		width: 100%;
 		height: var(--hauteur-header);
@@ -64,9 +60,6 @@
 
 	header li a:hover,
 	header .menu-btn:hover {
-		background-color: #f4f4f4;
-		color: black;
-		border-radius: 5px;
 	}
 
 	header .logo {
@@ -75,6 +68,11 @@
 		justify-content: center;
 		height: 100%;
 		padding: 0.5rem;
+	}
+	header .logo p {
+		display: inline;
+		font-style: italic;
+		font-family: 'Times New Roman', Times, serif;
 	}
 
 	/* menu */
@@ -155,28 +153,47 @@
 	@media (min-width: 48em) {
 		header {
 			background-color: var(--couleur-header);
+			backdrop-filter: blur(60px);
 		}
-
-		header ul {
+		header .menu {
 			display: flex;
 			background-color: transparent;
+			margin-right: 15px;
 		}
-
+		header a {
+			color: white;
+		}
 		header .menu li {
 			display: flex;
 			justify-content: center;
 			align-items: center;
 			height: var(--hauteur-header);
-			padding: 0 20px;
+			margin: 0;
+			padding: 0;
+			padding-left: calc(2 * var(--espacement-items-menu) + 5px);
+			background-color: transparent;
 		}
 
-		/* header .menu li::after {
+		header .menu li::after {
 			content: '';
 			background-color: transparent;
 			height: 100%;
-			width: 3px;
-			box-shadow: 1px 1px 6px 0 var(--couleur-ombre);
-		} */
+			width: 5px;
+			position: relative;
+			right: calc((-1) * var(--espacement-items-menu));
+			box-shadow: 2px 0 1px 0px var(--couleur-ombre);
+		}
+
+		header .menu li a {
+			padding: var(--espacement-items-menu);
+			margin: var(--espacement-items-menu);
+		}
+		header .menu li a:hover {
+			background-color: #f4f4f4;
+			color: black !important;
+			border-radius: 3px;
+		}
+
 		header .menu {
 			clear: none;
 			float: right;
