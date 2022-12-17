@@ -11,7 +11,7 @@
 			<a href="/">HyperTexte</a>
 		</li>
 		<li aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}>
-			<a href="/hypertexte-plus">HyperTexte<b>+</b></a>
+			<a href="/hypertexte-plus">HyperTexte<span class="glow">+</span></a>
 		</li>
 		<li aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}>
 			<a href="/benchmarks">Benchmarks</a>
@@ -27,32 +27,38 @@
 
 <style>
 	/* header */
-
-	header a {
-		color: black;
-		text-decoration: none;
+	:root {
+		--couleur-header-mobile: white;
+		--couleur-header: rgba(0, 0, 0, 0.6);
+		--couleur-liens-header: white;
+		--hauteur-element-menu-mobile: 10px;
 	}
 	header {
-		background-color: white;
+		--couleur-ombre: rgba(0, 0, 0, 0.1);
+		background-color: var(--couleur-header-mobile);
 		backdrop-filter: blur(60px);
-		box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.1);
+		box-shadow: 1px 1px 6px 0 var(--couleur-ombre);
 		position: fixed;
 		width: 100%;
 		height: var(--hauteur-header);
 		z-index: 3;
 	}
-
+	header a {
+		color: var(--couleur-liens-header);
+		text-decoration: none;
+	}
 	header ul {
 		margin: 0;
 		padding: 0;
 		list-style: none;
 		overflow: hidden;
-		background-color: white;
+		background-color: var(--couleur-header-mobile);
 	}
 
-	header li a {
-		display: inline-block;
-		margin: 10px 20px;
+	header .menu li {
+		display: block;
+		padding: var(--hauteur-element-menu-mobile) 0;
+		padding-left: var(--marge-fenetre);
 		text-decoration: none;
 	}
 
@@ -110,11 +116,11 @@
 	}
 
 	header .menu-icon .navicon:before {
-		top: 5px;
+		top: 5px; /* Écartement des barres du hamburger */
 	}
 
 	header .menu-icon .navicon:after {
-		top: -5px;
+		top: -5px; /* Écartement des barres du hamburger */
 	}
 
 	/* menu btn */
@@ -144,27 +150,33 @@
 		top: 0;
 	}
 
-	/* 48em = 768px */
+	/* 48em = 768px, donc pour les grands écrans */
 
 	@media (min-width: 48em) {
 		header {
-			background-color: transparent;
+			background-color: var(--couleur-header);
 		}
 
 		header ul {
+			display: flex;
 			background-color: transparent;
 		}
 
-		header li {
-			float: left;
-		}
-		header li a {
+		header .menu li {
 			display: flex;
 			justify-content: center;
 			align-items: center;
 			height: var(--hauteur-header);
 			padding: 0 20px;
 		}
+
+		/* header .menu li::after {
+			content: '';
+			background-color: transparent;
+			height: 100%;
+			width: 3px;
+			box-shadow: 1px 1px 6px 0 var(--couleur-ombre);
+		} */
 		header .menu {
 			clear: none;
 			float: right;
