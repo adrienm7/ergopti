@@ -10,3 +10,6 @@
 	<!-- <a href="/downloads/HyperTextePlus.ahk"><button>HyperTextePlus.ahk</button></a> -->
 	<!-- <a href="/downloads/HyperTextePlus.exe"><button>HyperTextePlus.exe</button></a> -->
 </div>
+
+<h2>S’entraîner virtuellement</h2>
+Clavier virtuel ici qui remplace ce qu’on tape en azerty

@@ -30,6 +30,10 @@
   }
 
   
+#page[data-theme='dark'] header {
+	--couleur-ombre: rgba(255, 255, 255, 0.1);
+}
+
 #page[data-theme='dark'] header a {
 	color: black;
 }

@@ -1,4 +1,5 @@
 :root {
+	--marge-fenetre: 5vw;
     --hauteur-header: 60px; /* Fallback si clamp n'est pas supporté */
 
     --color-orange: #ff6300;
