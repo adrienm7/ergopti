@@ -4,6 +4,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	font-size: 0.6rem;
 }
 
 .btn-group button:first-child {
@@ -15,7 +16,8 @@
 	background-color: rgba(255, 255, 255, 0.1);
 	color: white;
 	padding: 10px;
-	border: 2px solid rgba(255, 255, 255, 0.8)
+	border: 2px solid rgba(255, 255, 255, 0.8);
+	cursor: pointer;
 }
 
 .btn-group button a {

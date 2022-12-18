@@ -77,12 +77,16 @@
 </script>
 
 <h1 class="titre">
-	Disposition clavier<br /><span class="hyper">— Hyper</span><span class="texte">Texte —</span>
+	Disposition clavier<br /><span style="font-weight: normal;"
+		><span class="hyper">— Hyper</span><span class="texte">Texte —</span></span
+	>
 </h1>
 
-<petit-espace />
+<bloc-clavier id="clavier-presentation">
+	<Clavier />
+</bloc-clavier>
 
-<div class="btn-group">
+<div class="btn-group" style="margin-top: 15px;">
 	<button on:click={changerCouche}>
 		{couche === 'Visuel' ? 'Base ➜ AltGr' : 'AltGr ➜ Base'}
 	</button>
@@ -93,14 +97,10 @@
 		{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
 	</button>
 </div>
-<mini-espace />
-<bloc-clavier id="clavier-presentation">
-	<Clavier />
-</bloc-clavier>
 
 <moyen-espace />
 
-<p>
+<p class="encart">
 	<Nom /> est une disposition clavier destinée à taper majoritairement du français ainsi que de l’anglais.
 	Elle se veut la plus optimale possible. Comment atteindre cet objectif ? C’est ce qui vous sera présenté
 	sur cette page.

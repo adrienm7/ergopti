@@ -42,7 +42,13 @@ html, body {
 	color: black;
 }
 
-
+.encart {
+	background-color: rgba(44, 0, 71, 0.3);
+	backdrop-filter: blur(60px);
+	padding: 20px;
+	border-radius: 10px;
+	border: 1px solid  rgba(44, 0, 71, 0.8);
+}
 
 
 
