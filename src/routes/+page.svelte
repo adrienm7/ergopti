@@ -77,9 +77,7 @@
 </script>
 
 <h1 class="titre">
-	Disposition clavier<br /><span style="font-weight: normal;"
-		><span class="hyper">— Hyper</span><span class="texte">Texte —</span></span
-	>
+	Disposition clavier<br /><span class="hyper">— Hyper</span><span class="texte">Texte —</span>
 </h1>
 
 <bloc-clavier id="clavier-presentation">

@@ -1,13 +1,5 @@
 :root {
-	/* Header */
-	--couleur-header-mobile: white;
-	--couleur-header: rgba(0, 0, 0, 0.6);
-	--couleur-liens-header: black;
-	--hauteur-element-menu-mobile: 10px;
-	--espacement-items-menu: 5px;
-	--couleur-ombre: rgba(255, 255, 255, 0.1);
-	--marge-fenetre: 5vw;
-    --hauteur-header: 60px; /* Fallback si clamp n'est pas supporté */
+
 
     --color-orange: #ff6300;
     --color-blue-light: #00cbff;
@@ -43,6 +35,7 @@ html, body {
 }
 
 .encart {
+	background-color: rgba(117, 117, 117, 0.3);
 	background-color: rgba(44, 0, 71, 0.3);
 	backdrop-filter: blur(60px);
 	padding: 20px;
