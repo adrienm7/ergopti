@@ -43,6 +43,7 @@ bloc-clavier {
     border: 1px solid hsla(0deg, 0%, 80%, 70%);
     border-radius: var(--arrondi-clavier);
 	box-shadow: 0 0 50px 1px rgba(0, 99, 170, 0.8);
+	font-weight: lighter;
 }
 
 bloc-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {

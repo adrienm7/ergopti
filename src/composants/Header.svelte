@@ -30,9 +30,20 @@
 </header>
 
 <style>
-	/* header */
+	:root {
+		--couleur-header: rgba(0, 0, 0, 0.6);
+		--couleur-header-mobile: rgba(0, 0, 0, 1);
+		--couleur-liens-header: white;
+		--hauteur-element-menu-mobile: 10px;
+		--espacement-items-menu: 5px;
+		--couleur-ombre: rgba(255, 255, 255, 0.1);
+		--marge-fenetre: 5vw;
+		--hauteur-header: 60px; /* Fallback si clamp n'est pas supporté */
+	}
+
 	header {
-		background-color: var(--couleur-header-mobile);
+		background-color: var(--couleur-header);
+		backdrop-filter: blur(60px);
 		box-shadow: 0px 3px 10px 3px var(--couleur-ombre);
 		position: fixed;
 		width: 100%;
@@ -148,18 +159,11 @@
 
 	/* 48em = 768px, donc pour les grands écrans */
 
-	@media (min-width: 48em) {
-		header {
-			background-color: var(--couleur-header);
-			backdrop-filter: blur(60px);
-		}
+	@media (min-width: 1024px) {
 		header .menu {
 			display: flex;
 			background-color: transparent;
 			margin-right: 15px;
-		}
-		header a {
-			color: white;
 		}
 		header .menu li {
 			display: flex;
@@ -186,11 +190,28 @@
 			padding: var(--espacement-items-menu);
 			margin: var(--espacement-items-menu);
 		}
-		header .menu li a:hover,
+
 		header .menu li[aria-current='page'] a {
-			background-color: #f4f4f4;
+			/* background-color: #f4f4f4;
 			color: black !important;
-			border-radius: 3px;
+			border-radius: 3px; */
+			-webkit-background-clip: text;
+			background-clip: text;
+			-webkit-text-fill-color: transparent;
+			color: transparent;
+			-webkit-box-decoration-break: clone;
+			box-decoration-break: clone;
+			background-image: linear-gradient(to right, var(--gradient-blue));
+		}
+
+		header .menu li:not([aria-current='page']) a:hover {
+			-webkit-background-clip: text;
+			background-clip: text;
+			-webkit-text-fill-color: transparent;
+			color: transparent;
+			-webkit-box-decoration-break: clone;
+			box-decoration-break: clone;
+			background-image: linear-gradient(to right, var(--gradient-purple));
 		}
 
 		header .menu {
