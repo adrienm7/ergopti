@@ -1,5 +1,9 @@
 <script>
 	import { page } from '$app/stores';
+
+	function fermerMenu() {
+		document.getElementById('menu-btn').checked = false;
+	}
 </script>
 
 <header>
@@ -11,19 +15,28 @@
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<ul class="menu">
-		<li aria-current={$page.url.pathname === '/' ? 'page' : undefined}>
+		<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
 			<a href="/">HyperTexte</a>
 		</li>
-		<li aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}>
+		<li
+			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
+			on:click={fermerMenu}
+		>
 			<a href="/hypertexte-plus">HyperTexte<span class="glow">+</span></a>
 		</li>
-		<li aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}>
+		<li
+			aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
+			on:click={fermerMenu}
+		>
 			<a href="/benchmarks">Benchmarks</a>
 		</li>
-		<li aria-current={$page.url.pathname === '/telechargement' ? 'page' : undefined}>
+		<li
+			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
+			on:click={fermerMenu}
+		>
 			<a href="/telechargements">Téléchargements</a>
 		</li>
-		<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}>
+		<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined} on:click={fermerMenu}>
 			<a href="/contact">Contact</a>
 		</li>
 	</ul>
@@ -32,13 +45,14 @@
 <style>
 	:root {
 		--couleur-header: rgba(0, 0, 0, 0.6);
-		--couleur-header-mobile: rgba(0, 0, 0, 1);
+		--couleur-header-mobile: rgba(0, 0, 0, 0.85);
 		--couleur-liens-header: white;
 		--hauteur-element-menu-mobile: 10px;
 		--espacement-items-menu: 5px;
 		--couleur-ombre: rgba(255, 255, 255, 0.1);
 		--marge-fenetre: 5vw;
 		--hauteur-header: 60px; /* Fallback si clamp n'est pas supporté */
+		--couleur-icone-hamburger: white;
 	}
 
 	header {
@@ -69,6 +83,30 @@
 		text-decoration: none;
 		/* font-family: 'Times New Roman', Times, serif; */
 		text-shadow: rgba(255, 255, 255, 0.8) 1px 0 10px;
+	}
+
+	header .menu li[aria-current='page'] a {
+		/* background-color: #f4f4f4;
+			color: black !important;
+			border-radius: 3px; */
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+		background-image: linear-gradient(to right, var(--gradient-blue));
+	}
+
+	header .menu li:not([aria-current='page']) a:hover {
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+		background-image: linear-gradient(to right, var(--gradient-purple));
+		text-shadow: none;
 	}
 
 	header .logo {
@@ -103,7 +141,7 @@
 	}
 
 	header .menu-icon .navicon {
-		background: #333;
+		background: var(--couleur-icone-hamburger);
 		display: block;
 		height: 2px;
 		position: relative;
@@ -113,7 +151,7 @@
 
 	header .menu-icon .navicon:before,
 	header .menu-icon .navicon:after {
-		background: #333;
+		background: var(--couleur-icone-hamburger);
 		content: '';
 		display: block;
 		height: 100%;
@@ -189,29 +227,6 @@
 		header .menu li a {
 			padding: var(--espacement-items-menu);
 			margin: var(--espacement-items-menu);
-		}
-
-		header .menu li[aria-current='page'] a {
-			/* background-color: #f4f4f4;
-			color: black !important;
-			border-radius: 3px; */
-			-webkit-background-clip: text;
-			background-clip: text;
-			-webkit-text-fill-color: transparent;
-			color: transparent;
-			-webkit-box-decoration-break: clone;
-			box-decoration-break: clone;
-			background-image: linear-gradient(to right, var(--gradient-blue));
-		}
-
-		header .menu li:not([aria-current='page']) a:hover {
-			-webkit-background-clip: text;
-			background-clip: text;
-			-webkit-text-fill-color: transparent;
-			color: transparent;
-			-webkit-box-decoration-break: clone;
-			box-decoration-break: clone;
-			background-image: linear-gradient(to right, var(--gradient-purple));
 		}
 
 		header .menu {
