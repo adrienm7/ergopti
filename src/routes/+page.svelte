@@ -76,32 +76,36 @@
 	}
 </script>
 
-<h1 class="titre">
-	Disposition clavier<br /><span class="hyper">— Hyper</span><span class="texte">Texte —</span>
-</h1>
+<div class="fullheight">
+	<div>
+		<h1 class="titre">
+			Disposition clavier<br /><span class="hyper">— Hyper</span><span class="texte">Texte —</span>
+		</h1>
+	</div>
 
-<bloc-clavier id="clavier-presentation">
-	<Clavier />
-</bloc-clavier>
+	<bloc-clavier id="clavier-presentation">
+		<Clavier />
+	</bloc-clavier>
 
-<div class="btn-group" style="margin-top: 15px;">
-	<button on:click={changerCouche}>
-		{couche === 'Visuel' ? 'Base ➜ AltGr' : 'AltGr ➜ Base'}
-	</button>
-	<button on:click={toggleCouleur}>
-		{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
-	</button>
-	<button on:click={toggleIso}>
-		{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
-	</button>
+	<div class="btn-group">
+		<button on:click={changerCouche}>
+			{couche === 'Visuel' ? 'Base ➜ AltGr' : 'AltGr ➜ Base'}
+		</button>
+		<button on:click={toggleCouleur}>
+			{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
+		</button>
+		<button on:click={toggleIso}>
+			{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
+		</button>
+	</div>
 </div>
 
 <moyen-espace />
 
 <p class="important">
 	<Nom /> est une disposition clavier destinée à taper majoritairement du français ainsi que de l’anglais.
-	Elle se veut la plus optimale possible. Comment atteindre cet objectif ? C’est ce qui vous sera présenté
-	sur cette page.
+	Elle se veut la plus <span class="degrade">optimale</span> possible. Comment atteindre cet objectif ?
+	C’est ce qui vous sera présenté sur cette page.
 </p>
 
 <h2>Genèse et raison des choix</h2>

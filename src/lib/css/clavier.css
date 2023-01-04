@@ -43,9 +43,9 @@ bloc-clavier {
     margin: 0 auto;
     padding: var(--marge-clavier);
     background-color: rgba(46, 46, 46, 0.5);
-    border: 1px solid hsla(0deg, 0%, 80%, 70%);
+    border: 1px solid hsla(0deg, 0%, 100%, 40%);
     border-radius: var(--arrondi-clavier);
-	box-shadow: 0 0 50px 1px rgba(0, 99, 170, 0.8);
+	box-shadow: 0 0 20px 5px rgba(0, 99, 170, 0.8);
 	font-weight: 300;
 }
 
@@ -130,7 +130,6 @@ bloc-touche[data-touche="Option"] {
 bloc-touche[data-type="double"] div {
     line-height: 1.1;
     font-size: calc(var(--taille-texte-touche) * 0.7);
-	font-weight: normal; /* Car le glyphes des touches mortes s’affichent mal sinon */
 }
 
 bloc-touche[data-touche="’"] div,
@@ -142,6 +141,12 @@ bloc-touche[data-touche="!"] div {
 	content: "HyperTexte";
 	color:hsl(0, 0, 30%);
 } */
+
+/* Car le glyphes des touches mortes s’affichent mal sinon */
+bloc-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"] div,
+bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
+	font-weight: normal;
+}
 
 
 
