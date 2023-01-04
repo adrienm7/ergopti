@@ -21,14 +21,23 @@ grand-espace {
 	display: flex;
 	flex-direction: column;
 	justify-content: space-around;
-	height: calc(100vh - var(--hauteur-header));
+	height: calc(100vh - var(--hauteur-header) - 4vh);
+	margin: 2vh 0;
 	/* background-color: red; */
 }
 
 .fullheight h1 {
-	font-size: 8vh;
 	padding-top: 0;
     margin-bottom: 0;
+}
+
+.fullheight bloc-clavier {
+	--taille-clavier: 0.5;
+}
+@media (max-width: 700px) {
+	.fullheight bloc-clavier {
+		--taille-clavier: 0.9;
+	}
 }
 
 .fullheight .btn-group {

@@ -1,5 +1,14 @@
-:root {
-    --taille-clavier: 0.6; /* Pourcentage de la longueur de la page */
+
+
+@media (max-width: 700px) {
+	bloc-clavier {
+		--taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
+	}
+
+}
+
+bloc-clavier {
+	--taille-clavier: 0.6; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
     --arrondi-clavier: calc(var(--marge-touche) * 2.5);
     
@@ -28,16 +37,6 @@
     --couleur-doigt-droite-majeur: -100deg;
     --couleur-doigt-droite-annulaire: -140deg;
     --couleur-doigt-droite-auriculaire: -170deg;
-}
-
-@media (max-width: 700px) {
-	:root {
-		--taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
-	}
-
-}
-
-bloc-clavier {
     display: block;
     width: max-content;
     margin: 0 auto;

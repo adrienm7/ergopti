@@ -79,7 +79,9 @@
 <div class="fullheight">
 	<div>
 		<h1 class="titre">
-			Disposition clavier<br /><span class="hyper">— Hyper</span><span class="texte">Texte —</span>
+			Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="texte"
+				>Texte&nbsp;—</span
+			>
 		</h1>
 	</div>
 

@@ -8,8 +8,6 @@
 	import '$lib/css/typography.css';
 	import '$lib/css/buttons.css';
 	import '$lib/css/miscellaneous.css';
-
-	import '$lib/icons/fontawesome/css/all.min.css';
 </script>
 
 <div id="page">
