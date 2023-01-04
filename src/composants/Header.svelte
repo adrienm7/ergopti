@@ -9,36 +9,35 @@
 
 <header>
 	<div class="logo">
-		<a href="/"
-			><p class="hyper">⌨ <span class="italic">Disposition optimisée HyperTexte</span></p></a
+		<a href="/"><p class="hyper"><span class="italic">Disposition optimisée HyperTexte</span></p></a
 		>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<ul class="menu">
 		<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/"><i class="fa-duotone fa-keyboard" /> HyperTexte</a>
+			<a href="/">⌨ HyperTexte</a>
 		</li>
 		<li
 			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/hypertexte-plus">HyperTexte<span class="glow">+</span></a>
+			<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
 		</li>
 		<li
 			aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/benchmarks">Benchmarks</a>
+			<a href="/benchmarks">❖ Benchmarks</a>
 		</li>
 		<li
 			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/telechargements">Téléchargements</a>
+			<a href="/telechargements">⭮ Téléchargements</a>
 		</li>
 		<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/contact"><i class="fa-solid fa-envelope" /> Contact</a>
+			<a href="/contact">✉ Contact</a>
 		</li>
 	</ul>
 </header>
