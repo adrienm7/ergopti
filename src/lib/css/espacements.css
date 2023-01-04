@@ -14,3 +14,23 @@ grand-espace {
 	display: block;
 	height: 30vh;
 }
+
+
+
+.fullheight {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-around;
+	height: calc(100vh - var(--hauteur-header));
+	/* background-color: red; */
+}
+
+.fullheight h1 {
+	font-size: 8vh;
+	padding-top: 0;
+    margin-bottom: 0;
+}
+
+.fullheight .btn-group {
+	font-size: 1.8vh;
+}

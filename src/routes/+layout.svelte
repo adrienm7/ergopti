@@ -8,6 +8,8 @@
 	import '$lib/css/typography.css';
 	import '$lib/css/buttons.css';
 	import '$lib/css/miscellaneous.css';
+
+	import '$lib/icons/fontawesome/css/all.min.css';
 </script>
 
 <div id="page">
@@ -37,9 +39,9 @@
 		min-height: 100vh;
 		background: linear-gradient(
 			90deg,
-			rgba(0, 2, 12, 1) 0%,
-			rgba(0, 3, 38, 1) 50%,
-			rgba(0, 0, 0, 1) 100%
+			rgba(0, 0, 12, 1) 0%,
+			rgba(0, 0, 48, 1) 50%,
+			rgba(0, 0, 12, 1) 100%
 		);
 		color: white;
 	}

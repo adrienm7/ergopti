@@ -31,7 +31,7 @@ h1 {
 	color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
-	background-image: linear-gradient(to top, rgb(255, 255, 255) 0%, rgb(75, 75, 75) 100%);
+	background-image: linear-gradient(to top, rgb(255, 255, 255) 0%, rgb(150, 150, 150) 100%);
 }
 
 h2 {
@@ -120,8 +120,8 @@ strong,
     padding: 0 0.3em;
 }
 
-.font-logo {
-    font-family: 'Tele-Marines', system-ui, Helvetica, Arial, sans-serif;
+.italic {
+	font-style: italic;
 }
 
 .font-size-big {
@@ -254,7 +254,7 @@ strong,
 
 
 .hypertexte {
-	font-style: italic;
+	/* font-style: italic; */
 }
 .hyper {
 	-webkit-background-clip: text;
@@ -273,4 +273,12 @@ strong,
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	background-image: linear-gradient(to left, var(--gradient-purple));
+}
+
+
+
+.degrade {
+	box-decoration-break: clone;
+-webkit-text-fill-color: transparent;
+	background: linear-gradient(93.3deg, rgb(203, 184, 255) 0%, rgb(128, 125, 255) 100%) padding-box text;
 }

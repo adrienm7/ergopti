@@ -1003,7 +1003,7 @@
 			"touche": "b",
 			"Primary": "b",
 			"Shift": "B",
-			"AltGr": "",
+			"AltGr": "@",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1191,7 +1191,7 @@
 			"touche": "y",
 			"Primary": "y",
 			"Shift": "Y",
-			"AltGr": "@",
+			"AltGr": "_",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1199,7 +1199,7 @@
 			"touche": "z",
 			"Primary": "z",
 			"Shift": "Z",
-			"AltGr": "_",
+			"AltGr": "",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1441,7 +1441,7 @@
 			"touche": "Space",
 			"Primary": "",
 			"Shift": "-",
-			"AltGr": "_",
+			"AltGr": "⌫",
 			"ShiftAltGr": "",
 			"type": "space"
 		},

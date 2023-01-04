@@ -1,5 +1,6 @@
 <script>
 	import { page } from '$app/stores';
+	import Nom from '../composants/Nom.svelte';
 
 	function fermerMenu() {
 		document.getElementById('menu-btn').checked = false;
@@ -9,14 +10,14 @@
 <header>
 	<div class="logo">
 		<a href="/"
-			>⌨ <p>Disposition optimisée HyperTexte</p></a
+			><p class="hyper">⌨ <span class="italic">Disposition optimisée HyperTexte</span></p></a
 		>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<ul class="menu">
 		<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/">HyperTexte</a>
+			<a href="/"><i class="fa-duotone fa-keyboard" /> HyperTexte</a>
 		</li>
 		<li
 			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
@@ -37,19 +38,19 @@
 			<a href="/telechargements">Téléchargements</a>
 		</li>
 		<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/contact">Contact</a>
+			<a href="/contact"><i class="fa-solid fa-envelope" /> Contact</a>
 		</li>
 	</ul>
 </header>
 
 <style>
 	:root {
-		--couleur-header: rgba(0, 0, 0, 0.6);
-		--couleur-header-mobile: rgba(0, 0, 0, 0.85);
-		--couleur-liens-header: white;
-		--hauteur-element-menu-mobile: 10px;
+		--couleur-header: rgba(0, 0, 0, 0.8);
+		--couleur-header-mobile: rgba(0, 0, 0, 0.6);
+		--couleur-liens-header: rgba(255, 255, 255, 0.9);
+		--hauteur-element-menu-mobile: 30px;
 		--espacement-items-menu: 5px;
-		--couleur-ombre: rgba(255, 255, 255, 0.1);
+		--couleur-ombre: rgba(255, 255, 255, 0.3);
 		--marge-fenetre: 5vw;
 		--hauteur-header: 60px; /* Fallback si clamp n'est pas supporté */
 		--couleur-icone-hamburger: white;
@@ -57,8 +58,8 @@
 
 	header {
 		background-color: var(--couleur-header);
-		backdrop-filter: blur(60px);
-		box-shadow: 0px 3px 10px 3px var(--couleur-ombre);
+		backdrop-filter: blur(30px);
+		box-shadow: 0px 0px 5px 1px var(--couleur-ombre);
 		position: fixed;
 		width: 100%;
 		height: var(--hauteur-header);
@@ -74,6 +75,8 @@
 		list-style: none;
 		overflow: hidden;
 		background-color: var(--couleur-header-mobile);
+		backdrop-filter: blur(30px);
+		border-top: 1px solid rgba(255, 255, 255, 0.2);
 	}
 
 	header .menu li {
@@ -81,8 +84,11 @@
 		padding: var(--hauteur-element-menu-mobile) 0;
 		padding-left: var(--marge-fenetre);
 		text-decoration: none;
+		font-size: 1.5rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 		/* font-family: 'Times New Roman', Times, serif; */
-		text-shadow: rgba(255, 255, 255, 0.8) 1px 0 10px;
+		/* font-style: italic; */
+		/* text-shadow: rgba(255, 255, 255, 0.3) 0 0 20px; */
 	}
 
 	header .menu li[aria-current='page'] a {
@@ -97,6 +103,16 @@
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
+	/* header .menu li[aria-current='page'] a::after {
+		content: '';
+		display: block;
+		position: relative;
+		bottom: -5px;
+		width: 100%;
+		height: 3px;
+		border-radius: 5px;
+		background-image: linear-gradient(to right, var(--gradient-blue));
+	} */
 
 	header .menu li:not([aria-current='page']) a:hover {
 		-webkit-background-clip: text;
@@ -106,8 +122,18 @@
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-purple));
-		text-shadow: none;
 	}
+
+	/* header .menu li:not([aria-current='page']) a:hover::after {
+		content: '';
+		display: block;
+		position: relative;
+		bottom: -5px;
+		width: 100%;
+		height: 3px;
+		border-radius: 5px;
+		background-image: linear-gradient(to right, var(--gradient-purple));
+	} */
 
 	header .logo {
 		display: inline-flex;
@@ -118,7 +144,6 @@
 	}
 	header .logo p {
 		display: inline;
-		font-style: italic;
 		font-family: 'Times New Roman', Times, serif;
 	}
 
@@ -127,7 +152,7 @@
 	header .menu {
 		clear: both;
 		max-height: 0;
-		transition: max-height 0.2s ease-out;
+		transition: height 0.2s ease-out;
 	}
 
 	/* menu icon */
@@ -174,8 +199,13 @@
 		display: none;
 	}
 
+	header .menu-btn:not(:checked) ~ .menu {
+		display: none;
+	}
+
 	header .menu-btn:checked ~ .menu {
-		max-height: 240px;
+		max-height: 100vh;
+		height: 100vh;
 	}
 
 	header .menu-btn:checked ~ .menu-icon .navicon {
@@ -199,10 +229,18 @@
 
 	@media (min-width: 1024px) {
 		header .menu {
-			display: flex;
+			display: flex !important;
 			background-color: transparent;
 			margin-right: 15px;
+			height: unset !important;
 		}
+
+		header ul {
+			border: none;
+			margin: 0;
+			padding: 0;
+		}
+
 		header .menu li {
 			display: flex;
 			justify-content: center;
@@ -212,6 +250,7 @@
 			padding: 0;
 			padding-left: calc(2 * var(--espacement-items-menu) + 5px);
 			background-color: transparent;
+			font-size: 1rem;
 		}
 
 		header .menu li::after {
