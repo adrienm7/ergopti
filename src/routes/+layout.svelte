@@ -30,6 +30,7 @@
  */
 
 	#page {
+		--couleur: 48;
 		display: flex;
 		flex-direction: column;
 		margin: 0;
@@ -38,12 +39,26 @@
 		background: linear-gradient(
 			90deg,
 			rgba(0, 0, 12, 1) 0%,
-			rgba(0, 0, 48, 1) 50%,
+			rgba(0, 0, var(--couleur), 1) 50%,
 			rgba(0, 0, 12, 1) 100%
 		);
 		color: white;
 	}
-
+	@media (max-width: 400px) {
+		#page {
+			--couleur: 24;
+		}
+	}
+	@media (max-width: 600px) {
+		#page {
+			--couleur: 32;
+		}
+	}
+	@media (max-width: 800px) {
+		#page {
+			--couleur: 40;
+		}
+	}
 	main {
 		flex-grow: 1;
 		padding-top: var(--hauteur-header); /* Pour que le contune soit en-dessous du header */

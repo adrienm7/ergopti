@@ -10,7 +10,7 @@
 bloc-clavier {
 	--taille-clavier: 0.6; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
-    --arrondi-clavier: calc(var(--marge-touche) * 2.5);
+    --arrondi-clavier: calc(var(--marge-touche) * 3.5);
     
     --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
@@ -42,7 +42,7 @@ bloc-clavier {
     margin: 0 auto;
     padding: var(--marge-clavier);
     background-color: rgba(46, 46, 46, 0.5);
-    border: 1px solid hsla(0deg, 0%, 100%, 40%);
+    border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
 	box-shadow: 0 0 20px 5px rgba(0, 99, 170, 0.8);
 	font-weight: 300;
