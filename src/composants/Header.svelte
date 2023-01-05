@@ -9,8 +9,7 @@
 
 <header>
 	<div class="logo">
-		<a href="/"><p class="hyper"><span class="italic">Disposition optimisée HyperTexte</span></p></a
-		>
+		<a href="/"><p class="hyper"><span class="italic">Disposition clavier HyperTexte</span></p></a>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
@@ -51,11 +50,14 @@
 		--espacement-items-menu: 5px;
 		--couleur-ombre: rgba(255, 255, 255, 0.3);
 		--marge-fenetre: 5vw;
-		--hauteur-header: 60px; /* Fallback si clamp n'est pas supporté */
+		--hauteur-header: 70px; /* Fallback si clamp n'est pas supporté */
 		--couleur-icone-hamburger: white;
 	}
 
 	header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		background-color: var(--couleur-header);
 		backdrop-filter: blur(30px);
 		box-shadow: 0px 0px 5px 1px var(--couleur-ombre);
@@ -69,10 +71,15 @@
 		text-decoration: none;
 	}
 	header ul {
+		position: fixed;
+		width: 100%;
+		height: 100%;
+		top: var(--hauteur-header);
+		z-index: -1;
+		display: block;
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		overflow: hidden;
 		background-color: var(--couleur-header-mobile);
 		backdrop-filter: blur(30px);
 		border-top: 1px solid rgba(255, 255, 255, 0.2);
@@ -157,10 +164,9 @@
 	/* menu icon */
 
 	header .menu-icon {
+		padding: 30px;
+		display: inline-block;
 		cursor: pointer;
-		float: right;
-		padding: 28px 20px;
-		position: relative;
 		user-select: none;
 	}
 
@@ -235,6 +241,10 @@
 		}
 
 		header ul {
+			position: static;
+			width: unset;
+			height: unset;
+			z-index: 1;
 			border: none;
 			margin: 0;
 			padding: 0;

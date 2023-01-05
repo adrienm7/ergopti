@@ -1,14 +1,9 @@
 /* Titres */
 
- 
 
 .titre {
 	line-height: 1;
-	font-weight: normal;
 }
-
-
-
 
 .paragraphe,
 p,
@@ -25,6 +20,8 @@ h1 {
     margin-bottom: 1.5rem;
     padding-top: 5vh;
 	text-align: center;
+	line-height: auto;
+	font-weight: normal;
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
