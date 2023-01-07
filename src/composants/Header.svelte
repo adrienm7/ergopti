@@ -33,7 +33,7 @@
 			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/telechargements">⭮ Téléchargements</a>
+			<a href="/telechargements">➜ Téléchargements</a>
 		</li>
 		<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined} on:click={fermerMenu}>
 			<a href="/contact">✉ Contact</a>
@@ -164,7 +164,7 @@
 	/* menu icon */
 
 	header .menu-icon {
-		padding: 30px;
+		padding: 5vw;
 		display: inline-block;
 		cursor: pointer;
 		user-select: none;
@@ -259,10 +259,11 @@
 			padding: 0;
 			padding-left: calc(2 * var(--espacement-items-menu) + 5px);
 			background-color: transparent;
+			border-bottom: 0;
 			font-size: 1rem;
 		}
 
-		header .menu li::after {
+		header .menu li:not(:last-child)::after {
 			content: '';
 			background-color: transparent;
 			height: 100%;
