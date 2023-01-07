@@ -8,7 +8,7 @@
 }
 
 bloc-clavier {
-	--taille-clavier: 0.6; /* Pourcentage de la longueur de la page */
+	--taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
     --arrondi-clavier: calc(var(--marge-touche) * 3.5);
     
