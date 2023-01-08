@@ -103,6 +103,8 @@
 		/* text-shadow: rgba(255, 255, 255, 0.3) 0 0 20px; */
 	}
 
+	/* On met li et li a car ne fonctionne pas sur mobile et bureau sinon */
+	header .menu li::first-letter,
 	header .menu li a::first-letter {
 		-webkit-background-clip: text;
 		background-clip: text;
@@ -113,6 +115,7 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
+	header .menu li[aria-current='page']::first-letter,
 	header .menu li[aria-current='page'] a::first-letter {
 		background-image: linear-gradient(to right, var(--gradient-purple));
 	}
