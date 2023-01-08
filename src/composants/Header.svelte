@@ -42,7 +42,7 @@
 			<a href="/telechargements">➜ Téléchargements</a>
 		</li>
 		<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/contact">✉ Contact</a>
+			<a href="/contact"><span style="font-family: Arial">✉</span> Contact</a>
 		</li>
 	</ul>
 </header>
