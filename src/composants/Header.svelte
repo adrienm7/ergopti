@@ -9,7 +9,13 @@
 
 <header>
 	<div class="logo">
-		<a href="/"><p class="hyper"><span class="italic">Disposition clavier HyperTexte</span></p></a>
+		<a href="/"
+			><p class="italic">
+				Disposition clavier <span class="hyper"
+					>HyperTexte{$page.url.pathname === '/hypertexte-plus' ? '+' : ''}</span
+				>
+			</p></a
+		>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
@@ -97,6 +103,20 @@
 		/* text-shadow: rgba(255, 255, 255, 0.3) 0 0 20px; */
 	}
 
+	header .menu li a::first-letter {
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+		background-image: linear-gradient(to right, var(--gradient-blue));
+	}
+
+	header .menu li[aria-current='page'] a::first-letter {
+		background-image: linear-gradient(to right, var(--gradient-purple));
+	}
+
 	header .menu li[aria-current='page'] a {
 		/* background-color: #f4f4f4;
 			color: black !important;
@@ -107,7 +127,7 @@
 		color: transparent;
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
-		background-image: linear-gradient(to right, var(--gradient-blue));
+		background-image: linear-gradient(to right, var(--gradient-purple));
 	}
 	/* header .menu li[aria-current='page'] a::after {
 		content: '';
@@ -127,7 +147,7 @@
 		color: transparent;
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
-		background-image: linear-gradient(to right, var(--gradient-purple));
+		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
 	/* header .menu li:not([aria-current='page']) a:hover::after {
