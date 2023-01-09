@@ -4,6 +4,15 @@
 
 	function fermerMenu() {
 		document.getElementById('menu-btn').checked = false;
+		document.body.classList.remove('disable-scroll');
+	}
+
+	function toggleMenu() {
+		if (document.body.classList.contains('disable-scroll')) {
+			document.body.classList.remove('disable-scroll');
+		} else {
+			document.body.classList.add('disable-scroll');
+		}
 	}
 </script>
 
@@ -18,35 +27,35 @@
 		>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
-	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
+	<label class="menu-icon" for="menu-btn" on:click={toggleMenu}><span class="navicon" /></label>
 	<nav id="menu">
 		<ul>
 			<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-				<a href="/">⌨ HyperTexte</a>
+				<a href="/"><p>⌨ HyperTexte</p></a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
+				<a href="/hypertexte-plus"><p>★ HyperTexte<span class="glow">+</span></p></a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/benchmarks">❖ Benchmarks</a>
+				<a href="/benchmarks"><p>❖ Benchmarks</p></a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/telechargements">➜ Téléchargements</a>
+				<a href="/telechargements"><p>➜ Téléchargements</p></a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/contact">✉ Contact</a>
+				<a href="/contact"><p>✉ Contact</p></a>
 			</li>
 		</ul>
 	</nav>
@@ -88,13 +97,11 @@
 		text-decoration: none;
 	}
 
-	header #menu li a {
+	header #menu li a p {
 		font-size: 20px;
 	}
 
-	/* On met li et li a car ne fonctionne pas sur mobile et bureau sinon */
-	header #menu li::first-letter,
-	header #menu li a::first-letter {
+	header #menu li a p::first-letter {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -104,12 +111,11 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
-	header #menu li[aria-current='page']::first-letter,
-	header #menu li[aria-current='page'] a::first-letter {
+	header #menu li[aria-current='page'] a p::first-letter {
 		background-image: linear-gradient(to right, var(--gradient-purple));
 	}
 
-	header #menu li[aria-current='page'] a {
+	header #menu li[aria-current='page'] a p {
 		/* background-color: #f4f4f4;
 			color: black !important;
 			border-radius: 3px; */
@@ -132,7 +138,7 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	} */
 
-	header #menu li:not([aria-current='page']) a:hover {
+	header #menu li:not([aria-current='page']) a:hover p {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -181,6 +187,7 @@
 			backdrop-filter: blur(30px);
 			border-top: 1px solid rgba(255, 255, 255, 0.2);
 			list-style: none;
+			overflow: scroll !important;
 		}
 
 		header #menu ul {
@@ -188,7 +195,7 @@
 			padding: 0;
 		}
 
-		header #menu ul li {
+		header #menu ul li a {
 			display: block;
 			padding: var(--hauteur-element-menu-mobile) 0;
 			padding-left: var(--marge-fenetre);
@@ -196,7 +203,11 @@
 			font-size: 1.5rem;
 			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 		}
-
+		header #menu ul li,
+		header #menu ul li a p {
+			margin: 0;
+			padding: 0;
+		}
 		/* menu icon */
 
 		header .menu-icon {
@@ -271,7 +282,7 @@
 		}
 	}
 
-	@media (min-width: 1025px) {
+	@media (min-width: 1024px) {
 		header #menu {
 			display: block;
 		}
@@ -312,6 +323,9 @@
 
 		header #menu li a {
 			padding: calc(2 * var(--espacement-items-menu));
+		}
+		header #menu li a p {
+			text-align: center; /* Dans le cas où le texte passe sur deux lignes car trop long */
 		}
 		header #menu li:last-child a {
 			padding-right: 0;
