@@ -19,32 +19,37 @@
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
-	<ul id="menu">
-		<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/">⌨ HyperTexte</a>
-		</li>
-		<li
-			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
-			on:click={fermerMenu}
-		>
-			<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
-		</li>
-		<li
-			aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
-			on:click={fermerMenu}
-		>
-			<a href="/benchmarks">❖ Benchmarks</a>
-		</li>
-		<li
-			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
-			on:click={fermerMenu}
-		>
-			<a href="/telechargements">➜ Téléchargements</a>
-		</li>
-		<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/contact">✉ Contact</a>
-		</li>
-	</ul>
+	<nav id="menu">
+		<ul>
+			<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
+				<a href="/">⌨ HyperTexte</a>
+			</li>
+			<li
+				aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
+				on:click={fermerMenu}
+			>
+				<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
+			</li>
+			<li
+				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
+				on:click={fermerMenu}
+			>
+				<a href="/benchmarks">❖ Benchmarks</a>
+			</li>
+			<li
+				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
+				on:click={fermerMenu}
+			>
+				<a href="/telechargements">➜ Téléchargements</a>
+			</li>
+			<li
+				aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}
+				on:click={fermerMenu}
+			>
+				<a href="/contact">✉ Contact</a>
+			</li>
+		</ul>
+	</nav>
 </header>
 
 <style>
@@ -82,26 +87,9 @@
 		color: var(--couleur-liens-header);
 		text-decoration: none;
 	}
-	header #menu {
-		position: fixed;
-		top: var(--hauteur-header);
-		left: 0;
-		width: 100vw;
-		margin: 0;
-		padding: 0;
-		background-color: var(--couleur-header-mobile);
-		backdrop-filter: blur(30px);
-		border-top: 1px solid rgba(255, 255, 255, 0.2);
-		list-style: none;
-	}
 
-	header #menu li {
-		display: block;
-		padding: var(--hauteur-element-menu-mobile) 0;
-		padding-left: var(--marge-fenetre);
-		text-decoration: none;
-		font-size: 1.5rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+	header #menu li a {
+		font-size: 20px;
 	}
 
 	/* On met li et li a car ne fonctionne pas sur mobile et bureau sinon */
@@ -182,6 +170,33 @@
 	}
 
 	@media (max-width: 1024px) {
+		header #menu {
+			position: fixed;
+			top: var(--hauteur-header);
+			left: 0;
+			width: 100vw;
+			margin: 0;
+			padding: 0;
+			background-color: var(--couleur-header-mobile);
+			backdrop-filter: blur(30px);
+			border-top: 1px solid rgba(255, 255, 255, 0.2);
+			list-style: none;
+		}
+
+		header #menu ul {
+			margin: 0;
+			padding: 0;
+		}
+
+		header #menu ul li {
+			display: block;
+			padding: var(--hauteur-element-menu-mobile) 0;
+			padding-left: var(--marge-fenetre);
+			text-decoration: none;
+			font-size: 1.5rem;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+		}
+
 		/* menu icon */
 
 		header .menu-icon {
@@ -221,8 +236,8 @@
 
 		/* menu btn */
 
-		header #menu,
-		header .menu-btn:not(:checked) ~ #menu {
+		header #menu ul,
+		header .menu-btn:not(:checked) ~ #menu ul {
 			height: 0;
 			transition: height 0.2s ease-out;
 		}
@@ -231,10 +246,10 @@
 			display: none;
 		}
 
-		header .menu-btn:checked ~ #menu {
+		header .menu-btn:checked ~ #menu ul {
 			height: calc(100vh - var(--hauteur-header));
 		}
-		header .menu-btn:checked ~ #menu > * {
+		header .menu-btn:checked ~ #menu ul > * {
 			display: block;
 		}
 
@@ -258,16 +273,13 @@
 
 	@media (min-width: 1025px) {
 		header #menu {
+			display: block;
+		}
+		header #menu ul {
 			display: flex !important;
+			flex-direction: row;
 			background-color: transparent;
 			margin-right: 15px;
-			height: unset !important;
-		}
-
-		header #menu {
-			position: static;
-			width: unset;
-			height: unset;
 			z-index: 1;
 			border: none;
 			margin: 0;
@@ -275,7 +287,7 @@
 			padding-right: var(--marge-bords-menu);
 		}
 
-		header #menu li {
+		header #menu ul li {
 			display: flex;
 			justify-content: center;
 			align-items: center;
@@ -299,14 +311,10 @@
 		}
 
 		header #menu li a {
-			padding: var(--espacement-items-menu);
-			margin: var(--espacement-items-menu);
+			padding: calc(2 * var(--espacement-items-menu));
 		}
-
-		header #menu {
-			clear: none;
-			float: right;
-			max-height: none;
+		header #menu li:last-child a {
+			padding-right: 0;
 		}
 	}
 
