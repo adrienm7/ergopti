@@ -6,14 +6,6 @@
 		document.getElementById('menu-btn').checked = false;
 		document.body.classList.remove('disable-scroll');
 	}
-
-	function toggleMenu() {
-		if (document.body.classList.contains('disable-scroll')) {
-			document.body.classList.remove('disable-scroll');
-		} else {
-			document.body.classList.add('disable-scroll');
-		}
-	}
 </script>
 
 <header>
@@ -27,7 +19,7 @@
 		>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
-	<label class="menu-icon" for="menu-btn" on:click={toggleMenu}><span class="navicon" /></label>
+	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
 		<ul>
 			<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
@@ -186,13 +178,16 @@
 			background-color: var(--couleur-header-mobile);
 			backdrop-filter: blur(30px);
 			border-top: 1px solid rgba(255, 255, 255, 0.2);
-			list-style: none;
-			overflow: scroll !important;
+			overflow: scroll;
+			transition: height 0.25s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
+			overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
 		}
 
 		header #menu ul {
 			margin: 0;
 			padding: 0;
+			list-style: none;
+			overflow: hidden;
 		}
 
 		header #menu ul li a {
@@ -208,6 +203,7 @@
 			margin: 0;
 			padding: 0;
 		}
+
 		/* menu icon */
 
 		header .menu-icon {
@@ -247,21 +243,14 @@
 
 		/* menu btn */
 
-		header #menu ul,
-		header .menu-btn:not(:checked) ~ #menu ul {
+		header #menu,
+		header .menu-btn:not(:checked) ~ #menu {
 			height: 0;
-			transition: height 0.2s ease-out;
 		}
 
-		header .menu-btn:not(:checked) ~ #menu > * {
-			display: none;
-		}
-
+		header .menu-btn:checked ~ #menu,
 		header .menu-btn:checked ~ #menu ul {
 			height: calc(100vh - var(--hauteur-header));
-		}
-		header .menu-btn:checked ~ #menu ul > * {
-			display: block;
 		}
 
 		header .menu-btn:checked ~ .menu-icon .navicon {
@@ -331,5 +320,4 @@
 			padding-right: 0;
 		}
 	}
-
 </style>
