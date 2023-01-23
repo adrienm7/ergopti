@@ -172,7 +172,7 @@
 			position: fixed;
 			top: var(--hauteur-header);
 			left: 0;
-			width: 100vw;
+			width: 100%;
 			margin: 0;
 			padding: 0;
 			background-color: var(--couleur-header-mobile);
@@ -250,7 +250,7 @@
 
 		header .menu-btn:checked ~ #menu,
 		header .menu-btn:checked ~ #menu ul {
-			height: calc(100vh - var(--hauteur-header));
+			min-height: calc(100vh - var(--hauteur-header));
 		}
 
 		header .menu-btn:checked ~ .menu-icon .navicon {
@@ -279,12 +279,11 @@
 			display: flex !important;
 			flex-direction: row;
 			background-color: transparent;
-			margin-right: 15px;
 			z-index: 1;
 			border: none;
 			margin: 0;
 			padding: 0;
-			padding-right: var(--marge-bords-menu);
+			padding-right: 40px;
 		}
 
 		header #menu ul li {
@@ -320,4 +319,5 @@
 			padding-right: 0;
 		}
 	}
+
 </style>
