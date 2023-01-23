@@ -248,7 +248,9 @@
 			height: 0;
 		}
 
-		header .menu-btn:checked ~ #menu,
+		header .menu-btn:checked ~ #menu {
+			height: calc(100vh - var(--hauteur-header));
+		}
 		header .menu-btn:checked ~ #menu ul {
 			min-height: calc(100vh - var(--hauteur-header));
 		}
