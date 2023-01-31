@@ -27,3 +27,30 @@
 
 <h2>Résultats de benchmarks</h2>
 <p>Les résultats vont différer selon le corpus utilisé</p>
+
+<div class="image">
+	<p>Benchmark sur du code informatique</p>
+	<img src="/img/benchmark_code.jpg" />
+	<p>Benchmark sur de l’anglais</p>
+	<img src="/img/benchmark_english.jpg" />
+</div>
+
+<style>
+	.image {
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.image img {
+		width: 80%;
+		margin: 0 auto;
+		border-radius: 10px;
+		text-align: center;
+	}
+
+	.image p {
+		font-size: 1.3rem;
+		font-weight: bold;
+	}
+
+</style>
