@@ -1122,9 +1122,9 @@
 		{
 			"touche": "q",
 			"Primary": "q",
-			"touche+": "qu",
+			"touche+": "[qu]",
 			"Shift": "Q",
-			"Shift+": "Qu",
+			"Shift+": "[Qu]",
 			"AltGr": "",
 			"ShiftAltGr": "",
 			"type": "lettre"
@@ -1173,10 +1173,8 @@
 			"touche": "w",
 			"Primary": "w",
 			"Shift": "W",
-			"AltGr": "ù",
-			"AltGr+": "où",
-			"ShiftAltGr": "Ù",
-			"ShiftAltGr+": "Où",
+			"AltGr": "_",
+			"ShiftAltGr": "",
 			"type": "lettre"
 		},
 		{
@@ -1191,8 +1189,10 @@
 			"touche": "y",
 			"Primary": "y",
 			"Shift": "Y",
-			"AltGr": "_",
-			"ShiftAltGr": "",
+			"AltGr": "ù",
+			"AltGr+": "[où]",
+			"ShiftAltGr": "Ù",
+			"ShiftAltGr+": "[Où]",
 			"type": "lettre"
 		},
 		{
