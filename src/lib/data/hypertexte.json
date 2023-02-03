@@ -568,9 +568,9 @@
 		{
 			"touche": "j",
 			"main": "droite",
-			"doigt": "index",
+			"doigt": "majeur",
 			"ligne": "5",
-			"colonne": "9",
+			"colonne": "10",
 			"taille": "1"
 		},
 		{
@@ -624,9 +624,9 @@
 		{
 			"touche": "q",
 			"main": "droite",
-			"doigt": "auriculaire",
-			"ligne": "3",
-			"colonne": "13",
+			"doigt": "index",
+			"ligne": "5",
+			"colonne": "9",
 			"taille": "1"
 		},
 		{
@@ -697,7 +697,7 @@
 			"touche": "z",
 			"main": "droite",
 			"doigt": "auriculaire",
-			"ligne": "2",
+			"ligne": "3",
 			"colonne": "13",
 			"taille": "1"
 		},
@@ -737,7 +737,7 @@
 			"touche": "!",
 			"main": "droite",
 			"doigt": "auriculaire",
-			"ligne": "4",
+			"ligne": "2",
 			"colonne": "13",
 			"taille": "1"
 		},
@@ -777,7 +777,7 @@
 			"touche": "%",
 			"main": "droite",
 			"doigt": "auriculaire",
-			"ligne": "1",
+			"ligne": "4",
 			"colonne": "13",
 			"taille": "1"
 		},
@@ -793,7 +793,7 @@
 			"touche": "€",
 			"main": "droite",
 			"doigt": "auriculaire",
-			"ligne": "5",
+			"ligne": "1",
 			"colonne": "13",
 			"taille": "1"
 		},
@@ -919,6 +919,14 @@
 		},
 		{
 			"touche": "vide",
+			"main": "droite",
+			"doigt": "auriculaire",
+			"ligne": "5",
+			"colonne": "13",
+			"taille": "1"
+		},
+		{
+			"touche": "vide",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "5",
@@ -970,7 +978,7 @@
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "5",
-			"colonne": "10",
+			"colonne": "9",
 			"taille": "1"
 		},
 		{
@@ -1003,7 +1011,7 @@
 			"touche": "b",
 			"Primary": "b",
 			"Shift": "B",
-			"AltGr": "@",
+			"AltGr": "…",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1067,7 +1075,7 @@
 			"touche": "j",
 			"Primary": "j",
 			"Shift": "J",
-			"AltGr": "◌̈",
+			"AltGr": "",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1075,7 +1083,7 @@
 			"touche": "k",
 			"Primary": "k",
 			"Shift": "K",
-			"AltGr": "…",
+			"AltGr": "",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1125,7 +1133,7 @@
 			"touche+": "[qu]",
 			"Shift": "Q",
 			"Shift+": "[Qu]",
-			"AltGr": "",
+			"AltGr": "◌̈",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1173,8 +1181,10 @@
 			"touche": "w",
 			"Primary": "w",
 			"Shift": "W",
-			"AltGr": "_",
-			"ShiftAltGr": "",
+			"AltGr": "ù",
+			"AltGr+": "[où]",
+			"ShiftAltGr": "Ù",
+			"ShiftAltGr+": "[Où]",
 			"type": "lettre"
 		},
 		{
@@ -1189,10 +1199,8 @@
 			"touche": "y",
 			"Primary": "y",
 			"Shift": "Y",
-			"AltGr": "ù",
-			"AltGr+": "[où]",
-			"ShiftAltGr": "Ù",
-			"ShiftAltGr+": "[Où]",
+			"AltGr": "@",
+			"ShiftAltGr": "",
 			"type": "lettre"
 		},
 		{
@@ -1367,10 +1375,10 @@
 		},
 		{
 			"touche": "CapsLock",
-			"Primary": "⇪",
-			"Shift": "⇪",
-			"AltGr": "⇪",
-			"ShiftAltGr": "⇪",
+			"Primary": "⌫",
+			"Shift": "⌫",
+			"AltGr": "⌫",
+			"ShiftAltGr": "⌫",
 			"type": "special"
 		},
 		{
@@ -1441,7 +1449,7 @@
 			"touche": "Space",
 			"Primary": "",
 			"Shift": "-",
-			"AltGr": "⌫",
+			"AltGr": "_",
 			"ShiftAltGr": "",
 			"type": "space"
 		},

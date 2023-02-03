@@ -143,7 +143,7 @@ bloc-touche[data-touche="!"] div {
 
 /* Car le glyphes des touches mortes s’affichent mal sinon */
 bloc-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"] div,
-bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
+bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="q"] div {
 	font-weight: normal;
 }
 
