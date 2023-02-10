@@ -1,5 +1,6 @@
 <script>
 	import Nom from '../composants/Nom.svelte';
+	import NomPlus from '../composants/Nom_Plus.svelte';
 	import Clavier from '../composants/Clavier.svelte';
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
@@ -254,14 +255,16 @@
 
 <h3>Optimisation pour l’utilisation à une main</h3>
 <p>
-	Le = a été dupliqué à gauche en accès direct. Cela permet de faire facilement les raccourcis sur
-	excel comme = et Alt =. Normalement, le = se situe en AltGr + L.
+	Le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire facilement les
+	raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>. Normalement, le
+	<kbd>=</kbd>
+	se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
 </p>
 
-<h2>Pour aller plus loin</h2>
+<h2>★★★ Pour aller plus loin ★★★</h2>
 <p>
-	<Nom /> + permet d’avoir une disposition encore meilleure. Les roulements sont meilleurs et les doigts
-	ont encore moins de distance à parcourir. Cependant, ces exxcellents résultats sont le fruit d’une
-	fraude. En effet, ils nécessitent d’avoir un logiciel permettant de se faire des raccourcis personnalisés
-	comme AutoHotkey. Il faudra aussi accepter d’apprendre certains enchaînements de touches.
+	<NomPlus /> permet d’avoir une disposition encore meilleure. Les roulements sont meilleurs et les doigts
+	ont encore moins de distance à parcourir. Cependant, ces excellents résultats sont le fruit d’une fraude.
+	En effet, ils nécessitent d’avoir un logiciel permettant de se faire des raccourcis personnalisés comme
+	AutoHotkey. Il faudra aussi accepter d’apprendre certains enchaînements de touches.
 </p>

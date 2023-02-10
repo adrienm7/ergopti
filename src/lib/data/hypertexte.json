@@ -1083,7 +1083,7 @@
 			"touche": "k",
 			"Primary": "k",
 			"Shift": "K",
-			"AltGr": "",
+			"AltGr": "…",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},
@@ -1199,7 +1199,7 @@
 			"touche": "y",
 			"Primary": "y",
 			"Shift": "Y",
-			"AltGr": "@",
+			"AltGr": "↩",
 			"ShiftAltGr": "",
 			"type": "lettre"
 		},

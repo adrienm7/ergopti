@@ -63,27 +63,50 @@
 	<li>YI</li>
 </ul>
 <h2>[QU] automatiques avant les voyelles</h2>
-<h2>Utilisation de la touche À : en tant que J</h2>
-<h2>Utilisation de la touche À : pour éviter des SFBs</h2>
+<h2>[où]</h2>
+<h2>Utilisation de la touche <kbd>À</kbd> : en tant que J</h2>
+<h2>Utilisation de la touche <kbd>À</kbd> : pour éviter des SFBs</h2>
 <h2>
 	Utilisation de la touche È : pour certaines combinaisons de touches impossibles en français (ÈI,
 	ÈO, etc.) ➜ J pour les voyelles, suppressions des SFB pour les autres
 </h2>
-<h2>ê fait office de ^</h2>
-<h2>Remplacement automatique des ’ pour l’anglais : t’s, n't</h2>
-<h2>Ajout des suffixes les plus communs en , pour encore plus optimiser</h2>
-<h2>Autres</h2>
-<ul>
-	<li>Shift + "Capslock" (BackSpace) = Delete</li>
-	<li>AltGr + "Capslock" (BackSpace) = Ctrl + BackSpace</li>
-	<li>Windows + "Capslock" (BackSpace) = Capslock</li>
-</ul>
-<ul>
-	<li>AltGr + LShift = Dot shift space</li>
-	<li>AltGr + Tab = Capsword</li>
-</ul>
+<h2><kbd>Ê</kbd> fait office de <kbd>^</kbd></h2>
+<h2>Remplacement automatique des <kbd>’</kbd> pour l’anglais : t’s, n't</h2>
+<h2>Ajout des suffixes les plus communs en <kbd>,</kbd> pour encore plus optimiser</h2>
+
+<h2>Tap-hold</h2>
+<p>
+	Le tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et une
+	lors de son maintien. C’est particulièrement adapté pour les touches modificatrices (Shift,
+	Control, Alt, AltGr). Ainsi, il est possible d’utiliser la touche AltGr normalementt, tout en y
+	assignant une autre touche lors d’un simple appui, par exemple Entrée.
+</p>
+<p>
+	Ces tap-holds ont été introduits afin de diminuer la distance parcourue par les doigts et
+	améliorer le confort. Par exemple, la touche Entrée est régulièrement utilisée mais est pourtant
+	très loin. Elle nécessite de plus d’être pressée par l’auriculaire (droit), qui est le doigt le
+	plus faible de notre main.
+</p>
 <ul>
 	<li>Tap hold en AltGr = Entrée sur le tap</li>
 	<li>Tap hold en Alt = Alt+Tab sur le tap</li>
+	<li>Tap hold en LCtrl = Ctrl+V sur le tap</li>
 	<li>Tap hold en Space = layer de navigation en hold</li>
+</ul>
+
+<h2>Ajouts divers</h2>
+<h3>Avec AltGr</h3>
+<ul class="line-height-2">
+	<li><kbd>AltGr</kbd> + <kbd>Tab</kbd> ➜ <kbd>Capsword</kbd></li>
+	<li>
+		<kbd>AltGr</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd>Ctrl</kbd> + <kbd>BackSpace</kbd>
+	</li>
+	<li>
+		<kbd>AltGr</kbd> + <kbd>LShift</kbd> ➜ <kbd>Dot</kbd> + <kbd>Space</kbd> + <kbd>Shift</kbd>
+	</li>
+</ul>
+<h3>Avec les autres modificateurs</h3>
+<ul class="line-height-2">
+	<li><kbd>Shift</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd>Delete</kbd></li>
+	<li><kbd>Windows</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd>Capslock</kbd></li>
 </ul>
