@@ -5,8 +5,9 @@
 	line-height: 1;
 }
 
-main .paragraphe,
+.paragraphe,
 main p,
+main ul,
 h1, h2, h3, h4 {
     line-height: 1.35em;
     max-width: 800px;
@@ -14,6 +15,13 @@ h1, h2, h3, h4 {
     margin: 0 auto;
 }
 
+main p:not(:first-child){
+	margin-top: 1rem;
+}
+
+.line-height-2 {
+	line-height: 2rem; /* Cela doit être assez élevé car les touches de clavier sont hautes */
+}
 
 h1 {
     font-size: 3rem;

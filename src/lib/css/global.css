@@ -1,6 +1,4 @@
 :root {
-
-
     --color-orange: #ff6300;
     --color-blue-light: #00cbff;
     --color-blue-dark: #39f;
@@ -51,12 +49,3 @@ html, body {
 }
 
 
-
-
-
-
-
-
-.disable-scroll {
-	overflow: hidden;
-}
