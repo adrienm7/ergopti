@@ -28,9 +28,10 @@
 			<li>réduit les distances parcourues par les doigts, en particulier l’auriculaire droit ;</li>
 			<li>divise par 2 le nombre de touches frappées pour écrire certains mots ;</li>
 			<li>
-				ajoute divers raccourcis tels qu’une touche <kbd>Alt</kbd> + <kbd>Tab</kbd>,
-				<kbd>Capsword</kbd>
-				ou encore <kbd>Dot-Space-Shift</kbd>.
+				ajoute divers raccourcis tels qu’une touche <kbd-sortie>Alt</kbd-sortie> +
+				<kbd-sortie>Tab</kbd-sortie>,
+				<kbd-sortie>Capsword</kbd-sortie>
+				ou encore <kbd-sortie>Dot-Space-Shift</kbd-sortie>.
 			</li>
 		</ul>
 	</div>
@@ -60,7 +61,8 @@
 		☒ Ensuite, et c’est le plus grand inconvénient, dans de très rares cas ces raccourcis vous
 		empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <Nom_Plus />, les
 		combinaisons de touches extrêmement rares comme <kbd>HC</kbd> sont transformées en d’autres bien
-		plus utiles comme <kbd>WH</kbd>. Cela signifie que dans les cas où vous voulez vraiment écrire
+		plus utiles comme <kbd-sortie>WH</kbd-sortie>. Cela signifie que dans les cas où vous voulez
+		vraiment écrire
 		<kbd>HC</kbd>, il faudra remettre à zéro le remplacement de texte.
 	</p>
 	<p class="lettrine">

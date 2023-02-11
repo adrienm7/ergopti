@@ -7,18 +7,18 @@
 <h3>Ajout des suffixes les plus communs en <kbd>,</kbd></h3>
 <p>
 	Il y a toujours un espace après la virgule (sauf si l’on écrit des nombres). Par conséquent, toute
-	combinaison de type <kbd>,s</kbd> ou <kbd>,c</kbd> n’est jamais tapée. Cela donne une opportunité
+	combinaison de type <kbd>,S</kbd> ou <kbd>,C</kbd> n’est jamais tapée. Cela donne une opportunité
 	extraordinaire de raccourcis pour augmenter sa vitesse et son confort de frappe. Par exemple, au
-	lieu de taper 5 lettres pour écrire le suffixe <kbd>EMENT</kbd>, très souvent utilisé en français,
-	deux frappes suffisent : <kbd>,S</kbd>. Ces raccourcis vont diviser par deux le nombre de touches
-	nécessaires pour écrire les suffixes les plus communs, entrainant une petite augmentation de
-	vitesse.
+	lieu de taper 5 lettres pour écrire le suffixe <kbd-sortie>EMENT</kbd-sortie>, très souvent
+	utilisé en français, deux frappes suffisent : <kbd>,S</kbd>. Ces raccourcis vont diviser par deux
+	le nombre de touches nécessaires pour écrire les suffixes les plus communs, entrainant une petite
+	augmentation de vitesse.
 </p>
 <p>
 	Le confort est aussi visé, par exemple pour la combinaison <em>GHT</em> qui est un peu
 	inconfortable à faire en <Nom />, car il faut frapper de l’annulaire droit, du majeur droit, puis
 	encore de l’annulaire droit. Ce n’est pas un beau roulement, alors qu’au contraire <kbd>,I</kbd>
-	écrira <em>IGHT</em> et <kbd>,O</kbd> écrira <em>OUGH</em>.
+	écrira <kbd-sortie>IGHT</kbd-sortie> et <kbd>,O</kbd> écrira <kbd-sortie>OUGH</kbd-sortie>.
 </p>
 
 <h3>Remplacement de texte avec <kbd>"</kbd></h3>
@@ -31,20 +31,20 @@
 </p>
 
 <ul class="margin-top-2">
-	<li><kbd>A"</kbd> ➜ <em>Ainsi</em></li>
-	<li><kbd>C"</kbd> ➜ <em>C’est</em></li>
-	<li><kbd>Ct"</kbd> ➜ <em>C’était</em></li>
-	<li><kbd>D"</kbd> ➜ <em>Donc</em></li>
-	<li><kbd>Dé"</kbd> ➜ <em>Déjà</em></li>
-	<li><kbd>Ê"</kbd> ➜ <em>Être</em></li>
-	<li><kbd>Eef"</kbd> ➜ <em>En effet</em></li>
-	<li><kbd>F"</kbd> ➜ <em>Faire</em></li>
-	<li><kbd>G"</kbd> ➜ <em>J’ai</em></li>
-	<li><kbd>Gt"</kbd> ➜ <em>J’étais</em></li>
-	<li><kbd>M"</kbd> ➜ <em>Mais</em></li>
-	<li><kbd>Pê"</kbd> ➜ <em>Peut-être</em></li>
-	<li><kbd>Pex"</kbd> ➜ <em>Par exemple</em></li>
-	<li><kbd>R"</kbd> ➜ <em>Rien</em></li>
+	<li><kbd>A"</kbd> ➜ <kbd-sortie>Ainsi</kbd-sortie></li>
+	<li><kbd>C"</kbd> ➜ <kbd-sortie>C’est</kbd-sortie></li>
+	<li><kbd>Ct"</kbd> ➜ <kbd-sortie>C’était</kbd-sortie></li>
+	<li><kbd>D"</kbd> ➜ <kbd-sortie>Donc</kbd-sortie></li>
+	<li><kbd>Dé"</kbd> ➜ <kbd-sortie>Déjà</kbd-sortie></li>
+	<li><kbd>Ê"</kbd> ➜ <kbd-sortie>Être</kbd-sortie></li>
+	<li><kbd>Eef"</kbd> ➜ <kbd-sortie>En effet</kbd-sortie></li>
+	<li><kbd>F"</kbd> ➜ <kbd-sortie>Faire</kbd-sortie></li>
+	<li><kbd>G"</kbd> ➜ <kbd-sortie>J’ai</kbd-sortie></li>
+	<li><kbd>Gt"</kbd> ➜ <kbd-sortie>J’étais</kbd-sortie></li>
+	<li><kbd>M"</kbd> ➜ <kbd-sortie>Mais</kbd-sortie></li>
+	<li><kbd>Pê"</kbd> ➜ <kbd-sortie>Peut-être</kbd-sortie></li>
+	<li><kbd>Pex"</kbd> ➜ <kbd-sortie>Par exemple</kbd-sortie></li>
+	<li><kbd>R"</kbd> ➜ <kbd-sortie>Rien</kbd-sortie></li>
 </ul>
 
 <p>
