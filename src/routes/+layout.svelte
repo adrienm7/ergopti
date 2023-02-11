@@ -67,6 +67,6 @@
 
 	main {
 		flex-grow: 1;
-		padding-top: var(--hauteur-header); /* Pour que le contune soit en-dessous du header */
+		margin-top: var(--hauteur-header); /* Pour que le contenu soit en-dessous du header */
 	}
 </style>

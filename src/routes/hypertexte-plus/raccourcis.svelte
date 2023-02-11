@@ -1,6 +1,7 @@
 <script>
 	import Nom from '../../composants/Nom.svelte';
 	import Nom_Plus from '../../composants/Nom_Plus.svelte';
+	import SFB from '../../composants/SFB.svelte';
 </script>
 
 <h2>Raccourcis</h2>
@@ -32,7 +33,7 @@
 		<kbd>AltGr</kbd> + <kbd>LShift</kbd> ➜ <kbd>Dot</kbd> + <kbd>Space</kbd> + <kbd>Shift</kbd>
 	</li>
 	<p>
-		Le dot-space-shift envoie un point, puis un espace, puis active la touche Shift pour la
+		Le Dot-Space-Shift envoie un point, puis un espace, puis active la touche Shift pour la
 		prochaine touche pressée, avant de se désactiver. C’est un gain de temps et de confort, car en
 		un seul raccourci, trois touches sont pressée, dont la touche Shift qui est peu confortable à
 		presser sur claviers standards (car pressée par les auriculaires). Un autre avantage est que
@@ -68,7 +69,7 @@
 		consonnes. Toutefois, elle est peu accessible sur un clavier standard, nécessitant que
 		l’auriculaire droit traverse 3 colonnes de lettres avant de l’atteindre. Par conséquent, placer
 		cette touche sur la touche AltGr la ramène à un endroit extrêmement accessible. Cela empéche
-		aussi beaucoup de SFBs.
+		aussi beaucoup de <SFB />s.
 	</p>
 	<p>
 		À noter que les raccourcis en Ctrl + Entrée par exemple ne sont pas pris en charge par cette

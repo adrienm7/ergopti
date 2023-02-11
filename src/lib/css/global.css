@@ -31,21 +31,3 @@ html, body {
     scroll-behavior: smooth;
 	color: black;
 }
-
-.info {
-	background-color: rgba(44, 0, 71, 0.3);
-	backdrop-filter: blur(60px);
-	padding: 20px;
-	border-radius: 10px;
-	border: 1px solid  rgba(44, 0, 71, 0.8);
-}
-
-.important {
-	background-color: rgba(117, 117, 117, 0.3);
-	backdrop-filter: blur(60px);
-	padding: 20px;
-	border-radius: 10px;
-	border: 1px solid  rgba(255, 255, 255, 0.1);
-}
-
-

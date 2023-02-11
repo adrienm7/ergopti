@@ -4,16 +4,17 @@ kbd {
 	justify-content: center; line-height: 1.35rem; text-align: center; 
 	padding: 1px 5px 0px 5px;
 	/* width: calc(calc(.6*100vw/15)*1 - 2*calc(.6*.35vw)); */
-  }
+}
 
-  
-  kbd:active,
-  kbd:hover {
-	box-shadow: rgba(204, 204, 204, 0.7) 0 .766667px 0 0;
-	position: relative;
-	top: calc(calc(.6*.25vw) - calc(.6*.1vw));
-  }
-  
+kbd:active,
+kbd:hover {
+box-shadow: rgba(204, 204, 204, 0.7) 0 .766667px 0 0;
+position: relative;
+top: calc(calc(.6*.25vw) - calc(.6*.1vw));
+}
+
+
+
 .btn-group {
 	--arrondi-bouton: 7px;
 	margin: 0 auto;
@@ -27,6 +28,7 @@ kbd {
 	border-radius: var(--arrondi-bouton) 0 0 var(--arrondi-bouton);
 	border-left: 2px solid rgba(255, 255, 255, 0.8);
 }
+
 .btn-group button,
 .btn-group select {
 	border-radius: 0;

@@ -249,9 +249,9 @@ bloc-clavier[data-couleur="freq"] bloc-touche {
 }
 bloc-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
     --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
-    --couleur-touche-saturation: 100%;
-    --couleur-touche-luminosite: 100%;
-	--transparence-touche: 30%;
+    --couleur-touche-saturation: 80%;
+    --couleur-touche-luminosite: 50%;
+	--transparence-touche: 40%;
 	background-color: hsla( var(--couleur-touche), 100%, 80%, var(--transparence-touche));
 	/* calc( (1 - var(--frequence)) * 40% + 30%) */
 }
