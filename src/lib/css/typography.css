@@ -78,6 +78,17 @@ p {
 	text-align: justify;
 }
 
+.lettrine::first-letter {
+	font-size: 3em;
+	float:left;
+	color:black;
+	background-color: white;
+	padding: 12px;
+	margin-top: 8px;
+	margin-right: 10px;
+	border-radius: 2px;
+  }
+  
 @media (max-width: 600px) {
 	p {
 		text-align: left;
