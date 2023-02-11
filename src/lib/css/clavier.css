@@ -97,6 +97,10 @@ bloc-clavier[data-couche="Visuel"] bloc-touche[data-type="français"] {
 	text-transform: uppercase;
 }
 
+bloc-clavier[data-couche="Visuel"][data-plus=true] bloc-touche[data-touche="q"] {
+	text-transform: capitalize;
+}
+
 bloc-touche[data-touche=""] {
 	display: none;
 }
@@ -136,16 +140,21 @@ bloc-touche[data-touche="!"] div {
     line-height: 1.3;
 }
 
-/* bloc-touche[data-touche="Space"] div::before {
-	content: "HyperTexte";
+bloc-clavier[data-couche="Visuel"] bloc-touche[data-touche="Space"] div::before {
+	content: "HyperTexte v.1.0";
 	color:hsl(0, 0, 30%);
-} */
+}
 
 /* Car le glyphes des touches mortes s’affichent mal sinon */
+bloc-touche[data-touche="CapsLock"] div,
+bloc-touche[data-touche="Enter"] div,
 bloc-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"] div,
-bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="q"] div {
+bloc-clavier[data-couche="Primary"] bloc-touche[data-touche="!"] div,
+bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
 	font-weight: normal;
 }
+
+
 
 
 
@@ -159,7 +168,7 @@ bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="q"] div {
 
 
 bloc-touche[data-type="enter"]{
-	--correction-decalage-entree: 0.5%;
+	--correction-decalage-entree: 1%;
     top: 0;
     position: relative;
 }

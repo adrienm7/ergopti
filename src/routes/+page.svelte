@@ -1,6 +1,6 @@
 <script>
 	import Nom from '../composants/Nom.svelte';
-	import NomPlus from '../composants/Nom_Plus.svelte';
+	import Nom_Plus from '../composants/Nom_Plus.svelte';
 	import Clavier from '../composants/Clavier.svelte';
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
@@ -9,6 +9,7 @@
 	let typeClavier = 'iso';
 	let couche = 'Visuel';
 	let couleur = 'oui';
+	let plus = false;
 
 	onMount(() => {
 		majClavier({
@@ -17,7 +18,8 @@
 			config: {
 				type: typeClavier,
 				couche: couche,
-				couleur: couleur
+				couleur: couleur,
+				plus: plus
 			}
 		});
 		majClavier({
@@ -26,24 +28,22 @@
 			config: {
 				type: 'iso',
 				couche: 'Visuel',
-				couleur: 'freq'
+				couleur: 'freq',
+				plus: false
 			}
 		});
 	});
 
-	function changerCouche() {
-		if (couche == 'Visuel') {
-			couche = 'AltGr';
-		} else {
-			couche = 'Visuel';
-		}
+	function changerCouche(selected) {
+		couche = selected;
 		majClavier({
 			emplacement: 'clavier-presentation',
 			data: hypertexte,
 			config: {
 				type: typeClavier,
 				couche: couche,
-				couleur: couleur
+				couleur: couleur,
+				plus: plus
 			}
 		});
 	}
@@ -71,10 +71,28 @@
 			config: {
 				type: typeClavier,
 				couche: couche,
-				couleur: couleur
+				couleur: couleur,
+				plus: plus
 			}
 		});
 	}
+	function togglePlus() {
+		let emplacement = 'clavier-presentation';
+		plus = !plus;
+		majClavier({
+			emplacement: emplacement,
+			data: hypertexte,
+			config: {
+				type: typeClavier,
+				couche: couche,
+				couleur: couleur,
+				plus: plus
+			}
+		});
+	}
+
+	let selected = 'Visuel';
+	let options = ['Visuel', 'Primary', 'Shift', 'AltGr', 'ShiftAltGr', 'layer'];
 </script>
 
 <div class="fullheight">
@@ -91,8 +109,11 @@
 	</bloc-clavier>
 
 	<div class="btn-group">
-		<button on:click={changerCouche}>
-			{couche === 'Visuel' ? 'Base ➜ AltGr' : 'AltGr ➜ Base'}
+		<select bind:value={selected} on:change={() => changerCouche(selected)}>
+			{#each options as value}<option {value}>{value}</option>{/each}
+		</select>
+		<button on:click={togglePlus}>
+			{plus === true ? 'Plus ➜ Normal' : 'Normal ➜ Plus'}
 		</button>
 		<button on:click={toggleCouleur}>
 			{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
@@ -263,8 +284,8 @@
 
 <h2>★★★ Pour aller plus loin ★★★</h2>
 <p>
-	<NomPlus /> permet d’avoir une disposition encore meilleure. Les roulements sont meilleurs et les doigts
-	ont encore moins de distance à parcourir. Cependant, ces excellents résultats sont le fruit d’une fraude.
-	En effet, ils nécessitent d’avoir un logiciel permettant de se faire des raccourcis personnalisés comme
-	AutoHotkey. Il faudra aussi accepter d’apprendre certains enchaînements de touches.
+	<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les roulements sont meilleurs et les
+	doigts ont encore moins de distance à parcourir. Cependant, ces excellents résultats sont le fruit
+	d’une fraude. En effet, ils nécessitent d’avoir un logiciel permettant de se faire des raccourcis personnalisés
+	comme AutoHotkey. Il faudra aussi accepter d’apprendre certains enchaînements de touches.
 </p>
