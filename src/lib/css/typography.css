@@ -1,3 +1,6 @@
+
+
+
 /* Titres */
 
 
@@ -5,22 +8,22 @@
 	line-height: 1;
 }
 
-.paragraphe,
-main p,
-main ul,
-h1, h2, h3, h4 {
-    line-height: 1.35em;
+
+.contenu {
+    line-height: 1.35;
     max-width: 800px;
     max-width: clamp(200px, 90vw, 800px);
-    margin: 0 auto;
+	margin: 0 auto;
+	padding: 0;
 }
 
 
 
+
 h1 {
+	margin: 0;
     font-size: 3rem;
-    margin-bottom: 1.5rem;
-    padding-top: 5vh;
+    margin-bottom: 20vh;
 	text-align: center;
 	line-height: auto;
 	font-weight: normal;
@@ -74,23 +77,27 @@ h2, h3, h4 {
 	line-height: 1.1em;
 }
 
-p {
+p, 
+.tooltiptext {
 	text-align: justify;
 }
+
+
 
 .lettrine::first-letter {
 	font-size: 3em;
 	float:left;
 	color:black;
 	background-color: white;
-	padding: 12px;
-	margin-top: 8px;
+	padding: 13px;
+	margin-top: 6px;
 	margin-right: 10px;
 	border-radius: 2px;
   }
   
 @media (max-width: 600px) {
-	p {
+	p, 
+	.tooltiptext {
 		text-align: left;
 	}
 
@@ -155,6 +162,34 @@ strong,
         font-size: 1.5rem;
     }
 }
+
+
+
+
+
+/* Boîtes de message */
+
+
+.info {
+	background-color: rgba(44, 0, 71, 0.3);
+	backdrop-filter: blur(60px);
+	padding: 20px;
+	border-radius: 10px;
+	border: 1px solid  rgba(44, 0, 71, 0.8);
+}
+
+.important {
+	background-color: rgba(117, 117, 117, 0.3);
+	backdrop-filter: blur(60px);
+	padding: 20px;
+	border-radius: 10px;
+	border: 1px solid  rgba(255, 255, 255, 0.1);
+}
+.important p {
+	margin: 0;
+}
+
+
 
 
 

@@ -6,6 +6,10 @@ main p:not(:first-child){
 	margin-top: 2rem; /* Cela doit être assez élevé car les touches de clavier sont hautes */
 }
 
+.margin0 {
+	margin: 0;
+}
+
 mini-espace {
 	display: block;
 	height: 5vh;

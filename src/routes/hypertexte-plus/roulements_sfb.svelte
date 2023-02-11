@@ -1,15 +1,20 @@
 <script>
 	import Nom from '../../composants/Nom.svelte';
 	import Nom_Plus from '../../composants/Nom_Plus.svelte';
+	import SFB from '../../composants/SFB.svelte';
 </script>
 
-<h2>Roulements et diminution des SFBs</h2>
-<p>L’un des avantages majeurs de <Nom_Plus /> est qu’il réduit presque à 0 les SFBs.</p>
-
-<h3>Ajout d’excellents roulements et suppression des SFB majeurs</h3>
-<p>Les SFBs les plus fréquents sont, par ordre de fréquence : SC, PT, GT, BU et UB.</p>
+<h2>Roulements et diminution des <SFB />s</h2>
+<p>L’un des avantages majeurs de <Nom_Plus /> est qu’il réduit presque à 0 les <SFB />s.</p>
 <p>
-	SC est supprimé par le racccourci <kbd>,C</kbd> et tous les autres SFBs se font par roulements :
+	Les <SFB />s les plus fréquents de la disposition sont, par ordre de fréquence : SC, PT, OE, EO,
+	GT, BU et UB. Évidemment, ils seront tous supprimés.
+</p>
+<h3>Ajout d’excellents roulements et suppression des <SFB />s majeurs</h3>
+
+<p>
+	SC est supprimé par le racccourci <kbd>,C</kbd> et tous les autres <SFB />s se font par roulements
+	:
 </p>
 <ul class="margin-top-2">
 	<li>HC ➜ <kbd>WH</kbd></li>
@@ -27,7 +32,7 @@
 <h3>Utilisation de la touche <kbd>À</kbd> + <kbd>Consonne</kbd></h3>
 <p>
 	La touche <kbd>À</kbd> est l’une des plus importantes dans <Nom_Plus />. C’est grâce à elle que
-	tous les autres SFBs, en dehors de ceux supprimés grâce à des roulements, sont supprimés.
+	tous les autres <SFB />s, en dehors de ceux supprimés grâce à des roulements, sont supprimés.
 </p>
 
 <h3>Utilisation de la touche <kbd>È</kbd> + <kbd>Voyelle</kbd></h3>
