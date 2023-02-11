@@ -23,7 +23,8 @@
 h1 {
 	margin: 0;
     font-size: 3rem;
-    margin-bottom: 20vh;
+	margin-top: 3vh;
+    margin-bottom: 15vh;
 	text-align: center;
 	line-height: auto;
 	font-weight: normal;
@@ -179,7 +180,7 @@ strong,
 }
 
 .important {
-	background-color: rgba(117, 117, 117, 0.3);
+	background-color: rgba(255, 255, 255, 0.125);
 	backdrop-filter: blur(60px);
 	padding: 20px;
 	border-radius: 10px;

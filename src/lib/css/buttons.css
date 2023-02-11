@@ -1,13 +1,33 @@
-kbd {
-	--taille: 1; align-items: center; background-color: hsla(100deg, 0%, 60%, 10%); border: .666667px solid rgba(255, 255, 255, 0.3); border-image: none 100% 1 0 stretch; border-radius: .15em; box-shadow: rgba(0, 0, 0, 0.3) 5px 3px 5px, 0 calc(.6*.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%); box-sizing: border-box; color: hsla(0, 100%, 100%, 90%); cursor: pointer; display: inline-flex; font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", Arial, sans-serif; font-size: calc(calc(.6*100vw/15)/2.5); font-weight: 300;
+kbd, kbd-sortie {
+	--taille: 1; 
+	align-items: center; 
+	background-color: hsla(100deg, 0%, 60%, 10%); 
+	border: .666667px solid rgba(255, 255, 255, 0.3); 
+	border-image: none 100% 1 0 stretch; 
+	border-radius: .15em; 
+	box-shadow: rgba(0, 0, 0, 0.3) 5px 3px 5px, 0 calc(.6*.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%); 
+	box-sizing: border-box; 
+	color: hsla(0, 100%, 100%, 90%); 
+	cursor: pointer; 
+	display: inline-flex; 
+	font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", Arial, sans-serif; 
+	font-size: 1em;
+	font-weight: 300;
 	/* height: calc(calc(.6*100vw/15) - 2*calc(.6*.35vw));  */
-	justify-content: center; line-height: 1.35rem; text-align: center; 
-	padding: 1px 5px 0px 5px;
+	justify-content: center; 
+	line-height: 1.35rem; 
+	text-align: center; 
+	padding: 0px 5px 2px 5px;
+	margin-top: 3px;
 	/* width: calc(calc(.6*100vw/15)*1 - 2*calc(.6*.35vw)); */
 }
 
-kbd:active,
-kbd:hover {
+kbd-sortie {
+	background-color: hsla(0, 100%, 100%, 90%);
+	color: black;
+}
+kbd:active, kbd-sortie:active,
+kbd:hover, kbd-sortie:hover {
 box-shadow: rgba(204, 204, 204, 0.7) 0 .766667px 0 0;
 position: relative;
 top: calc(calc(.6*.25vw) - calc(.6*.1vw));

@@ -19,6 +19,7 @@
 		visibility: hidden;
 		width: 90%;
 		background-color: black;
+		border: 1px solid rgba(255, 255, 255, 0.2);
 		color: white;
 		border-radius: 8px;
 		padding: 20px;

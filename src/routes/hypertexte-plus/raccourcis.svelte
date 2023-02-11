@@ -7,7 +7,7 @@
 <h2>Raccourcis</h2>
 <h3>Avec AltGr</h3>
 <ul class="margin-top-2">
-	<li><kbd>AltGr</kbd> + <kbd>Tab</kbd> ➜ <kbd>Capsword</kbd></li>
+	<li><kbd>AltGr</kbd> + <kbd>Tab</kbd> ➜ <kbd-sortie>Capsword</kbd-sortie></li>
 	<p>
 		Capsword est une sorte de <strong>Capslock qui se désactive automatiquement</strong> à la fin
 		d’un "mot". Ainsi, Capslock se désactive lors de la pression de <kbd>Espace</kbd>,
@@ -17,7 +17,8 @@
 		comme <em>KC_SPC</em>, <em>SERVER_NAME</em>, etc.
 	</p>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd>Ctrl</kbd> + <kbd>BackSpace</kbd>
+		<kbd>AltGr</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd-sortie>Ctrl</kbd-sortie> +
+		<kbd-sortie>BackSpace</kbd-sortie>
 	</li>
 	<p>
 		Ctrl + BackSpace permet de supprimer en une fois le mot vers la gauche. AltGr est un
@@ -30,7 +31,9 @@
 		car la touche Suppr. est quant à elle disponible en Shift + "Capslock".
 	</p>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>LShift</kbd> ➜ <kbd>Dot</kbd> + <kbd>Space</kbd> + <kbd>Shift</kbd>
+		<kbd>AltGr</kbd> + <kbd>LShift</kbd> ➜ <kbd-sortie>Dot</kbd-sortie> +
+		<kbd-sortie>Space</kbd-sortie>
+		+ <kbd-sortie>Shift</kbd-sortie>
 	</li>
 	<p>
 		Le Dot-Space-Shift envoie un point, puis un espace, puis active la touche Shift pour la
@@ -40,14 +43,16 @@
 		Shift ne s’active que pour le premier caractère de la nouvelle phrase. Ainsi, vous n’aurez plus
 		jamais de <em>JE</em> ou de <em>THe</em> par exemple.
 	</p>
-	<li><kbd>AltGr</kbd> + <kbd>Y</kbd> ➜ <kbd>Escape</kbd></li>
-	<li><kbd>AltGr</kbd> + <kbd>Z</kbd> ➜ <kbd>Home</kbd></li>
-	<li><kbd>AltGr</kbd> + <kbd>Q</kbd> ➜ <kbd>End</kbd></li>
+	<li><kbd>AltGr</kbd> + <kbd>Y</kbd> ➜ <kbd-sortie>Échap</kbd-sortie></li>
+	<li><kbd>AltGr</kbd> + <kbd>Z</kbd> ➜ <kbd-sortie>Home</kbd-sortie></li>
+	<li><kbd>AltGr</kbd> + <kbd>Q</kbd> ➜ <kbd-sortie>End</kbd-sortie></li>
 </ul>
 <h3>Autres raccourcis sur "Capslock" (BackSpace)</h3>
 <ul class="margin-top-2">
-	<li><kbd>Shift</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd>Delete</kbd></li>
-	<li><kbd>Windows</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd>Capslock</kbd></li>
+	<li><kbd>Shift</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd-sortie>Delete</kbd-sortie></li>
+	<li>
+		<kbd>Windows</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd-sortie>Capslock</kbd-sortie>
+	</li>
 </ul>
 <h3>Tap-hold</h3>
 <p>
@@ -63,7 +68,7 @@
 	plus faible de notre main.
 </p>
 <ul class="margin-top-2">
-	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd>Entrée</kbd> sur le tap</li>
+	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-sortie>Entrée</kbd-sortie> sur le tap</li>
 	<p>
 		La touche Entrée est l’une des plus utilisée sur un clavier, elle l’est même plus que certaines
 		consonnes. Toutefois, elle est peu accessible sur un clavier standard, nécessitant que
@@ -79,18 +84,23 @@
 		touche Entrée, qui fonctionne exactement comme avant.
 	</p>
 
-	<li>Tap hold en <kbd>Alt</kbd> ➜ <kbd>Alt</kbd> + <kbd>Tab</kbd> sur le tap</li>
+	<li>
+		Tap hold en <kbd>Alt</kbd> ➜ <kbd-sortie>Alt</kbd-sortie> + <kbd-sortie>Tab</kbd-sortie> sur le tap
+	</li>
 	<p>
 		Ce raccourci est extrêmement pratique. Plus besoin de faire la combinaison Alt+Tab, seul un
 		appui sur Tab suffit, ce qui le transfore en sorte de toggle entre les fenêtres.
 	</p>
-	<li>Tap hold en <kbd>LCtrl</kbd> ➜ <kbd>Ctrl</kbd> + <kbd>V</kbd> sur le tap</li>
+	<li>
+		Tap hold en <kbd>LCtrl</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>V</kbd-sortie> sur le
+		tap
+	</li>
 	<p>
 		Avoir la possibilité de "Coller" par appui de la main gauche sur une touche est très utile,
 		particulièrement lorsque la souris est utilisée en même temps par la main droite. Cela permet de
 		remplacer à la volée des parties de texte.
 	</p>
-	<li>Tap hold en <kbd>Espace</kbd> ➜ Layer de navigation en hold</li>
+	<li>Tap hold en <kbd>Espace</kbd> ➜ <kbd-sortie>Layer de navigation</kbd-sortie> en hold</li>
 	<p>
 		Ce layer de navigation contient les flèches directionnelles pour naviguer rapidement dans un
 		texte, mais aussi toutes les combinaisons de ces flèches avec des modificateurs. Ainsi, il y a
