@@ -2,10 +2,12 @@ export function majClavier({ emplacement, data, config }) {
 	const typeClavier = config.type;
 	const coucheClavier = config.couche;
 	const couleurClavier = config.couleur;
+	const plusClavier = config.plus;
 
 	document.getElementById(emplacement).dataset.type = typeClavier;
 	document.getElementById(emplacement).dataset.couche = coucheClavier;
 	document.getElementById(emplacement).dataset.couleur = couleurClavier;
+	document.getElementById(emplacement).dataset.plus = plusClavier;
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 	for (let i = 1; i <= 5; i++) {
 		for (let j = 0; j <= 15; j++) {
@@ -25,10 +27,27 @@ export function majClavier({ emplacement, data, config }) {
 							toucheClavier.getElementsByTagName('div')[0].innerHTML =
 								touche['Shift'] + '<br/>' + touche['Primary'];
 						} else {
-							toucheClavier.getElementsByTagName('div')[0].innerHTML = touche['Primary'];
+							if (plusClavier) {
+								if (touche['Primary' + '+'] !== undefined) {
+									toucheClavier.getElementsByTagName('div')[0].innerHTML = touche['Primary' + '+'];
+								} else {
+									toucheClavier.getElementsByTagName('div')[0].innerHTML = touche['Primary'];
+								}
+							} else {
+								toucheClavier.getElementsByTagName('div')[0].innerHTML = touche['Primary'];
+							}
 						}
 					} else {
-						toucheClavier.getElementsByTagName('div')[0].innerHTML = touche[coucheClavier];
+						if (plusClavier) {
+							if (touche[coucheClavier + '+'] !== undefined) {
+								toucheClavier.getElementsByTagName('div')[0].innerHTML =
+									touche[coucheClavier + '+'];
+							} else {
+								toucheClavier.getElementsByTagName('div')[0].innerHTML = touche[coucheClavier];
+							}
+						} else {
+							toucheClavier.getElementsByTagName('div')[0].innerHTML = touche[coucheClavier];
+						}
 					}
 				}
 				toucheClavier.dataset.touche = res.touche;

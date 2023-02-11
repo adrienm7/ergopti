@@ -23,26 +23,37 @@ kbd {
 	font-size: 0.6rem;
 }
 
-.btn-group button:first-child {
+.btn-group>:first-child {
 	border-radius: var(--arrondi-bouton) 0 0 var(--arrondi-bouton);
-	border-right: 0;
+	border-left: 2px solid rgba(255, 255, 255, 0.8);
 }
-.btn-group button {
+.btn-group button,
+.btn-group select {
 	border-radius: 0;
 	background-color: rgba(255, 255, 255, 0.1);
 	color: white;
 	padding: 10px;
 	border: 2px solid rgba(255, 255, 255, 0.8);
+	border-right: 0;
 	cursor: pointer;
+}
+
+.btn-group select {
+	line-height: 1.3;
+	font-family: initial;
+}
+.btn-group select option {
+	background-color: white;
+	color: black;
 }
 
 .btn-group button a {
 	color: inherit;
 	text-decoration: none;
 }
-.btn-group button:last-child {
+.btn-group>:last-child {
 	border-radius: 0 var(--arrondi-bouton) var(--arrondi-bouton) 0;
-	border-left: 0;
+	border-right: 2px solid rgba(255, 255, 255, 0.8);
 }
 
 .btn-group button:hover {
