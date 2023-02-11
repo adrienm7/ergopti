@@ -30,7 +30,7 @@
  */
 
 	#page {
-		--couleur: 48;
+		--couleur: 80;
 		display: flex;
 		flex-direction: column;
 		margin: 0;
@@ -38,27 +38,33 @@
 		min-height: 100vh;
 		background: linear-gradient(
 			90deg,
-			rgba(0, 0, 12, 1) 0%,
-			rgba(0, 0, var(--couleur), 1) 50%,
-			rgba(0, 0, 12, 1) 100%
+			rgba(0, 0, var(--couleur), 1) 0%,
+			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 10%,
+			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 20%,
+			rgba(0, 0, calc(var(--couleur) / 3), 1) 30%,
+			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 40%,
+			rgba(0, 0, calc(var(--couleur) / 4), 1) 50%,
+			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 60%,
+			rgba(0, 0, calc(var(--couleur) / 3), 1) 70%,
+			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 80%,
+			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 90%,
+			rgba(0, 0, var(--couleur), 1) 100%
 		);
 		color: white;
 	}
-	@media (max-width: 400px) {
-		#page {
-			--couleur: 24;
-		}
-	}
-	@media (max-width: 600px) {
-		#page {
-			--couleur: 32;
-		}
-	}
+
 	@media (max-width: 800px) {
 		#page {
-			--couleur: 40;
+			--couleur: 150;
+			background: linear-gradient(
+				90deg,
+				rgba(0, 0, calc(var(--couleur) / 3), 1) 0%,
+				rgba(0, 0, calc(var(--couleur) / 4), 1) 50%,
+				rgba(0, 0, calc(var(--couleur) / 3), 1) 100%
+			);
 		}
 	}
+
 	main {
 		flex-grow: 1;
 		padding-top: var(--hauteur-header); /* Pour que le contune soit en-dessous du header */
