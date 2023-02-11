@@ -29,21 +29,21 @@
 	normal.
 </p>
 <petit-espace />
-<p>
+<p class="lettrine">
 	Toutefois, ces nombreux avantages viennent à un prix. D’abord, il y a un effort d’apprentissage
 	supplémentaire à effectuer. C’est d’autant plus difficile que ces raccourcis ne sont pas marqués
 	sur le clavier, il faut donc les apprendre par cœur car regarder ses touches ne fournira aucune
 	information. Le bon côté est que vous n’êtes pas obligé de tous les utiliser d’un coup, ce ne sont
 	que des possibilités supplémentaires. Ainsi, le passage de <Nom /> vers <Nom_Plus /> se fait en douceur.
 </p>
-<p>
+<p class="lettrine">
 	Ensuite, et c’est le plus grand inconvénient, dans de très rares cas ces raccourcis vous
 	empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <Nom_Plus />, les
 	combinaisons de touches extrêmement rares comme HC sont transformées en d’autres bien plus utiles
 	comme WH. Cela signifie que dans les cas où vous voulez vraiment écrire HC, il faudra remettre à
 	zéro le remplacement de texte.
 </p>
-<p>
+<p class="lettrine">
 	Cela peut notamment se faire en utilisant les flèches de navigation, la touche Échap, cliquant
 	quelque part, etc. Ces manipulations ne devraient arriver que très rarement, mais tout dépend de
 	votre utilisation. Par exemple, l’enchaînement XG est très peu commun, mais les data scientists
