@@ -8,7 +8,44 @@
 	import '$lib/css/typography.css';
 	import '$lib/css/buttons.css';
 	import '$lib/css/miscellaneous.css';
+
+	import Clavier from '../composants/Clavier.svelte';
+	import hypertexte from '$lib/data/hypertexte.json';
+	import { majClavier } from '$lib/js/clavier.js';
+	import { onMount } from 'svelte';
+
+	let typeClavier = 'iso';
+	let couche = 'Visuel';
+	let couleur = 'oui';
+	let plus = false;
+
+	onMount(() => {
+		majClavier({
+			emplacement: 'clavier-reference',
+			data: hypertexte,
+			config: {
+				type: typeClavier,
+				couche: couche,
+				couleur: couleur,
+				plus: plus
+			}
+		});
+	});
+
+	let zIndex = -999;
+
+	function toggleZIndex() {
+		zIndex = zIndex === -999 ? 100 : -999;
+	}
 </script>
+
+<button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
+
+<div id="clavier" style="z-index: {zIndex};">
+	<bloc-clavier id="clavier-reference">
+		<Clavier />
+	</bloc-clavier>
+</div>
 
 <div id="page">
 	<Header />
@@ -21,6 +58,38 @@
 </div>
 
 <style>
+	#clavier {
+		position: fixed;
+		bottom: 0;
+		left: 50%;
+		transform: translate(-50%, 0);
+		width: 100vw;
+		height: calc(100vh - var(--hauteur-header));
+		display: flex;
+		align-items: center;
+		--couleur: 80;
+		background: linear-gradient(
+			90deg,
+			rgba(0, 0, var(--couleur), 1) 0%,
+			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 10%,
+			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 20%,
+			rgba(0, 0, calc(var(--couleur) / 3), 1) 30%,
+			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 40%,
+			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 50%,
+			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 60%,
+			rgba(0, 0, calc(var(--couleur) / 3), 1) 70%,
+			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 80%,
+			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 90%,
+			rgba(0, 0, var(--couleur), 1) 100%
+		);
+	}
+	#afficher-clavier-reference {
+		position: fixed;
+		z-index: 999;
+		bottom: 20px;
+		right: 20px;
+		padding: 10px;
+	}
 	/* Permet de toujours placer le footer en bas de la page */
 
 	/* « Je vous conseille fortement d’utiliser un conteneur global, comme ici avec #page, pour réaliser ce genre de mise en page.
@@ -43,7 +112,7 @@
 			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 20%,
 			rgba(0, 0, calc(var(--couleur) / 3), 1) 30%,
 			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 40%,
-			rgba(0, 0, calc(var(--couleur) / 4), 1) 50%,
+			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 50%,
 			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 60%,
 			rgba(0, 0, calc(var(--couleur) / 3), 1) 70%,
 			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 80%,

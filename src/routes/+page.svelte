@@ -1,6 +1,7 @@
 <script>
 	import Nom from '../composants/Nom.svelte';
 	import Nom_Plus from '../composants/Nom_Plus.svelte';
+	import SFB from '../composants/SFB.svelte';
 	import Clavier from '../composants/Clavier.svelte';
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
@@ -91,42 +92,49 @@
 		});
 	}
 
-	let selected = 'Visuel';
-	let options = ['Visuel', 'Primary', 'Shift', 'AltGr', 'ShiftAltGr', 'layer'];
+	let options = [
+		['Visuel', 'Visuel'],
+		['Primary', 'Primary'],
+		['Shift', 'Shift'],
+		['AltGr', 'AltGr'],
+		['Shift + AltGr', 'ShiftAltGr'],
+		['Layer', 'layer']
+	];
+	let selected = options[0]; // On actualise la valeur du select avec celle par défaut, cad "Visuel"
 </script>
 
-<div class="contenu">
-	<div class="fullheight">
-		<div>
-			<h1 class="titre">
-				Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="texte"
-					>Texte&nbsp;—</span
-				>
-			</h1>
-		</div>
-
-		<bloc-clavier id="clavier-presentation">
-			<Clavier />
-		</bloc-clavier>
-
-		<div class="btn-group">
-			<select bind:value={selected} on:change={() => changerCouche(selected)}>
-				{#each options as value}<option {value}>{value}</option>{/each}
-			</select>
-			<button on:click={togglePlus}>
-				{plus === true ? 'Plus ➜ Normal' : 'Normal ➜ Plus'}
-			</button>
-			<button on:click={toggleCouleur}>
-				{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
-			</button>
-			<button on:click={toggleIso}>
-				{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
-			</button>
-		</div>
+<div class="fullheight">
+	<div>
+		<h1 class="titre">
+			Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="texte"
+				>Texte&nbsp;—</span
+			>
+		</h1>
 	</div>
 
-	<mini-espace />
+	<bloc-clavier id="clavier-presentation">
+		<Clavier />
+	</bloc-clavier>
 
+	<div class="btn-group">
+		<select bind:value={selected} on:change={() => changerCouche(selected[1])}>
+			{#each options as value}<option {value}>{value[0]}</option>{/each}
+		</select>
+		<button on:click={togglePlus}>
+			{plus === true ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
+		</button>
+		<button on:click={toggleCouleur}>
+			{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
+		</button>
+		<button on:click={toggleIso}>
+			{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
+		</button>
+	</div>
+</div>
+
+<mini-espace />
+
+<div class="contenu">
 	<p class="important">
 		<Nom /> est une disposition clavier optimisée. Elle est destinée à taper majoritairement du français
 		ainsi que de l’anglais. Elle se veut la plus <span class="hyper">optimale</span> possible. Comment
@@ -143,7 +151,7 @@
 	</p>
 	<ul class="paragraphe">
 		<li>Bépo, puis Optimot, puis Optim7 puis HyperTexte</li>
-		<li>E sur le majeur et non l’index à cause des roulements et SFB</li>
+		<li>E sur le majeur et non l’index à cause des roulements et <SFB />s</li>
 		<li>Q puis P puis W sur l’index gauche</li>
 		<li>Comment retenir les symboles en AltGr</li>
 	</ul>
@@ -158,6 +166,106 @@
 		AltGr+Espace.
 	</p>
 
+	<h3>Placement logique des touches</h3>
+	<p>
+		Afin de faciliter la mémorisation, les touches sont placées logiquement, en particulier sur la
+		couche AltGr. Ainsi :
+	</p>
+
+	<ul class="margin-top-2">
+		<li>
+			<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>`</kbd-sortie> Le
+			<span class="hyper text-bold">`</span> sur le A
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>@</kbd-sortie> aro<span class="hyper text-bold"
+				>B</span
+			>ase
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
+			<span class="hyper text-bold">C</span> cédille
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>D</kbd> ➜ <kbd-sortie>$</kbd-sortie>
+			<span class="hyper text-bold">D</span>ollar
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
+			le <span class="hyper text-bold">/</span> sur le E
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>\</kbd-sortie>
+			le <span class="hyper text-bold">\</span> sur le E
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-sortie>#</kbd-sortie>
+			<span class="hyper text-bold">H</span>ashtag
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-sortie>=</kbd-sortie> éga<span class="hyper text-bold"
+				>L</span
+			>
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>M</kbd> ➜ <kbd-sortie>&</kbd-sortie> a<span class="hyper text-bold"
+				>M</span
+			>persand
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>P</kbd> ➜ <kbd-sortie>+</kbd-sortie>
+			<span class="hyper text-bold">P</span>lus
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> barre
+			<span class="hyper text-bold">V</span>erticale
+		</li>
+	</ul>
+
+	<petit-espace />
+
+	<p>D’autres sont placés par paires l’une à côté de l’autre :</p>
+	<ul class="margin-top-2">
+		<li>
+			<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
+			<kbd>I</kbd>
+			➜ <kbd-sortie>]</kbd-sortie>
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>E</kbd> ➜ <kbd-sortie>{'{'}</kbd-sortie> et <kbd>AltGr</kbd> +
+			<kbd>U</kbd>
+			➜ <kbd-sortie>{'}'}</kbd-sortie>
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>S</kbd> ➜ <kbd-sortie>(</kbd-sortie> et <kbd>AltGr</kbd> +
+			<kbd>N</kbd>
+			➜ <kbd-sortie>)</kbd-sortie>
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>{'<'}</kbd-sortie> et <kbd>AltGr</kbd> +
+			<kbd>R</kbd>
+			➜ <kbd-sortie>{'>'}</kbd-sortie>
+		</li>
+		<li>
+			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>⩽</kbd-sortie> et
+			<kbd>Shift</kbd>
+			+ <kbd>AltGr</kbd> +
+			<kbd>R</kbd>
+			➜ <kbd-sortie>⩾</kbd-sortie>
+		</li>
+		<li>
+			<kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>«</kbd-sortie> et <kbd>AltGr</kbd> +
+			<kbd>X</kbd>
+			➜ <kbd-sortie>»</kbd-sortie>
+		</li>
+		<li>
+			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>“</kbd-sortie> et
+			<kbd>Shift</kbd>
+			+ <kbd>AltGr</kbd> +
+			<kbd>X</kbd>
+			➜ <kbd-sortie>”</kbd-sortie>
+		</li>
+	</ul>
 	<h3>Chiffres en accès direct</h3>
 	<p>
 		Les chiffres sont en accès direct sur les dispositions QWERTY, mais pas en AZERTY. Chaque
@@ -171,6 +279,14 @@
 		profite pour déplacer les caractères qui étaient auparavant en accès direct sur la rangée des
 		chiffres. Ils se retrouvent en AltGr sur les 3 rangées du milieu pour ne pas avoir à trop bouger
 		les doigts.
+	</p>
+
+	<h3>Optimisation pour l’utilisation à une main</h3>
+	<p>
+		Le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire facilement les
+		raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>. Normalement, le
+		<kbd>=</kbd>
+		se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
 	</p>
 
 	<h2>Disposition clavier optimisée</h2>
@@ -226,7 +342,7 @@
 <div class="contenu">
 	<grand-espace />
 
-	<h3>➂ Minimisation des SFB</h3>
+	<h3>➂ Minimisation des <SFB />s</h3>
 
 	<h3>➃ Optimisation des roulements</h3>
 	<p>
@@ -261,11 +377,11 @@
 	<p>
 		Notamment, le E n’est pas sur l’index de la rangée de repos. Ce qui est pourtant étrange, tant
 		son apparition est fréquente dans les textes. C’est la lettre la plus fréquente et de loin.
-		Pourtant, elle ne se trouve pas sur l’index notamment afin de réduire les SFB. Si le E avait été
-		sur l’index, alors les 6 touches tapées par ce doigt auraient possiblement fait des SFB avec le
-		E. E s’associe avec quasiment toutes les lettres, donc ce serait une très mauvaise idée. Au
-		contraire, la voyelle U ne s’associe pas avec beaucoup de lettres, donc elle est bien mieux à
-		cet emplacement. D’autant que cet arrangemement des voyelles permet alors de très bons
+		Pourtant, elle ne se trouve pas sur l’index notamment afin de réduire les <SFB />s. Si le E
+		avait été sur l’index, alors les 6 touches tapées par ce doigt auraient possiblement fait des <SFB
+		/>s avec le E. E s’associe avec quasiment toutes les lettres, donc ce serait une très mauvaise
+		idée. Au contraire, la voyelle U ne s’associe pas avec beaucoup de lettres, donc elle est bien
+		mieux à cet emplacement. D’autant que cet arrangemement des voyelles permet alors de très bons
 		roulements.
 	</p>
 
@@ -278,21 +394,12 @@
 		<li>K est assez loin, surtout pour l’anglais avec ses SK, CK, etc.</li>
 	</ul>
 
-	<h2>Autres choix de la disposition</h2>
-
-	<h3>Optimisation pour l’utilisation à une main</h3>
+	<h2><span class="glow">★</span> Pour aller plus loin</h2>
 	<p>
-		Le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire facilement les
-		raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>. Normalement, le
-		<kbd>=</kbd>
-		se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
-	</p>
-
-	<h2>★★★ Pour aller plus loin ★★★</h2>
-	<p>
-		<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les roulements sont meilleurs et les
-		doigts ont encore moins de distance à parcourir. Cependant, ces excellents résultats sont le fruit
-		d’une fraude. En effet, ils nécessitent d’avoir un logiciel permettant de se faire des raccourcis
-		personnalisés comme AutoHotkey. Il faudra aussi accepter d’apprendre certains enchaînements de touches.
+		<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués, les
+		roulements sont améliorés et les doigts ont encore moins de distance à parcourir. Cependant, ces
+		excellents résultats sont le fruit d’une fraude. En effet, ils nécessitent d’avoir un logiciel
+		permettant de se faire des raccourcis personnalisés comme AutoHotkey. Il faudra aussi accepter
+		d’apprendre des enchaînements de touches supplémentaires.
 	</p>
 </div>
