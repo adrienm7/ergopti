@@ -1004,7 +1004,7 @@
 			"Primary": "a",
 			"Shift": "A",
 			"AltGr": "[",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "ℕ",
 			"layer": "",
 			"type": "lettre"
 		},
@@ -1040,7 +1040,7 @@
 			"Primary": "e",
 			"Shift": "E",
 			"AltGr": "{",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "ᵉ",
 			"layer": "",
 			"type": "lettre"
 		},
@@ -1076,7 +1076,7 @@
 			"Primary": "i",
 			"Shift": "I",
 			"AltGr": "]",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "ᵢ",
 			"layer": "↑",
 			"type": "lettre"
 		},
@@ -1186,7 +1186,7 @@
 			"Primary": "u",
 			"Shift": "U",
 			"AltGr": "}",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "μ",
 			"layer": "",
 			"type": "lettre"
 		},
