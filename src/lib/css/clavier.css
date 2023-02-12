@@ -168,7 +168,7 @@ bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
 
 
 bloc-touche[data-type="enter"]{
-	--correction-decalage-entree: 1%;
+	--correction-decalage-entree: 0;
     top: 0;
     position: relative;
 }
