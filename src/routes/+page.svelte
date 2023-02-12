@@ -125,11 +125,11 @@
 		</div>
 	</div>
 
-	<moyen-espace />
+	<mini-espace />
 
 	<p class="important">
 		<Nom /> est une disposition clavier optimisée. Elle est destinée à taper majoritairement du français
-		ainsi que de l’anglais. Elle se veut la plus <span class="degrade">optimale</span> possible. Comment
+		ainsi que de l’anglais. Elle se veut la plus <span class="hyper">optimale</span> possible. Comment
 		atteindre cet objectif ? C’est ce qui vous sera présenté sur cette page.
 	</p>
 

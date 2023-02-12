@@ -64,34 +64,32 @@
 	La touche <kbd>"</kbd> est surtout utilisée pour entourer du texte. Dans la plupart des éditeurs,
 	l’appui sur cette touche va directement écrire <kbd-sortie>""</kbd-sortie>. Il est toutefois tout
 	à fait possible de l’utiliser comme touche de raccourci, car là encore les mots
-	<kbd-non>c"</kbd-non>
-	et
-	<kbd-non>gt"</kbd-non> n’existent pas. Ainsi, l’écriture de l’abréviation puis du guillemet ne va pas
-	écrire de guillemet mais plutôt transformer le texte écrit.
+	<kbd-non>C"</kbd-non> et <kbd-non>GT"</kbd-non> n’existent pas. Ainsi, l’écriture de l’abréviation
+	puis du guillemet ne va pas écrire de guillemet mais plutôt transformer le texte écrit.
 </p>
 
 <ul class="margin-top-2">
 	<li><kbd>A"</kbd> ➜ <kbd-sortie>AINSI</kbd-sortie></li>
-	<li><kbd>Avv"</kbd> ➜ <kbd-sortie>AVEZ-VOUS</kbd-sortie></li>
+	<li><kbd>AVV"</kbd> ➜ <kbd-sortie>AVEZ-VOUS</kbd-sortie></li>
 	<li><kbd>C"</kbd> ➜ <kbd-sortie>C’EST</kbd-sortie></li>
-	<li><kbd>Ct"</kbd> ➜ <kbd-sortie>C’ÉTAIT</kbd-sortie></li>
+	<li><kbd>CT"</kbd> ➜ <kbd-sortie>C’ÉTAIT</kbd-sortie></li>
 	<li><kbd>D"</kbd> ➜ <kbd-sortie>DONC</kbd-sortie></li>
-	<li><kbd>Dé"</kbd> ➜ <kbd-sortie>DÉJÀ</kbd-sortie></li>
+	<li><kbd>DÉ"</kbd> ➜ <kbd-sortie>DÉJÀ</kbd-sortie></li>
 	<li><kbd>Ê"</kbd> ➜ <kbd-sortie>ÊTRE</kbd-sortie></li>
-	<li><kbd>Eef"</kbd> ➜ <kbd-sortie>EN EFFET</kbd-sortie></li>
+	<li><kbd>EEF"</kbd> ➜ <kbd-sortie>EN EFFET</kbd-sortie></li>
 	<li><kbd>F"</kbd> ➜ <kbd-sortie>FAIRE</kbd-sortie></li>
 	<li><kbd>G"</kbd> ➜ <kbd-sortie>J’AI</kbd-sortie></li>
-	<li><kbd>Gt"</kbd> ➜ <kbd-sortie>J’ÉTAIS</kbd-sortie></li>
+	<li><kbd>GT"</kbd> ➜ <kbd-sortie>J’ÉTAIS</kbd-sortie></li>
 	<li><kbd>M"</kbd> ➜ <kbd-sortie>MAIS</kbd-sortie></li>
-	<li><kbd>Pê"</kbd> ➜ <kbd-sortie>PEUT-ÊTRE</kbd-sortie></li>
-	<li><kbd>Pex"</kbd> ➜ <kbd-sortie>PAR EXEMPLE</kbd-sortie></li>
+	<li><kbd>PÊ"</kbd> ➜ <kbd-sortie>PEUT-ÊTRE</kbd-sortie></li>
+	<li><kbd>PEX"</kbd> ➜ <kbd-sortie>PAR EXEMPLE</kbd-sortie></li>
 	<li><kbd>R"</kbd> ➜ <kbd-sortie>RIEN</kbd-sortie></li>
 </ul>
 
 <p>
 	Ici aussi, dans des cas rares cela ne peut pas fonctionner. Peut-être que vous voudrez réellement
-	écrire <kbd>"ê"</kbd> dans un texte, ce qui activera malencontrueusement le remplacement en
-	<kbd-sortie>"être</kbd-sortie>. Cela ne devrait presque jamais arriver, car écrire ce genre de
+	écrire <kbd>"Ê"</kbd> dans un texte, ce qui activera malencontrueusement le remplacement en
+	<kbd-sortie>"ÊTRE</kbd-sortie>. Cela ne devrait presque jamais arriver, car écrire ce genre de
 	texte arrive surtout pour tester des conditions en programmation notamment. Dans les éditeurs de
 	code, l’ajout automatique des deux guillemets fait tout fonctionner comme il le faut.
 </p>

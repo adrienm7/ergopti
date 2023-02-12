@@ -10,7 +10,7 @@
 
 
 .contenu {
-    line-height: 1.35;
+    line-height: 1.4;
     max-width: 800px;
     max-width: clamp(200px, 90vw, 800px);
 	margin: 0 auto;
@@ -311,12 +311,4 @@ strong,
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	background-image: linear-gradient(to left, var(--gradient-purple));
-}
-
-
-
-.degrade {
-	box-decoration-break: clone;
--webkit-text-fill-color: transparent;
-	background: linear-gradient(93.3deg, rgb(203, 184, 255) 0%, rgb(128, 125, 255) 100%) padding-box text;
 }

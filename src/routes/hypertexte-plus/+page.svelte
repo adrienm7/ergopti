@@ -38,13 +38,13 @@
 
 	<mini-espace />
 	<p>
-		<span class="texte text-bold">
-			Toutefois, l’utilisation de cette version nécessite des outils de programmation de clavier
-			spécifiques.
+		Toutefois, l’utilisation de cette version nécessite des <span class="texte text-bold"
+			>outils de programmation de clavier spécifiques.
 		</span>
 		<span>
-			Sur Windows, le programme <strong>AutoHotkey</strong> est utilisé afin de réaliser ces changements.
-			Il est également possible de programmer le firmware de son clavier (avec QMK ou ZMK) pour ce faire.
+			Sur Windows, le programme <span class="texte"><strong>AutoHotkey</strong></span> est utilisé afin
+			de réaliser ces changements. Il est également possible de programmer le firmware de son clavier
+			(avec QMK ou ZMK) pour ce faire.
 		</span>
 	</p>
 

@@ -18,7 +18,7 @@ kbd, kbd-sortie, kbd-non {
 	line-height: 1.35em; 
 	text-align: center;
 	padding: 1px 5px 2px 5px;
-	margin: 1px 0;
+	margin: 2px 0;
 	/* width: calc(calc(.6*100vw/15)*1 - 2*calc(.6*.35vw)); */
 }
 
