@@ -7,14 +7,19 @@
 <h2>Roulements et diminution des <SFB />s</h2>
 <p>L’un des avantages majeurs de <Nom_Plus /> est qu’il réduit presque à 0 les <SFB />s.</p>
 <p>
-	Les <SFB />s les plus fréquents de la disposition sont, par ordre de fréquence : SC, PT, OE, EO,
-	GT, BU et UB. Évidemment, ils seront tous supprimés.
+	Les <SFB />s les plus fréquents de la disposition sont, par ordre de fréquence : <kbd>SC</kbd>,
+	<kbd>PT</kbd>, <kbd>EO</kbd>, <kbd>OE</kbd>,
+	<kbd>UB</kbd>, <kbd>BU</kbd> et <kbd>GT</kbd>. <kbd>SC</kbd> étant de loin celui apparaissant le
+	plus. En outre, <kbd>EO</kbd> et
+	<kbd>OE</kbd> sont relativement fréquents en anglais (pour écrire <kbd-sortie>DOES</kbd-sortie>,
+	<kbd-sortie>PEOPLE</kbd-sortie>, etc.) Tous ces <SFB />s seront supprimés, plus de nombreux autres
+	encore moins fréquents.
 </p>
 <h3>Ajout d’excellents roulements et suppression des <SFB />s majeurs</h3>
 
 <p>
-	<kbd-sortie>SC</kbd-sortie> est remplacé par le racccourci <kbd>,C</kbd> et tous les autres <SFB
-	/>s les plus fréquents se font par roulements :
+	<kbd-sortie>SC</kbd-sortie> est remplacé par le racccourci <kbd>,C</kbd> et d’autres <SFB />s
+	parmi les plus fréquents se font par roulements :
 </p>
 <ul class="margin-top-2">
 	<li><kbd>P’</kbd> ➜ <kbd-sortie>PT</kbd-sortie></li>
@@ -30,18 +35,25 @@
 </ul>
 
 <mini-espace />
-
+<p>
+	Le roulement <kbd>CH</kbd> était déjà l’un des atouts majeur de la disposition <Nom />, car cette
+	combinaison est très fréquente et ce roulement la rend extrêmement confortable. L’ajout de ce
+	roulement <kbd>WH</kbd> est
+</p>
 <p>
 	Encore une fois, ces roulements améliorent beaucoup l’expérience de frappe dans la majorité du
-	temps. Cependant, parfois vous voudrez écrire GX (par exemple pour écrire Yu-Gi-Oh GX) et vous ne
-	pourrez pas car GX se transformera en GT. À vous de voir si vous voulez supprimer certains
-	raccourcis, les modifier ou créer d’autres raccourcis pour écrire GX d’une autre manière.
+	temps. Cependant, parfois vous voudrez écrire <kbd>GX</kbd> (par exemple pour écrire Yu-Gi-Oh GX)
+	et vous ne pourrez pas car <kbd>GX</kbd> se transformera en <kbd-non>GT</kbd-non>. À vous de voir
+	si vous voulez supprimer certains raccourcis, les modifier ou créer d’autres raccourcis pour
+	écrire <kbd>GX</kbd> d’une autre manière.
 </p>
 
 <h3>Utilisation de la touche <kbd>À</kbd> + <kbd>Consonne</kbd></h3>
 <p>
 	La touche <kbd>À</kbd> est l’une des plus importantes dans <Nom_Plus />. C’est grâce à elle que
-	tous les autres <SFB />s, en dehors de ceux supprimés grâce à des roulements, sont supprimés.
+	tous les autres <SFB />s, en dehors de ceux supprimés grâce à des roulements, sont supprimés. De
+	plus, certaines des combinaisons sont aussi pour plus de confort, en évitant de dovoir sauter 3
+	lignes entre chaque lettre comme pour <kbd>PH</kbd>.
 </p>
 <ul class="margin-top-2">
 	<li><kbd>ÀB</kbd> ➜ <kbd-sortie>BÉ</kbd-sortie></li>
@@ -59,7 +71,10 @@
 	<li><kbd>ÀS</kbd> ➜ <kbd-sortie>CS</kbd-sortie></li>
 	<li><kbd>ÀT</kbd> ➜ <kbd-sortie>TP</kbd-sortie></li>
 	<li><kbd>ÀV</kbd> ➜ <kbd-sortie>ADV</kbd-sortie></li>
+	<li><kbd>ÀW</kbd> ➜ <kbd-sortie>JA</kbd-sortie></li>
 	<li><kbd>ÀX</kbd> ➜ <kbd-sortie>ADM</kbd-sortie></li>
+	<li><kbd>À,</kbd> ➜ <kbd-sortie>U,</kbd-sortie></li>
+	<li><kbd>À.</kbd> ➜ <kbd-sortie>U.</kbd-sortie></li>
 </ul>
 <p>
 	Comme vous pouvez le constater, la touche <kbd>À</kbd> est vraiment pour supprimer les derniers
@@ -81,4 +96,6 @@
 		<kbd>ÈÉ</kbd> ➜ <kbd-sortie>BU</kbd-sortie> et <kbd>ÉÈ</kbd> ➜ <kbd-sortie>UB</kbd-sortie>
 	</li>
 	<li><kbd>ÈÊ</kbd> ➜ <kbd-sortie>YI</kbd-sortie></li>
+	<li><kbd>UÈ</kbd> ➜ <kbd-sortie>UÉ</kbd-sortie></li>
+	<li><kbd>ÈU</kbd> ➜ <kbd-sortie>ÉU</kbd-sortie></li>
 </ul>

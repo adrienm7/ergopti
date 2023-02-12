@@ -4,7 +4,7 @@
 		« Same Finger Bigram », c’est-à-dire utiliser le même doigt d’affilée pour taper deux lettres
 		qui se suivent. C’est par exemple utiliser l’index droit pour taper <kbd>SC</kbd>, car
 		<kbd>S</kbd> et <kbd>C</kbd> sont tous deux sur la colonne de ce doigt dans la disposition
-		HyperTexte. Un autre exemple en AZERTY de SFB sur le même doigt est <kbd>UN</kbd> (qui est pourtant
+		HyperTexte. Un autre exemple en AZERTY de SFB sur ce même doigt est <kbd>UN</kbd> (qui est pourtant
 		tellement fréquent en français…)
 	</div>
 </div>

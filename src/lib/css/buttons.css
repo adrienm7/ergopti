@@ -1,4 +1,4 @@
-kbd, kbd-sortie {
+kbd, kbd-sortie, kbd-non {
 	--taille: 1; 
 	align-items: center; 
 	background-color: hsla(100deg, 0%, 60%, 10%); 
@@ -15,10 +15,10 @@ kbd, kbd-sortie {
 	font-weight: 300;
 	/* height: calc(calc(.6*100vw/15) - 2*calc(.6*.35vw));  */
 	justify-content: center; 
-	line-height: 1.35rem; 
-	text-align: center; 
-	padding: 0px 5px 2px 5px;
-	margin-top: 3px;
+	line-height: 1.35em; 
+	text-align: center;
+	padding: 1px 5px 2px 5px;
+	margin: 1px 0;
 	/* width: calc(calc(.6*100vw/15)*1 - 2*calc(.6*.35vw)); */
 }
 
@@ -26,8 +26,14 @@ kbd-sortie {
 	background-color: hsla(0, 100%, 100%, 90%);
 	color: black;
 }
-kbd:active, kbd-sortie:active,
-kbd:hover, kbd-sortie:hover {
+
+kbd-non {
+	background-color: hsla(0, 100%, 50%, 0.3);
+	color: white;
+}
+
+kbd:active, kbd-sortie:active, kbd-non:active,
+kbd:hover, kbd-sortie:hover, kbd-non:hover {
 box-shadow: rgba(204, 204, 204, 0.7) 0 .766667px 0 0;
 position: relative;
 top: calc(calc(.6*.25vw) - calc(.6*.1vw));

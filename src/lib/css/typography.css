@@ -38,7 +38,7 @@ h1 {
 }
 
 h2 {
-	margin-top: 25vh;
+	margin-top: 33vh;
     margin-bottom: 5vh;
     font-size: 2.3rem;
 }
@@ -61,8 +61,8 @@ h3::after {
 
 
 h3 {
-    margin-top: 10vh;
-    margin-bottom: 3vh;
+    margin-top: 18vh;
+    margin-bottom: 8vh;
 	font-size: 1.8rem;
 }
 
@@ -171,20 +171,12 @@ strong,
 /* Boîtes de message */
 
 
-.info {
-	background-color: rgba(44, 0, 71, 0.3);
-	backdrop-filter: blur(60px);
-	padding: 20px;
-	border-radius: 10px;
-	border: 1px solid  rgba(44, 0, 71, 0.8);
-}
-
 .important {
-	background-color: rgba(255, 255, 255, 0.125);
+	background-color: rgba(221, 109, 255, 0.125);
 	backdrop-filter: blur(60px);
 	padding: 20px;
 	border-radius: 10px;
-	border: 1px solid  rgba(255, 255, 255, 0.1);
+	border: 1px solid  rgba(68, 0, 140, 0.8);
 }
 .important p {
 	margin: 0;
