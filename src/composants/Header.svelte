@@ -4,7 +4,8 @@
 
 	function fermerMenu() {
 		document.getElementById('menu-btn').checked = false;
-		document.body.classList.remove('disable-scroll');
+		document.getElementById('clavier').style.zIndex =
+			'-999'; /* Si le clavier était ouvert, on le ferme */
 	}
 </script>
 
@@ -178,9 +179,9 @@
 			background-color: var(--couleur-header-mobile);
 			backdrop-filter: blur(30px);
 			border-top: 1px solid rgba(255, 255, 255, 0.2);
-			overflow: scroll;
+			overflow: scroll; /* Pour désactiver le scroll derrière le menu (1/3) */
+			overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu (2/3) */
 			transition: height 0.25s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
-			overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
 		}
 
 		header #menu ul {
@@ -252,7 +253,9 @@
 			height: calc(100vh - var(--hauteur-header));
 		}
 		header .menu-btn:checked ~ #menu ul {
-			min-height: calc(100vh - var(--hauteur-header));
+			min-height: calc(
+				100vh - var(--hauteur-header)
+			); /* Pour désactiver le scroll derrière le menu (3/3) */
 		}
 
 		header .menu-btn:checked ~ .menu-icon .navicon {
@@ -321,5 +324,4 @@
 			padding-right: 0;
 		}
 	}
-
 </style>
