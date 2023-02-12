@@ -5,6 +5,7 @@
 </script>
 
 <h2>Ajouts de confort</h2>
+
 <h3>[QU] automatiques avant les voyelles</h3>
 <p>
 	La touche <kbd>Q</kbd> est à 99% suivie de <kbd>U</kbd> si une voyelle vient ensuite. Par
@@ -12,41 +13,64 @@
 	automatiquement entre les deux pour donner <kbd-sortie>Q</kbd-sortie> + <kbd-sortie>U</kbd-sortie>
 	+ <kbd-sortie>Voyelle</kbd-sortie>.
 </p>
+
 <h3>[OÙ]</h3>
 <p>
 	La touche <kbd>Ù</kbd> n’est utilisée que pour écrire <kbd>OÙ</kbd>. Ainsi, autant tranformer
 	cette touche en raccourci pour écrire <kbd-sortie>OÙ</kbd-sortie> pour économiser une frappe
 	certaine sur la touche <kbd>O</kbd> et améliorer l’alternance des mains.
 </p>
+
 <h3>Utilisation de la touche <kbd>À</kbd> : en tant que J</h3>
 <p>
-	La touche <kbd>J</kbd> est très loin et pourtant relativement souvent utilisée en français,
-	notammentt pour écrire <em>je</em>. Les combinaisons <em>ÀI</em>, <em>ÀE</em>, etc. n’existent pas
-	en français. En fait, <kbd>À</kbd> est toujours suivie d’un espace. Cela donne une formidable opportunité
-	d’utiliser cette touche À comme J, si elle est suivie d’une voyelle.
+	La touche <kbd>J</kbd> est très loin et pourtant relativement souvent utilisée en français, en
+	particulier pour écrire <kbd>JE</kbd>. Les combinaisons <kbd-non>ÀI</kbd-non>,
+	<kbd-non>ÀE</kbd-non>, etc. n’existent pas en français. En fait, la lettre <kbd>À</kbd> est
+	toujours suivie d’un espace. Cela donne une formidable opportunité d’utiliser cette touche comme
+	un <kbd-sortie>J</kbd-sortie>, si elle est suivie d’une voyelle.
 </p>
+<p>
+	Dans les rares cas où vous voudrez écrire <kbd>J</kbd> + <kbd>Consonne</kbd>, il faudra utiliser
+	la vraie touche <kbd-sortie>J</kbd-sortie>. De même si vous voulez utiliser un raccourci avec
+	<kbd>J</kbd> comme <kbd>Ctrl</kbd> + <kbd>J</kbd> pour justifier un texte.
+</p>
+<ul class="margin-top-2">
+	<li><kbd>ÀY</kbd> ➜ <kbd-sortie>AJ</kbd-sortie></li>
+	<li><kbd>ÀW</kbd> ➜ <kbd-sortie>JA</kbd-sortie> (pour éviter un <SFB />)</li>
+	<li><kbd>ÀI</kbd> ➜ <kbd-sortie>JI</kbd-sortie></li>
+	<li><kbd>ÀE</kbd> ➜ <kbd-sortie>JE</kbd-sortie></li>
+	<li><kbd>ÀÉ</kbd> ➜ <kbd-sortie>JÉ</kbd-sortie></li>
+	<li><kbd>ÀO</kbd> ➜ <kbd-sortie>JO</kbd-sortie></li>
+	<li><kbd>ÀU</kbd> ➜ <kbd-sortie>ÀU</kbd-sortie></li>
+</ul>
+
 <h3><kbd>Ê</kbd> fait office de <kbd>^</kbd></h3>
 <p>
-	La touche morte <kbd>^</kbd> est très loin sur un clavier standard. La majorité des fois elle est
-	utilisée pour écrire ê, qui est une touche présente sur l’annulaire gauche. Toutefois, dans de
-	rares cas il est nécessaire de taper â, î, ô ou encore û. C’est pour cela que <kbd>ÊA</kbd> donne
-	<kbd-sortie>Â</kbd-sortie>
-	par exemple.
+	La touche morte <kbd>^</kbd> est très loin sur un clavier standard. La majorité du temps, elle est
+	utilisée pour écrire <kbd>Ê</kbd>, qui est une touche déjà présente sur l’annulaire gauche.
+	Toutefois, dans de rares cas, il est nécessaire d’écrire <kbd>Â</kbd>, <kbd>Î</kbd>, <kbd>Ô</kbd>
+	ou encore
+	<kbd>Û</kbd>. C’est pour cela que <kbd>ÊA</kbd> donne
+	<kbd-sortie>Â</kbd-sortie> par exemple.
 </p>
 <p>
-	À noter que pour écrire Î, plutôt que de faire un <SFB /> en tapant <kbd>ÊI</kbd>, vous pouvez
-	aussi faire <kbd>ÊE</kbd>.
+	À noter que pour écrire <kbd-sortie>Î</kbd-sortie>, plutôt que de faire un <SFB /> en tapant
+	<kbd>ÊI</kbd>, vous pouvez aussi faire <kbd>ÊE</kbd>.
 </p>
+
 <h3>Remplacement automatique des <kbd>’</kbd> par <kbd>'</kbd> pour l’anglais</h3>
 <p>
 	En anglais, l’apostrophe typographique n’est pas utilisée. Afin d’écrire "correctement" en anglais
 	sans perte de vitesse ni besoin de réflexion pour savoir quelle apostrophe taper, des
-	remplacements de texte ont été introduits. Ainsi, <kbd>t’s</kbd> et <kbd>n’t</kbd> sont
-	automatiquement remplacés par les bonnes apostrophes : <kbd-sortie>t's</kbd-sortie> et
-	<kbd-sortie>n't</kbd-sortie>.
+	remplacements de texte ont été introduits. Ainsi, <kbd>T’S</kbd> et <kbd>N’T</kbd> sont
+	automatiquement remplacés par les bonnes apostrophes : <kbd-sortie>T'S</kbd-sortie> et
+	<kbd-sortie>N'T</kbd-sortie>. Cela permet d’écrire correctement <kbd>IT'S</kbd>,
+	<kbd>THAT'S</kbd>, <kbd>DIDN'T</kbd>, <kbd>DON'T</kbd>, <kbd>WON'T</kbd>, <kbd>WOU'D</kbd>,
+	<kbd>WE'RE</kbd>,
+	<kbd>THERE'S</kbd>, <kbd>YOU'RE</kbd>, etc.
 </p>
 <p>
-	Un autre raccourci a été ajouté pour avoir la possibilité d’écrire <kbd-sortie>n't</kbd-sortie>
-	par un roulement. Effectivement, <kbd>nt’</kbd> se transforme en <kbd-sortie>n't</kbd-sortie> pour
+	Un autre raccourci a été ajouté pour avoir la possibilité d’écrire <kbd-sortie>N'T</kbd-sortie>
+	par un roulement. Effectivement, <kbd>NT’</kbd> se transforme en <kbd-sortie>N'T</kbd-sortie> pour
 	pouvoir faire [majeur, annulaire, auriculaire] plutôt que [majeur, auriculaire, annulaire].
 </p>

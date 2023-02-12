@@ -1,18 +1,19 @@
 <script>
 	import Nom from '../../composants/Nom.svelte';
 	import Nom_Plus from '../../composants/Nom_Plus.svelte';
+	import SFB from '../../composants/SFB.svelte';
 </script>
 
 <h2>Abréviations</h2>
 <h3>Ajout des suffixes les plus communs en <kbd>,</kbd></h3>
 <p>
 	Il y a toujours un espace après la virgule (sauf si l’on écrit des nombres). Par conséquent, toute
-	combinaison de type <kbd>,S</kbd> ou <kbd>,C</kbd> n’est jamais tapée. Cela donne une opportunité
-	extraordinaire de raccourcis pour augmenter sa vitesse et son confort de frappe. Par exemple, au
-	lieu de taper 5 lettres pour écrire le suffixe <kbd-sortie>EMENT</kbd-sortie>, très souvent
-	utilisé en français, deux frappes suffisent : <kbd>,S</kbd>. Ces raccourcis vont diviser par deux
-	le nombre de touches nécessaires pour écrire les suffixes les plus communs, entrainant une petite
-	augmentation de vitesse.
+	combinaison de type <kbd-non>,S</kbd-non> ou <kbd-non>,C</kbd-non> n’est jamais tapée. Cela donne
+	une opportunité extraordinaire de raccourcis pour augmenter sa vitesse et son confort de frappe.
+	Par exemple, au lieu de taper 5 lettres pour écrire le suffixe <kbd-sortie>EMENT</kbd-sortie>,
+	très souvent utilisé en français, deux frappes suffisent : <kbd>,S</kbd>. Ces raccourcis vont
+	diviser par deux le nombre de touches nécessaires pour écrire les suffixes les plus communs,
+	entrainant une petite augmentation de vitesse.
 </p>
 <p>
 	Le confort est aussi visé, par exemple pour la combinaison <em>GHT</em> qui est un peu
@@ -20,37 +21,77 @@
 	encore de l’annulaire droit. Ce n’est pas un beau roulement, alors qu’au contraire <kbd>,I</kbd>
 	écrira <kbd-sortie>IGHT</kbd-sortie> et <kbd>,O</kbd> écrira <kbd-sortie>OUGH</kbd-sortie>.
 </p>
+<p>
+	Enfin, notons que <kbd-sortie>SC</kbd-sortie> est présent en <kbd>,C</kbd>. En effet, cette
+	position est parfaite pour ensuite enchaîner avec le <kbd>H</kbd> ou le <kbd>R</kbd>.
+</p>
+
+<ul class="margin-top-2">
+	<li><kbd>,A</kbd> ➜ <kbd-sortie>AINSI</kbd-sortie></li>
+	<li><kbd>,B</kbd> ➜ Rien, pour éviter un <SFB /></li>
+	<li><kbd>,C</kbd> ➜ <kbd-sortie>SC</kbd-sortie></li>
+	<li><kbd>,D</kbd> ➜ <kbd-sortie>WOULD</kbd-sortie></li>
+	<li><kbd>,E</kbd> ➜ <kbd-sortie>THE</kbd-sortie></li>
+	<li><kbd>,É</kbd> ➜ Rien, pour éviter un <SFB /></li>
+	<li><kbd>,È</kbd> ➜ <kbd-sortie>ÈRE</kbd-sortie></li>
+	<li><kbd>,Ê</kbd> ➜ <kbd-sortie>ÊTRE</kbd-sortie></li>
+	<li><kbd>,F</kbd> ➜ <kbd-sortie>ENCE</kbd-sortie></li>
+	<li><kbd>,G</kbd> ➜ <kbd-sortie>RING</kbd-sortie></li>
+	<li><kbd>,H</kbd> ➜ <kbd-sortie>TECHN</kbd-sortie></li>
+	<li><kbd>,I</kbd> ➜ <kbd-sortie>IGHT</kbd-sortie></li>
+	<li><kbd>,J</kbd> ➜ <kbd-sortie>TOUJOURS</kbd-sortie></li>
+	<li><kbd>,K</kbd> ➜ Rien, pour éviter un <SFB /></li>
+	<li><kbd>,L</kbd> ➜ <kbd-sortie>ELLE</kbd-sortie></li>
+	<li><kbd>,M</kbd> ➜ <kbd-sortie>EMENTS</kbd-sortie></li>
+	<li><kbd>,N</kbd> ➜ <kbd-sortie>ATION</kbd-sortie></li>
+	<li><kbd>,O</kbd> ➜ <kbd-sortie>OUGH</kbd-sortie></li>
+	<li><kbd>,P</kbd> ➜ <kbd-sortie>MPL</kbd-sortie></li>
+	<li><kbd>,Q</kbd> ➜ <kbd-sortie>IQUE</kbd-sortie></li>
+	<li><kbd>,R</kbd> ➜ <kbd-sortie>ERRE</kbd-sortie></li>
+	<li><kbd>,S</kbd> ➜ <kbd-sortie>EMENT</kbd-sortie></li>
+	<li><kbd>,T</kbd> ➜ <kbd-sortie>CTION</kbd-sortie></li>
+	<li><kbd>,U</kbd> ➜ Rien, pour éviter un <SFB /></li>
+	<li><kbd>,V</kbd> ➜ <kbd-sortie>ANCE</kbd-sortie></li>
+	<li><kbd>,W</kbd> ➜ Rien, pour éviter un <SFB /></li>
+	<li><kbd>,X</kbd> ➜ <kbd-sortie>IEUX</kbd-sortie></li>
+	<li><kbd>,Y</kbd> ➜ <kbd-sortie>YING</kbd-sortie></li>
+	<li><kbd>,Z</kbd> ➜ <kbd-sortie>EZ-VOUS</kbd-sortie></li>
+	<li><kbd>,’</kbd> ➜ <kbd-sortie>QU’</kbd-sortie></li>
+</ul>
 
 <h3>Remplacement de texte avec <kbd>"</kbd></h3>
 <p>
 	La touche <kbd>"</kbd> est surtout utilisée pour entourer du texte. Dans la plupart des éditeurs,
-	l’appui sur cette touche va directement écrire <kbd>""</kbd>. Il est toutefois tout à fait
-	possible de l’utiliser comme touche de raccourci, car là encore les mots <em>c"</em> et
-	<em>gt"</em> n’existent pas. Ainsi, l’écriture de l’abréviation puis du guillemet ne va pas écrire
-	de guillemet mais plutôt transformer le texte écrit.
+	l’appui sur cette touche va directement écrire <kbd-sortie>""</kbd-sortie>. Il est toutefois tout
+	à fait possible de l’utiliser comme touche de raccourci, car là encore les mots
+	<kbd-non>c"</kbd-non>
+	et
+	<kbd-non>gt"</kbd-non> n’existent pas. Ainsi, l’écriture de l’abréviation puis du guillemet ne va pas
+	écrire de guillemet mais plutôt transformer le texte écrit.
 </p>
 
 <ul class="margin-top-2">
-	<li><kbd>A"</kbd> ➜ <kbd-sortie>Ainsi</kbd-sortie></li>
-	<li><kbd>C"</kbd> ➜ <kbd-sortie>C’est</kbd-sortie></li>
-	<li><kbd>Ct"</kbd> ➜ <kbd-sortie>C’était</kbd-sortie></li>
-	<li><kbd>D"</kbd> ➜ <kbd-sortie>Donc</kbd-sortie></li>
-	<li><kbd>Dé"</kbd> ➜ <kbd-sortie>Déjà</kbd-sortie></li>
-	<li><kbd>Ê"</kbd> ➜ <kbd-sortie>Être</kbd-sortie></li>
-	<li><kbd>Eef"</kbd> ➜ <kbd-sortie>En effet</kbd-sortie></li>
-	<li><kbd>F"</kbd> ➜ <kbd-sortie>Faire</kbd-sortie></li>
-	<li><kbd>G"</kbd> ➜ <kbd-sortie>J’ai</kbd-sortie></li>
-	<li><kbd>Gt"</kbd> ➜ <kbd-sortie>J’étais</kbd-sortie></li>
-	<li><kbd>M"</kbd> ➜ <kbd-sortie>Mais</kbd-sortie></li>
-	<li><kbd>Pê"</kbd> ➜ <kbd-sortie>Peut-être</kbd-sortie></li>
-	<li><kbd>Pex"</kbd> ➜ <kbd-sortie>Par exemple</kbd-sortie></li>
-	<li><kbd>R"</kbd> ➜ <kbd-sortie>Rien</kbd-sortie></li>
+	<li><kbd>A"</kbd> ➜ <kbd-sortie>AINSI</kbd-sortie></li>
+	<li><kbd>Avv"</kbd> ➜ <kbd-sortie>AVEZ-VOUS</kbd-sortie></li>
+	<li><kbd>C"</kbd> ➜ <kbd-sortie>C’EST</kbd-sortie></li>
+	<li><kbd>Ct"</kbd> ➜ <kbd-sortie>C’ÉTAIT</kbd-sortie></li>
+	<li><kbd>D"</kbd> ➜ <kbd-sortie>DONC</kbd-sortie></li>
+	<li><kbd>Dé"</kbd> ➜ <kbd-sortie>DÉJÀ</kbd-sortie></li>
+	<li><kbd>Ê"</kbd> ➜ <kbd-sortie>ÊTRE</kbd-sortie></li>
+	<li><kbd>Eef"</kbd> ➜ <kbd-sortie>EN EFFET</kbd-sortie></li>
+	<li><kbd>F"</kbd> ➜ <kbd-sortie>FAIRE</kbd-sortie></li>
+	<li><kbd>G"</kbd> ➜ <kbd-sortie>J’AI</kbd-sortie></li>
+	<li><kbd>Gt"</kbd> ➜ <kbd-sortie>J’ÉTAIS</kbd-sortie></li>
+	<li><kbd>M"</kbd> ➜ <kbd-sortie>MAIS</kbd-sortie></li>
+	<li><kbd>Pê"</kbd> ➜ <kbd-sortie>PEUT-ÊTRE</kbd-sortie></li>
+	<li><kbd>Pex"</kbd> ➜ <kbd-sortie>PAR EXEMPLE</kbd-sortie></li>
+	<li><kbd>R"</kbd> ➜ <kbd-sortie>RIEN</kbd-sortie></li>
 </ul>
 
 <p>
 	Ici aussi, dans des cas rares cela ne peut pas fonctionner. Peut-être que vous voudrez réellement
-	écrire <em>"ê"</em> dans un texte, ce qui activera malencontrueusement le remplacement en
-	<em>"être</em>. Cela ne devrait presque jamais arriver, car écrire ce genre de texte arrive
-	surtout pour tester des conditions en programmation notamment, et dans les IDE l’ajout automatique
-	des deux guillemets fait tout fonctionner comme il le faut.
+	écrire <kbd>"ê"</kbd> dans un texte, ce qui activera malencontrueusement le remplacement en
+	<kbd-sortie>"être</kbd-sortie>. Cela ne devrait presque jamais arriver, car écrire ce genre de
+	texte arrive surtout pour tester des conditions en programmation notamment. Dans les éditeurs de
+	code, l’ajout automatique des deux guillemets fait tout fonctionner comme il le faut.
 </p>

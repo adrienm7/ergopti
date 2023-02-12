@@ -18,8 +18,8 @@
 
 	<div class="important">
 		<p>
-			<Nom_Plus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très
-			près de la <strong>disposition clavier idéale</strong>.
+			<Nom_Plus /> est une version améliorée de la disposition <Nom />.<br />Elle se rapproche de
+			très près de la <span class="hyper"><strong>disposition clavier idéale</strong></span>.
 		</p>
 		<p>Effectivement, elle :</p>
 		<ul class="margin0">
@@ -37,12 +37,12 @@
 	</div>
 
 	<mini-espace />
-	<p class="text-bold">
-		<span class="hyper">
+	<p>
+		<span class="texte text-bold">
 			Toutefois, l’utilisation de cette version nécessite des outils de programmation de clavier
 			spécifiques.
 		</span>
-		<span class="texte">
+		<span>
 			Sur Windows, le programme <strong>AutoHotkey</strong> est utilisé afin de réaliser ces changements.
 			Il est également possible de programmer le firmware de son clavier (avec QMK ou ZMK) pour ce faire.
 		</span>
