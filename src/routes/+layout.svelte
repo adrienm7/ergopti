@@ -13,6 +13,7 @@
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
 	import { onMount } from 'svelte';
+	import Controles_Clavier from '../composants/Controles_Clavier.svelte';
 
 	let typeClavier = 'iso';
 	let couche = 'Visuel';
@@ -36,15 +37,20 @@
 
 	function toggleZIndex() {
 		zIndex = zIndex === -999 ? 100 : -999;
+		document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
 </script>
 
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
 
 <div id="clavier" style="z-index: {zIndex};">
-	<bloc-clavier id="clavier-reference">
-		<Clavier />
-	</bloc-clavier>
+	<div>
+		<bloc-clavier id="clavier-reference">
+			<Clavier />
+		</bloc-clavier>
+		<petit-espace />
+		<Controles_Clavier emplacement={'clavier-reference'} />
+	</div>
 </div>
 
 <div id="page">
@@ -65,8 +71,9 @@
 		transform: translate(-50%, 0);
 		width: 100vw;
 		height: calc(100vh - var(--hauteur-header));
-		display: flex;
-		align-items: center;
+		overflow: scroll;
+		transition: all 0.2s ease-in-out;
+		overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
 		--couleur: 80;
 		background: linear-gradient(
 			90deg,
@@ -82,6 +89,16 @@
 			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 90%,
 			rgba(0, 0, var(--couleur), 1) 100%
 		);
+	}
+
+	#clavier div {
+		--marge: 10vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-direction: column;
+		min-height: calc(100vh - var(--hauteur-header) + 1px - 2 * var(--marge));
+		padding: var(--marge) 0;
 	}
 	#afficher-clavier-reference {
 		position: fixed;

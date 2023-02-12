@@ -3,6 +3,7 @@
 	import Nom_Plus from '../composants/Nom_Plus.svelte';
 	import SFB from '../composants/SFB.svelte';
 	import Clavier from '../composants/Clavier.svelte';
+	import Controles_Clavier from '../composants/Controles_Clavier.svelte';
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
 	import { onMount } from 'svelte';
@@ -115,21 +116,7 @@
 	<bloc-clavier id="clavier-presentation">
 		<Clavier />
 	</bloc-clavier>
-
-	<div class="btn-group">
-		<select bind:value={selected} on:change={() => changerCouche(selected[1])}>
-			{#each options as value}<option {value}>{value[0]}</option>{/each}
-		</select>
-		<button on:click={togglePlus}>
-			{plus === true ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
-		</button>
-		<button on:click={toggleCouleur}>
-			{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
-		</button>
-		<button on:click={toggleIso}>
-			{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
-		</button>
-	</div>
+	<Controles_Clavier emplacement={'clavier-presentation'} />
 </div>
 
 <mini-espace />
