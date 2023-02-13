@@ -182,10 +182,17 @@ bloc-touche[data-type="enter"]{
     top: 0;
     position: relative;
 }
+@media (max-width: 600px) {
+	bloc-touche[data-type="enter"]{
+		--correction-decalage-entree: 1%;
+	}
+  }
 
 bloc-touche[data-type="enter"] div {
     z-index: 2;
 }
+
+
 
 bloc-touche[data-type="enter"]::before {
     /* On cache la jonction entre l’élément et l’after avec un rectangle */
@@ -214,6 +221,7 @@ bloc-touche[data-type="enter"]::after {
     border-radius: 0 0 var(--arrondi-touche) var(--arrondi-touche);
     box-shadow: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d), -1px var(--profondeur-touche) 0 var(--effet-3d);
 }
+
 
 
 bloc-touche[data-type="enter"]:active,
@@ -247,68 +255,73 @@ bloc-touche[data-type="enter"]:hover::after {
 
 
 
-bloc-clavier[data-couleur="non"] bloc-touche {
-    --couleur-touche: 0deg;
-    --couleur-touche-saturation: 0%;
-    --couleur-touche-luminosite: 100%;
-}
-bloc-clavier[data-couleur="freq"] bloc-touche {
-	--couleur-touche: 0deg;
-	--couleur-touche-saturation: 0%;
-	--couleur-touche-luminosite: 100%;
-}
-bloc-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
-    --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
-    --couleur-touche-saturation: 80%;
-    --couleur-touche-luminosite: 50%;
-	--transparence-touche: 40%;
-	background-color: hsla( var(--couleur-touche), 100%, 80%, var(--transparence-touche));
-	/* calc( (1 - var(--frequence)) * 40% + 30%) */
-}
+/* Couleur des touches par doigt et main */
 
-bloc-clavier[data-couleur="non"] bloc-touche[data-type="space"]{
-	background-color: var(--couleur-fond-touche);
-	/* background-color: white; */
-}
-
-
-
-bloc-touche[data-doigt="index"][data-main="gauche"]{
+bloc-touche[data-main="gauche"][data-doigt="index"]{
     --couleur-touche: var(--couleur-doigt-gauche-index);
 }
-bloc-touche[data-doigt="majeur"][data-main="gauche"]{
+bloc-touche[data-main="gauche"][data-doigt="majeur"]{
     --couleur-touche: var(--couleur-doigt-gauche-majeur);
 }
-bloc-touche[data-doigt="annulaire"][data-main="gauche"]{
+bloc-touche[data-main="gauche"][data-doigt="annulaire"]{
     --couleur-touche: var(--couleur-doigt-gauche-annulaire);
 }
-bloc-touche[data-doigt="auriculaire"][data-main="gauche"]{
+bloc-touche[data-main="gauche"][data-doigt="auriculaire"]{
     --couleur-touche: var(--couleur-doigt-gauche-auriculaire);
 }
-bloc-touche[data-doigt="index"][data-main="droite"]{
+bloc-touche[data-main="droite"][data-doigt="index"]{
     --couleur-touche: var(--couleur-doigt-droite-index);
 }
-bloc-touche[data-doigt="majeur"][data-main="droite"]{
+bloc-touche[data-main="droite"][data-doigt="majeur"]{
     --couleur-touche: var(--couleur-doigt-droite-majeur);
 }
-bloc-touche[data-doigt="annulaire"][data-main="droite"]{
+bloc-touche[data-main="droite"][data-doigt="annulaire"]{
     --couleur-touche: var(--couleur-doigt-droite-annulaire);
 }
-bloc-touche[data-doigt="auriculaire"][data-main="droite"]{
+bloc-touche[data-main="droite"][data-doigt="auriculaire"]{
     --couleur-touche: var(--couleur-doigt-droite-auriculaire);
 }
 
 
 
+/* Couleur des touches spéciales */
 
-
-bloc-touche[data-type="special"],
 bloc-touche[data-type="space"],
+bloc-touche[data-type="special"],
 bloc-touche[data-type="enter"],
 bloc-touche[data-type="enter"]::before,
 bloc-touche[data-type="enter"]::after {
     background-color: rgb(14, 14, 14);
+	color: white;
+	/* Bordure de la touche en blanc transparent */
+	--couleur-touche: 0deg; 
+    --couleur-touche-saturation: 0%;
+}
+
+bloc-touche[data-type="space"] {
+	background-color: rgba(255, 255, 255, 0.1);
+}
+
+
+
+/* Si pas de couleur, ou couleur spéciale */
+
+bloc-clavier[data-couleur="non"] bloc-touche,
+bloc-clavier[data-couleur="freq"] bloc-touche {
     --couleur-touche: 0deg;
     --couleur-touche-saturation: 0%;
-	color: white;
+    --couleur-touche-luminosite: 100%;
+}
+
+bloc-clavier[data-couleur="non"] bloc-touche[data-type="space"],
+bloc-clavier[data-couleur="freq"] bloc-touche[data-type="space"]{
+	background-color: var(--couleur-fond-touche);
+}
+
+bloc-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
+    --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
+    --couleur-touche-saturation: 80%;
+    --couleur-touche-luminosite: 50%;
+	--transparence-touche: 35%;
+	background-color: hsla( var(--couleur-touche), 100%, 80%, var(--transparence-touche));
 }
