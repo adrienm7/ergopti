@@ -31,3 +31,34 @@ html, body {
     scroll-behavior: smooth;
 	color: black;
 }
+
+
+.bg-blue {
+	--couleur: 80;
+	background: linear-gradient(
+		90deg,
+		rgba(0, 0, var(--couleur), 1) 0%,
+		rgba(0, 0, calc(var(--couleur) / 1.5), 1) 10%,
+		rgba(0, 0, calc(var(--couleur) / 2.25), 1) 20%,
+		rgba(0, 0, calc(var(--couleur) / 3), 1) 30%,
+		rgba(0, 0, calc(var(--couleur) / 3.5), 1) 40%,
+		rgba(0, 0, calc(var(--couleur) / 3.5), 1) 50%,
+		rgba(0, 0, calc(var(--couleur) / 3.5), 1) 60%,
+		rgba(0, 0, calc(var(--couleur) / 3), 1) 70%,
+		rgba(0, 0, calc(var(--couleur) / 2.25), 1) 80%,
+		rgba(0, 0, calc(var(--couleur) / 1.5), 1) 90%,
+		rgba(0, 0, var(--couleur), 1) 100%
+	);
+}
+
+@media (max-width: 800px) {
+	.bg-blue {
+		--couleur: 50;
+	}
+}
+
+@media (max-width: 400px) {
+	.bg-blue {
+		--couleur: 30;
+	}
+}

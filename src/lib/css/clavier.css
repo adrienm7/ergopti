@@ -154,6 +154,10 @@ bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
 	font-weight: normal;
 }
 
+/* Corrections localisées */
+bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="y"] div {
+	font-size: 1.8em;
+}
 
 
 
