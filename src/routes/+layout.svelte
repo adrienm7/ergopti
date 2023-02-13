@@ -9,35 +9,13 @@
 	import '$lib/css/buttons.css';
 	import '$lib/css/miscellaneous.css';
 
-	import Clavier from '../composants/Clavier.svelte';
-	import hypertexte from '$lib/data/hypertexte.json';
-	import { majClavier } from '$lib/js/clavier.js';
-	import { onMount } from 'svelte';
-	import Controles_Clavier from '../composants/Controles_Clavier.svelte';
-
-	let typeClavier = 'iso';
-	let couche = 'Visuel';
-	let couleur = 'oui';
-	let plus = false;
-
-	onMount(() => {
-		majClavier({
-			emplacement: 'clavier-reference',
-			data: hypertexte,
-			config: {
-				type: typeClavier,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
-			}
-		});
-	});
+	import ClavierTest from '../composants/Clavier_Test.svelte';
 
 	let zIndex = -999;
 
 	function toggleZIndex() {
 		zIndex = zIndex === -999 ? 100 : -999;
-		document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
+		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
 </script>
 
@@ -45,11 +23,14 @@
 
 <div id="clavier" class="bg-blue" style="z-index: {zIndex};">
 	<div>
-		<bloc-clavier id="clavier-reference">
-			<Clavier />
-		</bloc-clavier>
-		<mini-espace />
-		<Controles_Clavier emplacement={'clavier-reference'} />
+		<ClavierTest
+			emplacement={'clavier-reference'}
+			type={'iso'}
+			couche={'Visuel'}
+			couleur={'oui'}
+			plus={false}
+			controles={true}
+		/>
 	</div>
 </div>
 
@@ -70,6 +51,7 @@
 		left: 50%;
 		transform: translate(-50%, 0);
 		width: 100vw;
+		height: 100vh;
 		height: calc(100vh - var(--hauteur-header));
 		overflow: scroll;
 		transition: all 0.2s ease-in-out;
@@ -82,12 +64,13 @@
 		align-items: center;
 		justify-content: center;
 		flex-direction: column;
+		height: calc(100vh + 1px);
 		height: calc(100vh - var(--hauteur-header) + 1px);
 		padding: var(--marge) 0;
 	}
 	#afficher-clavier-reference {
 		position: fixed;
-		z-index: 999;
+		z-index: 101;
 		bottom: 20px;
 		right: 20px;
 		padding: 12px;

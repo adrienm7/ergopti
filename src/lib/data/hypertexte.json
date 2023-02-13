@@ -1012,7 +1012,7 @@
 			"touche": "b",
 			"Primary": "b",
 			"Shift": "B",
-			"AltGr": "…",
+			"AltGr": "@",
 			"ShiftAltGr": "",
 			"layer": "",
 			"type": "lettre"
@@ -1430,7 +1430,7 @@
 			"Primary": "⌫",
 			"Shift": "⌫",
 			"AltGr": "⌫",
-			"AltGr+": "Ctrl ⌫",
+			"AltGr+": "Ctrl + ⌫",
 			"ShiftAltGr": "⌫",
 			"layer": "⌫",
 			"type": "special"
@@ -1449,6 +1449,7 @@
 			"Primary": "⇧",
 			"Shift": "⇧",
 			"AltGr": "⇧",
+			"AltGr+": ".␣⇧",
 			"ShiftAltGr": "⇧",
 			"layer": "⇧",
 			"type": "special"
@@ -1521,6 +1522,7 @@
 			"Primary": "↹",
 			"Shift": "↹",
 			"AltGr": "↹",
+			"AltGr+": "Capsword",
 			"ShiftAltGr": "↹",
 			"layer": "↹",
 			"type": "special"

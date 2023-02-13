@@ -21,7 +21,7 @@ bloc-clavier {
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
     --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
 
-    --couleur-touche-saturation: 60%;
+    --couleur-touche-saturation: 70%;
     --couleur-touche-luminosite: 80%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
 	--transparence-touche: 15%;
@@ -44,7 +44,7 @@ bloc-clavier {
     background-color:hsla(234, 20%, 15%, 0.1);
     border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
-	box-shadow: 0 0 20px 5px rgba(0, 99, 170, 0.8);
+	box-shadow: 0 0 10px 1px rgba(0, 99, 170, 0.8);
 	font-weight: 300;
 }
 
@@ -157,6 +157,12 @@ bloc-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
 /* Corrections localisées */
 bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="y"] div {
 	font-size: 1.8em;
+}
+bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="CapsLock"] div {
+	font-size: 0.75em;
+}
+bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="Tab"] div {
+	font-size: 0.6em;
 }
 
 
@@ -301,7 +307,8 @@ bloc-touche[data-type="space"],
 bloc-touche[data-type="enter"],
 bloc-touche[data-type="enter"]::before,
 bloc-touche[data-type="enter"]::after {
-    background-color: rgb(22, 22, 22);
+    background-color: rgb(14, 14, 14);
     --couleur-touche: 0deg;
     --couleur-touche-saturation: 0%;
+	color: white;
 }

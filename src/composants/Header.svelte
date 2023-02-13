@@ -76,7 +76,7 @@
 		position: fixed;
 		top: 0;
 		left: 0;
-		z-index: 100;
+		z-index: 99;
 		height: var(--hauteur-header);
 		width: 100vw;
 		margin: 0;
@@ -168,7 +168,7 @@
 		display: none;
 	}
 
-	@media (max-width: 1024px) {
+	@media (max-width: 1200px) {
 		header #menu {
 			position: fixed;
 			top: var(--hauteur-header);
@@ -276,7 +276,7 @@
 		}
 	}
 
-	@media (min-width: 1024px) {
+	@media (min-width: 1200px) {
 		header #menu {
 			display: block;
 		}
