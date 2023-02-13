@@ -2,44 +2,7 @@
 	import Nom from '../composants/Nom.svelte';
 	import Nom_Plus from '../composants/Nom_Plus.svelte';
 	import SFB from '../composants/SFB.svelte';
-	import Clavier from '../composants/Clavier.svelte';
-	import Controles_Clavier from '../composants/Controles_Clavier.svelte';
-	import hypertexte from '$lib/data/hypertexte.json';
-	import { majClavier } from '$lib/js/clavier.js';
-	import { onMount } from 'svelte';
-
-	onMount(() => {
-		majClavier({
-			emplacement: 'clavier-presentation',
-			data: hypertexte,
-			config: {
-				type: 'iso',
-				couche: 'Visuel',
-				couleur: 'non',
-				plus: false
-			}
-		});
-		majClavier({
-			emplacement: 'clavier-freq',
-			data: hypertexte,
-			config: {
-				type: 'iso',
-				couche: 'Visuel',
-				couleur: 'freq',
-				plus: false
-			}
-		});
-	});
-
-	let options = [
-		['Visuel', 'Visuel'],
-		['Primary', 'Primary'],
-		['Shift', 'Shift'],
-		['AltGr', 'AltGr'],
-		['Shift + AltGr', 'ShiftAltGr'],
-		['Layer', 'layer']
-	];
-	let selected = options[0]; // On actualise la valeur du select avec celle par défaut, cad "Visuel"
+	import ClavierTest from '../composants/Clavier_Test.svelte';
 </script>
 
 <div class="fullheight">
@@ -51,15 +14,13 @@
 		</h1>
 	</div>
 
-	<bloc-clavier id="clavier-presentation">
-		<Clavier typeClavier={'iso'} couche={'Visuel'} plus={false} couleur={'non'} />
-	</bloc-clavier>
-	<Controles_Clavier
+	<ClavierTest
 		emplacement={'clavier-presentation'}
-		typeClavier={'iso'}
+		type={'iso'}
 		couche={'Visuel'}
-		plus={false}
 		couleur={'non'}
+		plus={false}
+		controles={true}
 	/>
 </div>
 
@@ -267,9 +228,14 @@
 
 	<moyen-espace />
 </div>
-<bloc-clavier id="clavier-freq">
-	<Clavier />
-</bloc-clavier>
+<ClavierTest
+	emplacement={'clavier-freq'}
+	type={'iso'}
+	couche={'Visuel'}
+	couleur={'freq'}
+	plus={false}
+	controles={false}
+/>
 <div class="contenu">
 	<grand-espace />
 

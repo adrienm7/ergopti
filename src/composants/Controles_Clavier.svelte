@@ -2,11 +2,11 @@
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
 
-	export let typeClavier;
+	export let emplacement;
+	export let type;
 	export let couche;
 	export let couleur;
 	export let plus;
-	export let emplacement;
 
 	function changerCouche(selected) {
 		couche = selected;
@@ -14,7 +14,7 @@
 			emplacement: emplacement,
 			data: hypertexte,
 			config: {
-				type: typeClavier,
+				type: type,
 				couche: couche,
 				couleur: couleur,
 				plus: plus
@@ -32,16 +32,16 @@
 	}
 
 	function toggleIso() {
-		if (typeClavier == 'iso') {
-			typeClavier = 'ergodox';
+		if (type == 'iso') {
+			type = 'ergodox';
 		} else {
-			typeClavier = 'iso';
+			type = 'iso';
 		}
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte,
 			config: {
-				type: typeClavier,
+				type: type,
 				couche: couche,
 				couleur: couleur,
 				plus: plus
@@ -54,7 +54,7 @@
 			emplacement: emplacement,
 			data: hypertexte,
 			config: {
-				type: typeClavier,
+				type: type,
 				couche: couche,
 				couleur: couleur,
 				plus: plus
@@ -84,6 +84,6 @@
 		{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
 	</button>
 	<button on:click={toggleIso}>
-		{typeClavier === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
+		{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
 	</button>
 </div>
