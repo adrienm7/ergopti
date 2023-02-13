@@ -2,10 +2,10 @@
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
 
-	let typeClavier = 'iso';
-	let couche = 'Visuel';
-	let couleur = 'oui';
-	let plus = false;
+	export let typeClavier;
+	export let couche;
+	export let couleur;
+	export let plus;
 	export let emplacement;
 
 	function changerCouche(selected) {

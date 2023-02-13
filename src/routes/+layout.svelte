@@ -90,12 +90,14 @@
 		z-index: 999;
 		bottom: 20px;
 		right: 20px;
-		padding: 10px;
+		padding: 12px;
 		cursor: pointer;
 		border: 1px solid rgba(0, 0, 0, 0.9);
 		border-radius: 6px;
+		font-size: 1.3rem;
 		box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
 	}
+
 	/* Permet de toujours placer le footer en bas de la page */
 
 	/* « Je vous conseille fortement d’utiliser un conteneur global, comme ici avec #page, pour réaliser ce genre de mise en page.

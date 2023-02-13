@@ -53,12 +53,12 @@ html, body {
 
 @media (max-width: 800px) {
 	.bg-blue {
-		--couleur: 50;
+		--couleur: 60;
 	}
 }
 
 @media (max-width: 400px) {
 	.bg-blue {
-		--couleur: 30;
+		--couleur: 40;
 	}
 }

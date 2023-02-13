@@ -8,20 +8,15 @@
 	import { majClavier } from '$lib/js/clavier.js';
 	import { onMount } from 'svelte';
 
-	let typeClavier = 'iso';
-	let couche = 'Visuel';
-	let couleur = 'oui';
-	let plus = false;
-
 	onMount(() => {
 		majClavier({
 			emplacement: 'clavier-presentation',
 			data: hypertexte,
 			config: {
-				type: typeClavier,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
+				type: 'iso',
+				couche: 'Visuel',
+				couleur: 'non',
+				plus: false
 			}
 		});
 		majClavier({
@@ -35,63 +30,6 @@
 			}
 		});
 	});
-
-	function changerCouche(selected) {
-		couche = selected;
-		majClavier({
-			emplacement: 'clavier-presentation',
-			data: hypertexte,
-			config: {
-				type: typeClavier,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
-			}
-		});
-	}
-
-	function toggleCouleur() {
-		let emplacement = 'clavier-presentation';
-		if (couleur == 'oui') {
-			couleur = 'non';
-		} else {
-			couleur = 'oui';
-		}
-		document.getElementById(emplacement).dataset.couleur = couleur;
-	}
-
-	function toggleIso() {
-		let emplacement = 'clavier-presentation';
-		if (typeClavier == 'iso') {
-			typeClavier = 'ergodox';
-		} else {
-			typeClavier = 'iso';
-		}
-		majClavier({
-			emplacement: emplacement,
-			data: hypertexte,
-			config: {
-				type: typeClavier,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
-			}
-		});
-	}
-	function togglePlus() {
-		let emplacement = 'clavier-presentation';
-		plus = !plus;
-		majClavier({
-			emplacement: emplacement,
-			data: hypertexte,
-			config: {
-				type: typeClavier,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
-			}
-		});
-	}
 
 	let options = [
 		['Visuel', 'Visuel'],
@@ -114,9 +52,15 @@
 	</div>
 
 	<bloc-clavier id="clavier-presentation">
-		<Clavier />
+		<Clavier typeClavier={'iso'} couche={'Visuel'} plus={false} couleur={'non'} />
 	</bloc-clavier>
-	<Controles_Clavier emplacement={'clavier-presentation'} />
+	<Controles_Clavier
+		emplacement={'clavier-presentation'}
+		typeClavier={'iso'}
+		couche={'Visuel'}
+		plus={false}
+		couleur={'non'}
+	/>
 </div>
 
 <mini-espace />

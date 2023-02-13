@@ -41,7 +41,7 @@ bloc-clavier {
     width: max-content;
     margin: 0 auto;
     padding: var(--marge-clavier);
-    background-color: rgba(46, 46, 46, 0.5);
+    background-color:hsla(234, 20%, 15%, 0.1);
     border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
 	box-shadow: 0 0 20px 5px rgba(0, 99, 170, 0.8);
