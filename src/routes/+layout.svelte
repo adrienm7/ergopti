@@ -43,17 +43,17 @@
 
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
 
-<div id="clavier" style="z-index: {zIndex};">
+<div id="clavier" class="bg-blue" style="z-index: {zIndex};">
 	<div>
 		<bloc-clavier id="clavier-reference">
 			<Clavier />
 		</bloc-clavier>
-		<petit-espace />
+		<mini-espace />
 		<Controles_Clavier emplacement={'clavier-reference'} />
 	</div>
 </div>
 
-<div id="page">
+<div id="page" class="bg-blue">
 	<Header />
 
 	<main>
@@ -74,21 +74,6 @@
 		overflow: scroll;
 		transition: all 0.2s ease-in-out;
 		overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
-		--couleur: 80;
-		background: linear-gradient(
-			90deg,
-			rgba(0, 0, var(--couleur), 1) 0%,
-			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 10%,
-			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 20%,
-			rgba(0, 0, calc(var(--couleur) / 3), 1) 30%,
-			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 40%,
-			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 50%,
-			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 60%,
-			rgba(0, 0, calc(var(--couleur) / 3), 1) 70%,
-			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 80%,
-			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 90%,
-			rgba(0, 0, var(--couleur), 1) 100%
-		);
 	}
 
 	#clavier div {
@@ -97,7 +82,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-direction: column;
-		min-height: calc(100vh - var(--hauteur-header) + 1px - 2 * var(--marge));
+		height: calc(100vh - var(--hauteur-header) + 1px);
 		padding: var(--marge) 0;
 	}
 	#afficher-clavier-reference {
@@ -106,6 +91,10 @@
 		bottom: 20px;
 		right: 20px;
 		padding: 10px;
+		cursor: pointer;
+		border: 1px solid rgba(0, 0, 0, 0.9);
+		border-radius: 6px;
+		box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
 	}
 	/* Permet de toujours placer le footer en bas de la page */
 
@@ -116,39 +105,12 @@
  */
 
 	#page {
-		--couleur: 80;
 		display: flex;
 		flex-direction: column;
 		margin: 0;
 		padding: 0;
 		min-height: 100vh;
-		background: linear-gradient(
-			90deg,
-			rgba(0, 0, var(--couleur), 1) 0%,
-			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 10%,
-			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 20%,
-			rgba(0, 0, calc(var(--couleur) / 3), 1) 30%,
-			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 40%,
-			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 50%,
-			rgba(0, 0, calc(var(--couleur) / 3.5), 1) 60%,
-			rgba(0, 0, calc(var(--couleur) / 3), 1) 70%,
-			rgba(0, 0, calc(var(--couleur) / 2.25), 1) 80%,
-			rgba(0, 0, calc(var(--couleur) / 1.5), 1) 90%,
-			rgba(0, 0, var(--couleur), 1) 100%
-		);
 		color: white;
-	}
-
-	@media (max-width: 800px) {
-		#page {
-			--couleur: 150;
-			background: linear-gradient(
-				90deg,
-				rgba(0, 0, calc(var(--couleur) / 3), 1) 0%,
-				rgba(0, 0, calc(var(--couleur) / 4), 1) 50%,
-				rgba(0, 0, calc(var(--couleur) / 3), 1) 100%
-			);
-		}
 	}
 
 	main {
