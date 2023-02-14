@@ -202,8 +202,8 @@ bloc-touche[data-type="enter"]::before {
     height: var(--taille-touche);
     width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 1px);
     background-color: var(--couleur-fond-touche);
-    border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
 	border-radius: 0 var(--arrondi-touche) 0 0;
+    border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
 }
 
 bloc-touche[data-type="enter"]::after {
