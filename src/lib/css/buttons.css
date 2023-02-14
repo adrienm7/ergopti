@@ -66,11 +66,12 @@ top: calc(calc(.6*.25vw) - calc(.6*.1vw));
 
 .btn-group select {
 	line-height: 1.3;
-	font-family: initial;
+	font-family: inherit;
 }
 .btn-group select option {
 	background-color: white;
 	color: black;
+	font-family: inherit;
 }
 
 .btn-group button a {

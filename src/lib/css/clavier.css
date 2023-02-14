@@ -180,12 +180,14 @@ bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="Tab"]
 bloc-touche[data-type="enter"]{ 
     top: 0;
     position: relative;
+	z-index: 1;
 	border-right: none;
+	border-top-right-radius: calc(var(--arrondi-touche) + 1px);
 }
 
 
 bloc-touche[data-type="enter"] div {
-    z-index: 2;
+    z-index: 3;
 }
 
 
@@ -195,7 +197,7 @@ bloc-touche[data-type="enter"]::before {
     position: absolute;
     top: 0;
     right: 0;
-    z-index: 1;
+    z-index: 2;
     content: '';
     height: var(--taille-touche);
     width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 1px);
