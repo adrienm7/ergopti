@@ -16,7 +16,7 @@ bloc-clavier {
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
     --profondeur-touche: calc(var(--taille-clavier) * 0.25vw);
     --profondeur-touche-pressee: calc(var(--taille-clavier) * 0.1vw);
-    --marge-touche: calc(var(--taille-clavier) * 0.35vw);
+    --marge-touche: calc(var(--taille-clavier) * 0.36vw);
     --arrondi-touche: 0.15em;
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
     --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
@@ -177,10 +177,10 @@ bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="Tab"]
 
 
 
-bloc-touche[data-type="enter"]{
-	--correction-decalage-entree: 0;
+bloc-touche[data-type="enter"]{ 
     top: 0;
     position: relative;
+	border-right: none;
 }
 
 
@@ -193,20 +193,21 @@ bloc-touche[data-type="enter"] div {
 bloc-touche[data-type="enter"]::before {
     /* On cache la jonction entre l’élément et l’after avec un rectangle */
     position: absolute;
-    top: calc(0% + 5px);
-    right: calc(var(--taille-bordure-touche) * -1 + var(--correction-decalage-entree));
+    top: 0;
+    right: 0;
     z-index: 1;
     content: '';
     height: var(--taille-touche);
-    width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 3px);
+    width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 1px);
     background-color: var(--couleur-fond-touche);
     border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+	border-radius: 0 var(--arrondi-touche) 0 0;
 }
 
 bloc-touche[data-type="enter"]::after {
     position: absolute;
     top: 100%;
-    right: calc(var(--taille-bordure-touche) * -1 + var(--correction-decalage-entree));
+    right: 0;
     z-index: 0;
 	content: '';
     height: calc(var(--taille-touche) + var(--marge-touche) / 2);
@@ -215,7 +216,7 @@ bloc-touche[data-type="enter"]::after {
     border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
     border-top: none;
     border-radius: 0 0 var(--arrondi-touche) var(--arrondi-touche);
-    box-shadow: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d), -1px var(--profondeur-touche) 0 var(--effet-3d);
+    box-shadow: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d), -0.5px var(--profondeur-touche) 0 var(--effet-3d);
 }
 
 
