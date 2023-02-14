@@ -184,7 +184,7 @@ bloc-touche[data-type="enter"]{
 }
 @media (max-width: 600px) {
 	bloc-touche[data-type="enter"]{
-		--correction-decalage-entree: 1px;
+		--correction-decalage-entree: 1.5px;
 	}
 }
 
