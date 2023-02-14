@@ -178,15 +178,11 @@ bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="Tab"]
 
 
 bloc-touche[data-type="enter"]{
-	--correction-decalage-entree: 0.5px;
+	--correction-decalage-entree: 0;
     top: 0;
     position: relative;
 }
-@media (max-width: 600px) {
-	bloc-touche[data-type="enter"]{
-		--correction-decalage-entree: 0.8px;
-	}
-}
+
 
 bloc-touche[data-type="enter"] div {
     z-index: 2;

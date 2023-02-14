@@ -81,6 +81,7 @@
 	<li><kbd>G"</kbd> ➜ <kbd-sortie>J’AI</kbd-sortie></li>
 	<li><kbd>GT"</kbd> ➜ <kbd-sortie>J’ÉTAIS</kbd-sortie></li>
 	<li><kbd>M"</kbd> ➜ <kbd-sortie>MAIS</kbd-sortie></li>
+	<li><kbd>PCQ"</kbd> ➜ <kbd-sortie>PCQ</kbd-sortie></li>
 	<li><kbd>PÊ"</kbd> ➜ <kbd-sortie>PEUT-ÊTRE</kbd-sortie></li>
 	<li><kbd>PEX"</kbd> ➜ <kbd-sortie>PAR EXEMPLE</kbd-sortie></li>
 	<li><kbd>R"</kbd> ➜ <kbd-sortie>RIEN</kbd-sortie></li>
