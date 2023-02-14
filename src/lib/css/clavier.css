@@ -182,7 +182,7 @@ bloc-touche[data-type="enter"]{
     position: relative;
 	z-index: 1;
 	border-right: none;
-	border-top-right-radius: calc(var(--arrondi-touche) + 1px);
+	/* border-top-right-radius: calc(var(--arrondi-touche) + 1px); */
 }
 
 
