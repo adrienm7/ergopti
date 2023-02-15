@@ -69,8 +69,38 @@ export function majClavier({ emplacement, data, config }) {
 			}
 		}
 	}
+	toggle_couche(emplacement, coucheClavier);
 }
 
+function toggle_couche(emplacement, couche) {
+	let shift1 = document.getElementById(emplacement).querySelector("[data-touche='LShift']");
+	let shift2 = document.getElementById(emplacement).querySelector("[data-touche='RShift']");
+	let altgr = document.getElementById(emplacement).querySelector("[data-touche='RAlt']");
+	let a_grave = document.getElementById(emplacement).querySelector("[data-touche='à']");
+	let space = document.getElementById(emplacement).querySelector("[data-touche='Space']");
+
+	/* On enlève tout, puis on remet le bon */
+	shift1.classList.remove('touche-active');
+	shift2.classList.remove('touche-active');
+	altgr.classList.remove('touche-active');
+	a_grave.classList.remove('touche-active');
+	space.classList.remove('touche-active');
+
+	if (couche == 'Shift') {
+		shift1.classList.add('touche-active');
+		shift2.classList.add('touche-active');
+	} else if (couche == 'AltGr') {
+		altgr.classList.add('touche-active');
+	} else if (couche == 'ShiftAltGr') {
+		shift1.classList.add('touche-active');
+		shift2.classList.add('touche-active');
+		altgr.classList.add('touche-active');
+	} else if (couche == 'à') {
+		a_grave.classList.add('touche-active');
+	} else if (couche == 'layer') {
+		space.classList.add('touche-active');
+	}
+}
 var mayzner = {
 	max: 12.49,
 	a: 8.04,
