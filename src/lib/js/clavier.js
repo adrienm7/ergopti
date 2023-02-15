@@ -24,8 +24,13 @@ export function majClavier({ emplacement, data, config }) {
 				} else {
 					if (coucheClavier == 'Visuel') {
 						if (touche.type == 'double') {
-							toucheClavier.getElementsByTagName('div')[0].innerHTML =
-								touche['Shift'] + '<br/>' + touche['Primary'];
+							if (res.touche == '"') {
+								toucheClavier.getElementsByTagName('div')[0].innerHTML =
+									touche['Shift'] + '<br/>' + touche['Primary'];
+							} else {
+								toucheClavier.getElementsByTagName('div')[0].innerHTML =
+									touche['AltGr'] + '<br/>' + touche['Primary'];
+							}
 						} else {
 							if (plusClavier) {
 								if (touche['Primary' + '+'] !== undefined) {
