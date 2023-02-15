@@ -84,7 +84,8 @@ bloc-touche {
 }
 
 bloc-touche:active,
-bloc-touche:hover {
+bloc-touche:hover,
+.touche-active {
 	--couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-pressee-luminosite), var(--transparence-touche-pressee));
     position: relative;
     top: var(--descente-touche);
@@ -305,6 +306,11 @@ bloc-touche[data-type="enter"]::after {
 
 bloc-touche[data-type="space"] {
 	background-color: rgba(255, 255, 255, 0.1);
+}
+
+.touche-active {
+	color: black!important;
+	background-color: rgba(255, 255, 255, 0.7)!important;
 }
 
 

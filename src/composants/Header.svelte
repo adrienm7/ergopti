@@ -87,11 +87,12 @@
 	}
 	header a {
 		color: var(--couleur-liens-header);
+		font-size: 18px;
 		text-decoration: none;
 	}
 
 	header #menu li a p {
-		font-size: 20px;
+		font-size: 18px;
 	}
 
 	header #menu li a p::first-letter {
