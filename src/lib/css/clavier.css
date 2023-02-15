@@ -130,7 +130,7 @@ bloc-touche[data-touche="Option"] {
 
 
 
-bloc-touche[data-type="double"] div {
+bloc-clavier[data-couche="Visuel"] bloc-touche[data-type="double"] div {
     line-height: 1.1;
     font-size: calc(var(--taille-texte-touche) * 0.7);
 }
@@ -159,10 +159,18 @@ bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="y"] d
 	font-size: 1.8em;
 }
 bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="CapsLock"] div {
-	font-size: 0.75em;
+	font-size: 0.7em;
 }
 bloc-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="Tab"] div {
 	font-size: 0.6em;
+}
+bloc-clavier[data-couche="layer"] bloc-touche[data-touche="à"] div,
+bloc-clavier[data-couche="layer"] bloc-touche[data-touche="c"] div,
+bloc-clavier[data-couche="layer"] bloc-touche[data-touche="d"] div,
+bloc-clavier[data-couche="layer"] bloc-touche[data-touche="’"] div,
+bloc-clavier[data-couche="layer"] bloc-touche[data-touche="w"] div,
+bloc-clavier[data-couche="layer"] bloc-touche[data-touche="x"] div {
+	font-size: 0.8em;
 }
 
 

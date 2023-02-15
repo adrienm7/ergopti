@@ -68,7 +68,8 @@
 		['Shift', 'Shift'],
 		['AltGr', 'AltGr'],
 		['Shift + AltGr', 'ShiftAltGr'],
-		['Layer', 'layer']
+		['Layer', 'layer'],
+		['Touche À', 'à']
 	];
 	let selected = options[0]; // On actualise la valeur du select avec celle par défaut, cad "Visuel"
 </script>

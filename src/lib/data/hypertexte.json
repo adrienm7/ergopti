@@ -1006,6 +1006,7 @@
 			"AltGr": "[",
 			"ShiftAltGr": "ℕ",
 			"layer": "⤒",
+			"à": "",
 			"type": "lettre"
 		},
 		{
@@ -1015,6 +1016,7 @@
 			"AltGr": "@",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "bé",
 			"type": "lettre"
 		},
 		{
@@ -1023,7 +1025,8 @@
 			"Shift": "C",
 			"AltGr": "ç",
 			"ShiftAltGr": "Ç",
-			"layer": "",
+			"layer": "+⊞⇦",
+			"à": "cd",
 			"type": "lettre"
 		},
 		{
@@ -1032,7 +1035,8 @@
 			"Shift": "D",
 			"AltGr": "$",
 			"ShiftAltGr": "",
-			"layer": "",
+			"layer": "+^⇦",
+			"à": "ds",
 			"type": "lettre"
 		},
 		{
@@ -1042,6 +1046,7 @@
 			"AltGr": "{",
 			"ShiftAltGr": "ᵉ",
 			"layer": "⇩",
+			"à": "je",
 			"type": "lettre"
 		},
 		{
@@ -1051,15 +1056,17 @@
 			"AltGr": "~",
 			"ShiftAltGr": "≈",
 			"layer": "",
+			"à": "dm",
 			"type": "lettre"
 		},
 		{
 			"touche": "g",
 			"Primary": "g",
 			"Shift": "G",
-			"AltGr": "« ",
+			"AltGr": "«▮",
 			"ShiftAltGr": "“",
-			"layer": "",
+			"layer": "⊞⇨",
+			"à": "gl",
 			"type": "lettre"
 		},
 		{
@@ -1068,7 +1075,8 @@
 			"Shift": "H",
 			"AltGr": "#",
 			"ShiftAltGr": "„",
-			"layer": "",
+			"layer": "⊞⇦",
+			"à": "nh",
 			"type": "lettre"
 		},
 		{
@@ -1078,6 +1086,7 @@
 			"AltGr": "]",
 			"ShiftAltGr": "ᵢ",
 			"layer": "⇧",
+			"à": "ji",
 			"type": "lettre"
 		},
 		{
@@ -1087,6 +1096,7 @@
 			"AltGr": "◌̈",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "",
 			"type": "lettre"
 		},
 		{
@@ -1096,6 +1106,7 @@
 			"AltGr": "…",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "",
 			"type": "lettre"
 		},
 		{
@@ -1104,7 +1115,8 @@
 			"Shift": "L",
 			"AltGr": "=",
 			"ShiftAltGr": "≠",
-			"layer": "",
+			"layer": "^⇦",
+			"à": "cl",
 			"type": "lettre"
 		},
 		{
@@ -1113,7 +1125,8 @@
 			"Shift": "M",
 			"AltGr": "&",
 			"ShiftAltGr": "−",
-			"layer": "",
+			"layer": "+⇤",
+			"à": "sm",
 			"type": "lettre"
 		},
 		{
@@ -1123,6 +1136,7 @@
 			"AltGr": ")",
 			"ShiftAltGr": "",
 			"layer": "⇦",
+			"à": "nl",
 			"type": "lettre"
 		},
 		{
@@ -1131,7 +1145,8 @@
 			"Shift": "O",
 			"AltGr": "œ",
 			"ShiftAltGr": "Œ",
-			"layer": "",
+			"layer": "^⇥",
+			"à": "jo",
 			"type": "lettre"
 		},
 		{
@@ -1140,7 +1155,8 @@
 			"Shift": "P",
 			"AltGr": "+",
 			"ShiftAltGr": "±",
-			"layer": "",
+			"layer": "^⇨",
+			"à": "ph",
 			"type": "lettre"
 		},
 		{
@@ -1153,6 +1169,7 @@
 			"AltGr+": "⇥",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "",
 			"type": "lettre"
 		},
 		{
@@ -1162,6 +1179,7 @@
 			"AltGr": ">",
 			"ShiftAltGr": "⩾",
 			"layer": "⇥",
+			"à": "rq",
 			"type": "lettre"
 		},
 		{
@@ -1171,6 +1189,7 @@
 			"AltGr": "(",
 			"ShiftAltGr": "",
 			"layer": "⇤",
+			"à": "cs",
 			"type": "lettre"
 		},
 		{
@@ -1180,6 +1199,7 @@
 			"AltGr": "<",
 			"ShiftAltGr": "⩽",
 			"layer": "⇨",
+			"à": "tp",
 			"type": "lettre"
 		},
 		{
@@ -1189,6 +1209,7 @@
 			"AltGr": "}",
 			"ShiftAltGr": "μ",
 			"layer": "⤓",
+			"à": "ju",
 			"type": "lettre"
 		},
 		{
@@ -1198,6 +1219,7 @@
 			"AltGr": "|",
 			"ShiftAltGr": "¦",
 			"layer": "",
+			"à": "adv",
 			"type": "lettre"
 		},
 		{
@@ -1208,16 +1230,18 @@
 			"AltGr+": "[où]",
 			"ShiftAltGr": "Ù",
 			"ShiftAltGr+": "[Où]",
-			"layer": "",
+			"layer": "+^⇥",
+			"à": "ja",
 			"type": "lettre"
 		},
 		{
 			"touche": "x",
 			"Primary": "x",
 			"Shift": "X",
-			"AltGr": " »",
+			"AltGr": "▮»",
 			"ShiftAltGr": "”",
-			"layer": "",
+			"layer": "+⊞⇨",
+			"à": "adm",
 			"type": "lettre"
 		},
 		{
@@ -1227,7 +1251,8 @@
 			"AltGr": " ",
 			"AltGr+": "␛",
 			"ShiftAltGr": "",
-			"layer": "",
+			"layer": "^⇤",
+			"à": "aj",
 			"type": "lettre"
 		},
 		{
@@ -1238,24 +1263,27 @@
 			"AltGr+": "⇤",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "",
 			"type": "lettre"
 		},
 		{
 			"touche": ",",
 			"Primary": ",",
-			"Shift": " ;",
+			"Shift": "▮;",
 			"AltGr": ";",
 			"ShiftAltGr": "",
-			"layer": "",
+			"layer": "+⇥",
+			"à": "u,",
 			"type": "double"
 		},
 		{
 			"touche": ".",
 			"Primary": ".",
-			"Shift": " :",
+			"Shift": "▮:",
 			"AltGr": ":",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "u.",
 			"type": "double"
 		},
 		{
@@ -1264,25 +1292,28 @@
 			"Shift": "'",
 			"AltGr": "*",
 			"ShiftAltGr": "×",
-			"layer": "",
+			"layer": "!⇩",
+			"à": "",
 			"type": "double"
 		},
 		{
 			"touche": "’",
 			"Primary": "’",
-			"Shift": " ?",
+			"Shift": "▮?",
 			"AltGr": "?",
 			"ShiftAltGr": "¿",
-			"layer": "",
+			"layer": "+^⇨",
+			"à": "j’",
 			"type": "double"
 		},
 		{
 			"touche": "!",
 			"Primary": "◌̂",
-			"Shift": " !",
+			"Shift": "▮!",
 			"AltGr": "!",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "",
 			"type": "double"
 		},
 		{
@@ -1291,7 +1322,8 @@
 			"Shift": "Ê",
 			"AltGr": "^",
 			"ShiftAltGr": "",
-			"layer": "",
+			"layer": "!⇧",
+			"à": "",
 			"type": "français"
 		},
 		{
@@ -1300,7 +1332,8 @@
 			"Shift": "É",
 			"AltGr": "/",
 			"ShiftAltGr": "÷",
-			"layer": "",
+			"layer": "+!⇩",
+			"à": "jé",
 			"type": "français"
 		},
 		{
@@ -1309,7 +1342,8 @@
 			"Shift": "È",
 			"AltGr": "\\",
 			"ShiftAltGr": "",
-			"layer": "",
+			"layer": "+!⇧",
+			"à": "",
 			"type": "français"
 		},
 		{
@@ -1318,7 +1352,8 @@
 			"Shift": "À",
 			"AltGr": "`",
 			"ShiftAltGr": "",
-			"layer": "",
+			"layer": "+^⇤",
+			"à": "",
 			"type": "français"
 		},
 		{
@@ -1327,6 +1362,7 @@
 			"Shift": " %",
 			"AltGr": "‰",
 			"ShiftAltGr": "",
+			"à": "",
 			"layer": ""
 		},
 		{
@@ -1335,6 +1371,7 @@
 			"Shift": "=",
 			"AltGr": "=",
 			"ShiftAltGr": "=",
+			"à": "",
 			"layer": ""
 		},
 		{
@@ -1343,6 +1380,7 @@
 			"Shift": " €",
 			"AltGr": "£",
 			"ShiftAltGr": "",
+			"à": "",
 			"layer": ""
 		},
 		{
@@ -1351,7 +1389,8 @@
 			"Shift": "1",
 			"AltGr": "1",
 			"ShiftAltGr": "1",
-			"layer": "1"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "2",
@@ -1359,7 +1398,8 @@
 			"Shift": "2",
 			"AltGr": "2",
 			"ShiftAltGr": "2",
-			"layer": "2"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "3",
@@ -1367,7 +1407,8 @@
 			"Shift": "3",
 			"AltGr": "3",
 			"ShiftAltGr": "3",
-			"layer": "3"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "4",
@@ -1375,7 +1416,8 @@
 			"Shift": "4",
 			"AltGr": "4",
 			"ShiftAltGr": "4",
-			"layer": "4"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "5",
@@ -1383,7 +1425,8 @@
 			"Shift": "5",
 			"AltGr": "5",
 			"ShiftAltGr": "5",
-			"layer": "5"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "6",
@@ -1391,7 +1434,8 @@
 			"Shift": "6",
 			"AltGr": "6",
 			"ShiftAltGr": "6",
-			"layer": "6"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "7",
@@ -1399,7 +1443,8 @@
 			"Shift": "7",
 			"AltGr": "7",
 			"ShiftAltGr": "7",
-			"layer": "7"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "8",
@@ -1407,7 +1452,8 @@
 			"Shift": "8",
 			"AltGr": "8",
 			"ShiftAltGr": "8",
-			"layer": "8"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "9",
@@ -1415,7 +1461,8 @@
 			"Shift": "9",
 			"AltGr": "9",
 			"ShiftAltGr": "9",
-			"layer": "9"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "0",
@@ -1423,7 +1470,8 @@
 			"Shift": "º",
 			"AltGr": "°",
 			"ShiftAltGr": "ª",
-			"layer": "0"
+			"à": "",
+			"layer": ""
 		},
 		{
 			"touche": "CapsLock",
@@ -1433,6 +1481,7 @@
 			"AltGr+": "Ctrl + ⌫",
 			"ShiftAltGr": "⌫",
 			"layer": "⌫",
+			"à": "⌫",
 			"type": "special"
 		},
 		{
@@ -1442,6 +1491,7 @@
 			"AltGr": "⇧",
 			"ShiftAltGr": "⇧",
 			"layer": "⇧",
+			"à": "⇧",
 			"type": "special"
 		},
 		{
@@ -1452,6 +1502,7 @@
 			"AltGr+": ".␣⇧",
 			"ShiftAltGr": "⇧",
 			"layer": "⇧",
+			"à": "⇧",
 			"type": "special"
 		},
 		{
@@ -1461,6 +1512,7 @@
 			"AltGr": "Ctrl",
 			"ShiftAltGr": "Ctrl",
 			"layer": "Ctrl",
+			"à": "Ctrl",
 			"type": "special"
 		},
 		{
@@ -1470,6 +1522,7 @@
 			"AltGr": "Ctrl",
 			"ShiftAltGr": "Ctrl",
 			"layer": "Ctrl",
+			"à": "Ctrl",
 			"type": "special"
 		},
 		{
@@ -1479,6 +1532,7 @@
 			"AltGr": "Alt",
 			"ShiftAltGr": "Alt",
 			"layer": "Alt",
+			"à": "Alt",
 			"type": "special"
 		},
 		{
@@ -1488,6 +1542,7 @@
 			"AltGr": "AltGr",
 			"ShiftAltGr": "AltGr",
 			"layer": "AltGr",
+			"à": "AltGr",
 			"type": "special"
 		},
 		{
@@ -1497,6 +1552,7 @@
 			"AltGr": "Win",
 			"ShiftAltGr": "Win",
 			"layer": "Win",
+			"à": "Win",
 			"type": "special"
 		},
 		{
@@ -1506,6 +1562,7 @@
 			"AltGr": "Option",
 			"ShiftAltGr": "Option",
 			"layer": "Option",
+			"à": "Option",
 			"type": "special"
 		},
 		{
@@ -1515,6 +1572,7 @@
 			"AltGr": "_",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "",
 			"type": "space"
 		},
 		{
@@ -1525,6 +1583,7 @@
 			"AltGr+": "Capsword",
 			"ShiftAltGr": "↹",
 			"layer": "↹",
+			"à": "↹",
 			"type": "special"
 		},
 		{
@@ -1534,6 +1593,7 @@
 			"AltGr": "↩",
 			"ShiftAltGr": "↩",
 			"layer": "↩",
+			"à": "↩",
 			"type": "enter"
 		},
 		{
@@ -1543,6 +1603,7 @@
 			"AltGr": "⌫",
 			"ShiftAltGr": "⌫",
 			"layer": "⌫",
+			"à": "⌫",
 			"type": "special"
 		},
 		{
@@ -1552,6 +1613,7 @@
 			"AltGr": "Ⓒ",
 			"ShiftAltGr": "Ⓒ",
 			"layer": "Ⓒ",
+			"à": "Ⓒ",
 			"type": "special"
 		},
 		{
@@ -1561,6 +1623,7 @@
 			"AltGr": "Ⓥ",
 			"ShiftAltGr": "Ⓥ",
 			"layer": "Ⓥ",
+			"à": "Ⓥ",
 			"type": "special"
 		},
 		{
@@ -1570,6 +1633,7 @@
 			"AltGr": "Ⓧ",
 			"ShiftAltGr": "Ⓧ",
 			"layer": "Ⓧ",
+			"à": "Ⓧ",
 			"type": "special"
 		},
 		{
@@ -1579,6 +1643,7 @@
 			"AltGr": "Alt<br>Tab",
 			"ShiftAltGr": "Alt<br>Tab",
 			"layer": "Alt<br>Tab",
+			"à": "Alt<br>Tab",
 			"type": "special"
 		},
 		{
@@ -1588,6 +1653,7 @@
 			"AltGr": "",
 			"ShiftAltGr": "",
 			"layer": "",
+			"à": "",
 			"type": "vide"
 		}
 	]

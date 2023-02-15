@@ -36,19 +36,19 @@
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/benchmarks"><p>❖ Benchmarks</p></a>
+				<a href="/benchmarks"><p>⚑ Benchmarks</p></a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/telechargements"><p>➜ Téléchargements</p></a>
+				<a href="/telechargements"><p>❖ Téléchargements</p></a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/contact"><p>✉ Contact</p></a>
+				<a href="/contact"><p>➜ Contact</p></a>
 			</li>
 		</ul>
 	</nav>
