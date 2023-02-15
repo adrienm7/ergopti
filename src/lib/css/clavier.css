@@ -182,7 +182,6 @@ bloc-touche[data-type="enter"]{
     position: relative;
 	z-index: 1;
 	border-right: none;
-	/* border-top-right-radius: calc(var(--arrondi-touche) + 1px); */
 }
 
 
@@ -202,7 +201,7 @@ bloc-touche[data-type="enter"]::before {
     height: var(--taille-touche);
     width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 1px);
     background-color: var(--couleur-fond-touche);
-	border-radius: 0 var(--arrondi-touche) 0 0;
+	border-radius: 0 calc(var(--arrondi-touche) - 1px) 0 0;
     border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
 }
 
@@ -232,7 +231,6 @@ bloc-touche[data-type="enter"]:hover {
 bloc-touche[data-type="enter"]:active::before,
 bloc-touche[data-type="enter"]:hover::before {
     height: var(--taille-touche);
-    width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 2px);
 }
 
 bloc-touche[data-type="enter"]:active::after,
