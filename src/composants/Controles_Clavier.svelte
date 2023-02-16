@@ -74,7 +74,7 @@
 	let selected = options[0]; // On actualise la valeur du select avec celle par défaut, cad "Visuel"
 </script>
 
-<div class="btn-group">
+<controles-clavier class="btn-group">
 	<select bind:value={selected} on:change={() => changerCouche(selected[1])}>
 		{#each options as value}<option {value}>{value[0]}</option>{/each}
 	</select>
@@ -87,4 +87,4 @@
 	<button on:click={toggleIso}>
 		{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
 	</button>
-</div>
+</controles-clavier>
