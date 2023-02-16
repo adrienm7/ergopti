@@ -16,7 +16,7 @@ export function majClavier({ emplacement, data, config }) {
 				.querySelector("[data-ligne='" + i + "'][data-colonne='" + j + "']");
 			toucheClavier.dataset.touche = ''; // On nettoie le contenu de la touche
 			const res = data[typeClavier].find((el) => (el.ligne == i) & (el.colonne == j));
-			console.log(res);
+			// console.log(res);
 			if (res !== undefined) {
 				const touche = data.touches.find((el) => el.touche == res.touche);
 				if (touche[coucheClavier] === '') {
@@ -70,6 +70,53 @@ export function majClavier({ emplacement, data, config }) {
 		}
 	}
 	toggle_couche(emplacement, coucheClavier);
+	boutons_changer_couche(emplacement, data, config);
+}
+
+function boutons_changer_couche(emplacement, data, config) {
+	let emplacementClavier = document.getElementById(emplacement);
+	let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
+	let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
+	let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
+
+	for (let toucheClavier of [toucheRAlt, toucheLShift, toucheRShift]) {
+		toucheClavier.addEventListener('click', function () {
+			let couche = config.couche;
+			if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'Shift')) {
+				couche = 'ShiftAltGr';
+			} else if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'AltGr')) {
+				couche = 'Visuel';
+			} else if (toucheClavier.dataset.touche == 'RAlt') {
+				couche = 'AltGr';
+			} else if ((toucheClavier.dataset.touche == 'LShift') & (couche == 'AltGr')) {
+				couche = 'ShiftAltGr';
+			} else if ((toucheClavier.dataset.touche == 'RShift') & (couche == 'AltGr')) {
+				couche = 'ShiftAltGr';
+			} else if (
+				((toucheClavier.dataset.touche == 'LShift') & (couche == 'Shift')) |
+				((toucheClavier.dataset.touche == 'RShift') & (couche == 'Shift'))
+			) {
+				couche = 'Visuel';
+			} else if (
+				(toucheClavier.dataset.touche == 'LShift') |
+				(toucheClavier.dataset.touche == 'RShift')
+			) {
+				couche = 'Shift';
+			} else {
+				couche = 'Visuel';
+			}
+			majClavier({
+				emplacement: emplacement,
+				data: data,
+				config: {
+					type: config.type,
+					couche: couche,
+					couleur: config.couleur,
+					plus: config.plus
+				}
+			});
+		});
+	}
 }
 
 function toggle_couche(emplacement, couche) {
