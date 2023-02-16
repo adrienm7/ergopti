@@ -129,7 +129,6 @@ function boutons_changer_couche(emplacement, data, config) {
 			if ((toucheClavier.dataset.touche == 'Space') & (couche == 'layer')) {
 				couche = 'Visuel';
 			} else if (toucheClavier.dataset.touche == 'Space') {
-				console.log(couche);
 				couche = 'layer';
 			}
 

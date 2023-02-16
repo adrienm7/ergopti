@@ -1,6 +1,6 @@
 <script>
-	import Header from '../composants/Header.svelte';
-	import Footer from '../composants/Footer.svelte';
+	import Header from '$lib/composants/Header.svelte';
+	import Footer from '$lib/composants/Footer.svelte';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -8,8 +8,7 @@
 	import '$lib/css/typography.css';
 	import '$lib/css/buttons.css';
 	import '$lib/css/miscellaneous.css';
-
-	import ClavierTest from '../composants/Clavier_Test.svelte';
+	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 
 	let zIndex = -999;
 
@@ -23,7 +22,7 @@
 
 <div id="clavier" class="bg-blue" style="z-index: {zIndex};">
 	<div>
-		<ClavierTest
+		<EnsembleClavier
 			emplacement={'clavier-reference'}
 			type={'iso'}
 			couche={'Visuel'}

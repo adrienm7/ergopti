@@ -1,6 +1,6 @@
 <script>
-	import Nom from '../../composants/Nom.svelte';
-	import NomPlus from '../../composants/Nom_Plus.svelte';
+	import Nom from '$lib/composants/Nom.svelte';
+	import NomPlus from '$lib/composants/Nom_Plus.svelte';
 </script>
 
 <svelte:head>

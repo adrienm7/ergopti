@@ -1,7 +1,7 @@
 <script>
-	import Nom from '../../composants/Nom.svelte';
-	import Nom_Plus from '../../composants/Nom_Plus.svelte';
-	import SFB from '../../composants/SFB.svelte';
+	import Nom from '$lib/composants/Nom.svelte';
+	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import SFB from '$lib/composants/SFB.svelte';
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
 	import Raccourcis from './raccourcis.svelte';
