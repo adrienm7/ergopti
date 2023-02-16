@@ -78,33 +78,57 @@ function boutons_changer_couche(emplacement, data, config) {
 	let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 	let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
 	let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
+	let toucheSpace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
+	let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 
-	for (let toucheClavier of [toucheRAlt, toucheLShift, toucheRShift]) {
+	for (let toucheClavier of [toucheRAlt, toucheLShift, toucheRShift, toucheSpace, toucheA]) {
 		toucheClavier.addEventListener('click', function () {
 			let couche = config.couche;
+
 			if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'Shift')) {
 				couche = 'ShiftAltGr';
 			} else if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'AltGr')) {
 				couche = 'Visuel';
+			} else if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'ShiftAltGr')) {
+				couche = 'Shift';
 			} else if (toucheClavier.dataset.touche == 'RAlt') {
 				couche = 'AltGr';
-			} else if ((toucheClavier.dataset.touche == 'LShift') & (couche == 'AltGr')) {
-				couche = 'ShiftAltGr';
-			} else if ((toucheClavier.dataset.touche == 'RShift') & (couche == 'AltGr')) {
+			}
+
+			if (
+				((toucheClavier.dataset.touche == 'LShift') | (toucheClavier.dataset.touche == 'RShift')) &
+				(couche == 'AltGr')
+			) {
 				couche = 'ShiftAltGr';
 			} else if (
-				((toucheClavier.dataset.touche == 'LShift') & (couche == 'Shift')) |
-				((toucheClavier.dataset.touche == 'RShift') & (couche == 'Shift'))
+				((toucheClavier.dataset.touche == 'LShift') | (toucheClavier.dataset.touche == 'RShift')) &
+				(couche == 'Shift')
 			) {
 				couche = 'Visuel';
+			} else if (
+				((toucheClavier.dataset.touche == 'LShift') | (toucheClavier.dataset.touche == 'RShift')) &
+				(couche == 'ShiftAltGr')
+			) {
+				couche = 'AltGr';
 			} else if (
 				(toucheClavier.dataset.touche == 'LShift') |
 				(toucheClavier.dataset.touche == 'RShift')
 			) {
 				couche = 'Shift';
-			} else {
-				couche = 'Visuel';
 			}
+
+			if ((toucheClavier.dataset.touche == 'Space') & (couche == 'layer')) {
+				couche = 'Visuel';
+			} else if (toucheClavier.dataset.touche == 'Space') {
+				couche = 'layer';
+			}
+
+			if ((toucheClavier.dataset.touche == 'à') & (couche == 'à')) {
+				couche = 'Visuel';
+			} else if (toucheClavier.dataset.touche == 'à') {
+				couche = 'à';
+			}
+
 			majClavier({
 				emplacement: emplacement,
 				data: data,
