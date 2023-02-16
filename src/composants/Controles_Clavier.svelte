@@ -62,6 +62,7 @@
 		});
 	}
 
+	// let options = ['Visuel', 'Primary', 'Shift', 'AltGr', 'ShiftAltGr', 'layer', 'à'];
 	let options = [
 		['Visuel', 'Visuel'],
 		['Primary', 'Primary'],
@@ -71,12 +72,11 @@
 		['Layer', 'layer'],
 		['Touche À', 'à']
 	];
-	let selected = options[0]; // On actualise la valeur du select avec celle par défaut, cad "Visuel"
 </script>
 
 <controles-clavier class="btn-group">
-	<select bind:value={selected} on:change={() => changerCouche(selected[1])}>
-		{#each options as value}<option {value}>{value[0]}</option>{/each}
+	<select bind:value={couche} on:change={() => changerCouche(couche)}>
+		{#each options as value}<option value={value[1]}>{value[0]}</option>{/each}
 	</select>
 	<button on:click={togglePlus}>
 		{plus === true ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
