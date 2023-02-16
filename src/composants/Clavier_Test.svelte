@@ -20,23 +20,20 @@
 				type: type,
 				couche: couche,
 				couleur: couleur,
-				plus: plus
+				plus: plus,
+				controles: controles
 			}
 		});
 	});
 </script>
 
-<div class="center">
-	<bloc-clavier id={emplacement}>
-		<Base_Clavier />
-	</bloc-clavier>
-
-	<mini-espace />
-
+<ensemble-clavier id={emplacement} class="center">
+	<Base_Clavier />
 	{#if controles}
+		<mini-espace />
 		<Controles_Clavier {emplacement} {type} {couche} {plus} {couleur} />
 	{/if}
-</div>
+</ensemble-clavier>
 
 <style>
 	.center {

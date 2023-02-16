@@ -3,6 +3,7 @@ export function majClavier({ emplacement, data, config }) {
 	const coucheClavier = config.couche;
 	const couleurClavier = config.couleur;
 	const plusClavier = config.plus;
+	const controlesClavier = config.controles;
 
 	document.getElementById(emplacement).dataset.type = typeClavier;
 	document.getElementById(emplacement).dataset.couche = coucheClavier;
@@ -69,8 +70,14 @@ export function majClavier({ emplacement, data, config }) {
 			}
 		}
 	}
+
+	/* La couche active a ses modificateurs pressés */
 	toggle_couche(emplacement, coucheClavier);
-	boutons_changer_couche(emplacement, data, config);
+
+	if (controlesClavier) {
+		/* Il n’y a les touches pour changer de couche que quand il y a les contrôles pour changer de couche */
+		boutons_changer_couche(emplacement, data, config);
+	}
 }
 
 function boutons_changer_couche(emplacement, data, config) {
