@@ -1,6 +1,6 @@
 <script>
-	import Base_Clavier from './Base_Clavier.svelte';
-	import Controles_Clavier from '../composants/Controles_Clavier.svelte';
+	import Bloc_Clavier from './Bloc_Clavier.svelte';
+	import Controles_Clavier from './Controles_Clavier.svelte';
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
 	import { onMount } from 'svelte';
@@ -28,7 +28,7 @@
 </script>
 
 <ensemble-clavier id={emplacement} class="center">
-	<Base_Clavier />
+	<Bloc_Clavier />
 	{#if controles}
 		<mini-espace />
 		<Controles_Clavier {emplacement} {type} {couche} {plus} {couleur} />

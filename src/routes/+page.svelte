@@ -1,8 +1,8 @@
 <script>
-	import Nom from '../composants/Nom.svelte';
-	import Nom_Plus from '../composants/Nom_Plus.svelte';
-	import SFB from '../composants/SFB.svelte';
-	import ClavierTest from '../composants/Clavier_Test.svelte';
+	import Nom from '$lib/composants/Nom.svelte';
+	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import SFB from '$lib/composants/SFB.svelte';
+	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 </script>
 
 <div class="fullheight">
@@ -14,7 +14,7 @@
 		</h1>
 	</div>
 
-	<ClavierTest
+	<EnsembleClavier
 		emplacement={'clavier-presentation'}
 		type={'iso'}
 		couche={'Visuel'}
@@ -228,7 +228,7 @@
 
 	<moyen-espace />
 </div>
-<ClavierTest
+<EnsembleClavier
 	emplacement={'clavier-freq'}
 	type={'iso'}
 	couche={'Visuel'}
