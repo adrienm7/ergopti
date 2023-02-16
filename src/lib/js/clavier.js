@@ -78,6 +78,8 @@ export function majClavier({ emplacement, data, config }) {
 		/* Il n’y a les touches pour changer de couche que quand il y a les contrôles pour changer de couche */
 		boutons_changer_couche(emplacement, data, config);
 	}
+
+	document.getElementById(emplacement).querySelector('select').value = coucheClavier;
 }
 
 function boutons_changer_couche(emplacement, data, config) {
@@ -127,6 +129,7 @@ function boutons_changer_couche(emplacement, data, config) {
 			if ((toucheClavier.dataset.touche == 'Space') & (couche == 'layer')) {
 				couche = 'Visuel';
 			} else if (toucheClavier.dataset.touche == 'Space') {
+				console.log(couche);
 				couche = 'layer';
 			}
 
@@ -143,7 +146,8 @@ function boutons_changer_couche(emplacement, data, config) {
 					type: config.type,
 					couche: couche,
 					couleur: config.couleur,
-					plus: config.plus
+					plus: config.plus,
+					controles: config.controles
 				}
 			});
 		});
