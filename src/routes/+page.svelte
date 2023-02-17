@@ -19,8 +19,8 @@
 		type={'iso'}
 		couche={'Visuel'}
 		couleur={'non'}
-		plus={false}
-		controles={true}
+		plus={'false'}
+		controles={'oui'}
 	/>
 </div>
 
@@ -233,8 +233,8 @@
 	type={'iso'}
 	couche={'Visuel'}
 	couleur={'freq'}
-	plus={false}
-	controles={false}
+	plus={'non'}
+	controles={'non'}
 />
 <div class="contenu">
 	<grand-espace />

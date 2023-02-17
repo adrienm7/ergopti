@@ -15,23 +15,24 @@
 	onMount(() => {
 		majClavier({
 			emplacement: emplacement,
-			data: hypertexte,
-			config: {
-				type: type,
-				couche: couche,
-				couleur: couleur,
-				plus: plus,
-				controles: controles
-			}
+			data: hypertexte
 		});
 	});
 </script>
 
-<ensemble-clavier id={emplacement} class="center">
+<ensemble-clavier
+	id={emplacement}
+	data-type={type}
+	data-couche={couche}
+	data-couleur={couleur}
+	data-plus={plus}
+	data-controles={controles}
+	class="center"
+>
 	<Bloc_Clavier />
-	{#if controles}
+	{#if controles == 'oui'}
 		<mini-espace />
-		<Controles_Clavier {emplacement} {type} {couche} {plus} {couleur} />
+		<Controles_Clavier {emplacement} {type} {couche} {couleur} {plus} />
 	{/if}
 </ensemble-clavier>
 

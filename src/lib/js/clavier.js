@@ -1,21 +1,38 @@
-export function majClavier({ emplacement, data, config }) {
-	const typeClavier = config.type;
-	const coucheClavier = config.couche;
-	const couleurClavier = config.couleur;
-	const plusClavier = config.plus;
-	const controlesClavier = config.controles;
-
-	document.getElementById(emplacement).dataset.type = typeClavier;
-	document.getElementById(emplacement).dataset.couche = coucheClavier;
-	document.getElementById(emplacement).dataset.couleur = couleurClavier;
-	document.getElementById(emplacement).dataset.plus = plusClavier;
+export function majClavier({ emplacement, data }) {
+	let typeClavier = document.getElementById(emplacement).dataset.type;
+	let coucheClavier = document.getElementById(emplacement).dataset.couche;
+	let plusClavier = document.getElementById(emplacement).dataset.plus;
+	let controlesClavier = document.getElementById(emplacement).dataset.controles;
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
+
+	console.log('Activation de majClavier');
+
+	majClavier_light(emplacement, data, typeClavier, coucheClavier, plusClavier);
+
+	/* La couche active a ses modificateurs pressés */
+	affiche_modificateurs_actifs(emplacement);
+
+	if (controlesClavier == 'oui') {
+		/* Il n’y a les touches pour changer de couche que quand il y a les contrôles pour changer de couche */
+		console.log('Activation de boutons_changer_couche');
+		boutons_changer_couche(emplacement, data);
+	} else {
+		console.log('nul');
+	}
+
+	document.getElementById(emplacement).querySelector('select').value = coucheClavier;
+}
+
+function majClavier_light(emplacement, data, typeClavier, coucheClavier, plusClavier) {
 	for (let i = 1; i <= 5; i++) {
 		for (let j = 0; j <= 15; j++) {
 			const toucheClavier = document
 				.getElementById(emplacement)
 				.querySelector("[data-ligne='" + i + "'][data-colonne='" + j + "']");
+
 			toucheClavier.dataset.touche = ''; // On nettoie le contenu de la touche
+			toucheClavier.classList.remove('touche-active'); // On nettoie le style de la touche
+
 			const res = data[typeClavier].find((el) => (el.ligne == i) & (el.colonne == j));
 			// console.log(res);
 			if (res !== undefined) {
@@ -33,7 +50,7 @@ export function majClavier({ emplacement, data, config }) {
 									touche['AltGr'] + '<br/>' + touche['Primary'];
 							}
 						} else {
-							if (plusClavier) {
+							if (plusClavier == 'oui') {
 								if (touche['Primary' + '+'] !== undefined) {
 									toucheClavier.getElementsByTagName('div')[0].innerHTML = touche['Primary' + '+'];
 								} else {
@@ -44,7 +61,7 @@ export function majClavier({ emplacement, data, config }) {
 							}
 						}
 					} else {
-						if (plusClavier) {
+						if (plusClavier == 'oui') {
 							if (touche[coucheClavier + '+'] !== undefined) {
 								toucheClavier.getElementsByTagName('div')[0].innerHTML =
 									touche[coucheClavier + '+'];
@@ -70,19 +87,9 @@ export function majClavier({ emplacement, data, config }) {
 			}
 		}
 	}
-
-	/* La couche active a ses modificateurs pressés */
-	toggle_couche(emplacement, coucheClavier);
-
-	if (controlesClavier) {
-		/* Il n’y a les touches pour changer de couche que quand il y a les contrôles pour changer de couche */
-		boutons_changer_couche(emplacement, data, config);
-	}
-
-	document.getElementById(emplacement).querySelector('select').value = coucheClavier;
 }
 
-function boutons_changer_couche(emplacement, data, config) {
+function boutons_changer_couche(emplacement, data) {
 	let emplacementClavier = document.getElementById(emplacement);
 	let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 	let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
@@ -92,80 +99,73 @@ function boutons_changer_couche(emplacement, data, config) {
 
 	for (let toucheClavier of [toucheRAlt, toucheLShift, toucheRShift, toucheSpace, toucheA]) {
 		toucheClavier.addEventListener('click', function () {
-			let couche = config.couche;
+			let touchePressee = toucheClavier.dataset.touche;
+			let coucheActuelle = document.getElementById(emplacement).dataset.couche;
+			let nouvelleCouche = coucheActuelle;
 
-			if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'Shift')) {
-				couche = 'ShiftAltGr';
-			} else if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'AltGr')) {
-				couche = 'Visuel';
-			} else if ((toucheClavier.dataset.touche == 'RAlt') & (couche == 'ShiftAltGr')) {
-				couche = 'Shift';
-			} else if (toucheClavier.dataset.touche == 'RAlt') {
-				couche = 'AltGr';
+			if ((touchePressee == 'RAlt') & (coucheActuelle == 'AltGr')) {
+				nouvelleCouche = 'Visuel';
+			} else if ((touchePressee == 'RAlt') & (coucheActuelle == 'Shift')) {
+				nouvelleCouche = 'ShiftAltGr';
+			} else if ((touchePressee == 'RAlt') & (coucheActuelle == 'ShiftAltGr')) {
+				nouvelleCouche = 'Shift';
+			} else if (touchePressee == 'RAlt') {
+				nouvelleCouche = 'AltGr';
 			}
 
 			if (
-				((toucheClavier.dataset.touche == 'LShift') | (toucheClavier.dataset.touche == 'RShift')) &
-				(couche == 'AltGr')
+				((touchePressee == 'LShift') | (touchePressee == 'RShift')) &
+				(coucheActuelle == 'AltGr')
 			) {
-				couche = 'ShiftAltGr';
+				nouvelleCouche = 'ShiftAltGr';
 			} else if (
-				((toucheClavier.dataset.touche == 'LShift') | (toucheClavier.dataset.touche == 'RShift')) &
-				(couche == 'Shift')
+				((touchePressee == 'LShift') | (touchePressee == 'RShift')) &
+				(coucheActuelle == 'Shift')
 			) {
-				couche = 'Visuel';
+				nouvelleCouche = 'Visuel';
 			} else if (
-				((toucheClavier.dataset.touche == 'LShift') | (toucheClavier.dataset.touche == 'RShift')) &
-				(couche == 'ShiftAltGr')
+				((touchePressee == 'LShift') | (touchePressee == 'RShift')) &
+				(coucheActuelle == 'ShiftAltGr')
 			) {
-				couche = 'AltGr';
+				nouvelleCouche = 'AltGr';
 			} else if (
-				(toucheClavier.dataset.touche == 'LShift') |
-				(toucheClavier.dataset.touche == 'RShift')
+				((touchePressee == 'LShift') | (touchePressee == 'RShift')) &
+				(coucheActuelle == 'à')
 			) {
-				couche = 'Shift';
+				nouvelleCouche = 'Shift';
+			} else if ((touchePressee == 'LShift') | (touchePressee == 'RShift')) {
+				nouvelleCouche = 'Shift';
 			}
 
-			if ((toucheClavier.dataset.touche == 'Space') & (couche == 'layer')) {
-				couche = 'Visuel';
-			} else if (toucheClavier.dataset.touche == 'Space') {
-				couche = 'layer';
+			if ((touchePressee == 'Space') & (coucheActuelle == 'layer')) {
+				nouvelleCouche = 'Visuel';
+			} else if (touchePressee == 'Space') {
+				nouvelleCouche = 'layer';
 			}
 
-			if ((toucheClavier.dataset.touche == 'à') & (couche == 'à')) {
-				couche = 'Visuel';
-			} else if (toucheClavier.dataset.touche == 'à') {
-				couche = 'à';
+			if ((touchePressee == 'à') & (coucheActuelle == 'à')) {
+				nouvelleCouche = 'Visuel';
+			} else if (touchePressee == 'à') {
+				nouvelleCouche = 'à';
 			}
-
+			console.log(coucheActuelle);
+			console.log(nouvelleCouche);
+			document.getElementById(emplacement).dataset.couche = nouvelleCouche;
 			majClavier({
 				emplacement: emplacement,
-				data: data,
-				config: {
-					type: config.type,
-					couche: couche,
-					couleur: config.couleur,
-					plus: config.plus,
-					controles: config.controles
-				}
+				data: data
 			});
 		});
 	}
 }
 
-function toggle_couche(emplacement, couche) {
+function affiche_modificateurs_actifs(emplacement) {
+	let couche = document.getElementById(emplacement).dataset.couche;
 	let shift1 = document.getElementById(emplacement).querySelector("[data-touche='LShift']");
 	let shift2 = document.getElementById(emplacement).querySelector("[data-touche='RShift']");
 	let altgr = document.getElementById(emplacement).querySelector("[data-touche='RAlt']");
 	let a_grave = document.getElementById(emplacement).querySelector("[data-touche='à']");
 	let space = document.getElementById(emplacement).querySelector("[data-touche='Space']");
-
-	/* On enlève tout, puis on remet le bon */
-	shift1.classList.remove('touche-active');
-	shift2.classList.remove('touche-active');
-	altgr.classList.remove('touche-active');
-	a_grave.classList.remove('touche-active');
-	space.classList.remove('touche-active');
 
 	if (couche == 'Shift') {
 		shift1.classList.add('touche-active');

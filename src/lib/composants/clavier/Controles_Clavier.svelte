@@ -8,57 +8,63 @@
 	export let couleur;
 	export let plus;
 
-	function changerCouche(selected) {
-		couche = selected;
+	let controles = true;
+
+	// let type = document.getElementById(emplacement).dataset.type;
+	// let couche = document.getElementById(emplacement).dataset.couche;
+	// let couleur = document.getElementById(emplacement).dataset.couleur;
+	// let plus = document.getElementById(emplacement).dataset.plus;
+
+	function changerCouche(nouvelleValeur) {
+		document.getElementById(emplacement).dataset.couche = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte,
-			config: {
-				type: type,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
-			}
+			controles: controles
 		});
 	}
 
 	function toggleCouleur() {
-		if (couleur == 'oui') {
-			couleur = 'non';
+		let ancienneValeur = document.getElementById(emplacement).dataset.couleur;
+		let nouvelleValeur = ancienneValeur;
+		if (ancienneValeur == 'oui') {
+			nouvelleValeur = 'non';
 		} else {
-			couleur = 'oui';
+			nouvelleValeur = 'oui';
 		}
-		document.getElementById(emplacement).dataset.couleur = couleur;
+		document.getElementById(emplacement).dataset.couleur = nouvelleValeur;
 	}
 
 	function toggleIso() {
-		if (type == 'iso') {
-			type = 'ergodox';
+		let ancienneValeur = document.getElementById(emplacement).dataset.type;
+		let nouvelleValeur = ancienneValeur;
+		if (ancienneValeur == 'iso') {
+			nouvelleValeur = 'ergodox';
 		} else {
-			type = 'iso';
+			nouvelleValeur = 'iso';
 		}
+		document.getElementById(emplacement).dataset.type = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte,
-			config: {
-				type: type,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
-			}
+			controles: controles
 		});
 	}
 	function togglePlus() {
-		plus = !plus;
+		let ancienneValeur = document.getElementById(emplacement).dataset.plus;
+		let nouvelleValeur = ancienneValeur;
+
+		if (ancienneValeur == 'oui') {
+			nouvelleValeur = 'non';
+		} else {
+			nouvelleValeur = 'oui';
+		}
+
+		document.getElementById(emplacement).dataset.plus = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte,
-			config: {
-				type: type,
-				couche: couche,
-				couleur: couleur,
-				plus: plus
-			}
+			controles: controles
 		});
 	}
 
