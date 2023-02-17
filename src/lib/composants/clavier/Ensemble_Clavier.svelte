@@ -19,7 +19,6 @@
 			config: {
 				type: type,
 				couche: couche,
-				couleur: couleur,
 				plus: plus,
 				controles: controles
 			}
@@ -27,11 +26,11 @@
 	});
 </script>
 
-<ensemble-clavier id={emplacement} class="center">
+<ensemble-clavier id={emplacement} class="center" data-couleur={couleur}>
 	<Bloc_Clavier />
 	{#if controles}
 		<mini-espace />
-		<Controles_Clavier {emplacement} {type} {couche} {plus} {couleur} />
+		<Controles_Clavier {emplacement} {type} {couche} {plus} {couleur} {controles} />
 	{/if}
 </ensemble-clavier>
 
