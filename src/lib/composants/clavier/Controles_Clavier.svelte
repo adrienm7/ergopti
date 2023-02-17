@@ -7,18 +7,17 @@
 	export let couche;
 	export let couleur;
 	export let plus;
-	export let controles;
 
-	function changerCouche(nouvelleCouche) {
-		couche = nouvelleCouche;
+	function changerCouche(selected) {
+		couche = selected;
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte,
 			config: {
 				type: type,
 				couche: couche,
-				plus: plus,
-				controles: controles
+				couleur: couleur,
+				plus: plus
 			}
 		});
 	}
@@ -44,8 +43,8 @@
 			config: {
 				type: type,
 				couche: couche,
-				plus: plus,
-				controles: controles
+				couleur: couleur,
+				plus: plus
 			}
 		});
 	}
@@ -57,8 +56,8 @@
 			config: {
 				type: type,
 				couche: couche,
-				plus: plus,
-				controles: controles
+				couleur: couleur,
+				plus: plus
 			}
 		});
 	}
