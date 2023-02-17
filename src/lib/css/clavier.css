@@ -153,7 +153,7 @@ ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="double"] div {
     font-size: calc(var(--taille-texte-touche) * 0.7);
 }
 
-ensemble-clavier[data-couche="Visuel"][data-plus=true] bloc-touche[data-touche="q"] div {
+ensemble-clavier[data-couche="Visuel"][data-plus="oui"] bloc-touche[data-touche="q"] div {
 	text-transform: capitalize;
 }
 
@@ -169,15 +169,15 @@ ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="Space"] div::bef
 /* ======= Corrections localisées ======= */
 
 
-ensemble-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="y"] div {
+ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="y"] div {
 	font-size: 1.8em;
 }
 
-ensemble-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="CapsLock"] div {
+ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="CapsLock"] div {
 	font-size: 0.7em;
 }
 
-ensemble-clavier[data-couche="AltGr"][data-plus=true] bloc-touche[data-touche="Tab"] div {
+ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="Tab"] div {
 	font-size: 0.6em;
 }
 

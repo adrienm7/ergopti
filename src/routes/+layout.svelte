@@ -27,8 +27,8 @@
 			type={'iso'}
 			couche={'Visuel'}
 			couleur={'oui'}
-			plus={false}
-			controles={true}
+			plus={'non'}
+			controles={'oui'}
 		/>
 	</div>
 </div>
