@@ -1,11 +1,13 @@
 export function majClavier({ emplacement, data, config }) {
 	const typeClavier = config.type;
 	const coucheClavier = config.couche;
+	const couleurClavier = config.couleur;
 	const plusClavier = config.plus;
 	const controlesClavier = config.controles;
 
 	document.getElementById(emplacement).dataset.type = typeClavier;
 	document.getElementById(emplacement).dataset.couche = coucheClavier;
+	document.getElementById(emplacement).dataset.couleur = couleurClavier;
 	document.getElementById(emplacement).dataset.plus = plusClavier;
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 	for (let i = 1; i <= 5; i++) {
@@ -142,6 +144,7 @@ function boutons_changer_couche(emplacement, data, config) {
 				config: {
 					type: config.type,
 					couche: couche,
+					couleur: config.couleur,
 					plus: config.plus,
 					controles: config.controles
 				}
