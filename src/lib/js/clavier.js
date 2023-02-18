@@ -1,17 +1,7 @@
 export function majClavier({ emplacement, data }) {
-	let typeClavier = document.getElementById(emplacement).dataset.type;
-	let coucheClavier = document.getElementById(emplacement).dataset.couche;
-	let plusClavier = document.getElementById(emplacement).dataset.plus;
+	majTouches(emplacement, data);
+
 	let controlesClavier = document.getElementById(emplacement).dataset.controles;
-	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
-
-	console.log('Activation de majClavier');
-
-	majClavier_light(emplacement, data, typeClavier, coucheClavier, plusClavier);
-
-	/* La couche active a ses modificateurs pressés */
-	affiche_modificateurs_actifs(emplacement);
-
 	if (controlesClavier == 'oui') {
 		/* Il n’y a les touches pour changer de couche que quand il y a les contrôles pour changer de couche */
 		console.log('Activation de boutons_changer_couche');
@@ -20,10 +10,16 @@ export function majClavier({ emplacement, data }) {
 		console.log('nul');
 	}
 
-	document.getElementById(emplacement).querySelector('select').value = coucheClavier;
+	// let coucheClavier = document.getElementById(emplacement).dataset.couche;
+	// document.getElementById(emplacement).querySelector('select').value = coucheClavier;
 }
 
-function majClavier_light(emplacement, data, typeClavier, coucheClavier, plusClavier) {
+function majTouches(emplacement, data) {
+	let typeClavier = document.getElementById(emplacement).dataset.type;
+	let coucheClavier = document.getElementById(emplacement).dataset.couche;
+	let plusClavier = document.getElementById(emplacement).dataset.plus;
+	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
+
 	for (let i = 1; i <= 5; i++) {
 		for (let j = 0; j <= 15; j++) {
 			const toucheClavier = document
@@ -87,6 +83,11 @@ function majClavier_light(emplacement, data, typeClavier, coucheClavier, plusCla
 			}
 		}
 	}
+
+	document.getElementById(emplacement).querySelector('select').value = coucheClavier;
+
+	/* La couche active a ses modificateurs pressés */
+	affiche_modificateurs_actifs(emplacement);
 }
 
 function boutons_changer_couche(emplacement, data) {
@@ -151,10 +152,8 @@ function boutons_changer_couche(emplacement, data) {
 			console.log(coucheActuelle);
 			console.log(nouvelleCouche);
 			document.getElementById(emplacement).dataset.couche = nouvelleCouche;
-			majClavier({
-				emplacement: emplacement,
-				data: data
-			});
+
+			majTouches(emplacement, data);
 		});
 	}
 }

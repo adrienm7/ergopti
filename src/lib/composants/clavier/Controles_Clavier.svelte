@@ -3,24 +3,18 @@
 	import { majClavier } from '$lib/js/clavier.js';
 
 	export let emplacement;
-	export let type;
-	export let couche;
-	export let couleur;
-	export let plus;
-
-	let controles = true;
-
-	// let type = document.getElementById(emplacement).dataset.type;
-	// let couche = document.getElementById(emplacement).dataset.couche;
-	// let couleur = document.getElementById(emplacement).dataset.couleur;
-	// let plus = document.getElementById(emplacement).dataset.plus;
+	let type;
+	let couche;
+	let couleur;
+	let plus;
 
 	function changerCouche(nouvelleValeur) {
 		document.getElementById(emplacement).dataset.couche = nouvelleValeur;
+		couche = nouvelleValeur;
+		document.getElementById(emplacement).querySelector('select').value = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
-			data: hypertexte,
-			controles: controles
+			data: hypertexte
 		});
 	}
 
@@ -32,6 +26,7 @@
 		} else {
 			nouvelleValeur = 'oui';
 		}
+		couleur = nouvelleValeur;
 		document.getElementById(emplacement).dataset.couleur = nouvelleValeur;
 	}
 
@@ -44,10 +39,10 @@
 			nouvelleValeur = 'iso';
 		}
 		document.getElementById(emplacement).dataset.type = nouvelleValeur;
+		type = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
-			data: hypertexte,
-			controles: controles
+			data: hypertexte
 		});
 	}
 	function togglePlus() {
@@ -61,10 +56,10 @@
 		}
 
 		document.getElementById(emplacement).dataset.plus = nouvelleValeur;
+		plus = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
-			data: hypertexte,
-			controles: controles
+			data: hypertexte
 		});
 	}
 
@@ -84,13 +79,13 @@
 	<select bind:value={couche} on:change={() => changerCouche(couche)}>
 		{#each options as value}<option value={value[1]}>{value[0]}</option>{/each}
 	</select>
-	<button on:click={togglePlus}>
-		{plus === true ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
+	<button on:click={togglePlus} data-button="plus">
+		{plus === 'oui' ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
 	</button>
-	<button on:click={toggleCouleur}>
+	<button on:click={toggleCouleur} data-button="couleur">
 		{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
 	</button>
-	<button on:click={toggleIso}>
+	<button on:click={toggleIso} data-button="type">
 		{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
 	</button>
 </controles-clavier>

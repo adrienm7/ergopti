@@ -32,7 +32,7 @@
 	<Bloc_Clavier />
 	{#if controles == 'oui'}
 		<mini-espace />
-		<Controles_Clavier {emplacement} {type} {couche} {couleur} {plus} />
+		<Controles_Clavier {emplacement} />
 	{/if}
 </ensemble-clavier>
 
