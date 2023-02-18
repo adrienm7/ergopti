@@ -45,6 +45,7 @@
 
 <style>
 	#clavier {
+		--couleur: 60;
 		position: fixed;
 		bottom: 0;
 		left: 50%;
