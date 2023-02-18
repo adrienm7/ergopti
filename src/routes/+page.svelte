@@ -183,6 +183,61 @@
 
 	<h2>Disposition clavier optimisée</h2>
 
+	<div class="container">
+		<div class="tab">
+			<input type="radio" name="acc" id="acc1" />
+			<label for="acc1">
+				<numero-faq>01</numero-faq>
+				<h3>How do I apply?</h3>
+			</label>
+			<div class="content">
+				<p>
+					Lorem, ipsum dolor sit amet consectetur adipisicing elit. Mollitia at exercitationem fuga
+					laudantium commodi alias odio quibusdam praesentium earum impedit?
+				</p>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="radio" name="acc" id="acc2" />
+			<label for="acc2">
+				<numero-faq>02</numero-faq>
+				<h3>Lost or forgotten your password?</h3>
+			</label>
+			<div class="content">
+				<p>
+					Lorem ipsum, dolor sit amet consectetur adipisicing elit. Neque, nesciunt? Culpa nesciunt
+					harum eum. Repellendus vitae nobis nemo ab quae maxime molestiae! Recusandae, quo porro
+					necessitatibus perferendis molestias placeat repellendus assumenda. In tempora vel labore
+					est. Quo quod, assumenda culpa quam perspiciatis ducimus eum debitis molestias est placeat
+					mollitia ipsa.
+				</p>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="radio" name="acc" id="acc3" />
+			<label for="acc3">
+				<numero-faq>03</numero-faq>
+				<h3>How can I make a change to my application?</h3>
+			</label>
+			<div class="content">
+				<p>
+					Lorem, ipsum dolor sit amet consectetur adipisicing elit. Mollitia at exercitationem fuga
+					laudantium commodi alias odio quibusdam praesentium earum impedit?
+				</p>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="radio" name="acc" id="acc4" />
+			<label for="acc4">
+				<numero-faq>04</numero-faq>
+				<h3>How can I update my name?</h3>
+			</label>
+			<div class="content">
+				<p>Lorem, ipsum dolor sit amet consectetur adipisicing elit.</p>
+			</div>
+		</div>
+	</div>
+
 	<h3>➀ Alternance des mains</h3>
 	<p>
 		La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes

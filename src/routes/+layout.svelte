@@ -7,6 +7,7 @@
 	import '$lib/css/espacements.css';
 	import '$lib/css/typography.css';
 	import '$lib/css/buttons.css';
+	import '$lib/css/accordion.css';
 	import '$lib/css/miscellaneous.css';
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 
