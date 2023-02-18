@@ -1,17 +1,10 @@
 <script>
 	import hypertexte from '$lib/data/hypertexte.json';
 	import { majClavier } from '$lib/js/clavier.js';
-
 	export let emplacement;
-	let type;
-	let couche;
-	let couleur;
-	let plus;
 
 	function changerCouche(nouvelleValeur) {
 		document.getElementById(emplacement).dataset.couche = nouvelleValeur;
-		couche = nouvelleValeur;
-		document.getElementById(emplacement).querySelector('select').value = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte
@@ -39,7 +32,6 @@
 			nouvelleValeur = 'iso';
 		}
 		document.getElementById(emplacement).dataset.type = nouvelleValeur;
-		type = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte
@@ -56,7 +48,6 @@
 		}
 
 		document.getElementById(emplacement).dataset.plus = nouvelleValeur;
-		plus = nouvelleValeur;
 		majClavier({
 			emplacement: emplacement,
 			data: hypertexte
@@ -76,16 +67,16 @@
 </script>
 
 <controles-clavier class="btn-group">
-	<select bind:value={couche} on:change={() => changerCouche(couche)}>
+	<select on:change={() => changerCouche(value)}>
 		{#each options as value}<option value={value[1]}>{value[0]}</option>{/each}
 	</select>
 	<button on:click={togglePlus} data-button="plus">
-		{plus === 'oui' ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
+		<!-- {plus === 'oui' ? 'Plus ➜ Standard' : 'Standard ➜ Plus'} -->
 	</button>
 	<button on:click={toggleCouleur} data-button="couleur">
-		{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
+		<!-- {couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'} -->
 	</button>
 	<button on:click={toggleIso} data-button="type">
-		{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
+		<!-- {type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'} -->
 	</button>
 </controles-clavier>

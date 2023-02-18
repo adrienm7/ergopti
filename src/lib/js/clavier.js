@@ -1,5 +1,6 @@
 export function majClavier({ emplacement, data }) {
 	majTouches(emplacement, data);
+	majControles(emplacement);
 
 	let controlesClavier = document.getElementById(emplacement).dataset.controles;
 	if (controlesClavier == 'oui') {
@@ -9,15 +10,13 @@ export function majClavier({ emplacement, data }) {
 	} else {
 		console.log('nul');
 	}
-
-	// let coucheClavier = document.getElementById(emplacement).dataset.couche;
-	// document.getElementById(emplacement).querySelector('select').value = coucheClavier;
 }
 
 function majTouches(emplacement, data) {
 	let typeClavier = document.getElementById(emplacement).dataset.type;
 	let coucheClavier = document.getElementById(emplacement).dataset.couche;
 	let plusClavier = document.getElementById(emplacement).dataset.plus;
+
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 
 	for (let i = 1; i <= 5; i++) {
@@ -84,10 +83,65 @@ function majTouches(emplacement, data) {
 		}
 	}
 
-	document.getElementById(emplacement).querySelector('select').value = coucheClavier;
-
 	/* La couche active a ses modificateurs pressés */
 	affiche_modificateurs_actifs(emplacement);
+}
+
+function majControles(emplacement) {
+	let coucheClavier = document.getElementById(emplacement).dataset.couche;
+	let plusClavier = document.getElementById(emplacement).dataset.plus;
+	let couleurClavier = document.getElementById(emplacement).dataset.couleur;
+	let typeClavier = document.getElementById(emplacement).dataset.type;
+
+	document.getElementById(emplacement).querySelector('select').value = coucheClavier;
+
+	if (couleurClavier === 'oui') {
+		document.getElementById(emplacement).querySelector('button[data-button="couleur"]').innerHTML =
+			'Couleur ➜ Noir et blanc';
+	} else {
+		document.getElementById(emplacement).querySelector('button[data-button="couleur"]').innerHTML =
+			'Noir et blanc ➜ Couleur';
+	}
+
+	if (plusClavier === 'oui') {
+		document.getElementById(emplacement).querySelector('button[data-button="plus"]').innerHTML =
+			'Plus ➜ Standard';
+	} else {
+		document.getElementById(emplacement).querySelector('button[data-button="plus"]').innerHTML =
+			'Standard ➜ Plus';
+	}
+
+	if (typeClavier === 'iso') {
+		document.getElementById(emplacement).querySelector('button[data-button="type"]').innerHTML =
+			'ISO ➜ Ergodox';
+	} else {
+		document.getElementById(emplacement).querySelector('button[data-button="type"]').innerHTML =
+			'Ergodox ➜ ISO';
+	}
+}
+
+function affiche_modificateurs_actifs(emplacement) {
+	let couche = document.getElementById(emplacement).dataset.couche;
+	let shift1 = document.getElementById(emplacement).querySelector("[data-touche='LShift']");
+	let shift2 = document.getElementById(emplacement).querySelector("[data-touche='RShift']");
+	let altgr = document.getElementById(emplacement).querySelector("[data-touche='RAlt']");
+	let a_grave = document.getElementById(emplacement).querySelector("[data-touche='à']");
+	let space = document.getElementById(emplacement).querySelector("[data-touche='Space']");
+
+	if (couche == 'Shift') {
+		shift1.classList.add('touche-active');
+		shift2.classList.add('touche-active');
+	} else if (couche == 'AltGr') {
+		altgr.classList.add('touche-active');
+	} else if (couche == 'ShiftAltGr') {
+		shift1.classList.add('touche-active');
+		shift2.classList.add('touche-active');
+		altgr.classList.add('touche-active');
+	} else if (couche == 'à') {
+		a_grave.classList.add('touche-active');
+	} else if (couche == 'layer') {
+		space.classList.add('touche-active');
+	}
 }
 
 function boutons_changer_couche(emplacement, data) {
@@ -150,6 +204,7 @@ function boutons_changer_couche(emplacement, data) {
 				nouvelleCouche = 'à';
 			}
 			console.log(coucheActuelle);
+			console.log('-->');
 			console.log(nouvelleCouche);
 			document.getElementById(emplacement).dataset.couche = nouvelleCouche;
 
@@ -158,29 +213,6 @@ function boutons_changer_couche(emplacement, data) {
 	}
 }
 
-function affiche_modificateurs_actifs(emplacement) {
-	let couche = document.getElementById(emplacement).dataset.couche;
-	let shift1 = document.getElementById(emplacement).querySelector("[data-touche='LShift']");
-	let shift2 = document.getElementById(emplacement).querySelector("[data-touche='RShift']");
-	let altgr = document.getElementById(emplacement).querySelector("[data-touche='RAlt']");
-	let a_grave = document.getElementById(emplacement).querySelector("[data-touche='à']");
-	let space = document.getElementById(emplacement).querySelector("[data-touche='Space']");
-
-	if (couche == 'Shift') {
-		shift1.classList.add('touche-active');
-		shift2.classList.add('touche-active');
-	} else if (couche == 'AltGr') {
-		altgr.classList.add('touche-active');
-	} else if (couche == 'ShiftAltGr') {
-		shift1.classList.add('touche-active');
-		shift2.classList.add('touche-active');
-		altgr.classList.add('touche-active');
-	} else if (couche == 'à') {
-		a_grave.classList.add('touche-active');
-	} else if (couche == 'layer') {
-		space.classList.add('touche-active');
-	}
-}
 var mayzner = {
 	max: 12.49,
 	a: 8.04,
