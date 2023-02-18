@@ -1,22 +1,29 @@
-export function majClavier({ emplacement, data }) {
-	majTouches(emplacement, data);
-	majControles(emplacement);
+<script>
+export let couche;
+export let couleur;
+export let type;
+export let plus;
 
-	let controlesClavier = document.getElementById(emplacement).dataset.controles;
-	if (controlesClavier == 'oui') {
-		/* Il n’y a les touches pour changer de couche que quand il y a les contrôles pour changer de couche */
-		console.log('Activation de boutons_changer_couche');
-		boutons_changer_couche(emplacement, data);
-	} else {
-		console.log('nul');
-	}
+export function majClavier({ data }) {
+	majTouches(data);
+	// majControles(emplacement);
+	// let controlesClavier = document.getElementById(emplacement).dataset.controles;
+
+	// if (controles == 'oui') {
+	// 	/* Il n’y a les touches pour changer de couche que quand il y a les contrôles pour changer de couche */
+	// 	console.log('Activation de boutons_changer_couche');
+	// 	boutons_changer_couche(emplacement, config.couche);
+	// } else {
+	// 	console.log('nul');
+	// }
 }
 
-function majTouches(emplacement, data) {
-	let typeClavier = document.getElementById(emplacement).dataset.type;
-	let coucheClavier = document.getElementById(emplacement).dataset.couche;
-	let plusClavier = document.getElementById(emplacement).dataset.plus;
-
+function majTouches(data) {
+	let typeClavier = type;
+	let coucheClavier = couche;
+	let couleurClavier = couleur;
+	let plusClavier = plus;
+	let controlesClavier = controles;
 	// document.getElementById(emplacement).style.setProperty('--frequence-max', mayzner['max']);
 
 	for (let i = 1; i <= 5; i++) {
@@ -84,7 +91,7 @@ function majTouches(emplacement, data) {
 	}
 
 	/* La couche active a ses modificateurs pressés */
-	affiche_modificateurs_actifs(emplacement);
+	affiche_modificateurs_actifs();
 }
 
 function majControles(emplacement) {
@@ -120,8 +127,8 @@ function majControles(emplacement) {
 	}
 }
 
-function affiche_modificateurs_actifs(emplacement) {
-	let couche = document.getElementById(emplacement).dataset.couche;
+function affiche_modificateurs_actifs() {
+	// let couche = document.getElementById(emplacement).dataset.couche;
 	let shift1 = document.getElementById(emplacement).querySelector("[data-touche='LShift']");
 	let shift2 = document.getElementById(emplacement).querySelector("[data-touche='RShift']");
 	let altgr = document.getElementById(emplacement).querySelector("[data-touche='RAlt']");
@@ -144,7 +151,7 @@ function affiche_modificateurs_actifs(emplacement) {
 	}
 }
 
-function boutons_changer_couche(emplacement, data) {
+function boutons_changer_couche(emplacement, coucheActuelle) {
 	let emplacementClavier = document.getElementById(emplacement);
 	let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 	let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
@@ -155,7 +162,6 @@ function boutons_changer_couche(emplacement, data) {
 	for (let toucheClavier of [toucheRAlt, toucheLShift, toucheRShift, toucheSpace, toucheA]) {
 		toucheClavier.addEventListener('click', function () {
 			let touchePressee = toucheClavier.dataset.touche;
-			let coucheActuelle = document.getElementById(emplacement).dataset.couche;
 			let nouvelleCouche = coucheActuelle;
 
 			if ((touchePressee == 'RAlt') & (coucheActuelle == 'AltGr')) {
@@ -206,9 +212,7 @@ function boutons_changer_couche(emplacement, data) {
 			console.log(coucheActuelle);
 			console.log('-->');
 			console.log(nouvelleCouche);
-			document.getElementById(emplacement).dataset.couche = nouvelleCouche;
-
-			majTouches(emplacement, data);
+			return nouvelleCouche;
 		});
 	}
 }
@@ -242,3 +246,5 @@ var mayzner = {
 	y: 1.66,
 	z: 0.09
 };
+
+</script>
