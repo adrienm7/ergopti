@@ -185,7 +185,7 @@
 
 	<div class="container">
 		<div class="tab">
-			<input type="radio" name="acc" id="acc1" />
+			<input type="checkbox" name="acc" id="acc1" />
 			<label for="acc1">
 				<numero-faq>01</numero-faq>
 				<h3>How do I apply?</h3>
@@ -198,7 +198,7 @@
 			</div>
 		</div>
 		<div class="tab">
-			<input type="radio" name="acc" id="acc2" />
+			<input type="checkbox" name="acc" id="acc2" />
 			<label for="acc2">
 				<numero-faq>02</numero-faq>
 				<h3>Lost or forgotten your password?</h3>
@@ -214,7 +214,7 @@
 			</div>
 		</div>
 		<div class="tab">
-			<input type="radio" name="acc" id="acc3" />
+			<input type="checkbox" name="acc" id="acc3" />
 			<label for="acc3">
 				<numero-faq>03</numero-faq>
 				<h3>How can I make a change to my application?</h3>
@@ -227,7 +227,7 @@
 			</div>
 		</div>
 		<div class="tab">
-			<input type="radio" name="acc" id="acc4" />
+			<input type="checkbox" name="acc" id="acc4" />
 			<label for="acc4">
 				<numero-faq>04</numero-faq>
 				<h3>How can I update my name?</h3>
