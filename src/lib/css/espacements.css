@@ -33,14 +33,15 @@ grand-espace {
 	display: flex;
 	flex-direction: column;
 	justify-content: space-around;
-	height: calc(100vh - var(--hauteur-header) - 4vh);
+	/* height: calc(100vh - var(--hauteur-header) - 4vh); */
 	margin: 2vh 0;
 	/* background-color: red; */
 }
 
 .fullheight h1 {
-	padding-top: 0;
-    margin-bottom: 0;
+	margin-top: 5vh;
+    margin-bottom: 10vh;
+	font-size: 2.5rem;
 }
 
 .fullheight bloc-clavier {
