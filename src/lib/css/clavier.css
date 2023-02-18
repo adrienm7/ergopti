@@ -49,7 +49,7 @@ bloc-clavier {
 
 
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
-	margin-right: 5vw;
+	margin-right: 50px;
 }
 
 bloc-ligne {
