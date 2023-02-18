@@ -19,7 +19,7 @@
 		type={'iso'}
 		couche={'Visuel'}
 		couleur={'non'}
-		plus={'false'}
+		plus={'non'}
 		controles={'oui'}
 	/>
 </div>
