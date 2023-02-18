@@ -129,7 +129,7 @@
 
 .container .tab:nth-child(1) label numero-faq 
 {
-	background: linear-gradient( 135deg, #70F570 10%, #49C628 100%);
+	background: linear-gradient( -135deg, #70F570 10%, #49C628 100%);
 }
 .container .tab:nth-child(2) label numero-faq 
 {
@@ -137,9 +137,9 @@
 }
 .container .tab:nth-child(3) label numero-faq 
 {
-	background: linear-gradient( 135deg, #FF96F9 10%, #C32BAC 100%);
+	background: linear-gradient( -135deg, #FF96F9 10%, #C32BAC 100%);
 }
 .container .tab:nth-child(4) label numero-faq 
 {
-	background: linear-gradient( 135deg, #FD6E6A 10%, #FFC600 100%);
+	background: linear-gradient( -135deg, #FD6E6A 10%, #FFC600 100%);
 }
