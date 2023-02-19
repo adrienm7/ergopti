@@ -28,10 +28,275 @@
 
 <div class="contenu">
 	<p class="important">
-		<Nom /> est une disposition clavier optimisée. Elle est destinée à taper majoritairement du français
-		ainsi que de l’anglais. Elle se veut la plus <span class="hyper">optimale</span> possible. Comment
-		atteindre cet objectif ? C’est ce qui vous sera présenté sur cette page.
+		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
+		Elle se veut la plus <span class="hyper">optimale</span> possible. Comment atteindre cet objectif ?
+		C’est ce qui vous sera présenté sur cette page.
 	</p>
+
+	<h2>Disposition clavier optimisée</h2>
+
+	<div class="container">
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc1" />
+			<label for="acc1">
+				<span class="numero-faq" />
+				<h3>Alternance des mains</h3>
+			</label>
+			<div class="content">
+				<p>
+					La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux
+					groupes : main gauche et main droite. L’objectif de cela est d’essayer d’avoir le plus d’alternance
+					des mains possible lors de la frappe de texte : main droite, puis gauche, puis droite, etc.
+					Cette alternance des mains permet de ne pas surutiliser l’une des deux mains en tapant la majorité
+					du texte avec au détriment de l’autre main. Cela permet aussi de gagner légèrement en confort
+					et vitesse car pendant qu’une main tape, l’autre peut se replacer en position de repos et se
+					préparer à taper la touche suivante.
+				</p>
+				<p>
+					Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier.
+					Celles-ci étant majoritairement précédées et suivies de consonnes, cela amène
+					immédiatement une grande alternance des mains. À noter que cette idée est loin d’être
+					nouvelle, car elle est déjà appliquée dans presque toutes les dispositions alternatives :
+					Dvorak, BÉPO, etc.
+				</p>
+				<p>
+					Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que
+					sur la plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur
+					ce côté. Le côté droit a en effet trois colonnes de touches pour l’auriculaire alors que
+					l’auriculaire gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour
+					les langues ayant besoin de caractères supplémentaires comme les accents en français.
+				</p>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc2" />
+			<label for="acc2">
+				<span class="numero-faq" />
+				<h3>Distance des doigts aux touches</h3>
+			</label>
+			<div class="content">
+				<p>
+					La deuxième étape dans la création de la disposition a été de placer les touches les plus
+					souvent utilisées les plus proches possible des doigts. Les doigts sont effectivement
+					toujours censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est
+					donc logique de chercher à placer sur cette rangée les lettres les plus utilisées pour
+					réduire les déplacements des doigts aux touches.
+				</p>
+				<p>
+					En outre, chaque doigt a une force différente. Ainsi, un pouce a plus de force qu’un
+					index, qui a plus de force qu’un majeur, qui a plus de force qu’un annulaire, qui a plus
+					de force qu’un auriculaire. Par conséquent, les meilleurs emplacements sont ceux sur la
+					rangée de repos, en partant de l’index à l’annulaire. Puis, les meilleurs emplacements
+					seront sur les colonnes au-dessus et en-dessous de la rangée de repos, en partant là
+					encore de l’index à l’annulaire. La rangée des chiffres est donc la moins accessible,
+					c’est pour cela que laisser le <kbd>É</kbd> sur cette ligne comme en AZERTY est une très mauvaise
+					idée, car cette lettre est beaucoup utilisée en français.
+				</p>
+
+				<moyen-espace />
+
+				<EnsembleClavier
+					emplacement={'clavier-freq'}
+					type={'iso'}
+					couche={'Visuel'}
+					couleur={'freq'}
+					plus={'non'}
+					controles={'non'}
+				/>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc3" />
+			<label for="acc3">
+				<span class="numero-faq" />
+				<h3>Minimisation des <SFB />s</h3>
+			</label>
+			<div class="content">
+				<p>
+					Lorem, ipsum dolor sit amet consectetur adipisicing elit. Mollitia at exercitationem fuga
+					laudantium commodi alias odio quibusdam praesentium earum impedit?
+				</p>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc4" />
+			<label for="acc4">
+				<span class="numero-faq" />
+				<h3>Optimisation des roulements</h3>
+			</label>
+			<div class="content">
+				<p>
+					Pour moi, un "roulement" désigne plutôt un déplacement sur deux doigts consécutifs et
+					jamais à plus d’une rangée d’écart. Il y peu d’informations sur le sujet en ligne ; un
+					roulement a probablement une définition plus large que la mienne, mais alors dans ce cas
+					le côté "qui roule" est selon moi perdu. À la limite si c’est de l’index à l’auriculaire,
+					mais pas de l’index à l’annulaire par exemple. En conclusion, un roulement est pour moi le
+					ST du Bépo (idéalement, car mouvement horizontal), sinon le LS du Bépo, mais pas le GL ni
+					le TR du Bépo. La disposition Optim7 a été construite avec pour contrainte principale de
+					permettre de réaliser les digrammes consonne-consonne les plus courants grâce à des
+					roulements, de préférence sur des doigts consécutifs dans un mouvement horizontal.
+				</p>
+
+				<h4>Très bons digrammes</h4>
+				<ul class="paragraphe">
+					<li>AI, IE, EU, AIE, IEU, OI, OU</li>
+					<li>CH</li>
+					<li>OW et WO</li>
+					<li>YOU</li>
+					<li>PL</li>
+					<li>LD</li>
+					<li>+=</li>
+					<li>/* et */</li>
+				</ul>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc5" />
+			<label for="acc5">
+				<span class="numero-faq" />
+				<h3>Placement logique des touches</h3>
+			</label>
+			<div class="content">
+				<p>
+					Afin de faciliter la mémorisation, les touches sont placées logiquement, en particulier
+					sur la couche AltGr. Ainsi :
+				</p>
+
+				<ul class="margin-top-2">
+					<li>
+						<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>`</kbd-sortie> Le
+						<span class="hyper text-bold">`</span> sur le A
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>@</kbd-sortie> aro<span
+							class="hyper text-bold">B</span
+						>ase
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
+						<span class="hyper text-bold">C</span> cédille
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>D</kbd> ➜ <kbd-sortie>$</kbd-sortie>
+						<span class="hyper text-bold">D</span>ollar
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
+						le <span class="hyper text-bold">/</span> sur le E
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>\</kbd-sortie>
+						le <span class="hyper text-bold">\</span> sur le E
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-sortie>#</kbd-sortie>
+						<span class="hyper text-bold">H</span>ashtag
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-sortie>=</kbd-sortie> éga<span
+							class="hyper text-bold">L</span
+						>
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>M</kbd> ➜ <kbd-sortie>&</kbd-sortie> a<span
+							class="hyper text-bold">M</span
+						>persand
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>P</kbd> ➜ <kbd-sortie>+</kbd-sortie>
+						<span class="hyper text-bold">P</span>lus
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> barre
+						<span class="hyper text-bold">V</span>erticale
+					</li>
+				</ul>
+
+				<petit-espace />
+
+				<p>D’autres sont placés par paires l’une à côté de l’autre :</p>
+				<ul class="margin-top-2">
+					<li>
+						<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
+						<kbd>I</kbd>
+						➜ <kbd-sortie>]</kbd-sortie>
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>E</kbd> ➜ <kbd-sortie>{'{'}</kbd-sortie> et <kbd>AltGr</kbd> +
+						<kbd>U</kbd>
+						➜ <kbd-sortie>{'}'}</kbd-sortie>
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>S</kbd> ➜ <kbd-sortie>(</kbd-sortie> et <kbd>AltGr</kbd> +
+						<kbd>N</kbd>
+						➜ <kbd-sortie>)</kbd-sortie>
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>{'<'}</kbd-sortie> et <kbd>AltGr</kbd> +
+						<kbd>R</kbd>
+						➜ <kbd-sortie>{'>'}</kbd-sortie>
+					</li>
+					<li>
+						<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>⩽</kbd-sortie> et
+						<kbd>Shift</kbd>
+						+ <kbd>AltGr</kbd> +
+						<kbd>R</kbd>
+						➜ <kbd-sortie>⩾</kbd-sortie>
+					</li>
+					<li>
+						<kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>«</kbd-sortie> et <kbd>AltGr</kbd> +
+						<kbd>X</kbd>
+						➜ <kbd-sortie>»</kbd-sortie>
+					</li>
+					<li>
+						<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>“</kbd-sortie> et
+						<kbd>Shift</kbd>
+						+ <kbd>AltGr</kbd> +
+						<kbd>X</kbd>
+						➜ <kbd-sortie>”</kbd-sortie>
+					</li>
+				</ul>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc6" />
+			<label for="acc6">
+				<span class="numero-faq" />
+				<h3>Chiffres en accès direct</h3>
+			</label>
+			<div class="content">
+				<p>
+					Les chiffres sont en accès direct sur les dispositions QWERTY, mais pas en AZERTY. Chaque
+					manière de faire a ses avantages, car en AZERTY les symboles sont alors en accès direct et
+					plus facilement réalisables. En revanche, il devient alors compliqué d’écrire un chiffre
+					ou un nombre en plein milieu de phrase, car cela nécessite de passer en Shift.
+				</p>
+				<p>
+					De plus, une autre de mes modifications est le passage des chiffres en accès direct, car
+					maintenir Shift enfoncé pour écrire rapidement un nombre n’est vraiment pas pratique. J’en
+					profite pour déplacer les caractères qui étaient auparavant en accès direct sur la rangée
+					des chiffres. Ils se retrouvent en AltGr sur les 3 rangées du milieu pour ne pas avoir à
+					trop bouger les doigts.
+				</p>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc7" />
+			<label for="acc7">
+				<span class="numero-faq" />
+				<h3>Optimisation pour l’utilisation à une main</h3>
+			</label>
+			<div class="content">
+				<p>
+					Le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire facilement
+					les raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>. Normalement,
+					le
+					<kbd>=</kbd>
+					se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
+				</p>
+			</div>
+		</div>
+	</div>
 
 	<h2>Genèse et raison des choix</h2>
 	<p>
@@ -58,270 +323,9 @@
 		AltGr+Espace.
 	</p>
 
-	<h3>Placement logique des touches</h3>
-	<p>
-		Afin de faciliter la mémorisation, les touches sont placées logiquement, en particulier sur la
-		couche AltGr. Ainsi :
-	</p>
+	<h2>Autocritiques</h2>
 
-	<ul class="margin-top-2">
-		<li>
-			<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>`</kbd-sortie> Le
-			<span class="hyper text-bold">`</span> sur le A
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>@</kbd-sortie> aro<span class="hyper text-bold"
-				>B</span
-			>ase
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
-			<span class="hyper text-bold">C</span> cédille
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>D</kbd> ➜ <kbd-sortie>$</kbd-sortie>
-			<span class="hyper text-bold">D</span>ollar
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
-			le <span class="hyper text-bold">/</span> sur le E
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>\</kbd-sortie>
-			le <span class="hyper text-bold">\</span> sur le E
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-sortie>#</kbd-sortie>
-			<span class="hyper text-bold">H</span>ashtag
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-sortie>=</kbd-sortie> éga<span class="hyper text-bold"
-				>L</span
-			>
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>M</kbd> ➜ <kbd-sortie>&</kbd-sortie> a<span class="hyper text-bold"
-				>M</span
-			>persand
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>P</kbd> ➜ <kbd-sortie>+</kbd-sortie>
-			<span class="hyper text-bold">P</span>lus
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> barre
-			<span class="hyper text-bold">V</span>erticale
-		</li>
-	</ul>
-
-	<petit-espace />
-
-	<p>D’autres sont placés par paires l’une à côté de l’autre :</p>
-	<ul class="margin-top-2">
-		<li>
-			<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
-			<kbd>I</kbd>
-			➜ <kbd-sortie>]</kbd-sortie>
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>E</kbd> ➜ <kbd-sortie>{'{'}</kbd-sortie> et <kbd>AltGr</kbd> +
-			<kbd>U</kbd>
-			➜ <kbd-sortie>{'}'}</kbd-sortie>
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>S</kbd> ➜ <kbd-sortie>(</kbd-sortie> et <kbd>AltGr</kbd> +
-			<kbd>N</kbd>
-			➜ <kbd-sortie>)</kbd-sortie>
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>{'<'}</kbd-sortie> et <kbd>AltGr</kbd> +
-			<kbd>R</kbd>
-			➜ <kbd-sortie>{'>'}</kbd-sortie>
-		</li>
-		<li>
-			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>⩽</kbd-sortie> et
-			<kbd>Shift</kbd>
-			+ <kbd>AltGr</kbd> +
-			<kbd>R</kbd>
-			➜ <kbd-sortie>⩾</kbd-sortie>
-		</li>
-		<li>
-			<kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>«</kbd-sortie> et <kbd>AltGr</kbd> +
-			<kbd>X</kbd>
-			➜ <kbd-sortie>»</kbd-sortie>
-		</li>
-		<li>
-			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>“</kbd-sortie> et
-			<kbd>Shift</kbd>
-			+ <kbd>AltGr</kbd> +
-			<kbd>X</kbd>
-			➜ <kbd-sortie>”</kbd-sortie>
-		</li>
-	</ul>
-	<h3>Chiffres en accès direct</h3>
-	<p>
-		Les chiffres sont en accès direct sur les dispositions QWERTY, mais pas en AZERTY. Chaque
-		manière de faire a ses avantages, car en AZERTY les symboles sont alors en accès direct et plus
-		facilement réalisables. En revanche, il devient alors compliqué d’écrire un chiffre ou un nombre
-		en plein milieu de phrase, car cela nécessite de passer en Shift.
-	</p>
-	<p>
-		De plus, une autre de mes modifications est le passage des chiffres en accès direct, car
-		maintenir Shift enfoncé pour écrire rapidement un nombre n’est vraiment pas pratique. J’en
-		profite pour déplacer les caractères qui étaient auparavant en accès direct sur la rangée des
-		chiffres. Ils se retrouvent en AltGr sur les 3 rangées du milieu pour ne pas avoir à trop bouger
-		les doigts.
-	</p>
-
-	<h3>Optimisation pour l’utilisation à une main</h3>
-	<p>
-		Le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire facilement les
-		raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>. Normalement, le
-		<kbd>=</kbd>
-		se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
-	</p>
-
-	<h2>Disposition clavier optimisée</h2>
-
-	<div class="container">
-		<div class="tab">
-			<input type="checkbox" name="acc" id="acc1" />
-			<label for="acc1">
-				<numero-faq>01</numero-faq>
-				<h3>How do I apply?</h3>
-			</label>
-			<div class="content">
-				<p>
-					Lorem, ipsum dolor sit amet consectetur adipisicing elit. Mollitia at exercitationem fuga
-					laudantium commodi alias odio quibusdam praesentium earum impedit?
-				</p>
-			</div>
-		</div>
-		<div class="tab">
-			<input type="checkbox" name="acc" id="acc2" />
-			<label for="acc2">
-				<numero-faq>02</numero-faq>
-				<h3>Lost or forgotten your password?</h3>
-			</label>
-			<div class="content">
-				<p>
-					Lorem ipsum, dolor sit amet consectetur adipisicing elit. Neque, nesciunt? Culpa nesciunt
-					harum eum. Repellendus vitae nobis nemo ab quae maxime molestiae! Recusandae, quo porro
-					necessitatibus perferendis molestias placeat repellendus assumenda. In tempora vel labore
-					est. Quo quod, assumenda culpa quam perspiciatis ducimus eum debitis molestias est placeat
-					mollitia ipsa.
-				</p>
-			</div>
-		</div>
-		<div class="tab">
-			<input type="checkbox" name="acc" id="acc3" />
-			<label for="acc3">
-				<numero-faq>03</numero-faq>
-				<h3>How can I make a change to my application?</h3>
-			</label>
-			<div class="content">
-				<p>
-					Lorem, ipsum dolor sit amet consectetur adipisicing elit. Mollitia at exercitationem fuga
-					laudantium commodi alias odio quibusdam praesentium earum impedit?
-				</p>
-			</div>
-		</div>
-		<div class="tab">
-			<input type="checkbox" name="acc" id="acc4" />
-			<label for="acc4">
-				<numero-faq>04</numero-faq>
-				<h3>How can I update my name?</h3>
-			</label>
-			<div class="content">
-				<p>Lorem, ipsum dolor sit amet consectetur adipisicing elit.</p>
-			</div>
-		</div>
-	</div>
-
-	<h3>➀ Alternance des mains</h3>
-	<p>
-		La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
-		: main gauche et main droite. L’objectif de cela est d’essayer d’avoir le plus d’alternance des mains
-		possible lors de la frappe de texte : main droite, puis gauche, puis droite, etc. Cette alternance
-		des mains permet de ne pas surutiliser l’une des deux mains en tapant la majorité du texte avec au
-		détriment de l’autre main. Cela permet aussi de gagner légèrement en confort et vitesse car pendant
-		qu’une main tape, l’autre peut se replacer en position de repos et se préparer à taper la touche
-		suivante.
-	</p>
-	<p>
-		Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
-		étant majoritairement précédées et suivies de consonnes, cela amène immédiatement une grande
-		alternance des mains. À noter que cette idée est loin d’être nouvelle, car elle est déjà
-		appliquée dans presque toutes les dispositions alternatives : Dvorak, BÉPO, etc.
-	</p>
-	<p>
-		Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que sur la
-		plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur ce côté. Le
-		côté droit a en effet trois colonnes de touches pour l’auriculaire alors que l’auriculaire
-		gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour les langues ayant
-		besoin de caractères supplémentaires comme les accents en français.
-	</p>
-
-	<h3>➁ Distance des doigts aux touches</h3>
-	<p>
-		La deuxième étape dans la création de la disposition a été de placer les touches les plus
-		souvent utilisées les plus proches possible des doigts. Les doigts sont effectivement toujours
-		censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est donc logique de
-		chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les déplacements
-		des doigts aux touches.
-	</p>
-	<p>
-		En outre, chaque doigt a une force différente. Ainsi, un pouce a plus de force qu’un index, qui
-		a plus de force qu’un majeur, qui a plus de force qu’un annulaire, qui a plus de force qu’un
-		auriculaire. Par conséquent, les meilleurs emplacements sont ceux sur la rangée de repos, en
-		partant de l’index à l’annulaire. Puis, les meilleurs emplacements seront sur les colonnes
-		au-dessus et en-dessous de la rangée de repos, en partant là encore de l’index à l’annulaire. La
-		rangée des chiffres est donc la moins accessible, c’est pour cela que laisser le <kbd>É</kbd> sur
-		cette ligne comme en AZERTY est une très mauvaise idée, car cette lettre est beaucoup utilisée en
-		français.
-	</p>
-
-	<moyen-espace />
-</div>
-<EnsembleClavier
-	emplacement={'clavier-freq'}
-	type={'iso'}
-	couche={'Visuel'}
-	couleur={'freq'}
-	plus={'non'}
-	controles={'non'}
-/>
-<div class="contenu">
-	<grand-espace />
-
-	<h3>➂ Minimisation des <SFB />s</h3>
-
-	<h3>➃ Optimisation des roulements</h3>
-	<p>
-		Pour moi, un "roulement" désigne plutôt un déplacement sur deux doigts consécutifs et jamais à
-		plus d’une rangée d’écart. Il y peu d’informations sur le sujet en ligne ; un roulement a
-		probablement une définition plus large que la mienne, mais alors dans ce cas le côté "qui roule"
-		est selon moi perdu. À la limite si c’est de l’index à l’auriculaire, mais pas de l’index à
-		l’annulaire par exemple. En conclusion, un roulement est pour moi le ST du Bépo (idéalement, car
-		mouvement horizontal), sinon le LS du Bépo, mais pas le GL ni le TR du Bépo. La disposition
-		Optim7 a été construite avec pour contrainte principale de permettre de réaliser les digrammes
-		consonne-consonne les plus courants grâce à des roulements, de préférence sur des doigts
-		consécutifs dans un mouvement horizontal.
-	</p>
-
-	<h4>Très bons digrammes</h4>
-	<ul class="paragraphe">
-		<li>AI, IE, EU, AIE, IEU, OI, OU</li>
-		<li>CH</li>
-		<li>OW et WO</li>
-		<li>YOU</li>
-		<li>PL</li>
-		<li>LD</li>
-		<li>+=</li>
-		<li>/* et */</li>
-	</ul>
-
-	<h2>L’importance des compromis</h2>
+	<h3>L’importance des compromis</h3>
 	<p>
 		Il n’est évidemment pas possible de maximiser tous ces paramètres en même temps. Par conséquent,
 		certains choix ont dus être faits.
@@ -347,11 +351,13 @@
 	</ul>
 
 	<h2><span class="glow">★</span> Pour aller plus loin</h2>
-	<p>
-		<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués, les
-		roulements sont améliorés et les doigts ont encore moins de distance à parcourir. Cependant, ces
-		excellents résultats sont le fruit d’une fraude. En effet, ils nécessitent d’avoir un logiciel
-		permettant de se faire des raccourcis personnalisés comme AutoHotkey. Il faudra aussi accepter
-		d’apprendre des enchaînements de touches supplémentaires.
-	</p>
+	<div class="important">
+		<p>
+			<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués, les
+			roulements sont améliorés et les doigts ont encore moins de distance à parcourir. Cependant,
+			ces excellents résultats sont le fruit d’une fraude. En effet, ils nécessitent d’avoir un
+			logiciel permettant de se faire des raccourcis personnalisés comme AutoHotkey. Il faudra aussi
+			accepter d’apprendre des enchaînements de touches supplémentaires.
+		</p>
+	</div>
 </div>

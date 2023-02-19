@@ -5,6 +5,8 @@
 	flex-direction: column;
 	gap: 25px;
 }
+
+/* Suppression des styles de titre */
 .container .title,
 .container h2,
 .container h3,
@@ -23,6 +25,7 @@
 	padding: 0;
 	border-radius: 12px;
 }
+
 .container .tab 
 {
 	position: relative;
@@ -63,7 +66,7 @@
 	color: #fff;
 	transform: rotate(135deg);
 }
-.container .tab label numero-faq 
+.container .tab label .numero-faq 
 {
 	width: 40px;
 	height: 40px;
@@ -75,17 +78,24 @@
 	border-radius: 5px;
 	margin-right: 10px;
 }
-.container .tab input:checked ~ label numero-faq 
+.container .tab input:checked ~ label .numero-faq 
 {
 	position: absolute;
 	top: 0;
 	left: 0;
 	width: 100%;
-	height: 100%;
+	height: 100px;
 	color: rgba(255,255,255,0.2);
-	font-size: 8em;
+	font-size: 80px;
 	justify-content: flex-end;
+	align-items:center;
 	padding: 20px;
+	padding-right: 50px;
+}
+.container .tab input:checked ~ label {
+	height: 100px;
+	margin: 0 auto;
+	align-items: normal;
 }
 .container .tab label h3 
 {
@@ -96,6 +106,7 @@
 }
 .container .tab input:checked ~ label h3 
 {
+	height: fit-content;
 	background: #fff;
 	padding: 2px 10px;
 	color: #333;
@@ -112,7 +123,11 @@
 {
 	max-height: 100vh;
 	transition: 1s;
+	background-color: transparent;
+	color: white;
 }
+
+
 .container .tab .content p 
 {
 	position: relative;
@@ -120,26 +135,54 @@
 	color: #333;
 	z-index: 10;
 }
-.container .tab input:checked ~ .content p 
-{
-	color: #fff;
+
+.container .tab input:checked ~ .content kbd,
+.container .tab input:checked ~ .content kbd-sortie,
+.container .tab input:checked ~ .content kbd-non {
+	background-color: hsla(0deg, 0%, 10%, 90%);
 }
 
 
 
-.container .tab:nth-child(1) label numero-faq 
+.container .tab:nth-child(1) label .numero-faq 
 {
 	background: linear-gradient( -135deg, #70F570 10%, #49C628 100%);
 }
-.container .tab:nth-child(2) label numero-faq 
+.container .tab:nth-child(2) label .numero-faq 
+{
+	background: linear-gradient( 135deg, #fff200 10%, #ff7300 100%);
+	
+}
+.container .tab:nth-child(3) label .numero-faq 
+{
+	background: linear-gradient( -135deg, #c80101 10%, #FFC600 100%);
+}
+.container .tab:nth-child(4) label .numero-faq 
 {
 	background: linear-gradient( 135deg, #3C8CE7 10%, #00EAFF 100%);
 }
-.container .tab:nth-child(3) label numero-faq 
+.container .tab:nth-child(5) label .numero-faq 
+{
+	background: linear-gradient( 135deg, #00d9ff 10%, #00198b 100%);
+}
+.container .tab:nth-child(6) label .numero-faq 
+{
+	background: linear-gradient( 135deg, #000000 10%, #aaaaaa 100%);
+}
+.container .tab:nth-child(7) label .numero-faq 
 {
 	background: linear-gradient( -135deg, #FF96F9 10%, #C32BAC 100%);
+	
 }
-.container .tab:nth-child(4) label numero-faq 
-{
-	background: linear-gradient( -135deg, #FD6E6A 10%, #FFC600 100%);
-}
+
+
+
+.tab:first-of-type {
+	counter-reset: faq-counter;
+  }
+  
+.tab .numero-faq:before {
+	 counter-increment: faq-counter;
+	content: counter(faq-counter);
+  }
+  
