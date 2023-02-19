@@ -1,52 +1,66 @@
-
-.container 
-{
-	display: flex;
-	flex-direction: column;
-	gap: 20px;
-}
-
 /* Suppression des styles de titre */
-.container .title,
-.container h2,
-.container h3,
-.container .title::after,
-.container h2::after,
-.container h3::after
+
+.accordion label h3
 {
-	color: #333;
+	color: #333!important;
 	-webkit-background-clip: unset;
 	background-clip: unset;
 	-webkit-text-fill-color: unset;
 	-webkit-box-decoration-break: unset;
-	box-decoration-break: unset;
 	background: transparent;
 	margin: 0;
 	padding: 0;
+	font-weight: 700!important;
+	font-size: 1.35rem;
 }
 
-.container .tab 
-{
-	position: relative;
-	background: #fff;
-	padding: 0 20px 20px;
-	box-shadow: 0 15px 25px rgba(0,0,0,0.05);
-	border-radius: 5px;
-	overflow: hidden;
+
+
+
+/* Numérotation automatique des sections */
+section:first-of-type {
+	counter-reset: faq-counter;
+  }
+  
+section .numero-faq:before {
+	counter-increment: faq-counter;
+	content: counter(faq-counter);
 }
-.container .tab input 
-{
+
+
+
+.accordion {
+	display: flex;
+	flex-direction: column;
+	gap: 15px; /* Espace entre les sections */
+}
+
+.accordion section {
+	position: relative;
+	padding: 0 20px 20px;
+	border-radius: 3px;
+	overflow: hidden;
+	background: #fff;
+	border: 1px solid white;
+	box-shadow: 0 0 5px rgba(255, 255, 255, 1);
+}
+
+.accordion section input {
 	appearance: none;
 }
-.container .tab label 
-{
+
+.accordion section label {
 	display: inline-block;
 	display: flex;
 	margin-bottom: 0px;
 	align-items: center;
 	cursor: pointer;
 }
-.container .tab label::after 
+
+
+
+/* Bouton + */
+.accordion section label::after 
 {
 	content: '+';
 	position: absolute;
@@ -55,17 +69,20 @@
 	color: rgba(0,0,0,0.1);
 	transition: transform 1s;
 }
-.container .tab:hover label::after 
+.accordion section:hover label::after 
 {
 	color: #333;
 }
-.container .tab input:checked ~ label::after
+.accordion section input:checked ~ label::after
 {
 	content: '+';
 	color: #fff;
 	transform: rotate(135deg);
 }
-.container .tab label .numero-faq 
+
+
+
+.accordion section label .numero-faq 
 {
 	width: 40px;
 	height: 40px;
@@ -76,8 +93,10 @@
 	font-size: 1.25em;
 	border-radius: 5px;
 	margin-right: 10px;
+	font-weight: bold;
 }
-.container .tab input:checked ~ label .numero-faq 
+/* 
+.accordion section input:checked ~ label .numero-faq 
 {
 	position: absolute;
 	top: 0;
@@ -92,19 +111,23 @@
 	padding-right: 50px;
 	border-radius: 0;
 }
-.container .tab input:checked ~ label {
+.accordion section input:checked ~ label {
 	height: 100px;
 	margin: 0 auto;
 	align-items: normal;
-}
-.container .tab label h3 
+} */
+
+
+
+.accordion section label h3 
 {
 	position: relative;
 	font-weight: 500;
 	color: #333;
 	z-index: 10;
+	width:100%;
 }
-.container .tab input:checked ~ label h3 
+/* .accordion section input:checked ~ label h3 
 {
 	height: fit-content;
 	background: #fff;
@@ -113,39 +136,36 @@
 	border-radius: 3px;
 	box-shadow: 0 5px 15px rgba(0,0,0,0.05);
 	margin-left: 70px;
-} 
-.container .tab .content 
+} */
+
+
+
+.accordion section .content 
 {
 	max-height: 0;
 	overflow: hidden;
-	transition: 1s;
 }
-.container .tab input:checked ~ .content 
+.accordion section input:checked ~ .content 
 {
 	max-height: none;
-	transition: 1s;
-	background-color: transparent;
-	color: white;
+	transition: 0.5s;
+	background: white;
 	--taille-clavier: 0.7!important;
-}
-
-
-.container .tab .content 
-{
 	position: relative;
-	color: #333!important;
+	color: #333;
 	z-index: 10;
 }
 
-.container .tab input:checked ~ .content kbd,
-.container .tab input:checked ~ .content kbd-sortie,
-.container .tab input:checked ~ .content kbd-non {
+
+.accordion section input:checked ~ .content kbd,
+/* .accordion section input:checked ~ .content kbd-sortie, */
+.accordion section input:checked ~ .content kbd-non {
 	background-color: hsla(0deg, 0%, 10%, 90%);
-	background: linear-gradient(
+	/* background: linear-gradient(
 		90deg,
 		rgba(0, 0, 50, 1) 0%,
 		rgba(0, 0, 70, 1) 100%
-	);
+	); */
 }
 
 #clavier-freq bloc-clavier {
@@ -154,44 +174,31 @@
 }
 
 
-.container .tab:nth-child(1) label .numero-faq 
-{
-	background: linear-gradient( 135deg, #ff0000 10%, #ffd500 100%);
-}
-.container .tab:nth-child(2) label .numero-faq 
-{
-	background: linear-gradient( 135deg, #ff7300 10%, #fff200 100%);
-	
-}
-.container .tab:nth-child(3) label .numero-faq 
-{
-	background: linear-gradient( 135deg, #146100 10%, #04e217 100%);
-}
-.container .tab:nth-child(4) label .numero-faq 
-{
-	background: linear-gradient( 135deg, #00198b 10%, #00d9ff 100%);
-}
-.container .tab:nth-child(5) label .numero-faq 
-{
-	background: linear-gradient( 135deg, #04002a 10%, #006efe 100%);
-}
-.container .tab:nth-child(6) label .numero-faq 
-{
-	background: linear-gradient( 135deg, #010c3a 10%, #ff00fb 100%);
-}
-.container .tab:nth-child(7) label .numero-faq 
-{
-	background: linear-gradient( 135deg, #800000 10%, #e102c3 100%);
+.accordion section:nth-child(1) label .numero-faq {
+	background-image: linear-gradient( 135deg, #ff0000 10%, #ffd500 100%)!important;
 }
 
+.accordion section:nth-child(2) label .numero-faq {
+	background-image: linear-gradient( 135deg, #ff7300 10%, #fff200 100%);
+}
 
+.accordion section:nth-child(3) label .numero-faq {
+	background-image: linear-gradient( 135deg, #146100 10%, #04e217 100%);
+}
 
-.tab:first-of-type {
-	counter-reset: faq-counter;
-  }
-  
-.tab .numero-faq:before {
-	 counter-increment: faq-counter;
-	content: counter(faq-counter);
-  }
+.accordion section:nth-child(4) label .numero-faq {
+	background-image: linear-gradient( 135deg, #00198b 10%, #00d9ff 100%);
+}
+
+.accordion section:nth-child(5) label .numero-faq {
+	background-image: linear-gradient( 135deg, #04002a 10%, #006efe 100%);
+}
+
+.accordion section:nth-child(6) label .numero-faq {
+	background-image: linear-gradient( 135deg, #010c3a 10%, #ff00fb 100%);
+}
+
+.accordion section:nth-child(7) label .numero-faq {
+	background-image: linear-gradient( 135deg, #800000 10%, #e102c3 100%);
+}
   

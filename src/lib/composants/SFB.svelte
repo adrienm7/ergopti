@@ -24,6 +24,7 @@
 		border-radius: 8px;
 		padding: 20px;
 		font-size: 1rem;
+		font-weight: normal;
 		line-height: 1.35;
 		box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
 
@@ -35,7 +36,7 @@
 		position: absolute;
 		right: 50%;
 		transform: translate(50%, 0);
-		z-index: 1;
+		z-index: 20;
 	}
 
 	.tooltip:hover .tooltiptext {
