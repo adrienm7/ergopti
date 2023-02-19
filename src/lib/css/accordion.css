@@ -3,7 +3,7 @@
 {
 	display: flex;
 	flex-direction: column;
-	gap: 25px;
+	gap: 20px;
 }
 
 /* Suppression des styles de titre */
@@ -110,7 +110,7 @@
 	background: #fff;
 	padding: 2px 10px;
 	color: #333;
-	border-radius: 5px;
+	border-radius: 3px;
 	box-shadow: 0 5px 15px rgba(0,0,0,0.05);
 	margin-left: 70px;
 } 
@@ -133,7 +133,6 @@
 .container .tab .content 
 {
 	position: relative;
-	padding: 10px 0;
 	color: #333!important;
 	z-index: 10;
 }
@@ -149,42 +148,40 @@
 	);
 }
 
-.container .tab input:checked ~ .content bloc-clavier {
+#clavier-freq bloc-clavier {
 	background-color: black;
 	box-shadow: none;
-	--taille-clavier: 0.8;
 }
 
 
 .container .tab:nth-child(1) label .numero-faq 
 {
-	background: linear-gradient( -135deg, #70F570 10%, #49C628 100%);
+	background: linear-gradient( 135deg, #ff0000 10%, #ffd500 100%);
 }
 .container .tab:nth-child(2) label .numero-faq 
 {
-	background: linear-gradient( 135deg, #fff200 10%, #ff7300 100%);
+	background: linear-gradient( 135deg, #ff7300 10%, #fff200 100%);
 	
 }
 .container .tab:nth-child(3) label .numero-faq 
 {
-	background: linear-gradient( -135deg, #c80101 10%, #FFC600 100%);
+	background: linear-gradient( 135deg, #146100 10%, #04e217 100%);
 }
 .container .tab:nth-child(4) label .numero-faq 
 {
-	background: linear-gradient( 135deg, #3C8CE7 10%, #00EAFF 100%);
+	background: linear-gradient( 135deg, #00198b 10%, #00d9ff 100%);
 }
 .container .tab:nth-child(5) label .numero-faq 
 {
-	background: linear-gradient( 135deg, #00d9ff 10%, #00198b 100%);
+	background: linear-gradient( 135deg, #04002a 10%, #006efe 100%);
 }
 .container .tab:nth-child(6) label .numero-faq 
 {
-	background: linear-gradient( 135deg, #000000 10%, #aaaaaa 100%);
+	background: linear-gradient( 135deg, #010c3a 10%, #ff00fb 100%);
 }
 .container .tab:nth-child(7) label .numero-faq 
 {
-	background: linear-gradient( -135deg, #FF96F9 10%, #C32BAC 100%);
-	
+	background: linear-gradient( 135deg, #800000 10%, #e102c3 100%);
 }
 
 

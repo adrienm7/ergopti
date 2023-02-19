@@ -27,11 +27,13 @@
 <mini-espace />
 
 <div class="contenu">
-	<p class="important">
-		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
-		Elle se veut la plus <span class="hyper">optimale</span> possible. Comment atteindre cet objectif ?
-		C’est ce qui vous sera présenté sur cette page.
-	</p>
+	<div class="important">
+		<p>
+			<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
+			Elle se veut la plus <span class="test">optimale</span> possible. Comment atteindre cet objectif ?
+			C’est ce qui vous sera présenté sur cette page.
+		</p>
+	</div>
 
 	<h2>Disposition clavier optimisée</h2>
 
@@ -39,38 +41,6 @@
 		<div class="tab">
 			<input type="checkbox" name="acc" id="acc1" />
 			<label for="acc1">
-				<span class="numero-faq" />
-				<h3>Alternance des mains</h3>
-			</label>
-			<div class="content">
-				<p>
-					La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux
-					groupes : main gauche et main droite. L’objectif de cela est d’essayer d’avoir le plus d’alternance
-					des mains possible lors de la frappe de texte : main droite, puis gauche, puis droite, etc.
-					Cette alternance des mains permet de ne pas surutiliser l’une des deux mains en tapant la majorité
-					du texte avec au détriment de l’autre main. Cela permet aussi de gagner légèrement en confort
-					et vitesse car pendant qu’une main tape, l’autre peut se replacer en position de repos et se
-					préparer à taper la touche suivante.
-				</p>
-				<p>
-					Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier.
-					Celles-ci étant majoritairement précédées et suivies de consonnes, cela amène
-					immédiatement une grande alternance des mains. À noter que cette idée est loin d’être
-					nouvelle, car elle est déjà appliquée dans presque toutes les dispositions alternatives :
-					Dvorak, BÉPO, etc.
-				</p>
-				<p>
-					Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que
-					sur la plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur
-					ce côté. Le côté droit a en effet trois colonnes de touches pour l’auriculaire alors que
-					l’auriculaire gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour
-					les langues ayant besoin de caractères supplémentaires comme les accents en français.
-				</p>
-			</div>
-		</div>
-		<div class="tab">
-			<input type="checkbox" name="acc" id="acc2" />
-			<label for="acc2">
 				<span class="numero-faq" />
 				<h3>Distance des doigts aux touches</h3>
 			</label>
@@ -106,8 +76,8 @@
 			</div>
 		</div>
 		<div class="tab">
-			<input type="checkbox" name="acc" id="acc3" />
-			<label for="acc3">
+			<input type="checkbox" name="acc" id="acc2" />
+			<label for="acc2">
 				<span class="numero-faq" />
 				<h3>Minimisation des <SFB />s</h3>
 			</label>
@@ -115,6 +85,38 @@
 				<p>
 					Lorem, ipsum dolor sit amet consectetur adipisicing elit. Mollitia at exercitationem fuga
 					laudantium commodi alias odio quibusdam praesentium earum impedit?
+				</p>
+			</div>
+		</div>
+		<div class="tab">
+			<input type="checkbox" name="acc" id="acc3" />
+			<label for="acc3">
+				<span class="numero-faq" />
+				<h3>Alternance des mains</h3>
+			</label>
+			<div class="content">
+				<p>
+					La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux
+					groupes : main gauche et main droite. L’objectif de cela est d’essayer d’avoir le plus d’alternance
+					des mains possible lors de la frappe de texte : main droite, puis gauche, puis droite, etc.
+					Cette alternance des mains permet de ne pas surutiliser l’une des deux mains en tapant la majorité
+					du texte avec au détriment de l’autre main. Cela permet aussi de gagner légèrement en confort
+					et vitesse car pendant qu’une main tape, l’autre peut se replacer en position de repos et se
+					préparer à taper la touche suivante.
+				</p>
+				<p>
+					Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier.
+					Celles-ci étant majoritairement précédées et suivies de consonnes, cela amène
+					immédiatement une grande alternance des mains. À noter que cette idée est loin d’être
+					nouvelle, car elle est déjà appliquée dans presque toutes les dispositions alternatives :
+					Dvorak, BÉPO, etc.
+				</p>
+				<p>
+					Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que
+					sur la plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur
+					ce côté. Le côté droit a en effet trois colonnes de touches pour l’auriculaire alors que
+					l’auriculaire gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour
+					les langues ayant besoin de caractères supplémentaires comme les accents en français.
 				</p>
 			</div>
 		</div>

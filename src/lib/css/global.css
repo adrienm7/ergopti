@@ -62,3 +62,12 @@ html, body {
 		--couleur: 60;
 	}
 }
+
+.test {
+	--couleur: rgb(0, 110, 255);
+	/* color: var(--couleur); */
+	text-shadow: 0 0 5px var(--couleur),
+	0 0 10px var(--couleur),
+	0 0 20px var(--couleur),
+	0 0 30px var(--couleur);
+}

@@ -320,14 +320,14 @@
 			<select bind:value={couche} on:change={() => toggleCouche(couche)}>
 				{#each options as value}<option value={value[1]}>{value[0]}</option>{/each}
 			</select>
+			<button on:click={toggleType}>
+				{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
+			</button>
 			<button on:click={togglePlus}>
 				{plus === 'oui' ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
 			</button>
 			<button on:click={toggleCouleur}>
 				{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
-			</button>
-			<button on:click={toggleType}>
-				{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
 			</button>
 		</controles-clavier>
 	{/if}
