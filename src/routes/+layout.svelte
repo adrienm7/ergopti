@@ -12,16 +12,18 @@
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 
 	let zIndex = -999;
+	let affiche = 'none';
 
 	function toggleZIndex() {
 		zIndex = zIndex === -999 ? 100 : -999;
+		affiche = affiche === 'none' ? 'block' : 'none';
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
 </script>
 
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
 
-<div id="clavier" class="bg-blue" style="z-index: {zIndex};">
+<div id="clavier" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 	<div>
 		<EnsembleClavier
 			emplacement={'clavier-reference'}
