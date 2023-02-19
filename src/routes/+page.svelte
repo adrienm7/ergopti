@@ -81,7 +81,7 @@
 			<input type="checkbox" name="acc" id="acc2" />
 			<label for="acc2">
 				<span class="numero-faq" />
-				<h3>Minimisation des <SFB />s</h3>
+				<h3>Minimisation des SFBs</h3>
 			</label>
 			<div class="content">
 				<p>
@@ -303,65 +303,84 @@
 	</div>
 
 	<h2>Genèse et raison des choix</h2>
-	<p>
-		Les améliorations d’Optimot par rapport au Bépo sont vraiment significatives. Les tests sont
-		sans appel et montrent notamment une nette diminution des digrammes à un doigt. Après beaucoup
-		d’hésitation à passer du Bépo à Optimot, j’ai voulu d’abord être certain que l’apprentissage de
-		cette nouvelle disposition serait le dernier. C’est pourquoi j’ai décidé de regarder par
-		moi-même si Optimot pouvait éventuellement encore être améliorée avant de faire mon choix.
-	</p>
-	<ul class="paragraphe">
-		<li>Bépo, puis Optimot, puis Optim7 puis HyperTexte</li>
-		<li>E sur le majeur et non l’index à cause des roulements et <SFB />s</li>
-		<li>Q puis P puis W sur l’index gauche</li>
-		<li>Comment retenir les symboles en AltGr</li>
-	</ul>
+	<section>
+		<p>
+			Les améliorations d’Optimot par rapport au Bépo sont vraiment significatives. Les tests sont
+			sans appel et montrent notamment une nette diminution des digrammes à un doigt (SFBs).
+		</p>
+		<p>
+			Après beaucoup d’hésitation à passer du Bépo à Optimot, j’ai voulu d’abord être certain que
+			l’apprentissage de cette nouvelle disposition serait le dernier. C’est pourquoi j’ai décidé de
+			regarder par moi-même si Optimot pouvait éventuellement encore être améliorée avant de faire
+			mon choix.
+		</p>
+		<p>
+			La réponse a été « oui ». Évidemment, la disposition <Nom /> a été optimisée selon mes critères
+			qui ne seront probablement pas les votres. Toutefois, cela vous donnera probablement des idées
+			si vous comptez choisir une nouvelle disposition voire en créer une.
+		</p>
+		<ul class="paragraphe">
+			<li>Bépo, puis Optimot, puis Optim7 puis HyperTexte</li>
+			<li>E sur le majeur et non l’index à cause des roulements et <SFB />s</li>
+			<li>Q puis P puis W sur l’index gauche</li>
+			<li>Comment retenir les symboles en AltGr</li>
+		</ul>
+	</section>
 	<h3>Utilisation de la couche AltGr</h3>
-	<p>
-		N’ayant nullement besoin de tous les caractères exotiques des touches mortes Bépo/Optimot, j’en
-		ai supprimé la majeure partie. Cela me laisse assez de place pour avoir à la fois les
-		ponctuations avec espace insécable automatique en Shift et à la fois les ponctuations seules en
-		AltGr pour la programmation notamment. Cela fait que je n’ai plus grande utilité des espaces
-		insécables et espaces fines insécables. Celles-ci sont donc déplacées à un autre endroit pour me
-		permettre d’avoir le tiret en Shift+Espace qui est beaucoup plus utile. L’underscore reste en
-		AltGr+Espace.
-	</p>
+	<section>
+		<p>
+			N’ayant nullement besoin de tous les caractères exotiques des touches mortes Bépo/Optimot,
+			j’en ai supprimé la majeure partie. Cela me laisse assez de place pour avoir à la fois les
+			ponctuations avec espace insécable automatique en Shift et à la fois les ponctuations seules
+			en AltGr pour la programmation notamment.
+		</p>
+		<p>
+			Cela fait que je n’ai plus grande utilité des espaces insécables et espaces fines insécables.
+			Celles-ci sont donc déplacées à un autre endroit pour me permettre d’avoir le tiret en
+			Shift+Espace qui est beaucoup plus utile. L’underscore reste en AltGr+Espace.
+		</p>
+	</section>
 
 	<h2>Autocritiques</h2>
 
 	<h3>L’importance des compromis</h3>
-	<p>
-		Il n’est évidemment pas possible de maximiser tous ces paramètres en même temps. Par conséquent,
-		certains choix ont dus être faits.
-	</p>
-	<p>
-		Notamment, le E n’est pas sur l’index de la rangée de repos. Ce qui est pourtant étrange, tant
-		son apparition est fréquente dans les textes. C’est la lettre la plus fréquente et de loin.
-		Pourtant, elle ne se trouve pas sur l’index notamment afin de réduire les <SFB />s. Si le E
-		avait été sur l’index, alors les 6 touches tapées par ce doigt auraient possiblement fait des <SFB
-		/>s avec le E. E s’associe avec quasiment toutes les lettres, donc ce serait une très mauvaise
-		idée. Au contraire, la voyelle U ne s’associe pas avec beaucoup de lettres, donc elle est bien
-		mieux à cet emplacement. D’autant que cet arrangemement des voyelles permet alors de très bons
-		roulements.
-	</p>
+	<section>
+		<p>
+			Il n’est évidemment pas possible de maximiser tous ces paramètres en même temps. Par
+			conséquent, certains choix ont dus être faits.
+		</p>
+		<p>
+			Notamment, le E n’est pas sur l’index de la rangée de repos. Ce qui est pourtant étrange, tant
+			son apparition est fréquente dans les textes. C’est la lettre la plus fréquente et de loin.
+			Pourtant, elle ne se trouve pas sur l’index notamment afin de réduire les <SFB />s. Si le E
+			avait été sur l’index, alors les 6 touches tapées par ce doigt auraient possiblement fait des <SFB
+			/>s avec le E. E s’associe avec quasiment toutes les lettres, donc ce serait une très mauvaise
+			idée. Au contraire, la voyelle U ne s’associe pas avec beaucoup de lettres, donc elle est bien
+			mieux à cet emplacement. D’autant que cet arrangemement des voyelles permet alors de très bons
+			roulements.
+		</p>
+	</section>
 
 	<h3>Points d’amélioration</h3>
-
-	<ul class="paragraphe">
-		<li>SC mais parce que c’est à la moins pire position</li>
-		<li>PT</li>
-		<li>EO et OE pour l’anglais</li>
-		<li>K est assez loin, surtout pour l’anglais avec ses SK, CK, etc.</li>
-	</ul>
+	<section>
+		<ul class="paragraphe">
+			<li>SC mais parce que c’est à la moins pire position</li>
+			<li>PT</li>
+			<li>EO et OE pour l’anglais</li>
+			<li>K est assez loin, surtout pour l’anglais avec ses SK, CK, etc.</li>
+		</ul>
+	</section>
 
 	<h2><span class="glow">★</span> Pour aller plus loin</h2>
 	<div class="important">
 		<p>
 			<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués, les
-			roulements sont améliorés et les doigts ont encore moins de distance à parcourir. Cependant,
-			ces excellents résultats sont le fruit d’une fraude. En effet, ils nécessitent d’avoir un
-			logiciel permettant de se faire des raccourcis personnalisés comme AutoHotkey. Il faudra aussi
-			accepter d’apprendre des enchaînements de touches supplémentaires.
+			roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
+		</p>
+		<p>
+			Cependant, ces excellents résultats sont le fruit d’une fraude. En effet, ils nécessitent
+			d’avoir un logiciel permettant de se faire des raccourcis personnalisés comme AutoHotkey. Il
+			faudra aussi accepter d’apprendre des enchaînements de touches supplémentaires.
 		</p>
 	</div>
 </div>

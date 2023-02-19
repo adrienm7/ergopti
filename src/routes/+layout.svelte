@@ -78,7 +78,7 @@
 		right: 20px;
 		padding: 12px;
 		cursor: pointer;
-		border: 1px solid rgba(0, 0, 0, 0.9);
+		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 6px;
 		font-size: 1.3rem;
 		box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;

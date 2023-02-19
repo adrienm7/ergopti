@@ -93,7 +93,7 @@ bloc-touche:hover,
 	--couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-pressee-luminosite), var(--transparence-touche-pressee));
     position: relative;
     top: var(--descente-touche);
-    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 5px #00000077;
+    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 5px #00000044;
 }
 
 
