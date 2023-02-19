@@ -262,6 +262,37 @@
 		majClavier();
 	}
 
+	function taperTexte() {
+		let emplacementClavier = document.getElementById(emplacement);
+		let texte = ['a', 'd', 'r', 'i', 'e', 'n'];
+		function writeNext(texte, i) {
+			if (i == texte.length) {
+				emplacementClavier
+					.querySelector("bloc-touche[data-touche='" + texte[i - 1] + "']")
+					.classList.remove('touche-active');
+				return;
+			}
+
+			let nouvelleLettre = texte[i];
+			emplacementClavier
+				.querySelector("bloc-touche[data-touche='" + nouvelleLettre + "']")
+				.classList.add('touche-active');
+
+			if (i !== 0) {
+				let ancienneLettre = texte[i - 1];
+				emplacementClavier
+					.querySelector("bloc-touche[data-touche='" + ancienneLettre + "']")
+					.classList.remove('touche-active');
+			}
+
+			setTimeout(function () {
+				writeNext(texte, i + 1);
+			}, 500);
+		}
+
+		writeNext(texte, 0);
+	}
+
 	var mayzner = {
 		max: 12.49,
 		a: 8.04,
@@ -329,6 +360,7 @@
 			<button on:click={toggleCouleur}>
 				{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
 			</button>
+			<button on:click={taperTexte}>T</button>
 		</controles-clavier>
 	{/if}
 </ensemble-clavier>

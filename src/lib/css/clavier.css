@@ -17,7 +17,7 @@ bloc-clavier {
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
 	--transparence-touche: 15%;
 	
-	--transparence-touche-pressee: 10%;
+	--transparence-touche-pressee: 8%;
     --couleur-touche-pressee-luminosite: 60%;
 
     --couleur-doigt-gauche-index: 0deg;
@@ -201,6 +201,20 @@ ensemble-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
 }
 
 
+/* Affichage différent pour les touches mortes */
+ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="a"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="i"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"] {
+	--transparence-touche: 3%;
+	--couleur-touche-saturation: 0%;
+}
+
+
 
 
 
@@ -336,7 +350,7 @@ bloc-touche[data-type="space"] {
 	background-color: rgba(255, 255, 255, 0.1);
 }
 
-.touche-active {
+bloc-touche[data-type="special"].touche-active {
 	color: black!important;
 	background-color: rgba(255, 255, 255, 0.7)!important;
 }
