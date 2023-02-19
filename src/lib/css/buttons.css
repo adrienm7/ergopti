@@ -6,6 +6,7 @@ kbd, kbd-sortie, kbd-non {
 	border-image: none 100% 1 0 stretch; 
 	border-radius: .15em; 
 	box-shadow: rgba(0, 0, 0, 0.3) 5px 3px 5px, 0 calc(.6*.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%); 
+	box-shadow: rgba(0, 0, 0, 0.4) 1px 1px 1px, 0 calc(.6*.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%);
 	box-sizing: border-box; 
 	color: hsla(0, 100%, 100%, 90%); 
 	cursor: pointer; 
@@ -23,6 +24,7 @@ kbd, kbd-sortie, kbd-non {
 }
 
 kbd-sortie {
+	background-color: #1a1a1ae5;
 	background-color: hsla(0, 100%, 100%, 90%);
 	color: black;
 }
