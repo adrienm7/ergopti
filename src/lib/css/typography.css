@@ -44,7 +44,7 @@ h2 {
     font-size: 2.3rem;
 }
 
-h2::after,
+/* h2::after,
 h3::after {
 	content: '';
 	display: block;
@@ -54,11 +54,11 @@ h3::after {
 	height: 5px;
 	border-radius: 5px;
 	background-image: linear-gradient(to right, var(--gradient-blue));
-}
+} */
 
-h3::after {
+/* h3::after {
 	background-image: linear-gradient(to right, var(--gradient-purple));
-}
+} */
 
 
 h3 {
@@ -295,7 +295,8 @@ strong,
 .hypertexte {
 	/* font-style: italic; */
 }
-.hyper {
+.hyper,
+h2 {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
@@ -304,7 +305,8 @@ strong,
 	box-decoration-break: clone;
 	background-image: linear-gradient(to right, var(--gradient-blue));
 }
-.texte {
+.texte,
+h3 {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;

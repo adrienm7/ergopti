@@ -13,7 +13,7 @@ bloc-clavier {
     --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
 
     --couleur-touche-saturation: 70%;
-    --couleur-touche-luminosite: 80%;
+    --couleur-touche-luminosite: 70%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
 	--transparence-touche: 15%;
 	

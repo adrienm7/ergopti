@@ -57,7 +57,7 @@
 <style>
 	:root {
 		--couleur-header: rgba(0, 0, 0, 0.8);
-		--couleur-header-mobile: rgba(0, 0, 0, 0.3);
+		--couleur-header-mobile: rgba(0, 0, 0, 0.8);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
 		--espacement-items-menu: 5px;
@@ -197,13 +197,13 @@
 			padding: var(--hauteur-element-menu-mobile) 0;
 			padding-left: var(--marge-fenetre);
 			text-decoration: none;
-			font-size: 1.5rem;
 			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 		}
 		header #menu ul li,
 		header #menu ul li a p {
 			margin: 0;
 			padding: 0;
+			font-size: 1.1rem;
 		}
 
 		/* menu icon */

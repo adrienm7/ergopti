@@ -35,10 +35,12 @@
 		</p>
 	</div>
 
-	<h2>Disposition clavier optimisée</h2>
+	<grand-espace />
+	<h2 class="margin0">Disposition clavier optimisée</h2>
+	<petit-espace />
 
-	<div class="container">
-		<div class="tab">
+	<div class="accordion">
+		<section>
 			<input type="checkbox" name="acc" id="acc1" />
 			<label for="acc1">
 				<span class="numero-faq" />
@@ -74,8 +76,8 @@
 					controles={'non'}
 				/>
 			</div>
-		</div>
-		<div class="tab">
+		</section>
+		<section>
 			<input type="checkbox" name="acc" id="acc2" />
 			<label for="acc2">
 				<span class="numero-faq" />
@@ -87,8 +89,8 @@
 					laudantium commodi alias odio quibusdam praesentium earum impedit?
 				</p>
 			</div>
-		</div>
-		<div class="tab">
+		</section>
+		<section>
 			<input type="checkbox" name="acc" id="acc3" />
 			<label for="acc3">
 				<span class="numero-faq" />
@@ -119,8 +121,8 @@
 					les langues ayant besoin de caractères supplémentaires comme les accents en français.
 				</p>
 			</div>
-		</div>
-		<div class="tab">
+		</section>
+		<section>
 			<input type="checkbox" name="acc" id="acc4" />
 			<label for="acc4">
 				<span class="numero-faq" />
@@ -151,8 +153,8 @@
 					<li>/* et */</li>
 				</ul>
 			</div>
-		</div>
-		<div class="tab">
+		</section>
+		<section>
 			<input type="checkbox" name="acc" id="acc5" />
 			<label for="acc5">
 				<span class="numero-faq" />
@@ -259,8 +261,8 @@
 					</li>
 				</ul>
 			</div>
-		</div>
-		<div class="tab">
+		</section>
+		<section>
 			<input type="checkbox" name="acc" id="acc6" />
 			<label for="acc6">
 				<span class="numero-faq" />
@@ -281,8 +283,8 @@
 					trop bouger les doigts.
 				</p>
 			</div>
-		</div>
-		<div class="tab">
+		</section>
+		<section>
 			<input type="checkbox" name="acc" id="acc7" />
 			<label for="acc7">
 				<span class="numero-faq" />
@@ -297,7 +299,7 @@
 					se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
 				</p>
 			</div>
-		</div>
+		</section>
 	</div>
 
 	<h2>Genèse et raison des choix</h2>
