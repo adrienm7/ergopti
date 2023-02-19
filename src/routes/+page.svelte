@@ -93,7 +93,7 @@
 					idée, car cette lettre est beaucoup utilisée en français.
 				</p>
 
-				<moyen-espace />
+				<mini-espace />
 
 				<EnsembleClavier
 					emplacement={'clavier-freq'}
