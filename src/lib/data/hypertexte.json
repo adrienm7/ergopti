@@ -1034,7 +1034,7 @@
 			"Primary": "d",
 			"Shift": "D",
 			"AltGr": "$",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "§",
 			"layer": "+^⇦",
 			"à": "ds",
 			"type": "lettre"
@@ -1134,7 +1134,7 @@
 			"Primary": "n",
 			"Shift": "N",
 			"AltGr": ")",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "–",
 			"layer": "⇦",
 			"à": "nl",
 			"type": "lettre"
@@ -1187,7 +1187,7 @@
 			"Primary": "s",
 			"Shift": "S",
 			"AltGr": "(",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "—",
 			"layer": "⇤",
 			"à": "cs",
 			"type": "lettre"
@@ -1271,7 +1271,7 @@
 			"Primary": ",",
 			"Shift": "▮;",
 			"AltGr": ";",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "☻",
 			"layer": "+⇥",
 			"à": "u,",
 			"type": "double"
@@ -1281,7 +1281,7 @@
 			"Primary": ".",
 			"Shift": "▮:",
 			"AltGr": ":",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "·",
 			"layer": "",
 			"à": "u.",
 			"type": "double"
@@ -1311,7 +1311,7 @@
 			"Primary": "◌̂",
 			"Shift": "▮!",
 			"AltGr": "!",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "¡",
 			"layer": "",
 			"à": "",
 			"type": "double"
@@ -1351,7 +1351,7 @@
 			"Primary": "à",
 			"Shift": "À",
 			"AltGr": "`",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "œ",
 			"layer": "+^⇤",
 			"à": "À",
 			"type": "français"
@@ -1361,7 +1361,7 @@
 			"Primary": "%",
 			"Shift": " %",
 			"AltGr": "‰",
-			"ShiftAltGr": "",
+			"ShiftAltGr": "‱",
 			"à": "",
 			"layer": ""
 		},
