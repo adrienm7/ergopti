@@ -6,7 +6,7 @@ bloc-clavier {
     --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
     --profondeur-touche: 1.5px;
-    --profondeur-touche-pressee: 0.5px;
+    --profondeur-touche-pressee: 0.75px;
     --marge-touche: calc(var(--taille-clavier) * 0.36vw);
     --arrondi-touche: 0.15em;
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
@@ -90,11 +90,15 @@ bloc-touche[data-touche=""] {
 bloc-touche:active,
 bloc-touche:hover,
 .touche-active {
-	--couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-pressee-luminosite), var(--transparence-touche-pressee));
-    position: relative;
+	position: relative;
     top: var(--descente-touche);
-    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 5px #00000044;
+    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 1px #00000077;
+	color:black!important;
+	background-color: rgba(255, 255, 255, 0.75)!important;
+	/* --couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-pressee-luminosite), var(--transparence-touche-pressee)); */
 }
+
+
 
 
 
@@ -210,7 +214,7 @@ ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"] {
-	--transparence-touche: 3%;
+	--transparence-touche: 5%;
 	--couleur-touche-saturation: 0%;
 }
 
@@ -336,9 +340,7 @@ bloc-touche[data-main="droite"][data-doigt="auriculaire"]{
 
 bloc-touche[data-type="space"],
 bloc-touche[data-type="special"],
-bloc-touche[data-type="enter"],
-bloc-touche[data-type="enter"]::before,
-bloc-touche[data-type="enter"]::after {
+bloc-touche[data-type="enter"] {
     background-color: rgb(14, 14, 14);
 	color: white;
 	/* Bordure de la touche en blanc transparent */
@@ -346,13 +348,28 @@ bloc-touche[data-type="enter"]::after {
     --couleur-touche-saturation: 0%;
 }
 
-bloc-touche[data-type="space"] {
-	background-color: rgba(255, 255, 255, 0.1);
+bloc-touche[data-type="enter"]::before,
+bloc-touche[data-type="enter"]::after,
+bloc-touche[data-type="enter"]:hover,
+bloc-touche[data-type="enter"]:hover::before,
+bloc-touche[data-type="enter"]:hover::after,
+bloc-touche[data-type="enter"]:active,
+bloc-touche[data-type="enter"]:active::before,
+bloc-touche[data-type="enter"]:active::after {
+    background-color: rgb(14, 14, 14)!important;
+	color: white!important;
 }
 
-bloc-touche[data-type="special"].touche-active {
-	color: black!important;
-	background-color: rgba(255, 255, 255, 0.7)!important;
+/* Pas de changement en hover sur les touches sur le bord du clavier */
+bloc-touche[data-type="special"]:not(.touche-active):hover,
+bloc-touche[data-type="special"]:not(.touche-active):active {
+	background-color: rgb(14, 14, 14)!important;
+	color: white!important;
+}
+
+bloc-touche[data-type="space"]:not(.touche-active) {
+	background-color: rgba(255, 255, 255, 0.1)!important;
+	color: var(--couleur-texte-touche)!important;
 }
 
 
