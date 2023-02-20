@@ -24,14 +24,15 @@
 	/>
 </div>
 
-<mini-espace />
+<petit-espace />
 
 <div class="contenu">
 	<div class="important">
 		<p>
 			<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
-			Elle se veut la plus <span class="test">optimale</span> possible. Comment atteindre cet objectif ?
-			C’est ce qui vous sera présenté sur cette page.
+			Fruit de nombreux tests et réflexions, elle se veut la plus
+			<span class="text-glow">optimale</span>
+			possible. Cette page vous présentera la disposition ainsi que ses nombreux avantages.
 		</p>
 	</div>
 
@@ -168,57 +169,56 @@
 
 				<ul class="margin-top-2">
 					<li>
-						<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>`</kbd-sortie> Le
-						<span class="hyper text-bold">`</span> sur le A
+						<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>`</kbd-sortie> car le
+						<span class="hyper text-bold">`</span> est au-dessus du A
 					</li>
 					<li>
-						<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>@</kbd-sortie> aro<span
+						<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>@</kbd-sortie> car aro<span
 							class="hyper text-bold">B</span
 						>ase
 					</li>
 					<li>
 						<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
-						<span class="hyper text-bold">C</span> cédille
+						car la cédille est sous le <span class="hyper text-bold">C</span>
 					</li>
 					<li>
 						<kbd>AltGr</kbd> + <kbd>D</kbd> ➜ <kbd-sortie>$</kbd-sortie>
-						<span class="hyper text-bold">D</span>ollar
+						car c’est le première lettre de <span class="hyper text-bold">D</span>ollar
 					</li>
 					<li>
 						<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
-						le <span class="hyper text-bold">/</span> sur le E
+						car le <span class="hyper text-bold">/</span> est au-dessus du E
 					</li>
 					<li>
 						<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>\</kbd-sortie>
-						le <span class="hyper text-bold">\</span> sur le E
+						car le <span class="hyper text-bold">\</span> est au-dessus du E
 					</li>
 					<li>
 						<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-sortie>#</kbd-sortie>
-						<span class="hyper text-bold">H</span>ashtag
+						car c’est le première lettre de <span class="hyper text-bold">H</span>ashtag
 					</li>
 					<li>
-						<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-sortie>=</kbd-sortie> éga<span
+						<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-sortie>=</kbd-sortie> car éga<span
 							class="hyper text-bold">L</span
 						>
 					</li>
 					<li>
-						<kbd>AltGr</kbd> + <kbd>M</kbd> ➜ <kbd-sortie>&</kbd-sortie> a<span
-							class="hyper text-bold">M</span
-						>persand
+						<kbd>AltGr</kbd> + <kbd>M</kbd> ➜ <kbd-sortie>&</kbd-sortie> car le nom de ce symbole
+						est a<span class="hyper text-bold">M</span>persand
 					</li>
 					<li>
 						<kbd>AltGr</kbd> + <kbd>P</kbd> ➜ <kbd-sortie>+</kbd-sortie>
-						<span class="hyper text-bold">P</span>lus
+						car c’est le première lettre de <span class="hyper text-bold">P</span>lus
 					</li>
 					<li>
-						<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> barre
+						<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> car c’est la barre
 						<span class="hyper text-bold">V</span>erticale
 					</li>
 				</ul>
 
 				<petit-espace />
 
-				<p>D’autres sont placés par paires l’une à côté de l’autre :</p>
+				<p>D’autres sont placées par paires l’une à côté de l’autre :</p>
 				<ul class="margin-top-2">
 					<li>
 						<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
@@ -260,6 +260,12 @@
 						➜ <kbd-sortie>”</kbd-sortie>
 					</li>
 				</ul>
+				<p>
+					À noter que les touches sont aussi placées le plus possible par distance selon leur
+					fréquence d’utilisation. Ainsi, les touches très utilisées comme les <kbd>()</kbd>,
+					<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les lpus
+					forts.
+				</p>
 			</div>
 		</section>
 		<section>
