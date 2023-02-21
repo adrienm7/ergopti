@@ -49,13 +49,6 @@
 			</label>
 			<div class="content">
 				<p>
-					La deuxième étape dans la création de la disposition a été de placer les touches les plus
-					souvent utilisées les plus proches possible des doigts. Les doigts sont effectivement
-					toujours censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est
-					donc logique de chercher à placer sur cette rangée les lettres les plus utilisées pour
-					réduire les déplacements des doigts aux touches.
-				</p>
-				<p>
 					En outre, chaque doigt a une force différente. Ainsi, un pouce a plus de force qu’un
 					index, qui a plus de force qu’un majeur, qui a plus de force qu’un annulaire, qui a plus
 					de force qu’un auriculaire. Par conséquent, les meilleurs emplacements sont ceux sur la
@@ -99,27 +92,39 @@
 			</label>
 			<div class="content">
 				<p>
-					La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux
-					groupes : main gauche et main droite. L’objectif de cela est d’essayer d’avoir le plus d’alternance
-					des mains possible lors de la frappe de texte : main droite, puis gauche, puis droite, etc.
-					Cette alternance des mains permet de ne pas surutiliser l’une des deux mains en tapant la majorité
-					du texte avec au détriment de l’autre main. Cela permet aussi de gagner légèrement en confort
-					et vitesse car pendant qu’une main tape, l’autre peut se replacer en position de repos et se
-					préparer à taper la touche suivante.
+					L’alternance des mains est très importante pour garantir une bonne <strong
+						>fluidité de frappe</strong
+					>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus d’alternance des
+					mains possible lors de la frappe de texte : main droite pour une touche, ensuite main
+					gauche pour la touche suivante, puis main droite, main gauche, etc.
 				</p>
 				<p>
-					Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier.
-					Celles-ci étant majoritairement précédées et suivies de consonnes, cela amène
-					immédiatement une grande alternance des mains. À noter que cette idée est loin d’être
-					nouvelle, car elle est déjà appliquée dans presque toutes les dispositions alternatives :
-					Dvorak, BÉPO, etc.
+					Cette alternance des mains permet de <strong
+						>ne pas surutiliser l’une des deux mains</strong
+					> en tapant avec la majorité du texte, au détriment de l’autre main qui resterait au-dessus
+					de sa partie du clavier, à attendre de pouvoir enfin entrer en jeu. Ainsi, avec une bonne alternance
+					des mains, pendant qu’une main frappe une touche, l’autre peut se replacer sur la rangée du
+					milieu et se préparer à frapper la suivante.
 				</p>
 				<p>
-					Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que
-					sur la plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur
-					ce côté. Le côté droit a en effet trois colonnes de touches pour l’auriculaire alors que
-					l’auriculaire gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour
-					les langues ayant besoin de caractères supplémentaires comme les accents en français.
+					Si la touche suivante est sur la même main que la touche précédente (sauf roulement, cf.
+					le point suivant), la frappe sera moins confortable. Imaginez que vous deviez atteindre le <kbd
+						>C</kbd
+					>
+					de l’AZERTY, puis le <kbd>T</kbd>, pour écrire <kbd>CT</kbd>, un bigramme très courant en
+					français et anglais. Dans ce cas, vous devez d’abord légèrement abaisser votre main pour
+					que le majeur atteigne la rangée du bas pour taper
+					<kbd>C</kbd>. Puis, il faut que l’index atteigne quant à lui la rangée du haut pour taper
+					<kbd>T</kbd>. En résulte un sentiment d’inconfort avec deux doigts proches mais qui
+					doivent aller dans des directions différentes. Au contraire, en "parallélisant" les
+					frappes sur les deux mains, le résultat se révèle bien plus satisfaisant.
+				</p>
+				<p>
+					L’alternance des mains a une limite. Il est impossible d’alterner parfaitement à chaque
+					frappe. C’est pourquoi, une fois une alternance maximale atteinte, il faut encore
+					améliorer l’expérience de frappe dans le cas où deux touches de la même main doivent être
+					frappées d’affilée. C’est là qu’interviennent les roulements, présentés en détail dans le
+					point suivant.
 				</p>
 			</div>
 		</section>
@@ -131,27 +136,78 @@
 			</label>
 			<div class="content">
 				<p>
-					Pour moi, un "roulement" désigne plutôt un déplacement sur deux doigts consécutifs et
-					jamais à plus d’une rangée d’écart. Il y peu d’informations sur le sujet en ligne ; un
-					roulement a probablement une définition plus large que la mienne, mais alors dans ce cas
-					le côté "qui roule" est selon moi perdu. À la limite si c’est de l’index à l’auriculaire,
-					mais pas de l’index à l’annulaire par exemple. En conclusion, un roulement est pour moi le
-					ST du Bépo (idéalement, car mouvement horizontal), sinon le LS du Bépo, mais pas le GL ni
-					le TR du Bépo. La disposition Optim7 a été construite avec pour contrainte principale de
-					permettre de réaliser les digrammes consonne-consonne les plus courants grâce à des
+					L’optimisation de l’alternance des mains fait que lors de l’utilisation d’une main pour
+					frapper une touche, il y a de fortes probabilités que le frappe suivante se fasse avec
+					l’autre main. Toutefois, cela n’arrive pas dans la totalité des cas, c’est pourquoi il
+					convient de s’assurer que le plus possible de frappes inter-mains se fassent à l’aide de
+					roulements.
+				</p>
+				<p>
+					Pour moi, un "roulement" désigne un déplacement sur deux doigts consécutifs et jamais à
+					plus d’une rangée d’écart. Il y peu d’informations sur le sujet en ligne ; un roulement a
+					probablement une définition plus large que la mienne, mais alors dans ce cas le côté "qui
+					roule" est selon moi perdu. À la limite si c’est de l’index à l’auriculaire, mais pas de
+					l’index à l’annulaire par exemple.
+				</p>
+				<p>
+					En conclusion, un roulement est pour moi le <kbd>ST</kbd> du Bépo (idéalement, car
+					mouvement horizontal), sinon le <kbd>LS</kbd> du Bépo, mais pas le <kbd>GL</kbd> ni le
+					<kbd>TR</kbd>
+					du Bépo. La disposition <Nom /> a été construite avec pour contrainte principale de permettre
+					de réaliser les bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des
 					roulements, de préférence sur des doigts consécutifs dans un mouvement horizontal.
 				</p>
 
-				<h4>Très bons digrammes</h4>
-				<ul class="paragraphe">
-					<li>AI, IE, EU, AIE, IEU, OI, OU</li>
-					<li>CH</li>
-					<li>OW et WO</li>
-					<li>YOU</li>
-					<li>PL</li>
-					<li>LD</li>
-					<li>+=</li>
-					<li>/* et */</li>
+				<h4>Très bons bigrammes voyelle-voyelle</h4>
+				<ul class="margin-top-2">
+					<li><kbd>AI</kbd></li>
+					<li><kbd>IE</kbd></li>
+					<li><kbd>EU</kbd></li>
+					<li><kbd>OI</kbd></li>
+					<li><kbd>OU</kbd></li>
+				</ul>
+
+				Avec même quelques trigrammes très confortables :
+				<ul class="margin-top-2">
+					<li><kbd>AIE</kbd> notamment pour écrire <span class="hyper text-bold">AIE</span>NT</li>
+					(avec en plus NT qui est lui aussi un roulement, que demander de plus ?)
+					<li><kbd>IEU</kbd></li>
+					<li><kbd>YOU</kbd></li>
+				</ul>
+				<h4>Très bons bigrammes consonne-consonne</h4>
+				<ul class="margin-top-2">
+					<li>
+						<kbd>CH</kbd> ce bigramme est extraordinaire, une fois habitué il est difficile de s’en passer
+					</li>
+					<li><kbd>PL</kbd></li>
+					<li>
+						<kbd>LD</kbd> surtout fréquent en anglais (WOU<span class="hyper text-bold">LD</span>,
+						COU<span class="hyper text-bold">LD</span>, etc.)
+					</li>
+				</ul>
+				<h4>Autres bons bigrammes</h4>
+				<ul class="margin-top-2">
+					<li>
+						<kbd>OW</kbd> très utilisé en anglais (ALL<span class="hyper text-bold">OW</span>
+						, D<span class="hyper text-bold">OW</span>N, FOLL<span class="hyper text-bold">OW</span
+						>, H<span class="hyper text-bold">OW</span>, KN<span class="hyper text-bold">OW</span>,
+						N<span class="hyper text-bold">OW</span>, <span class="hyper text-bold">OW</span>N, SH<span
+							class="hyper text-bold">OW</span
+						>, etc.)
+					</li>
+					<li>
+						<kbd>WO</kbd> très utilisé en anglais (T<span class="hyper text-bold">WO</span>,
+						<span class="hyper text-bold">WO</span>MAN, <span class="hyper text-bold">WO</span>RD,
+						<span class="hyper text-bold">WO</span>RK, <span class="hyper text-bold">WO</span>RLD,
+						<span class="hyper text-bold">WO</span>RTH, <span class="hyper text-bold">WO</span>ULD,
+						etc.)
+					</li>
+					<li><kbd>+=</kbd> utilisé en programmation pour incrémenter</li>
+
+					<li>
+						<kbd>/*</kbd> et <kbd>*/</kbd> utilisés dans certains langages de programmation pour commenter
+						du code
+					</li>
 				</ul>
 			</div>
 		</section>
@@ -164,7 +220,7 @@
 			<div class="content">
 				<p>
 					Afin de faciliter la mémorisation, les touches sont placées logiquement, en particulier
-					sur la couche AltGr. Ainsi :
+					sur la couche <kbd>AltGr</kbd>. Ainsi :
 				</p>
 
 				<ul class="margin-top-2">
@@ -263,8 +319,17 @@
 				<p>
 					À noter que les touches sont aussi placées le plus possible par distance selon leur
 					fréquence d’utilisation. Ainsi, les touches très utilisées comme les <kbd>()</kbd>,
-					<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les lpus
+					<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les plus
 					forts.
+				</p>
+				<p>
+					Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
+					particularité. Lors de l’utilisation de <kbd>Shift</kbd>, elles sont automatiquement
+					envoyées avec une espace insécable automatique qui les précède. En revanche, avec
+					<kbd>AltGr</kbd>, la ponctuation seule est renvoyée, pour programmation notamment. Cela
+					permet ainsi d’écrire dans un français impeccable en <kbd>Shift</kbd>, tout en programment
+					normalement avec la couche <kbd>AltGr</kbd> qui contient d’ailleurs tout le reste des symboles
+					nécessaires à l’écriture de code.
 				</p>
 			</div>
 		</section>
@@ -298,9 +363,26 @@
 			</label>
 			<div class="content">
 				<p>
-					Le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire facilement
-					les raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>. Normalement,
-					le
+					Lorsqu’on utilise un ordinateur, la plupart du temps on utilise la souris de la main
+					droite et on garde la main gauche près de la partie gauche du clavier. Lorsqu’il faut
+					rentrer du texte ou taper sur une touche, il est bien souvent nécessaire de ramener la
+					main droite de la souris à la partie droite du clavier, de taper dessus, puis de retourner
+					à sa souris pour continuer la navigation. Par conséquent, il est aussi intéressant de
+					s’assurer que beaucoup d’actions courantes puissent se réaliser avec la seule main gauche.
+				</p>
+				<p>
+					La disposition ergodox est ainsi complètement optimisée sur ce critère, car des touches <kbd
+						>Copier</kbd
+					>, <kbd>Coller</kbd>, <kbp>Couper</kbp> et <kbd>Alt+Tab</kbd> sont directement inclues à
+					gauche du clavier. La version ISO quant à elle ne peut malhereusement pas bénéficier de
+					ces touches, car les touches à sa gauche sont déjà occupées par les touches
+					<kbd>Shift</kbd>, <kbd>Capslock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
+					placer ces touches sous les pouces.
+				</p>
+				<p>
+					De plus, le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire
+					facilement les raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>.
+					Normalement, le
 					<kbd>=</kbd>
 					se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
 				</p>
@@ -312,7 +394,7 @@
 	<section>
 		<p>
 			Les améliorations d’Optimot par rapport au Bépo sont vraiment significatives. Les tests sont
-			sans appel et montrent notamment une nette diminution des digrammes à un doigt (SFBs).
+			sans appel et montrent notamment une nette diminution des bigrammes à un doigt (SFBs).
 		</p>
 		<p>
 			Après beaucoup d’hésitation à passer du Bépo à Optimot, j’ai voulu d’abord être certain que
@@ -331,14 +413,45 @@
 			<li>Q puis P puis W sur l’index gauche</li>
 			<li>Comment retenir les symboles en AltGr</li>
 		</ul>
+		<p>
+			La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
+			: main gauche et main droite.
+		</p>
+		<p>
+			Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
+			étant majoritairement précédées et suivies de consonnes, cela amène immédiatement une grande
+			alternance des mains. À noter que cette idée est loin d’être nouvelle, car elle est déjà
+			appliquée dans presque toutes les dispositions alternatives : Dvorak, BÉPO, etc.
+		</p>
+		<p>
+			Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que sur
+			la plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur ce
+			côté. Le côté droit a en effet trois colonnes de touches pour l’auriculaire alors que
+			l’auriculaire gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour les
+			langues ayant besoin de caractères supplémentaires comme les accents en français.
+		</p>
+		<p>
+			La deuxième étape dans la création de la disposition a été de placer les touches les plus
+			souvent utilisées les plus proches possible des doigts. Les doigts sont effectivement toujours
+			censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est donc logique de
+			chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les
+			déplacements des doigts aux touches.
+		</p>
 	</section>
 	<h3>Utilisation de la couche AltGr</h3>
 	<section>
 		<p>
-			N’ayant nullement besoin de tous les caractères exotiques des touches mortes Bépo/Optimot,
-			j’en ai supprimé la majeure partie. Cela me laisse assez de place pour avoir à la fois les
-			ponctuations avec espace insécable automatique en Shift et à la fois les ponctuations seules
-			en AltGr pour la programmation notamment.
+			<Nom /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire
+			drastiquement les distances parcourues pour atteindre certaines touches. Un autre avantage est
+			le fait que cette touche modificatrice est aisément atteingable par le pouce droit sur un
+			clavier standard. Cela permet donc de mettre co doigt à contribution, contrairement à
+			l’AZERTY.
+		</p>
+		<p>
+			N’ayant nullement besoin de tous les caractères exotiques et touches mortes du Bépo et
+			d’Optimot, j’en ai supprimé la majeure partie. Cela laisse assez de place pour ne plus avoir à
+			atteindre la rangée des nombres pour taper des parenthèses, guillemets ou opérateurs
+			mathématiques.
 		</p>
 		<p>
 			Cela fait que je n’ai plus grande utilité des espaces insécables et espaces fines insécables.
