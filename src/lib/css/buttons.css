@@ -25,7 +25,7 @@ kbd, kbd-sortie, kbd-non {
 
 kbd-sortie {
 	background-color: #1a1a1ae5;
-	background-color: hsla(0, 100%, 100%, 90%);
+	background-color: hsla(0, 0%, 100%, 0.9);
 	color: black;
 }
 
@@ -36,9 +36,19 @@ kbd-non {
 
 kbd:active, kbd-sortie:active, kbd-non:active,
 kbd:hover, kbd-sortie:hover, kbd-non:hover {
-box-shadow: rgba(204, 204, 204, 0.7) 0 .766667px 0 0;
-position: relative;
-top: calc(calc(.6*.25vw) - calc(.6*.1vw));
+	box-shadow: rgba(204, 204, 204, 0.7) 0 .766667px 0 0;
+	position: relative;
+	top: calc(calc(.6*.25vw) - calc(.6*.1vw));
+}
+
+section kbd,
+section kbd-non {
+	background-color: hsla(0deg, 0%, 10%, 90%);
+	/* background: linear-gradient(
+		90deg,
+		rgba(0, 0, 50, 1) 0%,
+		rgba(0, 0, 70, 1) 100%
+	); */
 }
 
 

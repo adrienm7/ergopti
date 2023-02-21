@@ -3,6 +3,7 @@
 	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
+	import Sfb from '../lib/composants/SFB.svelte';
 </script>
 
 <div class="fullheight">
@@ -326,10 +327,15 @@
 					Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
 					particularité. Lors de l’utilisation de <kbd>Shift</kbd>, elles sont automatiquement
 					envoyées avec une espace insécable automatique qui les précède. En revanche, avec
-					<kbd>AltGr</kbd>, la ponctuation seule est renvoyée, pour programmation notamment. Cela
+					<kbd>AltGr</kbd>, la ponctuation seule est renvoyée, pour notamment la programmation. Cela
 					permet ainsi d’écrire dans un français impeccable en <kbd>Shift</kbd>, tout en programment
-					normalement avec la couche <kbd>AltGr</kbd> qui contient d’ailleurs tout le reste des symboles
-					nécessaires à l’écriture de code.
+					normalement avec la couche <kbd>AltGr</kbd>, qui contient d’ailleurs tout le reste des
+					symboles nécessaires à l’écriture de code.
+				</p>
+				<p>
+					Ainsi, il est facile de se rappeler où est quoi : <strong
+						>le français en <kbd>Shift</kbd>, la programmation en <kbd>AltGr</kbd></strong
+					>.
 				</p>
 			</div>
 		</section>
@@ -341,17 +347,20 @@
 			</label>
 			<div class="content">
 				<p>
-					Les chiffres sont en accès direct sur les dispositions QWERTY, mais pas en AZERTY. Chaque
-					manière de faire a ses avantages, car en AZERTY les symboles sont alors en accès direct et
-					plus facilement réalisables. En revanche, il devient alors compliqué d’écrire un chiffre
-					ou un nombre en plein milieu de phrase, car cela nécessite de passer en Shift.
+					Les chiffres sont en accès direct sur les dispositions QWERTY ou encore DVORAK, mais pas
+					en AZERTY. Chaque manière de faire a ses avantages, car en AZERTY les symboles sont alors
+					en accès direct et donc plus facilement réalisables. En revanche, il devient compliqué
+					d’écrire un chiffre ou un nombre en plein milieu d’une phrase, car cela nécessite de
+					passer en <kbd>Shift</kbd> momentanément pour écrire le nombre.
 				</p>
 				<p>
-					De plus, une autre de mes modifications est le passage des chiffres en accès direct, car
-					maintenir Shift enfoncé pour écrire rapidement un nombre n’est vraiment pas pratique. J’en
-					profite pour déplacer les caractères qui étaient auparavant en accès direct sur la rangée
-					des chiffres. Ils se retrouvent en AltGr sur les 3 rangées du milieu pour ne pas avoir à
-					trop bouger les doigts.
+					Le passage des chiffres en accès direct permet d’<strong
+						>écrire très rapidement des nombres</strong
+					>
+					en milieu de phrase. La rangée des nombres est de toute façon pas très accessible, donc il
+					faut mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>, plus
+					proches des mains car sur les 3 rangées du milieu pour ne pas avoir à trop bouger les
+					doigts.
 				</p>
 			</div>
 		</section>
@@ -363,28 +372,31 @@
 			</label>
 			<div class="content">
 				<p>
-					Lorsqu’on utilise un ordinateur, la plupart du temps on utilise la souris de la main
-					droite et on garde la main gauche près de la partie gauche du clavier. Lorsqu’il faut
-					rentrer du texte ou taper sur une touche, il est bien souvent nécessaire de ramener la
-					main droite de la souris à la partie droite du clavier, de taper dessus, puis de retourner
-					à sa souris pour continuer la navigation. Par conséquent, il est aussi intéressant de
-					s’assurer que beaucoup d’actions courantes puissent se réaliser avec la seule main gauche.
+					Lorsqu’on utilise un ordinateur, la plupart du temps la souris est tenue de la main droite
+					et la main gauche repose près de la partie gauche du clavier. Lorsqu’il faut rentrer du
+					texte ou taper sur une touche, il est bien souvent nécessaire de ramener la main droite de
+					la souris à la partie droite du clavier, de taper dessus, puis de retourner à sa souris
+					pour continuer la navigation. Par conséquent, il est aussi important de s’assurer que,
+					grâce a sa disposition clavier, beaucoup d’actions courantes puissent se réaliser avec la
+					seule main gauche afin de <strong>ne pas avoir à lâcher la souris</strong>.
 				</p>
 				<p>
-					La disposition ergodox est ainsi complètement optimisée sur ce critère, car des touches <kbd
-						>Copier</kbd
-					>, <kbd>Coller</kbd>, <kbp>Couper</kbp> et <kbd>Alt+Tab</kbd> sont directement inclues à
-					gauche du clavier. La version ISO quant à elle ne peut malhereusement pas bénéficier de
-					ces touches, car les touches à sa gauche sont déjà occupées par les touches
+					La version de <Nom /> adaptée aux claviers de type Ergodox est ainsi complètement optimisée
+					sur ce critère, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
+					<kbd>Alt+Tab</kbd>
+					sont directement inclues à gauche du clavier.
+				</p>
+				<p>
+					La version ISO ne peut quant à elle malheureusement pas bénéficier de ces touches de
+					raccourci, car les touches à sa gauche sont déjà occupées par les touches
 					<kbd>Shift</kbd>, <kbd>Capslock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
 					placer ces touches sous les pouces.
 				</p>
 				<p>
-					De plus, le <kbd>=</kbd> a été dupliqué à gauche en accès direct. Cela permet de faire
-					facilement les raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> + <kbd>=</kbd>.
-					Normalement, le
-					<kbd>=</kbd>
-					se situe en <kbd>AltGr</kbd> + <kbd>L</kbd>.
+					Dans tous les cas, le <kbd>=</kbd> a au moins été dupliqué à gauche en accès direct. Cela
+					permet de faire facilement les raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> +
+					<kbd>=</kbd>. En effet, normalement, le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
+					<kbd>L</kbd>.
 				</p>
 			</div>
 		</section>
@@ -482,12 +494,79 @@
 
 	<h3>Points d’amélioration</h3>
 	<section>
-		<ul class="paragraphe">
-			<li>SC mais parce que c’est à la moins pire position</li>
-			<li>PT</li>
-			<li>EO et OE pour l’anglais</li>
-			<li>K est assez loin, surtout pour l’anglais avec ses SK, CK, etc.</li>
+		<p>
+			Bien que largement supérieure à certaines dispositions telles que l’AZERTY et même le BÉPO, <Nom
+			/> est malheureusement encore loin d’être parfaite. En effet, la création d’une disposition est
+			une affaire de compromis, il est impossible de maximiser tous les aspects, car en maximisant le
+			critère de distance aux touches, le <kbd>E</kbd> serait logiquement sur l’index, voire le
+			pouce. Or, avoir cela engendrera beaucoup plus de <SFB />s, ce qui rendra impossible la
+			maximisation de ce seconde critère.
+		</p>
+		<p>
+			En outre, parfois tous les emplacements sont mauvais pour une touche, et il faut choisir le
+			moins pire. Par conséquent, <Nom /> a évidemment des défauts, dont voici les principaux :
+		</p>
+		<h4>Distances non optimales</h4>
+		<ul class="margin-top-2">
+			<li><kbd>E</kbd> est sur le majeur et non sur l’index</li>
+			<p>
+				Théoriquement, l’index est plus fort et devrait donc être l’endroit idéal pour la lettre <kbd
+					>E</kbd
+				> qui est de loin la lettre la plus fréquente, loin devant la deuxième lettre la plus fréquente
+				de l’alghabet.
+			</p>
 		</ul>
+
+		<h4><SFB />s</h4>
+		<ul class="margin-top-2">
+			<li>
+				<kbd>SC</kbd> engendre beaucoup de <SFB />s, mais c’est à la moins pire combinaison (en
+				fréquence d’apparition, NC > CR > CT > SC) et est en plus sur l’index qui est un doigt fort
+				alors que le pire aurait été que cela soit sur l’annulaire ou l’auriculaire.
+			</li>
+			<li><kbd>PT</kbd></li>
+			<li>
+				<kbd>EO</kbd> et <kbd>OE</kbd> bien qu’inexistants en français, sont relativement fréquents en
+				anglais (people, does)
+			</li>
+			<li>
+				<kbd>K</kbd> est assez loin sur clavier ISO, surtout pour l’anglais avec ses <kbd>SK</kbd>,
+				<kbd>CK</kbd>, etc.
+			</li>
+		</ul>
+
+		<h4>Alternance des mains non maximale</h4>
+		<ul class="margin-top-2">
+			<li>
+				<kbd>W</kbd> devrait théoriquement plutôt être du côté droit du clavier car cette lettre est
+				souvent précédée ou suivie d’une voyelle. Toutefois, la mettre sur l’index gauche permet de
+				mettre cette lettre sur un excellent emplacement tout en n’entrainant aucun <SFB /> supplémentaire
+				sur l’index gauche. Ainsi, la distance des doigts aux touches s’en trouve diminuée, et des roulements
+				très confortables sont introduits.
+			</li>
+		</ul>
+
+		<h4>Autres critiques</h4>
+		<p>
+			Certaines dispositions telles qu’Optimot préfèrent mettre en accès direct l’apostrophe (single
+			quote) plutôt que l’apostrophe typographique. Ceci car elle est souvent remplacée
+			automatiquement dans les éditeurs de texte. Toutefois, ce choix n’a pas été fait dans <Nom /> car
+			de toute manière les guillemets (double quote) sont rendus très accessibles et que la conversion
+			des apostrophes en apostrophes typographiques est loin d’intervenir partout. Par exemple, elle
+			ne se produit pas dans Discord, Messenger, Gmail et bien d’autres sites voire applications.
+		</p>
+		<p>
+			Peu de touches mortes et de couches de symboles. <Nom /> ne se prétend pas être exhaustive en incorporant
+			tous les alphabets des langueus européennes comme le BÉPO, ou encore l’écriture phonétique comme
+			Optimot. Ces couches n’intéressent que peu d’utilisateurs et occupent des emplacements du clavier
+			très accessibles pour une utilisation tê rare. La philosophie derrière <Nom /> est de fournir une
+			base de réflexion, mais pas nécessairement de promouvoir l’utilisation de la disposition « HyperTexte ».
+			Rien ne vaut une disposition créée sur-mesure pour vos usages. Si vous utilisez énormément Latex,
+			peut-être voudrez-vous ramener le \ encore plus proche de vos doigts, en intervertissant les touches
+			<kbd>È</kbd>
+			et <kbd>"</kbd>. De même, si vous voulez écrire régulièrement en allemand, il serait judicieux
+			de mettre la touche morte des trémats à un endroit plus accessible.
+		</p>
 	</section>
 
 	<h2><span class="glow">★</span> Pour aller plus loin</h2>
@@ -498,7 +577,7 @@
 		</p>
 		<p>
 			Cependant, ces excellents résultats sont le fruit d’une fraude. En effet, ils nécessitent
-			d’avoir un logiciel permettant de se faire des raccourcis personnalisés comme AutoHotkey. Il
+			d’avoir un logiciel comme AutoHotkey qui permet de se faire des raccourcis personnalisés. Il
 			faudra aussi accepter d’apprendre des enchaînements de touches supplémentaires.
 		</p>
 	</div>

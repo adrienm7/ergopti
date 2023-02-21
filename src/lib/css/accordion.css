@@ -163,16 +163,7 @@ section .numero-faq:before {
 --profondeur-touche-pressee: 0.5px!important;
 }
 
-.accordion section input:checked ~ .content kbd,
-/* .accordion section input:checked ~ .content kbd-sortie, */
-.accordion section input:checked ~ .content kbd-non {
-	background-color: hsla(0deg, 0%, 10%, 90%);
-	/* background: linear-gradient(
-		90deg,
-		rgba(0, 0, 50, 1) 0%,
-		rgba(0, 0, 70, 1) 100%
-	); */
-}
+
 
 .accordion section input:checked ~ .content kbd-sortie {
 	border: 1px solid rgba(0,0,0,0.3);
