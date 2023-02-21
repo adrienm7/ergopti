@@ -71,7 +71,8 @@ html, body {
 	0 0 12px var(--couleur);
 }
 
-section {
+section p,
+section ul {
 	background-color: white;
 	color: black;
 	padding:20px;
