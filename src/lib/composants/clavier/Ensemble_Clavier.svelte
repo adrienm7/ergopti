@@ -156,17 +156,22 @@
 		let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 
 		// On ajoute une action au clic sur chacune des touches modificatrices
-		for (let toucheModificatrice of [
-			toucheRAlt,
-			toucheLShift,
-			toucheRShift,
-			toucheSpace,
-			toucheA
-		]) {
+		for (let toucheModificatrice of [toucheRAlt, toucheLShift, toucheRShift]) {
 			if (toucheModificatrice !== null) {
 				toucheModificatrice.addEventListener('click', function () {
 					changerCouche(toucheModificatrice);
 				});
+			}
+		}
+
+		// Les boutons de touches modificatrices À et Space ne sont ajoutées que si + est activé
+		if (plus === 'oui') {
+			for (let toucheModificatrice of [toucheSpace, toucheA]) {
+				if (toucheModificatrice !== null) {
+					toucheModificatrice.addEventListener('click', function () {
+						changerCouche(toucheModificatrice);
+					});
+				}
 			}
 		}
 	}
@@ -256,6 +261,10 @@
 	function togglePlus() {
 		if (plus === 'oui') {
 			plus = 'non';
+			if (couche === 'à' || couche === 'layer') {
+				// Dans le cas où l’on est sur une couche spécifique à HyperTexte+, on change la couche pour une qui existe dans la version standard
+				couche = 'Visuel';
+			}
 		} else {
 			plus = 'oui';
 		}
@@ -323,15 +332,17 @@
 		z: 0.09
 	};
 
-	let options = [
+	let couches_standard = [
 		['Visuel', 'Visuel'],
-		['Primary', 'Primary'],
-		['Shift', 'Shift'],
-		['AltGr', 'AltGr'],
-		['Shift + AltGr', 'ShiftAltGr'],
-		['Layer', 'layer'],
-		['Touche À', 'à']
+		['➀ Primaire', 'Primary'],
+		['➁ Shift', 'Shift'],
+		['➂ AltGr', 'AltGr'],
+		['➃ Shift + AltGr', 'ShiftAltGr']
 	];
+	let couches_plus = couches_standard.concat([
+		['★ Layer', 'layer'],
+		['★ Touche À', 'à']
+	]);
 </script>
 
 <ensemble-clavier
@@ -348,9 +359,16 @@
 		<mini-espace />
 		<!-- <Controles_Clavier {emplacement} {type} {couche} {couleur} {plus} {controles} /> -->
 		<controles-clavier class="btn-group">
-			<select bind:value={couche} on:change={() => toggleCouche(couche)}>
-				{#each options as value}<option value={value[1]}>{value[0]}</option>{/each}
-			</select>
+			{#if plus === 'non'}
+				<select bind:value={couche} on:change={() => toggleCouche(couche)}>
+					{#each couches_standard as value}<option value={value[1]}>{value[0]}</option>{/each}
+				</select>
+			{/if}
+			{#if plus === 'oui'}
+				<select bind:value={couche} on:change={() => toggleCouche(couche)}>
+					{#each couches_plus as value}<option value={value[1]}>{value[0]}</option>{/each}
+				</select>
+			{/if}
 			<button on:click={toggleType}>
 				{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
 			</button>
