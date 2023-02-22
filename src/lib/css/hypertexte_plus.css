@@ -1,0 +1,20 @@
+.glow {
+	position: relative;
+	top: 0.07em;
+	left: 0.03em;
+	color: #fff;
+	text-align: center;
+	font-size: 1.2em;
+	font-weight: bold;
+	animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  @-webkit-keyframes glow {
+	from {
+	  text-shadow: 0 0 0 rgba(255, 255, 255, 0), 0 0 0 rgba(255, 255, 255, 0), 0 0 5px #fff, 0 0 10px #fff, 0 0 5px #009de6, 0 0 10px #004de6, 0 0 15px #000ce6, 0 0 20px #0049e6, 0 0 25px #9200e6;
+	}
+	
+	to {
+	  text-shadow: 0 0 1px #fff, 0 0 5px #ff4da6, 0 0 10px #ff4da6;
+	}
+  }

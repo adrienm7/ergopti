@@ -63,18 +63,24 @@ html, body {
 	}
 }
 
-.text-glow {
-	--couleur: rgb(0, 110, 255);
-	/* color: var(--couleur); */
-	text-shadow: 0 0 2px var(--couleur),
-	0 0 6px var(--couleur),
-	0 0 12px var(--couleur);
+
+
+section {
+	background-color: white;
+	color: #333;
+	padding: 20px;
+	border-radius: 5px;
 }
 
-section p,
 section ul {
-	background-color: white;
-	color: black;
-	padding:20px;
-	border-radius:5px;
+	padding-left: 35px;
+}
+
+#clavier-presentation bloc-clavier {
+	--taille-clavier: 0.5;
+}
+@media (max-width: 700px) {
+	#clavier-presentation bloc-clavier {
+		--taille-clavier: 0.9;
+	}
 }
