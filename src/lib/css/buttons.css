@@ -41,8 +41,7 @@ kbd:hover, kbd-sortie:hover, kbd-non:hover {
 	top: calc(calc(.6*.25vw) - calc(.6*.1vw));
 }
 
-section kbd,
-section kbd-non {
+section kbd {
 	background-color: hsla(0deg, 0%, 10%, 90%);
 	/* background: linear-gradient(
 		90deg,
@@ -51,6 +50,9 @@ section kbd-non {
 	); */
 }
 
+section kbd-sortie {
+	border: 1px solid rgba(0,0,0,0.3);
+}
 
 
 .btn-group {
