@@ -101,3 +101,31 @@ section kbd-sortie {
 	background-color: rgba(255, 255, 255, 1);
 	color: rgba(0, 0, 0, 0.8);
 }
+
+
+
+/* Cas où le fond est blanc */
+
+section .btn-group button,
+section .btn-group select {
+	color: #333;
+	border: 2px solid rgba(0, 0, 0, 0.8);
+}
+
+section .btn-group>:first-child {
+	border-left: 2px solid rgba(0, 0, 0, 0.8);
+}
+
+section .btn-group select option {
+	background-color: rgb(0, 0, 0);
+	color: rgb(255, 255, 255);
+}
+
+section .btn-group>:last-child {
+	border-right: 2px solid rgba(0, 0, 0, 0.8);
+}
+
+section .btn-group button:hover {
+	background-color: rgb(0, 0, 0);
+	color: rgba(255, 255, 255, 0.8);
+}

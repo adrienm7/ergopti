@@ -123,7 +123,16 @@
 				de réaliser les bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des
 				roulements, de préférence sur des doigts consécutifs dans un mouvement horizontal.
 			</p>
-
+			<petit-espace />
+			<EnsembleClavier
+				emplacement={'clavier-roulements'}
+				type={'iso'}
+				couche={'Visuel'}
+				couleur={'non'}
+				plus={'non'}
+				controles={'roulements'}
+			/>
+			<petit-espace />
 			<h4>Très bons bigrammes voyelle-voyelle</h4>
 			<ul class="margin-top-2">
 				<li><kbd>AI</kbd></li>
@@ -142,6 +151,12 @@
 			</ul>
 			<h4>Très bons bigrammes consonne-consonne</h4>
 			<ul class="margin-top-2">
+				<li><kbd>SN</kbd></li>
+				<li><kbd>NT</kbd></li>
+				<li><kbd>TR</kbd></li>
+				<li><kbd>RT</kbd></li>
+				<li><kbd>RS</kbd></li>
+				<li><kbd>NS</kbd></li>
 				<li>
 					<kbd>CH</kbd> ce bigramme est extraordinaire, une fois habitué il est difficile de s’en passer
 				</li>

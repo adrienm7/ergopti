@@ -271,32 +271,41 @@
 		majClavier();
 	}
 
-	function taperTexte() {
+	function taperTexte(texte, vitesse, disparition_anciennes_touches) {
 		let emplacementClavier = document.getElementById(emplacement);
-		let texte = ['a', 'd', 'r', 'i', 'e', 'n'];
-		function writeNext(texte, i) {
-			if (i == texte.length) {
-				emplacementClavier
-					.querySelector("bloc-touche[data-touche='" + texte[i - 1] + "']")
-					.classList.remove('touche-active');
-				return;
-			}
 
-			let nouvelleLettre = texte[i];
+		// Nettoyage des touches actives
+		const touchesActives = emplacementClavier.querySelectorAll('.touche-active');
+		[].forEach.call(touchesActives, function (el) {
+			el.classList.remove('touche-active');
+		});
+
+		// let texte = 'test';
+		function writeNext(texte, i) {
+			let nouvelleLettre = texte.charAt(i);
 			emplacementClavier
 				.querySelector("bloc-touche[data-touche='" + nouvelleLettre + "']")
 				.classList.add('touche-active');
 
-			if (i !== 0) {
-				let ancienneLettre = texte[i - 1];
-				emplacementClavier
-					.querySelector("bloc-touche[data-touche='" + ancienneLettre + "']")
-					.classList.remove('touche-active');
+			if (disparition_anciennes_touches) {
+				if (i == texte.length) {
+					emplacementClavier
+						.querySelector("bloc-touche[data-touche='" + texte.charAt(i - 1) + "']")
+						.classList.remove('touche-active');
+					return;
+				}
+
+				if (i !== 0) {
+					let ancienneLettre = texte.charAt(i - 1);
+					emplacementClavier
+						.querySelector("bloc-touche[data-touche='" + ancienneLettre + "']")
+						.classList.remove('touche-active');
+				}
 			}
 
 			setTimeout(function () {
 				writeNext(texte, i + 1);
-			}, 500);
+			}, vitesse);
 		}
 
 		writeNext(texte, 0);
@@ -343,6 +352,10 @@
 		['★ Layer', 'layer'],
 		['★ Touche À', 'à']
 	]);
+
+	let roulements_voyelles = ['ai', 'ie', 'eu', 'io', 'ou', 'oi', 'au', 'aie', 'ieu', 'you'];
+	let roulements_consonnes = ['ch', 'pl', 'ld'];
+	let texte;
 </script>
 
 <ensemble-clavier
@@ -378,7 +391,16 @@
 			<button on:click={toggleCouleur}>
 				{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
 			</button>
-			<button on:click={taperTexte}>T</button>
+		</controles-clavier>
+	{/if}
+	{#if controles === 'roulements'}
+		<controles-clavier class="btn-group">
+			<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
+				{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
+			</select>
+			<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
+				{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
+			</select>
 		</controles-clavier>
 	{/if}
 </ensemble-clavier>
