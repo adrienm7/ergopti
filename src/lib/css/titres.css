@@ -44,15 +44,15 @@ h3 {
 }
 
 h4 {
-	margin-top: 5vh;
-	margin-bottom: 1vh;
+	margin-top: 13vh;
+	margin-bottom: 5vh;
     font-size: 1.5rem;
 }
 
 h2, h3, h4 {
     /* font-weight: bold; */
 	font-weight: normal;
-	line-height: 1.1em;
+	line-height: auto;
 }
 
 

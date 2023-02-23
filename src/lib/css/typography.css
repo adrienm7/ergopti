@@ -1,21 +1,3 @@
-
-
-
-
-
-.contenu {
-    line-height: 1.4;
-    max-width: 800px;
-    max-width: clamp(200px, 90vw, 800px);
-	margin: 0 auto;
-	padding: 0;
-}
-
-
-
-
-
-
 p, 
 ul,
 .tooltiptext {

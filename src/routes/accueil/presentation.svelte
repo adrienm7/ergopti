@@ -15,15 +15,56 @@
 			<h3>Distance des doigts aux touches</h3>
 		</label>
 		<div class="content">
+			<h4>Optimisation de la rangée du milieu</h4>
 			<p>
-				En outre, chaque doigt a une force différente. Ainsi, un pouce a plus de force qu’un index,
-				qui a plus de force qu’un majeur, qui a plus de force qu’un annulaire, qui a plus de force
-				qu’un auriculaire. Par conséquent, les meilleurs emplacements sont ceux sur la rangée de
-				repos, en partant de l’index à l’annulaire. Puis, les meilleurs emplacements seront sur les
-				colonnes au-dessus et en-dessous de la rangée de repos, en partant là encore de l’index à
-				l’annulaire. La rangée des chiffres est donc la moins accessible, c’est pour cela que
-				laisser le <kbd>É</kbd> sur cette ligne comme en AZERTY est une très mauvaise idée, car cette
-				lettre est beaucoup utilisée en français.
+				En dactylographie, il est enseigné que les doigts doivent reposer sur la rangée du milieu (<kbd
+					>QSDF</kbd
+				>
+				et <kbd>JKLM</kbd>
+				en AZERTY). L’idée est de taper une touche, puis de toute suite replacer le doigt sur cette rangée
+				pour être capable de bouger rapidement dans n’importe quelle direction.
+			</p>
+			<p>
+				Il est alors logique de se dire que nos doigts étant la plupart du temps sur la rangée du
+				milieu, autant y placer les lettres les plus fréquemment utilisées. En faisant cela, il n’y
+				a presque plus besoin de bouger les doigts, juste à presser les lettres de la rangée de
+				repos et parfois atteindre la rangée supérieure ou inférieure pour les lettres les moins
+				fréquentes. Pourtant, AZERTY est pire qu’une disposition aléatoire sur ce point : la
+				quasi-totalité des touches les plus utilisées sont sur la rangée du dessus. Effectivement, <kbd
+					>E</kbd
+				>
+				est de loin la lettre la plus fréquente. Viennent ensuite les voyelles <kbd>A</kbd>,
+				<kbd>I</kbd>, <kbd>U</kbd> et <kbd>O</kbd>, ainsi que les consonnes
+				<kbd>S</kbd>, <kbd>N</kbd>, <kbd>T</kbd> et <kbd>R</kbd>.
+			</p>
+			<p>
+				Par conséquent, <Nom /> place évidemment ces lettres sur la rangée du milieu. En résulte la nécessité
+				de beaucoup moins bouger ses doigts et un meilleur confort.
+			</p>
+			<h4>Optimisation selon la force des doigts</h4>
+			<p>
+				Une fois que les lettres les plus fréquentes ont été placées sur la rangée du milieu, il
+				reste encore beaucoup à faire. En effet, chaque doigt a une force différente. Ainsi, un
+				pouce a plus de force qu’un index, qui a plus de force qu’un majeur, qui a plus de force
+				qu’un annulaire, qui a plus de force qu’un auriculaire. Vous pouvez facilement vous en
+				rendre compte en pressant fort de l’index sur une table, puis en essayent de faire de même
+				avec votre auriculaire.
+			</p>
+			<p>
+				Par conséquent, ce constat de la force des doigts pris en compte, les meilleurs emplacements
+				sont ceux sur la rangée de repos, en partant de l’index pour aller vers l’annulaire. Puis,
+				les meilleurs emplacements seront sur les touches au-dessus et en-dessous de la rangée de
+				repos, en partant là encore de l’index pour aller vers l’annulaire.
+			</p>
+			<p>
+				La rangée des chiffres est donc encore moins accessible, car il faut traverser deux rangées
+				depuis la rangée de repos pour l’atteindre. C’est pour cette raison que laisser le <kbd
+					>É</kbd
+				>
+				sur cette ligne comme en AZERTY est une très mauvaise idée, car cette lettre est beaucoup utilisée
+				en français. Par exemple, en français, le <kbd>É</kbd> est 5 fois plus fréquent que le
+				<kbd>J</kbd>, dont la touche est pourtant en AZERTY sur l’un des meilleurs emplacements du
+				clavier : l’index.
 			</p>
 
 			<mini-espace />
@@ -36,6 +77,16 @@
 				plus={'non'}
 				controles={'non'}
 			/>
+			<p>
+				Comme vous pouvez le constater sur le clavier ci-dessus, les lettres les plus fréquentes
+				sont bien sur la rangée du milieu en <Nom />. Effectivement, la lettre la plus fréquente, le
+				<kbd>E</kbd>, est en rouge. Viennent ensuite en orange les voyelles et consonnes les plus
+				fréquentes. Enfin, les lettres en vert, voire bleu, sont les moins fréquentes de toutes.
+			</p>
+			<p>
+				Attention toutefois, car ces fréquences vont varier selon le texte analysé et la langue de
+				celui-ci. Vous trouverez plus de détails sur la page <a href="/benchmarks">Benchmarks</a>.
+			</p>
 		</div>
 	</section>
 	<section>
@@ -46,8 +97,32 @@
 		</label>
 		<div class="content">
 			<p>
-				Lorem, ipsum dolor sit amet consectetur adipisicing elit. Mollitia at exercitationem fuga
-				laudantium commodi alias odio quibusdam praesentium earum impedit?
+				La disposition AZERTY est extrêmement mauvaise au vu de la distance nécessaire pour
+				atteindre les touches les plus fréquentes. Toutefois, c’est loin d’être son seul défaut.
+				L’un de ses autres défauts majeurs est son extrêmement grand nombre de <SFB />s.
+			</p>
+			<p>
+				Qu’est-ce qu’un SFB ? C’est le fait de devoir taper deux touches d’affilée avec exactement
+				le même doigt. Par exemple, c’est taper <kbd>CE</kbd> en AZERTY : il faut d’abord utiliser
+				le majeur gauche pour descendre d’une rangée et atteindre le <kbd>C</kbd>, puis remonter de
+				deux rangées pour atteindre le <kbd>E</kbd>. Avec <Nom />, le <kbd>C</kbd> est sur l’index
+				droit sur la rangée du haut et le <kbd>E</kbd> est directement sur la rangée du milieu, sur
+				le majeur gauche. Il y a donc 3 fois plus de déplacements entre rangées avec AZERTY, et le
+				pire c’est que <kbd>CE</kbd> est une combinaison extrêmement fréquente.
+			</p>
+			<p>
+				Cette combinaison de deux touches est appelée <em>bigramme</em> (ou <em>digramme</em>). Pour
+				optimiser une disposition clavier, il faut s’assurer que les bigrammes les plus fréquents ne
+				se fassent pas avec le même doigt : on parle de limiter les <em>Same Finger Bigrams</em>.
+			</p>
+			<p>
+				Cette tâche est bien plus difficile qu’on le pense, car certaines lettres comme le <kbd
+					>E</kbd
+				>
+				ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
+				regrouper avec les lettres faisant les bigrammes les moins fréquents. Il est donc impossible
+				de réduire totalement les <SFB />s, mais il est tout de même possible de les réduire
+				drastiquement.
 			</p>
 		</div>
 	</section>
@@ -162,8 +237,9 @@
 				</li>
 				<li><kbd>PL</kbd></li>
 				<li>
-					<kbd>LD</kbd> surtout fréquent en anglais (WOU<span class="hyper text-bold">LD</span>, COU<span
+					<kbd>LD</kbd> surtout fréquent en anglais (O<span class="hyper text-bold">LD</span>, COU<span
 						class="hyper text-bold">LD</span
+					>, SHOU<span class="hyper text-bold">LD</span>, WOU<span class="hyper text-bold">LD</span
 					>, etc.)
 				</li>
 			</ul>
@@ -201,11 +277,13 @@
 		</label>
 		<div class="content">
 			<p>
-				Afin de faciliter la mémorisation, les touches sont placées logiquement, en particulier sur
-				la couche <kbd>AltGr</kbd>. Ainsi :
+				Afin de <strong> faciliter la mémorisation</strong> ainsi que de
+				<strong>réduire la charge cognitive</strong>, les touches de la disposition sont, le plus
+				possible, <span style="text-decoration: underline;"> placées logiquement</span>. Ceci en
+				particulier sur la couche <kbd>AltGr</kbd> :
 			</p>
 
-			<ul class="margin-top-2">
+			<ul>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>`</kbd-sortie> car le
 					<span class="hyper text-bold">`</span> est au-dessus du A
@@ -254,10 +332,10 @@
 				</li>
 			</ul>
 
-			<petit-espace />
+			<mini-espace />
 
 			<p>D’autres sont placées par paires l’une à côté de l’autre :</p>
-			<ul class="margin-top-2">
+			<ul>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
 					<kbd>I</kbd>
@@ -298,24 +376,26 @@
 					➜ <kbd-sortie>”</kbd-sortie>
 				</li>
 			</ul>
+			<mini-espace />
 			<p>
 				À noter que les touches sont aussi placées le plus possible par distance selon leur
 				fréquence d’utilisation. Ainsi, les touches très utilisées comme les <kbd>()</kbd>,
 				<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les plus
 				forts.
 			</p>
+			<h4>Ponctuations avec espace insécable automatique</h4>
 			<p>
 				Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
 				particularité. Lors de l’utilisation de <kbd>Shift</kbd>, elles sont automatiquement
-				envoyées avec une espace insécable automatique qui les précède. En revanche, avec
-				<kbd>AltGr</kbd>, la ponctuation seule est renvoyée, pour notamment la programmation. Cela
-				permet ainsi d’écrire dans un français impeccable en <kbd>Shift</kbd>, tout en programment
-				normalement avec la couche <kbd>AltGr</kbd>, qui contient d’ailleurs tout le reste des
-				symboles nécessaires à l’écriture de code.
+				envoyées avec une espace insécable qui les précède. En revanche, avec
+				<kbd>AltGr</kbd>, la ponctuation seule est renvoyée, notamment pour faire de la
+				programmation. Cela permet ainsi d’écrire dans un français impeccable en <kbd>Shift</kbd>,
+				tout en programment normalement avec la couche <kbd>AltGr</kbd>, qui contient d’ailleurs
+				tout le reste des symboles nécessaires à l’écriture de code.
 			</p>
 			<p>
 				Ainsi, il est facile de se rappeler où est quoi : <strong
-					>le français en <kbd>Shift</kbd>, la programmation en <kbd>AltGr</kbd></strong
+					>le français est en <kbd>Shift</kbd>, la programmation est en <kbd>AltGr</kbd></strong
 				>.
 			</p>
 		</div>
@@ -331,17 +411,17 @@
 				Les chiffres sont en accès direct sur les dispositions QWERTY ou encore DVORAK, mais pas en
 				AZERTY. Chaque manière de faire a ses avantages, car en AZERTY les symboles sont alors en
 				accès direct et donc plus facilement réalisables. En revanche, il devient compliqué d’écrire
-				un chiffre ou un nombre en plein milieu d’une phrase, car cela nécessite de passer en <kbd
-					>Shift</kbd
-				> momentanément pour écrire le nombre.
+				un nombre en plein milieu d’une phrase, car cela nécessite de passer en <kbd>Shift</kbd> momentanément
+				pour l’écrire.
 			</p>
 			<p>
 				Le passage des chiffres en accès direct permet d’<strong
 					>écrire très rapidement des nombres</strong
 				>
-				en milieu de phrase. La rangée des nombres est de toute façon pas très accessible, donc il faut
-				mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>, plus proches des
-				mains car sur les 3 rangées du milieu pour ne pas avoir à trop bouger les doigts.
+				en milieu de phrase. La rangée des nombres n’est de toute façon pas très accessible, donc il
+				vaut mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>, plus
+				proches des mains car sur les 3 rangées du milieu pour ne pas avoir à trop bouger les
+				doigts.
 			</p>
 		</div>
 	</section>
@@ -353,13 +433,17 @@
 		</label>
 		<div class="content">
 			<p>
-				Lorsqu’on utilise un ordinateur, la plupart du temps la souris est tenue de la main droite
-				et la main gauche repose près de la partie gauche du clavier. Lorsqu’il faut rentrer du
-				texte ou taper sur une touche, il est bien souvent nécessaire de ramener la main droite de
-				la souris à la partie droite du clavier, de taper dessus, puis de retourner à sa souris pour
-				continuer la navigation. Par conséquent, il est aussi important de s’assurer que, grâce a sa
-				disposition clavier, beaucoup d’actions courantes puissent se réaliser avec la seule main
-				gauche afin de <strong>ne pas avoir à lâcher la souris</strong>.
+				Lors de l’utilisation d’un ordinateur, la plupart du temps la souris est tenue de la main
+				droite et la main gauche repose près de la partie gauche du clavier. Lorsqu’il faut rentrer
+				du texte ou taper sur une touche, il est bien souvent nécessaire de ramener la main droite
+				de la souris à la partie droite du clavier, de taper dessus, puis de retourner à sa souris
+				pour continuer la navigation.
+			</p>
+			<p>
+				Par conséquent, il est aussi important de s’assurer que, grâce à sa disposition clavier,
+				beaucoup d’actions courantes puissent se réaliser avec la seule main gauche afin de <strong
+					>ne pas avoir à lâcher la souris</strong
+				>.
 			</p>
 			<p>
 				La version de <Nom /> adaptée aux claviers de type Ergodox est ainsi complètement optimisée sur
@@ -370,8 +454,9 @@
 			<p>
 				La version ISO ne peut quant à elle malheureusement pas bénéficier de ces touches de
 				raccourci, car les touches à sa gauche sont déjà occupées par les touches
-				<kbd>Shift</kbd>, <kbd>Capslock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
-				placer ces touches sous les pouces.
+				<kbd>Shift</kbd>, <kbd>Capslock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on
+				peut placer ces touches sous les pouces. <Nom_Plus /> donne toutefois le moyen de contourner
+				ces limites.
 			</p>
 			<p>
 				Dans tous les cas, le <kbd>=</kbd> a au moins été dupliqué à gauche en accès direct. Cela
