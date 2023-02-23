@@ -42,7 +42,6 @@ section .numero-faq:before {
 	overflow: hidden;
 	background: #fff;
 	border: 1px solid white;
-	box-shadow: 0 0 5px rgba(255, 255, 255, 1);
 }
 
 .accordion section input {

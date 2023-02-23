@@ -2,7 +2,7 @@ main p:not(:first-child){
 	margin-top: 1rem;
 }
 
-.margin-top-2 li {
+section ul li {
 	margin-top: 1rem; /* Cela doit être assez élevé car les touches de clavier sont hautes */
 }
 

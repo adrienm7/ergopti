@@ -12,7 +12,7 @@ bloc-clavier {
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
     --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
 
-    --couleur-touche-saturation: 70%;
+    --couleur-touche-saturation: 80%;
     --couleur-touche-luminosite: 70%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
 	--transparence-touche: 15%;

@@ -32,7 +32,7 @@
 			<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
 			Fruit de nombreux tests et réflexions, elle se veut la plus
 			<span class="text-glow">optimale</span>
-			possible. Cette page vous présentera la disposition ainsi que ses nombreux avantages.
+			possible. Cette page vous présente la disposition ainsi que ses nombreux avantages.
 		</p>
 	</div>
 
@@ -51,6 +51,10 @@
 			d’avoir un logiciel comme AutoHotkey qui permet de se faire des raccourcis personnalisés. Il
 			faudra aussi accepter d’apprendre des enchaînements de touches supplémentaires.
 		</p>
+		<mini-espace />
+		<a href="/hypertexte-plus" style="text-decoration: none"
+			><button style="display:block; margin: 0 auto;"><Nom_Plus /></button></a
+		>
 	</div>
 </div>
 

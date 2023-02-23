@@ -54,7 +54,10 @@ section kbd-sortie {
 	border: 1px solid rgba(0,0,0,0.3);
 }
 
-
+button {
+	cursor: pointer;
+	padding: 7px;
+}
 .btn-group {
 	--arrondi-bouton: 7px;
 	margin: 0 auto;
