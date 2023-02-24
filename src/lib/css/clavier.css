@@ -81,6 +81,7 @@ bloc-touche {
     color: var(--couleur-texte-touche);
     cursor: pointer;
     font-size: var(--taille-texte-touche);
+	font-weight: 300;
 }
 
 bloc-touche[data-touche=""] {
@@ -94,7 +95,7 @@ bloc-touche:hover,
     top: var(--descente-touche);
     box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 1px #00000077;
 	color:black!important;
-	background-color: rgba(255, 255, 255, 0.75)!important;
+	background-color: rgba(255, 255, 255, 0.85)!important;
 	/* --couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-pressee-luminosite), var(--transparence-touche-pressee)); */
 }
 
@@ -113,17 +114,6 @@ bloc-touche:hover,
 */
 
 
-
-bloc-touche[data-touche="’"] div,
-bloc-touche[data-touche="!"] div {
-    line-height: 1.3;
-}
-
-bloc-touche[data-touche="AltTab"] div {
-	font-size: calc(var(--taille-texte-touche) / 1.8);
-	line-height: 1.15;
-}
-
 bloc-touche[data-touche="LAlt"] div,
 bloc-touche[data-touche="RAlt"] div,
 bloc-touche[data-touche="LCtrl"] div,
@@ -135,16 +125,52 @@ bloc-touche[data-touche="Option"] div {
 	font-weight: normal;
 }
 
+bloc-touche[data-touche="RShift"] div,
+bloc-touche[data-touche="LShift"] div {
+	font-weight: bold;
+}
+
+bloc-touche[data-touche="AltTab"] div {
+	font-size: calc(var(--taille-texte-touche) / 1.8);
+	line-height: 1.15;
+}
+
+
+
+
+
+/* ======= HyperTexte + ======= */
+
+
+
+/* Hold-tap */
+
 ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LShift"],
 ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LCtrl"],
 ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LAlt"],
-ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="RAlt"] div {
+ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="RAlt"] {
     line-height: 1.1;
     font-size: calc(var(--taille-texte-touche) * 0.7);
 }
 
 .tap {
 	color: rgb(5, 121, 210);
+}
+
+
+
+/* Corrections localisées */
+
+ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="y"] div {
+	font-size: 1.8em;
+}
+
+ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="CapsLock"] div {
+	font-size: 0.7em;
+}
+
+ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="Tab"] div {
+	font-size: 0.6em;
 }
 
 
@@ -164,8 +190,10 @@ ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="double"] div {
     font-size: calc(var(--taille-texte-touche) * 0.7);
 }
 
-ensemble-clavier[data-couche="Visuel"][data-plus="oui"] bloc-touche[data-touche="q"] div {
+ensemble-clavier[data-couche="Visuel"][data-plus="oui"] bloc-touche[data-touche="q"] div,
+ensemble-clavier[data-couche="Shift"][data-plus="oui"] bloc-touche[data-touche="q"] div {
 	text-transform: capitalize;
+	font-size: 0.9em;
 }
 
 ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="Space"] div::before {
@@ -180,18 +208,6 @@ ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="Space"] div::bef
 
 /* ======= Corrections localisées ======= */
 
-
-ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="y"] div {
-	font-size: 1.8em;
-}
-
-ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="CapsLock"] div {
-	font-size: 0.7em;
-}
-
-ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="Tab"] div {
-	font-size: 0.6em;
-}
 
 ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="à"] div,
 ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="c"] div,
@@ -249,6 +265,7 @@ bloc-touche[data-type="enter"]{
 
 
 bloc-touche[data-type="enter"] div {
+	font-weight: normal;
     z-index: 3;
 }
 
