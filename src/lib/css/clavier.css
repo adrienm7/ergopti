@@ -124,12 +124,6 @@ bloc-touche[data-touche="AltTab"] div {
 	line-height: 1.15;
 }
 
-bloc-touche[data-touche="LShift"] div,
-bloc-touche[data-touche="RShift"] div,
-bloc-touche[data-touche="CapsLock"] div {
-    font-weight: bold;
-}
-
 bloc-touche[data-touche="LAlt"] div,
 bloc-touche[data-touche="RAlt"] div,
 bloc-touche[data-touche="LCtrl"] div,
@@ -138,6 +132,19 @@ bloc-touche[data-touche="Space"] div,
 bloc-touche[data-touche="Win"] div,
 bloc-touche[data-touche="Option"] div {
     font-size: calc(var(--taille-texte-touche) * 0.7);
+	font-weight: normal;
+}
+
+ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LShift"],
+ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LCtrl"],
+ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LAlt"],
+ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="RAlt"] div {
+    line-height: 1.1;
+    font-size: calc(var(--taille-texte-touche) * 0.7);
+}
+
+.tap {
+	color: rgb(5, 121, 210);
 }
 
 
@@ -164,6 +171,7 @@ ensemble-clavier[data-couche="Visuel"][data-plus="oui"] bloc-touche[data-touche=
 ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="Space"] div::before {
 	content: "HyperTexte v.1.0";
 	color:hsl(0, 0, 30%);
+	font-weight: 300;
 }
 
 

@@ -372,6 +372,15 @@
 		<mini-espace />
 		<!-- <Controles_Clavier {emplacement} {type} {couche} {couleur} {plus} {controles} /> -->
 		<controles-clavier class="btn-group">
+			<button on:click={toggleCouleur}>
+				{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
+			</button>
+			<button on:click={toggleType}>
+				{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
+			</button>
+			<button on:click={togglePlus}>
+				{plus === 'oui' ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
+			</button>
 			{#if plus === 'non'}
 				<select bind:value={couche} on:change={() => toggleCouche(couche)}>
 					{#each couches_standard as value}<option value={value[1]}>{value[0]}</option>{/each}
@@ -382,15 +391,6 @@
 					{#each couches_plus as value}<option value={value[1]}>{value[0]}</option>{/each}
 				</select>
 			{/if}
-			<button on:click={toggleType}>
-				{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
-			</button>
-			<button on:click={togglePlus}>
-				{plus === 'oui' ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
-			</button>
-			<button on:click={toggleCouleur}>
-				{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
-			</button>
 		</controles-clavier>
 	{/if}
 	{#if controles === 'roulements'}
