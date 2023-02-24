@@ -878,7 +878,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "copier",
+			"touche": "Copier",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -886,7 +886,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "coller",
+			"touche": "Coller",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -894,7 +894,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "couper",
+			"touche": "Couper",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "4",
@@ -1497,22 +1497,29 @@
 		{
 			"touche": "LShift",
 			"Primary": "⇧",
+			"Primary+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Shift": "⇧",
+			"Shift+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"AltGr": "⇧",
-			"AltGr+": ".␣⇧",
+			"AltGr+": ". ␣ ⇧",
 			"ShiftAltGr": "⇧",
-			"layer": "⇧",
-			"à": "⇧",
+			"ShiftAltGr+": "⇧<br><span class='tap'>Ⓒ</span>",
+			"layer": "⇧<br><span class='tap'>Ⓒ</span>",
+			"à": "⇧<br><span class='tap'>Ⓒ</span>",
 			"type": "special"
 		},
 		{
 			"touche": "LCtrl",
 			"Primary": "Ctrl",
+			"Primary+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Shift": "Ctrl",
+			"Shift+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"AltGr": "Ctrl",
+			"AltGr+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"ShiftAltGr": "Ctrl",
-			"layer": "Ctrl",
-			"à": "Ctrl",
+			"ShiftAltGr+": "Ctrl<br><span class='tap'>Ⓥ</span>",
+			"layer": "Ctrl<br><span class='tap'>Ⓥ</span>",
+			"à": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"type": "special"
 		},
 		{
@@ -1528,21 +1535,29 @@
 		{
 			"touche": "LAlt",
 			"Primary": "Alt",
+			"Primary+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Shift": "Alt",
+			"Shift+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"AltGr": "Alt",
+			"AltGr+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"ShiftAltGr": "Alt",
-			"layer": "Alt",
-			"à": "Alt",
+			"ShiftAltGr+": "Alt<br><span class='tap'>Alt ↹</span>",
+			"layer": "Alt<br><span class='tap'>Alt ↹</span>",
+			"à": "Alt<br><span class='tap'>Alt ↹</span>",
 			"type": "special"
 		},
 		{
 			"touche": "RAlt",
 			"Primary": "AltGr",
+			"Primary+": "AltGr<br><span class='tap'>↩</span>",
 			"Shift": "AltGr",
+			"Shift+": "AltGr<br><span class='tap'>↩</span>",
 			"AltGr": "AltGr",
+			"AltGr+": "AltGr<br><span class='tap'>↩</span>",
 			"ShiftAltGr": "AltGr",
-			"layer": "AltGr",
-			"à": "AltGr",
+			"ShiftAltGr+": "AltGr<br><span class='tap'>↩</span>",
+			"layer+": "AltGr<br><span class='tap'>↩</span>",
+			"à": "AltGr<br><span class='tap'>↩</span>",
 			"type": "special"
 		},
 		{
@@ -1607,7 +1622,7 @@
 			"type": "special"
 		},
 		{
-			"touche": "copier",
+			"touche": "Copier",
 			"Primary": "Ⓒ",
 			"Shift": "Ⓒ",
 			"AltGr": "Ⓒ",
@@ -1617,7 +1632,7 @@
 			"type": "special"
 		},
 		{
-			"touche": "coller",
+			"touche": "Coller",
 			"Primary": "Ⓥ",
 			"Shift": "Ⓥ",
 			"AltGr": "Ⓥ",
@@ -1627,7 +1642,7 @@
 			"type": "special"
 		},
 		{
-			"touche": "couper",
+			"touche": "Couper",
 			"Primary": "Ⓧ",
 			"Shift": "Ⓧ",
 			"AltGr": "Ⓧ",
@@ -1638,12 +1653,12 @@
 		},
 		{
 			"touche": "AltTab",
-			"Primary": "Alt<br>Tab",
-			"Shift": "Alt<br>Tab",
-			"AltGr": "Alt<br>Tab",
-			"ShiftAltGr": "Alt<br>Tab",
-			"layer": "Alt<br>Tab",
-			"à": "Alt<br>Tab",
+			"Primary": "Alt<br><span class='tap'></span>Tab",
+			"Shift": "Alt<br><span class='tap'></span>Tab",
+			"AltGr": "Alt<br><span class='tap'></span>Tab",
+			"ShiftAltGr": "Alt<br><span class='tap'></span>Tab",
+			"layer": "Alt<br><span class='tap'></span>Tab",
+			"à": "Alt<br><span class='tap'></span>Tab",
 			"type": "special"
 		},
 		{
