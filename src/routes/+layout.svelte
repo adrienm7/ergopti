@@ -52,13 +52,13 @@
 	#afficher-clavier-reference {
 		position: fixed;
 		z-index: 101;
-		bottom: 20px;
-		right: 20px;
+		bottom: 1rem;
+		right: 1rem;
 		padding: 12px;
 		cursor: pointer;
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
-		font-size: 1.3rem;
+		font-size: 1.5rem;
 		box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
 	}
 
