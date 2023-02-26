@@ -204,7 +204,7 @@
 				type={'iso'}
 				couche={'Visuel'}
 				couleur={'non'}
-				plus={'non'}
+				plus={'oui'}
 				controles={'roulements'}
 			/>
 			<petit-espace />
@@ -260,12 +260,10 @@
 					<span class="hyper text-bold">WO</span>RTH, <span class="hyper text-bold">WO</span>ULD,
 					etc.)
 				</li>
-				<li><kbd>+=</kbd> utilisé en programmation pour incrémenter</li>
-
 				<li>
-					<kbd>/*</kbd> et <kbd>*/</kbd> utilisés dans certains langages de programmation pour commenter
-					du code
+					<kbd>="</kbd> utilisé en programmation pour assigner une chaîne de caractères à une variable
 				</li>
+				<li><kbd>+=</kbd> utilisé en programmation pour incrémenter</li>
 			</ul>
 		</div>
 	</section>
@@ -310,8 +308,12 @@
 					car le <span class="hyper text-bold">\</span> est au-dessus du E
 				</li>
 				<li>
+					<kbd>AltGr</kbd> + <kbd>F</kbd> ➜ <kbd-sortie>*</kbd-sortie>
+					car c’est la première lettre de <span class="hyper text-bold">F</span>ois
+				</li>
+				<li>
 					<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-sortie>#</kbd-sortie>
-					car c’est le première lettre de <span class="hyper text-bold">H</span>ashtag
+					car c’est la première lettre de <span class="hyper text-bold">H</span>ashtag
 				</li>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-sortie>=</kbd-sortie> car éga<span
@@ -324,7 +326,7 @@
 				</li>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>P</kbd> ➜ <kbd-sortie>+</kbd-sortie>
-					car c’est le première lettre de <span class="hyper text-bold">P</span>lus
+					car c’est la première lettre de <span class="hyper text-bold">P</span>lus
 				</li>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> car c’est la barre
@@ -382,6 +384,12 @@
 				fréquence d’utilisation. Ainsi, les touches très utilisées comme les <kbd>()</kbd>,
 				<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les plus
 				forts.
+			</p>
+			<p>
+				Le <kbd>$</kbd> est l’un des seuls symboles à ne pas être sur un emplacement logique (le
+				<kbd>D</kbd>
+				de <span class="hyper text-bold">D</span>ollar). Ceci parce qu’il est plus intéressant de
+				mettre le <kbd>"</kbd> sur cette lettre, afin d’avoir un excellent roulement <kbd>="</kbd>.
 			</p>
 			<h4>Ponctuations avec espace insécable automatique</h4>
 			<p>

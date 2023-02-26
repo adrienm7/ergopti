@@ -26,6 +26,7 @@
 		<li>Bépo, puis Optimot, puis Optim7 puis HyperTexte</li>
 		<li>E sur le majeur et non l’index à cause des roulements et <SFB />s</li>
 		<li>Q puis P puis W sur l’index gauche</li>
+		<li>É sur l’index, puis création de la touche ★</li>
 		<li>Comment retenir les symboles en AltGr</li>
 	</ul>
 	<p>

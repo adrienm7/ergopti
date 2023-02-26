@@ -1,9 +1,9 @@
 <script>
 	import { sendEmail } from '$lib/js/sendEmail';
 
-	let name = '';
-	let email = '';
-	let message = '';
+	let name = 'Moi';
+	let email = 'ieau@eua.fr';
+	let message = 'ieau ,ighta';
 	let sent = false;
 
 	const onSubmit = async (event) => {
