@@ -150,8 +150,11 @@ ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="magique"] div {
 
 
 /* Style de toutes les touches qui changent avec HyperTexte+ */
-ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"] {
-	background-color: rgb(25, 0, 40);
+
+ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"]{
+	--couleur-touche: 270deg;
+	--couleur-touche-saturation: 100%;
+	--couleur-touche-luminosite: 80%;
 }
 
 
@@ -242,7 +245,7 @@ ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="i"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","] {
-	--transparence-touche: 5%;
+	--couleur-touche-luminosite: 70%;
 	--couleur-touche-saturation: 0%;
 }
 
@@ -414,8 +417,7 @@ ensemble-clavier[data-couleur="freq"] bloc-touche {
     --couleur-touche-luminosite: 100%;
 }
 
-ensemble-clavier[data-couleur="non"] bloc-touche[data-type="space"],
-ensemble-clavier[data-couleur="freq"] bloc-touche[data-type="space"]{
+ensemble-clavier bloc-touche[data-type="space"] {
 	background-color: var(--couleur-fond-touche);
 }
 
