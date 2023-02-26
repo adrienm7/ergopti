@@ -142,6 +142,19 @@ bloc-touche[data-touche="AltTab"] div {
 /* ======= HyperTexte + ======= */
 
 
+ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="lettre"] div,
+ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="français"] div,
+ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="magique"] div {
+	text-transform: uppercase;
+}
+
+
+/* Style de toutes les touches qui changent avec HyperTexte+ */
+ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"] {
+	background-color: rgb(25, 0, 40);
+}
+
+
 
 /* Hold-tap */
 
@@ -209,37 +222,35 @@ ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="Space"] div::bef
 /* ======= Corrections localisées ======= */
 
 
-ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="à"] div,
-ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="c"] div,
-ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="d"] div,
-ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="’"] div,
-ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="w"] div,
-ensemble-clavier[data-couche="layer"] bloc-touche[data-touche="x"] div {
+ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="à"] div,
+ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="c"] div,
+ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="d"] div,
+ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="'"] div,
+ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="w"] div,
+ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="x"] div {
 	font-size: 0.8em;
 }
 
 
-/* Car les glyphes des touches mortes s’affichent mal sinon */
-bloc-touche[data-touche="CapsLock"] div,
-bloc-touche[data-touche="Enter"] div,
-ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"] div,
-ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"] div,
-ensemble-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"] div {
-	font-weight: normal;
-}
-
-
 /* Affichage différent pour les touches mortes */
+ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
-ensemble-clavier[data-couche="AltGr"] bloc-touche[data-touche="j"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="b"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="a"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="i"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"] {
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","] {
 	--transparence-touche: 5%;
 	--couleur-touche-saturation: 0%;
+}
+
+/* Car les glyphes des touches mortes s’affichent mal sinon */
+ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","] {
+	font-weight: normal;
 }
 
 
@@ -390,11 +401,6 @@ bloc-touche[data-type="special"]:not(.touche-active):hover,
 bloc-touche[data-type="special"]:not(.touche-active):active {
 	background-color: rgb(14, 14, 14)!important;
 	color: white!important;
-}
-
-bloc-touche[data-type="space"]:not(.touche-active) {
-	background-color: rgba(255, 255, 255, 0.1)!important;
-	color: var(--couleur-texte-touche)!important;
 }
 
 

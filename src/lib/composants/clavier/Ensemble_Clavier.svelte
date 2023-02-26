@@ -47,6 +47,7 @@
 
 				if (res !== undefined) {
 					const contenuTouche = data.touches.find((el) => el.touche == res.touche);
+					toucheClavier.dataset.plus = 'non';
 					if (contenuTouche[couche] === '') {
 						toucheClavier.innerHTML = '<div> <div>';
 					} else {
@@ -76,6 +77,7 @@
 									if (contenuTouche['Primary' + '+'] !== undefined) {
 										// Si la couche + existe
 										toucheClavier.innerHTML = '<div>' + contenuTouche['Primary' + '+'] + '</div>';
+										toucheClavier.dataset.plus = 'oui';
 									} else {
 										toucheClavier.innerHTML = '<div>' + contenuTouche['Primary'] + '</div>';
 									}
@@ -88,6 +90,7 @@
 							if (plus === 'oui') {
 								if (contenuTouche[couche + '+'] !== undefined) {
 									toucheClavier.innerHTML = '<div>' + contenuTouche[couche + '+'] + '</div>';
+									toucheClavier.dataset.plus = 'oui';
 								} else {
 									toucheClavier.innerHTML = '<div>' + contenuTouche[couche] + '</div>';
 								}
@@ -117,6 +120,8 @@
 	function activeModificateurs() {
 		let lShift = document.getElementById(emplacement).querySelector("[data-touche='LShift']");
 		let rShift = document.getElementById(emplacement).querySelector("[data-touche='RShift']");
+		let lCtrl = document.getElementById(emplacement).querySelector("[data-touche='LCtrl']");
+		let rCtrl = document.getElementById(emplacement).querySelector("[data-touche='RCtrl']");
 		let altGr = document.getElementById(emplacement).querySelector("[data-touche='RAlt']");
 		let aGrave = document.getElementById(emplacement).querySelector("[data-touche='à']");
 		let space = document.getElementById(emplacement).querySelector("[data-touche='Space']");
@@ -126,6 +131,12 @@
 		}
 		if ((couche === 'Shift') & (rShift !== null)) {
 			rShift.classList.add('touche-active');
+		}
+		if ((couche === 'Ctrl') & (lCtrl !== null)) {
+			lCtrl.classList.add('touche-active');
+		}
+		if ((couche === 'Ctrl') & (rCtrl !== null)) {
+			rCtrl.classList.add('touche-active');
 		}
 		if ((couche === 'AltGr') & (altGr !== null)) {
 			altGr.classList.add('touche-active');
@@ -139,10 +150,10 @@
 		if ((couche === 'ShiftAltGr') & (altGr !== null)) {
 			altGr.classList.add('touche-active');
 		}
-		if ((couche === 'à') & (aGrave !== null)) {
+		if ((couche === 'À') & (aGrave !== null)) {
 			aGrave.classList.add('touche-active');
 		}
-		if ((couche === 'layer') & (space !== null)) {
+		if ((couche === 'Layer') & (space !== null)) {
 			space.classList.add('touche-active');
 		}
 	}
@@ -152,11 +163,19 @@
 		let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 		let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
 		let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
+		let toucheLCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='LCtrl']");
+		let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
 		let toucheSpace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
 		let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 
 		// On ajoute une action au clic sur chacune des touches modificatrices
-		for (let toucheModificatrice of [toucheRAlt, toucheLShift, toucheRShift]) {
+		for (let toucheModificatrice of [
+			toucheRAlt,
+			toucheLShift,
+			toucheRShift,
+			toucheLCtrl,
+			toucheRCtrl
+		]) {
 			if (toucheModificatrice !== null) {
 				toucheModificatrice.addEventListener('click', function () {
 					changerCouche(toucheModificatrice);
@@ -210,25 +229,32 @@
 			nouvelleCouche = 'AltGr';
 		} else if (
 			((touchePressee === 'LShift') | (touchePressee === 'RShift')) &
-			(coucheActuelle === 'à')
+			(coucheActuelle === 'À')
 		) {
 			nouvelleCouche = 'Shift';
 		} else if ((touchePressee === 'LShift') | (touchePressee === 'RShift')) {
 			nouvelleCouche = 'Shift';
 		}
 
-		// Touche pressée = Space (pour accéder au layer)
-		if ((touchePressee === 'Space') & (coucheActuelle === 'layer')) {
+		// Touche pressée = Ctrl
+		if (((touchePressee === 'LCtrl') | (touchePressee === 'RCtrl')) & (coucheActuelle !== 'Ctrl')) {
+			nouvelleCouche = 'Ctrl';
+		} else if ((touchePressee === 'LCtrl') | (touchePressee === 'RCtrl')) {
+			nouvelleCouche = 'Visuel';
+		}
+
+		// Touche pressée = Space (pour accéder au Layer)
+		if ((touchePressee === 'Space') & (coucheActuelle === 'Layer')) {
 			nouvelleCouche = 'Visuel';
 		} else if (touchePressee === 'Space') {
-			nouvelleCouche = 'layer';
+			nouvelleCouche = 'Layer';
 		}
 
 		// Touche pressée = À
-		if ((touchePressee === 'à') & (coucheActuelle === 'à')) {
+		if ((touchePressee === 'à') & (coucheActuelle === 'À')) {
 			nouvelleCouche = 'Visuel';
 		} else if (touchePressee === 'à') {
-			nouvelleCouche = 'à';
+			nouvelleCouche = 'À';
 		}
 
 		// Une fois que la nouvelle couche est déterminée, on actualise le clavier
@@ -261,7 +287,7 @@
 	function togglePlus() {
 		if (plus === 'oui') {
 			plus = 'non';
-			if (couche === 'à' || couche === 'layer') {
+			if (couche === 'À' || couche === 'Layer') {
 				// Dans le cas où l’on est sur une couche spécifique à HyperTexte+, on change la couche pour une qui existe dans la version standard
 				couche = 'Visuel';
 			}
@@ -342,15 +368,16 @@
 	};
 
 	let couches_standard = [
-		['Visuel', 'Visuel'],
 		['➀ Primaire', 'Primary'],
 		['➁ Shift', 'Shift'],
 		['➂ AltGr', 'AltGr'],
-		['➃ Shift + AltGr', 'ShiftAltGr']
+		['➃ Shift + AltGr', 'ShiftAltGr'],
+		['Visuel', 'Visuel'],
+		['Ctrl', 'Ctrl']
 	];
 	let couches_plus = couches_standard.concat([
-		['★ Layer', 'layer'],
-		['★ Touche À', 'à']
+		['★ Layer', 'Layer'],
+		['★ Touche À', 'À']
 	]);
 
 	let roulements_voyelles = ['ai', 'ie', 'eu', 'io', 'ou', 'oi', 'au', 'aie', 'ieu', 'you'];
