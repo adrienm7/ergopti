@@ -6,13 +6,16 @@
 </script>
 
 <h2>Genèse et raison des choix</h2>
+<h3>Genèse</h3>
 <section>
 	<p>
-		Les améliorations d’Optimot par rapport au Bépo sont vraiment significatives. Les tests sont
-		sans appel et montrent notamment une nette diminution des bigrammes à un doigt (SFBs).
+		Les améliorations de la disposition Optimot par rapport au BÉPO sont vraiment significatives.
+		Les tests sont sans appel et montrent notamment une nette diminution des bigrammes à un doigt (<SFB
+		/>s).
 	</p>
 	<p>
-		Après beaucoup d’hésitation à passer du Bépo à Optimot, j’ai voulu d’abord être certain que
+		J’ai eu beaucoup d’hésitations à passer du BÉPO, qui était la disposition que j’utilisais depuis
+		plusieurs années, à Optimot. Avant de changer, j’ai voulu d’abord être certain que
 		l’apprentissage de cette nouvelle disposition serait le dernier. C’est pourquoi j’ai décidé de
 		regarder par moi-même si Optimot pouvait éventuellement encore être améliorée avant de faire mon
 		choix.
@@ -22,15 +25,20 @@
 		ne seront probablement pas les votres. Toutefois, cela vous donnera probablement des idées si vous
 		comptez choisir une nouvelle disposition voire en créer une.
 	</p>
-	<ul class="paragraphe">
-		<li>Bépo, puis Optimot, puis Optim7 puis HyperTexte</li>
-		<li>E sur le majeur et non l’index à cause des roulements et <SFB />s</li>
-		<li>Q puis P puis W sur l’index gauche</li>
-		<li>É sur l’index, puis création de la touche ★</li>
-		<li>Comment retenir les symboles en AltGr</li>
-	</ul>
+</section>
+<h3>Historique des modifications</h3>
+<section>
 	<p>
-		La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
+		Au départ, le nom de ma disposition dérivée d’Optimot était appelée <em>Optim7</em>. Cependant,
+		passé un certain cap, ce nom a été changé en <Nom />. La disposition a beaucoup évoluée au fil
+		du temps. En particulier, la touche sur l’index gauche a plusieur fois changé :
+		<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd> et enfin la création d’une touche spéciale
+		<kbd>★</kbd> et de déplacement de <kbd>É</kbd> sur l’annulaire gauche.
+	</p>
+
+	<h3>Comment la disposition a été créée</h3>
+	<p>
+		➀ La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
 		: main gauche et main droite.
 	</p>
 	<p>
@@ -47,13 +55,14 @@
 		besoin de caractères supplémentaires comme les accents en français.
 	</p>
 	<p>
-		La deuxième étape dans la création de la disposition a été de placer les touches les plus
+		➁ La deuxième étape dans la création de la disposition a été de placer les touches les plus
 		souvent utilisées les plus proches possible des doigts. Les doigts sont effectivement toujours
 		censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est donc logique de
 		chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les déplacements
 		des doigts aux touches.
 	</p>
 </section>
+
 <h3>Utilisation de la couche AltGr</h3>
 <section>
 	<p>

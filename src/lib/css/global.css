@@ -27,7 +27,6 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", Arial, sans-serif;
     font-size: 100%;
     font-size: clamp(16px, 1.5vw, 24px);
-	line-height: 1.35rem;
     scroll-behavior: smooth;
 	color: black;
 }

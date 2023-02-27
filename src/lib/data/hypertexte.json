@@ -1321,7 +1321,7 @@
 			"Shift": "’",
 			"AltGr": "$",
 			"ShiftAltGr": "§",
-			"Ctrl": " ",
+			"Ctrl": "⌫",
 			"Ctrl+": "s",
 			"Layer": "!⇩",
 			"À": "j",
@@ -1366,8 +1366,7 @@
 			"Shift": "É",
 			"AltGr": "/",
 			"ShiftAltGr": "÷",
-			"Ctrl": "é",
-			"Ctrl+": "+",
+			"Ctrl": "+",
 			"Layer": "+!⇩",
 			"À": "jé",
 			"type": "français"
@@ -1378,8 +1377,7 @@
 			"Shift": "È",
 			"AltGr": "\\",
 			"ShiftAltGr": "",
-			"Ctrl": "è",
-			"Ctrl+": "-",
+			"Ctrl": "-",
 			"Layer": "+!⇧",
 			"À": "",
 			"type": "français"

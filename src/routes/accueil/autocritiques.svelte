@@ -40,7 +40,7 @@
 		moins pire. Par conséquent, <Nom /> a évidemment des défauts, dont voici les principaux :
 	</p>
 	<h4>Distances non optimales</h4>
-	<ul class="margin-top-2">
+	<ul>
 		<li><kbd>E</kbd> est sur le majeur et non sur l’index</li>
 		<p>
 			Théoriquement, l’index est plus fort et devrait donc être l’endroit idéal pour la lettre <kbd
@@ -51,7 +51,7 @@
 	</ul>
 
 	<h4><SFB />s</h4>
-	<ul class="margin-top-2">
+	<ul>
 		<li>
 			<kbd>SC</kbd> engendre beaucoup de <SFB />s, mais c’est à la moins pire combinaison (en
 			fréquence d’apparition, NC > CR > CT > SC) et est en plus sur l’index qui est un doigt fort
@@ -69,7 +69,7 @@
 	</ul>
 
 	<h4>Alternance des mains non maximale</h4>
-	<ul class="margin-top-2">
+	<ul>
 		<li>
 			<kbd>W</kbd> devrait théoriquement plutôt être du côté droit du clavier car cette lettre est
 			souvent précédée ou suivie d’une voyelle. Toutefois, la mettre sur l’index gauche permet de

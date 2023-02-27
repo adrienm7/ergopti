@@ -12,7 +12,7 @@
 <style>
 	.tooltip {
 		display: inline-block;
-		border-bottom: 2px dotted white;
+		border-bottom: 2px dotted black;
 	}
 
 	.tooltip .tooltiptext {
