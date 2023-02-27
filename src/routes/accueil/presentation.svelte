@@ -471,13 +471,14 @@
 		<div class="content">
 			<p>
 				Lors de l’utilisation d’un ordinateur, la plupart du temps la souris est tenue de la main
-				droite et la main gauche repose près de la partie gauche du clavier. Lorsqu’il faut rentrer
-				du texte ou taper sur une touche, il est bien souvent nécessaire de ramener la main droite
-				de la souris à la partie droite du clavier, de taper dessus, puis de retourner à sa souris
-				pour continuer la navigation.
+				droite et la main gauche repose près de la partie gauche du clavier. Quand vient le moment
+				de taper sur une touche ou de réaliser une combinaison de touches pour faire un raccourci,
+				il est bien souvent nécessaire de bouger la main droite. Celle-ci doit se déplacer de la
+				souris à la partie droite du clavier, taper dessus, puis retourner à la souris pour
+				continuer la navigation.
 			</p>
 			<p>
-				Par conséquent, il est aussi important de s’assurer que, grâce à sa disposition clavier,
+				Par conséquent, il est également important de s’assurer que, grâce à sa disposition clavier,
 				beaucoup d’actions courantes puissent se réaliser avec la seule main gauche afin de <strong
 					>ne pas avoir à lâcher la souris</strong
 				>. À noter que sur ce point AZERTY est très bon car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
@@ -485,21 +486,21 @@
 				avec <kbd>Ctrl</kbd> sont du côté gauche.
 			</p>
 			<p>
-				En <Nom />, le <kbd>=</kbd> a ainsi été dupliqué à gauche pour être mis en accès direct.
+				Avec <Nom />, le <kbd>=</kbd> a ainsi été dupliqué à gauche pour être mis en accès direct.
 				Cela permet de faire facilement les raccourcis sur Excel comme <kbd>=</kbd> et
 				<kbd>Alt</kbd>
 				+
 				<kbd>=</kbd>. En effet, normalement le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
-				<kbd>L</kbd>. En dehors de cela des touches de raccourci ont été implémentées :
+				<kbd>L</kbd>. En dehors de cela, des touches de raccourci ont aussi été implémentées :
 			</p>
 
 			<h4>Touches de raccourci sur la version Ergodox</h4>
 			<p>
-				La version de <Nom /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
+				La version d’<Nom /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
 				à une main, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
-				<kbd>Alt+Tab</kbd> ont été directement inclues à gauche du clavier. À noter que ces touches ne
-				sont pas définies dans le pilote et que ce sont uniquement des idées d’implémentation. Les claviers
-				de type Ergodox peuvent en effet être programmés pour ajouter et déplacer des touches.
+				<kbd>Alt+Tab</kbd> ont été directement incluses à gauche du clavier. À noter que ces touches
+				ne sont pas définies dans le pilote et que ce sont uniquement des idées d’implémentation. Les
+				claviers de type Ergodox peuvent en effet être programmés pour ajouter et déplacer des touches.
 			</p>
 
 			<h4>Touches de raccourci sur la version ISO</h4>
