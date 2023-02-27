@@ -20,9 +20,8 @@
 				En dactylographie, il est enseigné que les doigts doivent reposer sur la rangée du milieu (<kbd
 					>QSDF</kbd
 				>
-				et <kbd>JKLM</kbd>
-				en AZERTY). L’idée est de taper une touche, puis de toute suite replacer le doigt sur cette rangée
-				pour être capable de bouger rapidement dans n’importe quelle direction.
+				et <kbd>JKLM</kbd> en AZERTY). L’idée est de taper une touche, puis de toute suite replacer le
+				doigt sur cette rangée pour être capable de bouger rapidement dans n’importe quelle direction.
 			</p>
 			<p>
 				Il est alors logique de se dire que nos doigts étant la plupart du temps sur la rangée du
@@ -296,10 +295,6 @@
 					car la cédille est sous le <span class="hyper text-bold">C</span>
 				</li>
 				<li>
-					<kbd>AltGr</kbd> + <kbd>D</kbd> ➜ <kbd-sortie>$</kbd-sortie>
-					car c’est le première lettre de <span class="hyper text-bold">D</span>ollar
-				</li>
-				<li>
 					<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
 					car le <span class="hyper text-bold">/</span> est au-dessus du E
 				</li>
@@ -378,6 +373,23 @@
 					➜ <kbd-sortie>”</kbd-sortie>
 				</li>
 			</ul>
+
+			<mini-espace />
+
+			<p>
+				Enfin, les raccourcis avec les nouvelles touches et <kbd>Ctrl</kbd> sont placés côte à côte et
+				faciles à retenir :
+			</p>
+			<ul>
+				<li>
+					<kbd>Ctrl</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
+					<kbd-sortie>+</kbd-sortie> pour zoomer
+				</li>
+				<li>
+					<kbd>Ctrl</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
+					<kbd-sortie>-</kbd-sortie> pour dézoomer
+				</li>
+			</ul>
 			<mini-espace />
 			<p>
 				À noter que les touches sont aussi placées le plus possible par distance selon leur
@@ -385,27 +397,43 @@
 				<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les plus
 				forts.
 			</p>
-			<p>
-				Le <kbd>$</kbd> est l’un des seuls symboles à ne pas être sur un emplacement logique (le
+			<p class="important">
+				<span class="text-bold">⚠ Attention</span> : Le <kbd>$</kbd> est l’un des seuls symboles à
+				ne pas être sur un emplacement logique (le
 				<kbd>D</kbd>
 				de <span class="hyper text-bold">D</span>ollar). Ceci parce qu’il est plus intéressant de
 				mettre le <kbd>"</kbd> sur cette lettre, afin d’avoir un excellent roulement <kbd>="</kbd>.
+				Le <kbd>$</kbd> se trouve sur la touche <kbd>★</kbd>.
 			</p>
 			<h4>Ponctuations avec espace insécable automatique</h4>
 			<p>
 				Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
-				particularité. Lors de l’utilisation de <kbd>Shift</kbd>, elles sont automatiquement
-				envoyées avec une espace insécable qui les précède. En revanche, avec
-				<kbd>AltGr</kbd>, la ponctuation seule est renvoyée, notamment pour faire de la
-				programmation. Cela permet ainsi d’écrire dans un français impeccable en <kbd>Shift</kbd>,
-				tout en programment normalement avec la couche <kbd>AltGr</kbd>, qui contient d’ailleurs
-				tout le reste des symboles nécessaires à l’écriture de code.
+				particularité. En effet, lors de l’utilisation de <kbd>Shift</kbd>, elles sont
+				<strong>automatiquement envoyées avec une espace insécable</strong> qui les précède. Les espaces
+				insécables ne sont pas disponibles en AZERTY, et c’est très dommage. Ce sont des espaces qui
+				ont la particularité de toujours rester collés au texte qui les précède et les suit.
 			</p>
 			<p>
-				Ainsi, il est facile de se rappeler où est quoi : <strong
-					>le français est en <kbd>Shift</kbd>, la programmation est en <kbd>AltGr</kbd></strong
-				>.
+				Ainsi, vous n’aurez plus jamais de <kbd>?</kbd> qui se balade au début d’une ligne parce
+				qu’il n’y avait plus de place sur la ligne précédente. Cela donne des documents avec un
+				rendu bien plus professionnel. Attention cependant :
+				<strong>ne les utilisez pas dans d’autres situations que l'écriture de texte</strong>. Par
+				exemple, en programmation, une espace insécable peut causer des erreurs, sans forcément être
+				visible (vous ne verrez qu’un simple espace, qui pourtant sera la cause du problème).
 			</p>
+			<p>
+				En revanche, en utilisant <kbd>AltGr</kbd>, la ponctuation seule est renvoyée. Cette méthode
+				permet d’écrire dans un français impeccable en
+				<kbd>Shift</kbd>, tout en programment normalement avec la couche <kbd>AltGr</kbd>, qui
+				contient d’ailleurs tout le reste des symboles nécessaires à l’écriture de code.
+			</p>
+			<div class="important">
+				<p class="text-bold">Ainsi, il est facile de se rappeler où est quoi :</p>
+				<ul class="margin0">
+					<li>le français est en <kbd>Shift</kbd></li>
+					<li class="margin0">la programmation est en <kbd>AltGr</kbd></li>
+				</ul>
+			</div>
 		</div>
 	</section>
 	<section>
@@ -417,10 +445,11 @@
 		<div class="content">
 			<p>
 				Les chiffres sont en accès direct sur les dispositions QWERTY ou encore DVORAK, mais pas en
-				AZERTY. Chaque manière de faire a ses avantages, car en AZERTY les symboles sont alors en
-				accès direct et donc plus facilement réalisables. En revanche, il devient compliqué d’écrire
-				un nombre en plein milieu d’une phrase, car cela nécessite de passer en <kbd>Shift</kbd> momentanément
-				pour l’écrire.
+				AZERTY. Chaque manière de faire a ses avantages, car en AZERTY les symboles sont alors
+				directement accessibles et donc plus facilement réalisables. En revanche, il devient
+				compliqué d’écrire un nombre en plein milieu d’une phrase, car cela nécessite de passer en <kbd
+					>Shift</kbd
+				> momentanément pour l’écrire.
 			</p>
 			<p>
 				Le passage des chiffres en accès direct permet d’<strong
@@ -429,7 +458,7 @@
 				en milieu de phrase. La rangée des nombres n’est de toute façon pas très accessible, donc il
 				vaut mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>, plus
 				proches des mains car sur les 3 rangées du milieu pour ne pas avoir à trop bouger les
-				doigts.
+				doigts. C’est exactement ce que fait <Nom />.
 			</p>
 		</div>
 	</section>
@@ -451,26 +480,49 @@
 				Par conséquent, il est aussi important de s’assurer que, grâce à sa disposition clavier,
 				beaucoup d’actions courantes puissent se réaliser avec la seule main gauche afin de <strong
 					>ne pas avoir à lâcher la souris</strong
-				>.
+				>. À noter que sur ce point AZERTY est très bon car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
+				et de nombreuses autres lettres fréquemment utilisées pour faire des raccourcis en combinaison
+				avec <kbd>Ctrl</kbd> sont du côté gauche.
 			</p>
 			<p>
-				La version de <Nom /> adaptée aux claviers de type Ergodox est ainsi complètement optimisée sur
-				ce critère, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
-				<kbd>Alt+Tab</kbd>
-				sont directement inclues à gauche du clavier.
+				En <Nom />, le <kbd>=</kbd> a ainsi été dupliqué à gauche pour être mis en accès direct.
+				Cela permet de faire facilement les raccourcis sur Excel comme <kbd>=</kbd> et
+				<kbd>Alt</kbd>
+				+
+				<kbd>=</kbd>. En effet, normalement le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
+				<kbd>L</kbd>. En dehors de cela des touches de raccourci ont été implémentées :
+			</p>
+
+			<h4>Touches de raccourci sur la version Ergodox</h4>
+			<p>
+				La version de <Nom /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
+				à une main, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
+				<kbd>Alt+Tab</kbd> ont été directement inclues à gauche du clavier. À noter que ces touches ne
+				sont pas définies dans le pilote et que ce sont uniquement des idées d’implémentation. Les claviers
+				de type Ergodox peuvent en effet être programmés pour ajouter et déplacer des touches.
+			</p>
+
+			<h4>Touches de raccourci sur la version ISO</h4>
+			<p>
+				La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier
+				de ces touches de raccourci, car les touches à sa gauche sont déjà occupées par les touches
+				<kbd>Shift</kbd>, <kbd>"Capslock"</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
+				placer ces 3 touches sous les pouces.
 			</p>
 			<p>
-				La version ISO ne peut quant à elle malheureusement pas bénéficier de ces touches de
-				raccourci, car les touches à sa gauche sont déjà occupées par les touches
-				<kbd>Shift</kbd>, <kbd>Capslock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on
-				peut placer ces touches sous les pouces. <Nom_Plus /> donne toutefois le moyen de contourner
-				ces limites.
+				<Nom_Plus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
+				<strong>mécanisme de tap-hold</strong>. L’idée du tap-hold est qu’il est possible d’assigner
+				deux actions à une même touche : une au tap (appui bref) et une au hold (maitenir pressé).
+				Grâce au tap-hold, il est possible de faire pour que taper une touche envoie un raccourci,
+				mais que si on la presse elle se comporte normalement. Cela permet d’intégrer des touches
+				<kbd>Copier</kbd>, <kbd>Coller</kbd> et <kbd>Alt+Tab</kbd> respectivement sur
+				<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>.
 			</p>
 			<p>
-				Dans tous les cas, le <kbd>=</kbd> a au moins été dupliqué à gauche en accès direct. Cela
-				permet de faire facilement les raccourcis sur Excel comme <kbd>=</kbd> et <kbd>Alt</kbd> +
-				<kbd>=</kbd>. En effet, normalement, le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
-				<kbd>L</kbd>.
+				Enfin, <Nom_Plus /> a aussi optimisé les raccourcis <kbd>Ctrl</kbd> + <kbd>Z</kbd> et
+				<kbd>Ctrl</kbd>
+				+ <kbd>S</kbd>. Ceux-ci sont dédoublés en <kbd>Ctrl</kbd> + <kbd>Ê</kbd> et <kbd>Ctrl</kbd>
+				+ <kbd>★</kbd>
 			</p>
 		</div>
 	</section>

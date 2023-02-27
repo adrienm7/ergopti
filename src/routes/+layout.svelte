@@ -25,7 +25,7 @@
 
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
 
-<div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
+<div id="clavier-ref" style="background-color: black; z-index: {zIndex}; display:{affiche}">
 	<div>
 		<EnsembleClavier
 			emplacement={'clavier-reference'}
