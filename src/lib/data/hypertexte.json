@@ -1018,7 +1018,7 @@
 			"ShiftAltGr": "œ",
 			"Ctrl": "b",
 			"Layer": "",
-			"À": "bé",
+			"À": "fs",
 			"type": "lettre"
 		},
 		{
@@ -1062,7 +1062,7 @@
 			"ShiftAltGr": "×",
 			"Ctrl": "f",
 			"Layer": "",
-			"À": "dm",
+			"À": "sf",
 			"type": "lettre"
 		},
 		{
@@ -1084,7 +1084,7 @@
 			"ShiftAltGr": "„",
 			"Ctrl": "h",
 			"Layer": "⊞⇦",
-			"À": "nh",
+			"À": "ph",
 			"type": "lettre"
 		},
 		{
@@ -1140,7 +1140,7 @@
 			"ShiftAltGr": "−",
 			"Ctrl": "m",
 			"Layer": "+⇤",
-			"À": "sm",
+			"À": "adm",
 			"type": "lettre"
 		},
 		{
@@ -1151,7 +1151,7 @@
 			"ShiftAltGr": "–",
 			"Ctrl": "n",
 			"Layer": "⇦",
-			"À": "nl",
+			"À": "",
 			"type": "lettre"
 		},
 		{
@@ -1173,7 +1173,7 @@
 			"ShiftAltGr": "±",
 			"Ctrl": "p",
 			"Layer": "^⇨",
-			"À": "ph",
+			"À": "xp",
 			"type": "lettre"
 		},
 		{
@@ -1220,7 +1220,7 @@
 			"ShiftAltGr": "⩽",
 			"Ctrl": "t",
 			"Layer": "⇨",
-			"À": "tp",
+			"À": "pt",
 			"type": "lettre"
 		},
 		{
@@ -1266,7 +1266,7 @@
 			"ShiftAltGr": "”",
 			"Ctrl": "x",
 			"Layer": "+⊞⇨",
-			"À": "adm",
+			"À": "'re",
 			"type": "lettre"
 		},
 		{
