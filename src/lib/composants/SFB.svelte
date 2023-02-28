@@ -36,7 +36,6 @@
 		position: absolute;
 		right: 50%;
 		transform: translate(50%, 0);
-		z-index: 20;
 	}
 
 	.tooltip:hover .tooltiptext {

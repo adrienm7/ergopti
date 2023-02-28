@@ -43,7 +43,7 @@
 	let affiche = 'none';
 
 	function toggleZIndex() {
-		zIndex = zIndex === -999 ? 100 : -999;
+		zIndex = zIndex === -999 ? 99 : -999;
 		affiche = affiche === 'none' ? 'block' : 'none';
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
