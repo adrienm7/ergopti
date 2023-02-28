@@ -12,10 +12,10 @@ bloc-clavier {
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
     --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
 
-    --couleur-touche-saturation: 80%;
-    --couleur-touche-luminosite: 70%;
+    --couleur-touche-saturation: 90%;
+    --couleur-touche-luminosite: 65%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
-	--transparence-touche: 15%;
+	--transparence-touche: 25%;
 	
 	--transparence-touche-pressee: 8%;
     --couleur-touche-pressee-luminosite: 60%;
@@ -46,7 +46,11 @@ bloc-clavier {
 	}
 }
 
-
+#clavier-reference bloc-clavier {
+	/* --couleur-touche-saturation: 0%;
+	--couleur-touche-luminosite: 5%; */
+	--transparence-touche: 25% !important;
+}
 
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
 	margin-right: 50px;
@@ -410,24 +414,17 @@ bloc-touche[data-type="special"]:not(.touche-active):active {
 }
 
 
-/* Style différent quand il y a de la couleur */
-
-/* ensemble-clavier[data-couleur="oui"] bloc-clavier {
-	background-color:hsla(0, 0%, 0%, 0.8);
-	--couleur-touche-saturation: 60%;
-    --couleur-touche-luminosite: 65%;
-	--transparence-touche: 100%;
-	--couleur-texte-touche:white;
-	text-shadow: 1px 1px 5px #000000;
-} */
 
 /* Si pas de couleur, ou couleur spéciale */
 
 ensemble-clavier[data-couleur="non"] bloc-touche,
 ensemble-clavier[data-couleur="freq"] bloc-touche {
-    --couleur-touche: 0deg;
     --couleur-touche-saturation: 0%;
     --couleur-touche-luminosite: 100%;
+}
+
+ensemble-clavier[data-couleur="non"] bloc-touche {
+	--transparence-touche: 15%;
 }
 
 ensemble-clavier bloc-touche[data-type="space"] {
