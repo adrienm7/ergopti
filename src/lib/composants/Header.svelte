@@ -76,7 +76,7 @@
 		position: fixed;
 		top: 0;
 		left: 0;
-		z-index: 99;
+		z-index: 100;
 		height: var(--hauteur-header);
 		width: 100vw;
 		margin: 0;

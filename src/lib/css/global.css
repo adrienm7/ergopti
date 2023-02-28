@@ -82,12 +82,3 @@ section {
 section ul {
 	padding-left: 35px;
 }
-
-#clavier-presentation bloc-clavier {
-	--taille-clavier: 0.5;
-}
-@media (max-width: 700px) {
-	#clavier-presentation bloc-clavier {
-		--taille-clavier: 0.9;
-	}
-}

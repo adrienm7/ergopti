@@ -36,7 +36,7 @@ bloc-clavier {
     background-color:hsla(234, 20%, 15%, 0.1);
     border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
-	box-shadow: 0 0 10px 1px rgba(0, 99, 170, 0.8);
+	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
 	font-weight: 300;
 }
 
@@ -46,11 +46,8 @@ bloc-clavier {
 	}
 }
 
-#clavier-reference bloc-clavier {
-	/* --couleur-touche-saturation: 0%;
-	--couleur-touche-luminosite: 5%; */
-	--transparence-touche: 25% !important;
-}
+
+
 
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
 	margin-right: 50px;
@@ -413,6 +410,11 @@ bloc-touche[data-type="special"]:not(.touche-active):active {
 	color: white!important;
 }
 
+ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="special"],
+ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="enter"] {
+	--couleur-bordure-touche: hsla(var(--couleur-touche), 100%, 100%, 35%);
+}
+
 
 
 /* Si pas de couleur, ou couleur spéciale */
@@ -437,4 +439,32 @@ ensemble-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
     --couleur-touche-luminosite: 80%;
 	--transparence-touche: 40%;
 	background-color: hsla( var(--couleur-touche), 100%, 80%, var(--transparence-touche));
+}
+
+
+
+
+
+
+
+/*
+==================================================
+======= Style par emplacements de claviers =======
+==================================================
+*/
+
+
+#clavier-reference bloc-clavier {
+	--taille-clavier: 0.75;
+}
+
+#clavier-presentation bloc-clavier {
+	--taille-clavier: 0.5;
+}
+
+@media (max-width: 700px) {
+	#clavier-reference bloc-clavier,
+	#clavier-presentation bloc-clavier {
+		--taille-clavier: 0.9;
+	}
 }
