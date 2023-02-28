@@ -368,11 +368,11 @@
 	};
 
 	let couches_standard = [
+		['Visuel', 'Visuel'],
 		['➀ Primaire', 'Primary'],
 		['➁ Shift', 'Shift'],
 		['➂ AltGr', 'AltGr'],
 		['➃ Shift + AltGr', 'ShiftAltGr'],
-		['Visuel', 'Visuel'],
 		['Ctrl', 'Ctrl']
 	];
 	let couches_plus = couches_standard.concat([

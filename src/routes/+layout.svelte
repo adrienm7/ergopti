@@ -19,7 +19,24 @@
 
 	onMount(async () => {
 		typography();
-		matomo();
+		// matomo();
+		var _paq = window._paq || [];
+		/* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+		_paq.push(['trackPageView']);
+		_paq.push(['enableLinkTracking']);
+		(function () {
+			var u = 'https://stats.beseven.fr/';
+			_paq.push(['setTrackerUrl', u + 'm.php']);
+			_paq.push(['setSiteId', '6']);
+			var d = document,
+				g = d.createElement('script'),
+				s = d.getElementsByTagName('script')[0];
+			g.type = 'text/javascript';
+			g.async = true;
+			g.defer = true;
+			g.src = u + 'm.js';
+			s.parentNode.insertBefore(g, s);
+		})();
 	});
 
 	let zIndex = -999;
@@ -34,7 +51,7 @@
 
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
 
-<div id="clavier-ref" style="background-color: black; z-index: {zIndex}; display:{affiche}">
+<div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 	<div>
 		<EnsembleClavier
 			emplacement={'clavier-reference'}
