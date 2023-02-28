@@ -190,12 +190,15 @@
 				l’index à l’annulaire par exemple.
 			</p>
 			<p>
-				En conclusion, un roulement est pour moi le <kbd>ST</kbd> du Bépo (idéalement, car mouvement
-				horizontal), sinon le <kbd>LS</kbd> du Bépo, mais pas le <kbd>GL</kbd> ni le
-				<kbd>TR</kbd>
-				du Bépo. La disposition <Nom /> a été construite avec pour contrainte principale de permettre
-				de réaliser les bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des
-				roulements, de préférence sur des doigts consécutifs dans un mouvement horizontal.
+				En conclusion, un roulement est pour moi le <kbd>PO</kbd> de l’AZERTY ou le <kbd>ST</kbd> du
+				BÉPO (idéalement, car mouvement horizontal). Sinon, c’est éventuellement le <kbd>PL</kbd> de
+				l’AZERTY ou le <kbd>LS</kbd> du BÉPO. Toutefois, ce n’est pas le <kbd>ST</kbd> de l’AZERTY
+				ni le <kbd>GL</kbd> du BÉPO.
+			</p>
+			<p>
+				La disposition <Nom /> a été construite avec pour contrainte principale de permettre de réaliser
+				les bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des roulements,
+				de préférence sur des doigts consécutifs dans un mouvement horizontal.
 			</p>
 			<petit-espace />
 			<EnsembleClavier
@@ -208,7 +211,7 @@
 			/>
 			<petit-espace />
 			<h4>Très bons bigrammes voyelle-voyelle</h4>
-			<ul class="margin-top-2">
+			<ul>
 				<li><kbd>AI</kbd></li>
 				<li><kbd>IE</kbd></li>
 				<li><kbd>EU</kbd></li>
@@ -217,14 +220,14 @@
 			</ul>
 
 			Avec même quelques trigrammes très confortables :
-			<ul class="margin-top-2">
+			<ul>
 				<li><kbd>AIE</kbd> notamment pour écrire <span class="hyper text-bold">AIE</span>NT</li>
 				(avec en plus NT qui est lui aussi un roulement, que demander de plus ?)
 				<li><kbd>IEU</kbd></li>
 				<li><kbd>YOU</kbd></li>
 			</ul>
 			<h4>Très bons bigrammes consonne-consonne</h4>
-			<ul class="margin-top-2">
+			<ul>
 				<li><kbd>SN</kbd></li>
 				<li><kbd>NT</kbd></li>
 				<li><kbd>TR</kbd></li>
@@ -243,7 +246,7 @@
 				</li>
 			</ul>
 			<h4>Autres bons bigrammes</h4>
-			<ul class="margin-top-2">
+			<ul>
 				<li>
 					<kbd>OW</kbd> très utilisé en anglais (ALL<span class="hyper text-bold">OW</span>
 					, D<span class="hyper text-bold">OW</span>N, FOLL<span class="hyper text-bold">OW</span>,
@@ -377,8 +380,8 @@
 			<mini-espace />
 
 			<p>
-				Enfin, les raccourcis avec les nouvelles touches et <kbd>Ctrl</kbd> sont placés côte à côte et
-				faciles à retenir :
+				Enfin, les raccourcis avec les nouvelles touches par rapport à l’AZERTY et <kbd>Ctrl</kbd> sont
+				placés côte à côte et faciles à retenir :
 			</p>
 			<ul>
 				<li>

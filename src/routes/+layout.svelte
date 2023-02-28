@@ -2,6 +2,8 @@
 	import Header from '$lib/composants/Header.svelte';
 	import Footer from '$lib/composants/Footer.svelte';
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
+	import { typography } from '$lib/js/typography.js';
+	import { matomo } from '$lib/js/code-matomo.js';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -12,6 +14,13 @@
 	import '$lib/css/buttons.css';
 	import '$lib/css/accordion.css';
 	import '$lib/css/miscellaneous.css';
+
+	import { onMount } from 'svelte';
+
+	onMount(async () => {
+		typography();
+		matomo();
+	});
 
 	let zIndex = -999;
 	let affiche = 'none';

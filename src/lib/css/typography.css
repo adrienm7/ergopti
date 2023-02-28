@@ -79,7 +79,7 @@ strong,
 
 
 .important {
-	background-color: rgba(100, 100, 100, 0.3);
+	background-color: rgba(150, 150, 150, 0.3);
 	backdrop-filter: blur(60px);
 	padding: 20px;
 	border-radius: 10px;
