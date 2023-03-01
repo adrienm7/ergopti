@@ -298,6 +298,11 @@
 					car la cédille est sous le <span class="hyper text-bold">C</span>
 				</li>
 				<li>
+					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>D</kbd> ➜
+					<kbd-sortie style="font-weight: normal;">◌̈</kbd-sortie>
+					car le trémat se nomme <span class="hyper text-bold">D</span>iaresis en anglais
+				</li>
+				<li>
 					<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
 					car le <span class="hyper text-bold">/</span> est au-dessus du E
 				</li>
