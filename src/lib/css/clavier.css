@@ -157,9 +157,6 @@ ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"]{
 	--couleur-touche-saturation: 100%;
 	--couleur-touche-luminosite: 80%;
 }
-ensemble-clavier[data-plus="oui"][data-couleur="oui"] bloc-touche[data-plus="oui"]{
-	--couleur-touche-saturation: 0%;
-}
 
 
 
@@ -244,19 +241,19 @@ ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="b"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="a"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="i"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","] {
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"]{
 	--couleur-touche-luminosite: 70%;
 	--couleur-touche-saturation: 0%;
 }
 
-/* Car les glyphes des touches mortes s’affichent mal sinon */
+/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche=","] {
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"] {
 	font-weight: normal;
 }
 
