@@ -222,9 +222,9 @@
 		{
 			"touche": ".",
 			"main": "gauche",
-			"doigt": "index",
+			"doigt": "annulaire",
 			"ligne": "4",
-			"colonne": "6",
+			"colonne": "3",
 			"taille": "1"
 		},
 		{
@@ -262,9 +262,9 @@
 		{
 			"touche": "é",
 			"main": "gauche",
-			"doigt": "annulaire",
+			"doigt": "index",
 			"ligne": "4",
-			"colonne": "3",
+			"colonne": "6",
 			"taille": "1"
 		},
 		{
@@ -712,9 +712,9 @@
 		{
 			"touche": ".",
 			"main": "gauche",
-			"doigt": "index",
+			"doigt": "annulaire",
 			"ligne": "4",
-			"colonne": "6",
+			"colonne": "3",
 			"taille": "1"
 		},
 		{
@@ -752,9 +752,9 @@
 		{
 			"touche": "é",
 			"main": "gauche",
-			"doigt": "annulaire",
+			"doigt": "index",
 			"ligne": "4",
-			"colonne": "3",
+			"colonne": "6",
 			"taille": "1"
 		},
 		{
@@ -1316,12 +1316,12 @@
 		},
 		{
 			"touche": "★",
-			"Primary": "⌫",
+			"Primary": "↩",
 			"Primary+": "★",
 			"Shift": "’",
 			"AltGr": "$",
 			"ShiftAltGr": "§",
-			"Ctrl": "⌫",
+			"Ctrl": "↩",
 			"Ctrl+": "s",
 			"Layer": "!⇩",
 			"À": "j",
@@ -1526,16 +1526,11 @@
 		},
 		{
 			"touche": "CapsLock",
-			"Primary": "↩",
-			"Primary+": "⌫",
-			"Shift": "↩",
-			"Shift+": "⌫",
-			"AltGr": "↩",
-			"AltGr+": "Ctrl + ⌫",
-			"ShiftAltGr": "↩",
-			"ShiftAltGr+": "⌫",
-			"Ctrl": "↩",
-			"Ctrl+": "⌫",
+			"Primary": "⌫",
+			"Shift": "⌫",
+			"AltGr": "⌫",
+			"ShiftAltGr": "⌫",
+			"Ctrl": "⌫",
 			"Layer": "⌫",
 			"À": "⌫",
 			"type": "special"
