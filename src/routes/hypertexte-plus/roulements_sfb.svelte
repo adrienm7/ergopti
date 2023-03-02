@@ -4,7 +4,6 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<h2>Roulements et diminution des <SFB />s</h2>
 <p>L’un des avantages majeurs de <Nom_Plus /> est qu’il réduit presque à 0 les <SFB />s.</p>
 <p>
 	Les <SFB />s les plus fréquents de la disposition sont, par ordre de fréquence : <kbd>SC</kbd>,

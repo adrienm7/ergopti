@@ -4,8 +4,6 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<h2>Ajouts de confort</h2>
-
 <h3>[QU] automatiques avant les voyelles</h3>
 <p>
 	La touche <kbd>Q</kbd> est à 99% suivie de <kbd>U</kbd> si une voyelle vient ensuite. Par
@@ -26,8 +24,9 @@
 	La touche <kbd>J</kbd> est très loin et pourtant relativement souvent utilisée en français, en
 	particulier pour écrire <kbd>JE</kbd>. Les combinaisons <kbd-non>ÀI</kbd-non>,
 	<kbd-non>ÀE</kbd-non>, etc. n’existent pas en français. En fait, la lettre <kbd>À</kbd> est
-	toujours suivie d’un espace. Cela donne une formidable opportunité d’utiliser cette touche comme
-	un <kbd-sortie>J</kbd-sortie>, si elle est suivie d’une voyelle.
+	toujours suivie d’un espace ou d’un caractère de ponctuation. Cela donne une formidable
+	opportunité d’utiliser cette touche comme un <kbd-sortie>J</kbd-sortie>, si elle est suivie d’une
+	voyelle.
 </p>
 <p>
 	Dans les rares cas où vous voudrez écrire <kbd>J</kbd> + <kbd>Consonne</kbd>, il faudra utiliser
@@ -58,16 +57,10 @@
 	<kbd>ÊI</kbd>, vous pouvez aussi faire <kbd>ÊE</kbd>.
 </p>
 
-<h3>Remplacement automatique des <kbd>’</kbd> par <kbd>'</kbd> pour l’anglais</h3>
+<h3>Remplacement automatique des <kbd>'</kbd> par <kbd>’</kbd> pour le français</h3>
 <p>
-	En anglais, l’apostrophe typographique n’est pas utilisée. Afin d’écrire "correctement" en anglais
-	sans perte de vitesse ni besoin de réflexion pour savoir quelle apostrophe taper, des
-	remplacements de texte ont été introduits. Ainsi, <kbd>T’S</kbd> et <kbd>N’T</kbd> sont
-	automatiquement remplacés par les bonnes apostrophes : <kbd-sortie>T'S</kbd-sortie> et
-	<kbd-sortie>N'T</kbd-sortie>. Cela permet d’écrire correctement <kbd>IT'S</kbd>,
-	<kbd>THAT'S</kbd>, <kbd>DIDN'T</kbd>, <kbd>DON'T</kbd>, <kbd>WON'T</kbd>, <kbd>WOU'D</kbd>,
-	<kbd>WE'RE</kbd>,
-	<kbd>THERE'S</kbd>, <kbd>YOU'RE</kbd>, etc.
+	Quand on écrit en français, il faudrait utiliser l’apostrophe typographique plutôt que
+	l’apostrophe droite.
 </p>
 <p>
 	Un autre raccourci a été ajouté pour avoir la possibilité d’écrire <kbd-sortie>N'T</kbd-sortie>

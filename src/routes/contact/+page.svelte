@@ -1,5 +1,30 @@
 <script>
-	import ContactForm from './ContactForm.svelte';
+	import nodemailer from 'nodemailer';
+
+	const transporter = nodemailer.createTransport({
+		host: 'mail.beseven.fr', // Remplacez par le nom de votre serveur SMTP
+		port: 465, // Remplacez par le port de votre serveur SMTP
+		secure: false,
+		auth: {
+			user: 'hypertexte@beseven.fr', // Remplacez par votre nom d'utilisateur SMTP
+			pass: '~=qqrVHC_wS8' // Remplacez par votre mot de passe SMTP
+		}
+	});
+
+	function send() {
+		let name = 'uie';
+		let email = 'aie@meu.fr';
+		let message = 'uei';
+
+		const mailOptions = {
+			from: email,
+			to: 'moyaux.adrien@gmail.com',
+			subject: `Message from ${name}`,
+			text: message
+		};
+
+		transporter.sendMail(mailOptions);
+	}
 </script>
 
 <svelte:head>
@@ -12,5 +37,5 @@
 		<h1>Contact</h1>
 	</div>
 	<p>Vous pouvez contacter l’auteur de cette disposition à l’adresse moyaux.adrien@gmail.com</p>
-	<ContactForm />
+	<button on:click={send}>Envoi</button>
 </div>

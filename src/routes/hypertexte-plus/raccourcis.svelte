@@ -4,9 +4,8 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<h2>Raccourcis</h2>
-<h3>Avec AltGr</h3>
-<ul class="margin-top-2">
+<h3>Raccourcis avec AltGr</h3>
+<ul>
 	<li><kbd>AltGr</kbd> + <kbd>Tab</kbd> ➜ <kbd-sortie>Capsword</kbd-sortie></li>
 	<p>
 		<kbd>Capsword</kbd> est une sorte de <strong>Capslock qui se désactive automatiquement</strong>
@@ -52,17 +51,19 @@
 		phrase. Ainsi, vous n’aurez plus jamais de <kbd-non>JE</kbd-non> ou de <kbd-non>THe</kbd-non> par
 		exemple.
 	</p>
-	<li><kbd>AltGr</kbd> + <kbd>Y</kbd> ➜ <kbd-sortie>Échap</kbd-sortie></li>
+	<li><kbd>AltGr</kbd> + <kbd>J</kbd> ➜ <kbd-sortie>Échap</kbd-sortie></li>
 	<li><kbd>AltGr</kbd> + <kbd>Z</kbd> ➜ <kbd-sortie>Home</kbd-sortie></li>
 	<li><kbd>AltGr</kbd> + <kbd>Q</kbd> ➜ <kbd-sortie>End</kbd-sortie></li>
 </ul>
 <h3>Autres raccourcis sur "Capslock" (BackSpace)</h3>
-<ul class="margin-top-2">
+<ul>
 	<li><kbd>Shift</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd-sortie>Delete</kbd-sortie></li>
 	<li>
 		<kbd>Windows</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd-sortie>Capslock</kbd-sortie>
 	</li>
 </ul>
+<h3>Raccourcis en <kbd>Ctrl</kbd></h3>
+<p>Ctrl + et Ctrl - sont en Ctrl sur la main gauche</p>
 <h3>Tap-hold</h3>
 <p>
 	Le tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et une
@@ -80,7 +81,7 @@
 	pourtant très loin. Elle nécessite de plus d’être pressée par l’auriculaire (droit), qui est le doigt
 	le plus faible de notre main.
 </p>
-<ul class="margin-top-2">
+<ul>
 	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-sortie>Entrée</kbd-sortie> sur le tap</li>
 	<p>
 		La touche <kbd>Entrée</kbd> est l’une des plus utilisée sur un clavier, elle l’est même plus que

@@ -14,14 +14,14 @@
 		certains choix ont dus être faits.
 	</p>
 	<p>
-		Notamment, le E n’est pas sur l’index de la rangée de repos. Ce qui est pourtant étrange, tant
-		son apparition est fréquente dans les textes. C’est la lettre la plus fréquente et de loin.
-		Pourtant, elle ne se trouve pas sur l’index notamment afin de réduire les <SFB />s. Si le E
-		avait été sur l’index, alors les 6 touches tapées par ce doigt auraient possiblement fait des <SFB
-		/>s avec le E. E s’associe avec quasiment toutes les lettres, donc ce serait une très mauvaise
-		idée. Au contraire, la voyelle U ne s’associe pas avec beaucoup de lettres, donc elle est bien
-		mieux à cet emplacement. D’autant que cet arrangemement des voyelles permet alors de très bons
-		roulements.
+		Notamment, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Ce qui est pourtant
+		étrange, tant son apparition est fréquente dans les textes. C’est la lettre la plus fréquente et
+		de loin. Pourtant, elle ne se trouve pas sur l’index notamment afin de réduire les <SFB />s. Si
+		le <kbd>E</kbd> avait été sur l’index, alors les 6 touches tapées par ce doigt auraient
+		possiblement fait des <SFB />s avec le <kbd>E</kbd>. <kbd>E</kbd> s’associe avec quasiment
+		toutes les lettres, donc ce serait une très mauvaise idée. Au contraire, la voyelle <kbd>U</kbd>
+		ne s’associe pas avec beaucoup de lettres, donc elle est bien mieux à cet emplacement. D’autant que
+		cet arrangemement des voyelles permet alors de très bons roulements.
 	</p>
 </section>
 

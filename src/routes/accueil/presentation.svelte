@@ -98,30 +98,41 @@
 			<p>
 				La disposition AZERTY est extrêmement mauvaise au vu de la distance nécessaire pour
 				atteindre les touches les plus fréquentes. Toutefois, c’est loin d’être son seul défaut.
-				L’un de ses autres défauts majeurs est son extrêmement grand nombre de <SFB />s.
+				L’un de ses autres problèmes majeurs est son grand nombre de <SFB />s.
 			</p>
 			<p>
-				Qu’est-ce qu’un SFB ? C’est le fait de devoir taper deux touches d’affilée avec exactement
-				le même doigt. Par exemple, c’est taper <kbd>CE</kbd> en AZERTY : il faut d’abord utiliser
-				le majeur gauche pour descendre d’une rangée et atteindre le <kbd>C</kbd>, puis remonter de
-				deux rangées pour atteindre le <kbd>E</kbd>. Avec <Nom />, le <kbd>C</kbd> est sur l’index
-				droit sur la rangée du haut et le <kbd>E</kbd> est directement sur la rangée du milieu, sur
-				le majeur gauche. Il y a donc 3 fois plus de déplacements entre rangées avec AZERTY, et le
-				pire c’est que <kbd>CE</kbd> est une combinaison extrêmement fréquente.
+				Qu’est-ce qu’un SFB ? C’est le fait de <strong
+					>devoir taper deux touches d’affilée avec exactement le même doigt</strong
+				>. Par exemple, c’est taper <kbd>CE</kbd> en AZERTY : il faut d’abord utiliser le majeur
+				gauche pour descendre d’une rangée et atteindre le <kbd>C</kbd>, puis remonter de deux
+				rangées pour atteindre le <kbd>E</kbd>. Avec <Nom />, le <kbd>C</kbd> est sur l’index droit
+				sur la rangée du haut et le <kbd>E</kbd> est directement sur la rangée du milieu, sur le majeur
+				gauche.
 			</p>
 			<p>
-				Cette combinaison de deux touches est appelée <em>bigramme</em> (ou <em>digramme</em>). Pour
-				optimiser une disposition clavier, il faut s’assurer que les bigrammes les plus fréquents ne
-				se fassent pas avec le même doigt : on parle de limiter les <em>Same Finger Bigrams</em>.
+				Il est donc impossible de paralléliser sa frappe lors d’un <SFB />. Suivre un chemin
+				linéaire est nécessaire : d’abord taper la première touche, puis bouger son doigt pour
+				atteindre la deuxième, puis enfin frapper la deuxième touche, ceci avec le même doigt.
+				Impossible de déplacer deux doigts en même temps pour ne plus avoir qu’à taper dans le bon
+				ordre sur les touches atteintes. Le pire est quand ces <SFB />s constituent la majorité de
+				vos frappes, ce qui se produit si vous utilisez une disposition non optimisée telle que
+				AZERTY.
 			</p>
+			<p>
+				Ainsi, une combinaison de deux touches, c’est-à-dire deux caractères qui se suivent, est
+				appelée <em>bigramme</em> (ou <em>digramme</em>). Pour optimiser une disposition clavier, il
+				faut s’assurer que les bigrammes les plus fréquents ne se fassent pas avec le même doigt :
+				on parle de <strong>>limiter les <em>Same Finger Bigrams</em></strong>.
+			</p>
+			<mini-espace />
 			<p>
 				Cette tâche est bien plus difficile qu’on le pense, car certaines lettres comme le <kbd
 					>E</kbd
 				>
 				ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
-				regrouper avec les lettres faisant les bigrammes les moins fréquents. Il est donc impossible
-				de réduire totalement les <SFB />s, mais il est tout de même possible de les réduire
-				drastiquement.
+				regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la
+				supression totale des <SFB />s est impossible. Toutedois, il est quand même possible de les
+				réduire drastiquement.
 			</p>
 		</div>
 	</section>
@@ -136,28 +147,28 @@
 				L’alternance des mains est très importante pour garantir une bonne <strong
 					>fluidité de frappe</strong
 				>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus d’alternance des
-				mains possible lors de la frappe de texte : main droite pour une touche, ensuite main gauche
-				pour la touche suivante, puis main droite, main gauche, etc.
+				mains possible lors de la frappe de texte : main droite, ensuite main gauche, puis main
+				droite, main gauche, etc.
 			</p>
 			<p>
 				Cette alternance des mains permet de <strong>ne pas surutiliser l’une des deux mains</strong
-				> en tapant avec la majorité du texte, au détriment de l’autre main qui resterait au-dessus de
-				sa partie du clavier, à attendre de pouvoir enfin entrer en jeu. Ainsi, avec une bonne alternance
-				des mains, pendant qu’une main frappe une touche, l’autre peut se replacer sur la rangée du milieu
-				et se préparer à frapper la suivante.
+				> l’utilisant pour taper la majorité du texte. Cela se ferait en effet au détriment de l’autre
+				main qui resterait au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer en jeu.
+				Ainsi, avec une bonne alternance des mains, pendant qu’une main frappe une touche, l’autre peut
+				se replacer sur la rangée du milieu et se préparer à frapper la suivante.
 			</p>
 			<p>
-				Si la touche suivante est sur la même main que la touche précédente (sauf roulement, cf. le
-				point suivant), la frappe sera moins confortable. Imaginez que vous deviez atteindre le <kbd
-					>C</kbd
-				>
+				Si la touche suivante est sur la même main que la touche précédente (sauf éventuellement
+				avec un roulement, cf. le point suivant), la frappe sera moins confortable. Imaginez que
+				vous deviez atteindre le <kbd>C</kbd>
 				de l’AZERTY, puis le <kbd>T</kbd>, pour écrire <kbd>CT</kbd>, un bigramme très courant en
 				français et anglais. Dans ce cas, vous devez d’abord légèrement abaisser votre main pour que
 				le majeur atteigne la rangée du bas pour taper
 				<kbd>C</kbd>. Puis, il faut que l’index atteigne quant à lui la rangée du haut pour taper
 				<kbd>T</kbd>. En résulte un sentiment d’inconfort avec deux doigts proches mais qui doivent
-				aller dans des directions différentes. Au contraire, en "parallélisant" les frappes sur les
-				deux mains, le résultat se révèle bien plus satisfaisant.
+				aller dans des directions différentes. Au contraire,
+				<strong>en "parallélisant" les frappes sur les deux mains</strong>, le résultat se révèle
+				bien plus satisfaisant.
 			</p>
 			<p>
 				L’alternance des mains a une limite. Il est impossible d’alterner parfaitement à chaque

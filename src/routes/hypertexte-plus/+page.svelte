@@ -16,7 +16,7 @@
 <div class="contenu">
 	<h1><Nom_Plus /></h1>
 
-	<div class="important">
+	<div class="introduction">
 		<p>
 			<Nom_Plus /> est une version améliorée de la disposition <Nom />.<br />Elle se rapproche de
 			très près de la <span class="hyper"><strong>disposition clavier idéale</strong></span>.
@@ -82,9 +82,46 @@
 	<p class="text-bold">Voici maintenant toutes les améliorations de <Nom_Plus /> :</p>
 
 	<petit-espace />
-
-	<Roulements_SFB />
-	<Abreviations />
-	<Confort />
-	<Raccourcis />
+	<div class="accordion">
+		<section>
+			<input type="checkbox" name="acc" id="acc1" />
+			<label for="acc1">
+				<span class="numero-faq" />
+				<h2>Roulements et diminution des SFBs</h2>
+			</label>
+			<div class="content">
+				<Roulements_SFB />
+			</div>
+		</section>
+		<section>
+			<input type="checkbox" name="acc" id="acc2" />
+			<label for="acc2">
+				<span class="numero-faq" />
+				<h2>Abréviations</h2>
+			</label>
+			<div class="content">
+				<Abreviations />
+			</div>
+		</section>
+		<section>
+			<input type="checkbox" name="acc" id="acc3" />
+			<label for="acc3">
+				<span class="numero-faq" />
+				<h2>Confort</h2>
+			</label>
+			<div class="content">
+				<Confort />
+			</div>
+		</section>
+		<section>
+			<input type="checkbox" name="acc" id="acc4" />
+			<label for="acc4">
+				<span class="numero-faq" />
+				<h2>Raccourcis</h2>
+			</label>
+			<div class="content">
+				<Raccourcis />
+			</div>
+		</section>
+	</div>
 </div>
