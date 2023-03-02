@@ -63,3 +63,11 @@ h2, h3, h4 {
         margin-bottom: 1.5rem;
     }
 }
+
+.introduction {
+	margin:0;
+	padding:10px 25px;
+	background-color:rgba(0,0,0,0.3);
+	border:2px solid rgba(255,255,255,0.7);
+	border-radius:10px;
+}

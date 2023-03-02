@@ -27,7 +27,7 @@
 <petit-espace />
 
 <div class="contenu">
-	<div class="important">
+	<div class="introduction">
 		<p>
 			<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
 			Fruit de longues réflexions, elle se veut la plus

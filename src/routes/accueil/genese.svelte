@@ -21,22 +21,24 @@
 		choix.
 	</p>
 	<p>
-		La réponse a été « oui ». Évidemment, la disposition <Nom /> a été optimisée selon mes critères qui
-		ne seront probablement pas les votres. Toutefois, cela vous donnera probablement des idées si vous
-		comptez choisir une nouvelle disposition voire en créer une.
+		La réponse a été « oui ». Évidemment, la disposition <Nom /> a été optimisée selon mes critères ;
+		ce ne seront peut-être pas totalements les vôtres. Toutefois, cela vous donnera probablement des
+		idées si vous comptez choisir une nouvelle disposition voire en créer une.
 	</p>
 </section>
 <h3>Historique des modifications</h3>
 <section>
 	<p>
-		Au départ, le nom de ma disposition dérivée d’Optimot était appelée <em>Optim7</em>. Cependant,
-		passé un certain cap, ce nom a été changé en <Nom />. La disposition a beaucoup évoluée au fil
-		du temps. En particulier, la touche sur l’index gauche a plusieur fois changé :
+		Au départ, ma disposition dérivée d’Optimot était nommée <em>Optim7</em>. Cependant, passé un
+		certain cap, ce nom a été changé en <Nom />. La disposition a beaucoup évoluée au fil du temps.
+		En particulier, la touche sur l’index gauche a plusieur fois changé :
 		<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd> et enfin la création d’une touche spéciale
 		<kbd>★</kbd> et de déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 	</p>
+</section>
 
-	<h3>Comment la disposition a été créée</h3>
+<h3>Comment la disposition a été créée</h3>
+<section>
 	<p>
 		➀ La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
 		: main gauche et main droite.
