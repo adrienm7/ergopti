@@ -28,7 +28,7 @@
 	}
 
 	function majTouches() {
-		for (let i = 1; i <= 5; i++) {
+		for (let i = 1; i <= 7; i++) {
 			for (let j = 0; j <= 15; j++) {
 				// Suppression des event listeners sur la touche
 				const toucheClavier0 = document
@@ -37,7 +37,14 @@
 				const toucheClavier = toucheClavier0.cloneNode(true);
 				toucheClavier0.parentNode.replaceChild(toucheClavier, toucheClavier0);
 
-				// Nettoyage de la touche
+				// Nettoyage des attributs de la touche
+				const attributes = toucheClavier.getAttributeNames();
+				const attributesToKeep = ['data-ligne', 'data-colonne'];
+				attributes.forEach((attribute) => {
+					if (attribute.startsWith('data-') && !attributesToKeep.includes(attribute)) {
+						toucheClavier.removeAttribute(attribute);
+					}
+				});
 				toucheClavier.dataset.touche = ''; // Suppression du contenu de la touche
 				toucheClavier.classList.remove('touche-active'); // Suppression de la classe css pour les touches pressées
 
