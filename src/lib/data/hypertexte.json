@@ -413,7 +413,7 @@
 		},
 		{
 			"touche": "Space",
-			"main": "",
+			"main": "gauche",
 			"doigt": "pouce",
 			"ligne": "5",
 			"colonne": "4",
@@ -484,7 +484,7 @@
 			"taille": "1.25"
 		},
 		{
-			"touche": "Delete",
+			"touche": "BackSpace",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "1",
@@ -995,6 +995,150 @@
 			"doigt": "auriculaire",
 			"ligne": "5",
 			"colonne": "12",
+			"taille": "1"
+		},
+		{
+			"touche": "aucune",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "0",
+			"taille": "1"
+		},
+		{
+			"touche": "aucune",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "1",
+			"taille": "1"
+		},
+		{
+			"touche": "aucune",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "vide",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "LCtrl",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "LAlt",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "7",
+			"taille": "1"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "vide",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "6",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "aucune",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "0",
+			"taille": "1"
+		},
+		{
+			"touche": "aucune",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "1",
+			"taille": "1"
+		},
+		{
+			"touche": "aucune",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "Space2",
+			"main": "gauche",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "BackSpace",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "5",
+			"taille": "1"
+		},
+		{
+			"touche": "Delete",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "Win",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "7",
+			"taille": "1"
+		},
+		{
+			"touche": "RAlt",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "8",
+			"taille": "1"
+		},
+		{
+			"touche": "RShift",
+			"main": "droite",
+			"doigt": "pouce",
+			"ligne": "7",
+			"colonne": "9",
 			"taille": "1"
 		}
 	],
@@ -1527,7 +1671,7 @@
 		{
 			"touche": "CapsLock",
 			"Primary": "⌫",
-			"Shift": "⌫",
+			"Shift": "⌦",
 			"AltGr": "⌫",
 			"ShiftAltGr": "⌫",
 			"Ctrl": "⌫",
@@ -1630,7 +1774,8 @@
 		},
 		{
 			"touche": "Space",
-			"Primary": "",
+			"Primary": "HyperTexte v.1.0",
+			"Primary+": "Layer de navigation<br><span class='tap'>HyperTexte v.1.0</span>",
 			"Shift": "-",
 			"AltGr": "_",
 			"ShiftAltGr": "",
@@ -1638,6 +1783,18 @@
 			"Layer": "",
 			"À": "",
 			"type": "space"
+		},
+		{
+			"touche": "Space2",
+			"Primary": "",
+			"Primary+": "Nav<br><span class='tap'>Espace</span>",
+			"Shift": "-",
+			"AltGr": "_",
+			"ShiftAltGr": "",
+			"Ctrl": "",
+			"Layer": "",
+			"À": "",
+			"type": "special"
 		},
 		{
 			"touche": "Tab",
@@ -1663,7 +1820,7 @@
 			"type": "enter"
 		},
 		{
-			"touche": "Delete",
+			"touche": "BackSpace",
 			"Primary": "⌫",
 			"Shift": "⌫",
 			"AltGr": "⌫",
@@ -1671,6 +1828,17 @@
 			"Ctrl": "⌫",
 			"Layer": "⌫",
 			"À": "⌫",
+			"type": "special"
+		},
+		{
+			"touche": "Delete",
+			"Primary": "⌦",
+			"Shift": "⌦",
+			"AltGr": "⌦",
+			"ShiftAltGr": "⌦",
+			"Ctrl": "⌦",
+			"Layer": "⌦",
+			"À": "⌦",
 			"type": "special"
 		},
 		{
@@ -1727,6 +1895,17 @@
 			"Layer": "",
 			"À": "",
 			"type": "vide"
+		},
+		{
+			"touche": "aucune",
+			"Primary": "",
+			"Shift": "",
+			"AltGr": "",
+			"ShiftAltGr": "",
+			"Ctrl": "",
+			"Layer": "",
+			"À": "",
+			"type": "aucune"
 		}
 	]
 }
