@@ -394,6 +394,7 @@
 	let roulements_voyelles = ['ai', 'ie', 'eu', 'io', 'ou', 'oi', 'au', 'aie', 'ieu', 'you'];
 	let roulements_consonnes = ['ch', 'pl', 'ld'];
 	let texte;
+	let texte_couleur = `<span class="hyper">Couleur</span>`;
 </script>
 
 <ensemble-clavier
@@ -411,7 +412,12 @@
 		<!-- <Controles_Clavier {emplacement} {type} {couche} {couleur} {plus} {controles} /> -->
 		<controles-clavier class="btn-group">
 			<button on:click={toggleCouleur}>
-				{couleur === 'oui' ? 'Couleur ➜ Noir et blanc' : 'Noir et blanc ➜ Couleur'}
+				{#if couleur === 'oui'}
+					{@html texte_couleur} ➜ Noir et blanc
+				{/if}
+				{#if couleur !== 'oui'}
+					Noir et blanc ➜ {@html texte_couleur}
+				{/if}
 			</button>
 			<button on:click={toggleType}>
 				{type === 'iso' ? 'ISO ➜ Ergodox' : 'Ergodox ➜ ISO'}
@@ -420,9 +426,13 @@
 				{plus === 'oui' ? 'Plus ➜ Standard' : 'Standard ➜ Plus'}
 			</button>
 			{#if plus === 'non'}
-				<select bind:value={couche} on:change={() => toggleCouche(couche)}>
-					{#each couches_standard as value}<option value={value[1]}>{value[0]}</option>{/each}
-				</select>
+				<div class="select-degrade">
+					<div class="select_box">
+						<select bind:value={couche} on:change={() => toggleCouche(couche)}>
+							{#each couches_standard as value}<option value={value[1]}>{value[0]}</option>{/each}
+						</select>
+					</div>
+				</div>
 			{/if}
 			{#if plus === 'oui'}
 				<select bind:value={couche} on:change={() => toggleCouche(couche)}>

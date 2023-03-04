@@ -1714,7 +1714,7 @@
 		{
 			"touche": "LShift",
 			"Primary": "⇧",
-			"Primary+": "⇧<br><span class='tap'>Ⓒ</span>",
+			"Primary+": "⇧<br><span class='tap'>↥</span>",
 			"Shift": "⇧",
 			"AltGr": "⇧",
 			"AltGr+": ". ␣ ⇧",
