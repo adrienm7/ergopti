@@ -1,6 +1,5 @@
 <script>
 	import Bloc_Clavier from './Bloc_Clavier.svelte';
-	// import Controles_Clavier from './Controles_Clavier.svelte';
 	import data from '$lib/data/hypertexte.json';
 	import { onMount } from 'svelte';
 
@@ -81,8 +80,8 @@
 								// Cas où la touche n’est pas double
 								if (plus === 'oui') {
 									// Cas où la touche n’est pas double et + est activé
-									if (contenuTouche['Primary' + '+'] !== undefined) {
-										// Si la couche + existe
+									if ((contenuTouche['Primary' + '+'] !== undefined) & (i < 6)) {
+										// Si la couche + existe ET n’est pas en thumb cluster
 										toucheClavier.innerHTML = '<div>' + contenuTouche['Primary' + '+'] + '</div>';
 										toucheClavier.dataset.plus = 'oui';
 									} else {
@@ -105,6 +104,11 @@
 								toucheClavier.innerHTML = '<div>' + contenuTouche[couche] + '</div>';
 							}
 						}
+					}
+
+					// Corrections localisées
+					if ((type === 'ergodox') & (res.touche === 'Space')) {
+						toucheClavier.innerHTML = '<div>␣</div>';
 					}
 
 					// On ajoute des infos dans les data attributes de la touche

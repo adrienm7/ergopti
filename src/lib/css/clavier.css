@@ -1,3 +1,10 @@
+/*
+==================================
+======= Style très général =======
+==================================
+*/
+
+
 bloc-clavier {
 	--taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
@@ -48,11 +55,6 @@ bloc-clavier {
 
 
 
-
-ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
-	margin-right: 50px;
-}
-
 bloc-ligne {
     display: flex;
 }
@@ -89,6 +91,15 @@ bloc-touche[data-touche=""] {
 	display: none;
 }
 
+bloc-touche[data-touche="aucune"],
+bloc-touche[data-touche="aucune"]:hover,
+bloc-touche[data-touche="aucune"].active {
+	background-color: transparent!important;
+	border-color: transparent;
+	box-shadow: none;
+	cursor: auto;
+}
+
 bloc-touche:active,
 bloc-touche:hover,
 .touche-active {
@@ -108,6 +119,36 @@ bloc-touche:hover,
 
 
 
+
+
+/*
+===============================
+======= Version Ergodox =======
+===============================
+*/
+
+
+ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
+	margin-right: 50px;
+}
+
+ensemble-clavier[data-type="ergodox"] bloc-touche[data-doigt="pouce"]{
+	background-color: rgb(0, 10, 30);
+}
+
+ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] {
+	margin-top: 30px;
+}
+
+
+
+
+
+
+
+
+
+	
 /*
 ============================================
 ======= Style par touches et couches =======
@@ -152,7 +193,8 @@ ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="magique"] div {
 
 /* Style de toutes les touches qui changent avec HyperTexte+ */
 
-ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"]{
+ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"],
+ensemble-clavier[data-plus="oui"][data-type='ergodox'] bloc-touche[data-touche="Space"]{
 	--couleur-touche: 270deg;
 	--couleur-touche-saturation: 100%;
 	--couleur-touche-luminosite: 80%;
@@ -271,7 +313,7 @@ ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"] {
 
 
 
-bloc-touche[data-type="enter"]{ 
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]{ 
     top: 0;
     position: relative;
 	z-index: 1;
@@ -279,14 +321,14 @@ bloc-touche[data-type="enter"]{
 }
 
 
-bloc-touche[data-type="enter"] div {
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"] div {
 	font-weight: normal;
     z-index: 3;
 }
 
 
 
-bloc-touche[data-type="enter"]::before {
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]::before {
     /* On cache la jonction entre l’élément et l’after avec un rectangle */
     position: absolute;
     top: 0;
@@ -300,7 +342,7 @@ bloc-touche[data-type="enter"]::before {
     border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
 }
 
-bloc-touche[data-type="enter"]::after {
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]::after {
     position: absolute;
     top: 100%;
     right: 0;
@@ -317,19 +359,19 @@ bloc-touche[data-type="enter"]::after {
 
 
 
-bloc-touche[data-type="enter"]:active,
-bloc-touche[data-type="enter"]:hover {
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:active,
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:hover {
     position: relative;
     top: var(--descente-touche);
 }
 
-bloc-touche[data-type="enter"]:active::before,
-bloc-touche[data-type="enter"]:hover::before {
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:active::before,
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:hover::before {
     height: var(--taille-touche);
 }
 
-bloc-touche[data-type="enter"]:active::after,
-bloc-touche[data-type="enter"]:hover::after {
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:active::after,
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:hover::after {
     box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), 0 var(--profondeur-touche-pressee) 0 var(--effet-3d);
 }
 
@@ -431,27 +473,9 @@ ensemble-clavier bloc-touche[data-type="space"] {
 }
 
 
-
-ensemble-clavier[data-type="ergodox"] bloc-touche[data-doigt="pouce"]{
-	--couleur-touche: 0deg;
-	background-color: rgb(0, 10, 30);
 }
 
-ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] {
-	margin-top: 25px;
-}
 
-ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] bloc-touche[data-touche="aucune"],
-ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] bloc-touche[data-touche="aucune"]:hover,
-ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] bloc-touche[data-touche="aucune"].active,
-ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '7'] bloc-touche[data-touche="aucune"],
-ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '7'] bloc-touche[data-touche="aucune"]:hover,
-ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '7'] bloc-touche[data-touche="aucune"].active {
-	background-color: transparent!important;
-	border-color: transparent;
-	box-shadow: none;
-	cursor: auto;
-}
 
 
 
