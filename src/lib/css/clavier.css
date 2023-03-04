@@ -5,6 +5,7 @@
 */
 
 
+
 bloc-clavier {
 	--taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
@@ -100,18 +101,6 @@ bloc-touche[data-touche="aucune"].active {
 	cursor: auto;
 }
 
-bloc-touche:active,
-bloc-touche:hover,
-.touche-active {
-	position: relative;
-    top: var(--descente-touche);
-    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 1px #00000077;
-	color:black!important;
-	background-color: rgba(255, 255, 255, 0.85)!important;
-	/* --couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-pressee-luminosite), var(--transparence-touche-pressee)); */
-}
-
-
 
 
 
@@ -128,12 +117,15 @@ bloc-touche:hover,
 */
 
 
+
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
 	margin-right: 50px;
 }
 
+ensemble-clavier[data-type="ergodox"] bloc-touche[data-touche="Space"],
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-doigt="pouce"]{
-	background-color: rgb(0, 10, 30);
+	/* background-color: rgb(10, 20, 40); */
+	/* background-color: var(--couleur-fond-touche); */
 }
 
 ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] {
@@ -150,11 +142,26 @@ ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] {
 
 	
 /*
-============================================
-======= Style par touches et couches =======
-============================================
+=========================================
+======= Style général des touches =======
+=========================================
 */
 
+
+
+bloc-touche:active,
+bloc-touche:hover,
+.touche-active {
+	position: relative;
+    top: var(--descente-touche);
+    box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 1px #00000077;
+	color:black!important;
+	background-color: rgba(255, 255, 255, 0.85)!important;
+}
+
+
+
+/* Touches spéciales */
 
 bloc-touche[data-touche="LAlt"] div,
 bloc-touche[data-touche="RAlt"] div,
@@ -179,20 +186,79 @@ bloc-touche[data-touche="AltTab"] div {
 
 
 
+/* Affichage différent pour les touches mortes */
 
+ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="b"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="a"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="i"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"]{
+	--couleur-touche-luminosite: 65%;
+	--couleur-touche-saturation: 0%;
+}
 
-/* ======= HyperTexte + ======= */
-
-
-ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="lettre"] div,
-ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="français"] div,
-ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="magique"] div {
-	text-transform: uppercase;
+/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
+ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"] {
+	font-weight: normal;
 }
 
 
-/* Style de toutes les touches qui changent avec HyperTexte+ */
 
+
+
+
+
+
+
+
+/*
+=============================
+======= Couche Visuel =======
+=============================
+*/
+
+
+
+ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="lettre"] div,
+ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="français"] div {
+	text-transform: uppercase;
+}
+
+ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="double"] div {
+    line-height: 1.1;
+    font-size: calc(var(--taille-texte-touche) * 0.7);
+}
+
+ensemble-clavier[data-couche="Visuel"][data-plus="oui"] bloc-touche[data-touche="q"] div,
+ensemble-clavier[data-couche="Shift"][data-plus="oui"] bloc-touche[data-touche="q"] div {
+	text-transform: capitalize;
+	font-size: 0.9em;
+}
+
+
+
+
+
+
+
+
+
+
+/*
+==================================
+======= Style HyperTexte + =======
+==================================
+*/
+
+
+
+/* Style de toutes les touches qui changent avec HyperTexte+ */
 ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"],
 ensemble-clavier[data-plus="oui"][data-type='ergodox'] bloc-touche[data-touche="Space"]{
 	--couleur-touche: 270deg;
@@ -234,40 +300,16 @@ ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="Ta
 
 
 
-
-
-/* ======= Couche Visuel ======= */
-
-
-ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="lettre"] div,
-ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="français"] div {
+/* Couche Ctrl */
+ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="lettre"] div,
+ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="français"] div,
+ensemble-clavier[data-couche="Ctrl"] bloc-touche[data-type="magique"] div {
 	text-transform: uppercase;
 }
 
-ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="double"] div {
-    line-height: 1.1;
-    font-size: calc(var(--taille-texte-touche) * 0.7);
-}
-
-ensemble-clavier[data-couche="Visuel"][data-plus="oui"] bloc-touche[data-touche="q"] div,
-ensemble-clavier[data-couche="Shift"][data-plus="oui"] bloc-touche[data-touche="q"] div {
-	text-transform: capitalize;
-	font-size: 0.9em;
-}
-
-/* ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="Space"] div::before {
-	content: "HyperTexte v.1.0";
-	color:hsl(0, 0, 30%);
-	font-weight: 300;
-} */
 
 
-
-
-
-/* ======= Corrections localisées ======= */
-
-
+/* Layer de navigation */
 ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="à"] div,
 ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="c"] div,
 ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="d"] div,
@@ -278,26 +320,7 @@ ensemble-clavier[data-couche="Layer"] bloc-touche[data-touche="x"] div {
 }
 
 
-/* Affichage différent pour les touches mortes */
-ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
-ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="b"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="a"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="i"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"]{
-	--couleur-touche-luminosite: 70%;
-	--couleur-touche-saturation: 0%;
-}
 
-/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
-ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
-ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"] {
-	font-weight: normal;
-}
 
 
 
@@ -328,8 +351,8 @@ ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"] div {
 
 
 
+/* On cache la jonction entre la touche et le bas de la touche créé par ::after, avec un rectangle par-dessus */
 ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]::before {
-    /* On cache la jonction entre l’élément et l’after avec un rectangle */
     position: absolute;
     top: 0;
     right: 0;
@@ -342,6 +365,7 @@ ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]::before {
     border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
 }
 
+/* On crée la partie en bas de la touche Entrée */
 ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]::after {
     position: absolute;
     top: 100%;
@@ -358,6 +382,8 @@ ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]::after {
 }
 
 
+
+/* Ce qui se passe quand on presse la touche Entrée */
 
 ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:active,
 ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:hover {
@@ -381,6 +407,9 @@ ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:hover::after {
 
 
 
+
+
+
 /*
 ========================
 ======= Couleurs =======
@@ -394,31 +423,44 @@ ensemble-clavier[data-type="iso"] bloc-touche[data-type="enter"]:hover::after {
 bloc-touche[data-main="gauche"][data-doigt="index"]{
     --couleur-touche: var(--couleur-doigt-gauche-index);
 }
+
 bloc-touche[data-main="gauche"][data-doigt="majeur"]{
     --couleur-touche: var(--couleur-doigt-gauche-majeur);
 }
+
 bloc-touche[data-main="gauche"][data-doigt="annulaire"]{
     --couleur-touche: var(--couleur-doigt-gauche-annulaire);
 }
+
 bloc-touche[data-main="gauche"][data-doigt="auriculaire"]{
     --couleur-touche: var(--couleur-doigt-gauche-auriculaire);
 }
+
 bloc-touche[data-main="droite"][data-doigt="index"]{
     --couleur-touche: var(--couleur-doigt-droite-index);
 }
+
 bloc-touche[data-main="droite"][data-doigt="majeur"]{
     --couleur-touche: var(--couleur-doigt-droite-majeur);
 }
+
 bloc-touche[data-main="droite"][data-doigt="annulaire"]{
     --couleur-touche: var(--couleur-doigt-droite-annulaire);
 }
+
 bloc-touche[data-main="droite"][data-doigt="auriculaire"]{
     --couleur-touche: var(--couleur-doigt-droite-auriculaire);
 }
 
+ensemble-clavier[data-type="iso"] bloc-touche[data-type="space"] {
+	/* background-color: rgb(0, 10, 30); */
+}
 
 
-/* Couleur des touches spéciales */
+
+
+
+/* === Couleur des touches spéciales === */
 
 bloc-touche[data-type="space"],
 bloc-touche[data-type="special"],
@@ -444,11 +486,14 @@ bloc-touche[data-type="enter"]:active::after {
 
 /* Pas de changement en hover sur les touches sur le bord du clavier */
 bloc-touche[data-type="special"]:not(.touche-active):hover,
-bloc-touche[data-type="special"]:not(.touche-active):active {
+bloc-touche[data-type="special"]:not(.touche-active):active,
+bloc-touche[data-type="space"]:not(.touche-active):hover,
+bloc-touche[data-type="space"]:not(.touche-active):active {
 	background-color: rgb(14, 14, 14)!important;
 	color: white!important;
 }
 
+/* La bordure des touches des touches spéciales est en blanc pour mieux les mettre en relief */
 ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="special"],
 ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="enter"] {
 	--couleur-bordure-touche: hsla(var(--couleur-touche), 100%, 100%, 35%);
@@ -456,7 +501,10 @@ ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="enter"] {
 
 
 
-/* Si pas de couleur, ou couleur spéciale */
+
+
+/* === Si pas de couleur, ou couleur spéciale === */
+
 
 ensemble-clavier[data-couleur="non"] bloc-touche,
 ensemble-clavier[data-couleur="freq"] bloc-touche {
@@ -468,18 +516,7 @@ ensemble-clavier[data-couleur="non"] bloc-touche {
 	--transparence-touche: 15%;
 }
 
-ensemble-clavier bloc-touche[data-type="space"] {
-	background-color: rgb(0, 10, 30);
-}
-
-
-}
-
-
-
-
-
-ensemble-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
+ensemble-clavier[data-couleur="freq"] bloc-touche[data-type="lettre"] {
     --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
     --couleur-touche-saturation: 100%;
     --couleur-touche-luminosite: 80%;
@@ -493,11 +530,15 @@ ensemble-clavier[data-couleur="freq"] bloc-touche[data-type = "lettre"] {
 
 
 
+
+
+
 /*
 ==================================================
 ======= Style par emplacements de claviers =======
 ==================================================
 */
+
 
 
 #clavier-reference bloc-clavier {
