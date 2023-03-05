@@ -406,6 +406,10 @@
 	let texte;
 	let roulements_voyelles = ['ai', 'ie', 'eu', 'io', 'ou', 'oi', 'au', 'aie', 'ieu', 'you'];
 	let roulements_consonnes = ['ch', 'pl', 'ld'];
+	let texte_couleur_vers_noir_blanc =
+		'<span class="red-text-gradient">Couleur</span> ➜ Noir et blanc';
+	let texte_noir_blanc_vers_couleur =
+		'Noir et blanc ➜ <span class="red-text-gradient">Couleur</span>';
 </script>
 
 <ensemble-clavier
@@ -422,9 +426,11 @@
 		<mini-espace />
 		<controles-clavier class="btn-group">
 			<button on:click={toggleCouleur}>
-				{couleur == 'non' ? 'Noir et blanc ➜' : ''}
-				{@html '<span class="red-text-gradient">Couleur</span>'}
-				{couleur == 'oui' ? '➜ Noir et blanc' : ''}
+				{#if couleur === 'oui'}
+					{@html texte_couleur_vers_noir_blanc}
+				{:else}
+					{@html texte_noir_blanc_vers_couleur}
+				{/if}
 			</button>
 			<button on:click={toggleType}>
 				{#if type === 'ergodox'}
