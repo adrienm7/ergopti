@@ -125,7 +125,7 @@ ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-touche="Space"],
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-doigt="pouce"]{
 	/* background-color: rgb(10, 20, 40); */
-	/* background-color: var(--couleur-fond-touche); */
+	background-color: var(--couleur-fond-touche);
 }
 
 ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] {
@@ -155,7 +155,7 @@ bloc-touche:hover,
 	position: relative;
     top: var(--descente-touche);
     box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 1px #00000077;
-	color:black!important;
+	color: #333!important;
 	background-color: rgba(255, 255, 255, 0.85)!important;
 }
 
@@ -464,6 +464,7 @@ ensemble-clavier[data-type="iso"] bloc-touche[data-type="space"] {
 
 /* === Couleur des touches spéciales === */
 
+
 bloc-touche[data-type="space"],
 bloc-touche[data-type="special"],
 bloc-touche[data-type="enter"] {
@@ -474,19 +475,12 @@ bloc-touche[data-type="enter"] {
     --couleur-touche-saturation: 0%;
 }
 
-bloc-touche[data-type="enter"]::before,
-bloc-touche[data-type="enter"]::after,
-bloc-touche[data-type="enter"]:hover,
-bloc-touche[data-type="enter"]:hover::before,
-bloc-touche[data-type="enter"]:hover::after,
-bloc-touche[data-type="enter"]:active,
-bloc-touche[data-type="enter"]:active::before,
-bloc-touche[data-type="enter"]:active::after {
-    background-color: rgb(14, 14, 14)!important;
-	color: white!important;
-}
 
 /* Pas de changement en hover sur les touches sur le bord du clavier SAUF celles activables */
+bloc-touche[data-touche="Escape"]:not(.touche-active):hover,
+bloc-touche[data-type="Escape"]:not(.touche-active):active,
+bloc-touche[data-touche="Delete"]:not(.touche-active):hover,
+bloc-touche[data-type="Delete"]:not(.touche-active):active,
 bloc-touche[data-touche="BackSpace"]:not(.touche-active):hover,
 bloc-touche[data-type="BackSpace"]:not(.touche-active):active,
 bloc-touche[data-touche="Tab"]:not(.touche-active):hover,
@@ -501,14 +495,38 @@ bloc-touche[data-touche="Option"]:not(.touche-active):hover,
 bloc-touche[data-type="Option"]:not(.touche-active):active,
 bloc-touche[data-type="space"]:not(.touche-active):hover,
 bloc-touche[data-type="space"]:not(.touche-active):active {
-	background-color: rgb(14, 14, 14)!important;
-	color: white!important;
+	/* background-color: rgb(14, 14, 14)!important;
+	color: white!important; */
 }
 
 /* La bordure des touches des touches spéciales est en blanc pour mieux les mettre en relief */
 ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="special"],
+ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="space"],
 ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="enter"] {
 	--couleur-bordure-touche: hsla(var(--couleur-touche), 100%, 100%, 35%);
+}
+
+
+
+/* Touche Enter */
+
+bloc-touche[data-type="enter"]::before,
+bloc-touche[data-type="enter"]::after,
+bloc-touche[data-type="enter"]:active,
+bloc-touche[data-type="enter"]:active::before,
+bloc-touche[data-type="enter"]:active::after {
+    background-color: rgb(14, 14, 14)!important;
+	color: white!important;
+}
+
+bloc-touche[data-type="enter"]:hover,
+bloc-touche[data-type="enter"]:hover div,
+bloc-touche[data-type="enter"]:hover::before,
+bloc-touche[data-type="enter"]:hover::after
+{
+	color: #333;
+	background-color: rgb(230, 230, 230)!important;
+	box-shadow: none;
 }
 
 

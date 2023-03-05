@@ -3,6 +3,7 @@
 .accordion label h2,
 .accordion label h3
 {
+	display: inline;
 	color: #333!important;
 	-webkit-background-clip: unset;
 	background-clip: unset;
@@ -59,8 +60,6 @@ section .numero-faq:before {
 
 .accordion section label {
 	display: inline-block;
-	display: flex;
-	align-items: center;
 	margin-bottom: 0px;
 	padding: 10px;
 	cursor: pointer;
@@ -69,20 +68,29 @@ section .numero-faq:before {
 
 
 /* Bouton + */
-.accordion section label::after 
+
+.accordion section label h2::after,
+.accordion section label h3::after 
 {
 	content: '+';
 	position: absolute;
-	right: 20px;
+	bottom: 7px;
+	right: 0;
+	margin: 0;
+	padding: 0;
 	font-size: 2em;
 	color: rgba(0,0,0,0.1);
 	transition: transform 1s;
 }
-.accordion section:hover label::after 
+
+.accordion section:hover label h2::after,
+.accordion section:hover label h3::after 
 {
-	color: #333;
+	color: rgba(0,0,0,0.6);
 }
-.accordion section input:checked ~ label::after
+
+.accordion section input:checked ~ label h2::after,
+.accordion section input:checked ~ label h3::after 
 {
 	content: '+';
 	color: #fff;
@@ -95,7 +103,7 @@ section .numero-faq:before {
 {
 	width: 40px;
 	height: 40px;
-	display: flex;
+	display: inline-flex;
 	justify-content: center;
 	align-items: center;
 	color: #fff;

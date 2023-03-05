@@ -427,9 +427,9 @@
 		<controles-clavier class="btn-group">
 			<button on:click={toggleCouleur}>
 				{#if couleur === 'oui'}
-					{@html '<p class="margin0"><span class="red-text-gradient">Couleur</span>&nbsp;➜ Noir&nbsp;et&nbsp;blanc</p>'}
+					{@html '<p class="margin0"><span class="red-text-gradient">Couleur</span>&nbsp;➜ Noir&nbsp;et blanc</p>'}
 				{:else}
-					{@html '<p class="margin0">Noir&nbsp;et&nbsp;blanc ➜&nbsp;<span class="red-text-gradient">Couleur</span></p>'}
+					{@html '<p class="margin0">Noir&nbsp;et blanc ➜&nbsp;<span class="red-text-gradient">Couleur</span></p>'}
 				{/if}
 			</button>
 			<button on:click={toggleType}>
