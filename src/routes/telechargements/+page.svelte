@@ -1,3 +1,7 @@
+<script>
+	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+</script>
+
 <svelte:head>
 	<title>Téléchargements</title>
 	<meta name="description" content="About this app" />
@@ -12,7 +16,8 @@
 			<button><a href="/downloads/HyperTexte.kbe">HyperTexte.kbe</a></button>
 		</div> -->
 
-		<h3>Installation de la disponisition</h3>
+		<h2>Fichiers</h2>
+		<h3>Installation de la disposition</h3>
 		<div>
 			<a href="/files/KbdEditInstallerhypertexte_v030.exe"><button>HyperTexte.v1.0.3.exe</button></a
 			>
@@ -41,7 +46,8 @@
 	<h2>Installation</h2>
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
-		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition.
+		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition. Vous aurez
+		alors automatiquement la meilleure version de la disposition : <Nom_Plus />
 	</p>
 
 	<h2>S’entraîner virtuellement</h2>

@@ -37,6 +37,10 @@
 	<div>
 		<h1>Contact</h1>
 	</div>
-	<p>Vous pouvez contacter l’auteur de cette disposition à l’adresse moyaux.adrien@gmail.com</p>
+	<p>
+		Vous pouvez contacter l’auteur de cette disposition à l’adresse <a
+			href="mailto:moyaux.adrien@gmail.com">moyaux.adrien@gmail.com</a
+		>
+	</p>
 	<!-- <button on:click={sendA}>Envoi</button> -->
 </div>

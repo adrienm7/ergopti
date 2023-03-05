@@ -468,7 +468,7 @@ ensemble-clavier[data-type="iso"] bloc-touche[data-type="space"] {
 bloc-touche[data-type="space"],
 bloc-touche[data-type="special"],
 bloc-touche[data-type="enter"] {
-    background-color: rgb(14, 14, 14);
+    background-color: rgb(7, 7, 7);
 	color: white;
 	/* Bordure de la touche en blanc transparent */
 	--couleur-touche: 0deg; 
@@ -495,7 +495,7 @@ bloc-touche[data-touche="Option"]:not(.touche-active):hover,
 bloc-touche[data-type="Option"]:not(.touche-active):active,
 bloc-touche[data-type="space"]:not(.touche-active):hover,
 bloc-touche[data-type="space"]:not(.touche-active):active {
-	/* background-color: rgb(14, 14, 14)!important;
+	/* background-color: rgb(7, 7, 7)!important;
 	color: white!important; */
 }
 
@@ -515,7 +515,7 @@ bloc-touche[data-type="enter"]::after,
 bloc-touche[data-type="enter"]:active,
 bloc-touche[data-type="enter"]:active::before,
 bloc-touche[data-type="enter"]:active::after {
-    background-color: rgb(14, 14, 14)!important;
+    background-color: rgb(7, 7, 7)!important;
 	color: white!important;
 }
 
