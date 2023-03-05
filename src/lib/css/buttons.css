@@ -79,7 +79,7 @@ button {
 	--arrondi-bouton: 7px;
 	margin: 0 auto;
 	display: flex;
-	font-size: 0.6rem;
+	font-size: 0.7rem;
 }
 
 .btn-group>:first-child {
@@ -96,6 +96,11 @@ button {
 	border: 2px solid white;
 	border-right: 0;
 	cursor: pointer;
+}
+@media (max-width: 450px) {
+	.btn-group p {
+		width: min-content;
+	}
 }
 
 
@@ -146,7 +151,7 @@ button {
 .select-degrade::after {
 	content: "▼";
 	position: absolute;
-	top: 30%;
+	top: 35%;
 	right: 10%;
   }
 

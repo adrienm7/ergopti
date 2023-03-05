@@ -13,7 +13,8 @@ export function typography(searchNode = document.body) {
 		'kbd',
 		'code',
 		'textarea',
-		'noscript'
+		'noscript',
+		'bloc-clavier'
 	];
 	const nodes = searchNode instanceof NodeList ? searchNode : searchNode.childNodes;
 
