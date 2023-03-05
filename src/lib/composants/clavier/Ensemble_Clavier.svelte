@@ -427,23 +427,23 @@
 		<controles-clavier class="btn-group">
 			<button on:click={toggleCouleur}>
 				{#if couleur === 'oui'}
-					{@html '<p class="margin0"><span class="red-text-gradient">Couleur</span> ➜ Noir et blanc</p>'}
+					{@html '<p class="margin0"><span class="red-text-gradient">Couleur</span>&nbsp;➜ Noir et blanc</p>'}
 				{:else}
-					{@html '<p class="margin0">Noir et blanc ➜ <span class="red-text-gradient">Couleur</span></p>'}
+					{@html '<p class="margin0">Noir et blanc ➜&nbsp;<span class="red-text-gradient">Couleur</span></p>'}
 				{/if}
 			</button>
 			<button on:click={toggleType}>
 				{#if type === 'ergodox'}
-					{@html '<p class="margin0"><span class="gray-text-gradient">Ergodox</span> ➜ ISO</p>'}
+					{@html '<p class="margin0"><span class="gray-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
 				{:else}
-					{@html '<p class="margin0">ISO ➜ <span class="gray-text-gradient">Ergodox</span></p>'}
+					{@html '<p class="margin0">ISO&nbsp;➜ <span class="gray-text-gradient">Ergodox</span></p>'}
 				{/if}
 			</button>
 			<button on:click={togglePlus}>
 				{#if plus === 'oui'}
-					{@html '<p class="margin0"><span class="hyper">Plus</span> ➜ Standard</p>'}
+					{@html '<p class="margin0"><span class="hyper">Plus</span>&nbsp;➜ Standard</p>'}
 				{:else}
-					{@html '<p class="margin0">Standard ➜ <span class="hyper">Plus</span></p>'}
+					{@html '<p class="margin0">Standard ➜&nbsp;<span class="hyper">Plus</span></p>'}
 				{/if}
 			</button>
 
