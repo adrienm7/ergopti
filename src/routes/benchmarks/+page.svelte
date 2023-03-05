@@ -39,7 +39,7 @@
 
 <svelte:head>
 	<title>Benchmarks</title>
-	<meta name="description" content="About this app" />
+	<meta name="description" content="Benchmarks de la disposition HyperTexte" />
 </svelte:head>
 
 <div class="contenu">

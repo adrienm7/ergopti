@@ -50,7 +50,7 @@
 </script>
 
 <div class="banner">
-	<p>Site en construction</p>
+	<p>En construction</p>
 </div>
 
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
@@ -88,7 +88,7 @@
 		right: -41vw;
 		z-index: 9999;
 		width: 100vw;
-		height: 4rem;
+		height: 3.5rem;
 		background-color: #a40606;
 		background-image: linear-gradient(0, #c80000 0%, #ff6f00 100%);
 		transform: rotate(315deg);
@@ -101,7 +101,7 @@
 	.banner p {
 		text-transform: uppercase;
 		color: white;
-		font-size: 1.2rem;
+		font-size: clamp(10px, 1.7vw, 18px);
 		font-weight: bold;
 		text-align: center;
 		line-height: 1;

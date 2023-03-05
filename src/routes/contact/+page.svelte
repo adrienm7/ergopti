@@ -30,7 +30,10 @@
 
 <svelte:head>
 	<title>Contact</title>
-	<meta name="description" content="About this app" />
+	<meta
+		name="description"
+		content="Contactez l’auteur de la disposition HyperTexte sur cette page"
+	/>
 </svelte:head>
 
 <div class="contenu">

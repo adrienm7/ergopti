@@ -536,6 +536,7 @@ bloc-touche[data-type="enter"]:hover::after
 /* === Si pas de couleur, ou couleur spéciale === */
 
 
+
 ensemble-clavier[data-couleur="non"] bloc-touche,
 ensemble-clavier[data-couleur="freq"] bloc-touche {
     --couleur-touche-saturation: 0%;
@@ -552,6 +553,11 @@ ensemble-clavier[data-couleur="freq"] bloc-touche[data-type="lettre"] {
     --couleur-touche-luminosite: 80%;
 	--transparence-touche: 40%;
 	background-color: hsla( var(--couleur-touche), 100%, 80%, var(--transparence-touche));
+}
+
+/* Pour avoir exactement le même style d'effet 3D en couleur et noir et blanc */
+ensemble-clavier[data-couleur="oui"] bloc-touche[data-doigt="pouce"] {
+	--effet-3d: hsla(var(--couleur-touche), 0%, calc(100% - 20%), 70%);
 }
 
 

@@ -9,8 +9,8 @@
 </script>
 
 <svelte:head>
-	<title>HyperTexte+</title>
-	<meta name="description" content="About this app" />
+	<title>HyperTexte +</title>
+	<meta name="description" content="Découvrez HyperTexte +" />
 </svelte:head>
 
 <div class="contenu">
