@@ -1,6 +1,40 @@
 <script>
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/Nom_Plus.svelte';
+
+	function toggleClavier() {
+		if (clavier === 'iso') {
+			clavier = 'ergodox';
+		} else {
+			clavier = 'iso';
+		}
+	}
+
+	function toggleLangue() {
+		if (langue === 'fr') {
+			langue = 'en';
+		} else {
+			langue = 'fr';
+		}
+	}
+
+	let liste_benchmarks_fr = [
+		['Essais', 'essais'],
+		['Corpus Panaché', 'panache'],
+		['Livre de Savoir II', 'LdS'],
+		['Romans', 'romans']
+	];
+
+	let liste_benchmarks_en = [
+		['Chained English Bigrams 7 (1M)', 'chained_english_bigrams7'],
+		['Chained Proglish Bigrams 7 (1M)', 'chained_proglish_bigrams7'],
+		['Chained Code Bigrams 7 (1M)', 'chained_code_bigrams7']
+	];
+
+	let clavier = 'iso';
+	let langue = 'fr';
+	let corpus_fr = 'essais';
+	let corpus_en = 'chained_english_bigrams7';
 </script>
 
 <svelte:head>
@@ -82,7 +116,11 @@
 	<p>
 		Voici enfin les résultats de benchmark que vous attendiez. Comme vous pouvez le constater, <Nom
 		/>
-		fait beaucoup mieux que le BÉPO et au moins aussi bien qu’Optimot.
+		fait beaucoup mieux que le BÉPO et au moins aussi bien qu’Optimot. En version ISO, la version Thumbshift
+		d’Optimot fait systématiquement mieux, avec notamment une grande différence en distance parcourrue.
+		C’était un résultat attendu, car <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> et
+		<kbd>AltGr</kbd>
+		est déplacé en <kbd>Alt</kbd>. Cela explique aussi les excellents scores de Engram.
 	</p>
 	<p>
 		Il n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement la disposition
@@ -93,14 +131,44 @@
 		fluidité lors de l’écriture de texte ainsi que le confort général.
 	</p>
 
-	<h3>Benchmark sur du code informatique</h3>
-	<div class="image">
-		<img src="/img/benchmark_code.jpg" />
-	</div>
+	<button on:click={toggleLangue}>
+		{#if langue === 'fr'}
+			<p>Français ➜ Anglais</p>
+		{:else}
+			<p>Anglais ➜ Français</p>
+		{/if}
+	</button>
 
-	<h3>Benchmark sur de l’anglais</h3>
+	<button on:click={toggleClavier}>
+		{#if clavier === 'iso'}
+			<p>ISO ➜ Ergodox</p>
+		{:else}
+			<p>Ergodox ➜ ISO</p>
+		{/if}
+	</button>
+
+	{#if langue === 'fr'}
+		<select bind:value={corpus_fr}>
+			{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
+					>{infos_benchmark[0]}</option
+				>{/each}
+		</select>
+	{/if}
+	{#if langue === 'en'}
+		<select bind:value={corpus_en}>
+			{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
+					>{infos_benchmark[0]}</option
+				>{/each}
+		</select>
+	{/if}
+
+	<mini-espace />
 	<div class="image">
-		<img src="/img/benchmark_english.jpg" />
+		{#if langue === 'fr'}
+			<img src="/img/benchmarks_{clavier}/{corpus_fr}.jpg" />
+		{:else}
+			<img src="/img/benchmarks_{clavier}/{corpus_en}.jpg" />
+		{/if}
 	</div>
 </div>
 

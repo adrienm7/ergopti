@@ -49,6 +49,10 @@
 	}
 </script>
 
+<div class="banner">
+	<p>Site en construction</p>
+</div>
+
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
 
 <div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
@@ -75,6 +79,34 @@
 </div>
 
 <style>
+	.banner {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: fixed;
+		bottom: 6vw;
+		right: -41vw;
+		z-index: 9999;
+		width: 100vw;
+		height: 4rem;
+		background-color: #a40606;
+		background-image: linear-gradient(0, #c80000 0%, #ff6f00 100%);
+		transform: rotate(315deg);
+		text-align: center;
+		margin: 0 auto;
+		border: 2px solid white;
+		box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+	}
+
+	.banner p {
+		text-transform: uppercase;
+		color: white;
+		font-size: 1.2rem;
+		font-weight: bold;
+		text-align: center;
+		line-height: 1;
+	}
+
 	#afficher-clavier-reference {
 		position: fixed;
 		z-index: 101;
@@ -85,7 +117,7 @@
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
 		font-size: 1.5rem;
-		box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+		box-shadow: rgba(0, 0, 0, 0.4) 0px 0px 18px;
 	}
 
 	#clavier-ref {
