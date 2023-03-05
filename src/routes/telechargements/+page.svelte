@@ -4,7 +4,7 @@
 
 <svelte:head>
 	<title>Téléchargements</title>
-	<meta name="description" content="About this app" />
+	<meta name="description" content="Télécharger HyperTexte" />
 </svelte:head>
 
 <div class="contenu">
