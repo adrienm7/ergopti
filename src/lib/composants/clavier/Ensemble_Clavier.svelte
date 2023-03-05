@@ -27,12 +27,26 @@
 	}
 
 	function majTouches() {
-		for (let i = 1; i <= 7; i++) {
+		for (let ligne = 1; ligne <= 7; ligne++) {
 			for (let j = 0; j <= 15; j++) {
+				// Récupération de ce qui doit être affiché sur la touche
+				const res = data[type].find((el) => (el['ligne'] == ligne) & (el['colonne'] == j));
+
+				let colonne = j;
+
+				// Interversion de É et de ★ sur les claviers ISO
+				if (res !== undefined) {
+					if ((type === 'iso') & (plus === 'oui') & (res.touche === 'é')) {
+						colonne = j + 1;
+					} else if ((type === 'iso') & (plus === 'oui') & (res.touche === 'magique')) {
+						colonne = j - 1;
+					}
+				}
+
 				// Suppression des event listeners sur la touche
 				const toucheClavier0 = document
 					.getElementById(emplacement)
-					.querySelector("bloc-touche[data-ligne='" + i + "'][data-colonne='" + j + "']");
+					.querySelector("bloc-touche[data-ligne='" + ligne + "'][data-colonne='" + colonne + "']");
 				const toucheClavier = toucheClavier0.cloneNode(true);
 				toucheClavier0.parentNode.replaceChild(toucheClavier, toucheClavier0);
 
@@ -44,16 +58,14 @@
 						toucheClavier.removeAttribute(attribute);
 					}
 				});
-				toucheClavier.dataset.touche = ''; // Suppression du contenu de la touche
+				toucheClavier.dataset['touche'] = ''; // Suppression du contenu de la touche
 				toucheClavier.classList.remove('touche-active'); // Suppression de la classe css pour les touches pressées
+				toucheClavier.dataset['plus'] = 'non';
 
-				// Récupération de ce qui doit être affiché sur la touche
-				const res = data[type].find((el) => (el.ligne == i) & (el.colonne == j));
 				// console.log(res);
-
 				if (res !== undefined) {
 					const contenuTouche = data.touches.find((el) => el.touche == res.touche);
-					toucheClavier.dataset.plus = 'non';
+
 					if (contenuTouche[couche] === '') {
 						toucheClavier.innerHTML = '<div> <div>';
 					} else {
@@ -80,7 +92,7 @@
 								// Cas où la touche n’est pas double
 								if (plus === 'oui') {
 									// Cas où la touche n’est pas double et + est activé
-									if ((contenuTouche['Primary' + '+'] !== undefined) & (i < 6)) {
+									if ((contenuTouche['Primary' + '+'] !== undefined) & (ligne < 6)) {
 										// Si la couche + existe ET n’est pas en thumb cluster
 										toucheClavier.innerHTML = '<div>' + contenuTouche['Primary' + '+'] + '</div>';
 										toucheClavier.dataset.plus = 'oui';
@@ -113,10 +125,10 @@
 
 					// On ajoute des infos dans les data attributes de la touche
 					toucheClavier.dataset['touche'] = res.touche;
-					toucheClavier.dataset.colonne = j;
-					toucheClavier.dataset.doigt = res.doigt;
-					toucheClavier.dataset.main = res.main;
-					toucheClavier.dataset.type = contenuTouche.type;
+					toucheClavier.dataset['colonne'] = colonne;
+					toucheClavier.dataset['doigt'] = res.doigt;
+					toucheClavier.dataset['main'] = res.main;
+					toucheClavier.dataset['type'] = contenuTouche.type;
 					toucheClavier.style.setProperty('--taille', res.taille);
 					toucheClavier.style.setProperty('--frequence', mayzner[res.touche] / mayzner['max']);
 					toucheClavier.style.setProperty(
@@ -408,14 +420,11 @@
 	<Bloc_Clavier />
 	{#if controles === 'oui'}
 		<mini-espace />
-		<!-- <Controles_Clavier {emplacement} {type} {couche} {couleur} {plus} {controles} /> -->
 		<controles-clavier class="btn-group">
 			<button on:click={toggleCouleur}>
-				{#if couleur === 'oui'}
-					{@html '<span class="red-text-gradient">Couleur</span> ➜ Noir et blanc'}
-				{:else}
-					{@html 'Noir et blanc ➜ <span class="red-text-gradient">Couleur</span>'}
-				{/if}
+				{couleur == 'non' ? 'Noir et blanc ➜' : ''}
+				{@html '<span class="red-text-gradient">Couleur</span>'}
+				{couleur == 'oui' ? '➜ Noir et blanc' : ''}
 			</button>
 			<button on:click={toggleType}>
 				{#if type === 'ergodox'}

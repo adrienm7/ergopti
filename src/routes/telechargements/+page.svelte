@@ -7,13 +7,35 @@
 	<h1>Téléchargements</h1>
 
 	<div class="paragraphe">
-		<div class="btn-group">
+		<!-- <div class="btn-group">
 			<button><a href="/downloads/HyperTexte.exe">HyperTexte.exe</a></button>
 			<button><a href="/downloads/HyperTexte.kbe">HyperTexte.kbe</a></button>
+		</div> -->
+
+		<h3>Installation de la disponisition</h3>
+		<div>
+			<a href="/files/KbdEditInstallerhypertexte_v030.exe"><button>HyperTexte.v1.0.3.exe</button></a
+			>
+		</div>
+		<mini-espace />
+		<div>
+			<a href="/files/HyperTexte v0.30.kbe"><button>Fichier source de HyperTexte.v1.0.3</button></a>
+		</div>
+		<mini-espace />
+		<div>
+			<a aria-disabled="true"><button>HyperTextePlus.exe — Pas encore disponible</button></a>
 		</div>
 
-		<!-- <a href="/downloads/HyperTextePlus.ahk"><button>HyperTextePlus.ahk</button></a> -->
-		<!-- <a href="/downloads/HyperTextePlus.exe"><button>HyperTextePlus.exe</button></a> -->
+		<h3>Pour les comparateurs de disposition</h3>
+		<div>
+			<a href="/files/hypertexte.v1.0.3.fr.iso.txt"><button>hypertexte.v1.0.3.fr.iso</button></a>
+		</div>
+		<mini-espace />
+		<div>
+			<a href="/files/hypertexte.v1.0.3.fr.ergodox.txt"
+				><button>hypertexte.v1.0.3.fr.ergodox</button></a
+			>
+		</div>
 	</div>
 
 	<h2>Installation</h2>
