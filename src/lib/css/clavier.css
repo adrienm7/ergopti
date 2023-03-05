@@ -264,6 +264,8 @@ ensemble-clavier[data-plus="oui"][data-type='ergodox'] bloc-touche[data-touche="
 	--couleur-touche: 270deg;
 	--couleur-touche-saturation: 100%;
 	--couleur-touche-luminosite: 80%;
+	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
+	
 }
 
 
@@ -484,9 +486,19 @@ bloc-touche[data-type="enter"]:active::after {
 	color: white!important;
 }
 
-/* Pas de changement en hover sur les touches sur le bord du clavier */
-bloc-touche[data-type="special"]:not(.touche-active):hover,
-bloc-touche[data-type="special"]:not(.touche-active):active,
+/* Pas de changement en hover sur les touches sur le bord du clavier SAUF celles activables */
+bloc-touche[data-touche="BackSpace"]:not(.touche-active):hover,
+bloc-touche[data-type="BackSpace"]:not(.touche-active):active,
+bloc-touche[data-touche="Tab"]:not(.touche-active):hover,
+bloc-touche[data-type="Tab"]:not(.touche-active):active,
+bloc-touche[data-touche="CapsLock"]:not(.touche-active):hover,
+bloc-touche[data-type="CapsLock"]:not(.touche-active):active,
+bloc-touche[data-touche="Win"]:not(.touche-active):hover,
+bloc-touche[data-type="Win"]:not(.touche-active):active,
+bloc-touche[data-touche="LAlt"]:not(.touche-active):hover,
+bloc-touche[data-type="LAlt"]:not(.touche-active):active,
+bloc-touche[data-touche="Option"]:not(.touche-active):hover,
+bloc-touche[data-type="Option"]:not(.touche-active):active,
 bloc-touche[data-type="space"]:not(.touche-active):hover,
 bloc-touche[data-type="space"]:not(.touche-active):active {
 	background-color: rgb(14, 14, 14)!important;
