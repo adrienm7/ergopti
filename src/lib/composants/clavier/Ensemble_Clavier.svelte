@@ -407,9 +407,9 @@
 	let roulements_voyelles = ['ai', 'ie', 'eu', 'io', 'ou', 'oi', 'au', 'aie', 'ieu', 'you'];
 	let roulements_consonnes = ['ch', 'pl', 'ld'];
 	let texte_couleur_vers_noir_blanc =
-		'<span class="red-text-gradient">Couleur</span> ➜ Noir et blanc';
+		'<p class="margin0"><span class="red-text-gradient">Couleur</span> ➜ Noir et blanc</p>';
 	let texte_noir_blanc_vers_couleur =
-		'Noir et blanc ➜ <span class="red-text-gradient">Couleur</span>';
+		'<p  class="margin0">Noir et blanc ➜ <span class="red-text-gradient">Couleur</span></p>';
 </script>
 
 <ensemble-clavier
@@ -427,23 +427,23 @@
 		<controles-clavier class="btn-group">
 			<button on:click={toggleCouleur}>
 				{#if couleur === 'oui'}
-					{@html texte_couleur_vers_noir_blanc}
+					{@html '<p class="margin0"><span class="red-text-gradient">Couleur</span> ➜ Noir et blanc</p>'}
 				{:else}
-					{@html texte_noir_blanc_vers_couleur}
+					{@html '<p class="margin0">Noir et blanc ➜ <span class="red-text-gradient">Couleur</span></p>'}
 				{/if}
 			</button>
 			<button on:click={toggleType}>
 				{#if type === 'ergodox'}
-					{@html '<span class="gray-text-gradient">Ergodox</span>'} ➜ ISO
+					{@html '<p class="margin0"><span class="gray-text-gradient">Ergodox</span> ➜ ISO</p>'}
 				{:else}
-					ISO ➜ {@html '<span class="gray-text-gradient">Ergodox</span>'}
+					{@html '<p class="margin0">ISO ➜ <span class="gray-text-gradient">Ergodox</span></p>'}
 				{/if}
 			</button>
 			<button on:click={togglePlus}>
 				{#if plus === 'oui'}
-					{@html '<span class="hyper">Plus</span>'} ➜ Standard
+					{@html '<p class="margin0"><span class="hyper">Plus</span> ➜ Standard</p>'}
 				{:else}
-					Standard ➜ {@html '<span class="hyper">Plus</span>'}
+					{@html '<p class="margin0">Standard ➜ <span class="hyper">Plus</span></p>'}
 				{/if}
 			</button>
 
