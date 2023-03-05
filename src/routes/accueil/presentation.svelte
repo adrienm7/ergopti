@@ -211,16 +211,7 @@
 				les bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des roulements,
 				de préférence sur des doigts consécutifs dans un mouvement horizontal.
 			</p>
-			<petit-espace />
-			<EnsembleClavier
-				emplacement={'clavier-roulements'}
-				type={'iso'}
-				couche={'Visuel'}
-				couleur={'non'}
-				plus={'oui'}
-				controles={'roulements'}
-			/>
-			<petit-espace />
+
 			<h4>Très bons bigrammes voyelle-voyelle</h4>
 			<ul>
 				<li><kbd>AI</kbd></li>
@@ -237,6 +228,7 @@
 				<li><kbd>IEU</kbd></li>
 				<li><kbd>YOU</kbd></li>
 			</ul>
+
 			<h4>Très bons bigrammes consonne-consonne</h4>
 			<ul>
 				<li><kbd>SN</kbd></li>
@@ -278,6 +270,18 @@
 				</li>
 				<li><kbd>+=</kbd> utilisé en programmation pour incrémenter</li>
 			</ul>
+
+			<petit-espace />
+			<p>Vous pouvez visualiser les roulements présentés précédemment ci-desosus :</p>
+			<EnsembleClavier
+				emplacement={'clavier-roulements'}
+				type={'iso'}
+				couche={'Visuel'}
+				couleur={'non'}
+				plus={'oui'}
+				controles={'roulements'}
+			/>
+			<petit-espace />
 		</div>
 	</section>
 	<section>
@@ -320,6 +324,10 @@
 				<li>
 					<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>\</kbd-sortie>
 					car le <span class="hyper text-bold">\</span> est au-dessus du E
+				</li>
+				<li>
+					<kbd>AltGr</kbd> + <kbd>Ê</kbd> ➜ <kbd-sortie>^</kbd-sortie>
+					car le <span class="hyper text-bold">^</span> est au-dessus du E
 				</li>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>F</kbd> ➜ <kbd-sortie>*</kbd-sortie>
