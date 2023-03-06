@@ -525,7 +525,7 @@ bloc-touche[data-type="enter"]:hover::before,
 bloc-touche[data-type="enter"]:hover::after
 {
 	color: #333;
-	background-color: rgb(230, 230, 230)!important;
+	background-color: rgb(215, 215, 215)!important;
 	box-shadow: none;
 }
 
