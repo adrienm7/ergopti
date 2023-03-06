@@ -15,8 +15,12 @@
 </svelte:head>
 
 <div class="contenu">
-	<h1><Nom_Plus /></h1>
-
+	<h1 class="titre">
+		Disposition clavier<br /><span style="line-height: 0.75!important;"
+			><span class="hyper">Hyper</span><span class="texte">Texte</span><span class="glow">+</span
+			></span
+		>
+	</h1>
 	<EnsembleClavier
 		emplacement={'clavier-presentation'}
 		type={'iso'}

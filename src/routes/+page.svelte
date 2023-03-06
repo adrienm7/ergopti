@@ -57,12 +57,3 @@
 		>
 	</div>
 </div>
-
-<style>
-	.titre {
-		z-index: 2;
-		line-height: 1;
-		margin: 7vh 0;
-		font-size: 2.5rem;
-	}
-</style>

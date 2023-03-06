@@ -56,8 +56,8 @@
 
 <style>
 	:root {
-		--couleur-header: rgba(0, 0, 0, 0.8);
-		--couleur-header-mobile: rgba(0, 0, 0, 0.7);
+		--couleur-header: rgba(0, 0, 0, 0.9);
+		--couleur-header-mobile: rgba(0, 0, 0, 0.8);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
 		--espacement-items-menu: 5px;
@@ -83,7 +83,7 @@
 		padding: 0;
 		background-color: var(--couleur-header);
 		backdrop-filter: blur(30px);
-		box-shadow: 0px 0px 5px 1px var(--couleur-ombre);
+		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
 	}
 	header a {
 		color: var(--couleur-liens-header);
@@ -312,7 +312,7 @@
 			width: 5px;
 			position: relative;
 			right: calc((-1) * var(--espacement-items-menu));
-			box-shadow: 2px 0 1px 0px var(--couleur-ombre);
+			box-shadow: 2px 0 2px 0px var(--couleur-ombre);
 		}
 
 		header #menu li a {
