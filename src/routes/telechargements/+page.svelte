@@ -44,11 +44,14 @@
 	</div>
 
 	<h2>Installation</h2>
+	<h3>Instructions générales</h3>
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
 		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition. Vous aurez
 		alors automatiquement la meilleure version de la disposition : <Nom_Plus />
 	</p>
+	<h3>Comment installer la disposition sur Windows</h3>
+	<p>[À faire]</p>
 
 	<h2>S’entraîner virtuellement</h2>
 	<div class="paragraphe">[Clavier virtuel ici qui remplace ce qu’on tape en azerty]</div>

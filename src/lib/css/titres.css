@@ -71,3 +71,7 @@ h2, h3, h4 {
 	border: 2px solid rgba(255,255,255,0.7);
 	border-radius: 10px;
 }
+
+p.introduction {
+	padding: 25px;
+}

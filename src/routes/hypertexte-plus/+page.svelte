@@ -2,6 +2,7 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
+	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
 	import Raccourcis from './raccourcis.svelte';
@@ -16,6 +17,16 @@
 <div class="contenu">
 	<h1><Nom_Plus /></h1>
 
+	<EnsembleClavier
+		emplacement={'clavier-presentation'}
+		type={'iso'}
+		couche={'Visuel'}
+		couleur={'oui'}
+		plus={'oui'}
+		controles={'oui'}
+	/>
+
+	<moyen-espace />
 	<div class="introduction">
 		<p>
 			<Nom_Plus /> est une version améliorée de la disposition <Nom />.<br />Elle se rapproche de
