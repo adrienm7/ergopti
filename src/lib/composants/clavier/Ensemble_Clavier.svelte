@@ -200,9 +200,13 @@
 			toucheRCtrl
 		]) {
 			if (toucheModificatrice !== null) {
-				toucheModificatrice.addEventListener('click', function () {
-					changerCouche(toucheModificatrice);
-				});
+				toucheModificatrice.addEventListener(
+					'click',
+					function () {
+						changerCouche(toucheModificatrice);
+					},
+					{ passive: true }
+				);
 			}
 		}
 
