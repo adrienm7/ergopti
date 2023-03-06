@@ -6,12 +6,11 @@
 
 <h3>Remplacement de texte avec <kbd>★</kbd></h3>
 <p>
-	La touche <kbd>★</kbd> est surtout utilisée pour entourer du texte. Dans la plupart des éditeurs,
-	l’appui sur cette touche va directement écrire <kbd-sortie>""</kbd-sortie>. Il est toutefois tout
-	à fait possible de l’utiliser comme touche de raccourci, car là encore les mots
-	<kbd-non>C"</kbd-non> et <kbd-non>GT"</kbd-non> n’existent pas. Ainsi, l’écriture de l’abréviation
-	puis du guillemet ne va pas écrire de guillemet mais plutôt transformer le texte écrit.
+	La touche <kbd>★</kbd> va normalement répéter la dernière touche frappée. Toutefois, dans le cas
+	où l’abréviation existe dans votre liste, alors elle sera envoyée à la place. Ainsi, <kbd>★R</kbd>
+	envoie le raccourci « Rien », tandis que <kbd>AR★IVER</kbd> enverra <kbd>ARRIVER</kbd>.
 </p>
+<p>Liste de quelques-une</p>
 
 <ul class="margin-top-2">
 	<li><kbd>A"</kbd> ➜ <kbd-sortie>AINSI</kbd-sortie></li>

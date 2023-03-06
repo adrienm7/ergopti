@@ -1,6 +1,7 @@
 <script>
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/Nom_Plus.svelte';
+	import SFB from '$lib/composants/SFB.svelte';
 
 	function toggleClavier() {
 		if (clavier === 'iso') {
@@ -45,7 +46,7 @@
 <div class="contenu">
 	<h1>Benchmarks</h1>
 
-	<p>
+	<p class="introduction">
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
 		KLAnext est l’un d’entre eux et peut être gratuitement utilisé à l’adresse <a
 			href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a
@@ -54,113 +55,159 @@
 	</p>
 
 	<h2>Comment bien utiliser KLAnext</h2>
+	<section>
+		<p>
+			Pour bien utiliser des comparateurs de disposition, il faut <strong
+				>comparer ce qui est comparable</strong
+			>. Ceci est très important, car si vous ne le faites pas, alors vos résultats n’auront aucune
+			valeur.
+		</p>
 
-	<p>
-		Pour bien utiliser des comparateurs de disposition, il faut comparer ce qui est comparable. Ceci
-		est très important. Ainsi, ne comparez pas une disposition ISO avec une disposition Ergodox.
-		Sinon, logiquement la disposition Ergodox sera mieux notée. Elle aura en effet une distance aux
-		touches moindre, car les pouces seront beaucoup plus mis à contribution. De plus, il y aura
-		moins de SFBs, car Shift, Enter, etc. ne seront plus sur les auriculaires mais les pouces.
-	</p>
-	<mini-espace />
-	<p>
-		Un autre point à bien faire attention est de <strong
-			>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</strong
-		>. Une disposition faite pour la langue anglaise aura de très bons scores pour des textes
-		français. Cela s’explique parce que tous les caractères accentués seront "sautés", n’existant
-		pas dans la disposition.
-	</p>
-	<mini-espace />
-	<p>
-		En conclusion, comparer des dispositions n’est pas aussi simple qu’on pourrait le penser.
-		Comparez avec le même type de clavier et avec exactement les mêmes caractères sur les touches.
-		En outre, la philosophie derrière la construction du clavier doit être prise en compte. En
-		effet, certaines dispositions comme Optimot préfèrent mettre l’apostrophe droite en accès direct
-		plutôt que celle typographique, partant du principe que la plupart des éditeurs de texte
-		remplaceront de toute manière par l’apostrophe typographique. Dans ce cas précis, le caractère
-		faisant office d’"apostrophe" est l’apostrophe droite, alors que d’autres dispositions comme <Nom
-		/> fait la distinction entre les deux. Pour comparer avec le plus d’exactitude les dispositions,
-		il faudrait modifier l’une des dispositions pour soit remplacer l’apostrophe typographique par une
-		apostrophe droite, soit ajoutant une apostrophe typographique dans la disposition n’en ayant pas.
-	</p>
-	<p class="text-bold">
-		➜ Comparer ce qui est comparable. Si le symbole n’existe pas dans la disposition, la touche ne
-		sera pas tapée.
-	</p>
+		<h3>Comparez le même type de clavier</h3>
+		<p>
+			Ne comparez pas une disposition ISO avec une disposition Ergodox. Sinon, logiquement la
+			disposition Ergodox sera mieux notée. Elle aura en effet une distance aux touches moindre, car
+			les pouces seront beaucoup plus mis à contribution. En outre, les <SFB />s seront diminués,
+			car <kbd>Shift</kbd>, <kbd>Enter</kbd>, etc. ne seront plus sur les auriculaires mais sur les
+			pouces.
+		</p>
+
+		<h3>Comparez des claviers possédant une touche pour tous les caractères du corpus</h3>
+		<p>
+			Un autre point à bien faire attention est de <strong
+				>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</strong
+			>. Une disposition faite pour la langue anglaise aura de très bons scores pour des textes
+			français. Cela s’explique parce que tous les caractères accentués seront "sautés", n’existant
+			pas dans la disposition anglophone.
+		</p>
+		<h3>Conclusion sur la comparaison de dispositions</h3>
+		<p>
+			Comparer des dispositions n’est pas aussi simple qu’on pourrait de prime abord le penser. Il
+			ne suffit pas de balancer son texte et sa disposition dans un comparateur et de le faire
+			tourner.
+		</p>
+
+		<p>
+			En outre, la philosophie derrière la construction du clavier doit être prise en compte.
+			Certaines dispositions comme Optimot préfèrent mettre l’apostrophe droite en accès direct
+			plutôt que celle typographique, partant du principe que la plupart des éditeurs de texte la
+			remplaceront de toute manière par l’apostrophe typographique. Dans ce cas précis, le caractère
+			faisant office d’"apostrophe" est l’apostrophe droite, alors que d’autres dispositions comme
+			une version précédente d’<Nom /> font la distinction entre les deux.
+		</p>
+		<p>
+			Pour comparer avec le plus d’exactitude les dispositions, il faudrait alors les modifier pour
+			soit remplacer l’apostrophe typographique par une apostrophe droite, soit en ajoutant une
+			apostrophe typographique dans la disposition n’en ayant pas.
+		</p>
+		<p class="text-bold">
+			➜ Comparer ce qui est comparable. Si le symbole n’existe pas dans la disposition, la touche ne
+			sera pas tapée.
+		</p>
+	</section>
 
 	<h2>La question du corpus</h2>
-	<p>
-		Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste encore
-		la question du corpus. Effectivement, vos résultats vont également différer selon le corpus
-		utilisé. Un corpus avec beaucoup de dialogues aura beaucoup de "je" alors qu’au contraire un
-		corpus plus "sérieux" aura beaucoup de z dû au vouvoiement.
-	</p>
+	<section>
+		<p>
+			Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste
+			encore la <strong>question fondamentale du corpus</strong>. Effectivement, vos résultats vont
+			sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de dialogues aura
+			beaucoup de "je", un corpus plus "sérieux" aura beaucoup de z dû au vouvoiement tandis qu’un
+			corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée du mot "wagon".
+		</p>
+		<p>
+			Évidemment, plus votre corpus sera volumineux, plus vos résultats seront crédibles. Toutefois,
+			cela augmentera d’autant les temps de calcul.
+		</p>
 
-	<p>
-		Par conséquent, ne prenez les résultats ci-dessous que comme des indicatiosn générales. Une
-		disposition meilleure de 2,48% sur un certain corpus n’implique pas que la disposition soit
-		meilleure de 2,48% en général. En outre, passé une certaine performance, les gains sont
-		marginaux. Par exemple, il serait probablement possible d’améliorer encore les résultats de <Nom
-		/> sur KLAnext, mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme
-		le comfort général ou la disparition de certains roulements. Autre exemple, certaines dispositions
-		optimisent tellement que les chiffres ne sont pas dans l’ordre mais plutôt du genre 3210987654. Cela
-		rend la disposition beaucoup moins logique et donc plus difficile à apprendre, pour seulement optimiser
-		légèrement leurs scores. Il serait aussi possible de faire cela pour les majuscules : il paraît évident
-		que la majuscule d’une lettre soit en Shift + Lettre. Pourtant, il serait tout à fait possible que
-		cela ne soit pas le cas, mais cela impliquerait alors d’apprendre deux fois plus de choses : où sont
-		les lettren, et où sont les majuscules. Tout cela pour peu de gains si ce n’est avoir un score légèrement
-		supérieur sur les comparateurs de dispositions.
-	</p>
+		<p>
+			En conclusion, <strong
+				>ne prenez les résultats des benchmarks que comme des tendances générales</strong
+			>. Une disposition meilleure de 2,48% sur un certain corpus n’implique pas que la disposition
+			soit meilleure de 2,48% en général. En outre, passé une certaine performance, les gains sont
+			marginaux.
+		</p>
+		<p>
+			Par exemple, il serait probablement possible d’améliorer encore les résultats de <Nom /> sur KLAnext,
+			mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le comfort général
+			ou la disparition de certains roulements. Autre exemple, certaines dispositions optimisent tellement
+			que les chiffres ne sont pas dans l’ordre mais plutôt du genre 3210987654. Cela rend la disposition
+			beaucoup moins logique et donc plus difficile à apprendre, pour seulement optimiser légèrement
+			leurs scores.
+		</p>
+		<p>
+			Il serait aussi possible de faire cela pour les majuscules. Cela nous paraît évident que la
+			majuscule d’une lettre soit en Shift + Lettre. Pourtant, il serait tout à fait possible que
+			cela ne soit pas le cas, mais cela impliquerait alors d’apprendre deux fois plus de choses :
+			où sont les lettres, et où sont les majuscules. Tout cela pour peu de gains si ce n’est
+			d’avoir un score légèrement supérieur sur les comparateurs de dispositions.
+		</p>
+	</section>
 
 	<h2>Résultats de benchmarks</h2>
-	<p>
-		Voici enfin les résultats de benchmark que vous attendiez. Comme vous pouvez le constater, <Nom
-		/>
-		fait beaucoup mieux que le BÉPO et au moins aussi bien qu’Optimot. En version ISO, la version Thumbshift
-		d’Optimot fait systématiquement mieux, avec notamment une grande différence en distance parcourrue.
-		C’était un résultat attendu, car <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> et
-		<kbd>AltGr</kbd>
-		est déplacé en <kbd>Alt</kbd>. Cela explique aussi les excellents scores de Engram.
-	</p>
-	<p>
-		Il n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement la disposition
-		clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre est mieux
-		notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier de type
-		Ergodox et ne peut donc pas être utilisée sur les claviers standards. En outre, elle a aussi une
-		faible alternance des mains ainsi que la touche E sur le pouce gauche, ce qui peut entraver la
-		fluidité lors de l’écriture de texte ainsi que le confort général.
-	</p>
+	<section>
+		<p>
+			Voici enfin les résultats de benchmark que vous attendiez. Comme vous pouvez le constater, <Nom
+			/>
+			fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
+		</p>
+		<p>
+			À noter qu’en version ISO, la version Thumbshift d’Optimot fait systématiquement mieux qu’<Nom
+			/>, avec notamment une grande différence en distance parcourue. C’était un résultat attendu,
+			car dans cette disposition <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> tandis que
+			<kbd>AltGr</kbd>
+			est quant à lui déplacé en <kbd>Alt</kbd>. Cela explique aussi les excellents scores de
+			Engram, qui a le même placement des touches <kbd>Shift</kbd> et <kbd>AltGr</kbd>.
+		</p>
+		<p>
+			En version Ergodox, <Nom /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
+			la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
+			est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
+			de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
+			a une faible alternance des mains ainsi que la touche E sur le pouce gauche, ce qui peut entraver
+			la fluidité lors de l’écriture de texte ainsi que le confort général.
+		</p>
+		<p>
+			Enfin, gardez en tête que les dispositions dont le nom est préfixé par « en » plutot que
+			« fr » ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles
+			vont donc forcément surperformer sur les corpus français. Et même sur les corpus anglais,
+			elles feront un peu mieux car il y aura moins de touches à disposer et donc plus de meilleurs
+			emplacements.
+		</p>
+	</section>
+	<mini-espace />
+	<div class="btn-group">
+		<button on:click={toggleLangue}>
+			{#if langue === 'fr'}
+				<p>Français ➜ Anglais</p>
+			{:else}
+				<p>Anglais ➜ Français</p>
+			{/if}
+		</button>
 
-	<button on:click={toggleLangue}>
+		<button on:click={toggleClavier}>
+			{#if clavier === 'iso'}
+				<p>ISO ➜ Ergodox</p>
+			{:else}
+				<p>Ergodox ➜ ISO</p>
+			{/if}
+		</button>
+
 		{#if langue === 'fr'}
-			<p>Français ➜ Anglais</p>
-		{:else}
-			<p>Anglais ➜ Français</p>
+			<select bind:value={corpus_fr}>
+				{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
+						>{infos_benchmark[0]}</option
+					>{/each}
+			</select>
 		{/if}
-	</button>
-
-	<button on:click={toggleClavier}>
-		{#if clavier === 'iso'}
-			<p>ISO ➜ Ergodox</p>
-		{:else}
-			<p>Ergodox ➜ ISO</p>
+		{#if langue === 'en'}
+			<select bind:value={corpus_en}>
+				{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
+						>{infos_benchmark[0]}</option
+					>{/each}
+			</select>
 		{/if}
-	</button>
-
-	{#if langue === 'fr'}
-		<select bind:value={corpus_fr}>
-			{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
-					>{infos_benchmark[0]}</option
-				>{/each}
-		</select>
-	{/if}
-	{#if langue === 'en'}
-		<select bind:value={corpus_en}>
-			{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
-					>{infos_benchmark[0]}</option
-				>{/each}
-		</select>
-	{/if}
+	</div>
 
 	<mini-espace />
 	<div class="image">
@@ -181,7 +228,9 @@
 	.image img {
 		width: 80%;
 		margin: 0 auto;
+		border: 10px solid rgb(255, 255, 255);
 		border-radius: 10px;
+		box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px;
 		text-align: center;
 	}
 

@@ -86,7 +86,7 @@
 		position: fixed;
 		bottom: 6vw;
 		right: -41vw;
-		z-index: 9999;
+		z-index: 99;
 		width: 100vw;
 		height: 3.5rem;
 		background-color: #a40606;

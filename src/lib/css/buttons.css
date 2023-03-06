@@ -82,6 +82,7 @@ button p {
 .btn-group {
 	--arrondi-bouton: 7px;
 	margin: 0 auto;
+	width: fit-content; /* Pour centrer */
 	display: flex;
 	font-size: 0.7rem;
 }
@@ -109,16 +110,21 @@ button p {
 
 
 
-.btn-group select {
-	position: relative;
-	height: 100%;
+ensemble-clavier .btn-group select {
 	background-image: linear-gradient(to left, var(--gradient-purple));
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;
+	border: none;
+}
+.btn-group select {
+	position: relative;
+	height: 100%;
 	line-height: 1.3;
 	border: 0;
 	font-family: inherit;
+	border: 2px solid white;
+	border-radius: 0 var(--arrondi-bouton) var(--arrondi-bouton) 0;
 }
 
 .btn-group select option {
