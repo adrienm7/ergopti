@@ -2,8 +2,9 @@
 	import Header from '$lib/composants/Header.svelte';
 	import Footer from '$lib/composants/Footer.svelte';
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
+	import { onMount } from 'svelte';
 	import { typography } from '$lib/js/typography.js';
-	import { matomo } from '$lib/js/code-matomo.js';
+	import Matomo, { matomo } from '@dexlib/svelte-matomo';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -15,28 +16,12 @@
 	import '$lib/css/accordion.css';
 	import '$lib/css/miscellaneous.css';
 
-	import { onMount } from 'svelte';
+	const url = 'https://stats.beseven.fr';
+	const siteId = 6;
 
-	onMount(async () => {
+	onMount(() => {
+		matomo.trackPageView();
 		typography();
-		// matomo();
-		var _paq = window._paq || [];
-		/* tracker methods like "setCustomDimension" should be called before "trackPageView" */
-		_paq.push(['trackPageView']);
-		_paq.push(['enableLinkTracking']);
-		(function () {
-			var u = 'https://stats.beseven.fr/';
-			_paq.push(['setTrackerUrl', u + 'm.php']);
-			_paq.push(['setSiteId', '6']);
-			var d = document,
-				g = d.createElement('script'),
-				s = d.getElementsByTagName('script')[0];
-			g.type = 'text/javascript';
-			g.async = true;
-			g.defer = true;
-			g.src = u + 'm.js';
-			s.parentNode.insertBefore(g, s);
-		})();
 	});
 
 	let zIndex = -999;
@@ -49,6 +34,7 @@
 	}
 </script>
 
+<Matomo {url} {siteId} />
 <div class="banner">
 	<p>En construction</p>
 </div>
