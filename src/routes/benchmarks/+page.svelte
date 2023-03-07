@@ -44,7 +44,7 @@
 </svelte:head>
 
 <div class="contenu">
-	<h1>Benchmarks</h1>
+	<h1 data-aos="zoom-in" data-aos-mirror="true">Benchmarks</h1>
 
 	<p class="introduction">
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
@@ -54,7 +54,7 @@
 		serait plus "juste" que les autres.
 	</p>
 
-	<h2>Comment bien utiliser KLAnext</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Comment bien utiliser KLAnext</h2>
 	<section>
 		<p>
 			Pour bien utiliser des comparateurs de disposition, il faut <strong
@@ -106,7 +106,7 @@
 		</p>
 	</section>
 
-	<h2>La question du corpus</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">La question du corpus</h2>
 	<section>
 		<p>
 			Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste
@@ -144,7 +144,7 @@
 		</p>
 	</section>
 
-	<h2>Résultats de benchmarks</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Résultats de benchmarks</h2>
 	<section>
 		<p>
 			Voici enfin les résultats de benchmark que vous attendiez. Comme vous pouvez le constater, <Nom

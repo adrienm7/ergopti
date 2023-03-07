@@ -15,7 +15,7 @@
 </svelte:head>
 
 <div class="contenu">
-	<h1 class="titre">
+	<h1 class="titre" data-aos="zoom-in" data-aos-mirror="true">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"
 			><span class="hyper">Hyper</span><span class="texte">Texte</span><span class="glow">+</span
 			></span
@@ -102,7 +102,7 @@
 			<input type="checkbox" name="acc" id="acc1" />
 			<label for="acc1">
 				<span class="numero-faq" />
-				<h2>Roulements et diminution des SFBs</h2>
+				<h2 data-aos="zoom-out" data-aos-mirror="true">Roulements et diminution des SFBs</h2>
 			</label>
 			<div class="content">
 				<Roulements_SFB />
@@ -112,7 +112,7 @@
 			<input type="checkbox" name="acc" id="acc2" />
 			<label for="acc2">
 				<span class="numero-faq" />
-				<h2>Abréviations</h2>
+				<h2 data-aos="zoom-out" data-aos-mirror="true">Abréviations</h2>
 			</label>
 			<div class="content">
 				<Abreviations />
@@ -122,7 +122,7 @@
 			<input type="checkbox" name="acc" id="acc3" />
 			<label for="acc3">
 				<span class="numero-faq" />
-				<h2>Confort</h2>
+				<h2 data-aos="zoom-out" data-aos-mirror="true">Confort</h2>
 			</label>
 			<div class="content">
 				<Confort />
@@ -132,7 +132,7 @@
 			<input type="checkbox" name="acc" id="acc4" />
 			<label for="acc4">
 				<span class="numero-faq" />
-				<h2>Raccourcis</h2>
+				<h2 data-aos="zoom-out" data-aos-mirror="true">Raccourcis</h2>
 			</label>
 			<div class="content">
 				<Raccourcis />

@@ -30,3 +30,16 @@ enorme-espace {
 	display: block;
 	height: 50vh;
 }
+	
+hr {
+    border: 0;
+    height: 1px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+}
+
+.titre-orange {
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+	background-image: linear-gradient(90deg, #fcaa00, #ff6300 30%, #ff0063 100%);
+	box-decoration-break: clone;  
+}

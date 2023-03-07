@@ -5,7 +5,7 @@
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 </script>
 
-<h2>Genèse et raison des choix</h2>
+<h2 data-aos="zoom-out" data-aos-mirror="true">Genèse et raison des choix</h2>
 <section>
 	<h3>Genèse</h3>
 	<p>
@@ -37,7 +37,7 @@
 		<kbd>★</kbd> et de déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 	</p>
 </section>
-
+<moyen-espace />
 <section>
 	<h3>Comment la disposition a été créée</h3>
 	<p>

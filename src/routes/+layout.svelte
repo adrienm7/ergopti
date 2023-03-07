@@ -16,6 +16,7 @@
 	import '$lib/css/buttons.css';
 	import '$lib/css/accordion.css';
 	import '$lib/css/aos.css';
+	import '$lib/css/orb.css';
 	import '$lib/css/miscellaneous.css';
 
 	const url = 'https://stats.beseven.fr';
@@ -25,24 +26,6 @@
 		matomo.trackPageView();
 		AOS.init();
 		typography();
-
-		// Récupération de tous les éléments h de la page
-		const h1Elements = document.querySelectorAll('h1');
-		const h2Elements = document.querySelectorAll('h2');
-		const h3Elements = document.querySelectorAll('h3');
-
-		h1Elements.forEach((h1Element) => {
-			h1Element.setAttribute('data-aos', 'zoom-in');
-			h1Element.setAttribute('data-aos-mirror', 'true');
-		});
-		h2Elements.forEach((h2Element) => {
-			h2Element.setAttribute('data-aos', 'fade-right');
-			h2Element.setAttribute('data-aos-mirror', 'true');
-		});
-		h3Elements.forEach((h3Element) => {
-			h3Element.setAttribute('data-aos', 'fade-right');
-			h3Element.setAttribute('data-aos-mirror', 'true');
-		});
 	});
 
 	let zIndex = -999;
