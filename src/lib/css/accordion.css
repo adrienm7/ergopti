@@ -168,14 +168,7 @@ section .numero-faq:before {
 	z-index: 10;
 }
 
-.accordion bloc-clavier {
-	--taille-touche: min(47px, 100vw / 20)!important;
-	--marge-touche: min(3px, 0.35vw)!important;
-	--profondeur-touche: 1px!important;
-	--profondeur-touche-pressee: 0.5px!important;
-	background-color: rgb(0, 2, 16);
-	box-shadow: none;
-}
+
 
 
 
