@@ -24,32 +24,23 @@ h2 {
 	/* border-radius: 7px; */
 	color: rgba(198, 241, 255, 0.9);
 	width: fit-content;
-	/* border: 1px solid rgba(0, 2, 60, 0.6); */
-	/* box-shadow: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0, 0.3) 0px 30px 60px -30px, rgba(10, 37, 64, 0.35) 0px -2px 6px 0px inset; */
 }
 
-
-
-/* h2::after,
-h3::after {
-	content: '';
-	display: block;
-	position: relative;
-	top: 5px;
-	width: 100%;
-	height: 5px;
-	border-radius: 5px;
-	background-image: linear-gradient(to right, var(--gradient-blue));
-} */
-
-/* h3::after {
-	background-image: linear-gradient(to right, var(--gradient-purple));
-} */
 
 h3 {
     margin-top: 18vh;
     margin-bottom: 8vh;
 	font-size: 1.8rem;
+
+	padding: 0.15em 0.6em 0.3em 0.6em;
+	background-color: rgb(0, 1, 55);
+	border-radius: 7px;
+	color: rgba(217, 198, 255, 0.9);
+	width: fit-content;
+}
+
+section h3 {
+	margin-top: 0;
 }
 
 h4 {
