@@ -5,7 +5,7 @@
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 </script>
 
-<h2>Disposition clavier optimisée</h2>
+<h2 data-aos="zoom-out" data-aos-mirror="true">Disposition clavier optimisée</h2>
 
 <div class="accordion">
 	<section>

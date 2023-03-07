@@ -5,7 +5,7 @@
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 </script>
 
-<h2>Autocritiques</h2>
+<h2 data-aos="zoom-out" data-aos-mirror="true">Autocritiques</h2>
 
 <section>
 	<h3>L’importance des compromis</h3>

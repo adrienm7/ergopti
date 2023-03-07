@@ -8,7 +8,7 @@
 </svelte:head>
 
 <div class="contenu">
-	<h1>Téléchargements</h1>
+	<h1 data-aos="zoom-in" data-aos-mirror="true">Téléchargements</h1>
 
 	<div class="paragraphe">
 		<!-- <div class="btn-group">
@@ -16,7 +16,7 @@
 			<button><a href="/downloads/HyperTexte.kbe">HyperTexte.kbe</a></button>
 		</div> -->
 
-		<h2>Fichiers</h2>
+		<h2 data-aos="zoom-out" data-aos-mirror="true">Fichiers</h2>
 		<h3>Installation de la disposition</h3>
 		<div>
 			<a href="/files/KbdEditInstallerhypertexte_v030.exe"><button>HyperTexte.v1.0.3.exe</button></a
@@ -43,7 +43,7 @@
 		</div>
 	</div>
 
-	<h2>Installation</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
 	<h3>Instructions générales</h3>
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
@@ -53,6 +53,6 @@
 	<h3>Comment installer la disposition sur Windows</h3>
 	<p>[À faire]</p>
 
-	<h2>S’entraîner virtuellement</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">S’entraîner virtuellement</h2>
 	<div class="paragraphe">[Clavier virtuel ici qui remplace ce qu’on tape en azerty]</div>
 </div>

@@ -38,7 +38,7 @@
 
 <div class="contenu">
 	<div>
-		<h1>Contact</h1>
+		<h1 data-aos="zoom-in" data-aos-mirror="true">Contact</h1>
 	</div>
 	<p>
 		Vous pouvez contacter l’auteur de cette disposition à l’adresse <a

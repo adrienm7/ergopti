@@ -17,7 +17,7 @@
 </svelte:head>
 
 <div class="presentation">
-	<h1 class="titre">
+	<h1 class="titre" data-aos="zoom-in" data-aos-mirror="true">
 		Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="texte"
 			>Texte&nbsp;—</span
 		>
@@ -33,35 +33,343 @@
 	/>
 </div>
 <petit-espace />
-
 <div class="contenu">
-	<div class="introduction">
-		<p>
-			<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
-			Fruit de longues réflexions, elle se veut la plus
-			<span class="text-glow">optimale</span>
-			possible. Cette page vous présente la disposition ainsi que ses nombreux avantages.
-		</p>
-	</div>
+	<hr />
+	<p class="introduction-text">
+		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
+		Fruit de longues réflexions, elle se veut la plus
+		<span class="text-glow">optimale</span>
+		possible. Cette page vous présente la disposition ainsi que ses nombreux avantages.
+	</p>
+	<hr />
 
 	<Presentation />
 	<Genese />
 	<Autocritiques />
 
-	<h2><span class="glow">★</span> Pour aller plus loin</h2>
-	<div class="important">
-		<p>
-			<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués, les
-			roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
-		</p>
-		<p>
-			Cependant, ces excellents résultats sont le fruit d’une fraude. En effet, ils nécessitent
-			d’avoir un logiciel comme AutoHotkey qui permet de se faire des raccourcis personnalisés. Il
-			faudra aussi accepter d’apprendre des enchaînements de touches supplémentaires.
-		</p>
-		<mini-espace />
-		<a href="/hypertexte-plus" style="text-decoration: none"
-			><button style="display:block; margin: 0 auto;"><Nom_Plus /></button></a
-		>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">
+		<span class="glow">★</span>
+	</h2>
+	<div id="orb">
+		<div class="wrap">
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+			<div class="c" />
+		</div>
+		<h2 class="titre-orange text-center" style="margin: 0 auto; padding-top: 20vh;">
+			Pour aller <b>+</b> loin
+		</h2>
+		<div class="texte-orb">
+			<hr />
+			<p class="introduction-text">
+				<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
+				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
+			</p>
+			<hr />
+			<mini-espace />
+			<a href="/hypertexte-plus" style="text-decoration: none"
+				><button
+					style="display:block; margin: 0 auto; background: rgba(0, 0, 0, 0.2); padding: 10px; padding-top: 6px; border-radius: 3px; border: 1px solid white;"
+					><Nom_Plus /></button
+				></a
+			>
+		</div>
 	</div>
 </div>
