@@ -25,6 +25,7 @@
 	"dependencies": {
 		"@dexlib/svelte-matomo": "^0.1.4",
 		"@sveltejs/adapter-static": "^1.0.0-next.48",
+		"aos": "^2.3.4",
 		"nodemailer": "^6.9.1",
 		"svelte-email": "^0.0.4"
 	}
