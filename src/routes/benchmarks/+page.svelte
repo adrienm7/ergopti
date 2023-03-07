@@ -179,34 +179,35 @@
 	<div class="btn-group">
 		<button on:click={toggleLangue}>
 			{#if langue === 'fr'}
-				<p>Français ➜ Anglais</p>
+				{@html '<p><span class="hyper">Français</span>➜&nbsp;<span class="texte">Anglais</span></p>'}
 			{:else}
-				<p>Anglais ➜ Français</p>
+				{@html '<p><span class="texte">Anglais</span> ➜&nbsp;<span class="hyper">Français</span></p>'}
 			{/if}
 		</button>
 
 		<button on:click={toggleClavier}>
-			{#if clavier === 'iso'}
-				<p>ISO ➜ Ergodox</p>
+			{#if clavier === 'ergodox'}
+				{@html '<p><span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
 			{:else}
-				<p>Ergodox ➜ ISO</p>
+				{@html '<p>ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
 			{/if}
 		</button>
-
-		{#if langue === 'fr'}
-			<select bind:value={corpus_fr}>
-				{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
-						>{infos_benchmark[0]}</option
-					>{/each}
-			</select>
-		{/if}
-		{#if langue === 'en'}
-			<select bind:value={corpus_en}>
-				{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
-						>{infos_benchmark[0]}</option
-					>{/each}
-			</select>
-		{/if}
+		<div>
+			{#if langue === 'fr'}
+				<select bind:value={corpus_fr}>
+					{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
+							>{infos_benchmark[0]}</option
+						>{/each}
+				</select>
+			{/if}
+			{#if langue === 'en'}
+				<select bind:value={corpus_en}>
+					{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
+							>{infos_benchmark[0]}</option
+						>{/each}
+				</select>
+			{/if}
+		</div>
 	</div>
 
 	<mini-espace />

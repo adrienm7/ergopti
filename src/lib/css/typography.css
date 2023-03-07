@@ -80,11 +80,11 @@ strong,
 
 
 .important {
-	background-color: rgba(150, 150, 150, 0.3);
+	background-color: rgba(0, 0, 0, 0.5);
 	backdrop-filter: blur(60px);
 	padding: 20px;
 	border-radius: 10px;
-	border: 1px solid rgba(80, 80, 80, 0.5);
+	border: 2px solid rgba(80, 80, 80, 0.5);
 	box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
 }
 .important p {
@@ -196,8 +196,7 @@ strong,
 	box-decoration-break: clone;
 	background-image: linear-gradient(to right, var(--gradient-blue));
 }
-.texte,
-h3 {
+.texte {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
@@ -207,7 +206,7 @@ h3 {
 	background-image: linear-gradient(to left, var(--gradient-purple));
 }
 
-.gray-text-gradient {
+.ergodox-text-gradient {
 	background: -webkit-linear-gradient(#eee, #888888);
 	background: -webkit-linear-gradient(#1aff00, #107400);
 	background-clip: text;

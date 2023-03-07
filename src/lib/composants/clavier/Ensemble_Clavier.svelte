@@ -434,9 +434,9 @@
 			</button>
 			<button on:click={toggleType}>
 				{#if type === 'ergodox'}
-					{@html '<p><span class="gray-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
+					{@html '<p><span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
 				{:else}
-					{@html '<p>ISO&nbsp;➜ <span class="gray-text-gradient">Ergodox</span></p>'}
+					{@html '<p>ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
 				{/if}
 			</button>
 			<button on:click={togglePlus}>
@@ -463,9 +463,11 @@
 	{#if controles === 'roulements'}
 		<controles-clavier class="btn-group">
 			<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
+				<option value="none" selected disabled hidden>Roulements voyelles</option>
 				{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
 			</select>
 			<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
+				<option value="none" selected disabled hidden>Roulements consonnes</option>
 				{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
 			</select>
 		</controles-clavier>

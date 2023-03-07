@@ -7,8 +7,8 @@
 
 <h2>Autocritiques</h2>
 
-<h3>L’importance des compromis</h3>
 <section>
+	<h3>L’importance des compromis</h3>
 	<p>
 		Il n’est évidemment pas possible de maximiser tous ces paramètres en même temps. Par conséquent,
 		certains choix ont dus être faits.
@@ -24,9 +24,9 @@
 		cet arrangemement des voyelles permet alors de très bons roulements.
 	</p>
 </section>
-
-<h3>Points d’amélioration</h3>
+<moyen-espace />
 <section>
+	<h3>Points d’amélioration</h3>
 	<p>
 		Bien que largement supérieure à certaines dispositions telles que l’AZERTY et même le BÉPO, <Nom
 		/> est malheureusement encore loin d’être parfaite. En effet, la création d’une disposition est une

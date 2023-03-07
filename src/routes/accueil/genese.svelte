@@ -6,8 +6,8 @@
 </script>
 
 <h2>Genèse et raison des choix</h2>
-<h3>Genèse</h3>
 <section>
+	<h3>Genèse</h3>
 	<p>
 		Les améliorations de la disposition Optimot par rapport au BÉPO sont vraiment significatives.
 		Les tests sont sans appel et montrent notamment une nette diminution des bigrammes à un doigt (<SFB
@@ -26,8 +26,9 @@
 		idées si vous comptez choisir une nouvelle disposition voire en créer une.
 	</p>
 </section>
-<h3>Historique des modifications</h3>
+<moyen-espace />
 <section>
+	<h3>Historique des modifications</h3>
 	<p>
 		Au départ, ma disposition dérivée d’Optimot était nommée <em>Optim7</em>. Cependant, passé un
 		certain cap, ce nom a été changé en <Nom />. La disposition a beaucoup évoluée au fil du temps.
@@ -37,8 +38,8 @@
 	</p>
 </section>
 
-<h3>Comment la disposition a été créée</h3>
 <section>
+	<h3>Comment la disposition a été créée</h3>
 	<p>
 		➀ La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
 		: main gauche et main droite.
@@ -56,17 +57,18 @@
 		gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour les langues ayant
 		besoin de caractères supplémentaires comme les accents en français.
 	</p>
+	<petit-espace />
 	<p>
 		➁ La deuxième étape dans la création de la disposition a été de placer les touches les plus
-		souvent utilisées les plus proches possible des doigts. Les doigts sont effectivement toujours
+		souvent utilisées le plus proche possible des doigts. Les doigts sont effectivement toujours
 		censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est donc logique de
 		chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les déplacements
 		des doigts aux touches.
 	</p>
 </section>
-
-<h3>Utilisation de la couche AltGr</h3>
+<moyen-espace />
 <section>
+	<h3>Utilisation de la couche AltGr</h3>
 	<p>
 		<Nom /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire
 		drastiquement les distances parcourues pour atteindre certaines touches. Un autre avantage est
