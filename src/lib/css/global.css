@@ -11,10 +11,8 @@
     --gradient-blue: #3088ed 0%, #02c9db 100%;
     --gradient-purple: #6c00ff 0%, rgb(242, 59, 255) 100%, rgb(255, 112, 118) 200%, rgb(29, 29, 31) 300%;
     --gradient-green: hsl(var(--green), 30%) 0%, hsl(var(--green), 70%) 100%;
-    
-    --background-gradient: linear-gradient(0deg, black 0%, #001440 50%, black 100%);
-    --color-background-blue-light: rgb(0, 30, 60);
-    --color-background-blue-dark: #0a1929;
+
+	--bg-color: hsl(217, 100%, 9%);
 }
 
 *, *:before, *:after {
@@ -48,9 +46,10 @@ html, body {
 		rgba(0, 0, calc(var(--couleur) / 1.5), 1) 90%,
 		rgba(0, 0, var(--couleur), 1) 100%
 	);
+	background: var(--bg-color);
 }
 
-@media (max-width: 800px) {
+/* @media (max-width: 800px) {
 	.bg-blue {
 		--couleur: 70;
 	}
@@ -60,7 +59,7 @@ html, body {
 	.bg-blue {
 		--couleur: 60;
 	}
-}
+} */
 
 
 .contenu {

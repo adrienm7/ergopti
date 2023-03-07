@@ -8,6 +8,14 @@
 	import Autocritiques from './accueil/autocritiques.svelte';
 </script>
 
+<svelte:head>
+	<title>Disposition HyperTexte</title>
+	<meta
+		name="description"
+		content="La disposition HyperTexte est optimisée pour le français et l’anglais"
+	/>
+</svelte:head>
+
 <div class="presentation">
 	<h1 class="titre">
 		Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="texte"

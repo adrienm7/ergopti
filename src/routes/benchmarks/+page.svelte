@@ -50,8 +50,8 @@
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
 		KLAnext est l’un d’entre eux et peut être gratuitement utilisé à l’adresse <a
 			href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a
-		>. Il est l’un des plus utilisés en raison de son algorithme de notation qui serait plus "juste"
-		que les autres comparateurs du même type.
+		>. C’est l’un des comparateurs les plus utilisés en raison de son algorithme de notation qui
+		serait plus "juste" que les autres.
 	</p>
 
 	<h2>Comment bien utiliser KLAnext</h2>

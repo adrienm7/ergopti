@@ -139,7 +139,7 @@ strong,
     }
     
     
-    h2, .text-blue-gradient {
+	.text-blue-gradient {
         -webkit-background-clip: text;
                 background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -150,7 +150,7 @@ strong,
     }
     
     
-    h3, .text-purple-gradient {
+    .text-purple-gradient {
         -webkit-background-clip: text;
                 background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -185,8 +185,9 @@ strong,
 	/* font-style: italic; */
 	text-shadow: -1px 0px 4px #00000011, 1px 0px 4px #00000011;
 }
-.hyper,
-h2 {
+
+/* h2, */
+.hyper {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;

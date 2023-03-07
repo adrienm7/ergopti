@@ -20,10 +20,10 @@ bloc-clavier {
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
     --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
 
-    --couleur-touche-saturation: 90%;
-    --couleur-touche-luminosite: 65%;
+    --couleur-touche-saturation: 0%;
+    --couleur-touche-luminosite: 100%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
-	--transparence-touche: 25%;
+	--transparence-touche: 20%;
 	
 	--transparence-touche-pressee: 8%;
     --couleur-touche-pressee-luminosite: 60%;
@@ -81,6 +81,7 @@ bloc-touche {
     border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
     border-radius: var(--arrondi-touche);
     background-color: var(--couleur-fond-touche);
+
     box-shadow: var(--ombres-touche);
     color: var(--couleur-texte-touche);
     cursor: pointer;
@@ -124,8 +125,8 @@ ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
 
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-touche="Space"],
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-doigt="pouce"]{
-	/* background-color: rgb(10, 20, 40); */
 	background-color: var(--couleur-fond-touche);
+	background-color: rgb(0, 18, 56);
 }
 
 ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] {
@@ -190,6 +191,7 @@ bloc-touche[data-touche="AltTab"] div {
 
 ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="AltGr"][data-plus="non"] bloc-touche[data-touche="q"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="b"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"],
@@ -197,13 +199,15 @@ ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="a"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="i"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"]{
-	--couleur-touche-luminosite: 65%;
 	--couleur-touche-saturation: 0%;
+	--couleur-touche-luminosite: 100%;
+	--transparence-touche: 5%;
 }
 
 /* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
+ensemble-clavier[data-couche="AltGr"][data-plus="non"] bloc-touche[data-touche="q"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"] {
 	font-weight: normal;
 }
@@ -238,7 +242,6 @@ ensemble-clavier[data-couche="Visuel"] bloc-touche[data-type="double"] div {
 ensemble-clavier[data-couche="Visuel"][data-plus="oui"] bloc-touche[data-touche="q"] div,
 ensemble-clavier[data-couche="Shift"][data-plus="oui"] bloc-touche[data-touche="q"] div {
 	text-transform: capitalize;
-	font-size: 0.9em;
 }
 
 
@@ -261,9 +264,8 @@ ensemble-clavier[data-couche="Shift"][data-plus="oui"] bloc-touche[data-touche="
 /* Style de toutes les touches qui changent avec HyperTexte+ */
 ensemble-clavier[data-plus="oui"] bloc-touche[data-plus="oui"],
 ensemble-clavier[data-plus="oui"][data-type='ergodox'] bloc-touche[data-touche="Space"]{
-	--couleur-touche: 270deg;
-	--couleur-touche-saturation: 100%;
-	--couleur-touche-luminosite: 80%;
+	--couleur-touche-saturation: 0%;
+	--couleur-touche-luminosite: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
 	
 }
@@ -272,12 +274,21 @@ ensemble-clavier[data-plus="oui"][data-type='ergodox'] bloc-touche[data-touche="
 
 /* Hold-tap */
 
-ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LShift"],
-ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LCtrl"],
-ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="LAlt"],
-ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="RAlt"] {
-    line-height: 1.1;
+ensemble-clavier[data-plus="oui"][data-couche="Visuel"] bloc-touche[data-touche="Space"] div,
+ensemble-clavier[data-plus="oui"][data-couche="Visuel"] bloc-touche[data-touche="LCtrl"] div,
+ensemble-clavier[data-plus="oui"][data-couche="Primary"] bloc-touche[data-touche="LCtrl"] div,
+ensemble-clavier[data-plus="oui"][data-couche="Visuel"] bloc-touche[data-touche="LAlt"] div,
+ensemble-clavier[data-plus="oui"][data-couche="Primary"] bloc-touche[data-touche="LAlt"] div,
+ensemble-clavier[data-plus="oui"][data-couche="Visuel"] bloc-touche[data-touche="RAlt"] div,
+ensemble-clavier[data-plus="oui"][data-couche="Primary"] bloc-touche[data-touche="RAlt"] div {
+    line-height: 1.2;
     font-size: calc(var(--taille-texte-touche) * 0.7);
+}
+
+ensemble-clavier[data-plus="oui"][data-couche="Visuel"] bloc-touche[data-touche="LShift"] div,
+ensemble-clavier[data-plus="oui"][data-couche="Primary"] bloc-touche[data-touche="LShift"] div {
+	line-height: 1.05;
+	font-size: calc(var(--taille-texte-touche) * 0.8);
 }
 
 .tap {
@@ -288,8 +299,16 @@ ensemble-clavier[data-plus="oui"] bloc-touche[data-touche="RAlt"] {
 
 /* Corrections localisées */
 
-ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="y"] div {
-	font-size: 1.8em;
+
+ensemble-clavier[data-couche="Primary"][data-plus=oui] bloc-touche[data-touche="q"] div,
+ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="w"] div {
+	font-size: 0.9em;
+}
+
+ensemble-clavier[data-couche="Visuel"][data-plus=oui] bloc-touche[data-touche="q"] div,
+ensemble-clavier[data-couche="Shift"][data-plus=oui] bloc-touche[data-touche="q"] div,
+ensemble-clavier[data-couche="ShiftAltGr"][data-plus=oui] bloc-touche[data-touche="w"] div {
+	font-size: 0.8em;
 }
 
 ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="CapsLock"] div {
@@ -471,8 +490,8 @@ bloc-touche[data-type="enter"] {
     background-color: rgb(7, 7, 7);
 	color: white;
 	/* Bordure de la touche en blanc transparent */
-	--couleur-touche: 0deg; 
-    --couleur-touche-saturation: 0%;
+	--couleur-touche: 0deg!important; 
+    --couleur-touche-saturation: 0%!important;
 }
 
 
@@ -500,10 +519,11 @@ bloc-touche[data-type="space"]:not(.touche-active):active {
 }
 
 /* La bordure des touches des touches spéciales est en blanc pour mieux les mettre en relief */
-ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="special"],
-ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="space"],
-ensemble-clavier[data-couleur="oui"] bloc-touche[data-type="enter"] {
+bloc-touche[data-type="special"],
+bloc-touche[data-type="space"],
+bloc-touche[data-type="enter"] {
 	--couleur-bordure-touche: hsla(var(--couleur-touche), 100%, 100%, 35%);
+	--effet-3d: hsla(var(--couleur-touche), 0%, calc(100% - 20%), 70%);
 }
 
 
@@ -525,7 +545,7 @@ bloc-touche[data-type="enter"]:hover::before,
 bloc-touche[data-type="enter"]:hover::after
 {
 	color: #333;
-	background-color: rgb(215, 215, 215)!important;
+	background-color: rgb(210, 210, 210)!important;
 	box-shadow: none;
 }
 
@@ -536,23 +556,19 @@ bloc-touche[data-type="enter"]:hover::after
 /* === Si pas de couleur, ou couleur spéciale === */
 
 
-
-ensemble-clavier[data-couleur="non"] bloc-touche,
-ensemble-clavier[data-couleur="freq"] bloc-touche {
-    --couleur-touche-saturation: 0%;
-    --couleur-touche-luminosite: 100%;
+ensemble-clavier[data-couleur="oui"] bloc-touche {
+	--couleur-touche-saturation: 80%;
+	--transparence-touche: 35%;
+	--couleur-touche-luminosite: 65%;
 }
 
-ensemble-clavier[data-couleur="non"] bloc-touche {
-	--transparence-touche: 15%;
-}
 
 ensemble-clavier[data-couleur="freq"] bloc-touche[data-type="lettre"] {
     --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
-    --couleur-touche-saturation: 100%;
-    --couleur-touche-luminosite: 80%;
-	--transparence-touche: 40%;
-	background-color: hsla( var(--couleur-touche), 100%, 80%, var(--transparence-touche));
+	--couleur-touche-saturation: 90%;
+	--couleur-touche-luminosite: 70%;
+	--transparence-touche: 45%;
+	background-color: hsla( var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-luminosite), var(--transparence-touche));
 }
 
 /* Pour avoir exactement le même style d'effet 3D en couleur et noir et blanc */
@@ -590,4 +606,13 @@ ensemble-clavier[data-couleur="oui"] bloc-touche[data-doigt="pouce"] {
 	#clavier-presentation bloc-clavier {
 		--taille-clavier: 0.9;
 	}
+}
+
+.accordion bloc-clavier {
+	--taille-touche: min(47px, 100vw / 20)!important;
+	--marge-touche: min(3px, 0.35vw)!important;
+	--profondeur-touche: 1px!important;
+	--profondeur-touche-pressee: 0.5px!important;
+	background-color: var(--bg-color);
+	box-shadow: none;
 }
