@@ -23,9 +23,9 @@ bloc-clavier {
     --couleur-touche-saturation: 0%;
     --couleur-touche-luminosite: 100%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
-	--transparence-touche: 20%;
+	--opacite-touche: 35%;
 	
-	--transparence-touche-pressee: 8%;
+	--opacite-touche-pressee: 8%;
     --couleur-touche-pressee-luminosite: 60%;
 
     --couleur-doigt-gauche-index: 0deg;
@@ -41,7 +41,7 @@ bloc-clavier {
     width: max-content;
     margin: 0 auto;
     padding: var(--marge-clavier);
-    background-color:hsla(234, 20%, 15%, 0.1);
+    background-color:hsla(236, 100%, 9%, 0.3);
     border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
 	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
@@ -66,7 +66,7 @@ bloc-touche {
     --longueur-touche: calc(var(--taille-touche) * var(--taille) - 2 * var(--marge-touche));
     --effet-3d: hsla(var(--couleur-touche), var(--couleur-touche-saturation), calc(var(--couleur-touche-luminosite) - 20%), 70%);
     --ombres-touche: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d);
-    --couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-luminosite), var(--transparence-touche));
+    --couleur-fond-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-luminosite), var(--opacite-touche));
     --couleur-bordure-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-luminosite), 30%);
     --taille-bordure-touche: 1px; /* calc(var(--taille-clavier) * 0.1rem) */
     --taille-texte-touche: calc(var(--taille-touche) / 2.5);
@@ -201,7 +201,7 @@ ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"]{
 	--couleur-touche-saturation: 0%;
 	--couleur-touche-luminosite: 100%;
-	--transparence-touche: 5%;
+	--opacite-touche: 5%;
 }
 
 /* Car les glyphes de certaines touches mortes s’affichent mal sinon */
@@ -557,8 +557,8 @@ bloc-touche[data-type="enter"]:hover::after
 
 
 ensemble-clavier[data-couleur="oui"] bloc-touche {
-	--couleur-touche-saturation: 80%;
-	--transparence-touche: 35%;
+	--couleur-touche-saturation: 85%;
+	--opacite-touche: 45%;
 	--couleur-touche-luminosite: 65%;
 }
 
@@ -567,8 +567,8 @@ ensemble-clavier[data-couleur="freq"] bloc-touche[data-type="lettre"] {
     --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
 	--couleur-touche-saturation: 90%;
 	--couleur-touche-luminosite: 70%;
-	--transparence-touche: 45%;
-	background-color: hsla( var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-luminosite), var(--transparence-touche));
+	--opacite-touche: 45%;
+	background-color: hsla( var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-luminosite), var(--opacite-touche));
 }
 
 /* Pour avoir exactement le même style d'effet 3D en couleur et noir et blanc */

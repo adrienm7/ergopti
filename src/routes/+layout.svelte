@@ -114,11 +114,10 @@
 		--couleur: 60;
 		position: fixed;
 		bottom: 0;
-		left: 50%;
-		transform: translate(-50%, 0);
+		left: 0;
 		width: 100vw;
 		height: 100vh;
-		height: calc(100vh - var(--hauteur-header));
+		padding-top: var(--hauteur-header);
 		overflow: scroll;
 		transition: all 0.2s ease-in-out;
 		overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
@@ -131,9 +130,8 @@
 		align-items: center;
 		justify-content: center;
 		flex-direction: column;
-		height: calc(100vh + 1px);
-		height: calc(100vh - var(--hauteur-header) + 1px);
-		padding: var(--marge) 0;
+		min-height: calc(100vh - var(--hauteur-header) - 2 * var(--marge) + 1px);
+		margin: var(--marge) 0;
 	}
 
 	/* Le code ci-dessous permet de toujours placer le footer en bas de la page */
