@@ -1213,7 +1213,7 @@
 			"touche": "g",
 			"Primary": "g",
 			"Shift": "G",
-			"AltGr": "«▮",
+			"AltGr": "«␣",
 			"ShiftAltGr": "“",
 			"Ctrl": "g",
 			"Layer": "⊞⇨",
@@ -1406,7 +1406,7 @@
 			"touche": "x",
 			"Primary": "x",
 			"Shift": "X",
-			"AltGr": "▮»",
+			"AltGr": "␣»",
 			"ShiftAltGr": "”",
 			"Ctrl": "x",
 			"Layer": "+⊞⇨",
@@ -1439,7 +1439,7 @@
 		{
 			"touche": ",",
 			"Primary": ",",
-			"Shift": "▮;",
+			"Shift": "␣;",
 			"AltGr": ";",
 			"ShiftAltGr": "",
 			"Ctrl": ",",
@@ -1450,7 +1450,7 @@
 		{
 			"touche": ".",
 			"Primary": ".",
-			"Shift": "▮:",
+			"Shift": "␣:",
 			"AltGr": ":",
 			"ShiftAltGr": "·",
 			"Ctrl": ".",
@@ -1485,7 +1485,7 @@
 		{
 			"touche": "'",
 			"Primary": "'",
-			"Shift": "▮?",
+			"Shift": "␣?",
 			"AltGr": "?",
 			"ShiftAltGr": "¿",
 			"Ctrl": "'",
@@ -1496,7 +1496,7 @@
 		{
 			"touche": "!",
 			"Primary": "◌̂",
-			"Shift": "▮!",
+			"Shift": "␣!",
 			"AltGr": "!",
 			"ShiftAltGr": "¡",
 			"Ctrl": "!",
