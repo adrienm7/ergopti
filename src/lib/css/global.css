@@ -12,7 +12,7 @@
     --gradient-purple: #6c00ff 0%, rgb(242, 59, 255) 100%, rgb(255, 112, 118) 200%, rgb(29, 29, 31) 300%;
     --gradient-green: hsl(var(--green), 30%) 0%, hsl(var(--green), 70%) 100%;
 
-	--bg-color: hsl(217, 100%, 15%);
+	--bg-color: hsl(217, 100%, 12%);
 }
 
 *, *:before, *:after {
