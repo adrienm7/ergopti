@@ -23,7 +23,7 @@ bloc-clavier {
     --couleur-touche-saturation: 0%;
     --couleur-touche-luminosite: 100%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
-	--opacite-touche: 35%;
+	--opacite-touche: 20%;
 	
 	--opacite-touche-pressee: 8%;
     --couleur-touche-pressee-luminosite: 60%;
@@ -83,6 +83,7 @@ bloc-touche {
     background-color: var(--couleur-fond-touche);
 
     box-shadow: var(--ombres-touche);
+	text-shadow: rgb(0, 0, 0) 0px 0 1px, rgb(0, 0, 0) 0px 0 6px, rgba(0, 0, 0, 0.5) 0px 0 12px;
     color: var(--couleur-texte-touche);
     cursor: pointer;
     font-size: var(--taille-texte-touche);
@@ -155,6 +156,7 @@ bloc-touche:hover,
 .touche-active {
 	position: relative;
     top: var(--descente-touche);
+	text-shadow: none;
     box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 1px #00000077;
 	color: #333!important;
 	background-color: rgba(255, 255, 255, 0.85)!important;
@@ -557,9 +559,9 @@ bloc-touche[data-type="enter"]:hover::after
 
 
 ensemble-clavier[data-couleur="oui"] bloc-touche {
-	--couleur-touche-saturation: 85%;
-	--opacite-touche: 45%;
-	--couleur-touche-luminosite: 65%;
+	--couleur-touche-saturation: 100%;
+	--opacite-touche: 40%;
+	--couleur-touche-luminosite: 70%;
 }
 
 
