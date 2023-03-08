@@ -12,7 +12,7 @@
 		<input type="checkbox" name="acc" id="acc1" />
 		<label for="acc1">
 			<span class="numero-faq" />
-			<h3>Distance des doigts aux touches</h3>
+			<h3 data-aos="zoom-out" data-aos-mirror="true">Distance des doigts aux touches</h3>
 		</label>
 		<div class="content">
 			<h4>Optimisation de la rangée du milieu</h4>
@@ -92,7 +92,7 @@
 		<input type="checkbox" name="acc" id="acc2" />
 		<label for="acc2">
 			<span class="numero-faq" />
-			<h3>Minimisation des SFBs</h3>
+			<h3 data-aos="zoom-out" data-aos-mirror="true">Minimisation des SFBs</h3>
 		</label>
 		<div class="content">
 			<p>
@@ -140,7 +140,7 @@
 		<input type="checkbox" name="acc" id="acc3" />
 		<label for="acc3">
 			<span class="numero-faq" />
-			<h3>Alternance des mains</h3>
+			<h3 data-aos="zoom-out" data-aos-mirror="true">Alternance des mains</h3>
 		</label>
 		<div class="content">
 			<p>
@@ -183,7 +183,7 @@
 		<input type="checkbox" name="acc" id="acc4" />
 		<label for="acc4">
 			<span class="numero-faq" />
-			<h3>Optimisation des roulements</h3>
+			<h3 data-aos="zoom-out" data-aos-mirror="true">Optimisation des roulements</h3>
 		</label>
 		<div class="content">
 			<p>
@@ -288,7 +288,7 @@
 		<input type="checkbox" name="acc" id="acc5" />
 		<label for="acc5">
 			<span class="numero-faq" />
-			<h3>Placement logique des touches</h3>
+			<h3 data-aos="zoom-out" data-aos-mirror="true">Placement logique des touches</h3>
 		</label>
 		<div class="content">
 			<p>
@@ -467,7 +467,7 @@
 		<input type="checkbox" name="acc" id="acc6" />
 		<label for="acc6">
 			<span class="numero-faq" />
-			<h3>Chiffres en accès direct</h3>
+			<h3 data-aos="zoom-out" data-aos-mirror="true">Chiffres en accès direct</h3>
 		</label>
 		<div class="content">
 			<p>
@@ -493,7 +493,7 @@
 		<input type="checkbox" name="acc" id="acc7" />
 		<label for="acc7">
 			<span class="numero-faq" />
-			<h3>Optimisation pour l’utilisation à une main</h3>
+			<h3 data-aos="zoom-out" data-aos-mirror="true">Optimisation pour l’utilisation à une main</h3>
 		</label>
 		<div class="content">
 			<p>

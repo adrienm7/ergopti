@@ -12,7 +12,7 @@ h1 {
 	color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
-	background-image: linear-gradient(to top, rgb(255, 255, 255) 0%, rgb(150, 150, 150) 100%);
+	background-image: linear-gradient(to top, rgb(255, 255, 255) 0%, rgb(177, 177, 177) 100%);
 }
 
 h2 {
@@ -27,17 +27,19 @@ h2 {
 }
 
 
-h3 {
+section h3 {
     margin-top: 18vh;
     margin-bottom: 8vh;
 	font-size: 1.6rem;
 
 	padding: 0.15em 0.6em 0.3em 0.6em;
-	background-color: rgb(0, 1, 55);
 	background-color: var(--bg-color);
+	background-color: rgb(246, 246, 246);
+	border: 1px solid gray;
 	border-radius: 7px;
 	color: rgba(217, 198, 255, 0.9);
 	color: white;
+	color: #5d5d5d;
 	width: fit-content;
 }
 

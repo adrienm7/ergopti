@@ -56,7 +56,7 @@
 
 <style>
 	:root {
-		--couleur-header: rgba(0, 0, 0, 0.9);
+		--couleur-header: rgba(0, 0, 0, 0.8);
 		--couleur-header-mobile: rgba(0, 0, 0, 0.8);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
