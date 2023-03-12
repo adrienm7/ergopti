@@ -122,7 +122,7 @@
 				Ainsi, une combinaison de deux touches, c’est-à-dire deux caractères qui se suivent, est
 				appelée <em>bigramme</em> (ou <em>digramme</em>). Pour optimiser une disposition clavier, il
 				faut s’assurer que les bigrammes les plus fréquents ne se fassent pas avec le même doigt :
-				on parle de <strong>>limiter les <em>Same Finger Bigrams</em></strong>.
+				on parle de <strong>limiter les <em>Same Finger Bigrams</em></strong>.
 			</p>
 			<mini-espace />
 			<p>
@@ -132,7 +132,7 @@
 				ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
 				regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la
 				supression totale des <SFB />s est impossible. Toutedois, il est quand même possible de les
-				réduire drastiquement.
+				réduire drastiquement. C’est ce que fait <Nom />.
 			</p>
 		</div>
 	</section>

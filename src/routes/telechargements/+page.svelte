@@ -18,7 +18,7 @@
 
 		<h2 data-aos="zoom-out" data-aos-mirror="true">Fichiers</h2>
 
-		<h3 style="color: white; font-weight: normal;">Installation de la disposition</h3>
+		<h3>Pour installer la disposition</h3>
 		<mini-espace />
 		<div>
 			<a href="/files/KbdEditInstallerhypertexte_v030.exe"><button>HyperTexte.v1.0.3.exe</button></a
@@ -34,14 +34,16 @@
 		</div>
 		<petit-espace />
 
-		<h3 style="color: white; font-weight: normal;">Pour les comparateurs de disposition</h3>
+		<h3>Pour les comparateurs de disposition</h3>
 		<mini-espace />
 		<div>
-			<a href="/files/hypertexte.v1.0.3.fr.iso.txt"><button>hypertexte.v1.0.3.fr.iso</button></a>
+			<span>Version ISO : </span><a href="/files/hypertexte.v1.0.3.fr.iso.txt"
+				><button>hypertexte.v1.0.3.fr.iso</button></a
+			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/files/hypertexte.v1.0.3.fr.ergodox.txt"
+			<span>Version Ergodox : </span><a href="/files/hypertexte.v1.0.3.fr.ergodox.txt"
 				><button>hypertexte.v1.0.3.fr.ergodox</button></a
 			>
 		</div>
@@ -54,9 +56,30 @@
 		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition. Vous aurez
 		alors automatiquement la meilleure version de la disposition : <Nom_Plus />
 	</p>
+	<petit-espace />
 	<h3>Comment installer la disposition sur Windows</h3>
 	<p>[À faire]</p>
 
-	<h2 data-aos="zoom-out" data-aos-mirror="true">S’entraîner virtuellement</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
 	<div class="paragraphe">[Clavier virtuel ici qui remplace ce qu’on tape en azerty]</div>
 </div>
+
+<style>
+	h3 {
+		display: inline-block;
+		position: relative;
+		color: white;
+		font-weight: normal;
+	}
+
+	h3::after {
+		display: block;
+		position: absolute;
+		height: 4px;
+		width: 100%;
+		content: '';
+		background: white;
+		border-radius: 10px;
+		margin-top: 2px;
+	}
+</style>

@@ -42,7 +42,7 @@ kbd:hover, kbd-sortie:hover, kbd-non:hover {
 }
 
 section kbd {
-	background-color: hsla(0deg, 0%, 10%, 90%);
+	background-color: hsl(0, 0%, 14%);
 	/* background: linear-gradient(
 		90deg,
 		rgba(0, 0, 50, 1) 0%,
