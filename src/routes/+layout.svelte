@@ -153,6 +153,7 @@
 		margin: 0;
 		padding: 0;
 		min-height: 100vh;
+		overflow-x: hidden; /* Très important pour que les animations css horizontales n’agrandissent pas l’écran */
 		color: white; /* Couleur par défaut du texte */
 	}
 	main {
