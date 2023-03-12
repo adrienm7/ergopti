@@ -17,7 +17,9 @@
 		</div> -->
 
 		<h2 data-aos="zoom-out" data-aos-mirror="true">Fichiers</h2>
-		<h3>Installation de la disposition</h3>
+
+		<h3 style="color: white; font-weight: normal;">Installation de la disposition</h3>
+		<mini-espace />
 		<div>
 			<a href="/files/KbdEditInstallerhypertexte_v030.exe"><button>HyperTexte.v1.0.3.exe</button></a
 			>
@@ -30,8 +32,10 @@
 		<div>
 			<a aria-disabled="true"><button>HyperTextePlus.exe — Pas encore disponible</button></a>
 		</div>
+		<petit-espace />
 
-		<h3>Pour les comparateurs de disposition</h3>
+		<h3 style="color: white; font-weight: normal;">Pour les comparateurs de disposition</h3>
+		<mini-espace />
 		<div>
 			<a href="/files/hypertexte.v1.0.3.fr.iso.txt"><button>hypertexte.v1.0.3.fr.iso</button></a>
 		</div>

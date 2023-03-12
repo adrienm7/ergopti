@@ -37,7 +37,7 @@
 
 <div class="contenu">
 	<hr />
-	<p class="hypertexte-introduction">
+	<p class="encart-introduction">
 		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
 		Fruit de longues réflexions, elle se veut la plus
 		<span class="text-glow">optimale</span>
@@ -363,7 +363,7 @@
 		</h2>
 		<div class="texte-orb">
 			<hr />
-			<p class="introduction-text">
+			<p class="encart-introduction">
 				<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
 				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
 			</p>

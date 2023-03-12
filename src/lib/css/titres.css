@@ -16,10 +16,6 @@ h1 {
 	background-image: linear-gradient(to top, rgb(255, 255, 255) 0%, rgb(177, 177, 177) 100%);
 }
 
-h2, h3, h4 {
-	line-height: auto;
-}
-
 h2 {
 	padding: 0.15em 0.6em 0.3em 0.6em;
 	margin-top: 33vh;
@@ -39,7 +35,6 @@ h3 {
 	color: var(--bg-color);
 	font-size: 1.4rem;
 }
-
 
 h4 {
 	margin-top: 13vh;

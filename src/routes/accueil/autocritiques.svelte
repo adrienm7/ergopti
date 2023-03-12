@@ -83,10 +83,11 @@
 	<p>
 		Certaines dispositions telles qu’Optimot préfèrent mettre en accès direct l’apostrophe (single
 		quote) plutôt que l’apostrophe typographique. Ceci car elle est souvent remplacée
-		automatiquement dans les éditeurs de texte. Toutefois, ce choix n’a pas été fait dans <Nom /> car
-		de toute manière les guillemets (double quote) sont rendus très accessibles et que la conversion
-		des apostrophes en apostrophes typographiques est loin d’intervenir partout. Par exemple, elle ne
-		se produit pas dans Discord, Messenger, Gmail et bien d’autres sites voire applications.
+		automatiquement dans les éditeurs de texte. Toutefois, la conversion des apostrophes en
+		apostrophes typographiques est loin d’intervenir partout. Par exemple, elle ne se produit pas
+		dans Discord, Messenger, Gmail et bien d’autres sites voire applications. Dans les premières
+		versions d’<Nom />, une touche <kbd>’</kbd> avait donc été ajoutée. Dans les dernières versions
+		elle a cependant été enlevée au profit de la touche inédite <kbd>★</kbd>.
 	</p>
 	<p>
 		Peu de touches mortes et de couches de symboles. <Nom /> ne se prétend pas être exhaustive en incorporant
@@ -95,9 +96,8 @@
 		très accessibles pour une utilisation tê rare. La philosophie derrière <Nom /> est de fournir une
 		base de réflexion, mais pas nécessairement de promouvoir l’utilisation de la disposition « HyperTexte ».
 		Rien ne vaut une disposition créée sur-mesure pour vos usages. Si vous utilisez énormément Latex,
-		peut-être voudrez-vous ramener le \ encore plus proche de vos doigts, en intervertissant les touches
-		<kbd>È</kbd>
-		et <kbd>"</kbd>. De même, si vous voulez écrire régulièrement en allemand, il serait judicieux
-		de mettre la touche morte des trémats à un endroit plus accessible.
+		peut-être voudrez-vous ramener le \ encore plus proche de vos doigts. De même, si vous voulez écrire
+		régulièrement en allemand, il serait judicieux de mettre la touche morte des trémats à un endroit
+		plus accessible, voire en accès direct.
 	</p>
 </section>

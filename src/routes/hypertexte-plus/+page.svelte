@@ -35,7 +35,7 @@
 
 <div class="contenu">
 	<hr />
-	<div class="hypertexte-introduction">
+	<div class="encart-introduction">
 		<p>
 			<Nom_Plus /> est une version améliorée de la disposition <Nom />.<br />Elle se rapproche de
 			très près de la <span class="hyper"><strong>disposition clavier idéale</strong></span>.

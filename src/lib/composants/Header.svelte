@@ -106,7 +106,7 @@
 	}
 
 	header #menu li[aria-current='page'] a p::first-letter {
-		background-image: linear-gradient(to right, var(--gradient-purple));
+		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
 	header #menu li[aria-current='page'] a p {
@@ -119,7 +119,7 @@
 		color: transparent;
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
-		background-image: linear-gradient(to right, var(--gradient-purple));
+		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 	/* header #menu li[aria-current='page'] a::after {
 		content: '';
