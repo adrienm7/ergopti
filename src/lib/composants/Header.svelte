@@ -4,7 +4,7 @@
 
 	function fermerMenu() {
 		document.getElementById('menu-btn').checked = false;
-		document.getElementById('clavier').style.zIndex =
+		document.getElementById('clavier-ref').style.zIndex =
 			'-999'; /* Si le clavier était ouvert, on le ferme */
 	}
 </script>
@@ -140,6 +140,7 @@
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
+		line-height: 2em;
 	}
 
 	/* header #menu li:not([aria-current='page']) a:hover::after {
