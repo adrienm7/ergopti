@@ -62,7 +62,7 @@
 			>. Ceci est très important, car si vous ne le faites pas, alors vos résultats n’auront aucune
 			valeur.
 		</p>
-
+		<mini-espace />
 		<h3>Comparez le même type de clavier</h3>
 		<p>
 			Ne comparez pas une disposition ISO avec une disposition Ergodox. Sinon, logiquement la
@@ -72,6 +72,7 @@
 			pouces.
 		</p>
 
+		<mini-espace />
 		<h3>Comparez des claviers possédant une touche pour tous les caractères du corpus</h3>
 		<p>
 			Un autre point à bien faire attention est de <strong
@@ -80,6 +81,8 @@
 			français. Cela s’explique parce que tous les caractères accentués seront "sautés", n’existant
 			pas dans la disposition anglophone.
 		</p>
+
+		<mini-espace />
 		<h3>Conclusion sur la comparaison de dispositions</h3>
 		<p>
 			Comparer des dispositions n’est pas aussi simple qu’on pourrait de prime abord le penser. Il
@@ -227,7 +230,7 @@
 	}
 
 	.image img {
-		width: 80%;
+		width: 100%;
 		margin: 0 auto;
 		border: 10px solid rgb(255, 255, 255);
 		border-radius: 10px;

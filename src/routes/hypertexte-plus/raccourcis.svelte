@@ -95,7 +95,12 @@
 			<h3 data-aos="zoom-out" data-aos-mirror="true">Raccourcis en <kbd>Ctrl</kbd></h3>
 		</label>
 		<div class="content">
-			<p>Ctrl + et Ctrl - sont en Ctrl sur la main gauche</p>
+			<p>
+				Sur la main gauche, <kbd>Ctrl</kbd> + <kbd>É</kbd> donne <kbd-sortie>Ctrl +</kbd-sortie> et
+				<kbd>Ctrl</kbd>
+				+ <kbd>È</kbd> donne <kbd-sortie>Ctrl -</kbd-sortie>. Ces raccourcis permettent de zoomer et
+				dézoomer.
+			</p>
 		</div>
 	</section>
 	<section>

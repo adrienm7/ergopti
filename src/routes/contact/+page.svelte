@@ -37,13 +37,12 @@
 </svelte:head>
 
 <div class="contenu">
-	<div>
-		<h1 data-aos="zoom-in" data-aos-mirror="true">Contact</h1>
-	</div>
-	<p>
+	<h1 data-aos="zoom-in" data-aos-mirror="true">Contact</h1>
+	<div class="encadre">
 		Vous pouvez contacter l’auteur de cette disposition à l’adresse <a
 			href="mailto:moyaux.adrien@gmail.com">moyaux.adrien@gmail.com</a
 		>
-	</p>
+	</div>
+
 	<!-- <button on:click={sendA}>Envoi</button> -->
 </div>

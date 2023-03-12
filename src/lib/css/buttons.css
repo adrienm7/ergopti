@@ -111,7 +111,7 @@ button p {
 
 
 ensemble-clavier .btn-group select {
-	background-image: linear-gradient(to left, var(--gradient-purple));
+	background-image: linear-gradient(to right, var(--gradient-purple));
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;

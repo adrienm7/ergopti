@@ -75,6 +75,10 @@ section .numero-faq:before {
 
 
 
+
+
+/* Numéro */
+
 .accordion section label .numero-faq 
 {
 	width: 40px;
@@ -148,62 +152,32 @@ section .numero-faq:before {
 
 
 
+/* Couleurs */
 
-
-.accordion section:nth-child(1) label .numero-faq,
-.accordion section:nth-child(1) h4 {
-	background-image: linear-gradient( 135deg, #ff0000 10%, #ffd500 100%)!important;
-}
-.accordion section:nth-child(1) p strong {
-	color: #ff0000;
+.accordion section:nth-child(1) label .numero-faq {
+	background-image: linear-gradient( 135deg, #ff0000 10%, #ffd500 100%);
 }
 
-.accordion section:nth-child(2) label .numero-faq,
-.accordion section:nth-child(2) h4 {
+.accordion section:nth-child(2) label .numero-faq {
 	background-image: linear-gradient( 135deg, #ff7300 10%, #fff200 100%);
 }
-.accordion section:nth-child(2) p strong {
-	color: #FFA500;
-}
 
-.accordion section:nth-child(3) label .numero-faq,
-.accordion section:nth-child(3) h4 {
+.accordion section:nth-child(3) label .numero-faq {
 	background-image: linear-gradient( 135deg, #146100 10%, #04e217 100%);
 }
-.accordion section:nth-child(3) p strong {
-	color: #008000;
-}
 
-.accordion section:nth-child(4) label .numero-faq,
-.accordion section:nth-child(4) h4 {
+.accordion section:nth-child(4) label .numero-faq {
 	background-image: linear-gradient( 135deg, #00198b 10%, #00d9ff 100%);
 }
-.accordion section:nth-child(4) p strong {
-	color: #00198b;
-}
 
-.accordion section:nth-child(5) label .numero-faq,
-.accordion section:nth-child(5) h4 {
+.accordion section:nth-child(5) label .numero-faq {
 	background-image: linear-gradient( 135deg, #04002a 10%, #006efe 100%);
 }
-.accordion section:nth-child(5) p strong {
-	color: #090056;
-}
 
-.accordion section:nth-child(6) label .numero-faq,
-.accordion section:nth-child(6) h4 {
+.accordion section:nth-child(6) label .numero-faq {
 	background-image: linear-gradient( 135deg, #010c3a 10%, #ff00fb 100%);
 }
 
-.accordion section:nth-child(6) p strong {
-	color: #56007b;
-}
-
-.accordion section:nth-child(7) label .numero-faq,
-.accordion section:nth-child(7) h4 {
+.accordion section:nth-child(7) label .numero-faq {
 	background-image: linear-gradient( 135deg, #800000 10%, #e102c3 100%);
-}
-
-.accordion section:nth-child(7) p strong {
-	color: #800000;
 }
