@@ -1,11 +1,12 @@
 h1 {
 	margin: 0;
-    font-size: 3rem;
 	margin-top: 3vh;
     margin-bottom: 15vh;
-	text-align: center;
 	line-height: auto;
+    font-size: 3rem;
 	font-weight: normal;
+	text-align: center;
+
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
@@ -15,89 +16,33 @@ h1 {
 	background-image: linear-gradient(to top, rgb(255, 255, 255) 0%, rgb(177, 177, 177) 100%);
 }
 
+h2, h3, h4 {
+	line-height: auto;
+}
+
 h2 {
+	padding: 0.15em 0.6em 0.3em 0.6em;
 	margin-top: 33vh;
     margin-bottom: 11vh;
-	padding: 0.15em 0.6em 0.3em 0.6em;
-    font-size: 2rem;
-	background-color: rgba(0, 0, 0, 0.4);
-	/* border-radius: 7px; */
-	color: rgba(198, 241, 255, 0.9);
 	width: fit-content;
+	background-color: rgba(0, 0, 0, 0.4);
+	border: 1px solid  rgb(0, 55, 92);
+	border-radius: 7px;
+	color: rgba(198, 241, 255, 0.9);
+    font-size: 1.8rem;
+	font-weight: normal;
 }
 
-section{
-	margin-bottom: 10vh;
-}
-
-.accordion section{
-	margin-bottom: 0;
-}
-
-section h3 {
-    margin-top: 18vh;
-    margin-bottom: 8vh;
-	font-size: 1.6rem;
-
-	/* padding: 0.15em 0.6em 0.3em 0.6em;
-	background-color: rgb(246, 246, 246);
-	background-color: var(--bg-color);
-	border: 1px solid gray;
-	border-radius: 7px; */
+h3 {
+	display: inline;
+    margin: 0;
 	color: var(--bg-color);
-	/* color: #5d5d5d;
-	color: white;
-	width: fit-content; */
+	font-size: 1.4rem;
 }
 
-section h3:first-child {
-	margin-top: 0;
-}
 
 h4 {
 	margin-top: 13vh;
 	margin-bottom: 5vh;
-    font-size: 1.5rem;
-}
-
-h2, h3, h4 {
-    /* font-weight: bold; */
-	font-weight: normal;
-	line-height: auto;
-}
-
-
-
-@media (max-width: 600px){
-    h2 {
-        font-size: 2rem;
-        margin-bottom: 1.5rem;
-    }
-}
-
-.titre {
-	z-index: 2;
-	line-height: 1;
-	margin: 7vh 0;
-	font-size: 2.5rem;
-}
-
-.introduction-text {
-	max-width: 700px;
-	margin: 0 auto;
-	margin-bottom: 20px;
-	padding: 0;
-	text-align: center;
-}
-
-.introduction {
-	margin: 0;
-	padding: 10px 25px;
-	background-color: rgba(0, 0, 0, 0.2);
-	border: 2px solid rgba(255,255,255,0.7);
-	border-radius: 10px;
-}
-
-p.introduction {
-	padding: 25px;
+    font-size: 1.4rem;
 }

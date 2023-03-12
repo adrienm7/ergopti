@@ -12,13 +12,40 @@ ul,
 	}
 
 	h1 {
-		font-size: 2.5rem;
+		font-size: 2.5rem!important;
 	}
 }
 
 a {
 	color:rgb(0, 174, 255);
 	text-decoration: none;
+}
+
+
+
+
+
+.hypertexte-title {
+	z-index: 2;
+	line-height: 1;
+	margin: 7vh 0;
+	font-size: 2.5rem;
+}
+
+.hypertexte-introduction {
+	max-width: 700px;
+	margin: 0 auto;
+	margin-bottom: 20px;
+	padding: 0;
+	text-align: center;
+}
+
+.encadre {
+	margin: 0;
+	padding: 25px;
+	background-color: rgba(0, 0, 0, 0.2);
+	border: 2px solid rgba(255,255,255,0.7);
+	border-radius: 10px;
 }
 
 

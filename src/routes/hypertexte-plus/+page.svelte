@@ -14,8 +14,8 @@
 	<meta name="description" content="Découvrez HyperTexte +" />
 </svelte:head>
 
-<div class="contenu">
-	<h1 class="titre" data-aos="zoom-in" data-aos-mirror="true">
+<header>
+	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"
 			><span class="hyper">Hyper</span><span class="texte">Texte</span><span class="glow">+</span
 			></span
@@ -29,9 +29,13 @@
 		plus={'oui'}
 		controles={'oui'}
 	/>
+</header>
 
-	<moyen-espace />
-	<div class="introduction">
+<petit-espace />
+
+<div class="contenu">
+	<hr />
+	<div class="hypertexte-introduction">
 		<p>
 			<Nom_Plus /> est une version améliorée de la disposition <Nom />.<br />Elle se rapproche de
 			très près de la <span class="hyper"><strong>disposition clavier idéale</strong></span>.
@@ -50,6 +54,7 @@
 			</li>
 		</ul>
 	</div>
+	<hr />
 
 	<mini-espace />
 	<p>
@@ -72,7 +77,7 @@
 		d’un coup, ce ne sont que des possibilités supplémentaires. Ainsi, le passage de <Nom /> vers <Nom_Plus
 		/> se fait en douceur.
 	</p>
-	<p class="lettrine">
+	<p>
 		☒ Ensuite, et c’est le plus grand inconvénient, dans de très rares cas ces raccourcis vous
 		empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <Nom_Plus />, les
 		combinaisons de touches extrêmement rares comme <kbd>HC</kbd> sont transformées en d’autres bien
@@ -80,7 +85,7 @@
 		vraiment écrire
 		<kbd>HC</kbd>, il faudra remettre à zéro le remplacement de texte.
 	</p>
-	<p class="lettrine">
+	<p>
 		➜ La remise à zéro du remplacement de texte peut notamment se réaliser en utilisant les flèches
 		de navigation, la touche Échap, en cliquant quelque part, etc. Ces manipulations ne devraient
 		arriver que très rarement, mais tout dépend de votre utilisation. Par exemple, l’enchaînement <kbd
@@ -96,47 +101,15 @@
 
 	<p class="text-bold">Voici maintenant toutes les améliorations de <Nom_Plus /> :</p>
 
-	<petit-espace />
-	<div class="accordion">
-		<section>
-			<input type="checkbox" name="acc" id="acc1" />
-			<label for="acc1">
-				<span class="numero-faq" />
-				<h2 data-aos="zoom-out" data-aos-mirror="true">Roulements et diminution des SFBs</h2>
-			</label>
-			<div class="content">
-				<Roulements_SFB />
-			</div>
-		</section>
-		<section>
-			<input type="checkbox" name="acc" id="acc2" />
-			<label for="acc2">
-				<span class="numero-faq" />
-				<h2 data-aos="zoom-out" data-aos-mirror="true">Abréviations</h2>
-			</label>
-			<div class="content">
-				<Abreviations />
-			</div>
-		</section>
-		<section>
-			<input type="checkbox" name="acc" id="acc3" />
-			<label for="acc3">
-				<span class="numero-faq" />
-				<h2 data-aos="zoom-out" data-aos-mirror="true">Confort</h2>
-			</label>
-			<div class="content">
-				<Confort />
-			</div>
-		</section>
-		<section>
-			<input type="checkbox" name="acc" id="acc4" />
-			<label for="acc4">
-				<span class="numero-faq" />
-				<h2 data-aos="zoom-out" data-aos-mirror="true">Raccourcis</h2>
-			</label>
-			<div class="content">
-				<Raccourcis />
-			</div>
-		</section>
-	</div>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Roulements et diminution des SFBs</h2>
+	<Roulements_SFB />
+
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Abréviations</h2>
+	<Abreviations />
+
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Confort</h2>
+	<Confort />
+
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Raccourcis</h2>
+	<Raccourcis />
 </div>

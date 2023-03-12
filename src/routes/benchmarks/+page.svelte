@@ -46,13 +46,13 @@
 <div class="contenu">
 	<h1 data-aos="zoom-in" data-aos-mirror="true">Benchmarks</h1>
 
-	<p class="introduction">
+	<div class="encadre">
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
 		KLAnext est l’un d’entre eux et peut être gratuitement utilisé à l’adresse <a
 			href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a
 		>. C’est l’un des comparateurs les plus utilisés en raison de son algorithme de notation qui
 		serait plus "juste" que les autres.
-	</p>
+	</div>
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Comment bien utiliser KLAnext</h2>
 	<section>

@@ -16,8 +16,8 @@
 	/>
 </svelte:head>
 
-<div class="presentation">
-	<h1 class="titre" data-aos="zoom-in" data-aos-mirror="true">
+<header>
+	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
 		Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="texte"
 			>Texte&nbsp;—</span
 		>
@@ -31,11 +31,13 @@
 		plus={'non'}
 		controles={'oui'}
 	/>
-</div>
+</header>
+
 <petit-espace />
+
 <div class="contenu">
 	<hr />
-	<p class="introduction-text">
+	<p class="hypertexte-introduction">
 		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
 		Fruit de longues réflexions, elle se veut la plus
 		<span class="text-glow">optimale</span>
@@ -353,7 +355,10 @@
 			<div class="c" />
 			<div class="c" />
 		</div>
-		<h2 class="titre-orange text-center" style="margin: 0 auto; padding-top: 20vh;">
+		<h2
+			class="text-orange-gradient text-center"
+			style="margin: 0 auto; padding-top: 20vh; border:none; "
+		>
 			Pour aller <b>+</b> loin
 		</h2>
 		<div class="texte-orb">
