@@ -26,7 +26,7 @@
 		idées si vous comptez choisir une nouvelle disposition voire en créer une.
 	</p>
 </section>
-<moyen-espace />
+
 <section>
 	<h3>Historique des modifications</h3>
 	<p>
@@ -37,7 +37,7 @@
 		<kbd>★</kbd> et de déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 	</p>
 </section>
-<moyen-espace />
+
 <section>
 	<h3>Comment la disposition a été créée</h3>
 	<p>
@@ -66,7 +66,7 @@
 		des doigts aux touches.
 	</p>
 </section>
-<moyen-espace />
+
 <section>
 	<h3>Utilisation de la couche AltGr</h3>
 	<p>

@@ -24,7 +24,7 @@
 		cet arrangemement des voyelles permet alors de très bons roulements.
 	</p>
 </section>
-<moyen-espace />
+
 <section>
 	<h3>Points d’amélioration</h3>
 	<p>

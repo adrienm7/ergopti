@@ -56,12 +56,12 @@
 
 <style>
 	:root {
-		--couleur-header: rgba(0, 0, 0, 0.8);
-		--couleur-header-mobile: rgba(0, 0, 0, 0.8);
+		--couleur-header: rgba(0, 0, 0, 0.9);
+		--couleur-header-mobile: rgba(0, 16, 36, 0.9);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
 		--espacement-items-menu: 5px;
-		--couleur-ombre: rgba(255, 255, 255, 0.3);
+		--couleur-ombre: rgba(200, 233, 255, 0.4);
 		--marge-fenetre: var(--marge-bords-menu);
 		--hauteur-header: 70px; /* Fallback si clamp n'est pas supporté */
 		--couleur-icone-hamburger: white;
@@ -191,6 +191,7 @@
 			padding: 0;
 			list-style: none;
 			overflow: hidden;
+			z-index: 98;
 		}
 
 		header #menu ul li a {
@@ -199,12 +200,14 @@
 			padding-left: var(--marge-fenetre);
 			text-decoration: none;
 			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+			line-height: 1em;
 		}
 		header #menu ul li,
 		header #menu ul li a p {
 			margin: 0;
 			padding: 0;
 			font-size: 1.1rem;
+			line-height: 1em !important;
 		}
 
 		/* menu icon */
