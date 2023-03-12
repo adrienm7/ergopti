@@ -39,7 +39,7 @@
 		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
 		Fruit de longues réflexions, elle se veut la plus
 		<span class="text-glow">optimale</span>
-		possible. Cette page vous présente la disposition ainsi que ses nombreux avantages.
+		possible. Cette page vous présente la disposition ainsi que ses&nbsp;nombreux&nbsp;avantages.
 	</p>
 	<hr />
 

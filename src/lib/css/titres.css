@@ -26,24 +26,31 @@ h2 {
 	width: fit-content;
 }
 
+section{
+	margin-bottom: 10vh;
+}
+
+.accordion section{
+	margin-bottom: 0;
+}
 
 section h3 {
     margin-top: 18vh;
     margin-bottom: 8vh;
 	font-size: 1.6rem;
 
-	padding: 0.15em 0.6em 0.3em 0.6em;
-	background-color: var(--bg-color);
+	/* padding: 0.15em 0.6em 0.3em 0.6em;
 	background-color: rgb(246, 246, 246);
+	background-color: var(--bg-color);
 	border: 1px solid gray;
-	border-radius: 7px;
-	color: rgba(217, 198, 255, 0.9);
+	border-radius: 7px; */
+	color: var(--bg-color);
+	/* color: #5d5d5d;
 	color: white;
-	color: #5d5d5d;
-	width: fit-content;
+	width: fit-content; */
 }
 
-section h3 {
+section h3:first-child {
 	margin-top: 0;
 }
 
