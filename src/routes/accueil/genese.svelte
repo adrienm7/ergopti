@@ -5,7 +5,7 @@
 	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 </script>
 
-<h2 data-aos="zoom-out" data-aos-mirror="true">Genèse et raison des choix</h2>
+<h2 data-aos="zoom-out" data-aos-mirror="true">Informations supplémentaires sur la disposition</h2>
 <div class="accordion">
 	<section>
 		<input type="checkbox" name="acc" id="acc21" />
@@ -43,10 +43,12 @@
 			<p>
 				Au départ, ma disposition dérivée d’Optimot était nommée <em>Optim7</em>. Cependant, passé
 				un certain cap, ce nom a été changé en <Nom />. La disposition a beaucoup évoluée au fil du
-				temps. En particulier, la touche sur l’index gauche a plusieur fois changé :
+				temps.
+			</p>
+			<p>
+				En particulier, la touche sur l’index gauche a plusieurs fois changé :
 				<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd> et enfin la création d’une touche
-				spéciale
-				<kbd>★</kbd> et de déplacement de <kbd>É</kbd> sur l’annulaire gauche.
+				spéciale <kbd>★</kbd> et de déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 			</p>
 		</div>
 	</section>
@@ -82,6 +84,16 @@
 				de chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les
 				déplacements des doigts aux touches.
 			</p>
+			<petit-espace />
+			<p>
+				➂ La troisième étape a été de déplacer les lettres pour réduire au maximum le nombre de <SFB
+				/>s, tout en maximisant les roulements. Cette étape est la plus difficile, car intervertir
+				seulement deux touches peut faire passer d’une disposition excellente à une disposition très
+				moyenne. Il faut effectivement avoir en tête les bigrammes les plus fréquents et s’assurer
+				que déplacer une touche à un autre emplacement ne va pas empirer la situation.
+			</p>
+			<petit-espace />
+			<p>[À continuer]</p>
 		</div>
 	</section>
 	<section>
@@ -95,11 +107,11 @@
 				<Nom /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire
 				drastiquement les distances parcourues pour atteindre certaines touches. Un autre avantage
 				est le fait que cette touche modificatrice est aisément atteingable par le pouce droit sur
-				un clavier standard. Cela permet donc de mettre co doigt à contribution, contrairement à
-				l’AZERTY.
+				un clavier standard. Cela permet donc de mettre ce doigt à contribution, contrairement à
+				l’AZERTY qui ne l’exploite pas suffisamment.
 			</p>
 			<p>
-				N’ayant nullement besoin de tous les caractères exotiques et touches mortes du Bépo et
+				N’ayant nullement besoin de tous les caractères exotiques et touches mortes du BÉPO ou
 				d’Optimot, j’en ai supprimé la majeure partie. Cela laisse assez de place pour ne plus avoir
 				à atteindre la rangée des nombres pour taper des parenthèses, guillemets ou opérateurs
 				mathématiques.
@@ -107,7 +119,10 @@
 			<p>
 				Cela fait que je n’ai plus grande utilité des espaces insécables et espaces fines
 				insécables. Celles-ci sont donc déplacées à un autre endroit pour me permettre d’avoir le
-				tiret en Shift+Espace qui est beaucoup plus utile. L’underscore reste en AltGr+Espace.
+				tiret (<kbd-sortie>-</kbd-sortie>) en <kbd>Shift</kbd> + <kbd>Espace</kbd> qui est beaucoup
+				plus utile. L’underscore (<kbd-sortie>_</kbd-sortie>) reste quant à lui en <kbd>AltGr</kbd>
+				+
+				<kbd>Espace</kbd>.
 			</p>
 		</div>
 	</section>

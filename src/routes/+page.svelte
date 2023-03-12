@@ -46,8 +46,6 @@
 	<hr />
 
 	<Presentation />
-	<Genese />
-	<Autocritiques />
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">
 		<span class="glow">★</span>
@@ -357,7 +355,7 @@
 		</div>
 		<h2
 			class="text-orange-gradient text-center"
-			style="margin: 0 auto; padding-top: 20vh; border:none; "
+			style="margin: 0 auto; padding-top: 20vh; border:none; font-weight:bolder;"
 		>
 			Pour aller <b>+</b> loin
 		</h2>
@@ -365,16 +363,19 @@
 			<hr />
 			<p class="encart-introduction">
 				<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
-				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
+				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.<br
+				/>Découvrez cette amélioration de la disposition en consultant sa page associée :
 			</p>
-			<hr />
-			<mini-espace />
-			<a href="/hypertexte-plus" style="text-decoration: none"
+			<a href="/hypertexte-plus" style="text-decoration: none;"
 				><button
-					style="display:block; margin: 0 auto; background: rgba(0, 0, 0, 0.2); padding: 10px; padding-top: 6px; border-radius: 3px; border: 1px solid white;"
+					style="display:block; margin: 0 auto; margin-bottom: 25px; background: rgba(0, 0, 0, 0.2); padding: 10px; padding-top: 6px; border-radius: 3px; border: 1px solid white;"
 					><Nom_Plus /></button
 				></a
 			>
+			<hr />
 		</div>
 	</div>
+
+	<Genese />
+	<!-- <Autocritiques /> -->
 </div>
