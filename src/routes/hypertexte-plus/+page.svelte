@@ -56,7 +56,7 @@
 
 	<petit-espace />
 	<div class="encadre">
-		Toutefois, l’utilisation de cette version nécessite des <span class="texte text-bold"
+		Toutefois, l’utilisation de cette version nécessite des <span class="text-bold"
 			>outils de programmation de clavier spécifiques.
 		</span>
 		<span>
