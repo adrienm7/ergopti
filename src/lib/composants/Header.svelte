@@ -24,31 +24,31 @@
 	<nav id="menu">
 		<ul>
 			<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-				<a href="/"><p>⌨ HyperTexte</p></a>
+				<a href="/">⌨ HyperTexte</a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/hypertexte-plus"><p>★ HyperTexte<span class="glow">+</span></p></a>
+				<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/benchmarks"><p>⚑ Benchmarks</p></a>
+				<a href="/benchmarks">⚑ Benchmarks</a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/telechargements"><p>❖ Téléchargements</p></a>
+				<a href="/telechargements">❖ Téléchargements</a>
 			</li>
 			<li
 				aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/contact"><p>➜ Contact</p></a>
+				<a href="/contact">➜ Contact</a>
 			</li>
 		</ul>
 	</nav>
@@ -60,12 +60,12 @@
 		--couleur-header-mobile: rgba(0, 16, 36, 0.9);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
-		--espacement-items-menu: 5px;
+		--espacement-items-menu: clamp(5px, 0.45vw, 14px);
 		--couleur-ombre: rgba(200, 233, 255, 0.4);
 		--marge-fenetre: var(--marge-bords-menu);
-		--hauteur-header: 70px; /* Fallback si clamp n'est pas supporté */
+		--hauteur-header: clamp(70px, 5.5vw, 120px);
 		--couleur-icone-hamburger: white;
-		--marge-bords-menu: 20px;
+		--marge-bords-menu: 2vw;
 		--longueur-traits-hamburger: 18px;
 	}
 
@@ -87,15 +87,11 @@
 	}
 	header a {
 		color: var(--couleur-liens-header);
-		font-size: 1rem;
+		font-size: clamp(1rem, 1.4vw, 32px);
 		text-decoration: none;
 	}
 
-	header #menu li a p {
-		font-size: 1rem;
-	}
-
-	header #menu li a p::first-letter {
+	header #menu li a::first-letter {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -105,11 +101,11 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
-	header #menu li[aria-current='page'] a p::first-letter {
+	header #menu li[aria-current='page'] a::first-letter {
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
-	header #menu li[aria-current='page'] a p {
+	header #menu li[aria-current='page'] a {
 		/* background-color: #f4f4f4;
 			color: black !important;
 			border-radius: 3px; */
@@ -132,7 +128,7 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	} */
 
-	header #menu li:not([aria-current='page']) a:hover p {
+	header #menu li:not([aria-current='page']) a:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -140,7 +136,7 @@
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
-		line-height: 2em;
+		/* line-height: 6rem; */
 	}
 
 	/* header #menu li:not([aria-current='page']) a:hover::after {
@@ -293,7 +289,7 @@
 			border: none;
 			margin: 0;
 			padding: 0;
-			padding-right: 40px;
+			padding-right: var(--marge-bords-menu);
 		}
 
 		header #menu ul li {
