@@ -355,7 +355,7 @@
 		</div>
 		<h2
 			class="text-orange-gradient text-center"
-			style="margin: 0 auto; padding-top: 20vh; border:none; font-weight:bolder;"
+			style="margin: 0 auto; padding-top: 20vh; border:none; box-shadow: none; font-weight:bolder;"
 		>
 			Pour aller <b>+</b> loin
 		</h2>
