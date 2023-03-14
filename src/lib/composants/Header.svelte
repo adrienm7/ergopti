@@ -65,7 +65,7 @@
 		--marge-fenetre: var(--marge-bords-menu);
 		--hauteur-header: clamp(70px, 5.5vw, 120px);
 		--couleur-icone-hamburger: white;
-		--marge-bords-menu: 2vw;
+		--marge-bords-menu: clamp(15px, 2vw, 50px);
 		--longueur-traits-hamburger: 18px;
 	}
 

@@ -26,10 +26,28 @@
 
 	// 	transporter.sendMail(mailOptions);
 	// });
+	let titre = 'contoct';
+
+	function sleep(ms) {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	async function test() {
+		for (let i = 0; i < 1000; i++) {
+			if (i % 2 == 0) {
+				titre = 'HyperTexte +';
+			} else {
+				titre = 'HyperTexte ★';
+			}
+			// console.log(`Waiting ${i} seconds...`);
+			await sleep(i * 100);
+		}
+		console.log('Done');
+	}
 </script>
 
 <svelte:head>
-	<title>Contact</title>
+	<title>{titre}</title>
 	<meta
 		name="description"
 		content="Contactez l’auteur de la disposition HyperTexte sur cette page"
@@ -44,5 +62,5 @@
 		>
 	</div>
 
-	<!-- <button on:click={sendA}>Envoi</button> -->
+	<button on:click={test}>Envoi</button>
 </div>
