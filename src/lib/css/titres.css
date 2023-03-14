@@ -24,6 +24,7 @@ h2 {
 	background-color: rgba(0, 0, 0, 0.4);
 	border: 1px solid  rgb(0, 55, 92);
 	border-radius: 7px;
+	box-shadow: rgba(0, 0, 0, 0.4) 0px 0px 6px;
 	color: rgba(198, 241, 255, 0.9);
     font-size: 1.8rem;
 	font-weight: normal;
