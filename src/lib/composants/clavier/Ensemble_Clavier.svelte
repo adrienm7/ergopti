@@ -35,13 +35,13 @@
 				let colonne = j;
 
 				// Interversion de É et de ★ sur les claviers ISO
-				if (res !== undefined) {
-					if ((type === 'iso') & (plus === 'oui') & (res.touche === 'é')) {
-						colonne = j + 1;
-					} else if ((type === 'iso') & (plus === 'oui') & (res.touche === 'magique')) {
-						colonne = j - 1;
-					}
-				}
+				// if (res !== undefined) {
+				// 	if ((type === 'iso') & (plus === 'oui') & (res.touche === 'é')) {
+				// 		colonne = j + 1;
+				// 	} else if ((type === 'iso') & (plus === 'oui') & (res.touche === 'magique')) {
+				// 		colonne = j - 1;
+				// 	}
+				// }
 
 				// Suppression des event listeners sur la touche
 				const toucheClavier0 = document
