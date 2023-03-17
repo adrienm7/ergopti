@@ -203,12 +203,12 @@ bloc-touche[data-touche="AltTab"] div {
 ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="AltGr"][data-plus="non"] bloc-touche[data-touche="q"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="à"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="e"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="ê"],
 ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="h"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"]{
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="t"],
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="r"]{
 	--couleur-touche-saturation: 0%;
 	--couleur-touche-luminosite: 100%;
 	--opacite-touche: 5%;
@@ -218,7 +218,7 @@ ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="u"]{
 ensemble-clavier[data-couche="Visuel"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="Primary"] bloc-touche[data-touche="!"],
 ensemble-clavier[data-couche="AltGr"][data-plus="non"] bloc-touche[data-touche="q"],
-ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="d"] {
+ensemble-clavier[data-couche="ShiftAltGr"] bloc-touche[data-touche="t"] {
 	font-weight: normal;
 }
 
