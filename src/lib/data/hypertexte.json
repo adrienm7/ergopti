@@ -222,9 +222,9 @@
 		{
 			"touche": ".",
 			"main": "gauche",
-			"doigt": "index",
+			"doigt": "annulaire",
 			"ligne": "4",
-			"colonne": "6",
+			"colonne": "3",
 			"taille": "1"
 		},
 		{
@@ -262,9 +262,9 @@
 		{
 			"touche": "é",
 			"main": "gauche",
-			"doigt": "annulaire",
+			"doigt": "index",
 			"ligne": "4",
-			"colonne": "3",
+			"colonne": "6",
 			"taille": "1"
 		},
 		{
@@ -712,9 +712,9 @@
 		{
 			"touche": ".",
 			"main": "gauche",
-			"doigt": "index",
+			"doigt": "annulaire",
 			"ligne": "4",
-			"colonne": "5",
+			"colonne": "3",
 			"taille": "1"
 		},
 		{
@@ -752,9 +752,9 @@
 		{
 			"touche": "é",
 			"main": "gauche",
-			"doigt": "annulaire",
+			"doigt": "index",
 			"ligne": "4",
-			"colonne": "3",
+			"colonne": "5",
 			"taille": "1"
 		},
 		{
