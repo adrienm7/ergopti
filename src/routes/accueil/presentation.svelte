@@ -304,18 +304,19 @@
 					<span class="hyper text-bold">`</span> est au-dessus du A
 				</li>
 				<li>
-					<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>@</kbd-sortie> car aro<span
-						class="hyper text-bold">B</span
-					>ase
-				</li>
-				<li>
 					<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
 					car la cédille est sous le <span class="hyper text-bold">C</span>
 				</li>
 				<li>
 					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>D</kbd> ➜
-					<kbd-sortie style="font-weight: normal;">◌̈</kbd-sortie>
-					car le trémat se nomme <span class="hyper text-bold">D</span>iaresis en anglais
+					<kbd-sortie>δ</kbd-sortie>
+					car c’est la touche morte pour écrire les lettres grecques (α, β, γ, δ…), dont l'une des plus
+					connues est <span class="hyper text-bold">δ</span>
+				</li>
+				<li>
+					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>E</kbd> ➜
+					<kbd-sortie>ᵉ</kbd-sortie>
+					car c’est la touche morte <span class="hyper text-bold">E</span>xposant
 				</li>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
@@ -328,10 +329,6 @@
 				<li>
 					<kbd>AltGr</kbd> + <kbd>Ê</kbd> ➜ <kbd-sortie>^</kbd-sortie>
 					car le <span class="hyper text-bold">^</span> est au-dessus du E
-				</li>
-				<li>
-					<kbd>AltGr</kbd> + <kbd>F</kbd> ➜ <kbd-sortie>*</kbd-sortie>
-					car c’est la première lettre de <span class="hyper text-bold">F</span>ois
 				</li>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-sortie>#</kbd-sortie>
@@ -351,8 +348,23 @@
 					car c’est la première lettre de <span class="hyper text-bold">P</span>lus
 				</li>
 				<li>
+					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>R</kbd> ➜
+					<kbd-sortie>ℝ</kbd-sortie>
+					car c’est la touche morte pour écrire les ensembles mathématiques (ℕ, ℤ, ℚ, ℝ, ℂ), dont l'un
+					des plus connus est <span class="hyper text-bold">R</span>
+				</li>
+				<li>
+					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜
+					<kbd-sortie style="font-weight: normal;">◌̈</kbd-sortie>
+					car c’est la touche morte <span class="hyper text-bold">T</span>rémat
+				</li>
+				<li>
 					<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> car c’est la barre
 					<span class="hyper text-bold">V</span>erticale
+				</li>
+				<li>
+					<kbd>AltGr</kbd> + <kbd>X</kbd> ➜ <kbd-sortie>*</kbd-sortie>
+					car <span class="hyper text-bold">x</span> ressemble au fois
 				</li>
 			</ul>
 
@@ -361,9 +373,16 @@
 			<p>D’autres sont placées par paires l’une à côté de l’autre :</p>
 			<ul>
 				<li>
-					<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
+					<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>{'<'}</kbd-sortie> et <kbd>AltGr</kbd> +
 					<kbd>I</kbd>
-					➜ <kbd-sortie>]</kbd-sortie>
+					➜ <kbd-sortie>{'>'}</kbd-sortie>
+				</li>
+				<li>
+					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>⩽</kbd-sortie> et
+					<kbd>Shift</kbd>
+					+ <kbd>AltGr</kbd> +
+					<kbd>I</kbd>
+					➜ <kbd-sortie>⩾</kbd-sortie>
 				</li>
 				<li>
 					<kbd>AltGr</kbd> + <kbd>E</kbd> ➜ <kbd-sortie>{'{'}</kbd-sortie> et <kbd>AltGr</kbd> +
@@ -376,27 +395,20 @@
 					➜ <kbd-sortie>)</kbd-sortie>
 				</li>
 				<li>
-					<kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>{'<'}</kbd-sortie> et <kbd>AltGr</kbd> +
+					<kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
 					<kbd>R</kbd>
-					➜ <kbd-sortie>{'>'}</kbd-sortie>
+					➜ <kbd-sortie>]</kbd-sortie>
 				</li>
 				<li>
-					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>⩽</kbd-sortie> et
-					<kbd>Shift</kbd>
-					+ <kbd>AltGr</kbd> +
-					<kbd>R</kbd>
-					➜ <kbd-sortie>⩾</kbd-sortie>
-				</li>
-				<li>
-					<kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>«</kbd-sortie> et <kbd>AltGr</kbd> +
-					<kbd>X</kbd>
+					<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>«</kbd-sortie> et <kbd>AltGr</kbd> +
+					<kbd>F</kbd>
 					➜ <kbd-sortie>»</kbd-sortie>
 				</li>
 				<li>
-					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>G</kbd> ➜ <kbd-sortie>“</kbd-sortie> et
+					<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>“</kbd-sortie> et
 					<kbd>Shift</kbd>
 					+ <kbd>AltGr</kbd> +
-					<kbd>X</kbd>
+					<kbd>F</kbd>
 					➜ <kbd-sortie>”</kbd-sortie>
 				</li>
 			</ul>
@@ -405,7 +417,7 @@
 
 			<p>
 				Enfin, les raccourcis avec les nouvelles touches par rapport à l’AZERTY et <kbd>Ctrl</kbd> sont
-				placés côte à côte et faciles à retenir :
+				faciles à retenir :
 			</p>
 			<ul>
 				<li>
