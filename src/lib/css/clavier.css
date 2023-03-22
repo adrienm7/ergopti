@@ -23,7 +23,7 @@ bloc-clavier {
     --couleur-touche-saturation: 0%;
     --couleur-touche-luminosite: 100%;
     --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
-	--opacite-touche: 25%;
+	--opacite-touche: 10%;
 	
 	--opacite-touche-pressee: 8%;
     --couleur-touche-pressee-luminosite: 60%;
@@ -569,7 +569,7 @@ bloc-touche[data-type="enter"]:hover::after
 
 ensemble-clavier[data-couleur="oui"] bloc-touche {
 	--couleur-touche-saturation: 100%;
-	--opacite-touche: 40%;
+	--opacite-touche: 30%;
 	--couleur-touche-luminosite: 70%;
 }
 
