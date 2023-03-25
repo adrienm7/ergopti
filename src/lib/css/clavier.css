@@ -330,6 +330,10 @@ ensemble-clavier[data-couche="AltGr"][data-plus=oui] bloc-touche[data-touche="Ta
 	font-size: 0.6em;
 }
 
+ensemble-clavier[data-couche="Layer"][data-plus=oui] bloc-touche[data-touche="Coller"] div {
+	font-size: 0.85em;
+}
+
 
 
 /* Couche Ctrl */
