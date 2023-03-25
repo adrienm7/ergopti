@@ -1869,7 +1869,7 @@
 			"AltGr": "Ⓒ",
 			"ShiftAltGr": "Ⓒ",
 			"Ctrl": "Ⓒ",
-			"Layer": "Ⓒ",
+			"Layer": "Ⓕ",
 			"À": "Ⓒ",
 			"type": "special"
 		},
@@ -1880,7 +1880,7 @@
 			"AltGr": "Ⓥ",
 			"ShiftAltGr": "Ⓥ",
 			"Ctrl": "Ⓥ",
-			"Layer": "Ⓥ",
+			"Layer": "⊞Ⓥ",
 			"À": "Ⓥ",
 			"type": "special"
 		},
@@ -1891,7 +1891,7 @@
 			"AltGr": "Ⓧ",
 			"ShiftAltGr": "Ⓧ",
 			"Ctrl": "Ⓧ",
-			"Layer": "Ⓧ",
+			"Layer": "Ⓗ",
 			"À": "Ⓧ",
 			"type": "special"
 		},
