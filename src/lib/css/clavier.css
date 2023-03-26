@@ -569,8 +569,8 @@ bloc-touche[data-type="enter"]:hover::after
 
 ensemble-clavier[data-couleur="non"] bloc-touche {
 	--couleur-touche: 200!important;
-	--couleur-touche-luminosite: 80%;
-	--couleur-touche-saturation: 90%;
+	--couleur-touche-luminosite: 100%;
+	--couleur-touche-saturation: 0%;
 	--opacite-touche: 15%;
 }
 
