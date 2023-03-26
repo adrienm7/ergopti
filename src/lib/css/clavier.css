@@ -13,18 +13,13 @@ bloc-clavier {
     
     --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
-    --profondeur-touche: 1.5px;
-    --profondeur-touche-pressee: 0.75px;
     --marge-touche: calc(var(--taille-clavier) * 0.36vw);
+    --profondeur-touche: 1.5px;
     --arrondi-touche: 0.15em;
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
-    --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
-
-    --couleur-touche-saturation: 0%;
-    --couleur-touche-luminosite: 100%;
-    --couleur-texte-touche: hsla(0, 100%, 100%, 90%);
-	--opacite-touche: 10%;
 	
+    --profondeur-touche-pressee: 0.75px;
+    --descente-touche: calc(var(--profondeur-touche) - var(--profondeur-touche-pressee));
 	--opacite-touche-pressee: 8%;
     --couleur-touche-pressee-luminosite: 60%;
 
@@ -41,7 +36,7 @@ bloc-clavier {
     width: max-content;
     margin: 0 auto;
     padding: var(--marge-clavier);
-    background-color:hsla(236, 100%, 9%, 0.3);
+    background-color: hsl(216, 100%, 10%);
     border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
 	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
@@ -70,6 +65,7 @@ bloc-touche {
     --couleur-bordure-touche: hsla(var(--couleur-touche), var(--couleur-touche-saturation), var(--couleur-touche-luminosite), 30%);
     --taille-bordure-touche: 1px; /* calc(var(--taille-clavier) * 0.1rem) */
     --taille-texte-touche: calc(var(--taille-touche) / 2.5);
+	--couleur-texte-touche: hsla(0, 100%, 100%, 90%);
     
     display: inline-flex;
     justify-content: center;
@@ -570,6 +566,13 @@ bloc-touche[data-type="enter"]:hover::after
 
 /* === Si couleur, ou couleur spéciale === */
 
+
+ensemble-clavier[data-couleur="non"] bloc-touche {
+	--couleur-touche: 200!important;
+	--couleur-touche-luminosite: 70%;
+	--couleur-touche-saturation: 100%;
+	--opacite-touche: 15%;
+}
 
 ensemble-clavier[data-couleur="oui"] bloc-touche {
 	--couleur-touche-saturation: 100%;
