@@ -123,7 +123,7 @@ ensemble-clavier[data-type="ergodox"] bloc-touche[data-colonne="6"] {
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-touche="Space"],
 ensemble-clavier[data-type="ergodox"] bloc-touche[data-doigt="pouce"]{
 	background-color: var(--couleur-fond-touche);
-	background-color: rgb(0, 18, 56);
+	background-color: rgba(0, 46, 96, 0.3);
 }
 
 ensemble-clavier[data-type="ergodox"] bloc-ligne[data-ligne = '6'] {
@@ -569,15 +569,15 @@ bloc-touche[data-type="enter"]:hover::after
 
 ensemble-clavier[data-couleur="non"] bloc-touche {
 	--couleur-touche: 200!important;
-	--couleur-touche-luminosite: 70%;
-	--couleur-touche-saturation: 100%;
+	--couleur-touche-luminosite: 80%;
+	--couleur-touche-saturation: 90%;
 	--opacite-touche: 15%;
 }
 
 ensemble-clavier[data-couleur="oui"] bloc-touche {
-	--couleur-touche-saturation: 100%;
-	--opacite-touche: 30%;
-	--couleur-touche-luminosite: 70%;
+	--couleur-touche-saturation: 80%;
+	--opacite-touche: 35%;
+	--couleur-touche-luminosite: 65%;
 }
 
 
