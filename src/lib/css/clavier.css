@@ -542,18 +542,17 @@ bloc-touche[data-type="enter"] {
 /* Touche Enter */
 
 bloc-touche[data-type="enter"]::before,
-bloc-touche[data-type="enter"]::after,
-bloc-touche[data-type="enter"]:active,
-bloc-touche[data-type="enter"]:active::before,
-bloc-touche[data-type="enter"]:active::after {
+bloc-touche[data-type="enter"]::after {
     background-color: rgb(7, 7, 7)!important;
 	color: white!important;
 }
 
 bloc-touche[data-type="enter"]:hover,
-bloc-touche[data-type="enter"]:hover div,
 bloc-touche[data-type="enter"]:hover::before,
-bloc-touche[data-type="enter"]:hover::after
+bloc-touche[data-type="enter"]:hover::after,
+bloc-touche[data-type="enter"].touche-active,
+bloc-touche[data-type="enter"].touche-active::before,
+bloc-touche[data-type="enter"].touche-active::after
 {
 	color: #333;
 	background-color: rgb(210, 210, 210)!important;

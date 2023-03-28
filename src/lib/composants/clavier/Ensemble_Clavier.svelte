@@ -30,15 +30,15 @@
 		for (let ligne = 1; ligne <= 7; ligne++) {
 			for (let j = 0; j <= 15; j++) {
 				// Récupération de ce qui doit être affiché sur la touche
-				const res = data[type].find((el) => (el['ligne'] == ligne) & (el['colonne'] == j));
+				const res = data[type].find((el) => el['ligne'] == ligne && el['colonne'] == j);
 
 				let colonne = j;
 
 				// Interversion de É et de ★ sur les claviers ISO
 				// if (res !== undefined) {
-				// 	if ((type === 'iso') & (plus === 'oui') & (res.touche === 'é')) {
+				// 	if ((type === 'iso') && (plus === 'oui') && (res.touche === 'é')) {
 				// 		colonne = j + 1;
-				// 	} else if ((type === 'iso') & (plus === 'oui') & (res.touche === 'magique')) {
+				// 	} else if ((type === 'iso') && (plus === 'oui') && (res.touche === 'magique')) {
 				// 		colonne = j - 1;
 				// 	}
 				// }
@@ -64,14 +64,14 @@
 
 				// console.log(res);
 				if (res !== undefined) {
-					const contenuTouche = data.touches.find((el) => el['touche'] == res.touche);
+					const contenuTouche = data.touches.find((el) => el['touche'] === res['touche']);
 
 					if (contenuTouche[couche] === '') {
 						toucheClavier.innerHTML = '<div> <div>';
 					} else {
 						if (couche === 'Visuel') {
 							if (contenuTouche.type === 'double') {
-								if (res.touche === '"') {
+								if (res['touche'] === '"') {
 									// Cas particulier de la touche « " »
 									toucheClavier.innerHTML =
 										'<div>' +
@@ -92,7 +92,7 @@
 								// Cas où la touche n’est pas double
 								if (plus === 'oui') {
 									// Cas où la touche n’est pas double et + est activé
-									if ((contenuTouche['Primary' + '+'] !== undefined) & (ligne < 6)) {
+									if (contenuTouche['Primary' + '+'] !== undefined && ligne < 6) {
 										// Si la couche + existe ET n’est pas en thumb cluster
 										toucheClavier.innerHTML = '<div>' + contenuTouche['Primary' + '+'] + '</div>';
 										toucheClavier.dataset.plus = 'oui';
@@ -119,10 +119,10 @@
 					}
 
 					// Corrections localisées
-					if ((type === 'ergodox') & (res.touche === 'Space')) {
+					if (type === 'ergodox' && res.touche === 'Space') {
 						toucheClavier.innerHTML = '<div>␣</div>';
 					}
-					if ((type === 'iso') & (res.touche === 'Space')) {
+					if (type === 'iso' && res.touche === 'Space' && couche === 'Visuel') {
 						toucheClavier.innerHTML = '<div>HyperTexte v.1.0</div>';
 					}
 
@@ -152,34 +152,34 @@
 		let aGrave = document.getElementById(emplacement).querySelector("[data-touche='à']");
 		let space = document.getElementById(emplacement).querySelector("[data-touche='Space']");
 
-		if ((couche === 'Shift') & (lShift !== null)) {
+		if (couche === 'Shift' && lShift !== null) {
 			lShift.classList.add('touche-active');
 		}
-		if ((couche === 'Shift') & (rShift !== null)) {
+		if (couche === 'Shift' && rShift !== null) {
 			rShift.classList.add('touche-active');
 		}
-		if ((couche === 'Ctrl') & (lCtrl !== null)) {
+		if (couche === 'Ctrl' && lCtrl !== null) {
 			lCtrl.classList.add('touche-active');
 		}
-		if ((couche === 'Ctrl') & (rCtrl !== null)) {
+		if (couche === 'Ctrl' && rCtrl !== null) {
 			rCtrl.classList.add('touche-active');
 		}
-		if ((couche === 'AltGr') & (altGr !== null)) {
+		if (couche === 'AltGr' && altGr !== null) {
 			altGr.classList.add('touche-active');
 		}
-		if ((couche == 'ShiftAltGr') & (lShift !== null)) {
+		if (couche === 'ShiftAltGr' && lShift !== null) {
 			lShift.classList.add('touche-active');
 		}
-		if ((couche === 'ShiftAltGr') & (rShift !== null)) {
+		if (couche === 'ShiftAltGr' && rShift !== null) {
 			rShift.classList.add('touche-active');
 		}
-		if ((couche === 'ShiftAltGr') & (altGr !== null)) {
+		if (couche === 'ShiftAltGr' && altGr !== null) {
 			altGr.classList.add('touche-active');
 		}
-		if ((couche === 'À') & (aGrave !== null)) {
+		if (couche === 'À' && aGrave !== null) {
 			aGrave.classList.add('touche-active');
 		}
-		if ((couche === 'Layer') & (space !== null)) {
+		if (couche === 'Layer' && space !== null) {
 			space.classList.add('touche-active');
 		}
 	}
@@ -231,57 +231,54 @@
 		let nouvelleCouche = coucheActuelle;
 
 		// Touche pressée = AltGr
-		if ((touchePressee === 'RAlt') & (coucheActuelle === 'AltGr')) {
+		if (touchePressee === 'RAlt' && coucheActuelle === 'AltGr') {
 			nouvelleCouche = 'Visuel';
-		} else if ((touchePressee === 'RAlt') & (coucheActuelle === 'Shift')) {
+		} else if (touchePressee === 'RAlt' && coucheActuelle === 'Shift') {
 			nouvelleCouche = 'ShiftAltGr';
-		} else if ((touchePressee === 'RAlt') & (coucheActuelle === 'ShiftAltGr')) {
+		} else if (touchePressee === 'RAlt' && coucheActuelle === 'ShiftAltGr') {
 			nouvelleCouche = 'Shift';
 		} else if (touchePressee === 'RAlt') {
 			nouvelleCouche = 'AltGr';
 		}
 
 		// Touche pressée = Shift
-		if (
-			((touchePressee === 'LShift') | (touchePressee === 'RShift')) &
-			(coucheActuelle === 'AltGr')
-		) {
+		if ((touchePressee === 'LShift' || touchePressee === 'RShift') & (coucheActuelle === 'AltGr')) {
 			nouvelleCouche = 'ShiftAltGr';
 		} else if (
-			((touchePressee === 'LShift') | (touchePressee === 'RShift')) &
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &
 			(coucheActuelle === 'Shift')
 		) {
 			nouvelleCouche = 'Visuel';
 		} else if (
-			((touchePressee === 'LShift') | (touchePressee === 'RShift')) &
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &
 			(coucheActuelle === 'ShiftAltGr')
 		) {
 			nouvelleCouche = 'AltGr';
 		} else if (
-			((touchePressee === 'LShift') | (touchePressee === 'RShift')) &
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &
 			(coucheActuelle === 'À')
 		) {
 			nouvelleCouche = 'Shift';
-		} else if ((touchePressee === 'LShift') | (touchePressee === 'RShift')) {
+		} else if (touchePressee === 'LShift' || touchePressee === 'RShift') {
 			nouvelleCouche = 'Shift';
 		}
 
 		// Touche pressée = Ctrl
-		if (((touchePressee === 'LCtrl') | (touchePressee === 'RCtrl')) & (coucheActuelle !== 'Ctrl')) {
+		if ((touchePressee === 'LCtrl' || touchePressee === 'RCtrl') && coucheActuelle !== 'Ctrl') {
 			nouvelleCouche = 'Ctrl';
-		} else if ((touchePressee === 'LCtrl') | (touchePressee === 'RCtrl')) {
+		} else if (touchePressee === 'LCtrl' || touchePressee === 'RCtrl') {
 			nouvelleCouche = 'Visuel';
 		}
 
 		// Touche pressée = Space (pour accéder au Layer)
-		if ((touchePressee === 'Space') & (coucheActuelle === 'Layer')) {
+		if (touchePressee === 'Space' && coucheActuelle === 'Layer') {
 			nouvelleCouche = 'Visuel';
 		} else if (touchePressee === 'Space') {
 			nouvelleCouche = 'Layer';
 		}
 
 		// Touche pressée = À
-		if ((touchePressee === 'à') & (coucheActuelle === 'À')) {
+		if (touchePressee === 'à' && coucheActuelle === 'À') {
 			nouvelleCouche = 'Visuel';
 		} else if (touchePressee === 'à') {
 			nouvelleCouche = 'À';
@@ -344,7 +341,7 @@
 				.classList.add('touche-active');
 
 			if (disparition_anciennes_touches) {
-				if (i == texte.length) {
+				if (i === texte.length) {
 					emplacementClavier
 						.querySelector("bloc-touche[data-touche='" + texte.charAt(i - 1) + "']")
 						.classList.remove('touche-active');

@@ -495,6 +495,7 @@
 		},
 		{
 			"touche": "Tab",
+			"code": "Tab",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -528,6 +529,7 @@
 		},
 		{
 			"touche": "Enter",
+			"code": "Enter",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -536,6 +538,7 @@
 		},
 		{
 			"touche": "BackSpace",
+			"code": "Backspace",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "1",
