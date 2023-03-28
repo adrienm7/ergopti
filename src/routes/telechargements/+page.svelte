@@ -49,7 +49,7 @@
 			let toucheClavier = data.touches.find((el) => el['touche'] == res['touche']);
 			presserToucheClavier(toucheClavier['touche']);
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
-				champTexte = champTexte.slice(0, -1);
+				envoiTouche_ReplacerCurseur('Backspace');
 				return;
 			} else if (keyPressed === 'Enter' || keyPressed === 'AltRight') {
 				champTexte = champTexte + '<br>';
@@ -75,9 +75,42 @@
 						touche = champTexte.slice(-1);
 					}
 				}
-				champTexte = champTexte + touche;
+				console.log(touche);
+				touche = touche.replace(/<span class='espace-insecable'><\/span>/g, ' ');
+				console.log(touche);
+				envoiTouche_ReplacerCurseur(touche);
 			}
 		}
+	}
+
+	function envoiTouche_ReplacerCurseur(touche) {
+		// Récupérer le div et le contenu à insérer
+		var divEditable = document.getElementById('input-text');
+
+		// Récupérer la position du curseur dans le div
+		var positionCurseur = window.getSelection().getRangeAt(0).startOffset;
+
+		// Récupérer le contenu HTML avant et après la position du curseur
+		var contenuAvantCurseur = divEditable.innerHTML.substring(0, positionCurseur);
+		var contenuApresCurseur = divEditable.innerHTML.substring(positionCurseur);
+
+		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
+		if (touche === 'Backspace') {
+			divEditable.innerHTML =
+				contenuAvantCurseur.substring(0, positionCurseur - 1) + contenuApresCurseur;
+			var nouvellePositionCurseur = positionCurseur - 1;
+		} else {
+			divEditable.innerHTML = contenuAvantCurseur + touche + contenuApresCurseur;
+			var nouvellePositionCurseur = positionCurseur + touche.length;
+		}
+
+		// Remettre le curseur à sa position initiale
+		var range = document.createRange();
+		var sel = window.getSelection();
+		range.setStart(divEditable.childNodes[0], nouvellePositionCurseur);
+		range.collapse(true);
+		sel.removeAllRanges();
+		sel.addRange(range);
 	}
 
 	function relacherModificateurs(event) {
