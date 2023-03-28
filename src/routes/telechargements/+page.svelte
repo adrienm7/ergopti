@@ -1,5 +1,52 @@
 <script>
 	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import { onMount } from 'svelte';
+
+	const KEY_MAPPING = {
+		a: 'z',
+		b: 'y',
+		c: 'x',
+		d: 'w',
+		e: 'v',
+		f: 'u',
+		g: 't',
+		h: 's',
+		i: 'r',
+		j: 'q',
+		k: 'p',
+		l: 'o',
+		m: 'n',
+		n: 'm',
+		o: 'l',
+		p: 'k',
+		q: 'j',
+		r: 'i',
+		s: 'h',
+		t: 'g',
+		u: 'f',
+		v: 'e',
+		w: 'd',
+		x: 'c',
+		y: 'b',
+		z: 'a'
+	};
+
+	onMount(() => {
+		const inputText = document.getElementById('input-text');
+		const outputText = document.getElementById('output-text');
+		inputText.addEventListener('input', () => {
+			const inputValue = inputText.value.toLowerCase();
+			let outputValue = '';
+
+			for (let i = 0; i < inputValue.length; i++) {
+				const currentChar = inputValue.charAt(i);
+				const mappedChar = KEY_MAPPING[currentChar] || currentChar;
+				outputValue += mappedChar;
+			}
+
+			outputText.innerText = outputValue;
+		});
+	});
 </script>
 
 <svelte:head>
@@ -62,6 +109,8 @@
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
 	<div class="paragraphe">[Clavier virtuel ici qui remplace ce qu’on tape en azerty]</div>
+	<input type="text" id="input-text" />
+	<p id="output-text" />
 </div>
 
 <style>
