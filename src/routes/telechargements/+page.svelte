@@ -4,10 +4,26 @@
 	import { onMount } from 'svelte';
 	import data from '$lib/data/hypertexte.json';
 
-	let champTexte = '';
-	let emplacementClavier = null;
-	let couche = 'Visuel';
+	let emplacementClavier;
+	let plus = 'oui';
 
+	// Maj automatique de la couche
+	export let shift = false;
+	export let altgr = false;
+	let couche = 'Primary';
+	$: if (altgr && shift) {
+		couche = 'ShiftAltGr';
+		restart();
+	} else if (altgr && !shift) {
+		couche = 'AltGr';
+		restart();
+	} else if (!altgr && shift) {
+		couche = 'Shift';
+		restart();
+	} else {
+		couche = 'Primary';
+		restart();
+	}
 	// Pour maj le clavier
 	let unique = {}; // every {} is unique, {} === {} evaluates to false
 	function restart() {
@@ -15,40 +31,71 @@
 	}
 
 	function emulationClavier(event) {
+		// Si touche modificatrice
+		if (event.code === 'AltRight') {
+			altgr = true;
+			return;
+		}
+		if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+			shift = true;
+			return;
+		}
+
+		// Si touche normale
 		let keyPressed = event.code;
-		console.log(event);
 		let res = data['iso'].find((el) => el['code'] == keyPressed);
-		if (res == undefined) {
-			// Nothing
-		} else {
-			event.preventDefault();
-			presserToucheClavier(res['touche']);
-			let toucheClavier = data.touches.find((el) => el.touche == res.touche);
-			let touche = '';
-			if (keyPressed == 'CapsLock') {
+		if (res !== undefined) {
+			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
+			let toucheClavier = data.touches.find((el) => el['touche'] == res['touche']);
+			presserToucheClavier(toucheClavier['touche']);
+			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
 				champTexte = champTexte.slice(0, -1);
 				return;
-			} else if (keyPressed == 'AltRight') {
+			} else if (keyPressed === 'Enter' || keyPressed === 'AltRight') {
 				champTexte = champTexte + '<br>';
 				return;
 			} else {
-				if (event.shiftKey & event.altKey & event.ctrlKey) {
+				let touche = '';
+				if (event.shiftKey && altgr) {
 					touche = toucheClavier['ShiftAltGr'];
-				} else if (!event.shiftKey & event.altKey & event.ctrlKey) {
+				} else if (!event.shiftKey && altgr) {
 					touche = toucheClavier['AltGr'];
-				} else if (event.shiftKey & !event.altKey & !event.ctrlKey) {
+				} else if (event.shiftKey && !altgr) {
 					touche = toucheClavier['Shift'];
-				} else if (!event.shiftKey & !event.altKey & !event.ctrlKey) {
+				} else if (!event.shiftKey && !altgr) {
 					touche = toucheClavier['Primary'];
 				}
+
+				// Corrections localisées
+				if (plus === 'oui') {
+					if (toucheClavier['touche'] === 'q') {
+						touche = 'qu';
+					}
+					if (toucheClavier['touche'] === 'magique') {
+						touche = champTexte.slice(-1);
+					}
+				}
 				champTexte = champTexte + touche;
-				couche = 'AltGr';
-				restart();
 			}
 		}
 	}
 
+	function relacherModificateurs(event) {
+		if (event.code === 'AltRight') {
+			altgr = false;
+			restart();
+			return;
+		}
+		if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+			shift = false;
+			restart();
+			return;
+		}
+	}
+
 	function presserToucheClavier(touche) {
+		emplacementClavier = document.getElementById('clavier-emulation');
+
 		// Nettoyage des touches actives
 		const touchesActives = emplacementClavier.querySelectorAll('.touche-active');
 		[].forEach.call(touchesActives, function (el) {
@@ -60,9 +107,7 @@
 			.classList.add('touche-active');
 	}
 
-	onMount(() => {
-		emplacementClavier = document.getElementById('clavier-emulation');
-	});
+	let champTexte = '';
 </script>
 
 <svelte:head>
@@ -138,7 +183,12 @@
 
 	<mini-espace />
 	<div style="margin: 0 auto; width: 100%;">
-		<div contenteditable="true" id="input-text" on:keydown={emulationClavier}>
+		<div
+			contenteditable="true"
+			id="input-text"
+			on:keydown={emulationClavier}
+			on:keyup={relacherModificateurs}
+		>
 			{@html champTexte}
 		</div>
 	</div>
