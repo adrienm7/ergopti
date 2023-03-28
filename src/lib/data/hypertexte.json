@@ -5,6 +5,7 @@
 	"iso": [
 		{
 			"touche": "a",
+			"code": "KeyA",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -13,6 +14,7 @@
 		},
 		{
 			"touche": "b",
+			"code": "KeyT",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "2",
@@ -21,6 +23,7 @@
 		},
 		{
 			"touche": "c",
+			"code": "KeyM",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "4",
@@ -29,6 +32,7 @@
 		},
 		{
 			"touche": "d",
+			"code": "KeyU",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "2",
@@ -37,6 +41,7 @@
 		},
 		{
 			"touche": "e",
+			"code": "KeyD",
 			"main": "gauche",
 			"doigt": "majeur",
 			"ligne": "3",
@@ -45,6 +50,7 @@
 		},
 		{
 			"touche": "f",
+			"code": "KeyY",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "2",
@@ -53,6 +59,7 @@
 		},
 		{
 			"touche": "g",
+			"code": "Period",
 			"main": "droite",
 			"doigt": "annulaire",
 			"ligne": "4",
@@ -61,6 +68,7 @@
 		},
 		{
 			"touche": "h",
+			"code": "Comma",
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "4",
@@ -69,6 +77,7 @@
 		},
 		{
 			"touche": "i",
+			"code": "KeyS",
 			"main": "gauche",
 			"doigt": "annulaire",
 			"ligne": "3",
@@ -77,6 +86,7 @@
 		},
 		{
 			"touche": "j",
+			"code": "Backslash",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -85,6 +95,7 @@
 		},
 		{
 			"touche": "k",
+			"code": "KeyB",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "4",
@@ -93,6 +104,7 @@
 		},
 		{
 			"touche": "l",
+			"code": "KeyI",
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "2",
@@ -101,6 +113,7 @@
 		},
 		{
 			"touche": "m",
+			"code": "KeyH",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "3",
@@ -109,6 +122,7 @@
 		},
 		{
 			"touche": "n",
+			"code": "KeyK",
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "3",
@@ -117,6 +131,7 @@
 		},
 		{
 			"touche": "o",
+			"code": "KeyE",
 			"main": "gauche",
 			"doigt": "majeur",
 			"ligne": "2",
@@ -125,6 +140,7 @@
 		},
 		{
 			"touche": "p",
+			"code": "KeyO",
 			"main": "droite",
 			"doigt": "annulaire",
 			"ligne": "2",
@@ -133,6 +149,7 @@
 		},
 		{
 			"touche": "q",
+			"code": "Quote",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -141,6 +158,7 @@
 		},
 		{
 			"touche": "r",
+			"code": "Semicolon",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -149,6 +167,7 @@
 		},
 		{
 			"touche": "s",
+			"code": "KeyJ",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "3",
@@ -157,6 +176,7 @@
 		},
 		{
 			"touche": "t",
+			"code": "KeyL",
 			"main": "droite",
 			"doigt": "annulaire",
 			"ligne": "3",
@@ -165,6 +185,7 @@
 		},
 		{
 			"touche": "u",
+			"code": "KeyF",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "3",
@@ -173,6 +194,7 @@
 		},
 		{
 			"touche": "v",
+			"code": "KeyN",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "4",
@@ -181,6 +203,7 @@
 		},
 		{
 			"touche": "w",
+			"code": "KeyR",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "2",
@@ -189,6 +212,7 @@
 		},
 		{
 			"touche": "x",
+			"code": "Slash",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "4",
@@ -197,6 +221,7 @@
 		},
 		{
 			"touche": "y",
+			"code": "KeyW",
 			"main": "gauche",
 			"doigt": "annulaire",
 			"ligne": "2",
@@ -205,6 +230,7 @@
 		},
 		{
 			"touche": "z",
+			"code": "BracketLeft",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -213,6 +239,7 @@
 		},
 		{
 			"touche": ",",
+			"code": "KeyG",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "3",
@@ -221,6 +248,7 @@
 		},
 		{
 			"touche": ".",
+			"code": "KeyZ",
 			"main": "gauche",
 			"doigt": "annulaire",
 			"ligne": "4",
@@ -229,6 +257,7 @@
 		},
 		{
 			"touche": "magique",
+			"code": "KeyC",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "4",
@@ -237,6 +266,7 @@
 		},
 		{
 			"touche": "'",
+			"code": "KeyP",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -245,6 +275,7 @@
 		},
 		{
 			"touche": "!",
+			"code": "BracketRight",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -253,6 +284,7 @@
 		},
 		{
 			"touche": "ê",
+			"code": "KeyX",
 			"main": "gauche",
 			"doigt": "majeur",
 			"ligne": "4",
@@ -261,6 +293,7 @@
 		},
 		{
 			"touche": "é",
+			"code": "KeyV",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "4",
@@ -269,6 +302,7 @@
 		},
 		{
 			"touche": "è",
+			"code": "IntlBackslash",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "4",
@@ -277,6 +311,7 @@
 		},
 		{
 			"touche": "à",
+			"code": "KeyQ",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -285,6 +320,7 @@
 		},
 		{
 			"touche": "%",
+			"code": "Minus",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "1",
@@ -293,6 +329,7 @@
 		},
 		{
 			"touche": "=",
+			"code": "Backquote",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "1",
@@ -301,6 +338,7 @@
 		},
 		{
 			"touche": "€",
+			"code": "Equal",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "1",
@@ -309,6 +347,7 @@
 		},
 		{
 			"touche": "1",
+			"code": "Digit1",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "1",
@@ -317,6 +356,7 @@
 		},
 		{
 			"touche": "2",
+			"code": "Digit2",
 			"main": "gauche",
 			"doigt": "annulaire",
 			"ligne": "1",
@@ -325,6 +365,7 @@
 		},
 		{
 			"touche": "3",
+			"code": "Digit3",
 			"main": "gauche",
 			"doigt": "majeur",
 			"ligne": "1",
@@ -333,6 +374,7 @@
 		},
 		{
 			"touche": "4",
+			"code": "Digit4",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "1",
@@ -341,6 +383,7 @@
 		},
 		{
 			"touche": "5",
+			"code": "Digit5",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "1",
@@ -349,6 +392,7 @@
 		},
 		{
 			"touche": "6",
+			"code": "Digit6",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "1",
@@ -357,6 +401,7 @@
 		},
 		{
 			"touche": "7",
+			"code": "Digit7",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "1",
@@ -365,6 +410,7 @@
 		},
 		{
 			"touche": "8",
+			"code": "Digit8",
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "1",
@@ -373,6 +419,7 @@
 		},
 		{
 			"touche": "9",
+			"code": "Digit9",
 			"main": "droite",
 			"doigt": "annulaire",
 			"ligne": "1",
@@ -381,6 +428,7 @@
 		},
 		{
 			"touche": "0",
+			"code": "Digit0",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "1",
@@ -413,6 +461,7 @@
 		},
 		{
 			"touche": "Space",
+			"code": "Space",
 			"main": "gauche",
 			"doigt": "pouce",
 			"ligne": "5",
@@ -421,6 +470,7 @@
 		},
 		{
 			"touche": "RAlt",
+			"code": "AltRight",
 			"main": "droite",
 			"doigt": "pouce",
 			"ligne": "5",
@@ -453,6 +503,7 @@
 		},
 		{
 			"touche": "CapsLock",
+			"code": "CapsLock",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -1145,7 +1196,6 @@
 	"touches": [
 		{
 			"touche": "a",
-			"code": "KeyA",
 			"Primary": "a",
 			"Shift": "A",
 			"AltGr": "<",
@@ -1157,7 +1207,6 @@
 		},
 		{
 			"touche": "b",
-			"code": "KeyT",
 			"Primary": "b",
 			"Shift": "B",
 			"AltGr": "«<span class='espace-insecable'></span>",
@@ -1169,7 +1218,6 @@
 		},
 		{
 			"touche": "c",
-			"code": "KeyM",
 			"Primary": "c",
 			"Shift": "C",
 			"AltGr": "ç",
@@ -1181,7 +1229,6 @@
 		},
 		{
 			"touche": "d",
-			"code": "KeyU",
 			"Primary": "d",
 			"Shift": "D",
 			"AltGr": "\"",
@@ -1193,7 +1240,6 @@
 		},
 		{
 			"touche": "e",
-			"code": "KeyD",
 			"Primary": "e",
 			"Shift": "E",
 			"AltGr": "{",
@@ -1205,7 +1251,6 @@
 		},
 		{
 			"touche": "f",
-			"code": "KeyY",
 			"Primary": "f",
 			"Shift": "F",
 			"AltGr": "<span class='espace-insecable'></span>»",
@@ -1217,7 +1262,6 @@
 		},
 		{
 			"touche": "g",
-			"code": "Period",
 			"Primary": "g",
 			"Shift": "G",
 			"AltGr": "~",
@@ -1229,7 +1273,6 @@
 		},
 		{
 			"touche": "h",
-			"code": "Comma",
 			"Primary": "h",
 			"Shift": "H",
 			"AltGr": "#",
@@ -1241,7 +1284,6 @@
 		},
 		{
 			"touche": "i",
-			"code": "KeyS",
 			"Primary": "i",
 			"Shift": "I",
 			"AltGr": ">",
@@ -1253,7 +1295,6 @@
 		},
 		{
 			"touche": "j",
-			"code": "Backslash",
 			"Primary": "j",
 			"Shift": "J",
 			"AltGr": " ",
@@ -1266,7 +1307,6 @@
 		},
 		{
 			"touche": "k",
-			"code": "KeyB",
 			"Primary": "k",
 			"Shift": "K",
 			"AltGr": "…",
@@ -1278,7 +1318,6 @@
 		},
 		{
 			"touche": "l",
-			"code": "KeyI",
 			"Primary": "l",
 			"Shift": "L",
 			"AltGr": "=",
@@ -1290,7 +1329,6 @@
 		},
 		{
 			"touche": "m",
-			"code": "KeyH",
 			"Primary": "m",
 			"Shift": "M",
 			"AltGr": "&",
@@ -1302,7 +1340,6 @@
 		},
 		{
 			"touche": "n",
-			"code": "KeyK",
 			"Primary": "n",
 			"Shift": "N",
 			"AltGr": ")",
@@ -1314,7 +1351,6 @@
 		},
 		{
 			"touche": "o",
-			"code": "KeyE",
 			"Primary": "o",
 			"Shift": "O",
 			"AltGr": "œ",
@@ -1326,7 +1362,6 @@
 		},
 		{
 			"touche": "p",
-			"code": "KeyO",
 			"Primary": "p",
 			"Shift": "P",
 			"AltGr": "+",
@@ -1338,7 +1373,6 @@
 		},
 		{
 			"touche": "q",
-			"code": "Quote",
 			"Primary": "q",
 			"Primary+": "[qu]",
 			"Shift": "Q",
@@ -1353,7 +1387,6 @@
 		},
 		{
 			"touche": "r",
-			"code": "Semicolon",
 			"Primary": "r",
 			"Shift": "R",
 			"AltGr": "]",
@@ -1365,7 +1398,6 @@
 		},
 		{
 			"touche": "s",
-			"code": "KeyJ",
 			"Primary": "s",
 			"Shift": "S",
 			"AltGr": "(",
@@ -1377,7 +1409,6 @@
 		},
 		{
 			"touche": "t",
-			"code": "KeyL",
 			"Primary": "t",
 			"Shift": "T",
 			"AltGr": "[",
@@ -1389,7 +1420,6 @@
 		},
 		{
 			"touche": "u",
-			"code": "KeyF",
 			"Primary": "u",
 			"Shift": "U",
 			"AltGr": "}",
@@ -1401,7 +1431,6 @@
 		},
 		{
 			"touche": "v",
-			"code": "KeyN",
 			"Primary": "v",
 			"Shift": "V",
 			"AltGr": "|",
@@ -1413,7 +1442,6 @@
 		},
 		{
 			"touche": "w",
-			"code": "KeyR",
 			"Primary": "w",
 			"Shift": "W",
 			"AltGr": "ù",
@@ -1427,7 +1455,6 @@
 		},
 		{
 			"touche": "x",
-			"code": "Slash",
 			"Primary": "x",
 			"Shift": "X",
 			"AltGr": "*",
@@ -1439,7 +1466,6 @@
 		},
 		{
 			"touche": "y",
-			"code": "KeyW",
 			"Primary": "y",
 			"Shift": "Y",
 			"AltGr": "@",
@@ -1451,7 +1477,6 @@
 		},
 		{
 			"touche": "z",
-			"code": "BracketLeft",
 			"Primary": "z",
 			"Shift": "Z",
 			"AltGr": " ",
@@ -1532,7 +1557,6 @@
 		},
 		{
 			"touche": "à",
-			"code": "KeyQ",
 			"Primary": "à",
 			"Shift": "À",
 			"AltGr": "`",
@@ -1823,7 +1847,7 @@
 		},
 		{
 			"touche": "Space",
-			"Primary": "HyperTexte v.1.0",
+			"Primary": " ",
 			"Primary+": "Layer de navigation<br><span class='tap'>HyperTexte v.1.0</span>",
 			"Shift": "-",
 			"AltGr": "_",

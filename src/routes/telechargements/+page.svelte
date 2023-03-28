@@ -6,26 +6,49 @@
 
 	let champTexte = '';
 	let emplacementClavier = null;
+	let couche = 'Visuel';
 
-	function emulationClavier(event) {
-		event.preventDefault();
-		let keyPressed = event.code;
-		let res = data['touches'].find((el) => el['code'] == keyPressed);
-		let touche = keyPressed;
-		if (event.shiftKey & event.altKey & event.ctrlKey) {
-			touche = res['ShiftAltGr'];
-		} else if (!event.shiftKey & event.altKey & event.ctrlKey) {
-			touche = res['AltGr'];
-		} else if (event.shiftKey & !event.altKey & !event.ctrlKey) {
-			touche = res['Shift'];
-		} else if (!event.shiftKey & !event.altKey & !event.ctrlKey) {
-			touche = res['Primary'];
-		}
-		presserTouche(res['touche']);
-		champTexte = champTexte + touche;
+	// Pour maj le clavier
+	let unique = {}; // every {} is unique, {} === {} evaluates to false
+	function restart() {
+		unique = {};
 	}
 
-	function presserTouche(touche) {
+	function emulationClavier(event) {
+		let keyPressed = event.code;
+		console.log(event);
+		let res = data['iso'].find((el) => el['code'] == keyPressed);
+		if (res == undefined) {
+			// Nothing
+		} else {
+			event.preventDefault();
+			presserToucheClavier(res['touche']);
+			let toucheClavier = data.touches.find((el) => el.touche == res.touche);
+			let touche = '';
+			if (keyPressed == 'CapsLock') {
+				champTexte = champTexte.slice(0, -1);
+				return;
+			} else if (keyPressed == 'AltRight') {
+				champTexte = champTexte + '<br>';
+				return;
+			} else {
+				if (event.shiftKey & event.altKey & event.ctrlKey) {
+					touche = toucheClavier['ShiftAltGr'];
+				} else if (!event.shiftKey & event.altKey & event.ctrlKey) {
+					touche = toucheClavier['AltGr'];
+				} else if (event.shiftKey & !event.altKey & !event.ctrlKey) {
+					touche = toucheClavier['Shift'];
+				} else if (!event.shiftKey & !event.altKey & !event.ctrlKey) {
+					touche = toucheClavier['Primary'];
+				}
+				champTexte = champTexte + touche;
+				couche = 'AltGr';
+				restart();
+			}
+		}
+	}
+
+	function presserToucheClavier(touche) {
 		// Nettoyage des touches actives
 		const touchesActives = emplacementClavier.querySelectorAll('.touche-active');
 		[].forEach.call(touchesActives, function (el) {
@@ -101,23 +124,38 @@
 	<p>[À faire]</p>
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
-</div>
 
-<EnsembleClavier
-	emplacement={'clavier-emulation'}
-	type={'iso'}
-	couche={'Visuel'}
-	couleur={'non'}
-	plus={'non'}
-	controles={'non'}
-/>
-<div class="contenu">
-	<div class="paragraphe">[Clavier virtuel ici qui remplace ce qu’on tape en azerty]</div>
-	<input type="text" id="input-text" on:keydown={emulationClavier} value={champTexte} />
+	{#key unique}
+		<EnsembleClavier
+			emplacement={'clavier-emulation'}
+			type={'iso'}
+			{couche}
+			couleur={'non'}
+			plus={'non'}
+			controles={'non'}
+		/>
+	{/key}
+
+	<mini-espace />
+	<div style="margin: 0 auto; width: 100%;">
+		<div contenteditable="true" id="input-text" on:keydown={emulationClavier}>
+			{@html champTexte}
+		</div>
+	</div>
 	<p id="output-text" />
 </div>
 
 <style>
+	#input-text {
+		display: block;
+		margin: 0 auto;
+		width: 70%;
+		min-height: 50px;
+		padding: 12px;
+		border-radius: 7px;
+		background-color: white;
+		color: black;
+	}
 	h3 {
 		display: inline-block;
 		position: relative;
