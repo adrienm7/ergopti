@@ -11,6 +11,7 @@
 	export let shift = false;
 	export let altgr = false;
 	export let control = false;
+	export let a_grave = false;
 	let couche = 'Primary';
 	$: if (altgr && shift) {
 		couche = 'ShiftAltGr';
@@ -20,6 +21,9 @@
 		restart();
 	} else if (!altgr && shift) {
 		couche = 'Shift';
+		restart();
+	} else if (a_grave) {
+		couche = 'À';
 		restart();
 	} else {
 		couche = 'Primary';
@@ -71,7 +75,16 @@
 				} else if (event.shiftKey && !altgr) {
 					touche = toucheClavier['Shift'];
 				} else if (!event.shiftKey && !altgr) {
-					touche = toucheClavier['Primary'];
+					if (a_grave) {
+						// On supprime le à avant de taper le raccourci en à
+						var textarea = document.getElementById('input-text');
+						textarea.value = textarea.value.slice(0, -1);
+
+						touche = toucheClavier['À'];
+						a_grave = false;
+					} else {
+						touche = toucheClavier['Primary'];
+					}
 				}
 
 				// Corrections localisées
@@ -101,6 +114,9 @@
 		var texteAvantCurseur = textarea.value.substring(0, positionCurseur);
 		var texteApresCurseur = textarea.value.substring(positionCurseur);
 
+		if (touche === 'à') {
+			a_grave = true;
+		}
 		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
 		if (touche === 'Backspace') {
 			textarea.value = texteAvantCurseur.substring(0, positionCurseur - 1) + texteApresCurseur;

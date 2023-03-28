@@ -568,15 +568,15 @@ bloc-touche[data-type="enter"].touche-active::after
 
 ensemble-clavier[data-couleur="non"] bloc-touche {
 	--couleur-touche: 200!important;
-	--couleur-touche-luminosite: 100%;
-	--couleur-touche-saturation: 0%;
+	--couleur-touche-luminosite: 80%;
+	--couleur-touche-saturation: 80%;
 	--opacite-touche: 15%;
 }
 
 ensemble-clavier[data-couleur="oui"] bloc-touche {
-	--couleur-touche-saturation: 80%;
-	--opacite-touche: 35%;
 	--couleur-touche-luminosite: 65%;
+	--couleur-touche-saturation: 90%;
+	--opacite-touche: 30%;
 }
 
 
