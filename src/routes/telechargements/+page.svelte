@@ -10,6 +10,7 @@
 	// Maj automatique de la couche
 	export let shift = false;
 	export let altgr = false;
+	export let control = false;
 	let couche = 'Primary';
 	$: if (altgr && shift) {
 		couche = 'ShiftAltGr';
@@ -40,6 +41,15 @@
 			shift = true;
 			return;
 		}
+		if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
+			control = true;
+			return;
+		}
+
+		// Attention, quand AltGr est activé, Ctrl l’est aussi, d’où le &
+		if (control & !altgr) {
+			return true; // Ne pas intercepter les raccourcis avec Ctrl
+		}
 
 		// Si touche normale
 		let keyPressed = event.code;
@@ -50,10 +60,8 @@
 			presserToucheClavier(toucheClavier['touche']);
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
 				envoiTouche_ReplacerCurseur('Backspace');
-				return;
 			} else if (keyPressed === 'Enter' || keyPressed === 'AltRight') {
-				champTexte = champTexte + '<br>';
-				return;
+				envoiTouche_ReplacerCurseur('Enter');
 			} else {
 				let touche = '';
 				if (event.shiftKey && altgr) {
@@ -77,53 +85,34 @@
 				}
 				console.log(touche);
 				touche = touche.replace(/<span class='espace-insecable'><\/span>/g, ' ');
-				console.log(touche);
 				envoiTouche_ReplacerCurseur(touche);
 			}
 		}
 	}
 
 	function envoiTouche_ReplacerCurseur(touche) {
-		// Récupérer le div et le contenu à insérer
-		var divEditable = document.getElementById('input-text');
+		// Récupérer la textarea et le contenu à insérer
+		var textarea = document.getElementById('input-text');
 
-		// Récupérer la position du curseur dans le div
-		var positionCurseur = window.getSelection().getRangeAt(0).startOffset;
+		// Récupérer la position du curseur dans la textarea
+		var positionCurseur = textarea.selectionStart;
 
-		// Récupérer le contenu HTML avant et après la position du curseur
-		var contenuAvantCurseur = divEditable.innerHTML.substring(0, positionCurseur);
-		var contenuApresCurseur = divEditable.innerHTML.substring(positionCurseur);
+		// Récupérer le texte avant et après la position du curseur
+		var texteAvantCurseur = textarea.value.substring(0, positionCurseur);
+		var texteApresCurseur = textarea.value.substring(positionCurseur);
 
 		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
 		if (touche === 'Backspace') {
-			divEditable.innerHTML =
-				contenuAvantCurseur.substring(0, positionCurseur - 1) + contenuApresCurseur;
-			var nouvellePositionCurseur = positionCurseur - 1;
+			textarea.value = texteAvantCurseur.substring(0, positionCurseur - 1) + texteApresCurseur;
+		} else if (touche === 'Enter') {
+			let touche = '\n';
+			textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 		} else {
-			divEditable.innerHTML = contenuAvantCurseur + touche + contenuApresCurseur;
-			var nouvellePositionCurseur = positionCurseur + touche.length;
+			textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 		}
-
 		// Remettre le curseur à sa position initiale
-		var range = document.createRange();
-		var sel = window.getSelection();
-		range.setStart(divEditable.childNodes[0], nouvellePositionCurseur);
-		range.collapse(true);
-		sel.removeAllRanges();
-		sel.addRange(range);
-	}
-
-	function relacherModificateurs(event) {
-		if (event.code === 'AltRight') {
-			altgr = false;
-			restart();
-			return;
-		}
-		if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
-			shift = false;
-			restart();
-			return;
-		}
+		var nouvellePositionCurseur = positionCurseur + touche.length;
+		textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 
 	function presserToucheClavier(touche) {
@@ -138,6 +127,16 @@
 		emplacementClavier
 			.querySelector("bloc-touche[data-touche='" + touche + "']")
 			.classList.add('touche-active');
+	}
+
+	function relacherModificateurs(event) {
+		if (event.code === 'AltRight') {
+			altgr = false;
+		} else if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+			shift = false;
+		} else if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
+			control = false;
+		}
 	}
 
 	let champTexte = '';
@@ -216,14 +215,12 @@
 
 	<mini-espace />
 	<div style="margin: 0 auto; width: 100%;">
-		<div
-			contenteditable="true"
+		<textarea
 			id="input-text"
+			bind:value={champTexte}
 			on:keydown={emulationClavier}
 			on:keyup={relacherModificateurs}
-		>
-			{@html champTexte}
-		</div>
+		/>
 	</div>
 	<p id="output-text" />
 </div>
@@ -233,7 +230,7 @@
 		display: block;
 		margin: 0 auto;
 		width: 70%;
-		min-height: 50px;
+		height: 150px;
 		padding: 12px;
 		border-radius: 7px;
 		background-color: white;
