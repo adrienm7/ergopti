@@ -621,17 +621,20 @@ ensemble-clavier[data-couleur="oui"] bloc-touche[data-doigt="pouce"] {
 
 @media (max-width: 700px) {
 	#clavier-reference bloc-clavier,
-	#clavier-emulation bloc-clavier,
 	#clavier-presentation bloc-clavier {
 		--taille-clavier: 0.9;
 	}
 }
 
-.accordion bloc-clavier {
+.accordion bloc-clavier,
+#clavier-emulation bloc-clavier {
 	--taille-touche: min(47px, 100vw / 20)!important;
 	--marge-touche: min(3px, 0.35vw)!important;
 	--profondeur-touche: 1px!important;
 	--profondeur-touche-pressee: 0.5px!important;
+}
+
+.accordion bloc-clavier {
 	background-color: var(--bg-color);
 	box-shadow: none;
 }

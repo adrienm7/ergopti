@@ -64,7 +64,7 @@
 
 				// console.log(res);
 				if (res !== undefined) {
-					const contenuTouche = data.touches.find((el) => el.touche == res.touche);
+					const contenuTouche = data.touches.find((el) => el['touche'] == res.touche);
 
 					if (contenuTouche[couche] === '') {
 						toucheClavier.innerHTML = '<div> <div>';
@@ -121,6 +121,9 @@
 					// Corrections localisées
 					if ((type === 'ergodox') & (res.touche === 'Space')) {
 						toucheClavier.innerHTML = '<div>␣</div>';
+					}
+					if ((type === 'iso') & (res.touche === 'Space')) {
+						toucheClavier.innerHTML = '<div>HyperTexte v.1.0</div>';
 					}
 
 					// On ajoute des infos dans les data attributes de la touche
