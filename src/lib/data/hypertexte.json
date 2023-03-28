@@ -1145,6 +1145,7 @@
 	"touches": [
 		{
 			"touche": "a",
+			"code": "KeyA",
 			"Primary": "a",
 			"Shift": "A",
 			"AltGr": "<",
@@ -1156,6 +1157,7 @@
 		},
 		{
 			"touche": "b",
+			"code": "KeyT",
 			"Primary": "b",
 			"Shift": "B",
 			"AltGr": "«<span class='espace-insecable'></span>",
@@ -1167,6 +1169,7 @@
 		},
 		{
 			"touche": "c",
+			"code": "KeyM",
 			"Primary": "c",
 			"Shift": "C",
 			"AltGr": "ç",
@@ -1178,6 +1181,7 @@
 		},
 		{
 			"touche": "d",
+			"code": "KeyU",
 			"Primary": "d",
 			"Shift": "D",
 			"AltGr": "\"",
@@ -1189,6 +1193,7 @@
 		},
 		{
 			"touche": "e",
+			"code": "KeyD",
 			"Primary": "e",
 			"Shift": "E",
 			"AltGr": "{",
@@ -1200,6 +1205,7 @@
 		},
 		{
 			"touche": "f",
+			"code": "KeyY",
 			"Primary": "f",
 			"Shift": "F",
 			"AltGr": "<span class='espace-insecable'></span>»",
@@ -1211,6 +1217,7 @@
 		},
 		{
 			"touche": "g",
+			"code": "Period",
 			"Primary": "g",
 			"Shift": "G",
 			"AltGr": "~",
@@ -1222,6 +1229,7 @@
 		},
 		{
 			"touche": "h",
+			"code": "Comma",
 			"Primary": "h",
 			"Shift": "H",
 			"AltGr": "#",
@@ -1233,6 +1241,7 @@
 		},
 		{
 			"touche": "i",
+			"code": "KeyS",
 			"Primary": "i",
 			"Shift": "I",
 			"AltGr": ">",
@@ -1244,6 +1253,7 @@
 		},
 		{
 			"touche": "j",
+			"code": "Backslash",
 			"Primary": "j",
 			"Shift": "J",
 			"AltGr": " ",
@@ -1256,6 +1266,7 @@
 		},
 		{
 			"touche": "k",
+			"code": "KeyB",
 			"Primary": "k",
 			"Shift": "K",
 			"AltGr": "…",
@@ -1267,6 +1278,7 @@
 		},
 		{
 			"touche": "l",
+			"code": "KeyI",
 			"Primary": "l",
 			"Shift": "L",
 			"AltGr": "=",
@@ -1278,6 +1290,7 @@
 		},
 		{
 			"touche": "m",
+			"code": "KeyH",
 			"Primary": "m",
 			"Shift": "M",
 			"AltGr": "&",
@@ -1289,6 +1302,7 @@
 		},
 		{
 			"touche": "n",
+			"code": "KeyK",
 			"Primary": "n",
 			"Shift": "N",
 			"AltGr": ")",
@@ -1300,6 +1314,7 @@
 		},
 		{
 			"touche": "o",
+			"code": "KeyE",
 			"Primary": "o",
 			"Shift": "O",
 			"AltGr": "œ",
@@ -1311,6 +1326,7 @@
 		},
 		{
 			"touche": "p",
+			"code": "KeyO",
 			"Primary": "p",
 			"Shift": "P",
 			"AltGr": "+",
@@ -1322,6 +1338,7 @@
 		},
 		{
 			"touche": "q",
+			"code": "Quote",
 			"Primary": "q",
 			"Primary+": "[qu]",
 			"Shift": "Q",
@@ -1336,6 +1353,7 @@
 		},
 		{
 			"touche": "r",
+			"code": "Semicolon",
 			"Primary": "r",
 			"Shift": "R",
 			"AltGr": "]",
@@ -1347,6 +1365,7 @@
 		},
 		{
 			"touche": "s",
+			"code": "KeyJ",
 			"Primary": "s",
 			"Shift": "S",
 			"AltGr": "(",
@@ -1358,6 +1377,7 @@
 		},
 		{
 			"touche": "t",
+			"code": "KeyL",
 			"Primary": "t",
 			"Shift": "T",
 			"AltGr": "[",
@@ -1369,6 +1389,7 @@
 		},
 		{
 			"touche": "u",
+			"code": "KeyF",
 			"Primary": "u",
 			"Shift": "U",
 			"AltGr": "}",
@@ -1380,6 +1401,7 @@
 		},
 		{
 			"touche": "v",
+			"code": "KeyN",
 			"Primary": "v",
 			"Shift": "V",
 			"AltGr": "|",
@@ -1391,6 +1413,7 @@
 		},
 		{
 			"touche": "w",
+			"code": "KeyR",
 			"Primary": "w",
 			"Shift": "W",
 			"AltGr": "ù",
@@ -1404,6 +1427,7 @@
 		},
 		{
 			"touche": "x",
+			"code": "Slash",
 			"Primary": "x",
 			"Shift": "X",
 			"AltGr": "*",
@@ -1415,6 +1439,7 @@
 		},
 		{
 			"touche": "y",
+			"code": "KeyW",
 			"Primary": "y",
 			"Shift": "Y",
 			"AltGr": "@",
@@ -1426,6 +1451,7 @@
 		},
 		{
 			"touche": "z",
+			"code": "BracketLeft",
 			"Primary": "z",
 			"Shift": "Z",
 			"AltGr": " ",
@@ -1506,6 +1532,7 @@
 		},
 		{
 			"touche": "à",
+			"code": "KeyQ",
 			"Primary": "à",
 			"Shift": "À",
 			"AltGr": "`",
