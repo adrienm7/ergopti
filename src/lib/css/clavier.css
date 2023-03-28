@@ -621,6 +621,7 @@ ensemble-clavier[data-couleur="oui"] bloc-touche[data-doigt="pouce"] {
 
 @media (max-width: 700px) {
 	#clavier-reference bloc-clavier,
+	#clavier-emulation bloc-clavier,
 	#clavier-presentation bloc-clavier {
 		--taille-clavier: 0.9;
 	}

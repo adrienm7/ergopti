@@ -1,51 +1,44 @@
 <script>
 	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
 	import { onMount } from 'svelte';
+	import data from '$lib/data/hypertexte.json';
 
-	const KEY_MAPPING = {
-		a: 'z',
-		b: 'y',
-		c: 'x',
-		d: 'w',
-		e: 'v',
-		f: 'u',
-		g: 't',
-		h: 's',
-		i: 'r',
-		j: 'q',
-		k: 'p',
-		l: 'o',
-		m: 'n',
-		n: 'm',
-		o: 'l',
-		p: 'k',
-		q: 'j',
-		r: 'i',
-		s: 'h',
-		t: 'g',
-		u: 'f',
-		v: 'e',
-		w: 'd',
-		x: 'c',
-		y: 'b',
-		z: 'a'
-	};
+	let champTexte = '';
+	let emplacementClavier = null;
+
+	function emulationClavier(event) {
+		event.preventDefault();
+		let keyPressed = event.code;
+		let res = data['touches'].find((el) => el['code'] == keyPressed);
+		let touche = keyPressed;
+		if (event.shiftKey & event.altKey & event.ctrlKey) {
+			touche = res['ShiftAltGr'];
+		} else if (!event.shiftKey & event.altKey & event.ctrlKey) {
+			touche = res['AltGr'];
+		} else if (event.shiftKey & !event.altKey & !event.ctrlKey) {
+			touche = res['Shift'];
+		} else if (!event.shiftKey & !event.altKey & !event.ctrlKey) {
+			touche = res['Primary'];
+		}
+		presserTouche(res['touche']);
+		champTexte = champTexte + touche;
+	}
+
+	function presserTouche(touche) {
+		// Nettoyage des touches actives
+		const touchesActives = emplacementClavier.querySelectorAll('.touche-active');
+		[].forEach.call(touchesActives, function (el) {
+			el.classList.remove('touche-active');
+		});
+
+		emplacementClavier
+			.querySelector("bloc-touche[data-touche='" + touche + "']")
+			.classList.add('touche-active');
+	}
 
 	onMount(() => {
-		const inputText = document.getElementById('input-text');
-		const outputText = document.getElementById('output-text');
-		inputText.addEventListener('input', () => {
-			const inputValue = inputText.value.toLowerCase();
-			let outputValue = '';
-
-			for (let i = 0; i < inputValue.length; i++) {
-				const currentChar = inputValue.charAt(i);
-				const mappedChar = KEY_MAPPING[currentChar] || currentChar;
-				outputValue += mappedChar;
-			}
-
-			outputText.innerText = outputValue;
-		});
+		emplacementClavier = document.getElementById('clavier-emulation');
 	});
 </script>
 
@@ -108,8 +101,19 @@
 	<p>[À faire]</p>
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
+</div>
+
+<EnsembleClavier
+	emplacement={'clavier-emulation'}
+	type={'iso'}
+	couche={'Visuel'}
+	couleur={'non'}
+	plus={'non'}
+	controles={'non'}
+/>
+<div class="contenu">
 	<div class="paragraphe">[Clavier virtuel ici qui remplace ce qu’on tape en azerty]</div>
-	<input type="text" id="input-text" />
+	<input type="text" id="input-text" on:keydown={emulationClavier} value={champTexte} />
 	<p id="output-text" />
 </div>
 
