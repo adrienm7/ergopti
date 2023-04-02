@@ -76,11 +76,14 @@
 					touche = toucheClavier['Shift'];
 				} else if (!event.shiftKey && !altgr) {
 					if (a_grave) {
-						// On supprime le à avant de taper le raccourci en à
-						var textarea = document.getElementById('input-text');
-						textarea.value = textarea.value.slice(0, -1);
-
-						touche = toucheClavier['À'];
+						if (keyPressed === 'Space') {
+							touche = ' ';
+						} else {
+							// On supprime le à avant de taper le raccourci en à
+							var textarea = document.getElementById('input-text');
+							textarea.value = textarea.value.slice(0, -1);
+							touche = toucheClavier['À'];
+						}
 						a_grave = false;
 					} else {
 						touche = toucheClavier['Primary'];
@@ -96,7 +99,6 @@
 						touche = champTexte.slice(-1);
 					}
 				}
-				console.log(touche);
 				touche = touche.replace(/<span class='espace-insecable'><\/span>/g, ' ');
 				envoiTouche_ReplacerCurseur(touche);
 			}
@@ -117,17 +119,19 @@
 		if (touche === 'à') {
 			a_grave = true;
 		}
+
 		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
+		let nouvellePositionCurseur;
 		if (touche === 'Backspace') {
 			textarea.value = texteAvantCurseur.substring(0, positionCurseur - 1) + texteApresCurseur;
+			nouvellePositionCurseur = positionCurseur - 1;
 		} else if (touche === 'Enter') {
-			let touche = '\n';
-			textarea.value = texteAvantCurseur + touche + texteApresCurseur;
+			textarea.value = texteAvantCurseur + '\n' + texteApresCurseur;
+			nouvellePositionCurseur = positionCurseur + 1;
 		} else {
 			textarea.value = texteAvantCurseur + touche + texteApresCurseur;
+			nouvellePositionCurseur = positionCurseur + touche.length;
 		}
-		// Remettre le curseur à sa position initiale
-		var nouvellePositionCurseur = positionCurseur + touche.length;
 		textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 

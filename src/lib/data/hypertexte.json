@@ -220,7 +220,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "'",
+			"touche": "Quote",
 			"code": "KeyP",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -732,7 +732,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "'",
+			"touche": "Quote",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -1537,7 +1537,7 @@
 			"type": "special"
 		},
 		{
-			"touche": "'",
+			"touche": "Quote",
 			"Primary": "'",
 			"Shift": "<span class='espace-insecable'></span>?",
 			"AltGr": "?",
