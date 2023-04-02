@@ -52,23 +52,24 @@
 	}
 
 	function emulationClavier(event) {
-		let modificateur = activationModificateur(event);
-		if (modificateur) {
+		// Activation des éventuelles touches modificatrices
+		if (activationModificateur(event)) {
 			return; // Si c'est une touche modificatrice, on quitte la fonction
 		}
 
-		// Attention, quand AltGr est activé, Ctrl l’est aussi, d’où le &
+		// Ne pas intercepter les raccourcis avec Ctrl
 		if (control & !altgr) {
-			return true; // Ne pas intercepter les raccourcis avec Ctrl
+			// Attention, quand AltGr est activé, Ctrl l’est aussi, d’où le &
+			return true;
 		}
 
 		// Si touche normale
 		let keyPressed = event.code;
-		let res = data['iso'].find((el) => el['code'] == keyPressed);
+		let res = data['iso'].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
 			let toucheClavier = data.touches.find((el) => el['touche'] == res['touche']);
-			presserToucheClavier(toucheClavier['touche']);
+			presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
 				envoiTouche_ReplacerCurseur('Backspace');
 			} else if (
@@ -78,22 +79,24 @@
 			) {
 				envoiTouche_ReplacerCurseur('Enter');
 			} else if (a_grave) {
+				let touche;
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					// On supprime le à avant de taper le raccourci en à
+					// On supprime le à avant de taper le raccourci de la couche À
 					var textarea = document.getElementById('input-text');
 					textarea.value = textarea.value.slice(0, -1);
 					touche = toucheClavier['À'];
 				}
 				a_grave = false;
+				envoiTouche_ReplacerCurseur(touche);
 			} else {
-				fonction(event, toucheClavier);
+				envoiTouche(event, toucheClavier);
 			}
 		}
 	}
 
-	function fonction(event, toucheClavier) {
+	function envoiTouche(event, toucheClavier) {
 		let touche = '';
 		let couche;
 		if (event.shiftKey && altgr) {
@@ -124,6 +127,7 @@
 		touche = touche.replace(/<span class='espace-insecable'><\/span>/g, ' ');
 		envoiTouche_ReplacerCurseur(touche);
 	}
+
 	function envoiTouche_ReplacerCurseur(touche) {
 		// Récupérer la textarea et le contenu à insérer
 		var textarea = document.getElementById('input-text');
