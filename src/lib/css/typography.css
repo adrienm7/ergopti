@@ -33,10 +33,11 @@ a {
 }
 
 .encart-introduction {
+	background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%);
 	max-width: 700px;
 	margin: 0 auto;
 	margin-bottom: 20px;
-	padding: 0;
+	padding: 20px;
 	text-align: center;
 }
 
