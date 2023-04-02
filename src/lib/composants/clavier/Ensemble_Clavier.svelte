@@ -122,8 +122,12 @@
 					if (type === 'ergodox' && res.touche === 'Space') {
 						toucheClavier.innerHTML = '<div>␣</div>';
 					}
-					if (type === 'iso' && res.touche === 'Space' && couche === 'Visuel') {
+					if (type === 'iso' && res.touche === 'Space' && couche === 'Visuel' && plus === 'non') {
 						toucheClavier.innerHTML = '<div>HyperTexte v.1.0</div>';
+					}
+					if (type === 'iso' && res.touche === 'Space' && couche === 'Visuel' && plus === 'oui') {
+						toucheClavier.innerHTML =
+							"Layer de navigation<br><span class='tap'>HyperTexte v.1.0</span>";
 					}
 
 					// On ajoute des infos dans les data attributes de la touche

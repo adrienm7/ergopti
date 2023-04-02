@@ -5,7 +5,7 @@
 	import data from '$lib/data/hypertexte.json';
 
 	let emplacementClavier;
-	let plus = 'oui';
+	let plus = 'non';
 
 	// Maj automatique de la couche
 	export let shift = false;
@@ -35,19 +35,26 @@
 		unique = {};
 	}
 
-	function emulationClavier(event) {
-		// Si touche modificatrice
+	function activationModificateur(event) {
 		if (event.code === 'AltRight') {
 			altgr = true;
-			return;
+			return true;
 		}
 		if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
 			shift = true;
-			return;
+			return true;
 		}
 		if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
 			control = true;
-			return;
+			return true;
+		}
+		return false;
+	}
+
+	function emulationClavier(event) {
+		let modificateur = activationModificateur(event);
+		if (modificateur) {
+			return; // Si c'est une touche modificatrice, on quitte la fonction
 		}
 
 		// Attention, quand AltGr est activé, Ctrl l’est aussi, d’où le &
@@ -64,47 +71,59 @@
 			presserToucheClavier(toucheClavier['touche']);
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
 				envoiTouche_ReplacerCurseur('Backspace');
-			} else if (keyPressed === 'Enter' || keyPressed === 'AltRight') {
+			} else if (
+				keyPressed === 'Enter' ||
+				keyPressed === 'AltRight' ||
+				(toucheClavier['touche'] === 'magique' && plus === 'non')
+			) {
 				envoiTouche_ReplacerCurseur('Enter');
+			} else if (a_grave) {
+				if (keyPressed === 'Space') {
+					touche = ' ';
+				} else {
+					// On supprime le à avant de taper le raccourci en à
+					var textarea = document.getElementById('input-text');
+					textarea.value = textarea.value.slice(0, -1);
+					touche = toucheClavier['À'];
+				}
+				a_grave = false;
 			} else {
-				let touche = '';
-				if (event.shiftKey && altgr) {
-					touche = toucheClavier['ShiftAltGr'];
-				} else if (!event.shiftKey && altgr) {
-					touche = toucheClavier['AltGr'];
-				} else if (event.shiftKey && !altgr) {
-					touche = toucheClavier['Shift'];
-				} else if (!event.shiftKey && !altgr) {
-					if (a_grave) {
-						if (keyPressed === 'Space') {
-							touche = ' ';
-						} else {
-							// On supprime le à avant de taper le raccourci en à
-							var textarea = document.getElementById('input-text');
-							textarea.value = textarea.value.slice(0, -1);
-							touche = toucheClavier['À'];
-						}
-						a_grave = false;
-					} else {
-						touche = toucheClavier['Primary'];
-					}
-				}
-
-				// Corrections localisées
-				if (plus === 'oui') {
-					if (toucheClavier['touche'] === 'q') {
-						touche = 'qu';
-					}
-					if (toucheClavier['touche'] === 'magique') {
-						touche = champTexte.slice(-1);
-					}
-				}
-				touche = touche.replace(/<span class='espace-insecable'><\/span>/g, ' ');
-				envoiTouche_ReplacerCurseur(touche);
+				fonction(event, toucheClavier);
 			}
 		}
 	}
 
+	function fonction(event, toucheClavier) {
+		let touche = '';
+		let couche;
+		if (event.shiftKey && altgr) {
+			couche = 'ShiftAltGr';
+		} else if (!event.shiftKey && altgr) {
+			couche = 'AltGr';
+		} else if (event.shiftKey && !altgr) {
+			couche = 'Shift';
+		} else {
+			couche = 'Primary';
+		}
+		if (plus === 'oui') {
+			if (toucheClavier[couche + '+'] !== undefined) {
+				touche = toucheClavier[couche + '+'];
+			} else {
+				touche = toucheClavier[couche];
+			}
+		} else {
+			touche = toucheClavier[couche];
+		}
+
+		// Corrections localisées
+		if (plus === 'oui') {
+			if (toucheClavier['touche'] === 'q') {
+				touche = 'qu';
+			}
+		}
+		touche = touche.replace(/<span class='espace-insecable'><\/span>/g, ' ');
+		envoiTouche_ReplacerCurseur(touche);
+	}
 	function envoiTouche_ReplacerCurseur(touche) {
 		// Récupérer la textarea et le contenu à insérer
 		var textarea = document.getElementById('input-text');
@@ -127,6 +146,10 @@
 			nouvellePositionCurseur = positionCurseur - 1;
 		} else if (touche === 'Enter') {
 			textarea.value = texteAvantCurseur + '\n' + texteApresCurseur;
+			nouvellePositionCurseur = positionCurseur + 1;
+		} else if (touche === '★') {
+			let toucheRepetee = texteAvantCurseur.slice(-1);
+			textarea.value = texteAvantCurseur + toucheRepetee + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + 1;
 		} else {
 			textarea.value = texteAvantCurseur + touche + texteApresCurseur;
@@ -228,7 +251,7 @@
 			type={'iso'}
 			{couche}
 			couleur={'non'}
-			plus={'non'}
+			{plus}
 			controles={'non'}
 		/>
 	{/key}
