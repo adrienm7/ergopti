@@ -1,8 +1,8 @@
 <script>
 	import Nom from '$lib/composants/Nom.svelte';
-	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
+	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
 	import Raccourcis from './raccourcis.svelte';
@@ -37,7 +37,7 @@
 	<hr />
 	<div class="encart-introduction">
 		<p>
-			<Nom_Plus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très
+			<NomPlus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très
 			près de la <strong>disposition clavier idéale</strong>. Effectivement, elle :
 		</p>
 		<ul class="margin0">
@@ -74,11 +74,11 @@
 			ne sont pas marqués sur le clavier, il faut donc les apprendre par cœur car regarder ses
 			touches ne fournira aucune information. Le bon côté est que vous n’êtes pas obligé de tous les
 			utiliser d’un coup, ce ne sont que des possibilités supplémentaires. Ainsi, le passage de <Nom
-			/> vers <Nom_Plus /> se fait en douceur.
+			/> vers <NomPlus /> se fait en douceur.
 		</p>
 		<p>
 			☒ Ensuite, et c’est le plus grand inconvénient, dans de très rares cas ces raccourcis vous
-			empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <Nom_Plus />, les
+			empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <NomPlus />, les
 			combinaisons de touches extrêmement rares comme <kbd>HC</kbd> sont transformées en d’autres
 			bien plus utiles comme <kbd-sortie>WH</kbd-sortie>. Cela signifie que dans les cas où vous
 			voulez vraiment écrire
@@ -91,13 +91,13 @@
 			l’enchaînement <kbd>XG</kbd>
 			est très peu commun, mais les data scientists l’utiliseront régulièrement pour écrire
 			<em>XGBoost</em>. Si c’est le cas, vous avez la possibilité de désactiver certains des ajouts
-			de <Nom_Plus />, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple
+			de <NomPlus />, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple
 			avec une macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci
 			transformant XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce
 			n’était qu’un exemple illustratif.
 		</p>
 	</section>
-	<p class="text-bold">Voici maintenant toutes les améliorations de <Nom_Plus /> :</p>
+	<p class="text-bold">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">➀ Roulements et diminution des SFBs</h2>
 	<Roulements_SFB />

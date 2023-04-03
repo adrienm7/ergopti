@@ -1,8 +1,8 @@
 <script>
 	import Nom from '$lib/composants/Nom.svelte';
-	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
+	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
 	import Presentation from './accueil/presentation.svelte';
 	import Genese from './accueil/genese.svelte';
 	import Autocritiques from './accueil/autocritiques.svelte';
@@ -362,14 +362,14 @@
 		<div class="texte-orb">
 			<hr />
 			<p class="encart-introduction">
-				<Nom_Plus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
+				<NomPlus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
 				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.<br
 				/>Découvrez cette amélioration de la disposition en consultant sa page associée :
 			</p>
 			<a href="/hypertexte-plus" style="text-decoration: none;"
 				><button
 					style="display:block; margin: 0 auto; margin-bottom: 25px; background: rgba(0, 0, 0, 0.2); padding: 10px; padding-top: 6px; border-radius: 3px; border: 1px solid white;"
-					><Nom_Plus /></button
+					><NomPlus /></button
 				></a
 			>
 			<hr />
