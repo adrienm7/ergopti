@@ -1,10 +1,10 @@
 <script>
 	import Nom from '$lib/composants/Nom.svelte';
-	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<p>L’un des avantages majeurs de <Nom_Plus /> est qu’il réduit presque à 0 les <SFB />s.</p>
+<p>L’un des avantages majeurs de <NomPlus /> est qu’il réduit presque à 0 les <SFB />s.</p>
 <p>
 	Les <SFB />s les plus fréquents de la disposition sont : <kbd>SC</kbd>,
 	<kbd>PT</kbd>, <kbd>EO</kbd>, <kbd>OE</kbd>,
@@ -67,7 +67,7 @@
 		</label>
 		<div class="content">
 			<p>
-				La touche <kbd>À</kbd> est l’une des plus importantes dans <Nom_Plus />. C’est grâce à elle
+				La touche <kbd>À</kbd> est l’une des plus importantes dans <NomPlus />. C’est grâce à elle
 				que tous les autres <SFB />s, en dehors de ceux supprimés grâce à des roulements, sont
 				supprimés. De plus, certaines des combinaisons sont aussi pour plus de confort, en évitant
 				de dovoir sauter 3 lignes entre chaque lettre comme pour <kbd>PH</kbd>.

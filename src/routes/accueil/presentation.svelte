@@ -1,8 +1,8 @@
 <script>
 	import Nom from '$lib/composants/Nom.svelte';
-	import Nom_Plus from '$lib/composants/Nom_Plus.svelte';
+	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/composants/clavier/Ensemble_Clavier.svelte';
+	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
 </script>
 
 <h2 data-aos="zoom-out" data-aos-mirror="true">Disposition clavier optimisée</h2>
@@ -550,7 +550,7 @@
 				placer ces 3 touches sous les pouces.
 			</p>
 			<p>
-				<Nom_Plus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
+				<NomPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
 				<strong>mécanisme de tap-hold</strong>. L’idée du tap-hold est qu’il est possible d’assigner
 				deux actions à une même touche : une au tap (appui bref) et une au hold (maitenir pressé).
 				Grâce au tap-hold, il est possible de faire pour que taper une touche envoie un raccourci,
@@ -559,7 +559,7 @@
 				<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>.
 			</p>
 			<p>
-				Enfin, <Nom_Plus /> a aussi optimisé les raccourcis <kbd>Ctrl</kbd> + <kbd>Z</kbd> et
+				Enfin, <NomPlus /> a aussi optimisé les raccourcis <kbd>Ctrl</kbd> + <kbd>Z</kbd> et
 				<kbd>Ctrl</kbd>
 				+ <kbd>S</kbd>. Ceux-ci sont dédoublés en <kbd>Ctrl</kbd> + <kbd>Ê</kbd> et <kbd>Ctrl</kbd>
 				+ <kbd>★</kbd>

@@ -1,5 +1,5 @@
 <script>
-	import Bloc_Clavier from './Bloc_Clavier.svelte';
+	import BaseClavier from './BaseClavier.svelte';
 	import data from '$lib/data/hypertexte.json';
 	import { onMount } from 'svelte';
 
@@ -127,7 +127,7 @@
 					}
 					if (type === 'iso' && res.touche === 'Space' && couche === 'Visuel' && plus === 'oui') {
 						toucheClavier.innerHTML =
-							"Layer de navigation<br><span class='tap'>HyperTexte v.1.0</span>";
+							"<div>Layer de navigation<br><span class='tap'>HyperTexte v.1.0</span></div>";
 					}
 
 					// On ajoute des infos dans les data attributes de la touche
@@ -425,7 +425,7 @@
 	data-controles={controles}
 	class="center"
 >
-	<Bloc_Clavier />
+	<BaseClavier />
 	{#if controles === 'oui'}
 		<mini-espace />
 		<controles-clavier class="btn-group">
