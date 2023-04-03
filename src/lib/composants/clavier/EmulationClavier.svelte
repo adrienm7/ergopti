@@ -3,7 +3,7 @@
 	import data from '$lib/data/hypertexte.json';
 
 	let emplacementClavier;
-	let plus = 'non';
+	let plus = 'oui';
 
 	// Maj automatique de la couche
 	export let shift = false;
@@ -150,9 +150,22 @@
 			textarea.value = texteAvantCurseur + '\n' + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + 1;
 		} else if (touche === '★') {
-			let toucheRepetee = texteAvantCurseur.slice(-1);
-			textarea.value = texteAvantCurseur + toucheRepetee + texteApresCurseur;
-			nouvellePositionCurseur = positionCurseur + 1;
+			let mot = texteAvantCurseur.split(' ').slice(-1).toString();
+			var remplacements = { ct: 'c’était', gt: 'j’étais', f: 'faire' };
+
+			if (mot in remplacements) {
+				let remplacement = remplacements[mot];
+				textarea.value =
+					texteAvantCurseur.split(' ').slice(0, -1).join(' ') +
+					' ' +
+					remplacement +
+					texteApresCurseur;
+				nouvellePositionCurseur = positionCurseur + remplacement.length;
+			} else {
+				let toucheRepetee = texteAvantCurseur.slice(-1);
+				textarea.value = texteAvantCurseur + toucheRepetee + texteApresCurseur;
+				nouvellePositionCurseur = positionCurseur + 1;
+			}
 		} else {
 			textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + touche.length;
