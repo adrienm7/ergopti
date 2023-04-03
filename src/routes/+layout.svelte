@@ -32,7 +32,7 @@
 	let affiche = 'none';
 
 	function toggleZIndex() {
-		zIndex = zIndex === -999 ? 99 : -999;
+		zIndex = zIndex === -999 ? 80 : -999;
 		affiche = affiche === 'none' ? 'block' : 'none';
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
@@ -76,7 +76,7 @@
 		position: fixed;
 		bottom: 6vw;
 		right: -41vw;
-		z-index: 99;
+		z-index: 90;
 		width: 100vw;
 		height: 3.5rem;
 		background-color: #a40606;
@@ -105,7 +105,7 @@
 
 	#afficher-clavier-reference {
 		position: fixed;
-		z-index: 101;
+		z-index: 99;
 		bottom: 1rem;
 		right: 1rem;
 		padding: 12px;
