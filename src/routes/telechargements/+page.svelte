@@ -1,6 +1,8 @@
 <script>
 	import NomPlus from '$lib/composants/NomPlus.svelte';
-	import EmulationClavier from '$lib/composants/clavier/EmulationClavier.svelte';
+	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
+
+	let version = 'v1.0.5';
 </script>
 
 <svelte:head>
@@ -22,12 +24,15 @@
 		<h3>Pour installer la disposition</h3>
 		<mini-espace />
 		<div>
-			<a href="/files/KbdEditInstallerhypertexte_v030.exe"><button>HyperTexte.v1.0.3.exe</button></a
+			<a href="/files/KbdEditInstallerhypertexte_v035.exe"
+				><button>HyperTexte {version}.exe</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/files/HyperTexte v0.30.kbe"><button>Fichier source de HyperTexte.v1.0.3</button></a>
+			<a href="/files/HyperTexte v0.35.kbe"
+				><button>Fichier source de HyperTexte {version}</button></a
+			>
 		</div>
 		<mini-espace />
 		<div>
@@ -38,14 +43,14 @@
 		<h3>Pour les comparateurs de disposition</h3>
 		<mini-espace />
 		<div>
-			<span>Version ISO : </span><a href="/files/hypertexte.v1.0.3.fr.iso.txt"
-				><button>hypertexte.v1.0.3.fr.iso</button></a
+			<span>Version ISO : </span><a href="/files/hypertexte.v1.0.5.fr.iso.txt"
+				><button>hypertexte.{version}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<span>Version Ergodox : </span><a href="/files/hypertexte.v1.0.3.fr.ergodox.txt"
-				><button>hypertexte.v1.0.3.fr.ergodox</button></a
+			<span>Version Ergodox : </span><a href="/files/hypertexte.v1.0.5.fr.ergodox.txt"
+				><button>hypertexte.{version}.fr.ergodox</button></a
 			>
 		</div>
 	</div>

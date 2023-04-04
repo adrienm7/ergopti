@@ -1,8 +1,24 @@
 <script>
-	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
-	import data from '$lib/data/hypertexte.json';
+	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
+	import data from '$lib/clavier/data/hypertexte.json';
 
 	let emplacementClavier;
+	let remplacements = {
+		a: 'ainsi',
+		c: 'c’est',
+		ct: 'c’était',
+		d: 'donc',
+		f: 'faire',
+		g: 'j’ai',
+		gt: 'j’étais',
+		h: 'heure',
+		m: 'mais',
+		p: 'prendre',
+		q: 'question',
+		r: 'rien',
+		s: 'sous',
+		très: 't'
+	};
 	let plus = 'oui';
 
 	// Maj automatique de la couche
@@ -151,10 +167,25 @@
 			nouvellePositionCurseur = positionCurseur + 1;
 		} else if (touche === '★') {
 			let mot = texteAvantCurseur.split(' ').slice(-1).toString();
-			var remplacements = { ct: 'c’était', gt: 'j’étais', f: 'faire' };
 
-			if (mot in remplacements) {
-				let remplacement = remplacements[mot];
+			if (mot.toLowerCase() in remplacements) {
+				let remplacement = remplacements[mot.toLowerCase()];
+				// Vérifie si la chaîne est en majuscules
+				let casse = 'minuscules';
+				if (mot === mot.toUpperCase() && mot.length > 1) {
+					casse = 'majuscules';
+				} else if (mot === mot.charAt(0).toUpperCase() + mot.slice(1).toLowerCase()) {
+					casse = 'titelcase';
+				}
+
+				if (casse === 'minuscules') {
+					remplacement = remplacement.toLowerCase();
+				} else if (casse === 'titelcase') {
+					remplacement = remplacement.charAt(0).toUpperCase() + remplacement.slice(1).toLowerCase();
+				} else if (casse === 'majuscules') {
+					remplacement = remplacement.toUpperCase();
+				}
+
 				textarea.value =
 					texteAvantCurseur.split(' ').slice(0, -1).join(' ') +
 					' ' +

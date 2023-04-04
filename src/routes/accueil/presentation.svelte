@@ -2,7 +2,7 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
+	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
 </script>
 
 <h2 data-aos="zoom-out" data-aos-mirror="true">Disposition clavier optimisée</h2>

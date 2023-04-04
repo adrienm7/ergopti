@@ -1,5 +1,5 @@
 {
-    "label": "hypertexte.v1.0.3.fr.ergodox",
+    "label": "hypertexte.v1.0.5.fr.ergodox",
     "fingerStart": {
         "1": 29,
         "2": 30,
@@ -169,7 +169,7 @@
             "shift": 89,
             "finger": 2,
             "id": 16,
-            "altGr": 126,
+            "altGr": 64,
             "shiftAltGr": -1,
             "numpad": -1
         },
@@ -196,7 +196,7 @@
             "shift": 66,
             "finger": 4,
             "id": 19,
-            "altGr": 64,
+            "altGr": 171,
             "shiftAltGr": -1,
             "numpad": -1
         },
@@ -223,7 +223,7 @@
             "shift": 70,
             "finger": 7,
             "id": 22,
-            "altGr": 42,
+            "altGr": 187,
             "shiftAltGr": -1,
             "numpad": -1
         },
@@ -286,8 +286,8 @@
             "shift": 65,
             "finger": 1,
             "id": 29,
-            "altGr": 91,
-            "shiftAltGr": -1,
+            "altGr": 60,
+            "shiftAltGr": 10877,
             "numpad": -1
         },
         {
@@ -295,8 +295,8 @@
             "shift": 73,
             "finger": 2,
             "id": 30,
-            "altGr": 93,
-            "shiftAltGr": -1,
+            "altGr": 62,
+            "shiftAltGr": 10878,
             "numpad": -1
         },
         {
@@ -358,7 +358,7 @@
             "shift": 84,
             "finger": 9,
             "id": 37,
-            "altGr": 60,
+            "altGr": 91,
             "shiftAltGr": -1,
             "numpad": -1
         },
@@ -367,7 +367,7 @@
             "shift": 82,
             "finger": 10,
             "id": 38,
-            "altGr": 62,
+            "altGr": 93,
             "shiftAltGr": -1,
             "numpad": -1
         },
@@ -484,7 +484,7 @@
             "shift": 71,
             "finger": 9,
             "id": 51,
-            "altGr": 171,
+            "altGr": 126,
             "shiftAltGr": -1,
             "numpad": -1
         },
@@ -493,7 +493,7 @@
             "shift": 88,
             "finger": 10,
             "id": 52,
-            "altGr": 187,
+            "altGr": 42,
             "shiftAltGr": -1,
             "numpad": -1
         },
