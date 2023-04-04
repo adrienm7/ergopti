@@ -81,12 +81,13 @@
 		let keyPressed = event.code;
 		let res = data['iso'].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
-			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
 			let toucheClavier = data.touches.find((el) => el['touche'] == res['touche']);
 			presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
-				envoiTouche_ReplacerCurseur('Backspace');
-			} else if (
+				return true;
+			}
+			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
+			if (
 				keyPressed === 'Enter' ||
 				keyPressed === 'AltRight' ||
 				(toucheClavier['touche'] === 'magique' && plus === 'non')
@@ -170,7 +171,7 @@
 
 			if (mot.toLowerCase() in remplacements) {
 				let remplacement = remplacements[mot.toLowerCase()];
-				// Vérifie si la chaîne est en majuscules
+
 				let casse = 'minuscules';
 				if (mot === mot.toUpperCase() && mot.length > 1) {
 					casse = 'majuscules';
@@ -246,6 +247,7 @@
 <div style="margin: 0 auto; width: 100%;">
 	<textarea
 		id="input-text"
+		placeholder="Écrivez ici"
 		bind:value={champTexte}
 		on:keydown={emulationClavier}
 		on:keyup={relacherModificateurs}
@@ -256,28 +258,19 @@
 	#input-text {
 		display: block;
 		margin: 0 auto;
-		width: 70%;
-		height: 150px;
-		padding: 12px;
-		border-radius: 7px;
+		width: 100%;
+		height: 200px;
+		padding: 15px;
+		border-radius: 3px;
+		border: none;
+		resize: none;
 		background-color: white;
 		color: black;
 	}
-	h3 {
-		display: inline-block;
-		position: relative;
-		color: white;
-		font-weight: normal;
-	}
 
-	h3::after {
-		display: block;
-		position: absolute;
-		height: 4px;
-		width: 100%;
-		content: '';
-		background: white;
-		border-radius: 10px;
-		margin-top: 2px;
+	#input-text:focus-visible {
+		background-color: rgba(0, 0, 0, 0.4);
+		color: rgba(255, 255, 255, 0.9);
+		outline: none;
 	}
 </style>
