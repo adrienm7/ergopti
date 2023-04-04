@@ -1,5 +1,5 @@
 <script>
-	import '$lib/composants/clavier/clavier.css';
+	import '$lib/clavier/clavier.css';
 </script>
 
 <bloc-clavier>

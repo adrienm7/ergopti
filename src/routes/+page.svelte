@@ -2,7 +2,7 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
+	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
 	import Presentation from './accueil/presentation.svelte';
 	import Genese from './accueil/genese.svelte';
 	import Autocritiques from './accueil/autocritiques.svelte';

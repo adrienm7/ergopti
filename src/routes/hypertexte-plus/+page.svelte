@@ -2,7 +2,7 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
+	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
 	import Raccourcis from './raccourcis.svelte';

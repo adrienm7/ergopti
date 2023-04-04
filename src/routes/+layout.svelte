@@ -1,7 +1,7 @@
 <script>
 	import Header from '$lib/composants/Header.svelte';
 	import Footer from '$lib/composants/Footer.svelte';
-	import EnsembleClavier from '$lib/composants/clavier/EnsembleClavier.svelte';
+	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
 	import { onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';

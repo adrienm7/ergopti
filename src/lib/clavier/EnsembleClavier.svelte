@@ -1,6 +1,6 @@
 <script>
 	import BaseClavier from './BaseClavier.svelte';
-	import data from '$lib/data/hypertexte.json';
+	import data from '$lib/clavier/data/hypertexte.json';
 	import { onMount } from 'svelte';
 
 	export let emplacement;
