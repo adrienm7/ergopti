@@ -33,7 +33,7 @@ a {
 }
 
 .encart-introduction {
-	background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%);
+	/* background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%); */
 	max-width: 700px;
 	margin: 0 auto;
 	margin-bottom: 20px;
