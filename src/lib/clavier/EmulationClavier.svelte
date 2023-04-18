@@ -3,7 +3,7 @@
 	import data from '$lib/clavier/data/hypertexte.json';
 
 	let emplacementClavier;
-	let remplacements = {
+	const remplacements = {
 		a: 'ainsi',
 		c: 'c’est',
 		ct: 'c’était',
@@ -79,14 +79,16 @@
 
 		// Si touche normale
 		let keyPressed = event.code;
+		// console.log(keyPressed);
 		let res = data['iso'].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
+			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
 			let toucheClavier = data.touches.find((el) => el['touche'] == res['touche']);
 			presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
+				envoiTouche_ReplacerCurseur('Backspace');
 				return true;
 			}
-			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
 			if (
 				keyPressed === 'Enter' ||
 				keyPressed === 'AltRight' ||
