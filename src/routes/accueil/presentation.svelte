@@ -190,7 +190,7 @@
 				L’optimisation de l’alternance des mains fait que lors de l’utilisation d’une main pour
 				frapper une touche, il y a de fortes probabilités que le frappe suivante se fasse avec
 				l’autre main. Toutefois, cela n’arrive pas dans la totalité des cas, c’est pourquoi il
-				convient de s’assurer que le plus possible de frappes inter-mains se fassent à l’aide de
+				convient de s’assurer que le plus possible de frappes intra-mains se fassent à l’aide de
 				roulements.
 			</p>
 			<p>

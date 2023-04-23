@@ -565,12 +565,19 @@ bloc-touche[data-type="enter"].touche-active::after
 
 /* === Si couleur, ou couleur spéciale === */
 
-
-ensemble-clavier[data-couleur="non"] bloc-touche {
-	--couleur-touche: 200!important;
+ensemble-clavier bloc-touche {
 	--couleur-touche-luminosite: 65%;
 	--couleur-touche-saturation: 90%;
 	--opacite-touche: 17%;
+}
+
+ensemble-clavier[data-couleur="non"] bloc-touche {
+	--couleur-touche: 200!important;
+}
+
+ensemble-clavier[data-couleur="freq"] bloc-touche {
+	--couleur-touche-luminosite: 100%;
+	--couleur-touche-saturation: 0%;
 }
 
 ensemble-clavier[data-couleur="oui"] bloc-touche {
