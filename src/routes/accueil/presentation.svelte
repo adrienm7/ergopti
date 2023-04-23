@@ -2,7 +2,7 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
+	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 </script>
 
 <h2 data-aos="zoom-out" data-aos-mirror="true">Disposition clavier optimisée</h2>
@@ -68,14 +68,8 @@
 
 			<mini-espace />
 
-			<EnsembleClavier
-				emplacement={'clavier-freq'}
-				type={'iso'}
-				couche={'Visuel'}
-				couleur={'freq'}
-				plus={'non'}
-				controles={'non'}
-			/>
+			<BlocClavier clavier="frequences" />
+
 			<p>
 				Comme vous pouvez le constater sur le clavier ci-dessus, les lettres les plus fréquentes
 				sont bien sur la rangée du milieu en <Nom />. Effectivement, la lettre la plus fréquente, le
@@ -273,14 +267,7 @@
 
 			<petit-espace />
 			<p>Vous pouvez visualiser les roulements présentés précédemment ci-desosus :</p>
-			<EnsembleClavier
-				emplacement={'clavier-roulements'}
-				type={'iso'}
-				couche={'Visuel'}
-				couleur={'non'}
-				plus={'oui'}
-				controles={'roulements'}
-			/>
+			<BlocClavier clavier="roulements" />
 			<petit-espace />
 		</div>
 	</section>

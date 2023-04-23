@@ -3,6 +3,7 @@
 	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
 
 	let version = 'v1.0.5';
+	// À passer dans de store
 </script>
 
 <svelte:head>
