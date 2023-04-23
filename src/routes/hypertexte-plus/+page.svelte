@@ -2,7 +2,10 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
+
+	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
+
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
 	import Raccourcis from './raccourcis.svelte';
@@ -23,16 +26,11 @@
 	</h1>
 	<div class="container">
 		<div class="block">
-			<EnsembleClavier
-				emplacement={'clavier-presentation'}
-				type={'iso'}
-				couche={'Visuel'}
-				couleur={'oui'}
-				plus={'oui'}
-				controles={'non'}
-			/>
+			<BlocClavier clavier="presentation_plus" />
 		</div>
 	</div>
+	<mini-espace />
+	<ControlesClavier clavier="presentation_plus" />
 </header>
 
 <petit-espace />
@@ -140,7 +138,7 @@
 			-50%,
 			-15px
 		); /* mettre la même valeur en négatif que la valeur de l'épaisseur */
-		width: calc(100% + 10px);
+		width: calc(100% + 4px);
 		height: 100%;
 		background-color: #fff; /* ou la couleur de fond de votre choix */
 	}

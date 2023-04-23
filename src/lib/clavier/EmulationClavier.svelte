@@ -1,25 +1,29 @@
 <script>
-	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
-	import data from '$lib/clavier/data/hypertexte.json';
-
+	let clavier = 'emulation';
+	let textarea;
 	let emplacementClavier;
-	const remplacements = {
-		a: 'ainsi',
-		c: 'c’est',
-		ct: 'c’était',
-		d: 'donc',
-		f: 'faire',
-		g: 'j’ai',
-		gt: 'j’étais',
-		h: 'heure',
-		m: 'mais',
-		p: 'prendre',
-		q: 'question',
-		r: 'rien',
-		s: 'sous',
-		très: 't'
-	};
-	let plus = 'oui';
+	import { onMount } from 'svelte';
+	onMount(() => {
+		textarea = document.getElementById('input-text');
+		// A mettre en fonction de la variable clavier et non en dur
+		emplacementClavier = document.getElementById('clavier_' + clavier);
+	});
+
+	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
+	import data from '$lib/clavier/data/hypertexte.json';
+	import { majClavier } from '$lib/clavier/FonctionsClavier.js';
+
+	import * as data_clavier from '$lib/clavier/stores.js';
+
+	let claviersStores = {};
+	for (const clavier in Object.keys(data_clavier)) {
+		claviersStores[clavier] = data_clavier[clavier];
+	}
+	let infos_clavier;
+	data_clavier[clavier].subscribe((value) => {
+		infos_clavier = value;
+	});
 
 	// Maj automatique de la couche
 	export let shift = false;
@@ -27,26 +31,42 @@
 	export let control = false;
 	export let a_grave = false;
 	let couche = 'Primary';
+
 	$: if (altgr && shift) {
 		couche = 'ShiftAltGr';
-		restart();
+		data_clavier[clavier].update((currentData) => {
+			currentData['couche'] = couche;
+			return currentData;
+		});
+		majClavier(clavier);
 	} else if (altgr && !shift) {
 		couche = 'AltGr';
-		restart();
+		data_clavier[clavier].update((currentData) => {
+			currentData['couche'] = couche;
+			return currentData;
+		});
+		majClavier(clavier);
 	} else if (!altgr && shift) {
 		couche = 'Shift';
-		restart();
+		data_clavier[clavier].update((currentData) => {
+			currentData['couche'] = couche;
+			return currentData;
+		});
+		majClavier(clavier);
 	} else if (a_grave) {
 		couche = 'À';
-		restart();
+		data_clavier[clavier].update((currentData) => {
+			currentData['couche'] = couche;
+			return currentData;
+		});
+		majClavier(clavier);
 	} else {
 		couche = 'Primary';
-		restart();
-	}
-	// Pour maj le clavier
-	let unique = {}; // every {} is unique, {} === {} evaluates to false
-	function restart() {
-		unique = {};
+		data_clavier[clavier].update((currentData) => {
+			currentData['couche'] = couche;
+			return currentData;
+		});
+		// majClavier(clavier); // No fonctionne pas ici, mais pas grave car pas besoin
 	}
 
 	function activationModificateur(event) {
@@ -92,7 +112,7 @@
 			if (
 				keyPressed === 'Enter' ||
 				keyPressed === 'AltRight' ||
-				(toucheClavier['touche'] === 'magique' && plus === 'non')
+				(toucheClavier['touche'] === 'magique' && infos_clavier['plus'] === 'non')
 			) {
 				envoiTouche_ReplacerCurseur('Enter');
 			} else if (a_grave) {
@@ -101,7 +121,6 @@
 					touche = ' ';
 				} else {
 					// On supprime le à avant de taper le raccourci de la couche À
-					var textarea = document.getElementById('input-text');
 					textarea.value = textarea.value.slice(0, -1);
 					touche = toucheClavier['À'];
 				}
@@ -125,7 +144,7 @@
 		} else {
 			couche = 'Primary';
 		}
-		if (plus === 'oui') {
+		if (infos_clavier['plus'] === 'oui') {
 			if (toucheClavier[couche + '+'] !== undefined) {
 				touche = toucheClavier[couche + '+'];
 			} else {
@@ -136,7 +155,7 @@
 		}
 
 		// Corrections localisées
-		if (plus === 'oui') {
+		if (infos_clavier['plus'] === 'oui') {
 			if (toucheClavier['touche'] === 'q') {
 				touche = 'qu';
 			}
@@ -146,9 +165,6 @@
 	}
 
 	function envoiTouche_ReplacerCurseur(touche) {
-		// Récupérer la textarea et le contenu à insérer
-		var textarea = document.getElementById('input-text');
-
 		// Récupérer la position du curseur dans la textarea
 		var positionCurseur = textarea.selectionStart;
 
@@ -208,12 +224,12 @@
 	}
 
 	function presserToucheClavier(touche) {
-		emplacementClavier = document.getElementById('clavier-emulation');
-
 		// Nettoyage des touches actives
 		const touchesActives = emplacementClavier.querySelectorAll('.touche-active');
 		[].forEach.call(touchesActives, function (el) {
-			el.classList.remove('touche-active');
+			if (el.dataset.type != 'special') {
+				el.classList.remove('touche-active');
+			}
 		});
 
 		emplacementClavier
@@ -229,21 +245,31 @@
 		} else if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
 			control = false;
 		}
+		majClavier(clavier);
 	}
 
 	let champTexte = '';
+	const remplacements = {
+		a: 'ainsi',
+		c: 'c’est',
+		ct: 'c’était',
+		d: 'donc',
+		f: 'faire',
+		g: 'j’ai',
+		gt: 'j’étais',
+		h: 'heure',
+		m: 'mais',
+		p: 'prendre',
+		q: 'question',
+		r: 'rien',
+		s: 'sous',
+		très: 't'
+	};
 </script>
 
-{#key unique}
-	<EnsembleClavier
-		emplacement={'clavier-emulation'}
-		type={'iso'}
-		{couche}
-		couleur={'non'}
-		{plus}
-		controles={'non'}
-	/>
-{/key}
+<!-- <ControlesClavier clavier="emulation" /> -->
+<mini-espace />
+<BlocClavier clavier="emulation" />
 
 <mini-espace />
 <div style="margin: 0 auto; width: 100%;">
@@ -266,13 +292,13 @@
 		border-radius: 3px;
 		border: none;
 		resize: none;
-		background-color: white;
-		color: black;
+		background-color: rgba(0, 0, 0, 0.4);
+		color: rgba(255, 255, 255, 0.9);
 	}
 
 	#input-text:focus-visible {
-		background-color: rgba(0, 0, 0, 0.4);
-		color: rgba(255, 255, 255, 0.9);
+		background-color: white;
+		color: black;
 		outline: none;
 	}
 </style>

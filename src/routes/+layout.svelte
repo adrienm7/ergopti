@@ -1,7 +1,10 @@
 <script>
 	import Header from '$lib/composants/Header.svelte';
 	import Footer from '$lib/composants/Footer.svelte';
-	import EnsembleClavier from '$lib/clavier/EnsembleClavier.svelte';
+
+	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
+
 	import { onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
@@ -47,14 +50,9 @@
 
 <div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 	<div>
-		<EnsembleClavier
-			emplacement={'clavier-reference'}
-			type={'iso'}
-			couche={'Visuel'}
-			couleur={'oui'}
-			plus={'non'}
-			controles={'oui'}
-		/>
+		<BlocClavier clavier="reference" />
+		<mini-espace />
+		<ControlesClavier clavier="reference" />
 	</div>
 </div>
 
