@@ -5,11 +5,13 @@
 */
 
 
+:root {
+	--arrondi-clavier: 10px;
+}
 
 bloc-clavier {
 	--taille-clavier: 0.9; /* Pourcentage de la longueur de la page */
     --marge-clavier: calc(var(--marge-touche) * 5);
-    --arrondi-clavier: calc(var(--marge-touche) * 3.5);
     
     --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));

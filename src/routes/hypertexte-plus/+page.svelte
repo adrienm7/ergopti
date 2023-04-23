@@ -21,14 +21,18 @@
 			></span
 		>
 	</h1>
-	<EnsembleClavier
-		emplacement={'clavier-presentation'}
-		type={'iso'}
-		couche={'Visuel'}
-		couleur={'oui'}
-		plus={'oui'}
-		controles={'oui'}
-	/>
+	<div class="container">
+		<div class="block">
+			<EnsembleClavier
+				emplacement={'clavier-presentation'}
+				type={'iso'}
+				couche={'Visuel'}
+				couleur={'oui'}
+				plus={'oui'}
+				controles={'non'}
+			/>
+		</div>
+	</div>
 </header>
 
 <petit-espace />
@@ -111,3 +115,33 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">➃ Raccourcis</h2>
 	<Raccourcis />
 </div>
+
+<style>
+	.container {
+		perspective: 1000px;
+	}
+
+	.block {
+		position: relative;
+		margin: 0 auto;
+		width: fit-content;
+		transform: rotateX(25deg) translateZ(5px);
+		transform-style: preserve-3d;
+	}
+
+	.block::before {
+		border-radius: var(--arrondi-clavier);
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate3d(
+			-50%,
+			-50%,
+			-15px
+		); /* mettre la même valeur en négatif que la valeur de l'épaisseur */
+		width: calc(100% + 10px);
+		height: 100%;
+		background-color: #fff; /* ou la couleur de fond de votre choix */
+	}
+</style>
