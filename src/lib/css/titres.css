@@ -17,16 +17,17 @@ h1 {
 }
 
 h2 {
-	padding: 0.3rem 1rem 0.6rem 1rem;
+	width: fit-content;
 	margin-top: 33vh;
     margin-bottom: 11vh;
-	width: fit-content;
+	padding: 10px 15px 15px 15px;
 	background-color: rgba(0, 0, 0, 0.4);
 	border: 1px solid  rgb(0, 55, 92);
 	border-radius: 7px;
 	box-shadow: rgba(0, 0, 0, 0.4) 0px 0px 6px;
 	color: rgba(198, 241, 255, 0.9);
     font-size: 1.8rem;
+	line-height: 1.2;
 	font-weight: normal;
 }
 
