@@ -18,6 +18,7 @@
 </svelte:head>
 
 <header>
+	<img src="img/logo_hypertexte.png" class="logo" />
 	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"
 			><span class="hyper">Hyper</span><span class="texte">Texte</span><span class="glow">+</span
@@ -115,6 +116,16 @@
 </div>
 
 <style>
+	.logo {
+		display: block;
+		margin: 0 auto;
+		margin-top: 30px;
+		margin-bottom: -30px;
+		width: 80px;
+		border: 1px solid rgba(255, 255, 255, 0.7);
+		border-radius: 100px;
+		box-shadow: rgba(255, 255, 255, 0.24) 0px 3px 8px;
+	}
 	.container {
 		perspective: 1000px;
 	}
@@ -142,4 +153,5 @@
 		height: 100%;
 		background-color: #fff; /* ou la couleur de fond de votre choix */
 	}
+
 </style>
