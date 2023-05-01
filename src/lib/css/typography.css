@@ -17,7 +17,7 @@ ul,
 }
 
 a {
-	color:rgb(0, 174, 255);
+	color:rgb(49, 190, 255);
 	text-decoration: none;
 }
 
@@ -65,6 +65,10 @@ strong,
 
 .text-white {
     color: white;
+}
+
+.text-gray {
+    color: rgba(150, 150, 150, 0.7);
 }
 
 .text-black {

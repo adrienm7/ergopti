@@ -11,6 +11,7 @@
 	overflow: hidden;
 	background: white;
 	border: 1px solid rgb(0, 55, 92);
+	color: #333;
 }
 
 .accordion section input {
@@ -118,11 +119,27 @@ section .numero-faq:before {
 
 .accordion section label 
 {
-	position: relative;
+	display: flex;
+	align-items: center;
 	font-weight: 500;
 	color: #333;
 	z-index: 10;
 	width:100%;
+}
+
+.accordion h3 {
+	display: inline;
+	background: unset;
+	background-clip: unset;
+	color: var(--bg-color);
+	font-size: 1.7rem;
+	font-weight: 600;
+
+	background-clip: unset;
+	-webkit-background-clip: unset;
+	-webkit-text-fill-color: unset; 
+	-moz-background-clip: unset;
+	-moz-text-fill-color: unset;
 }
 /* .accordion section input:checked ~ label h3 
 {

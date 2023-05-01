@@ -57,6 +57,13 @@ bloc-ligne {
     display: flex;
 }
 
+legende-clavier {
+	display: block;
+	margin: 0;
+	margin-top: 7px;
+	text-align: center;
+}
+
 
 
 bloc-touche {
@@ -577,6 +584,22 @@ bloc-clavier[data-couleur="non"] bloc-touche {
 	--couleur-touche: 200!important;
 }
 
+
+bloc-clavier[data-couleur="azerty"] bloc-touche {
+	--couleur-touche: 200!important;
+}
+bloc-clavier[data-couleur="azerty"] legende-clavier {
+	color: hsl(200, 80%, 70%);
+}
+
+
+bloc-clavier[data-couleur="hypertexte"] bloc-touche {
+	--couleur-touche: 300!important;
+}
+bloc-clavier[data-couleur="hypertexte"] legende-clavier {
+	color: hsl(300, 80%, 75%);
+}
+
 bloc-clavier[data-couleur="freq"] bloc-touche {
 	--couleur-touche-luminosite: 100%;
 	--couleur-touche-saturation: 0%;
@@ -636,7 +659,7 @@ bloc-clavier[data-couleur="oui"] bloc-touche[data-doigt="pouce"] {
 	}
 }
 
-.accordion bloc-clavier,
+section bloc-clavier,
 #clavier_emulation {
 	--taille-touche: min(47px, 100vw / 20)!important;
 	--marge-touche: min(3px, 0.35vw)!important;

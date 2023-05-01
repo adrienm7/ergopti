@@ -17,25 +17,34 @@ h1 {
 }
 
 h2 {
+	display: block;
+    margin: 20vh 0 15vh 0;
+	color:white;
+	text-align: center;
+	font-size: 2.5rem;
+	font-weight: 400;
+
+	background: -webkit-linear-gradient(#f2dfff, #db4bff);
+	background-clip: text;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent; 
+	-moz-background-clip: text;
+	-moz-text-fill-color: transparent;
+}
+
+h3 {
 	width: fit-content;
-	margin-top: 33vh;
-    margin-bottom: 11vh;
+	margin-top: 30vh;
+    margin-bottom: 10vh;
 	padding: 10px 15px 15px 15px;
 	background-color: rgba(0, 0, 0, 0.4);
 	border: 1px solid  rgb(0, 55, 92);
 	border-radius: 7px;
 	box-shadow: rgba(0, 0, 0, 0.4) 0px 0px 6px;
-	color: rgba(198, 241, 255, 0.9);
-    font-size: 1.8rem;
+	color: rgb(106, 218, 255);
+    font-size: 1.5rem;
 	line-height: 1.2;
 	font-weight: normal;
-}
-
-h3 {
-	display: inline;
-    margin: 0;
-	color: var(--bg-color);
-	font-size: 1.4rem;
 }
 
 h4 {
