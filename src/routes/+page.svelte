@@ -373,6 +373,6 @@
 		</div>
 	</div>
 
-	<Genese />
+	<!-- <Genese /> -->
 	<!-- <Autocritiques /> -->
 </div>
