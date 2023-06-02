@@ -38,7 +38,7 @@ bloc-clavier {
     width: max-content;
     margin: 0 auto;
     padding: var(--marge-clavier);
-    background-color: hsl(216, 100%, 10%);
+    background-color: hsla(216, 100%, 10%, 0.6);
     border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
 	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
@@ -507,7 +507,7 @@ bloc-clavier[data-type="iso"] bloc-touche[data-type="space"] {
 bloc-touche[data-type="space"],
 bloc-touche[data-type="special"],
 bloc-touche[data-type="enter"] {
-    background-color: rgb(7, 7, 7);
+    background-color: rgb(10, 10, 10);
 	color: white;
 	/* Bordure de la touche en blanc transparent */
 	--couleur-touche: 0deg!important; 
@@ -552,7 +552,7 @@ bloc-touche[data-type="enter"] {
 
 bloc-touche[data-type="enter"]::before,
 bloc-touche[data-type="enter"]::after {
-    background-color: rgb(7, 7, 7)!important;
+    background-color: rgb(10, 10, 10)!important;
 	color: white!important;
 }
 
@@ -574,14 +574,17 @@ bloc-touche[data-type="enter"].touche-active::after
 
 /* === Si couleur, ou couleur spéciale === */
 
-bloc-clavier bloc-touche {
-	--couleur-touche-luminosite: 65%;
+bloc-clavier bloc-touche,
+bloc-clavier[data-couleur="oui"] bloc-touche {
+	--couleur-touche-luminosite: 70%;
 	--couleur-touche-saturation: 90%;
-	--opacite-touche: 17%;
+	--opacite-touche: 30%;
 }
 
 bloc-clavier[data-couleur="non"] bloc-touche {
-	--couleur-touche: 200!important;
+	--couleur-touche: 190!important;
+	--couleur-touche-luminosite: 60%;
+	--opacite-touche: 20%;
 }
 
 
@@ -604,13 +607,6 @@ bloc-clavier[data-couleur="freq"] bloc-touche {
 	--couleur-touche-luminosite: 100%;
 	--couleur-touche-saturation: 0%;
 }
-
-bloc-clavier[data-couleur="oui"] bloc-touche {
-	--couleur-touche-luminosite: 65%;
-	--couleur-touche-saturation: 90%;
-	--opacite-touche: 30%;
-}
-
 
 bloc-clavier[data-couleur="freq"] bloc-touche[data-type="lettre"] {
     --couleur-touche: calc(35deg * (0 - var(--frequence-log)) );
