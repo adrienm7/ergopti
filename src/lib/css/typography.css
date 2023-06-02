@@ -68,7 +68,7 @@ strong,
 }
 
 .text-gray {
-    color: rgba(150, 150, 150, 0.7);
+    color: hsla(190, 100%, 80%, 0.8);
 }
 
 .text-black {

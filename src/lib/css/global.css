@@ -36,6 +36,14 @@ html, body {
 		rgba(0, 0, var(--couleur), 1) 100%
 	);
 	background: var(--bg-color);
+	background: linear-gradient(
+		45deg,
+		hsl(205, 100%, 5%) 0%,
+		hsl(220, 100%, 10%) 30%,
+		hsl(220, 100%, 20%) 60%,
+		hsl(205, 100%, 25%) 100%
+	);
+	background-attachment: fixed;
 }
 
 /* @media (max-width: 800px) {
