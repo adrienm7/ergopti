@@ -147,11 +147,10 @@
 		transform: translate3d(
 			-50%,
 			-50%,
-			-15px
+			-20px
 		); /* mettre la même valeur en négatif que la valeur de l'épaisseur */
 		width: calc(100% + 4px);
 		height: 100%;
-		background-color: #fff; /* ou la couleur de fond de votre choix */
+		background-color: black; /* ou la couleur de fond de votre choix */
 	}
-
 </style>

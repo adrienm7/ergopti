@@ -38,7 +38,7 @@ bloc-clavier {
     width: max-content;
     margin: 0 auto;
     padding: var(--marge-clavier);
-    background-color: hsla(216, 100%, 10%, 0.6);
+    background-color: hsla(216, 100%, 10%, 0.85);
     border: 1px solid hsla(0deg, 0%, 100%, 30%);
     border-radius: var(--arrondi-clavier);
 	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
@@ -577,7 +577,7 @@ bloc-touche[data-type="enter"].touche-active::after
 bloc-clavier bloc-touche,
 bloc-clavier[data-couleur="oui"] bloc-touche {
 	--couleur-touche-luminosite: 70%;
-	--couleur-touche-saturation: 90%;
+	--couleur-touche-saturation: 100%;
 	--opacite-touche: 30%;
 }
 
@@ -592,7 +592,7 @@ bloc-clavier[data-couleur="azerty"] bloc-touche {
 	--couleur-touche: 200!important;
 }
 bloc-clavier[data-couleur="azerty"] legende-clavier {
-	color: hsl(200, 80%, 70%);
+	color: hsl(200, 100%, 80%);
 }
 
 
@@ -600,7 +600,7 @@ bloc-clavier[data-couleur="hypertexte"] bloc-touche {
 	--couleur-touche: 300!important;
 }
 bloc-clavier[data-couleur="hypertexte"] legende-clavier {
-	color: hsl(300, 80%, 75%);
+	color: hsl(300, 100%, 85%);
 }
 
 bloc-clavier[data-couleur="freq"] bloc-touche {
@@ -639,7 +639,7 @@ bloc-clavier[data-couleur="oui"] bloc-touche[data-doigt="pouce"] {
 
 
 #clavier_reference {
-	--taille-clavier: 0.75;
+	--taille-clavier: 0.6;
 }
 
 #clavier_presentation,

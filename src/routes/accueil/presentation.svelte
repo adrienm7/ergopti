@@ -8,7 +8,7 @@
 <section>
 	<h2 data-aos="fade-up" data-aos-mirror="true">Distance des doigts aux touches</h2>
 	<div class="content">
-		<h3>Optimisation de la rangée du milieu</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Optimisation de la rangée du milieu</h3>
 
 		<p>
 			Lors de l’apprentissage de la dactylographie, il est enseigné que les doigts doivent reposer
@@ -118,7 +118,7 @@
 			les plus utilisées sur la rangée du milieu. En résulte immédiatement un déplacement des doigts
 			largement diminué et un meilleur confort.
 		</p>
-		<h3>Optimisation selon la force des doigts</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Optimisation selon la force des doigts</h3>
 		<p>
 			Une fois que les lettres les plus fréquentes ont été placées sur la rangée du milieu, il reste
 			encore beaucoup à faire. En effet, <strong>chaque doigt a une force différente</strong>.
@@ -276,7 +276,7 @@
 			préférence sur des doigts consécutifs dans un mouvement horizontal.
 		</p>
 
-		<h3>Très bons bigrammes voyelle-voyelle</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Très bons bigrammes voyelle-voyelle</h3>
 		<ul>
 			<li><kbd>AI</kbd></li>
 			<li><kbd>IE</kbd></li>
@@ -293,7 +293,7 @@
 			<li><kbd>YOU</kbd></li>
 		</ul>
 
-		<h3>Très bons bigrammes consonne-consonne</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Très bons bigrammes consonne-consonne</h3>
 		<ul>
 			<li><kbd>SN</kbd></li>
 			<li><kbd>NT</kbd></li>
@@ -312,7 +312,7 @@
 				etc.)
 			</li>
 		</ul>
-		<h3>Autres bons bigrammes</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Autres bons bigrammes</h3>
 		<ul>
 			<li>
 				<kbd>OW</kbd> très utilisé en anglais (ALL<span class="hyper text-bold">OW</span>
@@ -488,7 +488,7 @@
 			d’utilisation. Ainsi, les touches très utilisées comme les <kbd>()</kbd>,
 			<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les plus forts.
 		</p>
-		<p class="important">
+		<p class="encadre">
 			<span class="text-bold">⚠ Attention</span> : Le <kbd>$</kbd> est l’un des seuls symboles à ne
 			pas être sur un emplacement logique (le
 			<kbd>D</kbd>
@@ -497,7 +497,9 @@
 			<kbd>$</kbd>
 			se trouve sur la touche <kbd>★</kbd>.
 		</p>
-		<h2>Ponctuations avec espace insécable automatique</h2>
+		<h2 data-aos="zoom-out" data-aos-mirror="true">
+			Ponctuations avec espace insécable automatique
+		</h2>
 		<p>
 			Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
 			particularité. En effet, lors de l’utilisation de <kbd>Shift</kbd>, elles sont
@@ -519,7 +521,7 @@
 			<kbd>Shift</kbd>, tout en programment normalement avec la couche <kbd>AltGr</kbd>, qui
 			contient d’ailleurs tout le reste des symboles nécessaires à l’écriture de code.
 		</p>
-		<div class="important">
+		<div class="encadre">
 			<p class="text-bold">Ainsi, il est facile de se rappeler où est quoi :</p>
 			<ul class="margin0">
 				<li>le français est en <kbd>Shift</kbd></li>
@@ -579,7 +581,9 @@
 			<kbd>L</kbd>. En dehors de cela, des touches de raccourci ont aussi été implémentées :
 		</p>
 
-		<h3>Touches de raccourci sur la version Ergodox</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">
+			Touches de raccourci sur la version Ergodox
+		</h3>
 		<p>
 			La version d’<Nom /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
 			à une main, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
@@ -588,7 +592,7 @@
 			de type Ergodox peuvent en effet être programmés pour ajouter et déplacer des touches.
 		</p>
 
-		<h3>Touches de raccourci sur la version ISO</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Touches de raccourci sur la version ISO</h3>
 		<p>
 			La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier
 			de ces touches de raccourci, car les touches à sa gauche sont déjà occupées par les touches
