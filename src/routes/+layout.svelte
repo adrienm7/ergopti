@@ -83,7 +83,7 @@
 		text-align: center;
 		margin: 0 auto;
 		border: 2px solid white;
-		box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+		box-shadow: rgba(0, 0, 0, 0.6) 0px -2px 4px, rgba(0, 0, 0, 0.7) 0px 3px 8px;
 	}
 
 	@media (max-width: 700px) {
@@ -111,7 +111,7 @@
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
 		font-size: 1.5rem;
-		box-shadow: rgba(0, 0, 0, 0.4) 0px 0px 18px;
+		box-shadow: 0px 0px 6px 4px #002136c6;
 	}
 
 	#clavier-ref {

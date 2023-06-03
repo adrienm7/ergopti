@@ -71,23 +71,3 @@
 
 	<EmulationClavier />
 </div>
-
-<style>
-	h3 {
-		display: inline-block;
-		position: relative;
-		color: white;
-		font-weight: normal;
-	}
-
-	h3::after {
-		display: block;
-		position: absolute;
-		height: 4px;
-		width: 100%;
-		content: '';
-		background: white;
-		border-radius: 10px;
-		margin-top: 2px;
-	}
-</style>
