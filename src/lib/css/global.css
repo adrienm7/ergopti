@@ -16,6 +16,7 @@ html, body {
     font-size: clamp(14px, 0.3vw + 14px, 24px);
     scroll-behavior: smooth;
 	color: #333;
+	background: black;
 }
 
 
