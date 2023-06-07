@@ -108,20 +108,7 @@ strong,
 
 
 
-/* Boîtes de message */
 
-
-.important {
-	background-color: rgb(234, 234, 234);
-	backdrop-filter: blur(60px);
-	padding: 20px;
-	border-radius: 10px;
-	border: 1px solid rgba(80, 80, 80, 0.5);
-	box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
-}
-.important p {
-	margin: 0;
-}
 
 
 
@@ -174,13 +161,12 @@ strong,
 	background-image: linear-gradient(to right, var(--gradient-blue));
 }
 .texte {
-	-webkit-background-clip: text;
+	background: linear-gradient(#e8c5ff, #db4bff);
 	background-clip: text;
+	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
-	color: transparent;
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
-	background-image: linear-gradient(to right, var(--gradient-purple));
+	-moz-background-clip: text;
+	-moz-text-fill-color: transparent;
 }
 
 .ergodox-text-gradient {

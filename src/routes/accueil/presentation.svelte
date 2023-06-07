@@ -3,6 +3,10 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import { taperTexte } from '$lib/clavier/taperTexte.js';
+	let texte;
+	let roulements_voyelles = ['ai', 'ie', 'eu', 'io', 'ou', 'oi', 'au', 'aie', 'ieu', 'you'];
+	let roulements_consonnes = ['ch', 'pl', 'ld'];
 </script>
 
 <section>
@@ -337,7 +341,20 @@
 		<petit-espace />
 		<p>Vous pouvez visualiser les roulements présentés précédemment ci-desosus :</p>
 		<BlocClavier clavier="roulements" />
-		<petit-espace />
+		<div style="height: 20px" />
+		<controles-roulements
+			class="btn-group"
+			style="width: 100%; margin: 0 auto; display: inline-block; text-align: center"
+		>
+			<select bind:value={texte} on:change={() => taperTexte('roulements', texte, 250, false)}>
+				<option value="none" selected disabled hidden>Roulements voyelles</option>
+				{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
+			</select>
+			<select bind:value={texte} on:change={() => taperTexte('roulements', texte, 250, false)}>
+				<option value="none" selected disabled hidden>Roulements consonnes</option>
+				{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
+			</select>
+		</controles-roulements>
 	</div>
 </section>
 <section>

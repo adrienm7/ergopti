@@ -320,7 +320,7 @@ function changerCouche(toucheModificatrice, clavier) {
 	majClavier(clavier);
 }
 
-var mayzner = {
+const mayzner = {
 	max: 12.49,
 	a: 8.04,
 	b: 1.48,
