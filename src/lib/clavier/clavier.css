@@ -15,7 +15,7 @@ bloc-clavier {
     
     --taille-touche: calc(var(--taille-clavier) * 100vw / 15);
     --hauteur-touche: calc(var(--taille-touche) - 2 * var(--marge-touche));
-    --marge-touche: calc(var(--taille-clavier) * 0.36vw);
+    --marge-touche: calc(var(--taille-clavier) * 0.4vw);
     --profondeur-touche: 1.5px;
     --arrondi-touche: 0.15em;
     --ombre-touche: rgba(0, 0, 0, 0.3) 5px 3px 5px;
