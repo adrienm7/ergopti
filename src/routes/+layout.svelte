@@ -111,7 +111,7 @@
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
 		font-size: 1.5rem;
-		box-shadow: 0px 0px 6px 4px #002136c6;
+		box-shadow: 0px 0px 6px 4px #002136b1;
 	}
 
 	#clavier-ref {

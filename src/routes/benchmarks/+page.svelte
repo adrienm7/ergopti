@@ -48,7 +48,7 @@
 
 	<div class="encadre">
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
-		<strong>KLAnext</strong> est l’un d’entre eux et peut être gratuitement utilisé à l’adresse
+		<strong>KLAnext</strong> est l’un d’entre eux et est gratuitement accessible à l’adresse
 		<a href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a>. C’est
 		l’un des comparateurs les plus utilisés en raison de son algorithme de notation qui serait plus
 		"juste" que les autres.

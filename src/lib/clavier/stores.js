@@ -5,7 +5,7 @@ export const presentation = writable({
 	type: 'iso',
 	couche: 'Visuel',
 	plus: 'non',
-	couleur: 'oui',
+	couleur: 'non',
 	controles: 'oui'
 });
 
@@ -51,5 +51,5 @@ export const roulements = writable({
 	couche: 'Visuel',
 	plus: 'non',
 	couleur: 'non',
-	controles: 'oui'
+	controles: 'non'
 });
