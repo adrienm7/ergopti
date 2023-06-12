@@ -60,16 +60,18 @@
 					><div>M</div></bloc-touche
 				>
 			</bloc-ligne>
-			<legende-clavier>Disposition AZERTY</legende-clavier>
+			<legende-clavier>Rangée du milieu en AZERTY</legende-clavier>
 		</bloc-clavier>
 
 		<p>
-			Pourtant, AZERTY est pire qu’une disposition aléatoire sur ce point. <span class="text-gray"
-				>La légende raconte que cette première rangée remonte à l’époque de l’invention de la
-				machine à écrire. Le choix de la disposition QWERTY aurait, entre autres raisions, été
-				influencé par un aspect purement marketing. En effet, à des fins de démonstrations, ont été
-				placées sur la rangée supérieure de la machine à écrire toutes les lettres nécessaires pour
-				pouvoire écrire <kbd-sortie>TYPEWRITER</kbd-sortie>.</span
+			Pourtant, le QWERTY est pire qu’une disposition aléatoire sur ce point. <span
+				class="text-gray"
+				>La légende raconte que sa première rangée remonte à l’époque de l’invention de la machine à
+				écrire. Le choix de la disposition QWERTY aurait, entre autres raisions, été influencé par
+				un aspect purement marketing. En effet, à des fins de démonstrations, ont été placées sur la
+				rangée supérieure de la machine à écrire toutes les lettres nécessaires pour pouvoire écrire <kbd-sortie
+					>TYPEWRITER</kbd-sortie
+				>.</span
 			>
 		</p>
 		<p>
@@ -111,7 +113,7 @@
 					><div>R</div></bloc-touche
 				>
 			</bloc-ligne>
-			<legende-clavier>Disposition HyperTexte</legende-clavier>
+			<legende-clavier>Rangée du milieu en HyperTexte</legende-clavier>
 		</bloc-clavier>
 
 		<p>
