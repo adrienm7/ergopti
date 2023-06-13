@@ -583,7 +583,7 @@ bloc-clavier[data-couleur="oui"] bloc-touche {
 
 bloc-clavier[data-couleur="non"] bloc-touche {
 	--couleur-touche: 190!important;
-	--couleur-touche-luminosite: 60%;
+	--couleur-touche-luminosite: 70%;
 	--opacite-touche: 20%;
 }
 
