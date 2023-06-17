@@ -34,12 +34,32 @@
 
 <div class="contenu">
 	<hr />
+	<mini-espace />
 	<p class="encart-introduction">
 		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
-		Fruit de longues réflexions, elle se veut la plus
-		<span class="text-glow">optimale</span>
-		possible. Cette page vous présente la disposition ainsi que ses&nbsp;nombreux&nbsp;avantages.
+		Fruit de longues réflexions, elle se veut la plus optimale possible pour un confort d’exception.
+		<br />Cette page vous présente la disposition ainsi que ses&nbsp;nombreux&nbsp;avantages.
 	</p>
+	<div class="cards">
+		<div class="card">
+			➀ <strong>Diminution de la distance parcourue</strong> pour moins de fatigue et plus de confort
+		</div>
+		<div class="card">
+			➁ <strong>Frappe ultra-fluide</strong> par élimination de la quasi-totalité des <SFB />s
+		</div>
+		<div class="card">
+			➂ <strong>Alternance des mains</strong> favorisée pour paralléliser la frappe et ainsi écrire plus
+			vite
+		</div>
+		<div class="card">
+			➃ <strong>Frappe ultra-confortable</strong> grâce à une optimisation des roulements
+		</div>
+		<div class="card">
+			➄ <strong>Placement logique</strong> des touches, permettant de s’en souvenir aisément
+		</div>
+		<div class="card">➅ <strong>Et bien d’autres</strong> améliorations, voire révolutions...</div>
+	</div>
+	<petit-espace />
 	<hr />
 
 	<Presentation />
@@ -376,3 +396,57 @@
 	<!-- <Genese /> -->
 	<!-- <Autocritiques /> -->
 </div>
+
+<style>
+	.cards {
+		max-width: 1000px;
+		margin: 0 auto;
+		display: grid;
+		gap: 1rem;
+		/* grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); */
+	}
+
+	.card {
+		display: block;
+		align-items: center;
+		background-color: rgba(38, 0, 110, 0.6);
+		padding: 1rem;
+		border-radius: 7px;
+	}
+
+	.cards .card:nth-child(even) {
+		background-color: rgba(0, 0, 0, 0.8);
+		color: white;
+	}
+	.cards .card:nth-child(odd) {
+		background-color: rgba(255, 255, 255, 0.9);
+		color: black;
+	}
+
+	/* Screen larger than 500px? 2 column */
+	@media (min-width: 500px) and (max-width: 900px) {
+		.cards {
+			grid-template-columns: repeat(2, 1fr);
+		}
+
+		.cards .card:nth-child(1),
+		.cards .card:nth-child(4),
+		.cards .card:nth-child(5) {
+			background-color: rgba(0, 0, 0, 0.8);
+			color: white;
+		}
+		.cards .card:nth-child(2),
+		.cards .card:nth-child(3),
+		.cards .card:nth-child(6) {
+			background-color: rgba(255, 255, 255, 0.9);
+			color: black;
+		}
+	}
+
+	/* Screen larger than 900px? 3 columns */
+	@media (min-width: 900px) {
+		.cards {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
+</style>

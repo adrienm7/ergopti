@@ -34,9 +34,8 @@ a {
 
 .encart-introduction {
 	/* background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%); */
-	max-width: 700px;
+	max-width: 820px;
 	margin: 0 auto;
-	margin-bottom: 20px;
 	padding: 20px;
 	text-align: center;
 }
@@ -45,8 +44,8 @@ a {
 	margin: 0;
 	padding: 25px;
 	background-color: rgba(0, 0, 0, 0.3);
-	border: 2px solid rgba(255,255,255,0.7);
-	border-radius: 10px;
+	border: 1px solid rgba(255,255,255,0.7);
+	border-radius: 7px;
 }
 
 
