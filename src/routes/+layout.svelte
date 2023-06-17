@@ -5,7 +5,7 @@
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
 
-	import { onMount } from 'svelte';
+	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
 	import Matomo, { matomo } from '@dexlib/svelte-matomo';
@@ -25,7 +25,7 @@
 	const url = 'https://stats.beseven.fr';
 	const siteId = 6;
 
-	onMount(() => {
+	afterUpdate(() => {
 		matomo.trackPageView();
 		AOS.init();
 		typography();

@@ -1,4 +1,4 @@
-import { version } from '$lib/clavier/stores_data.js';
+import { version } from '$lib/stores_infos.js';
 let versionValue;
 version.subscribe((value) => {
 	versionValue = value;

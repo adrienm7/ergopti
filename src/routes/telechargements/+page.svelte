@@ -2,8 +2,11 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
 
-	let version = 'v1.0.5';
-	// À passer dans de store
+	import { version } from '$lib/stores_infos.js';
+	let versionValue;
+	version.subscribe((value) => {
+		versionValue = value;
+	});
 </script>
 
 <svelte:head>
@@ -26,18 +29,21 @@
 		<mini-espace />
 		<div>
 			<a href="/files/KbdEditInstallerhypertexte_v035.exe"
-				><button class="bouton-telechargement">☛ HyperTexte {version}.exe</button></a
+				><button class="bouton-telechargement">☛ HyperTexte {versionValue}.exe</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<a href="/files/HyperTexte v0.35.kbe"
-				><button>Fichier source de HyperTexte {version}</button></a
+				><button>Fichier source de HyperTexte {versionValue}</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a aria-disabled="true"><button>HyperTextePlus.exe — Pas encore disponible</button></a>
+			<a aria-disabled="true"
+				><button class="bouton-telechargement">☛ HyperTextePlus.exe — Pas encore disponible</button
+				></a
+			>
 		</div>
 		<petit-espace />
 
@@ -45,13 +51,13 @@
 		<mini-espace />
 		<div>
 			<span>Version ISO : </span><a href="/files/hypertexte.v1.0.5.fr.iso.txt"
-				><button>hypertexte.{version}.fr.iso</button></a
+				><button>hypertexte.{versionValue}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version Ergodox : </span><a href="/files/hypertexte.v1.0.5.fr.ergodox.txt"
-				><button>hypertexte.{version}.fr.ergodox</button></a
+				><button>hypertexte.{versionValue}.fr.ergodox</button></a
 			>
 		</div>
 	</div>
@@ -77,7 +83,7 @@
 		padding: 10px;
 		background-color: rgba(0, 0, 0, 0.8);
 		color: white;
-		border: 1px solid rgba(255, 255, 255, 0.8);
+		border: 1px solid rgba(255, 255, 255, 0.6);
 		border-radius: 3px;
 	}
 </style>

@@ -146,7 +146,7 @@
 		<p>
 			En français et en anglais, le <kbd>E</kbd>
 			est de loin la lettre la plus fréquente. Viennent ensuite les voyelles <kbd>A</kbd>,
-			<kbd>I</kbd>, <kbd>U</kbd> et <kbd>O</kbd>, ainsi que les consonnes
+			<kbd>I</kbd>, <kbd>O</kbd> et <kbd>U</kbd>, ainsi que les consonnes
 			<kbd>S</kbd>, <kbd>N</kbd>, <kbd>T</kbd> et <kbd>R</kbd>. <Nom /> place évidemment les lettres
 			les plus utilisées sur la rangée du milieu. En résulte immédiatement un déplacement des doigts
 			largement diminué et un meilleur confort.
