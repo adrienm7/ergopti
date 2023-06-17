@@ -5,8 +5,35 @@
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import { taperTexte } from '$lib/clavier/taperTexte.js';
 	let texte;
-	let roulements_voyelles = ['ai', 'ie', 'eu', 'io', 'ou', 'oi', 'au', 'aie', 'ieu', 'you'];
-	let roulements_consonnes = ['ch', 'pl', 'ld'];
+	let roulements_voyelles = [
+		'ai',
+		'aie',
+		'au',
+		'eu',
+		'ée',
+		'ie',
+		'ieu',
+		'io',
+		'oi',
+		'ou',
+		'ow',
+		'wo',
+		'you'
+	];
+	let roulements_consonnes = [
+		'ch',
+		'd’',
+		'ld',
+		'nc',
+		'ng',
+		'ns',
+		'nt',
+		'ntr',
+		'pl',
+		'pr',
+		'rs',
+		'tr'
+	];
 </script>
 
 <section>
@@ -349,11 +376,10 @@
 			style="width: 100%; margin: 0 auto; display: inline-block; text-align: center"
 		>
 			<select bind:value={texte} on:change={() => taperTexte('roulements', texte, 250, false)}>
-				<option value="none" selected disabled hidden>Roulements voyelles</option>
+				<option selected disabled hidden>Sélectionner le roulement</option>
+				<option disabled>• Roulements voyelles •</option>
 				{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
-			</select>
-			<select bind:value={texte} on:change={() => taperTexte('roulements', texte, 250, false)}>
-				<option value="none" selected disabled hidden>Roulements consonnes</option>
+				<option disabled>• Roulements consonnes •</option>
 				{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
 			</select>
 		</controles-roulements>

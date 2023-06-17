@@ -26,7 +26,7 @@
 		<mini-espace />
 		<div>
 			<a href="/files/KbdEditInstallerhypertexte_v035.exe"
-				><button>HyperTexte {version}.exe</button></a
+				><button class="bouton-telechargement">☛ HyperTexte {version}.exe</button></a
 			>
 		</div>
 		<mini-espace />
@@ -71,3 +71,13 @@
 
 	<EmulationClavier />
 </div>
+
+<style>
+	.bouton-telechargement {
+		padding: 10px;
+		background-color: rgba(0, 0, 0, 0.8);
+		color: white;
+		border: 1px solid rgba(255, 255, 255, 0.8);
+		border-radius: 3px;
+	}
+</style>
