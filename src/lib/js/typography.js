@@ -22,7 +22,7 @@ export function typography(searchNode = document.body) {
 		if (node.nodeType === 1 && !excludedTags.includes(node.tagName.toLowerCase())) {
 			typography(node);
 		} else if (node.nodeType === 3 && node.nodeValue.trim() !== '') {
-			const spaceRegex = /(\u00AB|\u2014)(?:\s+)?|(?:\s+)?([\?!:;\u00BB])/g;
+			const spaceRegex = /(\u00AB)(?:\s+)?|(?:\s+)?([\?!:;\u00BB])/g;
 			const apostropheRegex = /'/g;
 			const space = '<span class="insecable" style="font-size: 0.67em">&nbsp;</span>';
 			const newText = node.nodeValue
