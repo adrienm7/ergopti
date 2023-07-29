@@ -39,8 +39,10 @@
 <div class="contenu">
 	<h1 data-aos="zoom-in" data-aos-mirror="true">Contact</h1>
 	<div class="encadre">
-		Vous pouvez contacter l’auteur de cette disposition à l’adresse <a
+		<!-- Vous pouvez contacter l’auteur de cette disposition à l’adresse <a
 			href="mailto:moyaux.adrien@gmail.com">moyaux.adrien@gmail.com</a
-		>
+		> -->
+		Utilisez le formulaire <a href="https://beseven.fr/contact">ici</a> pour contacter l’auteur de la
+		disposition HyperTexte.
 	</div>
 </div>
