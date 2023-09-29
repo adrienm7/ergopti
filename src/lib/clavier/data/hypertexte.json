@@ -1,5 +1,5 @@
 {
-	"nom": "HyperTexte v1.0.5",
+	"nom": "HyperTexte v1.0.10",
 	"auteur": "Adrien Moyaux",
 	"site": "https://hypertexte.beseven.fr",
 	"iso": [
@@ -381,30 +381,30 @@
 			"taille": "1.25"
 		},
 		{
-			"touche": "\u00e8",
-			"code": "IntlBackslash",
-			"main": "gauche",
-			"doigt": "auriculaire",
-			"ligne": "4",
-			"colonne": "2",
-			"taille": "1"
-		},
-		{
-			"touche": ".",
-			"code": "KeyZ",
-			"main": "gauche",
-			"doigt": "annulaire",
-			"ligne": "4",
-			"colonne": "3",
-			"taille": "1"
-		},
-		{
-			"touche": "\u00ea",
+			"touche": "è",
 			"code": "KeyX",
 			"main": "gauche",
 			"doigt": "majeur",
 			"ligne": "4",
 			"colonne": "4",
+			"taille": "1"
+		},
+		{
+			"touche": ".",
+			"code": "KeyV",
+			"main": "gauche",
+			"doigt": "index",
+			"ligne": "4",
+			"colonne": "6",
+			"taille": "1"
+		},
+		{
+			"touche": "ê",
+			"code": "IntlBackslash",
+			"main": "gauche",
+			"doigt": "auriculaire",
+			"ligne": "4",
+			"colonne": "2",
 			"taille": "1"
 		},
 		{
@@ -417,12 +417,12 @@
 			"taille": "1"
 		},
 		{
-			"touche": "\u00e9",
-			"code": "KeyV",
+			"touche": "é",
+			"code": "KeyZ",
 			"main": "gauche",
-			"doigt": "index",
+			"doigt": "annulaire",
 			"ligne": "4",
-			"colonne": "6",
+			"colonne": "3",
 			"taille": "1"
 		},
 		{
