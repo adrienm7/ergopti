@@ -45,7 +45,7 @@
 			➀ <strong>Diminution de la distance parcourue</strong> pour moins de fatigue et plus de confort
 		</div>
 		<div class="card">
-			➁ <strong>Frappe ultra-fluide</strong> par élimination de la quasi-totalité des <SFB />s
+			➁ <strong>Frappe extrêmement fluide</strong> par élimination de la quasi-totalité des <SFB />s
 		</div>
 		<div class="card">
 			➂ <strong>Alternance des mains</strong> favorisée pour paralléliser la frappe et ainsi écrire plus

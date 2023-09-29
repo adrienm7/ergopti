@@ -150,7 +150,7 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Résultats de benchmarks</h2>
 	<section>
 		<p>
-			Voici enfin les résultats de benchmark que vous attendiez. Comme vous pouvez le constater, <Nom
+			Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Nom
 			/>
 			fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
 		</p>
@@ -171,7 +171,7 @@
 			la fluidité lors de l’écriture de texte ainsi que le confort général.
 		</p>
 		<p>
-			Enfin, gardez en tête que les dispositions dont le nom est préfixé par « en » plutot que
+			Enfin, gardez en tête que les dispositions dont le nom est préfixé par « en » plutôt que
 			« fr » ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles
 			vont donc forcément surperformer sur les corpus français. Et même sur les corpus anglais,
 			elles feront un peu mieux car il y aura moins de touches à disposer et donc plus de meilleurs

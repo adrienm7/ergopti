@@ -94,8 +94,8 @@
 			Pourtant, le QWERTY est pire qu’une disposition aléatoire sur ce point. <span
 				class="text-gray"
 				>La légende raconte que sa première rangée remonte à l’époque de l’invention de la machine à
-				écrire. Le choix de la disposition QWERTY aurait, entre autres raisions, été influencé par
-				un aspect purement marketing. En effet, à des fins de démonstrations, ont été placées sur la
+				écrire. Le choix de la disposition QWERTY aurait, entre autres raisons, été influencé par un
+				aspect purement marketing. En effet, à des fins de démonstrations, ont été placées sur la
 				rangée supérieure de la machine à écrire toutes les lettres nécessaires pour pouvoire écrire <kbd-sortie
 					>TYPEWRITER</kbd-sortie
 				>.</span
@@ -103,13 +103,13 @@
 		</p>
 		<p>
 			Certaines des touches ayant les fréquences d’apparition les plus rares (en français et en
-			anglais) sont sur ces excellents emplacements tel que le <kbd>Q</kbd>, le <kbd>F</kbd>, le
+			anglais) sont sur ces excellents emplacements tels que le <kbd>Q</kbd>, le <kbd>F</kbd>, le
 			<kbd>J</kbd>
 			et le
 			<kbd>K</kbd>. Pire, la quasi-totalité des touches les plus utilisées se retrouvent en fait sur
 			la rangée du dessus (<kbd>AZERTYUIOP</kbd>). C’est notamment le cas de toutes les voyelles,
-			qui sont pourtant d’un nombre limité comparé au nombre de consonnes et qui pourtant sont
-			nécessaires à l’écriture de chaque mot.
+			dont le nombre est faible comparé au nombre de consonnes, mais qui sont toutefois
+			incontournables pour l’écriture de chaque mot.
 		</p>
 
 		<bloc-clavier data-couleur="hypertexte">
@@ -158,7 +158,7 @@
 			<span class="text-gray"
 				>Ainsi, un pouce a plus de force qu’un index, qui a plus de force qu’un majeur, qui a plus
 				de force qu’un annulaire, qui a plus de force qu’un auriculaire. Vous pouvez facilement vous
-				en rendre compte en pressant fort de l’index sur une table, puis en essayent de faire de
+				en rendre compte en pressant fort de l’index sur une table, puis en essayant de faire de
 				même avec votre auriculaire.</span
 			>
 		</p>
@@ -226,10 +226,12 @@
 			qui se produit si vous utilisez une disposition non optimisée telle que AZERTY.
 		</p>
 		<p>
-			Ainsi, une combinaison de deux touches, c’est-à-dire deux caractères qui se suivent, est
-			appelée <em>bigramme</em> (ou <em>digramme</em>). Pour optimiser une disposition clavier, il
-			faut s’assurer que les bigrammes les plus fréquents ne se fassent pas avec le même doigt : on
-			parle de <strong>limiter les <em>Same Finger Bigrams</em></strong>.
+			Une combinaison de deux touches, c’est-à-dire deux caractères qui se suivent, est appelée <em
+				>bigramme</em
+			>
+			(ou <em>digramme</em>). Pour optimiser une disposition clavier, il faut s’assurer que les
+			bigrammes les plus fréquents ne se fassent pas avec le même doigt : on parle de
+			<strong>limiter les <em>Same Finger Bigrams</em></strong>.
 		</p>
 		<mini-espace />
 		<p>
@@ -237,7 +239,7 @@
 			>
 			ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
 			regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la
-			supression totale des <SFB />s est impossible. Toutedois, il est quand même possible de les
+			supression totale des <SFB />s est impossible. Toutefois, il est quand même possible de les
 			réduire drastiquement. C’est ce que fait <Nom />.
 		</p>
 	</div>
@@ -248,16 +250,16 @@
 		<p>
 			L’alternance des mains est très importante pour garantir une bonne <strong
 				>fluidité de frappe</strong
-			>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus d’alternance des
-			mains possible lors de la frappe de texte : main droite, ensuite main gauche, puis main
-			droite, main gauche, etc.
+			>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus possible d’alternance
+			des mains lors de la frappe du texte : main droite, puis main gauche, main droite, main
+			gauche, etc.
 		</p>
 		<p>
-			Cette alternance des mains permet de <strong>ne pas surutiliser l’une des deux mains</strong> l’utilisant
-			pour taper la majorité du texte. Cela se ferait en effet au détriment de l’autre main qui resterait
-			au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer en jeu. Ainsi, avec une bonne
-			alternance des mains, pendant qu’une main frappe une touche, l’autre peut se replacer sur la rangée
-			du milieu et se préparer à frapper la suivante.
+			Cette alternance des mains permet de <strong>ne pas surutiliser l’une des deux mains</strong> en
+			en utilisant qu’une pour taper la majorité du texte. Cela se ferait en effet au détriment de l’autre
+			main qui resterait au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer en jeu.
+			Ainsi, avec une bonne alternance des mains, pendant qu’une main frappe une touche, l’autre peut
+			se replacer sur la rangée du milieu et se préparer à frapper la suivante.
 		</p>
 		<p>
 			Si la touche suivante est sur la même main que la touche précédente (sauf éventuellement avec
