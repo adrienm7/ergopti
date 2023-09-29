@@ -112,7 +112,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "\u20ac",
+			"touche": "€",
 			"code": "Equal",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -139,7 +139,7 @@
 			"taille": "1.5"
 		},
 		{
-			"touche": "\u00e0",
+			"touche": "à",
 			"code": "KeyQ",
 			"main": "gauche",
 			"doigt": "auriculaire",
@@ -381,30 +381,30 @@
 			"taille": "1.25"
 		},
 		{
-			"touche": "è",
-			"code": "KeyX",
-			"main": "gauche",
-			"doigt": "majeur",
-			"ligne": "4",
-			"colonne": "4",
-			"taille": "1"
-		},
-		{
-			"touche": ".",
-			"code": "KeyV",
-			"main": "gauche",
-			"doigt": "index",
-			"ligne": "4",
-			"colonne": "6",
-			"taille": "1"
-		},
-		{
 			"touche": "ê",
 			"code": "IntlBackslash",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "4",
 			"colonne": "2",
+			"taille": "1"
+		},
+		{
+			"touche": "é",
+			"code": "KeyZ",
+			"main": "gauche",
+			"doigt": "annulaire",
+			"ligne": "4",
+			"colonne": "3",
+			"taille": "1"
+		},
+		{
+			"touche": "è",
+			"code": "KeyX",
+			"main": "gauche",
+			"doigt": "majeur",
+			"ligne": "4",
+			"colonne": "4",
 			"taille": "1"
 		},
 		{
@@ -417,12 +417,12 @@
 			"taille": "1"
 		},
 		{
-			"touche": "é",
-			"code": "KeyZ",
+			"touche": ".",
+			"code": "KeyV",
 			"main": "gauche",
-			"doigt": "annulaire",
+			"doigt": "index",
 			"ligne": "4",
-			"colonne": "3",
+			"colonne": "6",
 			"taille": "1"
 		},
 		{
@@ -852,7 +852,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "\u00e8",
+			"touche": "ê",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "4",
@@ -860,7 +860,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": ".",
+			"touche": "é",
 			"main": "gauche",
 			"doigt": "annulaire",
 			"ligne": "4",
@@ -868,7 +868,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "\u00ea",
+			"touche": "è",
 			"main": "gauche",
 			"doigt": "majeur",
 			"ligne": "4",
@@ -876,7 +876,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "\u00e9",
+			"touche": "★",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "4",
@@ -884,7 +884,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "k",
+			"touche": ".",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "4",
@@ -972,7 +972,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "$",
+			"touche": "k",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "5",
@@ -1076,7 +1076,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "Enter",
+			"touche": "Tab",
 			"main": "gauche",
 			"doigt": "pouce",
 			"ligne": "6",
@@ -1108,7 +1108,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "Tab",
+			"touche": "RCtrl",
 			"main": "droite",
 			"doigt": "pouce",
 			"ligne": "6",
@@ -1116,7 +1116,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "\u2605",
+			"touche": "Enter",
 			"main": "droite",
 			"doigt": "pouce",
 			"ligne": "6",
@@ -1180,7 +1180,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "RAlt",
+			"touche": "RShift",
 			"main": "droite",
 			"doigt": "pouce",
 			"ligne": "7",
@@ -1188,7 +1188,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "RShift",
+			"touche": "RAlt",
 			"main": "droite",
 			"doigt": "pouce",
 			"ligne": "7",
@@ -1534,7 +1534,7 @@
 			"Ctrl": "★",
 			"Layer": "★",
 			"À": "★",
-			"type": "special"
+			"type": ""
 		},
 		{
 			"touche": "’",
