@@ -876,7 +876,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "★",
+			"touche": "magique",
 			"main": "gauche",
 			"doigt": "index",
 			"ligne": "4",
@@ -1315,7 +1315,7 @@
 			"AltGr": "…",
 			"ShiftAltGr": "",
 			"Ctrl": "k",
-			"Layer": "+↹",
+			"Layer": "",
 			"À": "",
 			"type": "lettre"
 		},
@@ -1508,7 +1508,7 @@
 			"AltGr": ":",
 			"ShiftAltGr": "·",
 			"Ctrl": ".",
-			"Layer": "!⇧",
+			"Layer": "+↹",
 			"À": "",
 			"type": "double"
 		},
@@ -1521,7 +1521,7 @@
 			"ShiftAltGr": "§",
 			"Ctrl": "↩",
 			"Ctrl+": "s",
-			"Layer": "!+⇩",
+			"Layer": "!⇧",
 			"À": "j",
 			"type": "magique"
 		},
