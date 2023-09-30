@@ -69,6 +69,40 @@
 		// majClavier(clavier); // No fonctionne pas ici, mais pas grave car pas besoin
 	}
 
+	function setCouche() {
+		if (altgr && shift) {
+			couche = 'ShiftAltGr';
+			data_clavier[clavier].update((currentData) => {
+				currentData['couche'] = couche;
+				return currentData;
+			});
+		} else if (altgr && !shift) {
+			couche = 'AltGr';
+			data_clavier[clavier].update((currentData) => {
+				currentData['couche'] = couche;
+				return currentData;
+			});
+		} else if (!altgr && shift) {
+			couche = 'Shift';
+			data_clavier[clavier].update((currentData) => {
+				currentData['couche'] = couche;
+				return currentData;
+			});
+		} else if (a_grave) {
+			couche = 'À';
+			data_clavier[clavier].update((currentData) => {
+				currentData['couche'] = couche;
+				return currentData;
+			});
+		} else {
+			couche = 'Primary';
+			data_clavier[clavier].update((currentData) => {
+				currentData['couche'] = couche;
+				return currentData;
+			});
+		}
+	}
+
 	function activationModificateur(event) {
 		if (event.code === 'AltRight') {
 			altgr = true;
@@ -245,6 +279,7 @@
 		} else if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
 			control = false;
 		}
+		setCouche();
 		majClavier(clavier);
 	}
 
