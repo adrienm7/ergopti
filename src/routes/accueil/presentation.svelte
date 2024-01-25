@@ -154,7 +154,9 @@
 		<h3 data-aos="fade-right" data-aos-mirror="true">Optimisation selon la force des doigts</h3>
 		<p>
 			Une fois que les lettres les plus fréquentes ont été placées sur la rangée du milieu, il reste
-			encore beaucoup à faire. En effet, <strong>chaque doigt a une force différente</strong>.
+			encore beaucoup à faire. En effet, <span class="important"
+				>chaque doigt a une force différente</span
+			>.
 			<span class="text-gray"
 				>Ainsi, un pouce a plus de force qu’un index, qui a plus de force qu’un majeur, qui a plus
 				de force qu’un annulaire, qui a plus de force qu’un auriculaire. Vous pouvez facilement vous
@@ -210,8 +212,8 @@
 			autres problèmes majeurs est son grand nombre de <SFB />s.
 		</p>
 		<p>
-			Qu’est-ce qu’un SFB ? C’est le fait de <strong
-				>devoir taper deux touches d’affilée avec exactement le même doigt</strong
+			Qu’est-ce qu’un SFB ? C’est le fait de <span class="important"
+				>devoir taper deux touches d’affilée avec exactement le même doigt</span
 			>. Par exemple, c’est taper <kbd>CE</kbd> en AZERTY : il faut d’abord utiliser le majeur
 			gauche pour descendre d’une rangée et atteindre le <kbd>C</kbd>, puis remonter de deux rangées
 			pour atteindre le <kbd>E</kbd>. Avec <Nom />, le <kbd>C</kbd> est sur l’index droit sur la
@@ -231,7 +233,7 @@
 			>
 			(ou <em>digramme</em>). Pour optimiser une disposition clavier, il faut s’assurer que les
 			bigrammes les plus fréquents ne se fassent pas avec le même doigt : on parle de
-			<strong>limiter les <em>Same Finger Bigrams</em></strong>.
+			<span class="important">limiter les <em>Same Finger Bigrams</em></span>.
 		</p>
 		<mini-espace />
 		<p>
@@ -248,18 +250,19 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Alternance des mains</h2>
 	<div class="content">
 		<p>
-			L’alternance des mains est très importante pour garantir une bonne <strong
-				>fluidité de frappe</strong
+			L’alternance des mains est très importante pour garantir une bonne <span class="important"
+				>fluidité de frappe</span
 			>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus possible d’alternance
 			des mains lors de la frappe du texte : main droite, puis main gauche, main droite, main
 			gauche, etc.
 		</p>
 		<p>
-			Cette alternance des mains permet de <strong>ne pas surutiliser l’une des deux mains</strong> en
-			en utilisant qu’une pour taper la majorité du texte. Cela se ferait en effet au détriment de l’autre
-			main qui resterait au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer en jeu.
-			Ainsi, avec une bonne alternance des mains, pendant qu’une main frappe une touche, l’autre peut
-			se replacer sur la rangée du milieu et se préparer à frapper la suivante.
+			Cette alternance des mains permet de <span class="important"
+				>ne pas surutiliser l’une des deux mains</span
+			> en en utilisant qu’une pour taper la majorité du texte. Cela se ferait en effet au détriment
+			de l’autre main qui resterait au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer
+			en jeu. Ainsi, avec une bonne alternance des mains, pendant qu’une main frappe une touche, l’autre
+			peut se replacer sur la rangée du milieu et se préparer à frapper la suivante.
 		</p>
 		<p>
 			Si la touche suivante est sur la même main que la touche précédente (sauf éventuellement avec
@@ -271,8 +274,8 @@
 			<kbd>C</kbd>. Puis, il faut que l’index atteigne quant à lui la rangée du haut pour taper
 			<kbd>T</kbd>. En résulte un sentiment d’inconfort avec deux doigts proches mais qui doivent
 			aller dans des directions différentes. Au contraire,
-			<strong>en "parallélisant" les frappes sur les deux mains</strong>, le résultat se révèle bien
-			plus satisfaisant.
+			<span class="important">en "parallélisant" les frappes sur les deux mains</span>, le résultat
+			se révèle bien plus satisfaisant.
 		</p>
 		<p>
 			L’alternance des mains a une limite. Il est impossible d’alterner parfaitement à chaque
@@ -391,10 +394,10 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Placement logique des touches</h2>
 	<div class="content">
 		<p>
-			Afin de <strong> faciliter la mémorisation</strong> ainsi que de
-			<strong>réduire la charge cognitive</strong>, les touches de la disposition sont, le plus
-			possible, <span style="text-decoration: underline;"> placées logiquement</span>. Ceci en
-			particulier sur la couche <kbd>AltGr</kbd> :
+			Afin de <span class="important"> faciliter la mémorisation</span> ainsi que de
+			<span class="important">réduire la charge cognitive</span>, les touches de la disposition
+			sont, le plus possible, <span style="text-decoration: underline;"> placées logiquement</span>.
+			Ceci en particulier sur la couche <kbd>AltGr</kbd> :
 		</p>
 
 		<ul>
@@ -550,26 +553,27 @@
 		<p>
 			Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
 			particularité. En effet, lors de l’utilisation de <kbd>Shift</kbd>, elles sont
-			<strong>automatiquement envoyées avec une espace insécable</strong> qui les précède. Les espaces
-			insécables ne sont pas disponibles en AZERTY, et c’est très dommage. Ce sont des espaces qui ont
-			la particularité de toujours rester collés au texte qui les précède et les suit.
+			<span class="important">automatiquement envoyées avec une espace insécable</span> qui les précède.
+			Les espaces insécables ne sont pas disponibles en AZERTY, et c’est très dommage. Ce sont des espaces
+			qui ont la particularité de toujours rester collés au texte qui les précède et les suit.
 		</p>
 		<p>
 			Ainsi, vous n’aurez plus jamais de <kbd>?</kbd> qui se balade au début d’une ligne parce qu’il
 			n’y avait plus de place sur la ligne précédente. Cela donne des documents avec un rendu bien
 			plus professionnel. Attention cependant :
-			<strong>ne les utilisez pas dans d’autres situations que l'écriture de texte</strong>. Par
-			exemple, en programmation, une espace insécable peut causer des erreurs, sans forcément être
-			visible (vous ne verrez qu’un simple espace, qui pourtant sera la cause du problème).
+			<span class="important"
+				>ne les utilisez pas dans d’autres situations que l'écriture de texte</span
+			>. Par exemple, en programmation, une espace insécable peut causer des erreurs, sans forcément
+			être visible (vous ne verrez qu’un simple espace, qui pourtant sera la cause du problème).
 		</p>
 		<p>
 			En revanche, en utilisant <kbd>AltGr</kbd>, la ponctuation seule est renvoyée. Cette méthode
 			permet d’écrire dans un français impeccable en
-			<kbd>Shift</kbd>, tout en programment normalement avec la couche <kbd>AltGr</kbd>, qui
+			<kbd>Shift</kbd>, tout en programmant normalement avec la couche <kbd>AltGr</kbd>, qui
 			contient d’ailleurs tout le reste des symboles nécessaires à l’écriture de code.
 		</p>
 		<div class="encadre">
-			<p class="text-bold">Ainsi, il est facile de se rappeler où est quoi :</p>
+			<p class="important">Ainsi, il est facile de se rappeler où est quoi :</p>
 			<ul class="margin0">
 				<li>le français est en <kbd>Shift</kbd></li>
 				<li class="margin0">la programmation est en <kbd>AltGr</kbd></li>
@@ -589,8 +593,8 @@
 			> momentanément pour l’écrire.
 		</p>
 		<p>
-			Le passage des chiffres en accès direct permet d’<strong
-				>écrire très rapidement des nombres</strong
+			Le passage des chiffres en accès direct permet d’<span class="important"
+				>écrire très rapidement des nombres</span
 			>
 			en milieu de phrase. La rangée des nombres n’est de toute façon pas très accessible, donc il vaut
 			mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>, plus proches des
@@ -613,8 +617,8 @@
 		</p>
 		<p>
 			Par conséquent, il est également important de s’assurer que, grâce à sa disposition clavier,
-			beaucoup d’actions courantes puissent se réaliser avec la seule main gauche afin de <strong
-				>ne pas avoir à lâcher la souris</strong
+			beaucoup d’actions courantes puissent se réaliser avec la seule main gauche afin de <span
+				class="important">ne pas avoir à lâcher la souris</span
 			>. À noter que sur ce point AZERTY est très bon car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
 			et de nombreuses autres lettres fréquemment utilisées pour faire des raccourcis en combinaison
 			avec <kbd>Ctrl</kbd> sont du côté gauche.
@@ -648,10 +652,11 @@
 		</p>
 		<p>
 			<NomPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
-			<strong>mécanisme de tap-hold</strong>. L’idée du tap-hold est qu’il est possible d’assigner
-			deux actions à une même touche : une au tap (appui bref) et une au hold (maitenir pressé).
-			Grâce au tap-hold, il est possible de faire pour que taper une touche envoie un raccourci,
-			mais que si on la presse elle se comporte normalement. Cela permet d’intégrer des touches
+			<span class="important">mécanisme de tap-hold</span>. L’idée du tap-hold est qu’il est
+			possible d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold
+			(maitenir pressé). Grâce au tap-hold, il est possible de faire pour que taper une touche
+			envoie un raccourci, mais que si on la presse elle se comporte normalement. Cela permet
+			d’intégrer des touches
 			<kbd>Copier</kbd>, <kbd>Coller</kbd> et <kbd>Alt+Tab</kbd> respectivement sur
 			<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>.
 		</p>

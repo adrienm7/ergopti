@@ -1,29 +1,25 @@
-p, 
+p,
 ul,
 .tooltiptext {
 	text-align: justify;
 }
-  
+
 @media (max-width: 600px) {
-	p, 
+	p,
 	ul,
 	.tooltiptext {
 		text-align: left;
 	}
 
 	h1 {
-		font-size: 2.5rem!important;
+		font-size: 2.5rem !important;
 	}
 }
 
 a {
-	color:rgb(49, 190, 255);
+	color: rgb(49, 190, 255);
 	text-decoration: none;
 }
-
-
-
-
 
 .hypertexte-title {
 	z-index: 2;
@@ -44,41 +40,49 @@ a {
 	margin: 0;
 	padding: 25px;
 	background-color: rgba(0, 0, 0, 0.3);
-	border: 1px solid rgba(255,255,255,0.7);
+	border: 1px solid rgba(255, 255, 255, 0.7);
 	border-radius: 7px;
 }
-
-
-
 
 /* Mise en forme du texte */
 
 strong,
 .text-bold {
-    font-weight: bold;
+	font-weight: bold;
+}
+
+.important {
+	font-weight: bold;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	color: transparent;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	background-image: linear-gradient(to right, var(--gradient-blue));
 }
 
 .text-center {
-    text-align: center;
+	text-align: center;
 }
 
 .text-white {
-    color: white;
+	color: white;
 }
 
 .text-gray {
-    color: hsla(190, 100%, 80%, 0.8);
+	color: hsla(190, 100%, 80%, 0.8);
 }
 
 .text-black {
-    color: black;
+	color: black;
 }
 
 .surlignage-blanc {
-    background-color: white;
-    color: black;
-    border-radius: 0.2em;
-    padding: 0 0.3em;
+	background-color: white;
+	color: black;
+	border-radius: 0.2em;
+	padding: 0 0.3em;
 }
 
 .italic {
@@ -86,63 +90,40 @@ strong,
 }
 
 .font-size-big {
-    font-size: 3.5rem;
+	font-size: 3.5rem;
 }
 
 .font-size-medium {
-    font-size: 1.7rem;
+	font-size: 1.7rem;
 }
 
 .no-max-width {
-    max-width: 90vw;
+	max-width: 90vw;
 }
 
-@media (max-width: 600px){
-    .font-size-medium {
-        font-size: 1.5rem;
-    }
+@media (max-width: 600px) {
+	.font-size-medium {
+		font-size: 1.5rem;
+	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* Couleurs de texte */
-
 
 .text-orange-gradient {
 	color: #ff6300;
 }
 
 @supports (background-clip: text) or (-webkit-background-clip: text) {
-    .text-orange-gradient {
-        -webkit-background-clip: text;
-                background-clip: text;
-        -webkit-text-fill-color: transparent;
-                          color: transparent;
-        -webkit-box-decoration-break: clone;
-                box-decoration-break: clone;
+	.text-orange-gradient {
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
 		background-image: linear-gradient(90deg, #fcaa00, #ff6300 30%, #ff0063 100%);
-    }
+	}
 }
-
-
-
-
-
-  
-
-
 
 .hypertexte {
 	/* font-style: italic; */
@@ -173,7 +154,7 @@ strong,
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;
-	line-height:1.1em;
+	line-height: 1.1em;
 }
 
 .red-text-gradient {
@@ -181,7 +162,7 @@ strong,
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;
-	line-height:1.1em;
+	line-height: 1.1em;
 }
 
 .rainbow-text-gradient {
@@ -189,17 +170,15 @@ strong,
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;
-	line-height:1.1em;
+	line-height: 1.1em;
 }
-
-
 
 /* Divers */
 
 .lettrine::first-letter {
 	font-size: 3em;
-	float:left;
-	color:black;
+	float: left;
+	color: black;
 	background-color: white;
 	padding: 13px;
 	margin-top: 6px;
@@ -210,7 +189,5 @@ strong,
 .text-glow {
 	--couleur: rgb(0, 110, 255);
 	/* color: var(--couleur); */
-	text-shadow: 0 0 2px var(--couleur),
-	0 0 6px var(--couleur),
-	0 0 12px var(--couleur);
+	text-shadow: 0 0 2px var(--couleur), 0 0 6px var(--couleur), 0 0 12px var(--couleur);
 }

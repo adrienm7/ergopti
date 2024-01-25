@@ -11,7 +11,7 @@
 			<li><kbd>AltGr</kbd> + <kbd>Tab</kbd> ➜ <kbd-sortie>Capsword</kbd-sortie></li>
 			<p>
 				<kbd>Capsword</kbd> est une sorte de
-				<strong>Capslock qui se désactive automatiquement</strong>
+				<span class="important">Capslock qui se désactive automatiquement</span>
 				à la fin d’un "mot". Ainsi, Capslock se désactive lors de la pression de
 				<kbd>Espace</kbd>,
 				<kbd>,</kbd> ou encore <kbd>Entrée</kbd>. Cette fonctionnalité peut être très utile pour

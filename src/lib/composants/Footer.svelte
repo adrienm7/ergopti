@@ -4,7 +4,7 @@
 </script>
 
 <footer>
-	<p>Copyright © {date} — <strong>HyperTexte</strong></p>
+	<p>Copyright © {date} — <span class="important">HyperTexte</span></p>
 </footer>
 
 <style>
@@ -22,5 +22,4 @@
 		font-size: 0.9rem;
 		text-align: center;
 	}
-
 </style>
