@@ -37,27 +37,32 @@
 	<mini-espace />
 	<p class="encart-introduction">
 		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
-		Fruit de longues réflexions, elle se veut la plus optimale possible pour un confort d’exception.
-		<br />Cette page vous présente la disposition ainsi que ses&nbsp;nombreux&nbsp;avantages.
+		Fruit de longues réflexions, elle se veut la plus optimale possible
+		<span class="important">pour un confort d’exception</span>. Cette page vous présente la
+		disposition ainsi que ses&nbsp;nombreux&nbsp;avantages.
 	</p>
 	<div class="cards">
 		<div class="card">
-			➀ <strong>Diminution de la distance parcourue</strong> pour moins de fatigue et plus de confort
+			➀ <span class="text-bold">Diminution de la distance parcourue</span> pour moins de fatigue et plus
+			de confort
 		</div>
 		<div class="card">
-			➁ <strong>Frappe extrêmement fluide</strong> par élimination de la quasi-totalité des <SFB />s
+			➁ <span class="important">Frappe extrêmement fluide</span> par élimination de la
+			quasi-totalité des <SFB />s
 		</div>
 		<div class="card">
-			➂ <strong>Alternance des mains</strong> favorisée pour paralléliser la frappe et ainsi écrire plus
-			vite
+			➂ <span class="text-bold">Alternance des mains</span> favorisée pour paralléliser la frappe et
+			ainsi écrire plus vite
 		</div>
 		<div class="card">
-			➃ <strong>Frappe ultra-confortable</strong> grâce à une optimisation des roulements
+			➃ <span class="important">Frappe ultra-confortable</span> grâce à une optimisation des roulements
 		</div>
 		<div class="card">
-			➄ <strong>Placement logique</strong> des touches, permettant de s’en souvenir aisément
+			➄ <span class="text-bold">Placement logique</span> des touches, permettant de s’en souvenir aisément
 		</div>
-		<div class="card">➅ <strong>Et bien d’autres</strong> améliorations, voire révolutions...</div>
+		<div class="card">
+			➅ <span class="important">Et bien d’autres</span> améliorations, voire révolutions...
+		</div>
 	</div>
 	<petit-espace />
 	<hr />

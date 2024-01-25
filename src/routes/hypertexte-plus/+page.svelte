@@ -41,7 +41,7 @@
 	<div class="encart-introduction">
 		<p>
 			<NomPlus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très
-			près de la <strong>disposition clavier idéale</strong>. Effectivement, elle :
+			près de la <span class="important">disposition clavier idéale</span>. Effectivement, elle :
 		</p>
 		<ul class="margin0">
 			<li>éradique la quasi-totalité des <SFB />s ;</li>
@@ -59,13 +59,13 @@
 
 	<petit-espace />
 	<div class="encadre">
-		Toutefois, l’utilisation de cette version nécessite des <span class="text-bold"
+		Toutefois, l’utilisation de cette version nécessite des <span class="important"
 			>outils de programmation de clavier spécifiques.
 		</span>
 		<span>
-			Sur Windows, le programme <span class="texte"><strong>AutoHotkey</strong></span> est utilisé afin
-			de réaliser ces changements. Il est également possible de programmer le firmware de son clavier
-			(avec QMK ou ZMK) pour ce faire.
+			Sur Windows, le programme <span class="texte"><span class="important">AutoHotkey</span></span>
+			est utilisé afin de réaliser ces changements. Il est également possible de programmer le firmware
+			de son clavier (avec QMK ou ZMK) pour ce faire.
 		</span>
 	</div>
 
@@ -100,7 +100,7 @@
 			n’était qu’un exemple illustratif.
 		</p>
 	</section>
-	<p class="text-bold">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
+	<p class="important">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">➀ Roulements et diminution des SFBs</h2>
 	<Roulements_SFB />

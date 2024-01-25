@@ -38,7 +38,7 @@
 
 <div class="contenu">
 	<h1 data-aos="zoom-in" data-aos-mirror="true">Contact</h1>
-	<div class="encadre">
+	<div class="encadre text-center">
 		<!-- Vous pouvez contacter l’auteur de cette disposition à l’adresse <a
 			href="mailto:moyaux.adrien@gmail.com">moyaux.adrien@gmail.com</a
 		> -->

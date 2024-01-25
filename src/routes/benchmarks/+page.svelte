@@ -48,7 +48,8 @@
 
 	<div class="encadre">
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
-		<strong>KLAnext</strong> est l’un d’entre eux et est gratuitement accessible à l’adresse
+		<span class="important">KLAnext</span> est l’un d’entre eux et est gratuitement accessible à
+		l’adresse
 		<a href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a>. C’est
 		l’un des comparateurs les plus utilisés en raison de son algorithme de notation qui serait plus
 		"juste" que les autres.
@@ -57,8 +58,8 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Comment bien utiliser KLAnext</h2>
 	<section>
 		<p>
-			Pour bien utiliser des comparateurs de disposition, il faut <strong
-				>comparer ce qui est comparable</strong
+			Pour bien utiliser des comparateurs de disposition, il faut <span class="important"
+				>comparer ce qui est comparable</span
 			>. Ceci est très important, car si vous ne le faites pas, alors vos résultats n’auront aucune
 			valeur.
 		</p>
@@ -75,8 +76,8 @@
 		<mini-espace />
 		<h3>Comparez des claviers possédant une touche pour tous les caractères du corpus</h3>
 		<p>
-			Un autre point à bien faire attention est de <strong
-				>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</strong
+			Un autre point à bien faire attention est de <span class="important"
+				>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</span
 			>. Une disposition faite pour la langue anglaise aura de très bons scores pour des textes
 			français. Cela s’explique parce que tous les caractères accentués seront "sautés", n’existant
 			pas dans la disposition anglophone.
@@ -103,7 +104,7 @@
 			soit remplacer l’apostrophe typographique par une apostrophe droite, soit en ajoutant une
 			apostrophe typographique dans la disposition n’en ayant pas.
 		</p>
-		<p class="text-bold">
+		<p class="important">
 			➜ Comparer ce qui est comparable. Si le symbole n’existe pas dans la disposition, la touche ne
 			sera pas tapée.
 		</p>
@@ -113,10 +114,11 @@
 	<section>
 		<p>
 			Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste
-			encore la <strong>question fondamentale du corpus</strong>. Effectivement, vos résultats vont
-			sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de dialogues aura
-			beaucoup de "je", un corpus plus "sérieux" aura beaucoup de z dû au vouvoiement tandis qu’un
-			corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée du mot "wagon".
+			encore la <span class="important">question fondamentale du corpus</span>. Effectivement, vos
+			résultats vont sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de
+			dialogues aura beaucoup de "je", un corpus plus "sérieux" aura beaucoup de z dû au vouvoiement
+			tandis qu’un corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée
+			du mot "wagon".
 		</p>
 		<p>
 			Évidemment, plus votre corpus sera volumineux, plus vos résultats seront crédibles. Toutefois,
@@ -124,8 +126,8 @@
 		</p>
 
 		<p>
-			En conclusion, <strong
-				>ne prenez les résultats des benchmarks que comme des tendances générales</strong
+			En conclusion, <span class="important"
+				>ne prenez les résultats des benchmarks que comme des tendances générales</span
 			>. Une disposition meilleure de 2,48% sur un certain corpus n’implique pas que la disposition
 			soit meilleure de 2,48% en général. En outre, passé une certaine performance, les gains sont
 			marginaux.
