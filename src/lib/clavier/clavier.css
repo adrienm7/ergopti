@@ -192,7 +192,7 @@ bloc-touche[data-touche='AltTab'] div {
 bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='!'],
 bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='!'],
 bloc-clavier[data-couche='AltGr'][data-plus='non'] bloc-touche[data-touche='j'],
-bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='d'],
+bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='magique'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='e'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='è'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='h'],
@@ -207,7 +207,7 @@ bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='r'] {
 /* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='!'],
 bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='!'],
-bloc-clavier[data-couche='AltGr'][data-plus='non'] bloc-touche[data-touche='j'],
+bloc-clavier[data-couche='AltGr'] bloc-touche[data-touche='j'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='t'] {
 	font-weight: normal;
 }
@@ -302,14 +302,9 @@ bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='magique'] div {
 	text-transform: uppercase;
 }
 
-/* Layer de navigation */
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='à'] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='c'] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='d'] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche="'"] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='w'] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='x'] div {
-	font-size: 0.8em;
+/* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */
+bloc-clavier[data-couche='Layer'] div {
+	font-size: 0.9em;
 }
 
 /*
@@ -428,7 +423,7 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='space'] {
 
 bloc-touche[data-type='space'],
 bloc-touche[data-type='special'],
-bloc-touche[data-type='enter'] {
+bloc-clavier[data-type='iso'] bloc-touche[data-touche='Enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
 	/* Bordure de la touche en blanc transparent */

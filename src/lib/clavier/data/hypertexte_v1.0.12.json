@@ -1,5 +1,5 @@
 {
-	"nom": "HyperTexte v1.0.10",
+	"nom": "HyperTexte v1.0.12",
 	"auteur": "Adrien Moyaux",
 	"site": "https://hypertexte.beseven.fr",
 	"iso": [
@@ -211,7 +211,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "p",
+			"touche": "’",
 			"code": "KeyO",
 			"main": "droite",
 			"doigt": "annulaire",
@@ -220,7 +220,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "’",
+			"touche": "q",
 			"code": "KeyP",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -229,7 +229,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "z",
+			"touche": "x",
 			"code": "BracketLeft",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -310,7 +310,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "m",
+			"touche": "v",
 			"code": "KeyH",
 			"main": "droite",
 			"doigt": "index",
@@ -355,7 +355,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "q",
+			"touche": "j",
 			"code": "Quote",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -364,7 +364,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "j",
+			"touche": "z",
 			"code": "Backslash",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -435,7 +435,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "v",
+			"touche": "g",
 			"code": "KeyN",
 			"main": "droite",
 			"doigt": "index",
@@ -453,7 +453,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "h",
+			"touche": "m",
 			"code": "Comma",
 			"main": "droite",
 			"doigt": "majeur",
@@ -462,7 +462,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "g",
+			"touche": "p",
 			"code": "Period",
 			"main": "droite",
 			"doigt": "annulaire",
@@ -471,7 +471,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "x",
+			"touche": "h",
 			"code": "Slash",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -548,7 +548,7 @@
 	],
 	"ergodox": [
 		{
-			"touche": "=",
+			"touche": "%",
 			"main": "gauche",
 			"doigt": "auriculaire",
 			"ligne": "1",
@@ -724,7 +724,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "p",
+			"touche": "’",
 			"main": "droite",
 			"doigt": "annulaire",
 			"ligne": "2",
@@ -732,7 +732,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "’",
+			"touche": "q",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -740,7 +740,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "!",
+			"touche": "x",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -796,7 +796,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "m",
+			"touche": "v",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "3",
@@ -836,7 +836,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "z",
+			"touche": "Enter",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -892,7 +892,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "v",
+			"touche": "g",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "4",
@@ -908,7 +908,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "h",
+			"touche": "m",
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "4",
@@ -916,7 +916,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "g",
+			"touche": "p",
 			"main": "droite",
 			"doigt": "annulaire",
 			"ligne": "4",
@@ -924,7 +924,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "x",
+			"touche": "h",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "4",
@@ -932,7 +932,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "%",
+			"touche": "z",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "4",
@@ -964,7 +964,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "vide",
+			"touche": "=",
 			"main": "gauche",
 			"doigt": "majeur",
 			"ligne": "5",
@@ -996,31 +996,15 @@
 			"taille": "1"
 		},
 		{
-			"touche": "q",
-			"main": "droite",
-			"doigt": "index",
-			"ligne": "5",
-			"colonne": "9",
-			"taille": "1"
-		},
-		{
-			"touche": "vide",
-			"main": "droite",
-			"doigt": "index",
-			"ligne": "5",
-			"colonne": "9",
-			"taille": "1"
-		},
-		{
-			"touche": "vide",
-			"main": "droite",
-			"doigt": "majeur",
-			"ligne": "5",
-			"colonne": "9",
-			"taille": "1"
-		},
-		{
 			"touche": "j",
+			"main": "droite",
+			"doigt": "index",
+			"ligne": "5",
+			"colonne": "9",
+			"taille": "1"
+		},
+		{
+			"touche": "!",
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "5",
@@ -1234,8 +1218,8 @@
 			"touche": "d",
 			"Primary": "d",
 			"Shift": "D",
-			"AltGr": "\"",
-			"ShiftAltGr": "δ",
+			"AltGr": "$",
+			"ShiftAltGr": "§",
 			"Ctrl": "d",
 			"Layer": "^+⇦",
 			"À": "ds",
@@ -1270,7 +1254,7 @@
 			"AltGr": "~",
 			"ShiftAltGr": "≈",
 			"Ctrl": "g",
-			"Layer": "⊞⇨",
+			"Layer": "",
 			"À": "gl",
 			"type": "lettre"
 		},
@@ -1281,7 +1265,7 @@
 			"AltGr": "#",
 			"ShiftAltGr": "œ",
 			"Ctrl": "h",
-			"Layer": "⊞⇦",
+			"Layer": "⊞+⇨",
 			"À": "ph",
 			"type": "lettre"
 		},
@@ -1299,11 +1283,14 @@
 		{
 			"touche": "j",
 			"Primary": "j",
+			"Primary+": "↩",
 			"Shift": "J",
+			"Shift+": "↩",
 			"AltGr": "◌̈",
-			"AltGr+": "␛",
+			"AltGr+": "↩",
 			"ShiftAltGr": "",
 			"Ctrl": "j",
+			"Ctrl+": "↩",
 			"Layer": "",
 			"À": "",
 			"type": "lettre"
@@ -1326,7 +1313,7 @@
 			"AltGr": "=",
 			"ShiftAltGr": "≠",
 			"Ctrl": "l",
-			"Layer": "+⇤",
+			"Layer": "+⇦",
 			"À": "cl",
 			"type": "lettre"
 		},
@@ -1337,7 +1324,7 @@
 			"AltGr": "&",
 			"ShiftAltGr": "−",
 			"Ctrl": "m",
-			"Layer": "+⇦",
+			"Layer": "⊞⇦",
 			"À": "adm",
 			"type": "lettre"
 		},
@@ -1370,7 +1357,7 @@
 			"AltGr": "+",
 			"ShiftAltGr": "±",
 			"Ctrl": "p",
-			"Layer": "+⇥",
+			"Layer": "⊞⇨",
 			"À": "xp",
 			"type": "lettre"
 		},
@@ -1381,10 +1368,9 @@
 			"Shift": "Q",
 			"Shift+": "[Qu]",
 			"AltGr": "%",
-			"AltGr+": "⇥",
 			"ShiftAltGr": "",
 			"Ctrl": "q",
-			"Layer": "+⇨",
+			"Layer": "^+⇨",
 			"À": "",
 			"type": "lettre"
 		},
@@ -1439,7 +1425,7 @@
 			"AltGr": "|",
 			"ShiftAltGr": "¦",
 			"Ctrl": "v",
-			"Layer": "^<span style='font-weight: light;'>↩</span>",
+			"Layer": "⇤",
 			"À": "adv",
 			"type": "lettre"
 		},
@@ -1463,7 +1449,7 @@
 			"AltGr": "*",
 			"ShiftAltGr": "×",
 			"Ctrl": "x",
-			"Layer": "⊞+⇨",
+			"Layer": "",
 			"À": "'re",
 			"type": "lettre"
 		},
@@ -1483,7 +1469,6 @@
 			"Primary": "z",
 			"Shift": "Z",
 			"AltGr": "!",
-			"AltGr+": "⇤",
 			"ShiftAltGr": "¡",
 			"Ctrl": "z",
 			"Layer": "",
@@ -1517,10 +1502,10 @@
 			"Primary": "-",
 			"Primary+": "★",
 			"Shift": "’",
-			"AltGr": "$",
-			"ShiftAltGr": "§",
+			"AltGr": "\"",
+			"ShiftAltGr": "δ",
 			"Ctrl": "s",
-			"Layer": "!⇧",
+			"Layer": "!+⇩",
 			"À": "j",
 			"type": "magique"
 		},
@@ -1542,7 +1527,7 @@
 			"AltGr": "?",
 			"ShiftAltGr": "¿",
 			"Ctrl": "'",
-			"Layer": "^+⇨",
+			"Layer": "+⇨",
 			"À": "j’",
 			"type": "double"
 		},
@@ -1563,7 +1548,7 @@
 			"Shift": "À",
 			"AltGr": "`",
 			"ShiftAltGr": "„",
-			"Ctrl": "à",
+			"Ctrl": "z",
 			"Layer": "^+⇤",
 			"À": "À",
 			"type": "français"
@@ -1575,7 +1560,7 @@
 			"AltGr": "/",
 			"ShiftAltGr": "÷",
 			"Ctrl": "+",
-			"Layer": "!+⇩",
+			"Layer": "!⇧",
 			"À": "jé",
 			"type": "français"
 		},
@@ -1586,7 +1571,7 @@
 			"AltGr": "\\",
 			"ShiftAltGr": "ᵢ",
 			"Ctrl": "-",
-			"Layer": "!+⇧",
+			"Layer": "!⇩",
 			"À": "",
 			"type": "français"
 		},
@@ -1596,8 +1581,8 @@
 			"Shift": "Ê",
 			"AltGr": "^",
 			"ShiftAltGr": "",
-			"Ctrl": "z",
-			"Layer": "!⇩",
+			"Ctrl": "x",
+			"Layer": "!+⇧",
 			"À": "",
 			"type": "français"
 		},
