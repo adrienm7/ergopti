@@ -4,7 +4,7 @@ version.subscribe((value) => {
 	versionValue = value;
 });
 
-import data from '$lib/clavier/data/hypertexte.json';
+import data from '$lib/clavier/data/hypertexte_v1.0.12.json';
 import * as data_clavier from '$lib/clavier/stores.js';
 
 let claviersStores = {};
