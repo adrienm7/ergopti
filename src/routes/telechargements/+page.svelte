@@ -28,13 +28,13 @@
 		<h3>Pour installer la disposition</h3>
 		<mini-espace />
 		<div>
-			<a href="/files/KbdEditInstallerhypertexte_v035.exe"
+			<a href="/files/KbdEditInstallerhypertexte_v1_0_12.exe"
 				><button class="bouton-telechargement">☛ HyperTexte {versionValue}.exe</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/files/HyperTexte v0.35.kbe"
+			<a href="/files/HyperTexte v1.0.12.kbe"
 				><button>Fichier source de HyperTexte {versionValue}</button></a
 			>
 		</div>
@@ -50,13 +50,13 @@
 		<h3>Pour les comparateurs de disposition</h3>
 		<mini-espace />
 		<div>
-			<span>Version ISO : </span><a href="/files/hypertexte.v1.0.5.fr.iso.txt"
+			<span>Version ISO : </span><a href="/files/hypertexte.v1.0.12.fr.iso.txt"
 				><button>hypertexte.{versionValue}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<span>Version Ergodox : </span><a href="/files/hypertexte.v1.0.5.fr.ergodox.txt"
+			<span>Version Ergodox : </span><a href="/files/hypertexte.v1.0.12.fr.ergodox.txt"
 				><button>hypertexte.{versionValue}.fr.ergodox</button></a
 			>
 		</div>
