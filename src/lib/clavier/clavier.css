@@ -255,7 +255,9 @@ bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='LC
 bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='LAlt'] div,
 bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='LAlt'] div,
 bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='RAlt'] div,
-bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='RAlt'] div {
+bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='RAlt'] div,
+bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='Tab'] div,
+bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='Tab'] div {
 	line-height: 1.2;
 	font-size: calc(var(--taille-texte-touche) * 0.7);
 }
@@ -287,7 +289,7 @@ bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='Caps
 	font-size: 0.7em;
 }
 
-bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='Tab'] div {
+bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='LAlt'] div {
 	font-size: 0.6em;
 }
 
@@ -303,8 +305,10 @@ bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='magique'] div {
 }
 
 /* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */
-bloc-clavier[data-couche='Layer'] div {
-	font-size: 0.9em;
+bloc-clavier[data-couche='Layer'] bloc-touche[data-type='lettre'] div,
+bloc-clavier[data-couche='Layer'] bloc-touche[data-type='français'] div,
+bloc-clavier[data-couche='Layer'] bloc-touche[data-type='double'] div {
+	font-size: 0.8em;
 }
 
 /*

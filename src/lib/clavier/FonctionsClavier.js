@@ -4,7 +4,7 @@ version.subscribe((value) => {
 	versionValue = value;
 });
 
-import data from '$lib/clavier/data/hypertexte_v1.0.12.json';
+import data from '$lib/clavier/data/hypertexte_v1.0.16.json';
 import * as data_clavier from '$lib/clavier/stores.js';
 
 let claviersStores = {};
@@ -122,22 +122,22 @@ function majTouches() {
 				if (
 					infos_clavier.type === 'iso' &&
 					res.touche === 'Space' &&
-					infos_clavier.couche === 'Visuel' &&
-					infos_clavier.plus === 'non'
+					infos_clavier.couche === 'Visuel'
+					// infos_clavier.plus === 'non'
 				) {
 					toucheClavier.innerHTML = '<div>HyperTexte v.' + versionValue + '</div>';
 				}
-				if (
-					infos_clavier.type === 'iso' &&
-					res.touche === 'Space' &&
-					infos_clavier.couche === 'Visuel' &&
-					infos_clavier.plus === 'oui'
-				) {
-					toucheClavier.innerHTML =
-						"<div>Layer de navigation<br><span class='tap'>HyperTexte v." +
-						versionValue +
-						'</span></div>';
-				}
+				// if (
+				// 	infos_clavier.type === 'iso' &&
+				// 	res.touche === 'Space' &&
+				// 	infos_clavier.couche === 'Visuel' &&
+				// 	infos_clavier.plus === 'oui'
+				// ) {
+				// 	toucheClavier.innerHTML =
+				// 		"<div>Layer de navigation<br><span class='tap'>HyperTexte v." +
+				// 		versionValue +
+				// 		'</span></div>';
+				// }
 
 				// On ajoute des infos_clavier dans les data attributes de la touche
 				toucheClavier.dataset['touche'] = res['touche'];
@@ -175,9 +175,9 @@ function activerModificateurs() {
 	let aGrave = document
 		.getElementById(infos_clavier.emplacement)
 		.querySelector("[data-touche='à']");
-	let space = document
+	let lalt = document
 		.getElementById(infos_clavier.emplacement)
-		.querySelector("[data-touche='Space']");
+		.querySelector("[data-touche='LAlt']");
 
 	if (infos_clavier.couche === 'Shift' && lShift !== null) {
 		lShift.classList.add('touche-active');
@@ -206,8 +206,8 @@ function activerModificateurs() {
 	if (infos_clavier.couche === 'À' && aGrave !== null) {
 		aGrave.classList.add('touche-active');
 	}
-	if (infos_clavier.couche === 'Layer' && space !== null) {
-		space.classList.add('touche-active');
+	if (infos_clavier.couche === 'Layer' && lalt !== null) {
+		lalt.classList.add('touche-active');
 	}
 }
 
@@ -218,7 +218,7 @@ function ajouterBoutonsChangerCouche(clavier) {
 	let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
 	let toucheLCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='LCtrl']");
 	let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
-	let toucheSpace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
+	let toucheLalt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
 	let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 
 	// On ajoute une action au clic sur chacune des touches modificatrices
@@ -242,7 +242,7 @@ function ajouterBoutonsChangerCouche(clavier) {
 
 	// Les boutons de touches modificatrices À et Space ne sont ajoutées que si + est activé
 	if (infos_clavier.plus === 'oui') {
-		for (let toucheModificatrice of [toucheSpace, toucheA]) {
+		for (let toucheModificatrice of [toucheLalt, toucheA]) {
 			if (toucheModificatrice !== null) {
 				toucheModificatrice.addEventListener('click', function () {
 					changerCouche(toucheModificatrice, clavier);
@@ -297,10 +297,10 @@ function changerCouche(toucheModificatrice, clavier) {
 		nouvelleCouche = 'Visuel';
 	}
 
-	// Touche pressée = Space (pour accéder au Layer)
-	if (touchePressee === 'Space' && coucheActuelle === 'Layer') {
+	// Touche pressée = LAlt (pour accéder au Layer)
+	if (touchePressee === 'LAlt' && coucheActuelle === 'Layer') {
 		nouvelleCouche = 'Visuel';
-	} else if (touchePressee === 'Space') {
+	} else if (touchePressee === 'LAlt') {
 		nouvelleCouche = 'Layer';
 	}
 
