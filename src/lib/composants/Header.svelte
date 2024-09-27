@@ -13,9 +13,7 @@
 	<div class="logo">
 		<a href="/"
 			><p class="italic">
-				Disposition clavier <span class="hyper"
-					>HyperTexte{$page.url.pathname === '/hypertexte-plus' ? '+' : ''}</span
-				>
+				Disposition clavier <span class="hyper">HyperTexte</span>
 			</p></a
 		>
 	</div>
