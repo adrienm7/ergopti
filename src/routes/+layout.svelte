@@ -28,7 +28,7 @@
 	afterUpdate(() => {
 		AOS.init();
 		typography(document.getElementById('page'));
-		matomo.trackPageView();
+		// matomo.trackPageView();
 	});
 
 	let zIndex = -999;
@@ -41,18 +41,7 @@
 	}
 </script>
 
-<noscript
-	><p>
-		<img
-			referrerpolicy="no-referrer-when-downgrade"
-			src="https://stats.beseven.fr/m.php?idsite=6&amp;rec=1"
-			style="border: 0"
-			alt=""
-		/>
-	</p></noscript
->
-
-<Matomo {url} {siteId} />
+<!-- <Matomo {url} {siteId} /> -->
 
 <div class="banner">
 	<p>En construction</p>
