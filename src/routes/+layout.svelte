@@ -8,7 +8,7 @@
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import Matomo, { matomo } from '@dexlib/svelte-matomo';
+	// import Matomo, { matomo } from '@dexlib/svelte-matomo';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
