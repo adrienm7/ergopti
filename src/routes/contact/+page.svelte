@@ -42,7 +42,7 @@
 		<!-- Vous pouvez contacter l’auteur de cette disposition à l’adresse <a
 			href="mailto:moyaux.adrien@gmail.com">moyaux.adrien@gmail.com</a
 		> -->
-		Utilisez le formulaire <a href="https://beseven.fr/contact">ici</a> pour contacter l’auteur de la
-		disposition HyperTexte.
+		Utilisez le formulaire <a href="https://beseven.fr/contact">ici</a> pour contacter
+		<strong>Adrien Moyaux</strong>, l’auteur de la disposition HyperTexte.
 	</div>
 </div>

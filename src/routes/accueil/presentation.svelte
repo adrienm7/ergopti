@@ -60,7 +60,7 @@
 			et parfois atteindre la rangée supérieure ou inférieure pour les lettres les moins fréquentes.
 		</p>
 		<bloc-clavier data-couleur="azerty">
-			<bloc-ligne>
+			<bloc-ligne class="center">
 				<bloc-touche data-doigt="auriculaire" data-main="gauche" style="--taille: 1;"
 					><div>Q</div></bloc-touche
 				>
@@ -113,7 +113,7 @@
 		</p>
 
 		<bloc-clavier data-couleur="hypertexte">
-			<bloc-ligne>
+			<bloc-ligne class="center">
 				<bloc-touche data-doigt="auriculaire" data-main="gauche" style="--taille: 1;"
 					><div>A</div></bloc-touche
 				>
@@ -170,7 +170,9 @@
 			meilleurs emplacements seront sur les touches au-dessus et en-dessous de la rangée de repos,
 			en partant là encore de l’index pour aller vers l’annulaire.
 		</p>
-		<p>METTRE ICI UN CLAVIER VIDE MONTRANT LES MEILLEURS EMPLACEMENT EN COULEUR</p>
+		<p style="text-align:center; color:red;">
+			[METTRE ICI UN CLAVIER VIDE MONTRANT LES MEILLEURS EMPLACEMENTS EN COULEUR]
+		</p>
 		<p>
 			La rangée des chiffres est donc encore moins accessible, car il faut traverser deux rangées
 			depuis la rangée de repos pour l’atteindre. C’est pour cette raison que laisser le <kbd>É</kbd
@@ -237,7 +239,8 @@
 		</p>
 		<mini-espace />
 		<p>
-			Cette tâche est bien plus difficile qu’on le pense, car certaines lettres comme le <kbd>E</kbd
+			➜ Cette tâche est bien plus difficile qu’on le pense, car certaines lettres comme le <kbd
+				>E</kbd
 			>
 			ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
 			regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la
@@ -259,7 +262,7 @@
 		<p>
 			Cette alternance des mains permet de <span class="important"
 				>ne pas surutiliser l’une des deux mains</span
-			> en en utilisant qu’une pour taper la majorité du texte. Cela se ferait en effet au détriment
+			> en n’en utilisant qu’une pour taper la majorité du texte. Cela se ferait en effet au détriment
 			de l’autre main qui resterait au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer
 			en jeu. Ainsi, avec une bonne alternance des mains, pendant qu’une main frappe une touche, l’autre
 			peut se replacer sur la rangée du milieu et se préparer à frapper la suivante.
@@ -290,17 +293,17 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Optimisation des roulements</h2>
 	<div class="content">
 		<p>
-			L’optimisation de l’alternance des mains fait que lors de l’utilisation d’une main pour
+			L’optimisation de l’alternance des mains engendre que lors de l’utilisation d’une main pour
 			frapper une touche, il y a de fortes probabilités que le frappe suivante se fasse avec l’autre
 			main. Toutefois, cela n’arrive pas dans la totalité des cas, c’est pourquoi il convient de
 			s’assurer que le plus possible de frappes intra-mains se fassent à l’aide de roulements.
 		</p>
 		<p>
-			Pour moi, un "roulement" désigne un déplacement sur deux doigts consécutifs et jamais à plus
-			d’une rangée d’écart. Il y peu d’informations sur le sujet en ligne ; un roulement a
-			probablement une définition plus large que la mienne, mais alors dans ce cas le côté "qui
-			roule" est selon moi perdu. À la limite si c’est de l’index à l’auriculaire, mais pas de
-			l’index à l’annulaire par exemple.
+			Ma définition personnelle d’un "roulement" est un déplacement sur deux doigts consécutifs et
+			jamais à plus d’une rangée d’écart. Il y peu d’informations sur le sujet en ligne ; un
+			roulement a probablement une définition plus large que la mienne, mais alors dans ce cas le
+			côté "qui roule" est selon moi perdu. À la limite si c’est de l’index à l’auriculaire, mais
+			pas de l’index à l’annulaire par exemple.
 		</p>
 		<p>
 			En conclusion, un roulement est pour moi le <kbd>PO</kbd> de l’AZERTY ou le <kbd>ST</kbd> du
@@ -317,10 +320,11 @@
 		<h3 data-aos="fade-right" data-aos-mirror="true">Très bons bigrammes voyelle-voyelle</h3>
 		<ul>
 			<li><kbd>AI</kbd></li>
-			<li><kbd>IE</kbd></li>
+			<li><kbd>IE</kbd> et <kbd>EI</kbd></li>
 			<li><kbd>EU</kbd></li>
-			<li><kbd>OI</kbd></li>
+			<li><kbd>IO</kbd> et <kbd>OI</kbd></li>
 			<li><kbd>OU</kbd></li>
+			<li><kbd>ÉE</kbd></li>
 		</ul>
 
 		Avec même quelques trigrammes très confortables :
@@ -333,12 +337,10 @@
 
 		<h3 data-aos="fade-right" data-aos-mirror="true">Très bons bigrammes consonne-consonne</h3>
 		<ul>
-			<li><kbd>SN</kbd></li>
+			<li><kbd>NS</kbd> et <kbd>SN</kbd></li>
 			<li><kbd>NT</kbd></li>
-			<li><kbd>TR</kbd></li>
-			<li><kbd>RT</kbd></li>
+			<li><kbd>TR</kbd> et <kbd>RT</kbd></li>
 			<li><kbd>RS</kbd></li>
-			<li><kbd>NS</kbd></li>
 			<li>
 				<kbd>CH</kbd> ce bigramme est extraordinaire, une fois habitué il est difficile de s’en passer
 			</li>
@@ -349,14 +351,19 @@
 				>, SHOU<span class="hyper text-bold">LD</span>, WOU<span class="hyper text-bold">LD</span>,
 				etc.)
 			</li>
+			<li><kbd>D’</kbd></li>
+			<li><kbd>NC</kbd></li>
+			<li><kbd>NG</kbd> pour tous les -I<span class="hyper text-bold">NG</span> en anglais</li>
+			<li><kbd>PR</kbd></li>
+			<li><kbd>GR</kbd></li>
 		</ul>
 		<h3 data-aos="fade-right" data-aos-mirror="true">Autres bons bigrammes</h3>
 		<ul>
 			<li>
-				<kbd>OW</kbd> très utilisé en anglais (ALL<span class="hyper text-bold">OW</span>
-				, D<span class="hyper text-bold">OW</span>N, FOLL<span class="hyper text-bold">OW</span>, H<span
+				<kbd>OW</kbd> très utilisé en anglais (ALL<span class="hyper text-bold">OW</span>, D<span
 					class="hyper text-bold">OW</span
-				>, KN<span class="hyper text-bold">OW</span>, N<span class="hyper text-bold">OW</span>,
+				>N, FOLL<span class="hyper text-bold">OW</span>, H<span class="hyper text-bold">OW</span>,
+				KN<span class="hyper text-bold">OW</span>, N<span class="hyper text-bold">OW</span>,
 				<span class="hyper text-bold">OW</span>N, SH<span class="hyper text-bold">OW</span>, etc.)
 			</li>
 			<li>
@@ -365,9 +372,6 @@
 				<span class="hyper text-bold">WO</span>RK, <span class="hyper text-bold">WO</span>RLD,
 				<span class="hyper text-bold">WO</span>RTH, <span class="hyper text-bold">WO</span>ULD,
 				etc.)
-			</li>
-			<li>
-				<kbd>="</kbd> utilisé en programmation pour assigner une chaîne de caractères à une variable
 			</li>
 			<li><kbd>+=</kbd> utilisé en programmation pour incrémenter</li>
 		</ul>
@@ -402,18 +406,21 @@
 
 		<ul>
 			<li>
-				<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>`</kbd-sortie> car le
-				<span class="hyper text-bold">`</span> est au-dessus du A
+				<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>\</kbd-sortie> car le
+				<span class="hyper text-bold">\</span> est au-dessus du A (Le \ était auparavant sur le
+				<kbd>È</kbd> et le ` sur le <kbd>À</kbd>, car plus logique. Cependant, cela a finalement été
+				déplacé pour placer plus près ce symbole qui est très utilisé en programmation, notamment en
+				LaTeX)
 			</li>
 			<li>
 				<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
 				car la cédille est sous le <span class="hyper text-bold">C</span>
 			</li>
 			<li>
-				<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>D</kbd> ➜
+				<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>★</kbd> ➜
 				<kbd-sortie>δ</kbd-sortie>
-				car c’est la touche morte pour écrire les lettres grecques (α, β, γ, δ…), dont l'une des plus
-				connues est <span class="hyper text-bold">δ</span>
+				car cette touche morte permettant d’écrire les lettres grecques (α, β, γ, δ…) est sur la touche
+				"magique" <span class="hyper text-bold">★</span>
 			</li>
 			<li>
 				<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>E</kbd> ➜
@@ -425,7 +432,7 @@
 				car le <span class="hyper text-bold">/</span> est au-dessus du E
 			</li>
 			<li>
-				<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>\</kbd-sortie>
+				<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>`</kbd-sortie>
 				car le <span class="hyper text-bold">\</span> est au-dessus du E
 			</li>
 			<li>
@@ -533,12 +540,12 @@
 			</li>
 		</ul>
 		<mini-espace />
-		<p>
+		<p class="encadre">
 			À noter que les touches sont aussi placées le plus possible par distance selon leur fréquence
 			d’utilisation. Ainsi, les touches très utilisées comme les <kbd>()</kbd>,
 			<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les plus forts.
 		</p>
-		<p class="encadre">
+		<!-- <p class="encadre">
 			<span class="text-bold">⚠ Attention</span> : Le <kbd>$</kbd> est l’un des seuls symboles à ne
 			pas être sur un emplacement logique (le
 			<kbd>D</kbd>
@@ -546,16 +553,16 @@
 			mettre le <kbd>"</kbd> sur cette lettre, afin d’avoir un excellent roulement <kbd>="</kbd>. Le
 			<kbd>$</kbd>
 			se trouve sur la touche <kbd>★</kbd>.
-		</p>
+		</p> -->
 		<h2 data-aos="zoom-out" data-aos-mirror="true">
 			Ponctuations avec espace insécable automatique
 		</h2>
 		<p>
 			Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
 			particularité. En effet, lors de l’utilisation de <kbd>Shift</kbd>, elles sont
-			<span class="important">automatiquement envoyées avec une espace insécable</span> qui les précède.
+			<span class="important">automatiquement envoyées avec un espace insécable</span> qui les précède.
 			Les espaces insécables ne sont pas disponibles en AZERTY, et c’est très dommage. Ce sont des espaces
-			qui ont la particularité de toujours rester collés au texte qui les précède et les suit.
+			qui ont pour comportement de toujours rester collés au texte qui les précède et les suit.
 		</p>
 		<p>
 			Ainsi, vous n’aurez plus jamais de <kbd>?</kbd> qui se balade au début d’une ligne parce qu’il
@@ -573,7 +580,7 @@
 			contient d’ailleurs tout le reste des symboles nécessaires à l’écriture de code.
 		</p>
 		<div class="encadre">
-			<p class="important">Ainsi, il est facile de se rappeler où est quoi :</p>
+			<p class="important" style="margin:0;">Ainsi, il est facile de se rappeler où est quoi :</p>
 			<ul class="margin0">
 				<li>le français est en <kbd>Shift</kbd></li>
 				<li class="margin0">la programmation est en <kbd>AltGr</kbd></li>
@@ -654,16 +661,23 @@
 			<NomPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
 			<span class="important">mécanisme de tap-hold</span>. L’idée du tap-hold est qu’il est
 			possible d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold
-			(maitenir pressé). Grâce au tap-hold, il est possible de faire pour que taper une touche
-			envoie un raccourci, mais que si on la presse elle se comporte normalement. Cela permet
+			(maitenir pressé). Grâce au tap-hold, il est possible d’avoir le comportement suivant : taper
+			une touche envoie un raccourci, mais la presser la fait se comporter normalement. Cela permet
 			d’intégrer des touches
 			<kbd>Copier</kbd>, <kbd>Coller</kbd> et <kbd>Alt+Tab</kbd> respectivement sur
 			<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>.
 		</p>
 		<p>
-			Enfin, <NomPlus /> a aussi optimisé les raccourcis <kbd>Ctrl</kbd> + <kbd>Z</kbd> et
+			Enfin, <NomPlus /> a aussi optimisé les raccourcis <kbd-sortie>Ctrl</kbd-sortie> +
+			<kbd-sortie>X</kbd-sortie>,
+			<kbd-sortie>Ctrl</kbd-sortie>
+			+ <kbd-sortie>Z</kbd-sortie> et <kbd-sortie>Ctrl</kbd-sortie>
+			+ <kbd-sortie>S</kbd-sortie>. Ceux-ci sont respectivement dédoublés en <kbd>Ctrl</kbd> +
+			<kbd>Ê</kbd>,
 			<kbd>Ctrl</kbd>
-			+ <kbd>S</kbd>. Ceux-ci sont dédoublés en <kbd>Ctrl</kbd> + <kbd>Ê</kbd> et <kbd>Ctrl</kbd>
+			+
+			<kbd>À</kbd>
+			et <kbd>Ctrl</kbd>
 			+ <kbd>★</kbd>
 		</p>
 	</div>
