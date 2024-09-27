@@ -53,6 +53,17 @@
 	})();
 </script>
 
+<noscript
+	><p>
+		<img
+			referrerpolicy="no-referrer-when-downgrade"
+			src="https://stats.beseven.fr/m.php?idsite=6&amp;rec=1"
+			style="border: 0"
+			alt=""
+		/>
+	</p></noscript
+>
+
 <div class="banner">
 	<p>En construction</p>
 </div>
