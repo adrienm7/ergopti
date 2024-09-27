@@ -24,6 +24,23 @@
 	afterUpdate(() => {
 		AOS.init();
 		typography(document.getElementById('page'));
+
+		// Code de tracking Matomo
+		var _paq = (window._paq = window._paq || []);
+		/* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+		_paq.push(['trackPageView']);
+		_paq.push(['enableLinkTracking']);
+		(function () {
+			var u = 'https://stats.beseven.fr/';
+			_paq.push(['setTrackerUrl', u + 'm.php']);
+			_paq.push(['setSiteId', '6']);
+			var d = document,
+				g = d.createElement('script'),
+				s = d.getElementsByTagName('script')[0];
+			g.async = true;
+			g.src = u + 'm.js';
+			s.parentNode.insertBefore(g, s);
+		})();
 	});
 
 	let zIndex = -999;
@@ -34,23 +51,6 @@
 		affiche = affiche === 'none' ? 'block' : 'none';
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
-
-	// Code de tracking Matomo
-	var _paq = (window._paq = window._paq || []);
-	/* tracker methods like "setCustomDimension" should be called before "trackPageView" */
-	_paq.push(['trackPageView']);
-	_paq.push(['enableLinkTracking']);
-	(function () {
-		var u = 'https://stats.beseven.fr/';
-		_paq.push(['setTrackerUrl', u + 'm.php']);
-		_paq.push(['setSiteId', '6']);
-		var d = document,
-			g = d.createElement('script'),
-			s = d.getElementsByTagName('script')[0];
-		g.async = true;
-		g.src = u + 'm.js';
-		s.parentNode.insertBefore(g, s);
-	})();
 </script>
 
 <noscript
