@@ -30,7 +30,11 @@
 		AOS.init();
 		typography(document.getElementById('page'));
 		// matomo.trackPageView();
-		matomo();
+		var _paq = window._paq || [];
+		_paq.push(['trackPageView']);
+		_paq.push(['enableLinkTracking']);
+		_paq.push(['setTrackerUrl', 'https://stats.beseven.fr/m.php']);
+		_paq.push(['setSiteId', '6']);
 	});
 
 	let zIndex = -999;
