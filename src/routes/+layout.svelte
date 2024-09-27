@@ -8,7 +8,6 @@
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import Matomo, { matomo } from '@dexlib/svelte-matomo';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -22,11 +21,7 @@
 	import '$lib/css/orb.css';
 	import '$lib/css/miscellaneous.css';
 
-	const url = 'https://stats.beseven.fr';
-	const siteId = 6;
-
 	afterUpdate(() => {
-		matomo.trackPageView();
 		AOS.init();
 		typography(document.getElementById('page'));
 	});
@@ -47,18 +42,17 @@
 	_paq.push(['enableLinkTracking']);
 	(function () {
 		var u = 'https://stats.beseven.fr/';
-		_paq.push(['setTrackerUrl', u + 'matomo.php']);
+		_paq.push(['setTrackerUrl', u + 'm.php']);
 		_paq.push(['setSiteId', '6']);
 		var d = document,
 			g = d.createElement('script'),
 			s = d.getElementsByTagName('script')[0];
 		g.async = true;
-		g.src = u + 'matomo.js';
+		g.src = u + 'm.js';
 		s.parentNode.insertBefore(g, s);
 	})();
 </script>
 
-<Matomo {url} {siteId} />
 <div class="banner">
 	<p>En construction</p>
 </div>
