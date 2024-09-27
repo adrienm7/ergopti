@@ -54,6 +54,12 @@ bloc-ligne {
 	display: flex;
 }
 
+.center {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
 legende-clavier {
 	display: block;
 	margin: 0;
@@ -194,7 +200,7 @@ bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='!'],
 bloc-clavier[data-couche='AltGr'][data-plus='non'] bloc-touche[data-touche='j'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='magique'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='e'],
-bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='è'],
+bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='à'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='h'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='u'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='t'],
@@ -427,7 +433,7 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='space'] {
 
 bloc-touche[data-type='space'],
 bloc-touche[data-type='special'],
-bloc-clavier[data-type='iso'] bloc-touche[data-touche='Enter'] {
+bloc-touche[data-touche='enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
 	/* Bordure de la touche en blanc transparent */

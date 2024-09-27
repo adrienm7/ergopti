@@ -49,9 +49,21 @@
 
 		<h3>Pour les comparateurs de disposition</h3>
 		<mini-espace />
+		<p>
+			Pour notamment l’utiliser sur le site <a href="https://klanext.keyboard-design.com/"
+				>https://klanext.keyboard-design.com/</a
+			> et ses dérivés.
+		</p>
+		<mini-espace />
 		<div>
 			<span>Version ISO : </span><a href="/files/hypertexte.v{versionValue}.fr.iso.txt"
 				><button>hypertexte.{versionValue}.fr.iso</button></a
+			>
+		</div>
+		<mini-espace />
+		<div>
+			<span>Version ISO+ : </span><a href="/files/hypertexte.v{versionValue}.fr.iso+.txt"
+				><button>hypertexte.{versionValue}.fr.iso+</button></a
 			>
 		</div>
 		<mini-espace />

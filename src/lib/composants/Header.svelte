@@ -87,7 +87,7 @@
 	}
 	header a {
 		color: var(--couleur-liens-header);
-		font-size: clamp(1rem, 1.4vw, 32px);
+		font-size: 1.1rem;
 		text-decoration: none;
 	}
 

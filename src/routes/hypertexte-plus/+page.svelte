@@ -43,7 +43,7 @@
 			<NomPlus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très
 			près de la <span class="important">disposition clavier idéale</span>. Effectivement, elle :
 		</p>
-		<ul class="margin0">
+		<ul class="margin0" style="text-align:left!important">
 			<li>éradique la quasi-totalité des <SFB />s ;</li>
 			<li>rajoute de merveilleux roulements ;</li>
 			<li>réduit les distances parcourues par les doigts, en particulier l’auriculaire droit ;</li>
