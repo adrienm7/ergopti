@@ -14,13 +14,18 @@
 			<kbd-sortie>U</kbd-sortie>
 			+ <kbd-sortie>Voyelle</kbd-sortie>.
 		</p>
+		<p>
+			Ainsi, pour écrire <kbd-sortie>QUE</kbd-sortie>, il suffira d’écrire <kbd>QE</kbd>. De même,
+			pour écrire <kbd-sortie>POURQUOI</kbd-sortie>, il suffira d’écrire
+			<kbd>POURQOI</kbd>.
+		</p>
 	</div>
 
 	<h3 data-aos="fade-right" data-aos-mirror="true">[OÙ]</h3>
 	<div class="content">
 		<p>
-			La touche <kbd>Ù</kbd> n’est utilisée que pour écrire <kbd>OÙ</kbd>. Ainsi, autant tranformer
-			cette touche en raccourci pour écrire <kbd-sortie>OÙ</kbd-sortie> pour économiser une frappe
+			La touche <kbd>Ù</kbd> n’est utilisée que pour écrire <kbd>OÙ</kbd>. Ainsi, autant transformer
+			cette touche en raccourci pour écrire <kbd-sortie>OÙ</kbd-sortie> afin d’économiser une frappe
 			certaine sur la touche <kbd>O</kbd> et améliorer l’alternance des mains.
 		</p>
 	</div>
@@ -50,20 +55,23 @@
 			lors de l’écriture de <kbd>parait</kbd>, rendant ce <SFB /> inoffensif.
 		</p>
 		<p>
-			À noter que pour écrire <kbd-sortie>Â</kbd-sortie> et éviter un <SFB />, il est aussi possible
-			de faire <kbd>ÊÀ</kbd>.
+			À noter que pour écrire <kbd-sortie>AÎ</kbd-sortie> et <kbd-sortie>Â</kbd-sortie>, évitant
+			donc des <SFB />s, il est aussi possible de réaliser respectivement <kbd>ÊÉ</kbd> et
+			<kbd>ÉÊ</kbd>. Ce sont en outre des roulements très confortables.
 		</p>
 	</div>
 
 	<h3 data-aos="fade-right" data-aos-mirror="true">
-		Remplacement automatique des <kbd>'</kbd> par <kbd>’</kbd> pour le français
+		Remplacement automatique des <kbd>'</kbd> par <kbd>’</kbd> en français
 	</h3>
 
 	<div class="content">
 		<p>
 			Lorsque l’on écrit en français, il faudrait idéalement utiliser l’apostrophe typographique
 			plutôt que l’apostrophe droite. C’est pour cela que <NomPlus /> va automatiquement l’utiliser à
-			la place de l’apostrophe droite lors de l’écriture en français.
+			la place de l’apostrophe droite lors de l’écriture en français. Cette apostrophe est d’ailleurs
+			plus jolie et présente l’avantage de ne pas avoir à être échappée en programmation si une chaîne
+			de caractères est écrite avec ce caractère à l’intérieur.
 		</p>
 		<!-- <p>
 			Un autre raccourci a été ajouté pour avoir la possibilité d’écrire <kbd-sortie>N'T</kbd-sortie
@@ -75,17 +83,16 @@
 	</div>
 
 	<h3 data-aos="fade-right" data-aos-mirror="true">
-		Utilisation de la touche <kbd>,</kbd> : en tant que J
+		Utilisation de la touche <kbd>,</kbd> + <kbd>Voyelle</kbd> : en tant que J
 	</h3>
 
 	<div class="content">
 		<p>
 			La touche <kbd>J</kbd> est très loin et pourtant relativement souvent utilisée en français, en
-			particulier pour écrire <kbd>JE</kbd>. Les combinaisons <kbd-non>,I</kbd-non>,
-			<kbd-non>,E</kbd-non>, etc. n’existent pas en français. En réalité, la lettre <kbd>,</kbd> est
-			systématiquement suivie d’un espace ou d’un caractère de ponctuation. Cela donne une
-			formidable opportunité d’utiliser cette touche comme un <kbd-sortie>J</kbd-sortie>, si elle
-			est suivie d’une voyelle.
+			particulier pour écrire <kbd>JE</kbd>. Les combinaisons <kbd>,I</kbd>,
+			<kbd>,E</kbd>, etc. n’existent pas en français. En réalité, la lettre <kbd>,</kbd> est
+			systématiquement suivie d’un espace. Cela donne une formidable opportunité d’utiliser cette
+			touche comme un <kbd-sortie>J</kbd-sortie> lorsqu’elle est suivie d’une voyelle.
 		</p>
 		<p>
 			Dans les rares cas où vous voudrez écrire <kbd>J</kbd> + <kbd>Consonne</kbd>, il faudra
@@ -99,7 +106,8 @@
 			<li><kbd>,E</kbd> ➜ <kbd-sortie>JE</kbd-sortie></li>
 			<li><kbd>,É</kbd> ➜ <kbd-sortie>JÉ</kbd-sortie></li>
 			<li><kbd>,O</kbd> ➜ <kbd-sortie>JO</kbd-sortie></li>
-			<li><kbd>,Ê</kbd> ➜ <kbd-sortie>JU</kbd-sortie></li>
+			<li><kbd>,Ê</kbd> ➜ <kbd-sortie>JU</kbd-sortie> pour éviter un <SFB /></li>
+			<li><kbd>,È</kbd> et <kbd>,À</kbd> ➜ <kbd-sortie>J</kbd-sortie></li>
 		</ul>
 	</div>
 </section>

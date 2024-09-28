@@ -26,6 +26,7 @@
 
 	// 	transporter.sendMail(mailOptions);
 	// });
+	import Nom from '$lib/composants/Nom.svelte';
 </script>
 
 <svelte:head>
@@ -42,7 +43,7 @@
 		<!-- Vous pouvez contacter l’auteur de cette disposition à l’adresse <a
 			href="mailto:moyaux.adrien@gmail.com">moyaux.adrien@gmail.com</a
 		> -->
-		Utilisez le formulaire <a href="https://beseven.fr/contact">ici</a> pour contacter
-		<strong>Adrien Moyaux</strong>, l’auteur de la disposition HyperTexte.
+		Le créateur de la disposition <Nom /> et de ce site est <strong>Adrien MOYAUX</strong>.<br />
+		Vous pouvez utiliser le formulaire <a href="https://beseven.fr/contact">ici</a> pour le contacter.
 	</div>
 </div>

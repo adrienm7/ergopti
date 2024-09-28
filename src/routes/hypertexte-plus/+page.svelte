@@ -50,9 +50,9 @@
 			<li>réduit les distances parcourues par les doigts, en particulier l’auriculaire droit ;</li>
 			<li>divise par 2 le nombre de touches frappées pour écrire certains mots ;</li>
 			<li>
-				ajoute divers raccourcis tels qu’une touche <kbd-sortie>Alt + Tab</kbd-sortie>,
-				<kbd-sortie>Capsword</kbd-sortie>
-				ou encore <kbd-sortie>Dot-Space-Shift</kbd-sortie>.
+				ajoute divers raccourcis tels qu’une touche <kbd-sortie>Alt + Tab</kbd-sortie> et
+				<kbd-sortie>Capsword</kbd-sortie>.
+				<!-- ou encore <kbd-sortie>Dot-Space-Shift</kbd-sortie>. -->
 			</li>
 		</ul>
 	</div>
@@ -109,11 +109,11 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">➁ Ajout d’excellents roulements</h2>
 	<Roulements />
 
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➂ Abréviations</h2>
-	<Abreviations />
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➃ Diminution des SFBs</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">➂ Diminution des SFBs</h2>
 	<Reduction_SFBs />
+
+	<h2 data-aos="zoom-out" data-aos-mirror="true">➃ Abréviations</h2>
+	<Abreviations />
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">➄ Raccourcis</h2>
 	<Raccourcis />
