@@ -8,7 +8,7 @@
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import Matomo, { matomo } from '@dexlib/svelte-matomo';
+	import Matomo from '@dexlib/svelte-matomo';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -22,13 +22,9 @@
 	import '$lib/css/orb.css';
 	import '$lib/css/miscellaneous.css';
 
-	const url = 'https://stats.beseven.fr';
-	const siteId = 6;
-
 	afterUpdate(() => {
 		AOS.init();
 		typography(document.getElementById('page'));
-		matomo.trackPageView();
 	});
 
 	let zIndex = -999;
@@ -41,7 +37,7 @@
 	}
 </script>
 
-<Matomo {url} {siteId} />
+<Matomo url="https://stats.beseven.fr" siteId={6} />
 
 <div class="banner">
 	<p>En construction</p>
