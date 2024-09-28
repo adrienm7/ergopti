@@ -166,14 +166,14 @@
 			/>
 			fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
 		</p>
-		<p>
+		<!-- <p>
 			À noter qu’en version ISO, la version Thumbshift d’Optimot fait systématiquement mieux qu’<Nom
 			/>, avec notamment une grande différence en distance parcourue. C’était un résultat attendu,
 			car dans cette disposition <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> tandis que
 			<kbd>AltGr</kbd>
 			est quant à lui déplacé en <kbd>Alt</kbd>. Cela explique aussi les excellents scores de
 			Engram, qui a le même placement des touches <kbd>Shift</kbd> et <kbd>AltGr</kbd>.
-		</p>
+		</p> -->
 		<p>
 			En version Ergodox, <Nom /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
 			la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
@@ -183,10 +183,10 @@
 			la fluidité lors de l’écriture de texte ainsi que le confort général.
 		</p>
 		<p>
-			Enfin, gardez en tête que les dispositions dont le nom est préfixé par « en » plutôt que
-			« fr » ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles
-			vont donc forcément surperformer sur les corpus français. Et même sur les corpus anglais,
-			elles feront un peu mieux car il y aura moins de touches à disposer et donc plus de meilleurs
+			Enfin, gardez en tête que les dispositions dont le nom est préfixé par « en » plutôt que « fr
+			» ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles vont
+			donc forcément surperformer sur les corpus français. Et même sur les corpus anglais, elles
+			feront un peu mieux car il y aura moins de touches à disposer et donc davantage de bons
 			emplacements.
 		</p>
 	</section>
@@ -194,17 +194,17 @@
 	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
 		<button on:click={toggleLangue} style="height:2.5rem;">
 			{#if langue === 'fr'}
-				{@html '<p><span class="hyper">Français</span>➜&nbsp;<span class="texte">Anglais</span></p>'}
+				{@html '<p><strong class="hyper">Français</strong>➜&nbsp;<span class="texte">Anglais</span></p>'}
 			{:else}
-				{@html '<p><span class="texte">Anglais</span> ➜&nbsp;<span class="hyper">Français</span></p>'}
+				{@html '<p><strong class="texte">Anglais</strong> ➜&nbsp;<span class="hyper">Français</span></p>'}
 			{/if}
 		</button>
 
 		<button on:click={toggleClavier} style="height:2.5rem;">
 			{#if clavier === 'ergodox'}
-				{@html '<p><span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
+				{@html '<p><strong class="ergodox-text-gradient">Ergodox</strong> ➜&nbsp;ISO</p>'}
 			{:else}
-				{@html '<p>ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
+				{@html '<strong>ISO</strong> ➜ <span class="ergodox-text-gradient">Ergodox</span>'}
 			{/if}
 		</button>
 		<div style="display:inline-block;">
@@ -234,11 +234,17 @@
 		{/if}
 	</div>
 	<h3>Analyse ErgoL</h3>
-	<select bind:value={langue}>
-		<option value="fr" selected>Français</option>
-		<option value="en">Anglais</option>
-		<option value="en_fr">Français + Anglais</option>
-	</select>
+	<div style="display:flex; align-items:center; justify-content:space-between;">
+		<select bind:value={langue} style="height: 2rem">
+			<option value="fr" selected>Français</option>
+			<option value="en">Anglais</option>
+			<option value="en_fr">Français + Anglais</option>
+		</select>
+		<a href="/img/analyse_ergol_{langue}.pdf" style="height: 2rem"
+			><button>Télécharger l’analyse ErgoL {langue}</button></a
+		>
+	</div>
+	<mini-espace />
 	<embed src="/img/analyse_ergol_{langue}.pdf" type="application/pdf" width="100%" height="600px" />
 </div>
 
