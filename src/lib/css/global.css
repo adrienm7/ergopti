@@ -51,7 +51,7 @@ body {
 .contenu {
 	line-height: 1.4;
 	max-width: 850px;
-	max-width: clamp(200px, 90vw, 850px);
+	max-width: clamp(200px, 95vw, 850px);
 	margin: 0 auto;
 	padding: 0;
 }
