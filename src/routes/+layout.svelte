@@ -28,6 +28,7 @@
 	afterUpdate(() => {
 		AOS.init();
 		typography(document.getElementById('page'));
+		matomo.trackPageView();
 	});
 
 	let zIndex = -999;
