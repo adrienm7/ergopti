@@ -190,7 +190,7 @@
 			emplacements.
 		</p>
 	</section>
-	<mini-espace />
+	<h3>Analyse KLAnext</h3>
 	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
 		<button on:click={toggleLangue} style="height:2.5rem;">
 			{#if langue === 'fr'}
@@ -233,6 +233,13 @@
 			<img src="/img/benchmarks_{clavier}/{corpus_en}.jpg" />
 		{/if}
 	</div>
+	<h3>Analyse ErgoL</h3>
+	<select bind:value={langue}>
+		<option value="fr" selected>Français</option>
+		<option value="en">Anglais</option>
+		<option value="en_fr">Français + Anglais</option>
+	</select>
+	<embed src="/img/analyse_ergol_{langue}.pdf" type="application/pdf" width="100%" height="600px" />
 </div>
 
 <style>

@@ -1,5 +1,5 @@
 {
-    "label": "hypertexte.v1.0.19.fr.iso",
+    "label": "hypertexte.v1.0.20.fr.iso",
     "fingerStart": {
         "1": 29,
         "2": 30,
@@ -381,10 +381,10 @@
             "numpad": -1
         },
         {
-            "primary": 106,
+            "primary": 8217,
             "finger": 10,
             "id": 40,
-            "shift": 74,
+            "shift": -1,
             "altGr": -1,
             "shiftAltGr": -1,
             "numpad": -1
@@ -426,8 +426,8 @@
             "numpad": -1
         },
         {
-            "primary": 9733,
-            "shift": 8217,
+            "primary": 106,
+            "shift": 74,
             "finger": 4,
             "id": 45,
             "altGr": 34,

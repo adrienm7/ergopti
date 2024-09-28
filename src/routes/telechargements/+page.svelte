@@ -57,19 +57,25 @@
 		<mini-espace />
 		<div>
 			<span>Version ISO : </span><a href="/files/hypertexte.v{versionValue}.fr.iso.txt"
-				><button>hypertexte.{versionValue}.fr.iso</button></a
+				><button>hypertexte.v{versionValue}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version ISO+ : </span><a href="/files/hypertexte.v{versionValue}.fr.iso+.txt"
-				><button>hypertexte.{versionValue}.fr.iso+</button></a
+				><button>hypertexte.v{versionValue}.fr.iso+</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version Ergodox : </span><a href="/files/hypertexte.v{versionValue}.fr.ergodox.txt"
-				><button>hypertexte.{versionValue}.fr.ergodox</button></a
+				><button>hypertexte.v{versionValue}.fr.ergodox</button></a
+			>
+		</div>
+		<mini-espace />
+		<div>
+			<span>Version pour le site ErgoL : </span><a href="/files/hypertexte.v{versionValue}.json"
+				><button>hypertexte.v{versionValue}</button></a
 			>
 		</div>
 	</div>
