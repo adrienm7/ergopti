@@ -301,7 +301,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": ",",
+			"touche": ".",
 			"code": "KeyG",
 			"main": "gauche",
 			"doigt": "index",
@@ -417,7 +417,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": ".",
+			"touche": ",",
 			"code": "KeyV",
 			"main": "gauche",
 			"doigt": "index",
@@ -1581,7 +1581,7 @@
 			"Ctrl": "z",
 			"Layer": "!⇩",
 			"À": "À",
-			",": "",
+			",": "j",
 			"type": "français"
 		},
 		{
