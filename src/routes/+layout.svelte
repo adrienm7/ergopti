@@ -8,7 +8,7 @@
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import Matomo from '@dexlib/svelte-matomo';
+	import Matomo, { matomo } from '@dexlib/svelte-matomo';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -22,6 +22,9 @@
 	import '$lib/css/orb.css';
 	import '$lib/css/miscellaneous.css';
 
+	onMount(() => {
+		matomo.trackPageView();
+	});
 	afterUpdate(() => {
 		AOS.init();
 		typography(document.getElementById('page'));
