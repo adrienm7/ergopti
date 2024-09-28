@@ -27,7 +27,7 @@ export function majClavier(clavier) {
 	document.getElementById(infos_clavier.emplacement).dataset['couleur'] = infos_clavier.couleur;
 
 	if (infos_clavier.controles === 'oui') {
-		ajouterBoutonsChangerCouche(clavier);
+		ajouterBoutonsChangerCouche(clavier, infos_clavier);
 	}
 }
 
@@ -83,6 +83,10 @@ function majTouches() {
 								// Toutes les autres touches "doubles"
 								toucheClavier.innerHTML =
 									'<div>' + contenuTouche['AltGr'] + '<br/>' + contenuTouche['Primary'] + '</div>';
+								if (contenuTouche['Primary' + '+'] !== undefined && ligne < 6) {
+									// Si la couche + existe ET n’est pas en thumb cluster
+									toucheClavier.dataset['plus'] = 'oui';
+								}
 							}
 						} else {
 							// Cas où la touche n’est pas double
@@ -175,9 +179,15 @@ function activerModificateurs() {
 	let aGrave = document
 		.getElementById(infos_clavier.emplacement)
 		.querySelector("[data-touche='à']");
+	let virgule = document
+		.getElementById(infos_clavier.emplacement)
+		.querySelector("[data-touche=',']");
 	let lalt = document
 		.getElementById(infos_clavier.emplacement)
 		.querySelector("[data-touche='LAlt']");
+	let space = document
+		.getElementById(infos_clavier.emplacement)
+		.querySelector("[data-touche='Space']");
 
 	if (infos_clavier.couche === 'Shift' && lShift !== null) {
 		lShift.classList.add('touche-active');
@@ -206,12 +216,18 @@ function activerModificateurs() {
 	if (infos_clavier.couche === 'À' && aGrave !== null) {
 		aGrave.classList.add('touche-active');
 	}
-	if (infos_clavier.couche === 'Layer' && lalt !== null) {
-		lalt.classList.add('touche-active');
+	if (infos_clavier.couche === ',' && virgule !== null) {
+		virgule.classList.add('touche-active');
+	}
+	if (infos_clavier.couche === 'Layer' && rCtrl !== null && infos_clavier.type === 'iso') {
+		rCtrl.classList.add('touche-active');
+	}
+	if (infos_clavier.couche === 'Layer' && space !== null && infos_clavier.type === 'ergodox') {
+		space.classList.add('touche-active');
 	}
 }
 
-function ajouterBoutonsChangerCouche(clavier) {
+function ajouterBoutonsChangerCouche(clavier, infos_clavier) {
 	let emplacementClavier = document.getElementById(infos_clavier.emplacement);
 	let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 	let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
@@ -220,6 +236,8 @@ function ajouterBoutonsChangerCouche(clavier) {
 	let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
 	let toucheLalt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
 	let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
+	let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
+	let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
 
 	// On ajoute une action au clic sur chacune des touches modificatrices
 	for (let toucheModificatrice of [
@@ -233,7 +251,7 @@ function ajouterBoutonsChangerCouche(clavier) {
 			toucheModificatrice.addEventListener(
 				'click',
 				function () {
-					changerCouche(toucheModificatrice, clavier);
+					changerCouche(toucheModificatrice, clavier, infos_clavier);
 				},
 				{ passive: true }
 			);
@@ -242,17 +260,17 @@ function ajouterBoutonsChangerCouche(clavier) {
 
 	// Les boutons de touches modificatrices À et Space ne sont ajoutées que si + est activé
 	if (infos_clavier.plus === 'oui') {
-		for (let toucheModificatrice of [toucheLalt, toucheA]) {
+		for (let toucheModificatrice of [toucheLalt, toucheA, toucheVirgule, toucheEspace]) {
 			if (toucheModificatrice !== null) {
 				toucheModificatrice.addEventListener('click', function () {
-					changerCouche(toucheModificatrice, clavier);
+					changerCouche(toucheModificatrice, clavier, infos_clavier);
 				});
 			}
 		}
 	}
 }
 
-function changerCouche(toucheModificatrice, clavier) {
+function changerCouche(toucheModificatrice, clavier, infos_clavier) {
 	let touchePressee = toucheModificatrice.dataset.touche;
 	let coucheActuelle = document.getElementById(infos_clavier.emplacement).dataset.couche;
 	let nouvelleCouche = coucheActuelle;
@@ -283,7 +301,7 @@ function changerCouche(toucheModificatrice, clavier) {
 		nouvelleCouche = 'AltGr';
 	} else if (
 		(touchePressee === 'LShift' || touchePressee === 'RShift') &
-		(coucheActuelle === 'À')
+		((coucheActuelle === 'À') | (coucheActuelle === ','))
 	) {
 		nouvelleCouche = 'Shift';
 	} else if (touchePressee === 'LShift' || touchePressee === 'RShift') {
@@ -297,10 +315,19 @@ function changerCouche(toucheModificatrice, clavier) {
 		nouvelleCouche = 'Visuel';
 	}
 
-	// Touche pressée = LAlt (pour accéder au Layer)
-	if (touchePressee === 'LAlt' && coucheActuelle === 'Layer') {
+	// Touche pressée = RCtrl (pour accéder au Layer)
+	if (
+		((touchePressee === 'RCtrl') & (infos_clavier.type === 'iso')) |
+			((touchePressee === 'Space') & (infos_clavier.type === 'ergodox')) &&
+		infos_clavier.plus === 'oui' &&
+		coucheActuelle === 'Layer'
+	) {
 		nouvelleCouche = 'Visuel';
-	} else if (touchePressee === 'LAlt') {
+	} else if (
+		((touchePressee === 'RCtrl') & (infos_clavier.type === 'iso')) |
+			((touchePressee === 'Space') & (infos_clavier.type === 'ergodox')) &&
+		infos_clavier.plus === 'oui'
+	) {
 		nouvelleCouche = 'Layer';
 	}
 
@@ -309,6 +336,13 @@ function changerCouche(toucheModificatrice, clavier) {
 		nouvelleCouche = 'Visuel';
 	} else if (touchePressee === 'à') {
 		nouvelleCouche = 'À';
+	}
+
+	// Touche pressée = ,
+	if (touchePressee === ',' && coucheActuelle === ',') {
+		nouvelleCouche = 'Visuel';
+	} else if (touchePressee === ',') {
+		nouvelleCouche = ',';
 	}
 
 	// Une fois que la nouvelle couche est déterminée, on actualise la valeur de la couche, puis le clavier

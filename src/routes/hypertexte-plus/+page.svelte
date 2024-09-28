@@ -44,10 +44,10 @@
 			près de la <span class="important">disposition clavier idéale</span>. Effectivement, elle :
 		</p>
 		<ul class="margin0" style="text-align:left!important">
-			<li>éradique la quasi-totalité des <SFB />s ;</li>
-			<li>rajoute de merveilleux roulements ;</li>
-			<li>réduit les distances parcourues par les doigts, en particulier l’auriculaire droit ;</li>
-			<li>divise par 2 le nombre de touches frappées pour écrire certains mots ;</li>
+			<li>éradique la quasi-totalité des <SFB />s ;</li>
+			<li>rajoute de merveilleux roulements ;</li>
+			<li>réduit les distances parcourues par les doigts, en particulier l’auriculaire droit ;</li>
+			<li>divise par 2 le nombre de touches frappées pour écrire certains mots ;</li>
 			<li>
 				ajoute divers raccourcis tels qu’une touche <kbd-sortie>Alt + Tab</kbd-sortie>,
 				<kbd-sortie>Capsword</kbd-sortie>
