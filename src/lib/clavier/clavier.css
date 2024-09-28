@@ -311,10 +311,12 @@ bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='magique'] div {
 }
 
 /* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */
-bloc-clavier[data-couche='Layer'] bloc-touche[data-type='lettre'] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-type='français'] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-type='double'] div {
+bloc-clavier[data-couche='Layer'] bloc-touche div {
 	font-size: 0.8em;
+}
+/* Layer À, pour éviter que les touches avec 4 symboles débordent */
+bloc-clavier[data-couche='À'] bloc-touche div {
+	font-size: 0.7em;
 }
 
 /*
