@@ -9,7 +9,8 @@
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
 	import Raccourcis from './raccourcis.svelte';
-	import Roulements_SFB from './roulements_sfb.svelte';
+	import Roulements from './roulements.svelte';
+	import Reduction_SFBs from './reduction_sfbs.svelte';
 </script>
 
 <svelte:head>
@@ -102,16 +103,19 @@
 	</section>
 	<p class="important">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
 
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➀ Roulements et diminution des SFBs</h2>
-	<Roulements_SFB />
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➁ Abréviations</h2>
-	<Abreviations />
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➂ Confort</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">➀ Confort</h2>
 	<Confort />
 
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➃ Raccourcis</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">➁ Ajout d’excellents roulements</h2>
+	<Roulements />
+
+	<h2 data-aos="zoom-out" data-aos-mirror="true">➂ Abréviations</h2>
+	<Abreviations />
+
+	<h2 data-aos="zoom-out" data-aos-mirror="true">➃ Diminution des SFBs</h2>
+	<Reduction_SFBs />
+
+	<h2 data-aos="zoom-out" data-aos-mirror="true">➄ Raccourcis</h2>
 	<Raccourcis />
 </div>
 

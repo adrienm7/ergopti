@@ -32,7 +32,8 @@
 		'pl',
 		'pr',
 		'rs',
-		'tr'
+		'tr',
+		'th'
 	];
 </script>
 
@@ -203,6 +204,22 @@
 			celui-ci. Vous trouverez plus de détails sur la page <a href="/benchmarks">Benchmarks</a>.
 		</p>
 	</div>
+	<h3 data-aos="fade-right" data-aos-mirror="true">
+		Touche <kbd>BackSpace</kbd> à la place de Capslock
+	</h3>
+	<p>
+		La touche <kbd>BackSpace</kbd> est l’une des touches les plus utilisées sur un clavier. En
+		effet, elle permet de corriger une erreur, ce qui est très fréquent lors de la frappe d’un
+		texte. Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée en haut à
+		droite du clavier. Par conséquent, il est logique de vouloir la placer sur un emplacement très
+		accessible. C’est pour cela que la touche <kbd>BackSpace</kbd> a été dupliquée sur la touche
+		<kbd>Capslock</kbd>
+		en <Nom />.
+	</p>
+	<p>
+		Idéalement, il serait même mieux de la mettre sur une touche activée par un pouce. Toutefois,
+		sur les claviers non Ergodox c’est difficilement réalisable.
+	</p>
 </section>
 
 <section>
@@ -354,6 +371,7 @@
 			<li><kbd>D’</kbd></li>
 			<li><kbd>NC</kbd></li>
 			<li><kbd>NG</kbd> pour tous les -I<span class="hyper text-bold">NG</span> en anglais</li>
+			<li><kbd>TH</kbd></li>
 			<li><kbd>PR</kbd></li>
 			<li><kbd>GR</kbd></li>
 		</ul>
@@ -653,7 +671,8 @@
 		<h3 data-aos="fade-right" data-aos-mirror="true">Touches de raccourci sur la version ISO</h3>
 		<p>
 			La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier
-			de ces touches de raccourci, car les touches à sa gauche sont déjà occupées par les touches
+			des touches de raccourci de la version Ergodox, car les touches à sa gauche sont déjà occupées
+			par les touches
 			<kbd>Shift</kbd>, <kbd>"Capslock"</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
 			placer ces 3 touches sous les pouces.
 		</p>

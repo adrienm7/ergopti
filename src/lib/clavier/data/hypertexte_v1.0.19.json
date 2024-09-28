@@ -1274,7 +1274,7 @@
 			"Ctrl": "h",
 			"Layer": "⊞⇦",
 			"À": "techn",
-			",": "nh",
+			",": "ph",
 			"type": "lettre"
 		},
 		{
@@ -1370,7 +1370,7 @@
 			"Ctrl": "p",
 			"Layer": "+⇨",
 			"À": "",
-			",": "ph",
+			",": "xp",
 			"type": "lettre"
 		},
 		{
@@ -1431,7 +1431,7 @@
 			"ShiftAltGr": "☻",
 			"Ctrl": "u",
 			"Layer": "^⇩",
-			"À": "bu",
+			"À": "ough",
 			",": "ju",
 			"type": "lettre"
 		},
@@ -1482,7 +1482,7 @@
 			"Ctrl": "y",
 			"Layer": "^⇤",
 			"À": "",
-			",": "",
+			",": "yi",
 			"type": "lettre"
 		},
 		{
