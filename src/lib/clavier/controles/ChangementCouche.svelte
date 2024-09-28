@@ -17,7 +17,7 @@
 	];
 	let couches_plus = couches_standard.concat([
 		['★ Layer', 'Layer'],
-		['★ Touche ,', ','],
+		['★ Touche Virgule', ','],
 		['★ Touche À', 'À']
 	]);
 
