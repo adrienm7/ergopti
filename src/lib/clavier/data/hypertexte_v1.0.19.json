@@ -1060,7 +1060,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "Tab",
+			"touche": "enter",
 			"main": "gauche",
 			"doigt": "pouce",
 			"ligne": "6",
@@ -1100,7 +1100,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "enter",
+			"touche": "Tab",
 			"main": "droite",
 			"doigt": "pouce",
 			"ligne": "6",

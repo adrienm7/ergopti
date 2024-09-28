@@ -20,22 +20,32 @@
 	}
 
 	let liste_benchmarks_fr = [
-		['Essais', 'essais'],
-		['Corpus Panaché', 'panache'],
-		['Livre de Savoir II', 'LdS'],
-		['Romans', 'romans']
+		['Corpus Panaché (Pyjam)', 'panache'],
+		['Essais (Pyjam)', 'essais'],
+		['Corpus Johnix Mails', 'corgus_johnix_mails'],
+		['Corpus Nemolivier', 'corpus_nemolivier_propre'],
+		['Romans (24Mo)', 'romans']
 	];
 
 	let liste_benchmarks_en = [
-		['Chained English Bigrams 7 (1M)', 'chained_english_bigrams7'],
-		['Chained Proglish Bigrams 7 (1M)', 'chained_proglish_bigrams7'],
-		['Chained Code Bigrams 7 (1M)', 'chained_code_bigrams7']
+		['Chained English Bigrams 9 (3M)', 'chained_english_bigrams_9'],
+		['Chained English Bigrams 7 (1M)', 'chained_english_bigrams_7'],
+		['Chained Proglish Bigrams 7 (1M)', 'chained_proglish_bigrams_7'],
+		['500 Common Words in Prose (664K)', '500_common_words_in_prose'],
+		['Common SAT Words (9K)', 'common_sat_words'],
+		['Chained Code Bigrams 7 (1M)', 'chained_code_bigrams_7'],
+		['Programming Ponctuation (10K)', 'programming_punctuation'],
+		['Python for Everybody (437K)', 'python_for_everybody'],
+		['Think C++ (330K)', 'think_c++'],
+		['Think Java (380K)', 'think_java'],
+		['Data Munging with Perl (600K)', 'data_munging_with_perl'],
+		['Practical PHP Testing  (95K)', 'practical_php_testing']
 	];
 
 	let clavier = 'iso';
 	let langue = 'fr';
-	let corpus_fr = 'essais';
-	let corpus_en = 'chained_english_bigrams7';
+	let corpus_fr = 'panache';
+	let corpus_en = 'chained_english_bigrams_9';
 </script>
 
 <svelte:head>
@@ -181,8 +191,8 @@
 		</p>
 	</section>
 	<mini-espace />
-	<div class="btn-group">
-		<button on:click={toggleLangue}>
+	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
+		<button on:click={toggleLangue} style="height:2.5rem;">
 			{#if langue === 'fr'}
 				{@html '<p><span class="hyper">Français</span>➜&nbsp;<span class="texte">Anglais</span></p>'}
 			{:else}
@@ -190,23 +200,23 @@
 			{/if}
 		</button>
 
-		<button on:click={toggleClavier}>
+		<button on:click={toggleClavier} style="height:2.5rem;">
 			{#if clavier === 'ergodox'}
 				{@html '<p><span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
 			{:else}
 				{@html '<p>ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
 			{/if}
 		</button>
-		<div>
+		<div style="display:inline-block;">
 			{#if langue === 'fr'}
-				<select bind:value={corpus_fr}>
+				<select bind:value={corpus_fr} style="height:2.5rem;">
 					{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
 							>{infos_benchmark[0]}</option
 						>{/each}
 				</select>
 			{/if}
 			{#if langue === 'en'}
-				<select bind:value={corpus_en}>
+				<select bind:value={corpus_en} style="height:2.5rem;">
 					{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
 							>{infos_benchmark[0]}</option
 						>{/each}
