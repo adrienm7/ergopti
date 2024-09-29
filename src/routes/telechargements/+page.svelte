@@ -1,5 +1,8 @@
 <script>
+	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
+	import SFB from '$lib/composants/SFB.svelte';
+
 	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
 
 	import { version } from '$lib/stores_infos.js';
@@ -17,15 +20,17 @@
 <div class="contenu">
 	<h1 data-aos="zoom-in" data-aos-mirror="true">Téléchargements</h1>
 
-	<div class="paragraphe">
+	<section class="paragraphe">
 		<!-- <div class="btn-group">
 			<button><a href="/downloads/HyperTexte.exe">HyperTexte.exe</a></button>
 			<button><a href="/downloads/HyperTexte.kbe">HyperTexte.kbe</a></button>
 		</div> -->
+		<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
+		<EmulationClavier />
 
 		<h2 data-aos="zoom-out" data-aos-mirror="true">Fichiers</h2>
 
-		<h3>Pour installer la disposition</h3>
+		<h3>Installer la disposition sur Windows</h3>
 		<mini-espace />
 		<div>
 			<a href="/files/HyperTexte v{versionValue}.exe"
@@ -47,7 +52,56 @@
 		</div>
 		<petit-espace />
 
-		<h3>Pour les comparateurs de disposition</h3>
+		<h3>Installer la disposition — Avec Kalamine</h3>
+		<p>
+			Kalamine permet de générer des fichiers d’installation pour plusieurs systèmes d’exploitation.
+			Cependant, les fichiers plus bas n’ont pas encore été testés. De plus, certaines
+			fonctionnalités vont manquer, comme la modification de la touche Ctrl pour avoir les
+			raccourcis <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>X</kbd-sortie>,
+			<kbd-sortie>Ctrl</kbd-sortie>
+			+ <kbd-sortie>C</kbd-sortie>, <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>V</kbd-sortie> et
+			<kbd-sortie>Ctrl</kbd-sortie>
+			+ <kbd-sortie>Z</kbd-sortie> sur la main gauche.
+		</p>
+		<p>
+			Si vous êtes sur Windows, il est fortement recommandé d’utiliser plutôt les fichiers ci-dessus
+			et non ceux pour Windows générés par Kalamine. Si vous n’utilisez pas Windows, vous pouvez les
+			utiliser, mais en vous rappelant de leurs limites.
+		</p>
+		<div>
+			<a href="/dist/hypertexte.svg"><button>hypertexte.svg</button></a>
+		</div>
+		<div>
+			<h4>Windows</h4>
+			<a href="/dist/hypertexte.ahk"
+				><button class="bouton-telechargement">HyperTexte Kalamine AHK</button></a
+			>
+		</div>
+		<mini-espace />
+		<div>
+			<a href="/dist/hypertexte.klc"
+				><button class="bouton-telechargement">HyperTexte Kalamine KLC</button></a
+			>
+		</div>
+		<h4>MacOS</h4>
+		<div>
+			<a href="/dist/hypertexte.keylayout"
+				><button class="bouton-telechargement">HyperTexte Kalamine KEYLAYOUT</button></a
+			>
+		</div>
+		<h4>Linux</h4>
+		<div>
+			<a href="/dist/hypertexte.xkb_keymap"
+				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_keymap</button></a
+			>
+			et
+			<a href="/dist/hypertexte.xkb_symbols"
+				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_symbols</button></a
+			>
+		</div>
+		<petit-espace />
+
+		<h3>Fichiers pour les comparateurs de disposition</h3>
 		<mini-espace />
 		<p>
 			Pour notamment l’utiliser sur le site <a href="https://klanext.keyboard-design.com/"
@@ -72,15 +126,32 @@
 				><button>hypertexte.v{versionValue}.fr.ergodox</button></a
 			>
 		</div>
-		<mini-espace />
+		<petit-espace />
 		<div>
-			<span>Version pour le site ErgoL : </span><a href="/files/hypertexte.v{versionValue}.json"
-				><button>hypertexte.v{versionValue}</button></a
+			<span>Analyseur Ergo-L — Version à utiliser sur le site : </span><a
+				href="/files/hypertexteK.v{versionValue}.json"
+				><button>hypertexteK.v{versionValue}</button></a
 			>
 		</div>
-	</div>
+		<mini-espace />
+		<div>
+			<span>Analyseur Ergo-L — Version théorique : </span><a
+				href="/files/hypertexte.v{versionValue}.json"><button>hypertexte.v{versionValue}</button></a
+			>
+			<p>
+				Sur l’analyseur Ergo-L, les touches assignées à chaque doigt diffèrent. La touche <kbd
+					>À</kbd
+				>
+				par exemple est assignée à l’annulaire et non au majeur. Cela entraîne un <SFB />, car la
+				touche
+				<kbd>J</kbd>
+				se retrouve sur le même doigt que la touche <kbd>E</kbd>. Le <kbd>J</kbd> doit normalement
+				être sous le <kbd>U</kbd>. D’où la nécessité de la version K, qui corrige ce problème.
+			</p>
+		</div>
+	</section>
 
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
+	<!-- <h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
 	<h3>Instructions générales</h3>
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
@@ -89,11 +160,7 @@
 	</p>
 	<petit-espace />
 	<h3>Comment installer la disposition sur Windows</h3>
-	<p>[À faire]</p>
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
-
-	<EmulationClavier />
+	<p>[À faire]</p> -->
 </div>
 
 <style>
