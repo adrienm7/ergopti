@@ -11,7 +11,7 @@
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
-	import data from '$lib/clavier/data/hypertexte_v1.0.19.json';
+	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
 	import { majClavier } from '$lib/clavier/FonctionsClavier.js';
 
 	import * as data_clavier from '$lib/clavier/stores.js';

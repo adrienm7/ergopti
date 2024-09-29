@@ -1,5 +1,5 @@
 {
-    "label": "Frodptimot",
+    "label": "Optimot AltGr-Space-Shift",
     "fingerStart": {
         "1": 29,
         "2": 30,
