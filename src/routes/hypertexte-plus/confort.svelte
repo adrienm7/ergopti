@@ -57,7 +57,7 @@
 		<p>
 			À noter que pour écrire <kbd-sortie>AÎ</kbd-sortie> et <kbd-sortie>Â</kbd-sortie>, évitant
 			donc des <SFB />s, il est aussi possible de réaliser respectivement <kbd>ÊÉ</kbd> et
-			<kbd>ÉÊ</kbd>. Ce sont en outre des roulements très confortables.
+			<kbd>ÉÊ</kbd>. Ils offrent en outre des roulements très confortables.
 		</p>
 	</div>
 
