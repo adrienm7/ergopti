@@ -74,29 +74,30 @@
 		<div>
 			<h4>Windows</h4>
 			<a href="/dist/hypertexte.ahk"
-				><button class="bouton-telechargement">HyperTexte Kalamine AHK</button></a
+				><button class="bouton-telechargement">HyperTexte Kalamine AHK (user)</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<a href="/dist/hypertexte.klc"
-				><button class="bouton-telechargement">HyperTexte Kalamine KLC</button></a
+				><button class="bouton-telechargement">HyperTexte Kalamine KLC (admin)</button></a
 			>
 		</div>
 		<h4>MacOS</h4>
 		<div>
 			<a href="/dist/hypertexte.keylayout"
-				><button class="bouton-telechargement">HyperTexte Kalamine KEYLAYOUT</button></a
+				><button class="bouton-telechargement">HyperTexte Kalamine Keylayout</button></a
 			>
 		</div>
 		<h4>Linux</h4>
 		<div>
 			<a href="/dist/hypertexte.xkb_keymap"
-				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_keymap</button></a
+				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_keymap (user)</button></a
 			>
-			et
+		</div>
+		<div>
 			<a href="/dist/hypertexte.xkb_symbols"
-				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_symbols</button></a
+				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_symbols (root)</button></a
 			>
 		</div>
 		<petit-espace />
