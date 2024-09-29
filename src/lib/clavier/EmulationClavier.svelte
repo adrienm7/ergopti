@@ -154,7 +154,6 @@
 			let toucheClavier = data.touches.find((el) => el['touche'] == res['touche']);
 			presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
-				console.log('CapsLock ou Backspace');
 				envoiTouche_ReplacerCurseur('Backspace');
 				return true;
 			}
