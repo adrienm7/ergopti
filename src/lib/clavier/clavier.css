@@ -217,6 +217,7 @@ bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='^'],
 bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='trema'],
 bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='trema'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='t'] {
+	font-family: default;
 	font-weight: normal;
 }
 
@@ -264,8 +265,12 @@ bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='LAl
 bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='LAlt'] div,
 bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='RAlt'] div,
 bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='RAlt'] div,
-bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='Tab'] div,
-bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='Tab'] div {
+bloc-clavier[data-plus='oui'][data-type='iso'][data-couche='Visuel']
+	bloc-touche[data-touche='Tab']
+	div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-couche='Primary']
+	bloc-touche[data-touche='Tab']
+	div {
 	line-height: 1.2;
 	font-size: calc(var(--taille-texte-touche) * 0.7);
 }
