@@ -3,12 +3,18 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
+	import AlternanceMains from './accueil/alternance_mains.svelte';
+	import DistanceDoigtsTouches from './accueil/distance_doigts_touches.svelte';
+	import MinimisationSfbs from './accueil/minimisation_sfbs.svelte';
+	import PlacementLogiqueTouches from './accueil/placement_logique_touches.svelte';
+	import ChiffresAccesDirect from './accueil/chiffres_acces_direct.svelte';
+	import UtilisationUneMain from './accueil/utilisation_une_main.svelte';
+	import OptimisationRoulements from './accueil/optimisation_roulements.svelte';
+
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
 
 	import Presentation from './accueil/presentation.svelte';
-	import Genese from './accueil/genese.svelte';
-	import Autocritiques from './accueil/autocritiques.svelte';
 </script>
 
 <svelte:head>
@@ -67,7 +73,13 @@
 	<petit-espace />
 	<hr />
 
-	<Presentation />
+	<DistanceDoigtsTouches />
+	<MinimisationSfbs />
+	<AlternanceMains />
+	<OptimisationRoulements />
+	<PlacementLogiqueTouches />
+	<ChiffresAccesDirect />
+	<UtilisationUneMain />
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">
 		<span class="glow">★</span>
