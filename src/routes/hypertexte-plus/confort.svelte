@@ -5,6 +5,22 @@
 </script>
 
 <section>
+	<h3 data-aos="fade-right" data-aos-mirror="true">
+		Touche <kbd>BackSpace</kbd> à la place de Capslock
+	</h3>
+	<p>
+		La touche <kbd>BackSpace</kbd> est l’une des touches les plus utilisées sur un clavier. En
+		effet, elle permet de corriger une erreur, ce qui est très fréquent lors de la frappe d’un
+		texte. Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée en haut à
+		droite du clavier. Par conséquent, il est logique de vouloir la placer sur un emplacement très
+		accessible. C’est pour cela que la touche <kbd>BackSpace</kbd> a été dupliquée sur la touche
+		<kbd>Capslock</kbd>
+		en <NomPlus />.
+	</p>
+	<p>
+		Idéalement, il serait même mieux de la mettre sur une touche activée par un pouce. Toutefois,
+		sur les claviers non Ergodox c’est difficilement réalisable.
+	</p>
 	<h3 data-aos="fade-right" data-aos-mirror="true">[QU] automatiques avant les voyelles</h3>
 	<div class="content">
 		<p>
