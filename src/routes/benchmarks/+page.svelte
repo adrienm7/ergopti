@@ -3,6 +3,12 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
+	import { version } from '$lib/stores_infos.js';
+	let versionValue;
+	version.subscribe((value) => {
+		versionValue = value;
+	});
+
 	function toggleClavier() {
 		if (clavier === 'iso') {
 			clavier = 'ergodox';
@@ -44,7 +50,8 @@
 	];
 
 	let clavier = 'iso';
-	let langue = 'en_fr';
+	let langue = 'fr';
+	let ergol = 'en_fr';
 	let corpus_fr = 'panache';
 	let corpus_en = 'chained_english_bigrams_9';
 </script>
@@ -229,24 +236,29 @@
 	<mini-espace />
 	<div class="image">
 		{#if langue === 'fr'}
-			<img src="/img/benchmarks_{clavier}/{corpus_fr}.jpg" />
+			<img src="/img/benchmarks_{versionValue}/{clavier}/{corpus_fr}.jpg" />
 		{:else}
-			<img src="/img/benchmarks_{clavier}/{corpus_en}.jpg" />
+			<img src="/img/benchmarks_{versionValue}/{clavier}/{corpus_en}.jpg" />
 		{/if}
 	</div>
-	<h3>Analyse ErgoL</h3>
+	<h3>Analyse Ergo-L</h3>
 	<div style="display:flex; align-items:center; justify-content:space-between;">
-		<select bind:value={langue} style="height: 2rem">
+		<select bind:value={ergol} style="height: 2rem">
 			<option value="en_fr" selected>Français + Anglais</option>
 			<option value="fr">Français</option>
 			<option value="en">Anglais</option>
 		</select>
-		<a href="/img/analyse_ergol_{langue}.pdf" style="height: 2rem"
-			><button>Télécharger l’analyse ErgoL {langue}</button></a
+		<a href="/img/benchmarks_{versionValue}/analyse_ergol_{ergol}.pdf" style="height: 2rem"
+			><button>Télécharger l’analyse Ergo-L {ergol}</button></a
 		>
 	</div>
-	<mini-espace />
-	<embed src="/img/analyse_ergol_{langue}.pdf" type="application/pdf" width="100%" height="600px" />
+	<!-- <mini-espace />
+	<embed
+		src="/img/benchmarks_{versionValue}/analyse_ergol_{langue}.pdf"
+		type="application/pdf"
+		width="100%"
+		height="600px"
+	/> -->
 </div>
 
 <style>
