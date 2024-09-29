@@ -30,6 +30,7 @@
 	export let altgr = false;
 	export let control = false;
 	export let a_grave = false;
+	export let virgule = false;
 	let couche = 'Primary';
 
 	$: if (altgr && shift) {
@@ -55,6 +56,13 @@
 		majClavier(clavier);
 	} else if (a_grave) {
 		couche = 'À';
+		data_clavier[clavier].update((currentData) => {
+			currentData['couche'] = couche;
+			return currentData;
+		});
+		majClavier(clavier);
+	} else if (virgule) {
+		couche = ',';
 		data_clavier[clavier].update((currentData) => {
 			currentData['couche'] = couche;
 			return currentData;
@@ -90,6 +98,12 @@
 			});
 		} else if (a_grave) {
 			couche = 'À';
+			data_clavier[clavier].update((currentData) => {
+				currentData['couche'] = couche;
+				return currentData;
+			});
+		} else if (virgule) {
+			couche = ',';
 			data_clavier[clavier].update((currentData) => {
 				currentData['couche'] = couche;
 				return currentData;
@@ -140,6 +154,7 @@
 			let toucheClavier = data.touches.find((el) => el['touche'] == res['touche']);
 			presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
+				console.log('CapsLock ou Backspace');
 				envoiTouche_ReplacerCurseur('Backspace');
 				return true;
 			}
@@ -159,6 +174,17 @@
 					touche = toucheClavier['À'];
 				}
 				a_grave = false;
+				envoiTouche_ReplacerCurseur(touche);
+			} else if (virgule) {
+				let touche;
+				if (keyPressed === 'Space') {
+					touche = ' ';
+				} else {
+					// On supprime le à avant de taper le raccourci de la couche À
+					textarea.value = textarea.value.slice(0, -1);
+					touche = toucheClavier[','];
+				}
+				virgule = false;
 				envoiTouche_ReplacerCurseur(touche);
 			} else {
 				envoiTouche(event, toucheClavier);
@@ -208,6 +234,9 @@
 
 		if (touche === 'à') {
 			a_grave = true;
+		}
+		if (touche === ',') {
+			virgule = true;
 		}
 
 		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
