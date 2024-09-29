@@ -195,13 +195,14 @@ bloc-touche[data-touche='AltTab'] div {
 
 /* Affichage différent pour les touches mortes */
 
-bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='!'],
-bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='!'],
+bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='^'],
+bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='^'],
+bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='trema'],
+bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='trema'],
 bloc-clavier[data-couche='AltGr'][data-plus='non'] bloc-touche[data-touche='j'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='magique'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='e'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='à'],
-bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='h'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='u'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='t'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='r'] {
@@ -211,9 +212,10 @@ bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='r'] {
 }
 
 /* Car les glyphes de certaines touches mortes s’affichent mal sinon */
-bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='!'],
-bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='!'],
-bloc-clavier[data-couche='AltGr'] bloc-touche[data-touche='j'],
+bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='^'],
+bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='^'],
+bloc-clavier[data-couche='Visuel'] bloc-touche[data-touche='trema'],
+bloc-clavier[data-couche='Primary'] bloc-touche[data-touche='trema'],
 bloc-clavier[data-couche='ShiftAltGr'] bloc-touche[data-touche='t'] {
 	font-weight: normal;
 }
@@ -308,6 +310,15 @@ bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='lettre'] div,
 bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='français'] div,
 bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='magique'] div {
 	text-transform: uppercase;
+}
+
+bloc-clavier[data-couche='Ctrl'] bloc-touche[data-touche='è'],
+bloc-clavier[data-couche='Ctrl'] bloc-touche[data-touche='ê'],
+bloc-clavier[data-couche='Ctrl'] bloc-touche[data-touche='é'],
+bloc-clavier[data-couche='Ctrl'] bloc-touche[data-touche='à'] {
+	--couleur-touche-saturation: 0%;
+	--couleur-touche-luminosite: 100%;
+	--opacite-touche: 5%;
 }
 
 /* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */

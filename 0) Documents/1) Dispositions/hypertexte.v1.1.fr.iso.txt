@@ -1,5 +1,5 @@
 {
-    "label": "hypertexte.v1.0.20.fr.iso",
+    "label": "hypertexte.v1.1.fr.iso",
     "fingerStart": {
         "1": 29,
         "2": 30,
@@ -138,7 +138,7 @@
             "numpad": -1
         },
         {
-            "primary": 20,
+            "primary": 8,
             "finger": 10,
             "id": 13,
             "shift": -1,
@@ -161,7 +161,7 @@
             "finger": 1,
             "id": 15,
             "altGr": 96,
-            "shiftAltGr": 8222,
+            "shiftAltGr": -1,
             "numpad": -1
         },
         {
@@ -170,7 +170,7 @@
             "finger": 2,
             "id": 16,
             "altGr": 64,
-            "shiftAltGr": -1,
+            "shiftAltGr": 8222,
             "numpad": -1
         },
         {
@@ -255,7 +255,7 @@
             "numpad": -1
         },
         {
-            "primary": -1,
+            "primary": 776,
             "shift": -1,
             "finger": 10,
             "id": 26,
@@ -273,7 +273,7 @@
             "numpad": -1
         },
         {
-            "primary": 8,
+            "primary": 20,
             "finger": 1,
             "id": 28,
             "shift": -1,
@@ -318,12 +318,12 @@
             "numpad": -1
         },
         {
-            "primary": 44,
+            "primary": 46,
             "shift": -1,
             "finger": 4,
             "id": 33,
-            "altGr": 59,
-            "shiftAltGr": -1,
+            "altGr": 58,
+            "shiftAltGr": 183,
             "numpad": -1
         },
         {
@@ -381,7 +381,7 @@
             "numpad": -1
         },
         {
-            "primary": 8217,
+            "primary": -1,
             "finger": 10,
             "id": 40,
             "shift": -1,
@@ -435,12 +435,12 @@
             "numpad": -1
         },
         {
-            "primary": 46,
+            "primary": 44,
             "shift": -1,
             "finger": 4,
             "id": 46,
-            "altGr": 58,
-            "shiftAltGr": 183,
+            "altGr": 59,
+            "shiftAltGr": 8217,
             "numpad": -1
         },
         {

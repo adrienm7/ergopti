@@ -1,2 +1,2 @@
 import { writable } from 'svelte/store';
-export const version = writable('1.0.19');
+export const version = writable('1.1.2');

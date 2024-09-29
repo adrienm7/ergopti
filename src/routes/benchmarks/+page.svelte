@@ -23,8 +23,7 @@
 		['Corpus Panaché (Pyjam)', 'panache'],
 		['Essais (Pyjam)', 'essais'],
 		['Corpus Johnix Mails', 'corgus_johnix_mails'],
-		['Corpus Nemolivier', 'corpus_nemolivier_propre'],
-		['Romans (24Mo)', 'romans']
+		['Romans (24M)', 'romans']
 	];
 
 	let liste_benchmarks_en = [
@@ -32,6 +31,7 @@
 		['Chained English Bigrams 7 (1M)', 'chained_english_bigrams_7'],
 		['Chained Proglish Bigrams 7 (1M)', 'chained_proglish_bigrams_7'],
 		['500 Common Words in Prose (664K)', '500_common_words_in_prose'],
+		['Common English Words (6K)', 'common_english_words'],
 		['Common SAT Words (9K)', 'common_sat_words'],
 		['Chained Code Bigrams 7 (1M)', 'chained_code_bigrams_7'],
 		['Programming Ponctuation (10K)', 'programming_punctuation'],
@@ -39,7 +39,8 @@
 		['Think C++ (330K)', 'think_c++'],
 		['Think Java (380K)', 'think_java'],
 		['Data Munging with Perl (600K)', 'data_munging_with_perl'],
-		['Practical PHP Testing  (95K)', 'practical_php_testing']
+		['Practical PHP Testing  (95K)', 'practical_php_testing'],
+		['Random Text (30K)', 'random_text']
 	];
 
 	let clavier = 'iso';
