@@ -451,7 +451,7 @@
 			</li>
 			<li>
 				<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>`</kbd-sortie>
-				car le <span class="hyper text-bold">\</span> est au-dessus du E
+				car le <span class="hyper text-bold">`</span> est au-dessus du E
 			</li>
 			<li>
 				<kbd>AltGr</kbd> + <kbd>Ê</kbd> ➜ <kbd-sortie>^</kbd-sortie>
