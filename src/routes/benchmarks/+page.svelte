@@ -236,9 +236,9 @@
 	<h3>Analyse ErgoL</h3>
 	<div style="display:flex; align-items:center; justify-content:space-between;">
 		<select bind:value={langue} style="height: 2rem">
-			<option value="fr" selected>Français</option>
+			<option value="en_fr" selected>Français + Anglais</option>
+			<option value="fr">Français</option>
 			<option value="en">Anglais</option>
-			<option value="en_fr">Français + Anglais</option>
 		</select>
 		<a href="/img/analyse_ergol_{langue}.pdf" style="height: 2rem"
 			><button>Télécharger l’analyse ErgoL {langue}</button></a
