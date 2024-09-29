@@ -44,7 +44,7 @@
 	];
 
 	let clavier = 'iso';
-	let langue = 'fr';
+	let langue = 'en_fr';
 	let corpus_fr = 'panache';
 	let corpus_en = 'chained_english_bigrams_9';
 </script>
@@ -75,7 +75,7 @@
 			valeur.
 		</p>
 		<mini-espace />
-		<h3>Comparez le même type de clavier</h3>
+		<h3>Comparer le même type de clavier</h3>
 		<p>
 			Ne comparez pas une disposition ISO avec une disposition Ergodox. Sinon, logiquement la
 			disposition Ergodox sera mieux notée. Elle aura en effet une distance aux touches moindre, car
@@ -85,7 +85,7 @@
 		</p>
 
 		<mini-espace />
-		<h3>Comparez des claviers possédant une touche pour tous les caractères du corpus</h3>
+		<h3>Comparer des claviers possédant une touche pour tous les caractères du corpus</h3>
 		<p>
 			Un autre point à bien faire attention est de <span class="important"
 				>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</span
