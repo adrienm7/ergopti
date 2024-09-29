@@ -62,8 +62,8 @@
 		<span class="important">KLAnext</span> est l’un d’entre eux et est gratuitement accessible à
 		l’adresse
 		<a href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a>. C’est
-		l’un des comparateurs les plus utilisés en raison de son algorithme de notation qui serait plus
-		"juste" que les autres.
+		l’un des comparateurs en ligne les plus utilisés en raison de son algorithme de notation qui
+		serait meilleur que les autres.
 	</div>
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Comment bien utiliser KLAnext</h2>

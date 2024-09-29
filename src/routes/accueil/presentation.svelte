@@ -50,7 +50,7 @@
 		</p>
 		<p class="text-gray">
 			➜ L’idée est de taper sur une touche, puis de tout de suite replacer le doigt sur la rangée du
-			mileu. Cela permet de toujours être capable de bouger rapidement dans n’importe quelle
+			milieu. Cela permet de toujours être capable de bouger rapidement dans n’importe quelle
 			direction, un peu comme un sportif se replace toujours au milieu du terrain au cours d’un
 			match.
 		</p>
@@ -97,7 +97,7 @@
 				>La légende raconte que sa première rangée remonte à l’époque de l’invention de la machine à
 				écrire. Le choix de la disposition QWERTY aurait, entre autres raisons, été influencé par un
 				aspect purement marketing. En effet, à des fins de démonstrations, ont été placées sur la
-				rangée supérieure de la machine à écrire toutes les lettres nécessaires pour pouvoire écrire <kbd-sortie
+				rangée supérieure de la machine à écrire toutes les lettres nécessaires pour pouvoir écrire <kbd-sortie
 					>TYPEWRITER</kbd-sortie
 				>.</span
 			>
@@ -261,7 +261,7 @@
 			>
 			ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
 			regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la
-			supression totale des <SFB />s est impossible. Toutefois, il est quand même possible de les
+			suppression totale des <SFB />s est impossible. Toutefois, il est quand même possible de les
 			réduire drastiquement. C’est ce que fait <Nom />.
 		</p>
 	</div>
@@ -395,7 +395,7 @@
 		</ul>
 
 		<petit-espace />
-		<p>Vous pouvez visualiser les roulements présentés précédemment ci-desosus :</p>
+		<p>Vous pouvez visualiser les roulements présentés précédemment ci-dessous :</p>
 		<BlocClavier clavier="roulements" />
 		<div style="height: 20px" />
 		<controles-roulements
@@ -662,8 +662,8 @@
 			+ <kbd-sortie>C</kbd-sortie>,
 			<kbd-sortie>Ctrl</kbd-sortie>
 			+ <kbd-sortie>V</kbd-sortie> et <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>Z</kbd-sortie>
-			sont également conservés à gauche. Cela permet de les réaliser sans avoir à bouger la main
-			droite. Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>, <kbd>Ctrl</kbd> +
+			sont également conservés à gauche. Cela permet de les réaliser sans avoir à bouger la main droite.
+			Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>, <kbd>Ctrl</kbd> +
 			<kbd>É</kbd>,
 			<kbd>Ctrl</kbd>
 			+ <kbd>À</kbd> et <kbd>Ctrl</kbd> + <kbd>È</kbd>

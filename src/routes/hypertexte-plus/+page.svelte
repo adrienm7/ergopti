@@ -94,11 +94,11 @@
 			devraient arriver que très rarement, mais tout dépend de votre utilisation. Par exemple,
 			l’enchaînement <kbd>XG</kbd>
 			est très peu commun, mais les data scientists l’utiliseront régulièrement pour écrire
-			<em>XGBoost</em>. Si c’est le cas, vous avez la possibilité de désactiver certains des ajouts
-			de <NomPlus />, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple
-			avec une macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci
-			transformant XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce
-			n’était qu’un exemple illustratif.
+			<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
+			/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
+			macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
+			XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était
+			qu’un exemple illustratif.
 		</p>
 	</section>
 	<p class="important">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
