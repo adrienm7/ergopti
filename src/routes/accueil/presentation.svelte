@@ -654,7 +654,19 @@
 			<kbd>Alt</kbd>
 			+
 			<kbd>=</kbd>. En effet, normalement le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
-			<kbd>L</kbd>. En dehors de cela, des touches de raccourci ont aussi été implémentées :
+			<kbd>L</kbd>.
+		</p>
+		<p>
+			Les raccourcis <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>X</kbd-sortie>,
+			<kbd-sortie>Ctrl</kbd-sortie>
+			+ <kbd-sortie>C</kbd-sortie>,
+			<kbd-sortie>Ctrl</kbd-sortie>
+			+ <kbd-sortie>V</kbd-sortie> et <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>Z</kbd-sortie>
+			sont également conservés à gauche. Cela permet de les réaliser sans avoir à bouger la main
+			droite. Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>, <kbd>Ctrl</kbd> +
+			<kbd>É</kbd>,
+			<kbd>Ctrl</kbd>
+			+ <kbd>À</kbd> et <kbd>Ctrl</kbd> + <kbd>È</kbd>
 		</p>
 
 		<h3 data-aos="fade-right" data-aos-mirror="true">
@@ -685,19 +697,6 @@
 			d’intégrer des touches
 			<kbd>Copier</kbd>, <kbd>Coller</kbd> et <kbd>Alt+Tab</kbd> respectivement sur
 			<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>.
-		</p>
-		<p>
-			Enfin, <NomPlus /> a aussi optimisé les raccourcis <kbd-sortie>Ctrl</kbd-sortie> +
-			<kbd-sortie>X</kbd-sortie>,
-			<kbd-sortie>Ctrl</kbd-sortie>
-			+ <kbd-sortie>Z</kbd-sortie> et <kbd-sortie>Ctrl</kbd-sortie>
-			+ <kbd-sortie>S</kbd-sortie>. Ceux-ci sont respectivement dédoublés en <kbd>Ctrl</kbd> +
-			<kbd>Ê</kbd>,
-			<kbd>Ctrl</kbd>
-			+
-			<kbd>À</kbd>
-			et <kbd>Ctrl</kbd>
-			+ <kbd>★</kbd>
 		</p>
 	</div>
 </section>
