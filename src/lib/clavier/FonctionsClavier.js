@@ -144,25 +144,30 @@ function majTouches() {
 				// }
 
 				// On ajoute des infos_clavier dans les data attributes de la touche
-			toucheClavier.dataset['touche'] = res['touche'];
+				toucheClavier.dataset['touche'] = res['touche'];
 				toucheClavier.dataset['colonne'] = colonne;
 				toucheClavier.dataset['doigt'] = res['doigt'];
 				toucheClavier.dataset['main'] = res['main'];
 				toucheClavier.dataset['type'] = contenuTouche['type'];
 				toucheClavier.dataset['style'] = '';
-				if (infos_clavier.couche === 'Visuel' && contenuTouche["Primary" + '-style'] !== undefined && contenuTouche["Primary" + '-style'] !== '') {
-					toucheClavier.dataset['style'] = contenuTouche["Primary" + '-style'];
-				} else{
-					if (contenuTouche[infos_clavier.couche + '-style'] !== undefined && contenuTouche[infos_clavier.couche + '-style'] !== '') {
-					toucheClavier.dataset['style'] = contenuTouche[infos_clavier.couche + '-style'];
+				if (
+					infos_clavier.couche === 'Visuel' &&
+					contenuTouche['Primary' + '-style'] !== undefined &&
+					contenuTouche['Primary' + '-style'] !== ''
+				) {
+					toucheClavier.dataset['style'] = contenuTouche['Primary' + '-style'];
+				} else {
+					if (
+						contenuTouche[infos_clavier.couche + '-style'] !== undefined &&
+						contenuTouche[infos_clavier.couche + '-style'] !== ''
+					) {
+						toucheClavier.dataset['style'] = contenuTouche[infos_clavier.couche + '-style'];
+					}
 				}
-			}
 				toucheClavier.style.setProperty('--taille', res['taille']);
-				toucheClavier.style.setProperty('--frequence', mayzner[res['touche']] / mayzner['max']);
-				toucheClavier.style.setProperty(
-					'--frequence-log',
-					Math.log(mayzner[res.touche] / mayzner['max'])
-				);
+				let frequence = mayzner[contenuTouche[infos_clavier.couche]] / mayzner['max'];
+				toucheClavier.style.setProperty('--frequence', frequence);
+				toucheClavier.style.setProperty('--frequence-log', Math.log(frequence));
 			}
 		}
 	}
@@ -363,31 +368,67 @@ function changerCouche(toucheModificatrice, clavier, infos_clavier) {
 }
 
 const mayzner = {
-	max: 12.49,
-	a: 8.04,
-	b: 1.48,
-	c: 3.34,
-	d: 3.82,
-	e: 12.49,
-	f: 2.4,
-	g: 1.87,
-	h: 5.05,
-	i: 7.57,
-	j: 0.16,
-	k: 0.54,
-	l: 4.07,
-	m: 2.51,
-	n: 7.23,
-	o: 7.64,
-	p: 2.14,
-	q: 0.12,
-	r: 6.28,
-	s: 6.51,
-	t: 9.28,
-	u: 2.73,
-	v: 1.05,
-	w: 1.68,
-	x: 0.23,
-	y: 1.66,
-	z: 0.09
+	max: 14.444,
+	e: 13.001,
+	t: 7.958,
+	a: 7.584,
+	n: 6.702,
+	s: 6.671,
+	o: 6.648,
+	i: 6.615,
+	r: 5.888,
+	u: 4.316,
+	l: 4.209,
+	h: 4.056,
+	d: 3.971,
+	c: 2.622,
+	m: 2.572,
+	',': 1.997,
+	p: 1.931,
+	f: 1.61,
+	g: 1.384,
+	v: 1.342,
+	w: 1.151,
+	b: 1.098,
+	y: 1.057,
+	q: 0.816,
+	"'": 0.756,
+	é: 0.716,
+	'.': 0.494,
+	k: 0.355,
+	j: 0.33,
+	';': 0.302,
+	x: 0.285,
+	à: 0.236,
+	'-': 0.175,
+	'“': 0.152,
+	'”': 0.15,
+	è: 0.13,
+	z: 0.115,
+	ê: 0.092,
+	':': 0.061,
+	'?': 0.061,
+	â: 0.054,
+	'!': 0.047,
+	î: 0.047,
+	ô: 0.036,
+	_: 0.03,
+	û: 0.024,
+	ç: 0.023,
+	ñ: 0.023,
+	ù: 0.022,
+	'‘': 0.013,
+	'—': 0.012,
+	œ: 0.011,
+	']': 0.009,
+	'[': 0.009,
+	'(': 0.008,
+	')': 0.008,
+	ï: 0.005,
+	'«': 0.004,
+	ë: 0.002,
+	'»': 0.002,
+	á: 0.001,
+	æ: 0.001,
+	í: 0.001
 };
