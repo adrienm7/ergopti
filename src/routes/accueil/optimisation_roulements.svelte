@@ -42,9 +42,9 @@
 	<div class="content">
 		<p>
 			L’optimisation de l’alternance des mains engendre que lors de l’utilisation d’une main pour
-			frapper une touche, il y a de fortes probabilités que le frappe suivante se fasse avec l’autre
+			frapper une touche, il y a de fortes probabilités que le frappe suivante se produise avec l’autre
 			main. Toutefois, cela n’arrive pas dans la totalité des cas, c’est pourquoi il convient de
-			s’assurer que le plus possible de frappes intra-mains se fassent à l’aide de roulements.
+			s’assurer que le plus possible de frappes intra-mains se fassent à l’aide de roulements, aussi appelés <i>rolls</i> en anglais.
 		</p>
 		<p>
 			Ma définition personnelle d’un "roulement" est un déplacement sur deux doigts consécutifs et

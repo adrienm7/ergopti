@@ -39,7 +39,7 @@ export const emulation = writable({
 export const frequences = writable({
 	emplacement: 'clavier_frequences',
 	type: 'iso',
-	couche: 'Visuel',
+	couche: 'Primary',
 	plus: 'non',
 	couleur: 'freq',
 	controles: 'non'

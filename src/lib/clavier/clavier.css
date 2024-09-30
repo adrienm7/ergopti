@@ -104,7 +104,10 @@ bloc-touche {
 	background-color: var(--couleur-fond-touche);
 
 	box-shadow: var(--ombres-touche);
-	text-shadow: rgb(0, 0, 0) 0px 0 1px, rgb(0, 0, 0) 0px 0 6px, rgba(0, 0, 0, 0.5) 0px 0 12px;
+	text-shadow:
+		rgb(0, 0, 0) 0px 0 1px,
+		rgb(0, 0, 0) 0px 0 6px,
+		rgba(0, 0, 0, 0.5) 0px 0 12px;
 	color: var(--couleur-texte-touche);
 	cursor: pointer;
 	font-size: var(--taille-texte-touche);
@@ -155,7 +158,9 @@ bloc-touche:hover,
 	position: relative;
 	top: var(--descente-touche);
 	text-shadow: none;
-	box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d), inset 0 0 1px #00000077;
+	box-shadow:
+		0 var(--profondeur-touche-pressee) 0 var(--effet-3d),
+		inset 0 0 1px #00000077;
 	color: #333 !important;
 	background-color: rgba(255, 255, 255, 0.85) !important;
 }
@@ -196,15 +201,13 @@ bloc-touche[data-touche='AltTab'] div {
 
 bloc-touche[data-style='morte'],
 bloc-touche[data-style='different'] {
-	--couleur-touche-saturation: 0%!important;
-	--couleur-touche-luminosite: 100%!important;
-	--opacite-touche: 5%!important;
+	--couleur-touche-saturation: 0% !important;
+	--couleur-touche-luminosite: 100% !important;
+	--opacite-touche: 5% !important;
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 	font-family: default;
 	font-weight: normal;
 }
-
-
 
 /*
 =============================
@@ -357,7 +360,9 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::after {
 	border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
 	border-top: none;
 	border-radius: 0 0 var(--arrondi-touche) var(--arrondi-touche);
-	box-shadow: var(--ombre-touche), 0 var(--profondeur-touche) 0 var(--effet-3d),
+	box-shadow:
+		var(--ombre-touche),
+		0 var(--profondeur-touche) 0 var(--effet-3d),
 		-0.5px var(--profondeur-touche) 0 var(--effet-3d);
 }
 
@@ -376,7 +381,8 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:hover::before {
 
 bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:active::after,
 bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:hover::after {
-	box-shadow: 0 var(--profondeur-touche-pressee) 0 var(--effet-3d),
+	box-shadow:
+		0 var(--profondeur-touche-pressee) 0 var(--effet-3d),
 		0 var(--profondeur-touche-pressee) 0 var(--effet-3d);
 }
 
@@ -520,7 +526,9 @@ bloc-clavier[data-couleur='freq'] bloc-touche {
 	--couleur-touche-saturation: 0%;
 }
 
-bloc-clavier[data-couleur='freq'] bloc-touche[data-type='lettre'] {
+bloc-clavier[data-couleur='freq'] bloc-touche[data-type='lettre'],
+bloc-clavier[data-couleur='freq'] bloc-touche[data-type='français'],
+bloc-clavier[data-couleur='freq'] bloc-touche[data-type='double'] {
 	--couleur-touche: calc(35deg * (0 - var(--frequence-log)));
 	--couleur-touche-saturation: 90%;
 	--couleur-touche-luminosite: 70%;
