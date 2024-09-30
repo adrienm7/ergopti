@@ -71,7 +71,7 @@ function majTouches() {
 				const contenuTouche = data.touches.find((el) => el['touche'] === res['touche']);
 
 				if (contenuTouche[infos_clavier.couche] === '') {
-					toucheClavier.innerHTML = '<div> <div>';
+					toucheClavier.innerHTML = '<div><div>'; /* Touche vide */
 				} else {
 					if (infos_clavier.couche === 'Visuel') {
 						if (contenuTouche['type'] === 'double') {
@@ -144,11 +144,19 @@ function majTouches() {
 				// }
 
 				// On ajoute des infos_clavier dans les data attributes de la touche
-				toucheClavier.dataset['touche'] = res['touche'];
+			toucheClavier.dataset['touche'] = res['touche'];
 				toucheClavier.dataset['colonne'] = colonne;
 				toucheClavier.dataset['doigt'] = res['doigt'];
 				toucheClavier.dataset['main'] = res['main'];
 				toucheClavier.dataset['type'] = contenuTouche['type'];
+				toucheClavier.dataset['style'] = '';
+				if (infos_clavier.couche === 'Visuel' && contenuTouche["Primary" + '-style'] !== undefined && contenuTouche["Primary" + '-style'] !== '') {
+					toucheClavier.dataset['style'] = contenuTouche["Primary" + '-style'];
+				} else{
+					if (contenuTouche[infos_clavier.couche + '-style'] !== undefined && contenuTouche[infos_clavier.couche + '-style'] !== '') {
+					toucheClavier.dataset['style'] = contenuTouche[infos_clavier.couche + '-style'];
+				}
+			}
 				toucheClavier.style.setProperty('--taille', res['taille']);
 				toucheClavier.style.setProperty('--frequence', mayzner[res['touche']] / mayzner['max']);
 				toucheClavier.style.setProperty(
