@@ -244,12 +244,12 @@
 	<h3>Analyse Ergo-L</h3>
 	<div style="display:flex; align-items:center; justify-content:space-between;">
 		<select bind:value={ergol} style="height: 2rem">
-			<option value="en_fr" selected>Français + Anglais</option>
+			<option value="en_fr">Français + Anglais</option>
 			<option value="fr">Français</option>
 			<option value="en">Anglais</option>
 		</select>
 		<a href="/img/benchmarks_{versionValue}/analyse_ergol_{ergol}.pdf" style="height: 2rem"
-			><button>Télécharger l’analyse Ergo-L {ergol}</button></a
+			><button>Télécharger l’analyse Ergo-L</button></a
 		>
 	</div>
 	<!-- <mini-espace />
