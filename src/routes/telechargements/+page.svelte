@@ -13,12 +13,12 @@
 </script>
 
 <svelte:head>
-	<title>Téléchargements</title>
-	<meta name="description" content="Télécharger HyperTexte" />
+	<title>Utiliser HyperTexte</title>
+	<meta name="description" content="Fichiers pour utiliser HyperTexte" />
 </svelte:head>
 
 <div class="contenu">
-	<h1 data-aos="zoom-in" data-aos-mirror="true">Téléchargements</h1>
+	<h1 data-aos="zoom-in" data-aos-mirror="true">Utiliser HyperTexte</h1>
 
 	<section class="paragraphe">
 		<!-- <div class="btn-group">
