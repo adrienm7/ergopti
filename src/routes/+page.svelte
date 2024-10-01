@@ -3,6 +3,9 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
+	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
+
 	import AlternanceMains from './accueil/alternance_mains.svelte';
 	import DistanceDoigtsTouches from './accueil/distance_doigts_touches.svelte';
 	import MinimisationSfbs from './accueil/minimisation_sfbs.svelte';
@@ -10,11 +13,6 @@
 	import ChiffresAccesDirect from './accueil/chiffres_acces_direct.svelte';
 	import UtilisationUneMain from './accueil/utilisation_une_main.svelte';
 	import OptimisationRoulements from './accueil/optimisation_roulements.svelte';
-
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
-
-	import Presentation from './accueil/presentation.svelte';
 </script>
 
 <svelte:head>
