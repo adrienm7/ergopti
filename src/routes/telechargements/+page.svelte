@@ -28,31 +28,31 @@
 		<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
 		<EmulationClavier />
 
-		<h2 data-aos="zoom-out" data-aos-mirror="true">Fichiers</h2>
+		<h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
 
-		<h3>Installer la disposition sur Windows</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Installer la disposition sur Windows</h3>
 		<mini-espace />
 		<div>
-			<a href="/files/HyperTexte v{versionValue}.exe"
+			<a href="/files/HyperTexte v{versionValue}.exe" download
 				><button class="bouton-telechargement">☛ HyperTexte {versionValue}.exe</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/files/HyperTexte v{versionValue}.kbe"
+			<a href="/files/HyperTexte v{versionValue}.kbe" download
 				><button>Fichier source de HyperTexte {versionValue}</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a aria-disabled="true"
+			<a aria-disabled="true" href="" download
 				><button class="bouton-telechargement">☛ HyperTextePlus.exe — Pas encore disponible</button
 				></a
 			>
 		</div>
 		<petit-espace />
 
-		<h3>Installer la disposition — Avec Kalamine</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Installer la disposition — Avec Kalamine</h3>
 		<p>
 			Kalamine permet de générer des fichiers d’installation pour plusieurs systèmes d’exploitation.
 			Cependant, les fichiers plus bas n’ont pas encore été testés. De plus, certaines
@@ -68,41 +68,49 @@
 			et non ceux pour Windows générés par Kalamine. Si vous n’utilisez pas Windows, vous pouvez les
 			utiliser, mais en vous rappelant de leurs limites.
 		</p>
+		<mini-espace />
 		<div>
-			<a href="/dist/hypertexte.svg"><button>hypertexte.svg</button></a>
+			<a href="/hypertexte.toml" download><button>hypertexte.toml</button></a>
+		</div>
+		<mini-espace />
+		<div>
+			<a href="/dist/hypertexte.svg" download><button>hypertexte.svg</button></a>
 		</div>
 		<div>
 			<h4>Windows</h4>
-			<a href="/dist/hypertexte.ahk"
+			<a href="/dist/hypertexte.ahk" download
 				><button class="bouton-telechargement">HyperTexte Kalamine AHK (user)</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/dist/hypertexte.klc"
+			<a href="/dist/hypertexte.klc" download
 				><button class="bouton-telechargement">HyperTexte Kalamine KLC (admin)</button></a
 			>
 		</div>
 		<h4>MacOS</h4>
 		<div>
-			<a href="/dist/hypertexte.keylayout"
+			<a href="/dist/hypertexte.keylayout" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Keylayout</button></a
 			>
 		</div>
 		<h4>Linux</h4>
 		<div>
-			<a href="/dist/hypertexte.xkb_keymap"
+			<a href="/dist/hypertexte.xkb_keymap" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_keymap (user)</button></a
 			>
 		</div>
+		<mini-espace />
 		<div>
-			<a href="/dist/hypertexte.xkb_symbols"
+			<a href="/dist/hypertexte.xkb_symbols" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_symbols (root)</button></a
 			>
 		</div>
 		<petit-espace />
 
-		<h3>Fichiers pour les comparateurs de disposition</h3>
+		<h2 data-aos="zoom-out" data-aos-mirror="true">
+			Fichiers pour les comparateurs de disposition
+		</h2>
 		<mini-espace />
 		<p>
 			Pour notamment l’utiliser sur le site <a href="https://klanext.keyboard-design.com/"
@@ -111,33 +119,35 @@
 		</p>
 		<mini-espace />
 		<div>
-			<span>Version ISO : </span><a href="/files/hypertexte.v{versionValue}.fr.iso.txt"
+			<span>Version ISO : </span><a href="/files/hypertexte.v{versionValue}.fr.iso.txt" download
 				><button>hypertexte.v{versionValue}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<span>Version ISO+ : </span><a href="/files/hypertexte.v{versionValue}.fr.iso+.txt"
+			<span>Version ISO+ : </span><a href="/files/hypertexte.v{versionValue}.fr.iso+.txt" download
 				><button>hypertexte.v{versionValue}.fr.iso+</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<span>Version Ergodox : </span><a href="/files/hypertexte.v{versionValue}.fr.ergodox.txt"
-				><button>hypertexte.v{versionValue}.fr.ergodox</button></a
+			<span>Version Ergodox : </span><a
+				href="/files/hypertexte.v{versionValue}.fr.ergodox.txt"
+				download><button>hypertexte.v{versionValue}.fr.ergodox</button></a
 			>
 		</div>
 		<petit-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version à utiliser sur le site : </span><a
 				href="/files/hypertexteK.v{versionValue}.json"
-				><button>hypertexteK.v{versionValue}</button></a
+				download><button>hypertexteK.v{versionValue}</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version théorique : </span><a
-				href="/files/hypertexte.v{versionValue}.json"><button>hypertexte.v{versionValue}</button></a
+				href="/files/hypertexte.v{versionValue}.json"
+				download><button>hypertexte.v{versionValue}</button></a
 			>
 			<p>
 				Sur l’analyseur Ergo-L, les touches assignées à chaque doigt diffèrent. La touche <kbd

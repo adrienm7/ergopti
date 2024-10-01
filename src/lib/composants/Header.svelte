@@ -40,13 +40,13 @@
 				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/telechargements">❖ Téléchargements</a>
+				<a href="/telechargements"><span style="font-weight: bold;">⭳</span> Téléchargements</a>
 			</li>
 			<li
-				aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}
+				aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
 				on:click={fermerMenu}
 			>
-				<a href="/contact">➜ Contact</a>
+				<a href="/informations"><span style="font-weight: bold;">ⓘ</span> Informations</a>
 			</li>
 		</ul>
 	</nav>
