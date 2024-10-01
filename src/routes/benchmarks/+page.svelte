@@ -82,7 +82,7 @@
 			valeur.
 		</p>
 		<mini-espace />
-		<h3>Comparer le même type de clavier</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Comparer le même type de clavier</h3>
 		<p>
 			Ne comparez pas une disposition ISO avec une disposition Ergodox. Sinon, logiquement la
 			disposition Ergodox sera mieux notée. Elle aura en effet une distance aux touches moindre, car
@@ -92,7 +92,9 @@
 		</p>
 
 		<mini-espace />
-		<h3>Comparer des claviers possédant une touche pour tous les caractères du corpus</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">
+			Comparer des claviers possédant une touche pour tous les caractères du corpus
+		</h3>
 		<p>
 			Un autre point à bien faire attention est de <span class="important"
 				>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</span
@@ -102,7 +104,9 @@
 		</p>
 
 		<mini-espace />
-		<h3>Conclusion sur la comparaison de dispositions</h3>
+		<h3 data-aos="fade-right" data-aos-mirror="true">
+			Conclusion sur la comparaison de dispositions
+		</h3>
 		<p>
 			Comparer des dispositions n’est pas aussi simple qu’on pourrait de prime abord le penser. Il
 			ne suffit pas de balancer son texte et sa disposition dans un comparateur et de le faire
@@ -198,7 +202,7 @@
 			emplacements.
 		</p>
 	</section>
-	<h3>Analyse KLAnext</h3>
+	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse KLAnext</h3>
 	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
 		<button on:click={toggleLangue} style="height:2.5rem;">
 			{#if langue === 'fr'}
@@ -241,7 +245,7 @@
 			<img src="/img/benchmarks_{versionValue}/{clavier}/{corpus_en}.jpg" />
 		{/if}
 	</div>
-	<h3>Analyse Ergo-L</h3>
+	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse Ergo-L</h3>
 	<div style="display:flex; align-items:center; justify-content:space-between;">
 		<select bind:value={ergol} style="height: 2rem">
 			<option value="en_fr">Français + Anglais</option>

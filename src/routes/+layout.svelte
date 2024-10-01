@@ -22,9 +22,6 @@
 	import '$lib/css/orb.css';
 	import '$lib/css/miscellaneous.css';
 
-	onMount(() => {
-		matomo.trackPageView();
-	});
 	afterUpdate(() => {
 		AOS.init();
 		typography(document.getElementById('page'));
@@ -84,7 +81,9 @@
 		text-align: center;
 		margin: 0 auto;
 		border: 2px solid white;
-		box-shadow: rgba(0, 0, 0, 0.6) 0px -2px 4px, rgba(0, 0, 0, 0.7) 0px 3px 8px;
+		box-shadow:
+			rgba(0, 0, 0, 0.6) 0px -2px 4px,
+			rgba(0, 0, 0, 0.7) 0px 3px 8px;
 	}
 
 	@media (max-width: 700px) {
