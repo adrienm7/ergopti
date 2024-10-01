@@ -22,8 +22,8 @@
 			<li aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}>
 				<a href="/hypertexte-plus">HyperTexte<span class="glow">+</span></a>
 			</li>
-			<li aria-current={$page.url.pathname === '/telechargement' ? 'page' : undefined}>
-				<a href="/telechargement">Téléchargement</a>
+			<li aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}>
+				<a href="/telechargements">Téléchargements</a>
 			</li>
 		</ul>
 		<svg viewBox="0 0 2 3" aria-hidden="true">
@@ -126,5 +126,4 @@
 	a:hover {
 		color: var(--color-theme-1);
 	}
-
 </style>
