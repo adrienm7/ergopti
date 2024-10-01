@@ -1197,7 +1197,7 @@
 			"touche": "b",
 			"Primary": "b",
 			"Shift": "B",
-			"AltGr": "«<span class='espace-insecable'></span>",
+			"AltGr": "«<espace-insecable></espace-insecable>",
 			"ShiftAltGr": "“",
 			"Ctrl": "b",
 			"Layer": "↹",
@@ -1246,7 +1246,7 @@
 			"touche": "f",
 			"Primary": "f",
 			"Shift": "F",
-			"AltGr": "<span class='espace-insecable'></span>»",
+			"AltGr": "<espace-insecable></espace-insecable>»",
 			"ShiftAltGr": "”",
 			"Ctrl": "f",
 			"Layer": "+<span style='font-weight: light;'>↩</span>",
@@ -1295,6 +1295,7 @@
 			"Primary": "j",
 			"Shift": "J",
 			"AltGr": "◌̈",
+			"AltGr-style": "morte",
 			"ShiftAltGr": "",
 			"Ctrl": "j",
 			"Layer": "",
@@ -1505,26 +1506,26 @@
 			"touche": ",",
 			"Primary": ",",
 			"Primary+": ",",
-			"Shift": "<span class='espace-insecable'></span>;",
+			"Shift": "<espace-insecable></espace-insecable>;",
 			"AltGr": ";",
 			"ShiftAltGr": "",
 			"Ctrl": ",",
 			"Layer": "␛",
 			"À": "",
 			",": ",",
-			"type": "double"
+			"type": "ponctuation"
 		},
 		{
 			"touche": ".",
 			"Primary": ".",
-			"Shift": "<span class='espace-insecable'></span>:",
+			"Shift": "<espace-insecable></espace-insecable>:",
 			"AltGr": ":",
 			"ShiftAltGr": "·",
 			"Ctrl": ".",
 			"Layer": "+↹",
 			"À": "",
 			",": "",
-			"type": "double"
+			"type": "ponctuation"
 		},
 		{
 			"touche": "magique",
@@ -1551,45 +1552,45 @@
 			"Layer": "★",
 			"À": "★",
 			",": "★",
-			"type": ""
+			"type": "magique"
 		},
 		{
 			"touche": "’",
 			"Primary": "'",
-			"Shift": "<span class='espace-insecable'></span>?",
+			"Shift": "<espace-insecable></espace-insecable>?",
 			"AltGr": "?",
 			"ShiftAltGr": "¿",
 			"Ctrl": "'",
 			"Layer": "^+⇨",
 			"À": "",
 			",": "j’",
-			"type": "double"
+			"type": "ponctuation"
 		},
 		{
 			"touche": "^",
 			"Primary": "◌̂",
 			"Primary-style": "morte",
-			"Shift": "<span class='espace-insecable'></span>!",
+			"Shift": "<espace-insecable></espace-insecable>!",
 			"AltGr": "!",
 			"ShiftAltGr": "¡",
 			"Ctrl": "!",
 			"Layer": "",
 			"À": "",
 			",": "",
-			"type": "double"
+			"type": "morte"
 		},
 		{
 			"touche": "trema",
 			"Primary": "◌̈",
 			"Primary-style": "morte",
-			"Shift": "<span class='espace-insecable'></span>",
-			"AltGr": "<span class='espace-insecable'></span>",
+			"Shift": "<espace-insecable></espace-insecable>",
+			"AltGr": "<espace-insecable></espace-insecable>",
 			"ShiftAltGr": "",
 			"Ctrl": "!",
 			"Layer": "",
 			"À": "",
 			",": "",
-			"type": ""
+			"type": "morte"
 		},
 		{
 			"touche": "à",
@@ -1648,13 +1649,14 @@
 		{
 			"touche": "%",
 			"Primary": "%",
-			"Shift": "<span class='espace-insecable'></span>%",
+			"Shift": "<espace-insecable></espace-insecable>%",
 			"AltGr": "‰",
 			"ShiftAltGr": "‱",
 			"Ctrl": "+",
 			"À": "",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "symbole"
 		},
 		{
 			"touche": "=",
@@ -1665,7 +1667,8 @@
 			"Ctrl": "=",
 			"À": "",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "symbole"
 		},
 		{
 			"touche": "$",
@@ -1676,18 +1679,20 @@
 			"Ctrl": "$",
 			"À": "",
 			",": "",
-			"Layer": "+↹"
+			"Layer": "+↹",
+			"type": "symbole"
 		},
 		{
 			"touche": "€",
 			"Primary": "€",
-			"Shift": "<span class='espace-insecable'></span>€",
+			"Shift": "<espace-insecable></espace-insecable>€",
 			"AltGr": "£",
 			"ShiftAltGr": "",
 			"Ctrl": "-",
 			"À": "",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "symbole"
 		},
 		{
 			"touche": "1",
@@ -1698,7 +1703,8 @@
 			"Ctrl": "1",
 			"À": "1",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "2",
@@ -1709,7 +1715,8 @@
 			"Ctrl": "2",
 			"À": "2",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "3",
@@ -1720,7 +1727,8 @@
 			"Ctrl": "3",
 			"À": "3",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "4",
@@ -1731,7 +1739,8 @@
 			"Ctrl": "4",
 			"À": "4",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "5",
@@ -1742,7 +1751,8 @@
 			"Ctrl": "5",
 			"À": "5",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "6",
@@ -1753,7 +1763,8 @@
 			"Ctrl": "6",
 			"À": "6",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "7",
@@ -1764,7 +1775,8 @@
 			"Ctrl": "7",
 			"À": "7",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "8",
@@ -1775,7 +1787,8 @@
 			"Ctrl": "8",
 			"À": "8",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "9",
@@ -1786,7 +1799,8 @@
 			"Ctrl": "9",
 			"À": "9",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "0",
@@ -1797,7 +1811,8 @@
 			"Ctrl": "0",
 			"À": "0",
 			",": "",
-			"Layer": ""
+			"Layer": "",
+			"type": "chiffre"
 		},
 		{
 			"touche": "CapsLock",

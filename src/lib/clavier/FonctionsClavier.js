@@ -74,7 +74,7 @@ function majTouches() {
 					toucheClavier.innerHTML = '<div><div>'; /* Touche vide */
 				} else {
 					if (infos_clavier.couche === 'Visuel') {
-						if (contenuTouche['type'] === 'double') {
+						if (contenuTouche['type'] === 'ponctuation') {
 							if (res['touche'] === '"') {
 								// Cas particulier de la touche « " »
 								toucheClavier.innerHTML =
