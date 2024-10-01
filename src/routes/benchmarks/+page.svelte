@@ -216,7 +216,7 @@
 			{#if clavier === 'ergodox'}
 				{@html '<p><strong class="ergodox-text-gradient">Ergodox</strong> ➜&nbsp;ISO</p>'}
 			{:else}
-				{@html '<strong>ISO</strong> ➜ <span class="ergodox-text-gradient">Ergodox</span>'}
+				{@html '<p><strong>ISO</strong> ➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
 			{/if}
 		</button>
 		<div style="display:inline-block;">
