@@ -145,15 +145,15 @@
 		<petit-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version à utiliser sur le site : </span><a
-				href="/pilotes/kalamine/{versionValue}/hypertexte_K.v{versionValue}.json"
-				download><button>hypertexte_K.v{versionValue}</button></a
+				href="/pilotes/kalamine/{versionValue}/hypertexte_K.json"
+				download><button>hypertexte_K.json</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version théorique : </span><a
-				href="/pilotes/kalamine/{versionValue}/hypertexte.v{versionValue}.json"
-				download><button>hypertexte.v{versionValue}</button></a
+				href="/pilotes/kalamine/{versionValue}/hypertexte..json"
+				download><button>hypertexte.json</button></a
 			>
 			<p>
 				Sur l’analyseur Ergo-L, les touches assignées à chaque doigt diffèrent. La touche <kbd
