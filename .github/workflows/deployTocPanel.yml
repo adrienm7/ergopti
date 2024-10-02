@@ -21,8 +21,8 @@ jobs:
         npm install
         npm run build
 
-    - name: FTP-Deploy-Action
-      uses: SamKirkland/FTP-Deploy-Action@4.3.3
+    - name: 📂 Sync files
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         local-dir: ./build/
         server: ${{ secrets.FTP_SERVER }}
