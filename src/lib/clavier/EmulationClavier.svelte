@@ -14,7 +14,7 @@
 	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
 	import { majClavier } from '$lib/clavier/FonctionsClavier.js';
 
-	import * as data_clavier from '$lib/clavier/stores.js';
+	import * as data_clavier from '$lib/clavier/etat_claviers.js';
 
 	let claviersStores = {};
 	for (const clavier in Object.keys(data_clavier)) {
