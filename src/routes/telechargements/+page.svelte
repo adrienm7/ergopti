@@ -33,13 +33,13 @@
 		<h3 data-aos="fade-right" data-aos-mirror="true">Installer la disposition sur Windows</h3>
 		<mini-espace />
 		<div>
-			<a href="/files/HyperTexte v{versionValue}.exe" download
+			<a href="/pilotes/kbdedit/HyperTexte v{versionValue}.exe" download
 				><button class="bouton-telechargement">☛ HyperTexte {versionValue}.exe</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/files/HyperTexte v{versionValue}.kbe" download
+			<a href="/pilotes/kbdedit/HyperTexte v{versionValue}.kbe" download
 				><button>Fichier source de HyperTexte {versionValue}</button></a
 			>
 		</div>
@@ -70,39 +70,43 @@
 		</p>
 		<mini-espace />
 		<div>
-			<a href="/hypertexte.toml" download><button>hypertexte.toml</button></a>
+			<a href="/pilotes/kalamine/{versionValue}/hypertexte.toml" download
+				><button>hypertexte.toml</button></a
+			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/dist/hypertexte.svg" download><button>hypertexte.svg</button></a>
+			<a href="/pilotes/kalamine/{versionValue}/hypertexte.svg" download
+				><button>hypertexte.svg</button></a
+			>
 		</div>
 		<div>
 			<h4>Windows</h4>
-			<a href="/dist/hypertexte.ahk" download
+			<a href="/pilotes/kalamine/{versionValue}/hypertexte.ahk" download
 				><button class="bouton-telechargement">HyperTexte Kalamine AHK (user)</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/dist/hypertexte.klc" download
+			<a href="/pilotes/kalamine/{versionValue}/hypertexte.klc" download
 				><button class="bouton-telechargement">HyperTexte Kalamine KLC (admin)</button></a
 			>
 		</div>
 		<h4>MacOS</h4>
 		<div>
-			<a href="/dist/hypertexte.keylayout" download
+			<a href="/pilotes/kalamine/{versionValue}/hypertexte.keylayout" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Keylayout</button></a
 			>
 		</div>
 		<h4>Linux</h4>
 		<div>
-			<a href="/dist/hypertexte.xkb_keymap" download
+			<a href="/pilotes/kalamine/{versionValue}/hypertexte.xkb_keymap" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_keymap (user)</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/dist/hypertexte.xkb_symbols" download
+			<a href="/pilotes/kalamine/{versionValue}/hypertexte.xkb_symbols" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_symbols (root)</button></a
 			>
 		</div>
@@ -119,34 +123,36 @@
 		</p>
 		<mini-espace />
 		<div>
-			<span>Version ISO : </span><a href="/files/hypertexte.v{versionValue}.fr.iso.txt" download
-				><button>hypertexte.v{versionValue}.fr.iso</button></a
+			<span>Version ISO : </span><a
+				href="/benchmarks/dispositions/iso/hypertexte_iso/hypertexte.v{versionValue}.fr.iso.txt"
+				download><button>hypertexte.v{versionValue}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<span>Version ISO+ : </span><a href="/files/hypertexte.v{versionValue}.fr.iso+.txt" download
-				><button>hypertexte.v{versionValue}.fr.iso+</button></a
+			<span>Version ISO+ : </span><a
+				href="/benchmarks/dispositions/iso/hypertexte_iso/hypertexte.v{versionValue}.fr.iso+.txt"
+				download><button>hypertexte.v{versionValue}.fr.iso+</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version Ergodox : </span><a
-				href="/files/hypertexte.v{versionValue}.fr.ergodox.txt"
+				href="/benchmarks/dispositions/ergodox/hypertexte_ergodox/hypertexte.v{versionValue}.fr.ergodox.txt"
 				download><button>hypertexte.v{versionValue}.fr.ergodox</button></a
 			>
 		</div>
 		<petit-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version à utiliser sur le site : </span><a
-				href="/files/hypertexteK.v{versionValue}.json"
+				href="/pilotes/kalamine/{versionValue}/hypertexteK.v{versionValue}.json"
 				download><button>hypertexteK.v{versionValue}</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version théorique : </span><a
-				href="/files/hypertexte.v{versionValue}.json"
+				href="/pilotes/kalamine/{versionValue}/hypertexte.v{versionValue}.json"
 				download><button>hypertexte.v{versionValue}</button></a
 			>
 			<p>
