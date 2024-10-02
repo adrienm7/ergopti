@@ -240,9 +240,9 @@
 	<mini-espace />
 	<div class="image">
 		{#if langue === 'fr'}
-			<img src="/img/benchmarks_{versionValue}/{clavier}/{corpus_fr}.jpg" />
+			<img src="/benchmarks/resultats/{versionValue}/{clavier}/{corpus_fr}.jpg" />
 		{:else}
-			<img src="/img/benchmarks_{versionValue}/{clavier}/{corpus_en}.jpg" />
+			<img src="/benchmarks/resultats/{versionValue}/{clavier}/{corpus_en}.jpg" />
 		{/if}
 	</div>
 	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse Ergo-L</h3>
@@ -252,7 +252,7 @@
 			<option value="fr">Français</option>
 			<option value="en">Anglais</option>
 		</select>
-		<a href="/img/benchmarks_{versionValue}/analyse_ergol_{ergol}.pdf" style="height: 2rem"
+		<a href="/benchmarks/resultats/{versionValue}/analyse_ergol_{ergol}.pdf" style="height: 2rem"
 			><button>Télécharger l’analyse Ergo-L</button></a
 		>
 	</div>

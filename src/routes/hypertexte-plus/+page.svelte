@@ -19,7 +19,7 @@
 </svelte:head>
 
 <header>
-	<img src="img/logo_hypertexte.png" class="logo" />
+	<img src="img/logo/logo_hypertexte.png" class="logo" />
 	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"
 			><span class="hyper">Hyper</span><span class="texte">Texte</span><span class="glow">+</span
