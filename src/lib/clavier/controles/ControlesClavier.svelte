@@ -7,7 +7,7 @@
 	import { majClavier } from '$lib/clavier/FonctionsClavier.js';
 	export let clavier;
 
-	import * as data_clavier from '$lib/clavier/stores.js';
+	import * as data_clavier from '$lib/clavier/etat_claviers.js';
 	let claviersStores = {};
 	for (const clavier in Object.keys(data_clavier)) {
 		claviersStores[clavier] = data_clavier[clavier];
