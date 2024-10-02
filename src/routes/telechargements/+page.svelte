@@ -145,8 +145,8 @@
 		<petit-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version à utiliser sur le site : </span><a
-				href="/pilotes/kalamine/{versionValue}/hypertexteK.v{versionValue}.json"
-				download><button>hypertexteK.v{versionValue}</button></a
+				href="/pilotes/kalamine/{versionValue}/hypertexte_K.v{versionValue}.json"
+				download><button>hypertexte_K.v{versionValue}</button></a
 			>
 		</div>
 		<mini-espace />
