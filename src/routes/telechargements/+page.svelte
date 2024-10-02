@@ -124,21 +124,21 @@
 		<mini-espace />
 		<div>
 			<span>Version ISO : </span><a
-				href="/benchmarks/dispositions/iso/hypertexte_iso/hypertexte.v{versionValue}.fr.iso.txt"
+				href="/benchmarks/dispositions/iso/hypertexte/hypertexte.v{versionValue}.fr.iso.txt"
 				download><button>hypertexte.v{versionValue}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version ISO+ : </span><a
-				href="/benchmarks/dispositions/iso/hypertexte_iso/hypertexte.v{versionValue}.fr.iso+.txt"
+				href="/benchmarks/dispositions/iso/hypertexte/hypertexte.v{versionValue}.fr.iso+.txt"
 				download><button>hypertexte.v{versionValue}.fr.iso+</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version Ergodox : </span><a
-				href="/benchmarks/dispositions/ergodox/hypertexte_ergodox/hypertexte.v{versionValue}.fr.ergodox.txt"
+				href="/benchmarks/dispositions/ergodox/hypertexte/hypertexte.v{versionValue}.fr.ergodox.txt"
 				download><button>hypertexte.v{versionValue}.fr.ergodox</button></a
 			>
 		</div>
