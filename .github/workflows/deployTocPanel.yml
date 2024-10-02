@@ -20,12 +20,12 @@ jobs:
       run: |
         npm install
         npm run build
-
-    - name: 📂 Sync files
+    - name: FTP-Deploy-Action
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
+        log-level: "verbose"
+        timeout: 3600000
         local-dir: ./build/
-        timeout: 600000
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
