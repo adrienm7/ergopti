@@ -1,4 +1,4 @@
-// .cpanel-ci.js
+// Utilisable soit dans le code GitHub Actions, soit ici 
 
 import { deploy, excludeDefaults } from "@samkirkland/ftp-deploy";
 
