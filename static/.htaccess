@@ -1,0 +1,122 @@
+RewriteEngine On
+RewriteBase /
+
+# Redirection de tout en https
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule (.*) https://%{HTTP_HOST}/$1 [R=301]
+
+# Check if request is for an actual file, serve the file
+RewriteRule ^([^\.]+)$ $1.html [NC,L]
+
+# Catch request to HTML file, remove extension
+RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /([^\ ]+)\.html
+RewriteRule ^/?(.*)\.html$ /$1 [L,R=301]
+
+
+
+
+
+
+
+
+
+
+# ======= PERFORMANCES + MISE EN PLACE D’UN CACHE =======
+
+
+
+# Contrôle du cache avec des headers d’expiration par type de ressources. ON MET À DIX ANS CAR ON UTILISE LE CACHE BUSTING
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Par défaut
+    ExpiresDefault                          "access plus 1 month"
+    
+    # cache.appcache needs re-requests in FF 3.6
+    ExpiresByType text/cache-manifest       "access plus 0 seconds"
+    
+    # Les pages html
+    ExpiresByType text/html                 "access plus 0 seconds"
+    
+    # Les données
+    ExpiresByType text/xml                  "access plus 0 seconds"
+    ExpiresByType application/xml           "access plus 0 seconds"
+    ExpiresByType application/json          "access plus 0 seconds"
+    
+    # Les flux d’actualité
+    ExpiresByType application/rss+xml       "access plus 1 hour"
+    ExpiresByType application/atom+xml      "access plus 1 hour"
+    
+    # La favicon (ne peut pas être renommée)
+    AddType image/x-icon .ico               "access plus 1 month"
+    ExpiresByType image/ico                 "access plus 1 month"
+    ExpiresByType image/icon                "access plus 1 month"
+    ExpiresByType image/x-icon              "access plus 1 month"
+
+    # Les PDFs
+    ExpiresByType application/pdf           "access plus 1 month"
+    
+    # Les médias : images, vidéos, audios, etc.
+    ExpiresByType image/jpg                 "access plus 10 years"
+    ExpiresByType image/jpeg                "access plus 10 years"
+    ExpiresByType image/png                 "access plus 10 years"
+    ExpiresByType image/gif                 "access plus 10 years"
+    ExpiresByType image/webp                "access plus 10 years"
+    ExpiresByType audio/mp3                 "access plus 10 years"
+    ExpiresByType video/ogg                 "access plus 10 years"
+    ExpiresByType audio/ogg                 "access plus 10 years"
+    ExpiresByType video/mp4                 "access plus 10 years"
+    ExpiresByType video/avi                 "access plus 10 years"
+    ExpiresByType video/webm                "access plus 10 years"
+    
+    # Les polices
+    ExpiresByType font/woff2                "access plus 10 years"
+    ExpiresByType font/woff                 "access plus 10 years"
+    ExpiresByType font/ttf                  "access plus 10 years"
+    ExpiresByType font/truetype             "access plus 10 years"
+    ExpiresByType font/opentype             "access plus 10 years"
+    ExpiresByType application/x-font-woff2  "access plus 10 years"
+    ExpiresByType application/x-font-woff   "access plus 10 years"
+    ExpiresByType application/x-font-ttf    "access plus 10 years"
+    ExpiresByType image/svg+xml             "access plus 10 years"
+    
+    # Le CSS et le JavaScript
+    ExpiresByType text/css                  "access plus 10 years"
+    ExpiresByType text/javascript           "access plus 10 years"
+    ExpiresByType application/javascript    "access plus 10 years"
+
+</IfModule>
+
+
+
+
+
+
+
+# ======= SÉCURITÉ =======
+
+
+
+# === Headers de sécurité ===
+
+# 1) N’autorise aucune des pages du site à être iframée – Défend contre la faille CSRF
+Header set X-Frame-Options DENY
+# 2) Empêche les failles XSS sur les anciens navigateurs qui ne prennent pas en compte la CSP
+# Header set X-XSS-Protection "1; mode=block"
+# 3) Empêche la faille XSS sur les liens relatifs (quand il y a /page au lieu de beseven.fr/page)
+Header set Content-Security-Policy "base-uri 'self';"
+# 4) Empêche l'interprétation de fichiers sous une autre extension : un hacker réussissant à uploader un txt ne pourra pas l'interpréter en php
+Header set X-Content-Type-Options nosniff
+
+
+# CSP pour tout, sauf l’inline CSS
+#Header set Content-Security-Policy "default-src 'self' *.beseven.fr; style-src 'self' *.beseven.fr 'unsafe-inline';"
+
+
+# Utiliser HSTS
+Header set Strict-Transport-Security "max-age=31536000; preload" env=HTTPS
+<Files 403.shtml>
+order allow,deny
+allow from all
+</Files>
