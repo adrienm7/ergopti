@@ -8,7 +8,10 @@ async function deployToCPanel() {
     server: process.env.FTP_SERVER,
     username: process.env.FTP_USERNAME,
     password: process.env.FTP_PASSWORD,
-    "server-dir": "/build/",
+   " local-dir": "./build/",
+    timeout: 600000,
+    "dry-run": false,
+    protocol: "ftps",
     exclude: [...excludeDefaults, ".env", ".git/**", "node_modules/**", "vendor/**"],
   });
   console.log("🚀 Deploy done!");
