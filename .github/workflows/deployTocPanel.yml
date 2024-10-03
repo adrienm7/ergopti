@@ -31,7 +31,7 @@ jobs:
         delete: "true"
         max_retries: "7"
         no_symlinks: "false"
-        ftp_ssl_allow: "true"
+        ftp_ssl_allow: "false"
         ftp_use_feat: "true"
         ftp_nop_interval: "9"
         net_max_retries: "3"
