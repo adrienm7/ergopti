@@ -26,9 +26,7 @@ jobs:
         local-dir: ./build/
         server-dir: ./
         dry-run: false # VERY useful
-        timeout: 600000
-        protocol: ftps
-        port: 21
+        timeout: 60000
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
