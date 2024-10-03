@@ -20,13 +20,9 @@ jobs:
       run: |
         npm install
         npm run build
-    - name: FTP-Deploy-Action
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      with:
-        local-dir: ./build/
-        timeout: 600000
-        dry-run: false # VERY useful
-        protocol: ftps
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
+    - name: 🚀 Deploy to CPanel
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: npm run deploy
