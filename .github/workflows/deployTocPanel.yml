@@ -24,6 +24,7 @@ jobs:
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         local-dir: ./build/
+        server-dir: ./
         dry-run: false # VERY useful
         timeout: 600000
         protocol: ftps
