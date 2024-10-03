@@ -1532,7 +1532,6 @@
 			"Primary": "j",
 			"Primary+": "★",
 			"Shift": "J",
-			"Shift+": "’",
 			"AltGr": "\"",
 			"ShiftAltGr": "δ",
 			"ShiftAltGr-style": "morte",
@@ -1873,8 +1872,9 @@
 		{
 			"touche": "RCtrl",
 			"Primary": "Ctrl",
-			"Primary+": "Layer",
+			"Primary+": "Shift",
 			"Shift": "Ctrl",
+			"Shift+": "Shift",
 			"AltGr": "Ctrl",
 			"ShiftAltGr": "Ctrl",
 			"Ctrl": "Ctrl",
@@ -1886,7 +1886,7 @@
 		{
 			"touche": "LAlt",
 			"Primary": "Alt",
-			"Primary+": "Shift<br><span class='tap'>↩</span>",
+			"Primary+": "Layer<br><span class='tap'>↩</span>",
 			"Shift": "Alt",
 			"Shift+": "+↩",
 			"AltGr": "Alt",
@@ -1894,7 +1894,7 @@
 			"ShiftAltGr": "Alt",
 			"Ctrl": "Alt",
 			"Ctrl+": "^↩",
-			"Layer": "Alt",
+			"Layer": "Layer",
 			"À": "Alt",
 			",": "Alt",
 			"type": "special"
