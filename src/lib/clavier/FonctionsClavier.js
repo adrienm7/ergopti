@@ -208,6 +208,9 @@ function activerModificateurs() {
 	if (infos_clavier.couche === 'Shift' && rShift !== null) {
 		rShift.classList.add('touche-active');
 	}
+	if (infos_clavier.couche === 'Shift' && rCtrl !== null && infos_clavier.plus === 'oui') {
+		rCtrl.classList.add('touche-active');
+	}
 	if (infos_clavier.couche === 'Ctrl' && lCtrl !== null) {
 		lCtrl.classList.add('touche-active');
 	}
@@ -232,8 +235,8 @@ function activerModificateurs() {
 	if (infos_clavier.couche === ',' && virgule !== null) {
 		virgule.classList.add('touche-active');
 	}
-	if (infos_clavier.couche === 'Layer' && rCtrl !== null && infos_clavier.type === 'iso') {
-		rCtrl.classList.add('touche-active');
+	if (infos_clavier.couche === 'Layer' && lalt !== null && infos_clavier.type === 'iso') {
+		lalt.classList.add('touche-active');
 	}
 	if (infos_clavier.couche === 'Layer' && space !== null && infos_clavier.type === 'ergodox') {
 		space.classList.add('touche-active');
@@ -328,12 +331,28 @@ function changerCouche(toucheModificatrice, clavier, infos_clavier) {
 		nouvelleCouche = 'Visuel';
 	}
 
-	// Touche pressée = RCtrl (pour accéder au Layer)
+	// Touche pressée = LAlt (devient Layer)
+	if (
+		((touchePressee === 'LAlt') & (infos_clavier.type === 'iso')) |
+			((touchePressee === 'Space') & (infos_clavier.type === 'ergodox')) &&
+		infos_clavier.plus === 'oui' &&
+		coucheActuelle === 'Layer'
+	) {
+		nouvelleCouche = 'Visuel';
+	} else if (
+		((touchePressee === 'LAlt') & (infos_clavier.type === 'iso')) |
+			((touchePressee === 'Space') & (infos_clavier.type === 'ergodox')) &&
+		infos_clavier.plus === 'oui'
+	) {
+		nouvelleCouche = 'Layer';
+	}
+
+	// Touche pressée = RCtrl (devient Shift)
 	if (
 		((touchePressee === 'RCtrl') & (infos_clavier.type === 'iso')) |
 			((touchePressee === 'Space') & (infos_clavier.type === 'ergodox')) &&
 		infos_clavier.plus === 'oui' &&
-		coucheActuelle === 'Layer'
+		coucheActuelle === 'Shift'
 	) {
 		nouvelleCouche = 'Visuel';
 	} else if (
@@ -341,7 +360,7 @@ function changerCouche(toucheModificatrice, clavier, infos_clavier) {
 			((touchePressee === 'Space') & (infos_clavier.type === 'ergodox')) &&
 		infos_clavier.plus === 'oui'
 	) {
-		nouvelleCouche = 'Layer';
+		nouvelleCouche = 'Shift';
 	}
 
 	// Touche pressée = À
