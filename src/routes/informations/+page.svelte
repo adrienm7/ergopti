@@ -33,11 +33,11 @@
 
 <svelte:head>
 	<title>Informations</title>
-	<meta name="description" content="Informations sur la disposition <Nom></Nom>" />
+	<meta name="description" content="Informations sur la disposition HyperTexte" />
 </svelte:head>
 
 <div class="contenu">
-	<h1 data-aos="zoom-in" data-aos-mirror="true">Informations sur la disposition</h1>
+	<h1 data-aos="zoom-in" data-aos-mirror="true">Informations sur la disposition <Nom></Nom></h1>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Genèse et Sources</h2>
 	<p>
 		La genèse de la disposition <Nom></Nom> remonte à 2022, à la suite de la découverte d'Optimot. Les
