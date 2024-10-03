@@ -256,13 +256,13 @@
 			><button>Télécharger l’analyse Ergo-L</button></a
 		>
 	</div>
-	<!-- <mini-espace />
+	<mini-espace />
 	<embed
 		src="/img/benchmarks_{versionValue}/analyse_ergol_{langue}.pdf"
 		type="application/pdf"
 		width="100%"
 		height="600px"
-	/> -->
+	/>
 </div>
 
 <style>
