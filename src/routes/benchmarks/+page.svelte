@@ -258,7 +258,7 @@
 	</div>
 	<mini-espace />
 	<embed
-		src="/img/benchmarks_{versionValue}/analyse_ergol_{langue}.pdf"
+		src="/benchmarks/resultats/{versionValue}/analyse_ergol_{ergol}.pdf"
 		type="application/pdf"
 		width="100%"
 		height="600px"
