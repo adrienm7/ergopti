@@ -27,6 +27,7 @@ jobs:
         dry-run: false # VERY useful
         timeout: 600000
         protocol: ftps
+        port: 21
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
