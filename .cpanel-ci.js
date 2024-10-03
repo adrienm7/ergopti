@@ -9,6 +9,7 @@ async function deployToCPanel() {
     username: process.env.FTP_USERNAME,
     password: process.env.FTP_PASSWORD,
    "local-dir": "./build/",
+   "server-dir": "./",
     timeout: 600000,
     "dry-run": false,
     protocol: "ftps",

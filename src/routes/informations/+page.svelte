@@ -33,7 +33,7 @@
 
 <svelte:head>
 	<title>Informations</title>
-	<meta name="description" content="Informations sur la disposition HyperTexte" />
+	<meta name="description" content="Informations sur la disposition <Nom></Nom>" />
 </svelte:head>
 
 <div class="contenu">
