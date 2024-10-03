@@ -79,8 +79,8 @@
 		width: 100vw;
 		margin: 0;
 		padding: 0;
-		background-color: var(--couleur-header);
 		backdrop-filter: blur(30px);
+		background-color: var(--couleur-header);
 		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
 	}
 	header a {
