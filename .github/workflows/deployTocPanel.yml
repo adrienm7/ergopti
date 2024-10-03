@@ -20,11 +20,23 @@ jobs:
       run: |
         npm install
         npm run build
-    - name: Upload ftp
-      uses: genietim/ftp-action@v4.0.1
+    - name: Upload from public_html via FTP
+      uses: airvzxf/ftp-deployment-action@latest
       with:
-        host: ${{ secrets.FTP_SERVER }}
+        server: ${{ secrets.FTP_SERVER }}
         user: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
-        localDir: ./build/
-        remoteDir: ./
+        local_dir: "./build"
+        remote_dir: ""
+        delete: "true"
+        max_retries: "7"
+        no_symlinks: "false"
+        ftp_ssl_allow: "true"
+        ftp_use_feat: "true"
+        ftp_nop_interval: "9"
+        net_max_retries: "3"
+        net_persist_retries: "11"
+        net_timeout: "30s"
+        dns_max_retries: "30"
+        dns_fatal_timeout: "never"
+        lftp_settings: "set cache:cache-empty-listings true; set cmd:status-interval 1s; set http:user-agent 'firefox';"
