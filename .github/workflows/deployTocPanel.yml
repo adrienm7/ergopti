@@ -20,13 +20,23 @@ jobs:
       run: |
         npm install
         npm run build
-    - name: FTP-Deploy-Action
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+    - name: Upload from public_html via FTP
+      uses: airvzxf/ftp-deployment-action@latest
       with:
-        local-dir: ./build/
-        server-dir: ./
-        dry-run: false # VERY useful
-        timeout: 60000
         server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
+        user: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
+        local_dir: "./build"
+        remote_dir: ""
+        delete: "true"
+        max_retries: "7"
+        no_symlinks: "false"
+        ftp_ssl_allow: "false"
+        ftp_use_feat: "true"
+        ftp_nop_interval: "9"
+        net_max_retries: "3"
+        net_persist_retries: "11"
+        net_timeout: "30s"
+        dns_max_retries: "30"
+        dns_fatal_timeout: "never"
+        lftp_settings: "set cache:cache-empty-listings true; set cmd:status-interval 1s; set http:user-agent 'firefox';"
