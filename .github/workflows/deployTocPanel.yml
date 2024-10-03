@@ -20,13 +20,11 @@ jobs:
       run: |
         npm install
         npm run build
-    - name: FTP-Deploy-Action
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+    - name: Upload ftp
+      uses: genietim/ftp-action@releases/v4
       with:
-        local-dir: ./build/
-        server-dir: ./
-        dry-run: false # VERY useful
-        timeout: 60000
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
+        host: ${{ secrets.FTP_SERVER }}
+        user: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
+        localDir: "build"
+        remoteDir: ""
