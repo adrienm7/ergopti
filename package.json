@@ -6,6 +6,7 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
+		"deploy": "node .cpanel-ci.js",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write ."
 	},
@@ -22,6 +23,7 @@
 	"type": "module",
 	"dependencies": {
 		"@dexlib/svelte-matomo": "^0.1.4",
+		"@samkirkland/ftp-deploy": "^1.2.4",
 		"@sveltejs/adapter-static": "^3.0.0",
 		"aos": "^2.3.4"
 	}
