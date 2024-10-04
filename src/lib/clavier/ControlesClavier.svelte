@@ -7,28 +7,10 @@
 	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
 	import { onMount } from 'svelte';
 
-	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
 	import * as data_clavier from '$lib/stores_infos.js';
-	let versionValue;
-	data_clavier.version.subscribe((value) => {
-		versionValue = value;
-	});
-
-	let path = `./data/hypertexte_v${versionValue}.json`;
-
-	async function loadData() {
-		try {
-			// Utiliser l'importation dynamique avec un chemin variable
-			const data = await import(/* @vite-ignore */ path);
-			// console.log('Données chargées :', data);
-			return data;
-		} catch (error) {
-			console.error('Erreur lors du chargement des données :', error);
-		}
-	}
 
 	export let nom;
-	let clavier = new Clavier(nom, data);
+	let clavier = new Clavier(nom);
 	onMount(() => {
 		clavier.majClavier();
 	});

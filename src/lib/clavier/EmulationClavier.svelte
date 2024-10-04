@@ -20,7 +20,7 @@
 		versionValue = value;
 	});
 
-	let clavier = new Clavier(nom, data);
+	let clavier = new Clavier(nom);
 
 	let claviersStores = {};
 	for (const clavier in Object.keys(data_clavier)) {
