@@ -48,9 +48,9 @@
 
 <div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 	<div>
-		<BlocClavier clavier="reference" />
+		<BlocClavier nom="reference" />
 		<mini-espace />
-		<ControlesClavier clavier="reference" />
+		<ControlesClavier nom="reference" />
 	</div>
 </div>
 
