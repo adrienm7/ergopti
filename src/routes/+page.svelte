@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
+	import ControlesClavier from '$lib/clavier/ControlesClavier.svelte';
 
 	import AlternanceMains from './accueil/alternance_mains.svelte';
 	import DistanceDoigtsTouches from './accueil/distance_doigts_touches.svelte';
