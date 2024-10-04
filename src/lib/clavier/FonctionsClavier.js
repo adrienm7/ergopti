@@ -356,8 +356,7 @@ function changerCouche(toucheModificatrice, clavier, infos_clavier) {
 	) {
 		nouvelleCouche = 'Visuel';
 	} else if (
-		((touchePressee === 'RCtrl') & (infos_clavier.type === 'iso')) |
-			((touchePressee === 'Space') & (infos_clavier.type === 'ergodox')) &&
+		(touchePressee === 'RCtrl') & (infos_clavier.type === 'iso') &&
 		infos_clavier.plus === 'oui'
 	) {
 		nouvelleCouche = 'Shift';

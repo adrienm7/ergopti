@@ -20,35 +20,33 @@
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
-		<ul>
-			<li aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-				<a href="/">⌨ HyperTexte</a>
-			</li>
-			<li
-				aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
-				on:click={fermerMenu}
-			>
-				<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
-			</li>
-			<li
-				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
-				on:click={fermerMenu}
-			>
-				<a href="/benchmarks">⚑ Benchmarks</a>
-			</li>
-			<li
-				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
-				on:click={fermerMenu}
-			>
-				<a href="/telechargements"><span style="font-weight: bold;">⇩</span> Téléchargements</a>
-			</li>
-			<li
-				aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
-				on:click={fermerMenu}
-			>
-				<a href="/informations"><span style="font-weight: bold;">ⓘ</span> Informations</a>
-			</li>
-		</ul>
+		<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
+			<a href="/">⌨ HyperTexte</a>
+		</p>
+		<p
+			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
+			on:click={fermerMenu}
+		>
+			<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
+		</p>
+		<p
+			aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
+			on:click={fermerMenu}
+		>
+			<a href="/benchmarks">⚑ Benchmarks</a>
+		</p>
+		<p
+			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
+			on:click={fermerMenu}
+		>
+			<a href="/telechargements"><span style="font-weight: bold;">⇩</span> Téléchargements</a>
+		</p>
+		<p
+			aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
+			on:click={fermerMenu}
+		>
+			<a href="/informations"><span style="font-weight: bold;">ⓘ</span> Informations</a>
+		</p>
 	</nav>
 </header>
 
@@ -89,7 +87,11 @@
 		text-decoration: none;
 	}
 
-	header #menu li a::first-letter {
+	header #menu p {
+		display: inline-block;
+	}
+
+	header #menu p a::first-letter {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -99,11 +101,11 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
-	header #menu li[aria-current='page'] a::first-letter {
+	header #menu p[aria-current='page'] a::first-letter {
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
-	header #menu li[aria-current='page'] a {
+	header #menu p[aria-current='page'] a {
 		/* background-color: #f4f4f4;
 			color: black !important;
 			border-radius: 3px; */
@@ -115,7 +117,7 @@
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
-	/* header #menu li[aria-current='page'] a::after {
+	/* header #menu p[aria-current='page'] a::after {
 		content: '';
 		display: block;
 		position: relative;
@@ -126,7 +128,7 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	} */
 
-	header #menu li:not([aria-current='page']) a:hover {
+	header #menu p:not([aria-current='page']) a:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -137,7 +139,7 @@
 		/* line-height: 6rem; */
 	}
 
-	/* header #menu li:not([aria-current='page']) a:hover::after {
+	/* header #menu p:not([aria-current='page']) a:hover::after {
 		content: '';
 		display: block;
 		position: relative;
@@ -178,17 +180,11 @@
 			overflow: scroll; /* Pour désactiver le scroll derrière le menu (1/3) */
 			overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu (2/3) */
 			transition: height 0.25s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
-		}
-
-		header #menu ul {
-			margin: 0;
-			padding: 0;
-			list-style: none;
 			overflow: hidden;
 			z-index: 98;
 		}
 
-		header #menu ul li a {
+		header #menu p a {
 			display: block;
 			padding: var(--hauteur-element-menu-mobile) 0;
 			padding-left: var(--marge-fenetre);
@@ -196,8 +192,9 @@
 			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 			line-height: 1em;
 		}
-		header #menu ul li,
-		header #menu ul li a p {
+		header #menu p,
+		header #menu p a p {
+			width: 100%;
 			margin: 0;
 			padding: 0;
 			font-size: 1.1rem;
@@ -277,9 +274,6 @@
 
 	@media (min-width: 1200px) {
 		header #menu {
-			display: block;
-		}
-		header #menu ul {
 			display: flex !important;
 			flex-direction: row;
 			background-color: transparent;
@@ -290,7 +284,7 @@
 			padding-right: var(--marge-bords-menu);
 		}
 
-		header #menu ul li {
+		header #menu p {
 			display: flex;
 			justify-content: center;
 			align-items: center;
@@ -303,7 +297,7 @@
 			font-size: 1rem;
 		}
 
-		header #menu li:not(:last-child)::after {
+		header #menu p:not(:last-child)::after {
 			content: '';
 			background-color: transparent;
 			height: 100%;
@@ -313,13 +307,13 @@
 			box-shadow: 2px 0 2px 0px var(--couleur-ombre);
 		}
 
-		header #menu li a {
+		header #menu p a {
 			padding: calc(2 * var(--espacement-items-menu));
 		}
-		header #menu li a p {
+		header #menu p a p {
 			text-align: center; /* Dans le cas où le texte passe sur deux lignes car trop long */
 		}
-		header #menu li:last-child a {
+		header #menu p:last-child a {
 			padding-right: 0;
 		}
 	}
