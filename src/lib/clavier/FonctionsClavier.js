@@ -1,12 +1,15 @@
 import * as data_clavier from '$lib/stores_infos.js';
+
 export class Clavier {
-	constructor(id, version, data) {
+	constructor(id, data) {
 		this.id = id;
 		this.data_clavier = data_clavier;
 		data_clavier[this.id].subscribe((value) => {
 			this.infos_clavier = value;
 		});
-		this.version = version;
+		data_clavier.version.subscribe((value) => {
+			this.version = value;
+		});
 		this.data = data;
 	}
 
