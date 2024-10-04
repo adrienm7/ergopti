@@ -28,11 +28,11 @@
 	</h1>
 	<div class="container">
 		<div class="block">
-			<BlocClavier clavier="presentation_plus" />
+			<BlocClavier nom="presentation_plus" />
 		</div>
 	</div>
 	<mini-espace />
-	<ControlesClavier clavier="presentation_plus" />
+	<ControlesClavier nom="presentation_plus" />
 </header>
 
 <petit-espace />

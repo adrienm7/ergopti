@@ -4,33 +4,37 @@
 	import ChangementPlus from '$lib/clavier/controles/ChangementPlus.svelte';
 	import ChangementCouche from '$lib/clavier/controles/ChangementCouche.svelte';
 
-	import { majClavier } from '$lib/clavier/FonctionsClavier.js';
-	export let clavier;
+	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
+
+	export let nom;
+	let texte = '';
 
 	import * as data_clavier from '$lib/clavier/etat_claviers.js';
 	let claviersStores = {};
-	for (const clavier in Object.keys(data_clavier)) {
-		claviersStores[clavier] = data_clavier[clavier];
+	for (const clav in Object.keys(data_clavier)) {
+		claviersStores[clav] = data_clavier[clav];
 	}
 
 	let infos_clavier;
-	data_clavier[clavier].subscribe((value) => {
+	data_clavier[nom].subscribe((value) => {
 		infos_clavier = value;
 	});
 
+	let clavier = new Clavier(nom);
+
 	function handleMessage(event) {
-		data_clavier[clavier].update((currentData) => {
+		data_clavier[nom].update((currentData) => {
 			currentData['type'] = event.detail.type;
 			currentData['couleur'] = event.detail.couleur;
 			currentData['plus'] = event.detail.plus;
 			currentData['couche'] = event.detail.couche;
 			return currentData;
 		});
-		majClavier(clavier);
+		clavier.majClavier();
 	}
 </script>
 
-<controles-clavier id={'controles_' + clavier}>
+<controles-clavier id={'controles_' + nom}>
 	<ChangementType
 		on:message={handleMessage}
 		coucheValue={infos_clavier.couche}
@@ -60,15 +64,15 @@
 		plusValue={infos_clavier.plus}
 	/>
 </controles-clavier>
-<!-- {#if controles === 'roulements'}
-<controles-clavier class="btn-group">
-	<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
-		<option value="none" selected disabled hidden>Roulements voyelles</option>
-		{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
-	</select>
-	<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
-		<option value="none" selected disabled hidden>Roulements consonnes</option>
-		{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
-	</select>
-</controles-clavier>
-{/if} -->
+{#if nom === 'roulements'}
+	<controles-clavier class="btn-group">
+		<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
+			<option value="none" selected disabled hidden>Roulements voyelles</option>
+			{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
+		</select>
+		<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
+			<option value="none" selected disabled hidden>Roulements consonnes</option>
+			{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
+		</select>
+	</controles-clavier>
+{/if}

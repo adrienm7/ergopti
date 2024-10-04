@@ -1,18 +1,19 @@
 <script>
-	let clavier = 'emulation';
+	let nom = 'emulation';
 	let textarea;
 	let emplacementClavier;
 	import { onMount } from 'svelte';
 	onMount(() => {
 		textarea = document.getElementById('input-text');
 		// A mettre en fonction de la variable clavier et non en dur
-		emplacementClavier = document.getElementById('clavier_' + clavier);
+		emplacementClavier = document.getElementById('clavier_' + nom);
 	});
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
 	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
-	import { majClavier } from '$lib/clavier/FonctionsClavier.js';
+	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
+	let clavier = new Clavier(nom);
 
 	import * as data_clavier from '$lib/clavier/etat_claviers.js';
 
@@ -21,7 +22,7 @@
 		claviersStores[clavier] = data_clavier[clavier];
 	}
 	let infos_clavier;
-	data_clavier[clavier].subscribe((value) => {
+	data_clavier[nom].subscribe((value) => {
 		infos_clavier = value;
 	});
 
@@ -35,42 +36,42 @@
 
 	$: if (altgr && shift) {
 		couche = 'ShiftAltGr';
-		data_clavier[clavier].update((currentData) => {
+		data_clavier[nom].update((currentData) => {
 			currentData['couche'] = couche;
 			return currentData;
 		});
-		majClavier(clavier);
+		clavier.majClavier();
 	} else if (altgr && !shift) {
 		couche = 'AltGr';
-		data_clavier[clavier].update((currentData) => {
+		data_clavier[nom].update((currentData) => {
 			currentData['couche'] = couche;
 			return currentData;
 		});
-		majClavier(clavier);
+		clavier.majClavier();
 	} else if (!altgr && shift) {
 		couche = 'Shift';
-		data_clavier[clavier].update((currentData) => {
+		data_clavier[nom].update((currentData) => {
 			currentData['couche'] = couche;
 			return currentData;
 		});
-		majClavier(clavier);
+		clavier.majClavier();
 	} else if (a_grave) {
 		couche = 'À';
-		data_clavier[clavier].update((currentData) => {
+		data_clavier[nom].update((currentData) => {
 			currentData['couche'] = couche;
 			return currentData;
 		});
-		majClavier(clavier);
+		clavier.majClavier();
 	} else if (virgule) {
 		couche = ',';
-		data_clavier[clavier].update((currentData) => {
+		data_clavier[nom].update((currentData) => {
 			currentData['couche'] = couche;
 			return currentData;
 		});
-		majClavier(clavier);
+		clavier.majClavier();
 	} else {
 		couche = 'Primary';
-		data_clavier[clavier].update((currentData) => {
+		data_clavier[nom].update((currentData) => {
 			currentData['couche'] = couche;
 			return currentData;
 		});
@@ -80,37 +81,37 @@
 	function setCouche() {
 		if (altgr && shift) {
 			couche = 'ShiftAltGr';
-			data_clavier[clavier].update((currentData) => {
+			data_clavier[nom].update((currentData) => {
 				currentData['couche'] = couche;
 				return currentData;
 			});
 		} else if (altgr && !shift) {
 			couche = 'AltGr';
-			data_clavier[clavier].update((currentData) => {
+			data_clavier[nom].update((currentData) => {
 				currentData['couche'] = couche;
 				return currentData;
 			});
 		} else if (!altgr && shift) {
 			couche = 'Shift';
-			data_clavier[clavier].update((currentData) => {
+			data_clavier[nom].update((currentData) => {
 				currentData['couche'] = couche;
 				return currentData;
 			});
 		} else if (a_grave) {
 			couche = 'À';
-			data_clavier[clavier].update((currentData) => {
+			data_clavier[nom].update((currentData) => {
 				currentData['couche'] = couche;
 				return currentData;
 			});
 		} else if (virgule) {
 			couche = ',';
-			data_clavier[clavier].update((currentData) => {
+			data_clavier[nom].update((currentData) => {
 				currentData['couche'] = couche;
 				return currentData;
 			});
 		} else {
 			couche = 'Primary';
-			data_clavier[clavier].update((currentData) => {
+			data_clavier[nom].update((currentData) => {
 				currentData['couche'] = couche;
 				return currentData;
 			});
@@ -308,7 +309,7 @@
 			control = false;
 		}
 		setCouche();
-		majClavier(clavier);
+		clavier.majClavier();
 	}
 
 	let champTexte = '';
@@ -330,9 +331,9 @@
 	};
 </script>
 
-<!-- <ControlesClavier clavier="emulation" /> -->
+<!-- <ControlesClavier nom="emulation" /> -->
 <mini-espace />
-<BlocClavier clavier="emulation" />
+<BlocClavier nom="emulation" />
 
 <mini-espace />
 <div style="margin: 0 auto; width: 100%;">

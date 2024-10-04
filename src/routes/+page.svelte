@@ -29,9 +29,9 @@
 			>Texte&nbsp;—</span
 		>
 	</h1>
-	<BlocClavier clavier="presentation" />
+	<BlocClavier nom="presentation" />
 	<mini-espace />
-	<ControlesClavier clavier="presentation" />
+	<ControlesClavier nom="presentation" />
 </header>
 
 <petit-espace />

@@ -162,7 +162,7 @@
 
 		<mini-espace />
 
-		<BlocClavier clavier="frequences" />
+		<BlocClavier nom="frequences" />
 
 		<p>
 			Comme vous pouvez le constater sur le clavier ci-dessus, les lettres les plus fréquentes sont
