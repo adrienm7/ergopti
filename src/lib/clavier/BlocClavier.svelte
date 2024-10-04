@@ -25,7 +25,7 @@
 	export let nom;
 	onMount(() => {
 		loadData(versionValue).then((data) => {
-			let clavier = new Clavier(nom, data_clavier, versionValue, data);
+			let clavier = new Clavier(nom, versionValue, data);
 			clavier.majClavier();
 		});
 	});
