@@ -1,26 +1,18 @@
-import { version } from '$lib/stores_infos.js';
-let versionValue;
-version.subscribe((value) => {
-	versionValue = value;
-});
-
-import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
-import * as data_clavier from '$lib/clavier/etat_claviers.js';
-
-let claviersStores = {};
-for (const clavier in Object.keys(data_clavier)) {
-	claviersStores[clavier] = data_clavier[clavier];
-}
-
-let infos_clavier;
 export class Clavier {
 	/*Nous n'avons pas besoin de préciser "function" devant notre constructeur
 	 *et nos autres méthodes classe*/
-	constructor(id) {
+	constructor(id, data_clavier, version, data) {
 		this.id = id;
+		this.data_clavier = data_clavier;
+		let claviersStores = {};
+		for (const clavier in Object.keys(data_clavier)) {
+			claviersStores[clavier] = data_clavier[clavier];
+		}
 		data_clavier[this.id].subscribe((value) => {
 			this.infos_clavier = value;
 		});
+		this.version = version;
+		this.data = data;
 	}
 
 	test() {
@@ -49,7 +41,7 @@ export class Clavier {
 		for (let ligne = 1; ligne <= 7; ligne++) {
 			for (let j = 0; j <= 15; j++) {
 				// Récupération de ce qui doit être affiché sur la touche
-				const res = data[this.infos_clavier.type].find(
+				const res = this.data[this.infos_clavier.type].find(
 					(el) => el['ligne'] == ligne && el['colonne'] == j
 				);
 
@@ -84,7 +76,7 @@ export class Clavier {
 				toucheClavier.dataset['plus'] = 'non';
 
 				if (res !== undefined) {
-					const contenuTouche = data.touches.find((el) => el['touche'] === res['touche']);
+					const contenuTouche = this.data.touches.find((el) => el['touche'] === res['touche']);
 
 					if (contenuTouche[this.infos_clavier.couche] === '') {
 						toucheClavier.innerHTML = '<div><div>'; /* Touche vide */
@@ -155,7 +147,7 @@ export class Clavier {
 						this.infos_clavier.couche === 'Visuel'
 						// this.infos_clavier.plus === 'non'
 					) {
-						toucheClavier.innerHTML = '<div>HyperTexte v.' + versionValue + '</div>';
+						toucheClavier.innerHTML = '<div>HyperTexte v.' + this.version + '</div>';
 					}
 					// if (
 					// 	this.infos_clavier.type === 'iso' &&
@@ -165,7 +157,7 @@ export class Clavier {
 					// ) {
 					// 	toucheClavier.innerHTML =
 					// 		"<div>Layer de navigation<br><span class='tap'>HyperTexte v." +
-					// 		versionValue +
+					// 		this.version +
 					// 		'</span></div>';
 					// }
 
@@ -372,7 +364,7 @@ export class Clavier {
 		}
 
 		// Une fois que la nouvelle couche est déterminée, on actualise la valeur de la couche, puis le clavier
-		data_clavier[this.id].update((currentData) => {
+		this.data_clavier[this.id].update((currentData) => {
 			currentData['couche'] = nouvelleCouche;
 			return currentData;
 		});
@@ -423,6 +415,7 @@ export class Clavier {
 		}
 	}
 }
+
 const mayzner = {
 	max: 14.444,
 	e: 13.001,

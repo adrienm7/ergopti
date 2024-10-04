@@ -3,23 +3,18 @@
 	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
 	import { onMount } from 'svelte';
 
+	import * as data_clavier from '$lib/clavier/etat_claviers.js';
+	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
 	import { version } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
 	});
 
-	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
-	import * as data_clavier from '$lib/clavier/etat_claviers.js';
-
-	let claviersStores = {};
-	for (const clavier in Object.keys(data_clavier)) {
-		claviersStores[clavier] = data_clavier[clavier];
-	}
-
 	export let nom;
-	let clavier = new Clavier(nom);
 	onMount(() => {
+		// data = import(/* @vite-ignore */ `./data/hypertexte_v${versionValue}.json`);
+		let clavier = new Clavier(nom, data_clavier, versionValue, data);
 		clavier.majClavier();
 	});
 </script>
