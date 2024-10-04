@@ -1,5 +1,6 @@
+import * as data_clavier from '$lib/stores_infos.js';
 export class Clavier {
-	constructor(id, data_clavier, version, data) {
+	constructor(id, version, data) {
 		this.id = id;
 		this.data_clavier = data_clavier;
 		data_clavier[this.id].subscribe((value) => {
@@ -30,7 +31,7 @@ export class Clavier {
 	majTouches() {
 		for (let ligne = 1; ligne <= 7; ligne++) {
 			for (let j = 0; j <= 15; j++) {
-				// Récupération de ce qui doit être affiché sur la touche
+				// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
 				const res = this.data[this.infos_clavier.type].find(
 					(el) => el['ligne'] == ligne && el['colonne'] == j
 				);
