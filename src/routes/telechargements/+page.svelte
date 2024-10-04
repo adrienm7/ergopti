@@ -138,7 +138,7 @@
 		<mini-espace />
 		<div>
 			<span>Version Ergodox : </span><a
-				href="/benchmarks/dispositions/ergodox/hypertexte.v{versionValue}.fr.ergodox.json"
+				href="/dispositions/ergodox/hypertexte.v{versionValue}.fr.ergodox.json"
 				download><button>hypertexte.v{versionValue}.fr.ergodox</button></a
 			>
 		</div>
