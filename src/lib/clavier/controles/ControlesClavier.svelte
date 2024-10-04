@@ -5,22 +5,23 @@
 	import ChangementCouche from '$lib/clavier/controles/ChangementCouche.svelte';
 
 	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
-
-	export let nom;
-	let texte = '';
+	import { onMount } from 'svelte';
 
 	import * as data_clavier from '$lib/clavier/etat_claviers.js';
-	let claviersStores = {};
-	for (const clav in Object.keys(data_clavier)) {
-		claviersStores[clav] = data_clavier[clav];
-	}
-
-	let infos_clavier;
-	data_clavier[nom].subscribe((value) => {
-		infos_clavier = value;
+	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
+	import { version } from '$lib/stores_infos.js';
+	let versionValue;
+	version.subscribe((value) => {
+		versionValue = value;
 	});
 
-	let clavier = new Clavier(nom);
+	export let nom;
+	let clavier = new Clavier(nom, data_clavier, versionValue, data);
+	onMount(() => {
+		clavier.majClavier();
+	});
+
+	let texte = '';
 
 	function handleMessage(event) {
 		data_clavier[nom].update((currentData) => {
@@ -37,31 +38,31 @@
 <controles-clavier id={'controles_' + nom}>
 	<ChangementType
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={clavier.infos_clavier.couche}
+		typeValue={clavier.infos_clavier.type}
+		couleurValue={clavier.infos_clavier.couleur}
+		plusValue={clavier.infos_clavier.plus}
 	/>
 	<ChangementPlus
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={clavier.infos_clavier.couche}
+		typeValue={clavier.infos_clavier.type}
+		couleurValue={clavier.infos_clavier.couleur}
+		plusValue={clavier.infos_clavier.plus}
 	/>
 	<ChangementCouleur
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={clavier.infos_clavier.couche}
+		typeValue={clavier.infos_clavier.type}
+		couleurValue={clavier.infos_clavier.couleur}
+		plusValue={clavier.infos_clavier.plus}
 	/>
 	<ChangementCouche
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={clavier.infos_clavier.couche}
+		typeValue={clavier.infos_clavier.type}
+		couleurValue={clavier.infos_clavier.couleur}
+		plusValue={clavier.infos_clavier.plus}
 	/>
 </controles-clavier>
 {#if nom === 'roulements'}
