@@ -7,11 +7,10 @@
 	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
 	import { onMount } from 'svelte';
 
-	import * as data_clavier from '$lib/clavier/etat_claviers.js';
 	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
-	import { version } from '$lib/stores_infos.js';
+	import * as data_clavier from '$lib/stores_infos.js';
 	let versionValue;
-	version.subscribe((value) => {
+	data_clavier.version.subscribe((value) => {
 		versionValue = value;
 	});
 

@@ -1,22 +1,12 @@
 export class Clavier {
-	/*Nous n'avons pas besoin de préciser "function" devant notre constructeur
-	 *et nos autres méthodes classe*/
 	constructor(id, data_clavier, version, data) {
 		this.id = id;
 		this.data_clavier = data_clavier;
-		let claviersStores = {};
-		for (const clavier in Object.keys(data_clavier)) {
-			claviersStores[clavier] = data_clavier[clavier];
-		}
 		data_clavier[this.id].subscribe((value) => {
 			this.infos_clavier = value;
 		});
 		this.version = version;
 		this.data = data;
-	}
-
-	test() {
-		console.log(this.id);
 	}
 
 	majClavier() {
@@ -379,7 +369,7 @@ export class Clavier {
 		let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
 		let toucheLCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='LCtrl']");
 		let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
-		let toucheLalt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
+		let toucheLAlt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
 		let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 		let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
 		let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
@@ -405,7 +395,7 @@ export class Clavier {
 
 		// Les boutons de touches modificatrices À et Space ne sont ajoutées que si + est activé
 		if (this.infos_clavier.plus === 'oui') {
-			for (let toucheModificatrice of [toucheLalt, toucheA, toucheVirgule, toucheEspace]) {
+			for (let toucheModificatrice of [toucheLAlt, toucheA, toucheVirgule, toucheEspace]) {
 				if (toucheModificatrice !== null) {
 					toucheModificatrice.addEventListener('click', () => {
 						this.changerCouche(toucheModificatrice);
