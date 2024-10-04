@@ -124,7 +124,7 @@
 		<mini-espace />
 		<div>
 			<span>Version ISO : </span><a
-				href="/dispositions/iso/hypertexte/hypertexte.v{versionValue}.fr.iso.json"
+				href="/dispositions/iso/hypertexte.v{versionValue}.fr.iso.json"
 				download><button>hypertexte.v{versionValue}.fr.iso</button></a
 			>
 		</div>
