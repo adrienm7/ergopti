@@ -1,17 +1,29 @@
+# Activer le moteur de réécriture
 RewriteEngine On
 RewriteBase /
 
-# Redirection de tout en https
-RewriteEngine On
+# Redirection pour supprimer le slash final des répertoires, sauf si c'est un répertoire physique
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)/$ /$1 [R=301,L]
+
+# Redirection de www vers sans www (forçage de l'URL sans www)
+RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+# Redirection de http vers https (forçage de l'URL HTTPS)
 RewriteCond %{HTTPS} off
-RewriteRule (.*) https://%{HTTP_HOST}/$1 [R=301]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
-# Check if request is for an actual file, serve the file
-RewriteRule ^([^\.]+)$ $1.html [NC,L]
+# Redirige /page vers /page.html sans changer l'URL du navigateur
+RewriteCond %{REQUEST_URI} !/$
+RewriteCond %{REQUEST_FILENAME}\.html -f
+RewriteRule ^(.*)$ $1.html [L]
 
-# Catch request to HTML file, remove extension
-RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /([^\ ]+)\.html
-RewriteRule ^/?(.*)\.html$ /$1 [L,R=301]
+
+
+
+
+
 
 
 
@@ -101,9 +113,9 @@ RewriteRule ^/?(.*)\.html$ /$1 [L,R=301]
 # === Headers de sécurité ===
 
 # 1) N’autorise aucune des pages du site à être iframée – Défend contre la faille CSRF
-Header set X-Frame-Options DENY
+#Header set X-Frame-Options DENY # Doit être désactivé, car sinon l’embedding de pdf ne fonctionne pas
 # 2) Empêche les failles XSS sur les anciens navigateurs qui ne prennent pas en compte la CSP
-# Header set X-XSS-Protection "1; mode=block"
+Header set X-XSS-Protection "1; mode=block"
 # 3) Empêche la faille XSS sur les liens relatifs (quand il y a /page au lieu de beseven.fr/page)
 Header set Content-Security-Policy "base-uri 'self';"
 # 4) Empêche l'interprétation de fichiers sous une autre extension : un hacker réussissant à uploader un txt ne pourra pas l'interpréter en php
