@@ -10,12 +10,17 @@
 	});
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
-	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
 	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
-	let clavier = new Clavier(nom);
-
 	import * as data_clavier from '$lib/clavier/etat_claviers.js';
+	import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
+
+	import { version } from '$lib/stores_infos.js';
+	let versionValue;
+	version.subscribe((value) => {
+		versionValue = value;
+	});
+
+	let clavier = new Clavier(nom, data_clavier, versionValue, data);
 
 	let claviersStores = {};
 	for (const clavier in Object.keys(data_clavier)) {

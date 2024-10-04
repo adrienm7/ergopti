@@ -3,7 +3,7 @@
 	import Footer from '$lib/composants/Footer.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import ControlesClavier from '$lib/clavier/controles/ControlesClavier.svelte';
+	import ControlesClavier from '$lib/clavier/ControlesClavier.svelte';
 
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';

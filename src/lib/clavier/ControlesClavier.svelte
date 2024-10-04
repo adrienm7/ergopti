@@ -15,6 +15,19 @@
 		versionValue = value;
 	});
 
+	let path = `./data/hypertexte_v${versionValue}.json`;
+
+	async function loadData() {
+		try {
+			// Utiliser l'importation dynamique avec un chemin variable
+			const data = await import(/* @vite-ignore */ path);
+			// console.log('Données chargées :', data);
+			return data;
+		} catch (error) {
+			console.error('Erreur lors du chargement des données :', error);
+		}
+	}
+
 	export let nom;
 	let clavier = new Clavier(nom, data_clavier, versionValue, data);
 	onMount(() => {
