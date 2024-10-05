@@ -278,7 +278,9 @@ bloc-clavier[data-couche='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche=
 	font-size: 0.85em;
 }
 
-bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
+bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
+bloc-clavier[data-couche='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
+bloc-clavier[data-couche='Ctrl'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
 	font-size: 0.7em;
 }
 
