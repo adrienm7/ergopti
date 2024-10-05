@@ -2,8 +2,11 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
+
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import { taperTexte } from '$lib/clavier/taperTexte.js';
+	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
+	let clavier = new Clavier('roulements');
+
 	let texte;
 	let roulements_voyelles = [
 		'ai',
@@ -134,7 +137,7 @@
 			class="btn-group"
 			style="width: 100%; margin: 0 auto; display: inline-block; text-align: center"
 		>
-			<select bind:value={texte} on:change={() => taperTexte('roulements', texte, 250, false)}>
+			<select bind:value={texte} on:change={() => clavier.taperTexte(texte, 250, false)}>
 				<option selected disabled hidden>Sélectionner le roulement</option>
 				<option disabled>• Roulements voyelles •</option>
 				{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
