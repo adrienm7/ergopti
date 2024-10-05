@@ -1,6 +1,5 @@
 export function taperTexte(emplacement, texte, vitesse, disparition_anciennes_touches) {
 	let emplacementClavier = document.getElementById(`clavier_${emplacement}`);
-	console.log(emplacementClavier);
 
 	// Nettoyage des touches actives
 	const touchesActives = emplacementClavier.querySelectorAll('.touche-active');

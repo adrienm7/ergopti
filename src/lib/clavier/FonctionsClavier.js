@@ -1,17 +1,17 @@
-import * as infos_clavier from '$lib/stores_infos.js';
+import * as stores_infos from '$lib/stores_infos.js';
 
 export class Clavier {
 	constructor(id) {
 		this.id = id;
-		infos_clavier['version'].subscribe((value) => {
+		stores_infos['version'].subscribe((value) => {
 			this.version = value;
 		});
-		infos_clavier['data'].subscribe((value) => {
+		stores_infos['data'].subscribe((value) => {
 			this.data = value;
 		});
-		this.data_clavier = infos_clavier[this.id];
+		this.data_clavier = stores_infos[this.id]; // Permet de modifier les données du clavier
 		this.data_clavier.subscribe((value) => {
-			this.infos_clavier = value;
+			this.infos_clavier = value; // Permet de récupérer les données du clavier mises à jour en temps réel
 		});
 	}
 
