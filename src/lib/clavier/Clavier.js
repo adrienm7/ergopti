@@ -106,8 +106,12 @@ export class Clavier {
 				if (res !== undefined) {
 					const contenuTouche = this.data.touches.find((el) => el['touche'] === res['touche']);
 
-					if (contenuTouche[this.infos_clavier.couche] === '') {
-						toucheClavier.innerHTML = '<div><div>'; /* Touche vide */
+					if (
+						this.infos_clavier.couche !== 'Visuel' &&
+						(contenuTouche[this.infos_clavier.couche] === '' ||
+							contenuTouche[this.infos_clavier.couche] === undefined)
+					) {
+						toucheClavier.innerHTML = '<div><div>'; /* Touche vide ou undefined dans le json */
 					} else {
 						if (this.infos_clavier.couche === 'Visuel') {
 							if (contenuTouche['type'] === 'ponctuation') {
