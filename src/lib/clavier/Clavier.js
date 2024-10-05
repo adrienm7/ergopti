@@ -47,15 +47,12 @@ export class Clavier {
 	majClavier() {
 		this.majTouches();
 		this.activerModificateurs();
+		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
 
-		document.getElementById(this.infos_clavier.emplacement).dataset['type'] =
-			this.infos_clavier.type;
-		document.getElementById(this.infos_clavier.emplacement).dataset['couche'] =
-			this.infos_clavier.couche;
-		document.getElementById(this.infos_clavier.emplacement).dataset['plus'] =
-			this.infos_clavier.plus;
-		document.getElementById(this.infos_clavier.emplacement).dataset['couleur'] =
-			this.infos_clavier.couleur;
+		emplacementClavier.dataset['type'] = this.infos_clavier.type;
+		emplacementClavier.dataset['couche'] = this.infos_clavier.couche;
+		emplacementClavier.dataset['plus'] = this.infos_clavier.plus;
+		emplacementClavier.dataset['couleur'] = this.infos_clavier.couleur;
 
 		if (this.infos_clavier.controles === 'oui') {
 			this.ajouterBoutonsChangerCouche(this.id, this.infos_clavier);
@@ -85,9 +82,10 @@ export class Clavier {
 				// }
 
 				// Suppression des event listeners sur la touche
-				const toucheClavier0 = document
-					.getElementById(this.infos_clavier.emplacement)
-					.querySelector("bloc-touche[data-ligne='" + ligne + "'][data-colonne='" + colonne + "']");
+				let emplacementClavier = document.getElementById(`clavier_${this.id}`);
+				const toucheClavier0 = emplacementClavier.querySelector(
+					"bloc-touche[data-ligne='" + ligne + "'][data-colonne='" + colonne + "']"
+				);
 				const toucheClavier = toucheClavier0.cloneNode(true);
 				toucheClavier0.parentNode.replaceChild(toucheClavier, toucheClavier0);
 
@@ -228,33 +226,16 @@ export class Clavier {
 	}
 
 	activerModificateurs() {
-		let lShift = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='LShift']");
-		let rShift = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='RShift']");
-		let lCtrl = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='LCtrl']");
-		let rCtrl = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='RCtrl']");
-		let altGr = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='RAlt']");
-		let aGrave = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='à']");
-		let virgule = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche=',']");
-		let lalt = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='LAlt']");
-		let space = document
-			.getElementById(this.infos_clavier.emplacement)
-			.querySelector("[data-touche='Space']");
+		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
+		let lShift = emplacementClavier.querySelector("[data-touche='LShift']");
+		let rShift = emplacementClavier.querySelector("[data-touche='RShift']");
+		let lCtrl = emplacementClavier.querySelector("[data-touche='LCtrl']");
+		let rCtrl = emplacementClavier.querySelector("[data-touche='RCtrl']");
+		let altGr = emplacementClavier.querySelector("[data-touche='RAlt']");
+		let aGrave = emplacementClavier.querySelector("[data-touche='à']");
+		let virgule = emplacementClavier.querySelector("[data-touche=',']");
+		let lalt = emplacementClavier.querySelector("[data-touche='LAlt']");
+		let space = emplacementClavier.querySelector("[data-touche='Space']");
 
 		if (this.infos_clavier.couche === 'Shift' && lShift !== null) {
 			lShift.classList.add('touche-active');
@@ -312,8 +293,9 @@ export class Clavier {
 
 	changerCouche(toucheModificatrice) {
 		let touchePressee = toucheModificatrice.dataset.touche;
-		let coucheActuelle = document.getElementById(this.infos_clavier.emplacement).dataset.couche;
+		let coucheActuelle = this.infos_clavier.couche;
 		let nouvelleCouche = coucheActuelle;
+		console.log(touchePressee, coucheActuelle, nouvelleCouche, this.infos_clavier.plus);
 
 		// Touche pressée = AltGr
 		if (touchePressee === 'RAlt' && coucheActuelle === 'AltGr') {
@@ -386,17 +368,38 @@ export class Clavier {
 			nouvelleCouche = 'Shift';
 		}
 
+		// Touche pressée = E
+		if (touchePressee === 'e' && coucheActuelle === 'ShiftAltGr') {
+			nouvelleCouche = 'e';
+		}
+
+		// Touche pressée = I
+		if (touchePressee === 'à' && coucheActuelle === 'ShiftAltGr') {
+			nouvelleCouche = 'i';
+		}
+
+		// Touche pressée = R
+		if (touchePressee === 'r' && coucheActuelle === 'ShiftAltGr') {
+			nouvelleCouche = 'R';
+		}
+
 		// Touche pressée = À
-		if (touchePressee === 'à' && coucheActuelle === 'À') {
-			nouvelleCouche = 'Visuel';
-		} else if (touchePressee === 'à') {
+		if (
+			touchePressee === 'à' &&
+			['Visuel', 'Primary', 'Shift'].includes(coucheActuelle) &&
+			this.infos_clavier.plus === 'oui'
+		) {
 			nouvelleCouche = 'À';
 		}
 
 		// Touche pressée = ,
 		if (touchePressee === ',' && coucheActuelle === ',') {
 			nouvelleCouche = 'Visuel';
-		} else if (touchePressee === ',') {
+		} else if (
+			touchePressee === ',' &&
+			['Visuel', 'Primary', 'Shift'].includes(coucheActuelle) &&
+			this.infos_clavier.plus === 'oui'
+		) {
 			nouvelleCouche = ',';
 		}
 
@@ -409,7 +412,7 @@ export class Clavier {
 	}
 
 	ajouterBoutonsChangerCouche() {
-		let emplacementClavier = document.getElementById(this.infos_clavier.emplacement);
+		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
 		let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 		let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
 		let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
@@ -417,6 +420,8 @@ export class Clavier {
 		let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
 		let toucheLAlt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
 		let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
+		let toucheE = emplacementClavier.querySelector("bloc-touche[data-touche='e']");
+		let toucheR = emplacementClavier.querySelector("bloc-touche[data-touche='r']");
 		let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
 		let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
 
@@ -426,7 +431,10 @@ export class Clavier {
 			toucheLShift,
 			toucheRShift,
 			toucheLCtrl,
-			toucheRCtrl
+			toucheRCtrl,
+			toucheA,
+			toucheE,
+			toucheR
 		]) {
 			if (toucheModificatrice !== null) {
 				toucheModificatrice.addEventListener(
@@ -441,7 +449,7 @@ export class Clavier {
 
 		// Les boutons de touches modificatrices À et Space ne sont ajoutées que si + est activé
 		if (this.infos_clavier.plus === 'oui') {
-			for (let toucheModificatrice of [toucheLAlt, toucheA, toucheVirgule, toucheEspace]) {
+			for (let toucheModificatrice of [toucheLAlt, toucheVirgule, toucheEspace]) {
 				if (toucheModificatrice !== null) {
 					toucheModificatrice.addEventListener('click', () => {
 						this.changerCouche(toucheModificatrice);
