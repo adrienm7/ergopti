@@ -5,6 +5,7 @@ export class EmulationClavier extends Clavier {
 		this.shift = false;
 		this.altgr = false;
 		this.control = false;
+		this.R = false;
 		this.a_grave = false;
 		this.virgule = false;
 		this.couche = 'Primary'; // Couche par défaut
@@ -37,6 +38,8 @@ export class EmulationClavier extends Clavier {
 			this.couche = 'AltGr';
 		} else if (this.shift) {
 			this.couche = 'Shift';
+		} else if (this.R) {
+			this.couche = 'R';
 		} else if (this.a_grave) {
 			this.couche = 'À';
 		} else if (this.virgule) {
@@ -65,9 +68,7 @@ export class EmulationClavier extends Clavier {
 
 		// Si touche normale
 		let keyPressed = event.code;
-		console.log(keyPressed);
 		let res = this.data[this.infos_clavier.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
-		console.log(res);
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
 			let toucheClavier = this.data.touches.find((el) => el['touche'] == res['touche']);
@@ -77,17 +78,27 @@ export class EmulationClavier extends Clavier {
 				this.envoiTouche_ReplacerCurseur('Backspace');
 				return true;
 			}
-			if (
-				keyPressed === 'Enter' ||
-				keyPressed === 'AltRight' ||
-				(toucheClavier['touche'] === 'magique' && this.infos_clavier['plus'] === 'non')
-			) {
+			if (keyPressed === 'Enter') {
 				this.envoiTouche_ReplacerCurseur('Enter');
+				// } else if (keyPressed === 'AltRight' && this.infos_clavier['plus'] === 'oui') {
+				// 	this.envoiTouche_ReplacerCurseur('Tab');
+				// } else if (keyPressed === 'ControlRight' && this.infos_clavier['plus'] === 'oui') {
+				// 	this.envoiTouche_ReplacerCurseur('a');
+			} else if (this.R) {
+				if (keyPressed === 'Space') {
+					touche = ' ';
+				} else {
+					// On supprime le R avant de taper le raccourci de la couche R
+					this.textarea.value = this.textarea.value.slice(0, -1);
+					touche = toucheClavier['R'];
+				}
+				this.R = false;
+				this.envoiTouche_ReplacerCurseur(touche);
 			} else if (this.a_grave) {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					// On supprime le à avant de taper le raccourci de la this.couche À
+					// On supprime le à avant de taper le raccourci de la couche À
 					this.textarea.value = this.textarea.value.slice(0, -1);
 					touche = toucheClavier['À'];
 				}
@@ -97,14 +108,13 @@ export class EmulationClavier extends Clavier {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					// On supprime le à avant de taper le raccourci de la this.couche À
+					// On supprime le , avant de taper le raccourci de la couche Virgule
 					this.textarea.value = this.textarea.value.slice(0, -1);
 					touche = toucheClavier[','];
 				}
 				this.virgule = false;
 				this.envoiTouche_ReplacerCurseur(touche);
 			} else {
-				console.log('envoi touche');
 				this.envoiTouche(event, toucheClavier);
 			}
 		}
@@ -122,7 +132,8 @@ export class EmulationClavier extends Clavier {
 			touche = toucheClavier[this.couche];
 		}
 
-		touche = touche.replace(/<span class='espace-insecable'><\/span>/g, ' ');
+		touche = touche.replace(/<espace-insecable><\/espace-insecable>/g, ' ');
+		touche = touche.replace(/Alt<br><span class='tap'>Alt ↹<\/span>/g, '');
 		this.envoiTouche_ReplacerCurseur(touche);
 	}
 
@@ -134,6 +145,9 @@ export class EmulationClavier extends Clavier {
 		var texteAvantCurseur = this.textarea.value.substring(0, positionCurseur);
 		var texteApresCurseur = this.textarea.value.substring(positionCurseur);
 
+		if (touche === 'ℝ') {
+			this.R = true;
+		}
 		if (touche === 'à') {
 			this.a_grave = true;
 		}
@@ -148,6 +162,9 @@ export class EmulationClavier extends Clavier {
 			nouvellePositionCurseur = positionCurseur - 1;
 		} else if (touche === 'Enter') {
 			this.textarea.value = texteAvantCurseur + '\n' + texteApresCurseur;
+			nouvellePositionCurseur = positionCurseur + 1;
+		} else if (touche === 'Tab') {
+			this.textarea.value = texteAvantCurseur + '\t' + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + 1;
 		} else if (touche === '★') {
 			let mot = texteAvantCurseur.split(' ').slice(-1).toString();
@@ -197,6 +214,17 @@ export class EmulationClavier extends Clavier {
 			.replace(/◌̂I/g, 'Î')
 			.replace(/◌̂O/g, 'Ô')
 			.replace(/◌̂U/g, 'Û');
+		this.textarea.value = this.textarea.value
+			.replace(/◌̈a/g, 'ä')
+			.replace(/◌̈e/g, 'ë')
+			.replace(/◌̈i/g, 'ï')
+			.replace(/◌̈o/g, 'ö')
+			.replace(/◌̈u/g, 'ü')
+			.replace(/◌̈A/g, 'Ä')
+			.replace(/◌̈E/g, 'Ë')
+			.replace(/◌̈I/g, 'Ï')
+			.replace(/◌̈O/g, 'Ö')
+			.replace(/◌̈U/g, 'Ü');
 		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 
@@ -215,7 +243,6 @@ export class EmulationClavier extends Clavier {
 	}
 
 	relacherModificateurs(event) {
-		console.log(event.code);
 		if (event.code === 'AltRight') {
 			this.altgr = false;
 		} else if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {

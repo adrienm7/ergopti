@@ -13,7 +13,8 @@
 		['➁ Shift', 'Shift'],
 		['➂ AltGr', 'AltGr'],
 		['➃ Shift + AltGr', 'ShiftAltGr'],
-		['Ctrl', 'Ctrl']
+		['Ctrl', 'Ctrl'],
+		['ℝ', 'R']
 	];
 	let couches_plus = couches_standard.concat([
 		['★ Layer', 'Layer'],
