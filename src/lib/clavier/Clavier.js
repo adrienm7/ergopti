@@ -2,8 +2,12 @@ import * as stores_infos from '$lib/stores_infos.js';
 
 async function loadData(version) {
 	try {
-		// Utilisation de l'importation dynamique avec un chemin variable
-		const data = await import(/* @vite-ignore */ `./data/hypertexte_v${version}.json`);
+		// Utilisation de fetch pour récupérer le fichier JSON depuis le dossier static
+		const response = await fetch(`/data/hypertexte_v${version}.json`);
+		if (!response.ok) {
+			throw new Error('Erreur lors du chargement du fichier JSON');
+		}
+		const data = await response.json(); // Parse les données JSON
 		// console.log('Données chargées :', data);
 		return data;
 	} catch (error) {

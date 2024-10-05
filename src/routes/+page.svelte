@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import ControlesClavier from '$lib/clavier/ControlesClavier.svelte';
+	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
 	import AlternanceMains from './accueil/alternance_mains.svelte';
 	import DistanceDoigtsTouches from './accueil/distance_doigts_touches.svelte';
@@ -31,7 +31,7 @@
 	</h1>
 	<BlocClavier nom="presentation" />
 	<mini-espace />
-	<ControlesClavier nom="presentation" />
+	<BlocControlesClavier nom="presentation" />
 </header>
 
 <petit-espace />
