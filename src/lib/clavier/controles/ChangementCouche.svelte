@@ -14,6 +14,8 @@
 		['➂ AltGr', 'AltGr'],
 		['➃ Shift + AltGr', 'ShiftAltGr'],
 		['Ctrl', 'Ctrl'],
+		['Exposant', 'e'],
+		['Indice', 'i'],
 		['ℝ', 'R']
 	];
 	let couches_plus = couches_standard.concat([

@@ -5,6 +5,8 @@ export class EmulationClavier extends Clavier {
 		this.shift = false;
 		this.altgr = false;
 		this.control = false;
+		this.e = false;
+		this.i = false;
 		this.R = false;
 		this.a_grave = false;
 		this.virgule = false;
@@ -38,6 +40,10 @@ export class EmulationClavier extends Clavier {
 			this.couche = 'AltGr';
 		} else if (this.shift) {
 			this.couche = 'Shift';
+		} else if (this.e) {
+			this.couche = 'e';
+		} else if (this.i) {
+			this.couche = 'i';
 		} else if (this.R) {
 			this.couche = 'R';
 		} else if (this.a_grave) {
@@ -84,12 +90,26 @@ export class EmulationClavier extends Clavier {
 				// 	this.envoiTouche_ReplacerCurseur('Tab');
 				// } else if (keyPressed === 'ControlRight' && this.infos_clavier['plus'] === 'oui') {
 				// 	this.envoiTouche_ReplacerCurseur('a');
+			} else if (this.e) {
+				if (keyPressed === 'Space') {
+					touche = ' ';
+				} else {
+					touche = toucheClavier['e'];
+				}
+				this.e = false;
+				this.envoiTouche_ReplacerCurseur(touche);
+			} else if (this.i) {
+				if (keyPressed === 'Space') {
+					touche = ' ';
+				} else {
+					touche = toucheClavier['i'];
+				}
+				this.i = false;
+				this.envoiTouche_ReplacerCurseur(touche);
 			} else if (this.R) {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					// On supprime le R avant de taper le raccourci de la couche R
-					this.textarea.value = this.textarea.value.slice(0, -1);
 					touche = toucheClavier['R'];
 				}
 				this.R = false;
@@ -145,8 +165,17 @@ export class EmulationClavier extends Clavier {
 		var texteAvantCurseur = this.textarea.value.substring(0, positionCurseur);
 		var texteApresCurseur = this.textarea.value.substring(positionCurseur);
 
+		if (touche === 'ᵉ') {
+			this.e = true;
+			touche = ''; /* Ne pas afficher la touche morte */
+		}
+		if (touche === 'ᵢ') {
+			this.i = true;
+			touche = ''; /* Ne pas afficher la touche morte */
+		}
 		if (touche === 'ℝ') {
 			this.R = true;
+			touche = ''; /* Ne pas afficher la touche morte */
 		}
 		if (touche === 'à') {
 			this.a_grave = true;
