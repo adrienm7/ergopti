@@ -246,7 +246,7 @@ data = {
 			"taille": "1"
 		},
 		{
-			"touche": "Enter",
+			"touche": "enter",
 			"code": "Enter",
 			"main": "droite",
 			"doigt": "auriculaire",

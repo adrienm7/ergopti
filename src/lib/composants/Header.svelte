@@ -7,15 +7,35 @@
 		document.getElementById('clavier-ref').style.zIndex =
 			'-999'; /* Si le clavier était ouvert, on le ferme */
 	}
+
+	import { version } from '$lib/stores_infos.js';
+	let versionValue;
+	version.subscribe((value) => {
+		versionValue = value;
+	});
+
+	// Utiliser `set` pour mettre à jour la version dans le store
+	function handleVersionChange() {
+		version.set(versionValue);
+	}
+
+	let liste_versions = ['1.0.5', '1.0.12', '1.0.16', '1.0.19', '1.1.2'];
 </script>
 
 <header>
 	<div class="logo">
-		<a href="/"
-			><p class="italic">
-				Disposition clavier <span class="hyper">HyperTexte</span>
-			</p></a
-		>
+		<p class="italic">
+			Disposition clavier <span class="hyper"
+				>HyperTexte
+				<div class="myselect">
+					<select id="selection-version" bind:value={versionValue} on:change={handleVersionChange}>
+						{#each liste_versions as value}<option {value}
+								><span class="hyper">{value}</span></option
+							>{/each}
+					</select>
+				</div></span
+			>
+		</p>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
@@ -63,6 +83,53 @@
 		--couleur-icone-hamburger: white;
 		--marge-bords-menu: clamp(15px, 2vw, 50px);
 		--longueur-traits-hamburger: 18px;
+	}
+
+	#selection-version {
+		margin: 0;
+		padding: 0;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+		background-image: inherit;
+		border: none;
+		font-style: italic;
+	}
+
+	.myselect {
+		position: relative;
+		display: inline-block;
+		margin: 0;
+		padding: 0;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+		background-image: inherit;
+		border: none;
+		font-style: italic;
+	}
+
+	.myselect::after {
+		content: '';
+		position: absolute;
+		right: 0px;
+		top: 8px;
+		width: 0;
+		height: 0;
+		border-left: 8px solid transparent;
+		border-right: 8px solid transparent;
+		border-top: 8px solid rgba(255, 255, 255, 1);
+		pointer-events: none;
+	}
+
+	#selection-version option {
+		background-color: white;
+		color: black;
+		font-style: normal;
 	}
 
 	header {
