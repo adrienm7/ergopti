@@ -185,6 +185,18 @@ export class EmulationClavier extends Clavier {
 			this.textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + touche.length;
 		}
+		/* Convertir les touches mortes avec la voyelle suivante */
+		this.textarea.value = this.textarea.value
+			.replace(/◌̂a/g, 'â')
+			.replace(/◌̂e/g, 'ê')
+			.replace(/◌̂i/g, 'î')
+			.replace(/◌̂o/g, 'ô')
+			.replace(/◌̂u/g, 'û')
+			.replace(/◌̂A/g, 'Â')
+			.replace(/◌̂E/g, 'Ê')
+			.replace(/◌̂I/g, 'Î')
+			.replace(/◌̂O/g, 'Ô')
+			.replace(/◌̂U/g, 'Û');
 		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 

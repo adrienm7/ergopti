@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import ControlesClavier from '$lib/clavier/ControlesClavier.svelte';
+	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
@@ -32,7 +32,7 @@
 		</div>
 	</div>
 	<mini-espace />
-	<ControlesClavier nom="presentation_plus" />
+	<BlocControlesClavier nom="presentation_plus" />
 </header>
 
 <petit-espace />

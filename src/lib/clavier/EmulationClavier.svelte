@@ -10,7 +10,7 @@
 	let champTexte = '';
 </script>
 
-<!-- <ControlesClavier nom="emulation" /> -->
+<!-- <BlocControlesClavier nom="emulation" /> -->
 <mini-espace />
 <BlocClavier nom="emulation" />
 

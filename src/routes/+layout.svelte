@@ -3,7 +3,7 @@
 	import Footer from '$lib/composants/Footer.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import ControlesClavier from '$lib/clavier/ControlesClavier.svelte';
+	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
@@ -23,9 +23,9 @@
 	import '$lib/css/miscellaneous.css';
 
 	afterUpdate(() => {
+		matomo.trackPageView();
 		AOS.init();
 		typography(document.getElementById('page'));
-		matomo.trackPageView();
 	});
 
 	let zIndex = -999;
@@ -40,9 +40,9 @@
 
 <Matomo url="https://stats.beseven.fr" siteId={6} />
 
-<div class="banner">
+<!-- <div class="banner">
 	<p>En construction</p>
-</div>
+</div> -->
 
 <button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
 
@@ -50,7 +50,7 @@
 	<div>
 		<BlocClavier nom="reference" />
 		<mini-espace />
-		<ControlesClavier nom="reference" />
+		<BlocControlesClavier nom="reference" />
 	</div>
 </div>
 
