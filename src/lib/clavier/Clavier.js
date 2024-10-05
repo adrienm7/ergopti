@@ -47,8 +47,12 @@ export class Clavier {
 	majClavier() {
 		this.majTouches();
 		this.activerModificateurs();
-		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
 
+		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
+		if (emplacementClavier === null) {
+			// Quitte la fonction si l'élément n'est pas défini
+			return;
+		}
 		emplacementClavier.dataset['type'] = this.infos_clavier.type;
 		emplacementClavier.dataset['couche'] = this.infos_clavier.couche;
 		emplacementClavier.dataset['plus'] = this.infos_clavier.plus;
@@ -83,6 +87,10 @@ export class Clavier {
 
 				// Suppression des event listeners sur la touche
 				let emplacementClavier = document.getElementById(`clavier_${this.id}`);
+				if (emplacementClavier === null) {
+					// Quitte la fonction si l'élément n'est pas défini
+					return;
+				}
 				const toucheClavier0 = emplacementClavier.querySelector(
 					"bloc-touche[data-ligne='" + ligne + "'][data-colonne='" + colonne + "']"
 				);
@@ -227,6 +235,10 @@ export class Clavier {
 
 	activerModificateurs() {
 		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
+		if (emplacementClavier === null) {
+			// Quitte la fonction si l'élément n'est pas défini
+			return;
+		}
 		let lShift = emplacementClavier.querySelector("[data-touche='LShift']");
 		let rShift = emplacementClavier.querySelector("[data-touche='RShift']");
 		let lCtrl = emplacementClavier.querySelector("[data-touche='LCtrl']");
@@ -413,6 +425,10 @@ export class Clavier {
 
 	ajouterBoutonsChangerCouche() {
 		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
+		if (emplacementClavier === null) {
+			// Quitte la fonction si l'élément n'est pas défini
+			return;
+		}
 		let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 		let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
 		let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
@@ -461,6 +477,10 @@ export class Clavier {
 
 	taperTexte(texte, vitesse, disparition_anciennes_touches) {
 		let emplacementClavier = document.getElementById(`clavier_${this.id}`);
+		if (emplacementClavier === null) {
+			// Quitte la fonction si l'élément n'est pas défini
+			return;
+		}
 
 		// Nettoyage des touches actives
 		const touchesActives = emplacementClavier.querySelectorAll('.touche-active');

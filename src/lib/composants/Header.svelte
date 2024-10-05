@@ -25,13 +25,11 @@
 <header>
 	<div class="logo">
 		<p class="italic">
-			Disposition clavier <span class="hyper"
-				>HyperTexte
+			<a href="/">Disposition clavier </a><span class="hyper"
+				><a href="/">HyperTexte</a>
 				<div class="myselect">
 					<select id="selection-version" bind:value={versionValue} on:change={handleVersionChange}>
-						{#each liste_versions as value}<option {value}
-								><span class="hyper">{value}</span></option
-							>{/each}
+						{#each liste_versions.sort().reverse() as value}<option {value}>{value}</option>{/each}
 					</select>
 				</div></span
 			>
