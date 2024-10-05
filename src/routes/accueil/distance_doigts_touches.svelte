@@ -2,10 +2,8 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
+
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import { taperTexte } from '$lib/clavier/taperTexte.js';
-	import AlternanceMains from './alternance_mains.svelte';
-	import DistanceDoigtsTouches from './distance_doigts_touches.svelte';
 </script>
 
 <section>
