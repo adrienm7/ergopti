@@ -1,6 +1,18 @@
 import { writable } from 'svelte/store';
+let valeurversion = '1.1.2';
 
-export const version = writable('1.1.2');
+async function loadData(version) {
+	try {
+		// Utiliser l'importation dynamique avec un chemin variable
+		const data = await import(/* @vite-ignore */ `./clavier/data/hypertexte_v${version}.json`);
+		// console.log('Données chargées :', data);
+		return data;
+	} catch (error) {
+		console.error('Erreur lors du chargement des données :', error);
+	}
+}
+export let data = writable(await loadData(valeurversion));
+export const version = writable(valeurversion);
 
 export const presentation = writable({
 	emplacement: 'clavier_presentation',
