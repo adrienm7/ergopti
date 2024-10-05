@@ -8,14 +8,11 @@
 	import { onMount } from 'svelte';
 
 	export let nom;
-
-	import * as data_clavier from '$lib/stores_infos.js';
 	let infos_clavier;
-	data_clavier[nom].subscribe((value) => {
+	let clavier = new Clavier(nom);
+	clavier.data_clavier.subscribe((value) => {
 		infos_clavier = value;
 	});
-
-	let clavier = new Clavier(nom);
 	onMount(() => {
 		clavier.majClavier();
 	});
@@ -65,15 +62,3 @@
 		plusValue={infos_clavier.plus}
 	/>
 </controles-clavier>
-{#if nom === 'roulements'}
-	<controles-clavier class="btn-group">
-		<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
-			<option value="none" selected disabled hidden>Roulements voyelles</option>
-			{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
-		</select>
-		<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
-			<option value="none" selected disabled hidden>Roulements consonnes</option>
-			{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
-		</select>
-	</controles-clavier>
-{/if}
