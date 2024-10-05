@@ -132,7 +132,11 @@ export class Clavier {
 						} else {
 							// Toutes les couches autres que "Visuel"
 							if (this.infos_clavier.plus === 'oui') {
-								if (contenuTouche[this.infos_clavier.couche + '+'] !== undefined) {
+								if (
+									contenuTouche[this.infos_clavier.couche + '+'] !== undefined &&
+									(ligne < 6 || res.touche === 'Space')
+								) {
+									// Si la couche + existe et n’est pas en thumb cluster. Sur le thumb cluster, on affiche seulement le tap hold en space et pas en Alt ou Ctrl
 									toucheClavier.innerHTML =
 										'<div>' + contenuTouche[this.infos_clavier.couche + '+'] + '</div>';
 									toucheClavier.dataset.plus = 'oui';
@@ -239,7 +243,8 @@ export class Clavier {
 		if (
 			this.infos_clavier.couche === 'Shift' &&
 			rCtrl !== null &&
-			this.infos_clavier.plus === 'oui'
+			this.infos_clavier.plus === 'oui' &&
+			this.infos_clavier.type === 'iso'
 		) {
 			rCtrl.classList.add('touche-active');
 		}

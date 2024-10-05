@@ -258,7 +258,7 @@ bloc-touche[data-touche='LShift'] div {
 }
 
 bloc-touche[data-touche='AltTab'] div {
-	font-size: calc(var(--taille-texte-touche) / 1.8);
+	font-size: 0.7em !important;
 	line-height: 1.15;
 }
 
@@ -295,6 +295,11 @@ bloc-clavier[data-couche='Layer'][data-plus='oui'] bloc-touche[data-touche='Coll
 bloc-clavier[data-couche='Layer'] bloc-touche div {
 	font-size: 0.8em;
 }
+bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Copier'] div,
+bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Couper'] div {
+	font-size: var(--taille-texte-touche);
+}
+
 /* Layer À, pour éviter que les touches avec 4 symboles débordent */
 bloc-clavier[data-couche='À'] bloc-touche div {
 	font-size: 0.7em;
