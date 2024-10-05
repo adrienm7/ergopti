@@ -1,16 +1,4 @@
 import * as data_clavier from '$lib/stores_infos.js';
-import data from '$lib/clavier/data/hypertexte_v1.1.2.json';
-
-async function loadData() {
-	try {
-		// Utiliser l'importation dynamique avec un chemin variable
-		const data = await import(/* @vite-ignore */ path);
-		// console.log('Données chargées :', data);
-		return data;
-	} catch (error) {
-		console.error('Erreur lors du chargement des données :', error);
-	}
-}
 
 export class Clavier {
 	constructor(id) {
@@ -22,11 +10,9 @@ export class Clavier {
 		data_clavier.version.subscribe((value) => {
 			this.version = value;
 		});
-		// let path = `./data/hypertexte_v${this.version}.json`;
-		// loadData(this.version).then((value) => {
-		// 	this.data = value;
-		// });
-		this.data = data;
+		data_clavier['data'].subscribe((value) => {
+			this.data = value;
+		});
 	}
 
 	majClavier() {
