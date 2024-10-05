@@ -1,17 +1,17 @@
-import * as data_clavier from '$lib/stores_infos.js';
+import * as infos_clavier from '$lib/stores_infos.js';
 
 export class Clavier {
 	constructor(id) {
 		this.id = id;
-		this.data_clavier = data_clavier;
-		data_clavier[this.id].subscribe((value) => {
-			this.infos_clavier = value;
-		});
-		data_clavier.version.subscribe((value) => {
+		infos_clavier['version'].subscribe((value) => {
 			this.version = value;
 		});
-		data_clavier['data'].subscribe((value) => {
+		infos_clavier['data'].subscribe((value) => {
 			this.data = value;
+		});
+		this.data_clavier = infos_clavier[this.id];
+		this.data_clavier.subscribe((value) => {
+			this.infos_clavier = value;
 		});
 	}
 
@@ -365,11 +365,10 @@ export class Clavier {
 		}
 
 		// Une fois que la nouvelle couche est déterminée, on actualise la valeur de la couche, puis le clavier
-		this.data_clavier[this.id].update((currentData) => {
+		this.data_clavier.update((currentData) => {
 			currentData['couche'] = nouvelleCouche;
 			return currentData;
 		});
-
 		this.majClavier();
 	}
 
