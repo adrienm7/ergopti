@@ -247,7 +247,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "Enter",
+			"touche": "enter",
 			"code": "Enter",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -836,7 +836,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "Enter",
+			"touche": "enter",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -1100,7 +1100,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "Enter",
+			"touche": "enter",
 			"main": "droite",
 			"doigt": "pouce",
 			"ligne": "6",
@@ -1231,6 +1231,7 @@
 			"Shift": "E",
 			"AltGr": "{",
 			"ShiftAltGr": "ᵉ",
+			"ShiftAltGr-style": "morte",
 			"Ctrl": "e",
 			"Layer": "⇩",
 			"À": "je",
@@ -1287,6 +1288,7 @@
 			"Shift": "J",
 			"Shift+": "↩",
 			"AltGr": "◌̈",
+			"AltGr-style": "morte",
 			"AltGr+": "↩",
 			"ShiftAltGr": "",
 			"Ctrl": "j",
@@ -1364,9 +1366,9 @@
 		{
 			"touche": "q",
 			"Primary": "q",
-			"Primary+": "[qu]",
+			"Primary+": "qu",
 			"Shift": "Q",
-			"Shift+": "[Qu]",
+			"Shift+": "Qu",
 			"AltGr": "%",
 			"ShiftAltGr": "",
 			"Ctrl": "q",
@@ -1380,6 +1382,7 @@
 			"Shift": "R",
 			"AltGr": "]",
 			"ShiftAltGr": "ℝ",
+			"ShiftAltGr-style": "morte",
 			"Ctrl": "r",
 			"Layer": "^⇨",
 			"À": "rq",
@@ -1402,6 +1405,7 @@
 			"Shift": "T",
 			"AltGr": "[",
 			"ShiftAltGr": "◌̈",
+			"ShiftAltGr-style": "morte",
 			"Ctrl": "t",
 			"Layer": "⇨",
 			"À": "pt",
@@ -1413,6 +1417,7 @@
 			"Shift": "U",
 			"AltGr": "}",
 			"ShiftAltGr": "☻",
+			"ShiftAltGr-style": "morte",
 			"Ctrl": "u",
 			"Layer": "^⇩",
 			"À": "ju",
@@ -1504,6 +1509,7 @@
 			"Shift": "’",
 			"AltGr": "\"",
 			"ShiftAltGr": "δ",
+			"ShiftAltGr-style": "morte",
 			"Ctrl": "s",
 			"Layer": "!+⇩",
 			"À": "j",
@@ -1534,6 +1540,7 @@
 		{
 			"touche": "!",
 			"Primary": "◌̂",
+			"Primary-style": "morte",
 			"Shift": "<span class='espace-insecable'></span>!",
 			"AltGr": "!",
 			"ShiftAltGr": "¡",
@@ -1570,6 +1577,7 @@
 			"Shift": "È",
 			"AltGr": "\\",
 			"ShiftAltGr": "ᵢ",
+			"ShiftAltGr-style": "morte",
 			"Ctrl": "-",
 			"Layer": "!⇩",
 			"À": "",
@@ -1856,7 +1864,7 @@
 			"type": "special"
 		},
 		{
-			"touche": "Enter",
+			"touche": "enter",
 			"Primary": "↩",
 			"Shift": "↩",
 			"AltGr": "↩",

@@ -1,18 +1,42 @@
 import * as stores_infos from '$lib/stores_infos.js';
 
+async function loadData(version) {
+	try {
+		// Utilisation de l'importation dynamique avec un chemin variable
+		const data = await import(/* @vite-ignore */ `./data/hypertexte_v${version}.json`);
+		// console.log('Données chargées :', data);
+		return data;
+	} catch (error) {
+		console.error('Erreur lors du chargement des données :', error);
+	}
+}
+
 export class Clavier {
 	constructor(id) {
 		this.id = id;
-		// this.emplacement = document.getElementById('clavier_' + this.id);
+
+		// S'abonner au store pour la version
 		stores_infos['version'].subscribe((value) => {
 			this.version = value;
+
+			// Charger les données en fonction de la version
+			loadData(value)
+				.then((data) => {
+					this.data = data;
+					this.majClavier(); // Très important, sinon les claviers seront vides
+					// console.log('Données chargées :', this.data);
+				})
+				.catch((error) => {
+					console.error('Erreur lors du chargement des données :', error);
+				});
 		});
-		stores_infos['data'].subscribe((value) => {
-			this.data = value;
-		});
+
+		// Liaison avec le store spécifique au clavier (data_clavier)
 		this.data_clavier = stores_infos[this.id]; // Permet de modifier les données du clavier
+
+		// S'abonner au store pour récupérer les données du clavier mises à jour en temps réel
 		this.data_clavier.subscribe((value) => {
-			this.infos_clavier = value; // Permet de récupérer les données du clavier mises à jour en temps réel
+			this.infos_clavier = value;
 		});
 	}
 
@@ -35,6 +59,9 @@ export class Clavier {
 	}
 
 	majTouches() {
+		if (this.data === undefined) {
+			return;
+		}
 		for (let ligne = 1; ligne <= 7; ligne++) {
 			for (let j = 0; j <= 15; j++) {
 				// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)

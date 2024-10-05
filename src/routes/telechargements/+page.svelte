@@ -5,10 +5,10 @@
 
 	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
 
-	import { version } from '$lib/stores_infos.js';
-	let versionValue;
-	version.subscribe((value) => {
-		versionValue = value;
+	import { derniere_version } from '$lib/stores_infos.js';
+	let version;
+	derniere_version.subscribe((value) => {
+		version = value;
 	});
 </script>
 
@@ -29,18 +29,23 @@
 		<EmulationClavier />
 
 		<h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
+		<p>
+			Note : les fichiers d’installation n’existent au complet qu’à partir de la 1.1.2, c’est
+			pourquoi le toggle de version n’a aucun impact sur cette page mis à part sur l’émulation du
+			clavier.
+		</p>
 
 		<h3 data-aos="fade-right" data-aos-mirror="true">Installer la disposition sur Windows</h3>
 		<mini-espace />
 		<div>
-			<a href="/pilotes/kbdedit/HyperTexte v{versionValue}.exe" download
-				><button class="bouton-telechargement">☛ HyperTexte {versionValue}.exe</button></a
+			<a href="/pilotes/kbdedit/HyperTexte v{version}.exe" download
+				><button class="bouton-telechargement">☛ HyperTexte {version}.exe</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/pilotes/kbdedit/HyperTexte v{versionValue}.kbe" download
-				><button>Fichier source de HyperTexte {versionValue}</button></a
+			<a href="/pilotes/kbdedit/HyperTexte v{version}.kbe" download
+				><button>Fichier source de HyperTexte {version}</button></a
 			>
 		</div>
 		<mini-espace />
@@ -70,43 +75,43 @@
 		</p>
 		<mini-espace />
 		<div>
-			<a href="/pilotes/kalamine/{versionValue}/hypertexte.toml" download
+			<a href="/pilotes/kalamine/{version}/hypertexte.toml" download
 				><button>hypertexte.toml</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/pilotes/kalamine/{versionValue}/hypertexte.svg" download
+			<a href="/pilotes/kalamine/{version}/hypertexte.svg" download
 				><button>hypertexte.svg</button></a
 			>
 		</div>
 		<div>
 			<h4>Windows</h4>
-			<a href="/pilotes/kalamine/{versionValue}/hypertexte.ahk" download
+			<a href="/pilotes/kalamine/{version}/hypertexte.ahk" download
 				><button class="bouton-telechargement">HyperTexte Kalamine AHK (user)</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/pilotes/kalamine/{versionValue}/hypertexte.klc" download
+			<a href="/pilotes/kalamine/{version}/hypertexte.klc" download
 				><button class="bouton-telechargement">HyperTexte Kalamine KLC (admin)</button></a
 			>
 		</div>
 		<h4>MacOS</h4>
 		<div>
-			<a href="/pilotes/kalamine/{versionValue}/hypertexte.keylayout" download
+			<a href="/pilotes/kalamine/{version}/hypertexte.keylayout" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Keylayout</button></a
 			>
 		</div>
 		<h4>Linux</h4>
 		<div>
-			<a href="/pilotes/kalamine/{versionValue}/hypertexte.xkb_keymap" download
+			<a href="/pilotes/kalamine/{version}/hypertexte.xkb_keymap" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_keymap (user)</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
-			<a href="/pilotes/kalamine/{versionValue}/hypertexte.xkb_symbols" download
+			<a href="/pilotes/kalamine/{version}/hypertexte.xkb_symbols" download
 				><button class="bouton-telechargement">HyperTexte Kalamine Xkb_symbols (root)</button></a
 			>
 		</div>
@@ -124,35 +129,35 @@
 		<mini-espace />
 		<div>
 			<span>Version ISO : </span><a
-				href="/dispositions/iso/hypertexte.v{versionValue}.fr.iso.json"
-				download><button>hypertexte.v{versionValue}.fr.iso</button></a
+				href="/dispositions/iso/hypertexte.v{version}.fr.iso.json"
+				download><button>hypertexte.v{version}.fr.iso</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version ISO+ : </span><a
-				href="/dispositions/iso/hypertexte.v{versionValue}.fr.iso+.json"
-				download><button>hypertexte.v{versionValue}.fr.iso+</button></a
+				href="/dispositions/iso/hypertexte.v{version}.fr.iso+.json"
+				download><button>hypertexte.v{version}.fr.iso+</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Version Ergodox : </span><a
-				href="/dispositions/ergodox/hypertexte.v{versionValue}.fr.ergodox.json"
-				download><button>hypertexte.v{versionValue}.fr.ergodox</button></a
+				href="/dispositions/ergodox/hypertexte.v{version}.fr.ergodox.json"
+				download><button>hypertexte.v{version}.fr.ergodox</button></a
 			>
 		</div>
 		<petit-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version à utiliser sur le site : </span><a
-				href="/pilotes/kalamine/{versionValue}/hypertexte_K.json"
+				href="/pilotes/kalamine/{version}/hypertexte_K.json"
 				download><button>hypertexte_K.json</button></a
 			>
 		</div>
 		<mini-espace />
 		<div>
 			<span>Analyseur Ergo-L — Version théorique : </span><a
-				href="/pilotes/kalamine/{versionValue}/hypertexte.json"
+				href="/pilotes/kalamine/{version}/hypertexte.json"
 				download><button>hypertexte.json</button></a
 			>
 			<p>

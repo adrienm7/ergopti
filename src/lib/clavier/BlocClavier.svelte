@@ -4,10 +4,7 @@
 	import { onMount } from 'svelte';
 
 	export let nom;
-	onMount(() => {
-		let clavier = new Clavier(nom);
-		clavier.majClavier();
-	});
+	let clavier = new Clavier(nom);
 </script>
 
 <bloc-clavier id={'clavier_' + nom}>
