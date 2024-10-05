@@ -1,6 +1,6 @@
 <script>
 	import BaseClavier from '$lib/clavier/BaseClavier.svelte';
-	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
+	import { Clavier } from '$lib/clavier/Clavier.js';
 	import { onMount } from 'svelte';
 
 	export let nom;

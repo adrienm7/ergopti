@@ -4,7 +4,7 @@
 	import ChangementPlus from '$lib/clavier/controles/ChangementPlus.svelte';
 	import ChangementCouche from '$lib/clavier/controles/ChangementCouche.svelte';
 
-	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
+	import { Clavier } from '$lib/clavier/Clavier.js';
 	import { onMount } from 'svelte';
 
 	export let nom;
