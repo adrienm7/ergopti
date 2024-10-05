@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import { Clavier } from '$lib/clavier/FonctionsClavier.js';
+	import { Clavier } from '$lib/clavier/Clavier.js';
 	let clavier = new Clavier('roulements');
 
 	let texte;

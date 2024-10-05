@@ -3,6 +3,7 @@ import * as stores_infos from '$lib/stores_infos.js';
 export class Clavier {
 	constructor(id) {
 		this.id = id;
+		// this.emplacement = document.getElementById('clavier_' + this.id);
 		stores_infos['version'].subscribe((value) => {
 			this.version = value;
 		});
