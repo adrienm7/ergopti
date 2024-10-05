@@ -9,12 +9,6 @@
 
 	export let nom;
 
-	import * as data_clavier from '$lib/stores_infos.js';
-	let infos_clavier;
-	data_clavier[nom].subscribe((value) => {
-		infos_clavier = value;
-	});
-
 	let clavier = new Clavier(nom);
 	onMount(() => {
 		clavier.majClavier();
@@ -23,7 +17,8 @@
 	let texte = '';
 
 	function handleMessage(event) {
-		data_clavier[nom].update((currentData) => {
+		// Permet de mettre à jour les données du clavier en fonction des contrôles
+		clavier.data_clavier.update((currentData) => {
 			currentData['type'] = event.detail.type;
 			currentData['couleur'] = event.detail.couleur;
 			currentData['plus'] = event.detail.plus;
@@ -34,36 +29,39 @@
 	}
 </script>
 
-<controles-clavier id={'controles_' + nom}>
-	<ChangementType
-		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
-	/>
-	<ChangementPlus
-		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
-	/>
-	<ChangementCouleur
-		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
-	/>
-	<ChangementCouche
-		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
-	/>
-</controles-clavier>
+{#if clavier.infos_clavier}
+	<controles-clavier id={'controles_' + nom}>
+		<ChangementType
+			on:message={handleMessage}
+			coucheValue={clavier.infos_clavier.couche}
+			typeValue={clavier.infos_clavier.type}
+			couleurValue={clavier.infos_clavier.couleur}
+			plusValue={clavier.infos_clavier.plus}
+		/>
+		<ChangementPlus
+			on:message={handleMessage}
+			coucheValue={clavier.infos_clavier.couche}
+			typeValue={clavier.infos_clavier.type}
+			couleurValue={clavier.infos_clavier.couleur}
+			plusValue={clavier.infos_clavier.plus}
+		/>
+		<ChangementCouleur
+			on:message={handleMessage}
+			coucheValue={clavier.infos_clavier.couche}
+			typeValue={clavier.infos_clavier.type}
+			couleurValue={clavier.infos_clavier.couleur}
+			plusValue={clavier.infos_clavier.plus}
+		/>
+		<ChangementCouche
+			on:message={handleMessage}
+			coucheValue={clavier.infos_clavier.couche}
+			typeValue={clavier.infos_clavier.type}
+			couleurValue={clavier.infos_clavier.couleur}
+			plusValue={clavier.infos_clavier.plus}
+		/>
+	</controles-clavier>
+{/if}
+
 {#if nom === 'roulements'}
 	<controles-clavier class="btn-group">
 		<select bind:value={texte} on:change={() => taperTexte(texte, 250, false)}>
