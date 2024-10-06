@@ -39,12 +39,12 @@
 	</p>
 	<h4>Distances non optimales</h4>
 	<ul>
-		<li><kbd>E</kbd> est sur le majeur et non sur l’index</li>
+		<li><kbd>E</kbd> est sur le majeur et non sur l’index.</li>
 		<p>
 			Théoriquement, l’index est plus fort et devrait donc être l’endroit idéal pour la lettre <kbd
 				>E</kbd
 			> qui est de loin la lettre la plus fréquente, loin devant la deuxième lettre la plus fréquente
-			de l’alghabet.
+			de l’alphabet.
 		</p>
 	</ul>
 
