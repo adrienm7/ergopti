@@ -17,10 +17,11 @@
 		<ul>
 			<li>
 				<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>\</kbd-sortie> car le
-				<span class="hyper text-bold">\</span> est au-dessus du A (Le \ était auparavant sur le
-				<kbd>È</kbd> et le ` sur le <kbd>À</kbd>, car plus logique. Cependant, cela a finalement été
-				déplacé pour placer plus près ce symbole qui est très utilisé en programmation, notamment en
-				LaTeX)
+				<span class="hyper text-bold">\</span> est au-dessus du A (Le <kbd-sortie>\</kbd-sortie>
+				était auparavant sur le
+				<kbd>È</kbd> et le <kbd-sortie>`</kbd-sortie> sur le <kbd>À</kbd>, car plus logique.
+				Cependant, cela a finalement été déplacé pour placer plus près ce symbole qui est très
+				utilisé en programmation, notamment en LaTeX.)
 			</li>
 			<li>
 				<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
@@ -132,23 +133,6 @@
 				➜ <kbd-sortie>”</kbd-sortie>
 			</li>
 		</ul>
-
-		<mini-espace />
-
-		<p>
-			Enfin, les raccourcis avec les nouvelles touches par rapport à l’AZERTY et <kbd>Ctrl</kbd> sont
-			faciles à retenir :
-		</p>
-		<ul>
-			<li>
-				<kbd>Ctrl</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
-				<kbd-sortie>+</kbd-sortie> pour zoomer
-			</li>
-			<li>
-				<kbd>Ctrl</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
-				<kbd-sortie>-</kbd-sortie> pour dézoomer
-			</li>
-		</ul>
 		<mini-espace />
 		<p class="encadre">
 			À noter que les touches sont aussi placées le plus possible par distance selon leur fréquence
@@ -175,12 +159,12 @@
 			qui ont pour comportement de toujours rester collés au texte qui les précède et les suit.
 		</p>
 		<p>
-			Ainsi, vous n’aurez plus jamais de <kbd>?</kbd> qui se balade au début d’une ligne parce qu’il
-			n’y avait plus de place sur la ligne précédente. Cela donne des documents avec un rendu bien
-			plus professionnel. Attention cependant :
+			Ainsi, vous n’aurez plus jamais de <kbd-sortie>?</kbd-sortie> qui se balade au début d’une
+			ligne parce qu’il n’y avait plus de place sur la ligne précédente. Cela donne des documents
+			avec un rendu bien plus professionnel. Attention cependant :
 			<span class="important"
 				>ne les utilisez pas dans d’autres situations que l'écriture de texte</span
-			>. Par exemple, en programmation, une espace insécable peut causer des erreurs, sans forcément
+			>. Par exemple, en programmation, un espace insécable peut causer des erreurs, sans forcément
 			être visible (vous ne verrez qu’un simple espace, qui pourtant sera la cause du problème).
 		</p>
 		<p>
@@ -192,8 +176,8 @@
 		<div class="encadre">
 			<p class="important" style="margin:0;">Ainsi, il est facile de se rappeler où est quoi :</p>
 			<ul class="margin0">
-				<li>le français est en <kbd>Shift</kbd></li>
-				<li class="margin0">la programmation est en <kbd>AltGr</kbd></li>
+				<li>le français est en <kbd>Shift</kbd> ;</li>
+				<li class="margin0">la programmation est en <kbd>AltGr</kbd>.</li>
 			</ul>
 		</div>
 	</div>

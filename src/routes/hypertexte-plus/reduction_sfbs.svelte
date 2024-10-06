@@ -100,8 +100,9 @@
 			Sur le logiciel Excel, la touche <kbd>F4</kbd> permet de répéter la dernière action. De la
 			même manière, la touche <kbd>★</kbd> va répéter la dernière touche tapée. Ainsi, <kbd>L★</kbd>
 			va envoyer
-			<kbd>LL</kbd>, tandis que <kbd>R★</kbd> va envoyer <kbd>RR</kbd>. L’utilisation de cette
-			touche va instantanément fluidifier la fra<kbd>p★</kbd>e et réduire le nombre de <SFB />s.
+			<kbd-sortie>LL</kbd-sortie>, tandis que <kbd>R★</kbd> va envoyer <kbd-sortie>RR</kbd-sortie>.
+			L’utilisation de cette touche va instantanément fluidifier la fra<kbd>p★</kbd>e et réduire le
+			nombre de <SFB />s.
 		</p>
 		<p>
 			Cette touche <kbd>★</kbd> est l’ajout majeur de <NomPlus /> et mérite son excellent emplacement

@@ -50,7 +50,7 @@
 		</div>
 		<mini-espace />
 		<div>
-			<a aria-disabled="true" href="" download
+			<a aria-disabled="true" disabled href="" download
 				><button class="bouton-telechargement">☛ HyperTextePlus.exe — Pas encore disponible</button
 				></a
 			>
