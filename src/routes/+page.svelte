@@ -40,8 +40,8 @@
 	<hr />
 	<mini-espace />
 	<p class="encart-introduction">
-		<Nom /> est une disposition clavier destinée à taper majoritairement du français et de l’anglais.
-		Fruit de longues réflexions, elle se veut la plus optimale possible
+		<Nom /> est une disposition clavier destinée à taper majoritairement du français, de l’anglais et
+		du code informatique. Fruit de longues réflexions, elle se veut la plus optimale possible
 		<span class="important">pour un confort d’exception</span>. Cette page vous présente la
 		disposition ainsi que ses&nbsp;nombreux&nbsp;avantages.
 	</p>
