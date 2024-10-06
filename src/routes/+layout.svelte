@@ -22,6 +22,9 @@
 	import '$lib/css/orb.css';
 	import '$lib/css/miscellaneous.css';
 
+	import '$lib/icons/fontawesome/css/fontawesome.min.css';
+	import '$lib/icons/fontawesome/css/duotone.min.css';
+
 	afterUpdate(() => {
 		matomo.trackPageView();
 		AOS.init();
@@ -44,7 +47,9 @@
 	<p>En construction</p>
 </div> -->
 
-<button id="afficher-clavier-reference" on:click={toggleZIndex}>⌨</button>
+<button id="afficher-clavier-reference" on:click={toggleZIndex}
+	><i class="fad fa-keyboard"></i></button
+>
 
 <div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 	<div>
@@ -65,6 +70,31 @@
 </div>
 
 <style>
+	#afficher-clavier-reference {
+		position: fixed;
+		z-index: 99;
+		bottom: 1rem;
+		right: 1rem;
+		padding: 12px;
+		background-color: rgba(0, 1, 14, 0.8);
+		cursor: pointer;
+		border: 1px solid rgba(0, 0, 0, 0.5);
+		border-radius: 5px;
+		font-size: 1.5rem;
+		box-shadow: 0px 0px 7px 3px #0087b4b1;
+	}
+	#afficher-clavier-reference i {
+		color: #3088ed;
+	}
+	#afficher-clavier-reference i::before {
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		color: transparent;
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+		background-image: linear-gradient(to right, var(--gradient-blue));
+	}
 	.banner {
 		display: flex;
 		align-items: center;
@@ -99,19 +129,6 @@
 		font-weight: bold;
 		text-align: center;
 		line-height: 1;
-	}
-
-	#afficher-clavier-reference {
-		position: fixed;
-		z-index: 99;
-		bottom: 1rem;
-		right: 1rem;
-		padding: 12px;
-		cursor: pointer;
-		border: 1px solid rgba(0, 0, 0, 0.5);
-		border-radius: 5px;
-		font-size: 1.5rem;
-		box-shadow: 0px 0px 6px 4px #002136b1;
 	}
 
 	#clavier-ref {

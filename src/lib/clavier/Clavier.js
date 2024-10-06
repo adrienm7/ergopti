@@ -3,7 +3,7 @@ import * as stores_infos from '$lib/stores_infos.js';
 async function loadData(version) {
 	try {
 		// Utilisation de fetch pour récupérer le fichier JSON depuis le dossier static
-		const response = await fetch(`/data/hypertexte_v${version}.json`);
+		const response = await fetch(`/dispositions/data/hypertexte_v${version}.json`);
 		if (!response.ok) {
 			throw new Error('Erreur lors du chargement du fichier JSON');
 		}

@@ -246,6 +246,11 @@
 		{/if}
 	</div>
 	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse Ergo-L</h3>
+	<p>
+		Réalisée à l’aide de l’analyseur disponible ici : <a
+			href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
+		>.
+	</p>
 	<div style="display:flex; align-items:center; justify-content:space-between;">
 		<select bind:value={ergol} style="height: 2rem">
 			<option value="en_fr">Français + Anglais</option>
