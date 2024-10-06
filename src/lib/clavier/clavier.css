@@ -538,7 +538,7 @@ bloc-clavier[data-couleur='freq'] bloc-touche {
 bloc-clavier[data-couleur='freq'] bloc-touche[data-type='lettre'],
 bloc-clavier[data-couleur='freq'] bloc-touche[data-type='français'],
 bloc-clavier[data-couleur='freq'] bloc-touche[data-type='ponctuation'] {
-	--couleur-touche: calc(35deg * (0 - var(--frequence-log)));
+	--couleur-touche: calc(180deg * (1 - var(--frequence-normalisee)));
 	--couleur-touche-saturation: 90%;
 	--couleur-touche-luminosite: 70%;
 	--opacite-touche: 45%;
