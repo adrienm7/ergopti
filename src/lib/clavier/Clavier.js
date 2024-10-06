@@ -225,7 +225,9 @@ export class Clavier {
 						}
 					}
 					toucheClavier.style.setProperty('--taille', res['taille']);
-					let frequence = mayzner[contenuTouche[this.infos_clavier.couche]] / mayzner['max'];
+					let frequence =
+						characterFrequencies[contenuTouche[this.infos_clavier.couche]] /
+						characterFrequencies['max'];
 					toucheClavier.style.setProperty('--frequence', frequence);
 					toucheClavier.style.setProperty('--frequence-log', Math.log(frequence));
 				}
@@ -281,12 +283,12 @@ export class Clavier {
 		if (this.infos_clavier.couche === 'ShiftAltGr' && altGr !== null) {
 			altGr.classList.add('touche-active');
 		}
-		if (this.infos_clavier.couche === 'À' && aGrave !== null) {
-			aGrave.classList.add('touche-active');
-		}
-		if (this.infos_clavier.couche === ',' && virgule !== null) {
-			virgule.classList.add('touche-active');
-		}
+		// if (this.infos_clavier.couche === 'À' && aGrave !== null) {
+		// 	aGrave.classList.add('touche-active');
+		// }
+		// if (this.infos_clavier.couche === ',' && virgule !== null) {
+		// 	virgule.classList.add('touche-active');
+		// }
 		if (
 			this.infos_clavier.couche === 'Layer' &&
 			lalt !== null &&
@@ -520,8 +522,8 @@ export class Clavier {
 	}
 }
 
-const mayzner = {
-	max: 14.444,
+const characterFrequencies = {
+	max: 13.001,
 	e: 13.001,
 	t: 7.958,
 	a: 7.584,
