@@ -12,30 +12,31 @@
 		sont sans appel et montrent notamment une nette diminution des bigrammes à un doigt (<SFB />s).
 	</p>
 	<p>
-		Les premières versions de ce projet, baptisées Optim7, étaient des dérivés directs d'Optimot.
-		L'objectif initial était de peaufiner légèrement les scores sur les analyseurs de dispositions
-		existants. À cette époque, étant utilisateur de la disposition BÉPO, l'idée d'apprendre Optimot,
-		pour peut-être découvrir encore une version améliorée par la suite, était peu attrayante. La
-		meilleure façon de m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles
-		dispositions était de créer la mienne, optimisée pour mes besoins, même si cela nécessitait un
-		investissement en temps considérable.
+		Les premières versions de ce projet, baptisées <strong>Optim7</strong>, étaient des dérivés
+		directs d'Optimot. L'objectif initial était de peaufiner légèrement les scores sur les
+		analyseurs de dispositions existants. À cette époque, étant utilisateur de la disposition BÉPO,
+		l'idée d'apprendre Optimot, pour peut-être découvrir encore une version améliorée par la suite,
+		était peu attrayante. La meilleure façon de m’assurer de ne pas avoir à passer mon temps à
+		apprendre de nouvelles dispositions était de créer la mienne, optimisée pour mes besoins, même
+		si cela nécessitait un investissement en temps considérable.
 	</p>
 	<p>
 		Rapidement, <Nom></Nom> s'est éloigné d'Optimot sur plusieurs aspects fondamentaux. L'un des points
 		clés était ma volonté d'optimiser les <em>roulements</em>, entraînant de nombreux tests sur la
 		disposition des touches principales, notamment sur la partie droite avec les consonnes. L'une
-		des décisions majeures fut de privilégier un agencement SNTR plutôt que TSRN, car le bigramme NT
-		est très fréquent, et il semblait pertinent de l'optimiser pour qu'il se réalise sur des doigts
-		consécutifs. L’agencement final des quatre lettres de la rangée principale a été soigneusement
-		conçu pour maximiser les bigrammes consonantiques, avec une disposition harmonieuse. Seuls les
-		bigrammes ST et TS (comme dans "STaTS") ne profitent pas de cette optimisation en roulement.
+		des décisions majeures fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que
+		<kbd>TSRN</kbd>, car le bigramme <kbd>NT</kbd> est très fréquent, et il semblait pertinent de
+		l'optimiser pour qu'il se réalise sur des doigts consécutifs. L’agencement final des quatre
+		lettres de la rangée principale a été soigneusement conçu pour maximiser les bigrammes
+		consonantiques, avec une disposition harmonieuse. Seuls les bigrammes <kbd>ST</kbd> et
+		<kbd>TS</kbd> (comme dans "STaTS") ne profitent pas de cette optimisation en roulement.
 	</p>
 	<p>
 		La disposition a beaucoup évoluée au fil du temps. En particulier, la touche sur l’index gauche
 		a plusieurs fois changé :
 		<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd> et enfin la création d’une touche spéciale
 		<kbd>★</kbd>
-		et de déplacement de <kbd>É</kbd> sur l’annulaire gauche.
+		et du déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 	</p>
 	<h3 data-aos="fade-right" data-aos-mirror="true">
 		Simplification et utilisation de la couche <kbd>AltGr</kbd>
@@ -43,30 +44,26 @@
 	<p>
 		<Nom /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire
 		drastiquement les distances parcourues pour atteindre certaines touches. Un autre avantage est
-		le fait que cette touche modificatrice est aisément atteingable par le pouce droit sur un
+		le fait que cette touche modificatrice est aisément atteignable par le pouce droit sur un
 		clavier standard. Cela permet donc de mettre ce doigt à contribution, contrairement à l’AZERTY
 		qui ne l’exploite pas suffisamment.
 	</p>
 	<p>
 		N’ayant nullement besoin de tous les caractères exotiques et touches mortes du BÉPO ou
-		d’Optimot, j’en ai supprimé la majeure partie. Cela laisse assez de place pour ne plus avoir à
-		atteindre la rangée des nombres pour taper des parenthèses, guillemets ou opérateurs
-		mathématiques.
-	</p>
-	<p>
-		De plus, un grand nombre de touches mortes et de caractères spéciaux présents dans le pilote
-		d'Optimot ont été supprimés, ne conservant que l'essentiel. Cette simplification a permis de
-		libérer de nombreux emplacements sur la couche <bkd>AltGr</bkd>. Les symboles, auparavant peu
-		accessibles sur la rangée numérique, ont été déplacés pour être plus facilement atteints sous la
-		couche <kbd>AltGr</kbd>, tandis que les chiffres sont désormais directement accessibles, un
-		changement très appréciable lors de l'utilisation quotidienne.
+		d’Optimot, la majeure partie fut supprimée pour ne conserver que l’essentiel. Cette
+		simplification permit de libérer de nombreux excellents emplacements sur la couche <bkd
+			>AltGr</bkd
+		> et me laissa assez de place pour y loger tous les symboles. Ainsi, je n’avais plus besoins d’étendre
+		mes doigts pour atteindre la rangée des nombres pour taper des parenthèses, guillemets ou opérateurs
+		mathématiques. En outre, les chiffres sont quant à eux passés en accès direct, un changement très
+		appréciable lors de l'utilisation quotidienne.
 	</p>
 	<h3 data-aos="fade-right" data-aos-mirror="true">Évolution incrémentale</h3>
 	<p>
 		À un certain stade de développement, il devint évident que la disposition n'était plus
 		simplement une variante d'Optimot. Le besoin de renommer ce projet s’est alors imposé. Grâce à
-		la suggestion d’un utilisateur nommé Zigmund sur Discord, le nom <Nom></Nom> a été retenu, après
-		avoir longtemps cherché une alternative aussi marquante que celui d’Optimot.
+		la suggestion d’un utilisateur nommé <strong>Zigmund</strong> sur Discord, après avoir longtemps
+		cherché une alternative aussi marquante que celui d’Optimot, le nom <Nom></Nom> fut retenu.
 	</p>
 	<p>
 		Bien que la création de <Nom></Nom> ait été un processus étalé sur plusieurs mois, près de 80% de
@@ -92,7 +89,9 @@
 		plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur ce côté. Le
 		côté droit a en effet trois colonnes de touches pour l’auriculaire alors que l’auriculaire
 		gauche n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour les langues ayant
-		besoin de caractères supplémentaires comme les accents en français.
+		besoin de caractères supplémentaires comme les accents en français. Le nombre de consonnes étant
+		largement supérieur au nombre de voyelles, même en comptant les voyelles accentuées du français,
+		les placer du côté avec le plus de touches était logique.
 	</p>
 	<petit-espace />
 	<p>
@@ -121,8 +120,8 @@
 		performante, en la rendant véritablement exceptionnelle. Le qualificatif d’exceptionnel n’est
 		pas exagéré : <NomPlus></NomPlus> permet, une fois maîtrisée, de réduire presque totalement les <SFB
 		></SFB>s, y compris ceux liés à la répétition d'une même touche. Cela est rendu possible grâce à
-		la touche spéciale ★, permettant de réitérer la frappe de la touche précédente avec une fluidité
-		inédite.
+		la touche spéciale <kbd>★</kbd>, permettant de réitérer la frappe de la touche précédente avec
+		une fluidité inédite.
 	</p>
 	<p>
 		Il convient de préciser que l’idée de cette touche de répétition n’est pas une invention propre,

@@ -29,7 +29,7 @@
 				><a href="/">HyperTexte</a>
 				<div class="myselect">
 					<select id="selection-version" bind:value={versionValue} on:change={handleVersionChange}>
-						{#each liste_versions.sort().reverse() as value}<option {value}>{value}</option>{/each}
+						{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
 					</select>
 				</div></span
 			>
