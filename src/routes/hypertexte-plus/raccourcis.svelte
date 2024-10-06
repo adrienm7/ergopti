@@ -96,7 +96,7 @@
 			<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-sortie>Tab</kbd-sortie> sur le tap</li>
 
 			<li>
-				Tap hold en <kbd>Alt</kbd> ➜ <kbd-sortie>Shift</kbd-sortie> en hold et
+				Tap hold en <kbd>Alt</kbd> ➜ <kbd-sortie>Layer</kbd-sortie> en hold et
 				<kbd-sortie>Enter</kbd-sortie> en tap
 			</li>
 			<p>
@@ -105,6 +105,20 @@
 				nécessitant que l’auriculaire droit traverse 3 colonnes de lettres avant de l’atteindre. Par
 				conséquent, placer cette touche sur la touche <kbd>"Alt"</kbd> la ramène à un endroit
 				extrêmement accessible. Cela supprime aussi beaucoup de <SFB />s.
+			</p>
+			<p>
+				Le layer de navigation contient quant à lui les flèches directionnelles pour naviguer
+				rapidement dans un texte, mais aussi toutes les combinaisons de ces flèches avec des
+				modificateurs. Ainsi, il y a des raccourcis <kbd>Ctrl</kbd> + <kbd>Flèche</kbd>,
+				<kbd>Ctrl</kbd>
+				+
+				<kbd>Shift</kbd>
+				+
+				<kbd>Flèche</kbd>, <kbd>Alt</kbd> + <kbd>Flèche</kbd>, <kbd>Alt</kbd> + <kbd>Shift</kbd> +
+				<kbd>Flèche</kbd>, <kbd>Windows</kbd> + <kbd>Flèche</kbd>, etc. En outre, les raccourcis
+				<kbd>Page Up</kbd>, <kbd>Page Down</kbd>, <kbd>Home</kbd> et <kbd>End</kbd> sont ajoutés. Ce
+				layer de navigation vous évite donc des positions inconfortables nécessitant de presser plusieurs
+				modificateurs en même temps ainsi que les touches de flèches qui sont peu accessibles.
 			</p>
 			<p>
 				À noter que les raccourcis comme <kbd>Ctrl</kbd> + <kbd>Entrée</kbd> par exemple sont
@@ -134,20 +148,9 @@
 				droite. Cela permet de remplacer à la volée des parties de texte.
 			</p>
 			<li>
-				Tap hold en <kbd>RControl</kbd> ➜ toggle le <kbd-sortie>Layer de navigation</kbd-sortie> en tap
+				Tap hold en <kbd>RControl</kbd> ➜ envoi <kbd-sortie>OneShot Shift</kbd-sortie> en tap,
+				<kbd-sortie>Shift</kbd-sortie> en hold.
 			</li>
-			<p>
-				Ce layer de navigation contient les flèches directionnelles pour naviguer rapidement dans un
-				texte, mais aussi toutes les combinaisons de ces flèches avec des modificateurs. Ainsi, il y
-				a des raccourcis <kbd>Ctrl</kbd> + <kbd>Flèche</kbd>, <kbd>Ctrl</kbd> +
-				<kbd>Shift</kbd>
-				+
-				<kbd>Flèche</kbd>, <kbd>Alt</kbd> + <kbd>Flèche</kbd>, <kbd>Alt</kbd> + <kbd>Shift</kbd> +
-				<kbd>Flèche</kbd>, <kbd>Windows</kbd> + <kbd>Flèche</kbd>, etc. En outre, les raccourcis
-				<kbd>Page Up</kbd>, <kbd>Page Down</kbd>, <kbd>Home</kbd> et <kbd>End</kbd> sont ajoutés. Ce
-				layer de navigation vous évite donc des positions inconfortables nécessitant de presser plusieurs
-				modificateurs en même temps ainsi que les touches de flèches qui sont peu accessibles.
-			</p>
 		</ul>
 	</div>
 </section>
