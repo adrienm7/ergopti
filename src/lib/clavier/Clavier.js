@@ -421,9 +421,7 @@ export class Clavier {
 		}
 
 		// Touche pressée = ,
-		if (touchePressee === ',' && coucheActuelle === ',') {
-			nouvelleCouche = 'Visuel';
-		} else if (
+		if (
 			touchePressee === ',' &&
 			['Visuel', 'Primary', 'Shift'].includes(coucheActuelle) &&
 			this.infos_clavier.plus === 'oui'

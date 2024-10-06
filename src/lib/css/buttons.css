@@ -1,22 +1,30 @@
-kbd, kbd-sortie, kbd-non {
-	--taille: 1; 
-	align-items: center; 
-	background-color: hsla(100deg, 0%, 60%, 10%); 
-	border: .666667px solid rgba(255, 255, 255, 0.3); 
-	border-image: none 100% 1 0 stretch; 
-	border-radius: .15em; 
-	box-shadow: rgba(0, 0, 0, 0.3) 5px 3px 5px, 0 calc(.6*.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%); 
-	box-shadow: rgba(0, 0, 0, 0.4) 1px 1px 1px, 0 calc(.6*.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%);
-	box-sizing: border-box; 
-	color: hsla(0, 100%, 100%, 90%); 
-	cursor: pointer; 
-	display: inline-flex; 
-	font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", Arial, sans-serif; 
+kbd,
+kbd-sortie,
+kbd-non {
+	--taille: 1;
+	align-items: center;
+	background-color: hsla(100deg, 0%, 60%, 10%);
+	border: 0.666667px solid rgba(255, 255, 255, 0.3);
+	border-image: none 100% 1 0 stretch;
+	border-radius: 0.15em;
+	box-shadow:
+		rgba(0, 0, 0, 0.3) 5px 3px 5px,
+		0 calc(0.6 * 0.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%);
+	box-shadow:
+		rgba(0, 0, 0, 0.4) 1px 1px 1px,
+		0 calc(0.6 * 0.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%);
+	box-sizing: border-box;
+	color: hsla(0, 100%, 100%, 90%);
+	cursor: pointer;
+	display: inline-flex;
+	font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', 'Roboto', 'Oxygen',
+		'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Helvetica', Arial,
+		sans-serif;
 	font-size: 1em;
 	font-weight: 300;
 	/* height: calc(calc(.6*100vw/15) - 2*calc(.6*.35vw));  */
-	justify-content: center; 
-	line-height: 1.35em; 
+	justify-content: center;
+	line-height: 1.35em;
 	text-align: center;
 	padding: 1px 5px 2px 5px;
 	margin: 1px 0;
@@ -34,11 +42,15 @@ kbd-non {
 	color: white;
 }
 
-kbd:active, kbd-sortie:active, kbd-non:active,
-kbd:hover, kbd-sortie:hover, kbd-non:hover {
-	box-shadow: rgba(204, 204, 204, 0.7) 0 .766667px 0 0;
+kbd:active,
+kbd-sortie:active,
+kbd-non:active,
+kbd:hover,
+kbd-sortie:hover,
+kbd-non:hover {
+	box-shadow: rgba(204, 204, 204, 0.7) 0 0.766667px 0 0;
 	position: relative;
-	top: calc(calc(.6*.25vw) - calc(.6*.1vw));
+	top: calc(calc(0.6 * 0.25vw) - calc(0.6 * 0.1vw));
 }
 
 section kbd {
@@ -51,14 +63,8 @@ section kbd {
 }
 
 section kbd-sortie {
-	border: 1px solid rgba(0,0,0,0.3);
+	border: 1px solid rgba(0, 0, 0, 0.3);
 }
-
-
-
-
-
-
 
 button {
 	cursor: pointer;
@@ -69,143 +75,11 @@ button p {
 	margin: 0;
 }
 
-controles-clavier button a {
-	color: inherit;
-	text-decoration: none;
-}
-
-controles-clavier button:hover {
-	background-color: white;
-	color: rgba(0, 0, 0, 0.8);
-}
-
-controles-clavier {
-	--arrondi-bouton: 7px;
-	margin: 0 auto;
-	width: fit-content; /* Pour centrer */
-	display: flex;
-	font-size: 0.7rem;
-}
-
-controles-clavier>:first-child {
-	border-radius: var(--arrondi-bouton) 0 0 var(--arrondi-bouton);
-	border-left: 2px solid rgba(255, 255, 255, 0.8);
-}
-
-controles-clavier button,
-controles-clavier select {
-	border-radius: 0;
-	background-color: rgba(0, 0, 0, 0.3);
-	color: white;
+/* Divers */
+.bouton-telechargement {
 	padding: 10px;
-	border: 2px solid white;
-	border-right: 0;
-	cursor: pointer;
-}
-@media (max-width: 450px) {
-	controles-clavier p {
-		width: min-content;
-	}
-}
-
-
-
-controles-clavier select {
-	background-image: linear-gradient(to right, var(--gradient-purple));
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	border: none;
-}
-controles-clavier select {
-	position: relative;
-	height: 100%;
-	line-height: 1.3;
-	border: 0;
-	font-family: inherit;
-	border-radius: 0 var(--arrondi-bouton) var(--arrondi-bouton) 0;
-}
-
-controles-clavier select option {
-	background-color: white;
-	color: black;
-	font-family: inherit;
-}
-
-.select-degrade {
-	position: relative!important;
-	border: 2px solid white;
-	border-radius: 0 var(--arrondi-bouton) var(--arrondi-bouton) 0;
-}
-
-.select-degrade::before {
-	content: "";
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	background-color: rgba(0, 0, 0, 0.3);
-	border-radius: 0 calc(var(--arrondi-bouton) - 3px) calc(var(--arrondi-bouton) - 3px) 0;
-	z-index: 0;
-}
-.select-degrade:hover::before {
-	background-color: white;
-}
-
-.select-degrade:hover::after {
-	color: black;
-}
-
-.select-degrade::after {
-	content: "▼";
-	position: absolute;
-	top: 35%;
-	right: 10%;
+	background-color: rgba(0, 0, 0, 0.8);
 	color: white;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Cas où le fond est blanc */
-
-section controles-clavier button,
-section controles-clavier select {
-	color: #333;
-	border: 2px solid rgba(0, 0, 0, 0.8);
-}
-
-section controles-clavier>:first-child {
-	border-left: 2px solid rgba(0, 0, 0, 0.8);
-}
-
-section controles-clavier select option {
-	background-color: rgb(0, 0, 0);
-	color: rgb(255, 255, 255);
-}
-
-section controles-clavier>:last-child {
-	border-right: 2px solid rgba(0, 0, 0, 0.8);
-}
-
-section controles-clavier button:hover {
-	background-color: rgb(0, 0, 0);
-	color: rgba(255, 255, 255, 0.8);
+	border: 1px solid rgba(255, 255, 255, 0.6);
+	border-radius: 3px;
 }
