@@ -23,6 +23,7 @@
 	import '$lib/css/miscellaneous.css';
 
 	import '$lib/icons/fontawesome/css/fontawesome.min.css';
+	import '$lib/icons/fontawesome/css/regular.min.css';
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 
 	afterUpdate(() => {

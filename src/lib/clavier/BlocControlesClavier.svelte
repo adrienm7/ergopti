@@ -1,11 +1,12 @@
 <script>
+	import '$lib/clavier/BlocControlesClavier.css';
+	import { Clavier } from '$lib/clavier/Clavier.js';
+	import { onMount } from 'svelte';
+
 	import ChangementType from '$lib/clavier/controles/ChangementType.svelte';
 	import ChangementCouleur from '$lib/clavier/controles/ChangementCouleur.svelte';
 	import ChangementPlus from '$lib/clavier/controles/ChangementPlus.svelte';
 	import ChangementCouche from '$lib/clavier/controles/ChangementCouche.svelte';
-
-	import { Clavier } from '$lib/clavier/Clavier.js';
-	import { onMount } from 'svelte';
 
 	export let nom;
 	let infos_clavier;

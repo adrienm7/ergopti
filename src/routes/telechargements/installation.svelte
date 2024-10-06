@@ -101,13 +101,3 @@
 	</div>
 	<petit-espace />
 </section>
-
-<style>
-	.bouton-telechargement {
-		padding: 10px;
-		background-color: rgba(0, 0, 0, 0.8);
-		color: white;
-		border: 1px solid rgba(255, 255, 255, 0.6);
-		border-radius: 3px;
-	}
-</style>

@@ -34,9 +34,12 @@
 	<BlocControlesClavier nom="presentation" />
 </header>
 
+<div style="margin: 0 auto; text-align:center; padding-top: 10px;">
+	<a href="#debut"><i class="far fa-chevron-down icon-chevron-down scrollez"></i></a>
+</div>
 <petit-espace />
 
-<div class="contenu">
+<div class="contenu" id="debut">
 	<hr />
 	<mini-espace />
 	<p class="encart-introduction">
@@ -67,6 +70,12 @@
 		<div class="card">
 			➅ <span class="important">Et bien d’autres</span> améliorations, voire révolutions...
 		</div>
+	</div>
+	<mini-espace />
+	<div style="text-align:center;">
+		<a href="/telechargements">
+			<button class="bouton-telechargement">➜ Essayer en ligne / Installation</button>
+		</a>
 	</div>
 	<petit-espace />
 	<hr />
@@ -412,6 +421,34 @@
 </div>
 
 <style>
+	.scrollez {
+		text-align: center;
+		font-size: 4rem;
+		font-size: clamp(20px, 4rem, 100px);
+		color: white;
+		-webkit-animation: bounce7 2s infinite;
+		animation: bounce7 2s infinite;
+	}
+
+	@-webkit-keyframes bounce7 {
+		0% {
+			-webkit-transform: translate(0, -20px);
+			opacity: 0;
+		}
+		50% {
+			opacity: 1;
+		}
+		100% {
+			-webkit-transform: translate(0, 20px);
+			opacity: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.scrollez {
+			animation: none;
+		}
+	}
+
 	.cards {
 		max-width: 1000px;
 		margin: 0 auto;

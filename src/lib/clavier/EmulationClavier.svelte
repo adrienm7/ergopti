@@ -1,20 +1,20 @@
 <script>
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import { EmulationClavier } from '$lib/clavier/EmulationClavier.js';
-	let clavier = new EmulationClavier('emulation');
-
 	import { onMount } from 'svelte';
+
+	let clavier = new EmulationClavier('emulation');
 	onMount(() => {
 		clavier.textarea = document.getElementById('input-text');
 	});
+
 	let champTexte = '';
 </script>
 
-<!-- <BlocControlesClavier nom="emulation" /> -->
-<mini-espace />
 <BlocClavier nom="emulation" />
 
 <mini-espace />
+
 <div style="margin: 0 auto; width: 100%;">
 	<textarea
 		id="input-text"
