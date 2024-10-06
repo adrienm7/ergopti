@@ -39,31 +39,35 @@
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
 		<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/">⌨ HyperTexte</a>
+			<a href="/"><i class="fad fa-keyboard"></i> HyperTexte</a>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/hypertexte-plus">★ HyperTexte<span class="glow">+</span></a>
+			<a href="/hypertexte-plus"
+				><i class="fad fa-star"></i> HyperTexte<span class="glow">+</span></a
+			>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/benchmarks">⚑ Benchmarks</a>
+			<a href="/benchmarks"
+				><span class="couleur"><i class="fad fa-analytics"></i></span> Benchmarks</a
+			>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/telechargements"><span style="font-weight: bold;">⇩</span> Téléchargements</a>
+			<a href="/telechargements"><i class="fad fa-download"></i> Téléchargements</a>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/informations"><span style="font-weight: bold;">ⓘ</span> Informations</a>
+			<a href="/informations"><i class="fad fa-info-circle"></i> Informations</a>
 		</p>
 	</nav>
 </header>
@@ -156,7 +160,10 @@
 		display: inline-block;
 	}
 
-	header #menu p a::first-letter {
+	header #menu i {
+		color: #3088ed;
+	}
+	header #menu i::before {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;

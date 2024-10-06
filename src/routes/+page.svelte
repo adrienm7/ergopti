@@ -78,7 +78,9 @@
 	<PlacementLogiqueTouches />
 	<ChiffresAccesDirect />
 	<UtilisationUneMain />
-
+</div>
+<div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);"></div>
+<div style="background:black; padding: 50px 0; margin-bottom:-10vh;">
 	<h2 data-aos="zoom-out" data-aos-mirror="true">
 		<span class="glow">★</span>
 	</h2>
@@ -387,9 +389,9 @@
 		</div>
 		<h2
 			class="text-orange-gradient text-center"
-			style="margin: 0 auto; padding-top: 20vh; border:none; box-shadow: none; font-weight:bolder;"
+			style="margin: 0 auto; padding-top: 20vh; padding-bottom:10vh; border:none; box-shadow: none; font-weight:bolder;"
 		>
-			Pour aller <b>+</b> loin
+			Pour aller encore <b>+</b> loin
 		</h2>
 		<div class="texte-orb">
 			<hr />
@@ -407,9 +409,6 @@
 			<hr />
 		</div>
 	</div>
-
-	<!-- <Genese /> -->
-	<!-- <Autocritiques /> -->
 </div>
 
 <style>
