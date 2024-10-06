@@ -1,11 +1,5 @@
 import os
 
-# Définir le répertoire de travail actuel
-os.chdir("D:/Documents/Github/hypertexte/0) Documents/2) Corpus")
-
-
-
-
 
 
 # ==================================================
@@ -14,96 +8,87 @@ os.chdir("D:/Documents/Github/hypertexte/0) Documents/2) Corpus")
 # ==================================================
 # ==================================================
 
-
-
-# Conversion en minuscules de tout le texte pour éviter que les changements ne s’effectuent pas sur les majuscules
-def conversion_minuscules(texte):
-	texte = texte.lower()
-	return texte
-
-
-
 def conversion_apostrophe_typo(texte):
 	texte = texte.replace("’", "'")
 	return texte
-
-
-
-def autocorrection(texte):
-	texte = texte.replace("www.", "ww")
-	return texte
-
-
 
 # Raccourcis avec ★
 def raccourcis_magique(texte):
 	texte = texte.replace("ainsi", "a★")
 	texte = texte.replace("c'est", "c★")
-	texte = texte.replace("donc", "d★")
+	texte = texte.replace("c'était", "ct★")
 	texte = texte.replace("déjà", "dé★")
-	texte = texte.replace("faire", "f★")
-	texte = texte.replace("j'étais", "gt★")
-	texte = texte.replace("j'ai", "g★")
+	texte = texte.replace("donc", "d★")
 	texte = texte.replace("d'être", "dê★")
 	texte = texte.replace("l'être", "lê★")
 	texte = texte.replace("être", "ê★")
+	texte = texte.replace("faire", "f★")
+	texte = texte.replace("heure", "h★")
+	texte = texte.replace("j'étais", "gt★")
+	texte = texte.replace("j'ai", "g★")
 	texte = texte.replace("mais", "m★")
+	texte = texte.replace("nouveau", "n★")
+	texte = texte.replace("prendre", "p★")
 	texte = texte.replace("question", "q★")
 	texte = texte.replace("rien", "r★")
+	texte = texte.replace("sous", "s★")
 	texte = texte.replace("très", "t★")
+	texte = texte.replace("exemple", "x★")
 	return texte
 
+# La touche A devient un J si elle est suivie d’une voyelle
+def virgule_devient_j(texte):
+	texte = texte.replace("ja", ",a")
+	texte = texte.replace("Ja", ";a")
+	texte = texte.replace("JA", ";A")
+	texte = texte.replace("je", ",e")
+	texte = texte.replace("Je", ";e")
+	texte = texte.replace("JE", ";E")
+	texte = texte.replace("ji", ",i")
+	texte = texte.replace("Ji", ";i")
+	texte = texte.replace("JI", ";I")
+	texte = texte.replace("jo", ",o")
+	texte = texte.replace("Jo", ";o")
+	texte = texte.replace("JO", ";O")
+	texte = texte.replace("ju", ",ê")
+	texte = texte.replace("Ju", ";ê")
+	texte = texte.replace("JU", ";Ê")
+	texte = texte.replace("jé", ",é")
+	texte = texte.replace("Jé", ";é")
+	texte = texte.replace("JÉ", ";É")
+	texte = texte.replace("j'", ",'")
+	texte = texte.replace("J'", ";'")
+	texte = texte.replace("j", ",à")
+	texte = texte.replace("J", ";à")
+	return texte
 
-
-def raccourcis_virgule(texte):
+def diminution_SFBs_virgule(texte):
 	texte = texte.replace("cd", ",c")
 	texte = texte.replace("ds", ",d")
-	texte = texte.replace("je", ",e")
-	texte = texte.replace(",f", ",f")
+	texte = texte.replace("fs", ",f")
 	texte = texte.replace("gl", ",g")
-	texte = texte.replace("gl", ",g")
-	texte = texte.replace("nh", ",h")
+	texte = texte.replace("ph", ",h")
+	texte = texte.replace("Ph", ";h")
+	texte = texte.replace("PH", ";H")
 	texte = texte.replace("cl", ",l")
-	texte = texte.replace("mpl", ",m")
+	texte = texte.replace("Cl", ";l")
+	texte = texte.replace("CL", ";L")
+	texte = texte.replace("dv", ",m")
 	texte = texte.replace("nl", ",n")
-	texte = texte.replace("ph", ",p")
-	texte = texte.replace("qu'", ",q")
+	texte = texte.replace("xp", ",p")
 	texte = texte.replace("q'", ",q")
+	texte = texte.replace("Q'", ";q")
 	texte = texte.replace("rq", ",r")
 	texte = texte.replace("sc", ",s")
+	texte = texte.replace("Sc", ";s")
+	texte = texte.replace("SC", ";S")
 	texte = texte.replace("pt", ",t")
+	texte = texte.replace("Pt", ";t")
+	texte = texte.replace("PT", ";T")
 	texte = texte.replace("dv", ",v")
 	texte = texte.replace("'re", ",x")
+	texte = texte.replace("bj", ",z")
 	return texte
-
-def raccourcis_virgule_old(texte):
-	texte = texte.replace("able", ",a")
-	texte = texte.replace("sc", ",c")
-	texte = texte.replace("would", ",d")
-	texte = texte.replace("the  ", ",e")
-	texte = texte.replace("ence", ",f")
-	texte = texte.replace("ought", ",g")
-	texte = texte.replace("techn", ",h")
-	texte = texte.replace("ight", ",i")
-	texte = texte.replace("toujours ", ",j")
-	texte = texte.replace("elle", ",l")
-	texte = texte.replace("ements", ",m")
-	texte = texte.replace("ation", ",n")
-	texte = texte.replace("could", ",o")
-	texte = texte.replace("mpl", ",p")
-	# texte = texte.replace("ique", ",q")
-	texte = texte.replace("ring", ",r")
-	texte = texte.replace("ement", ",s")
-	texte = texte.replace("ction", ",t")
-	texte = texte.replace("ance", ",v")
-	texte = texte.replace("ieux", ",x")
-	texte = texte.replace("ying", ",y")
-	texte = texte.replace("ez-vous", ",z")
-	texte = texte.replace("qu"", ","")
-	texte = texte.replace("Qu"", ","")
-	return texte
-
-
 
 def conversion_qu(texte):
 	texte = texte.replace("qu", "q")
@@ -111,12 +96,12 @@ def conversion_qu(texte):
 	texte = texte.replace("QU", "Q")
 	return texte
 
-
-
-# Plus besoin de la touche morte circonflexe avec les remplacements de texte
+# La touche Ê devient une touche morte circonflexe
 def touche_morte_circonflexe(texte):
-	texte = texte.replace("^a", "êè")
-	texte = texte.replace("â", "êè")
+	texte = texte.replace("^a", "éê")
+	texte = texte.replace("â", "éê")
+	texte = texte.replace("a^i", "êé")
+	texte = texte.replace("aî", "êé")
 	texte = texte.replace("^i", "êi")
 	texte = texte.replace("î", "êi")
 	texte = texte.replace("^e", "ê")
@@ -126,20 +111,41 @@ def touche_morte_circonflexe(texte):
 	texte = texte.replace("û", "êu")
 	return texte
 
-
-
 # SFBs sur la main gauche
-def diminution_sfbs_e_circ(texte):
-	texte = texte.replace("ié", "êé")
-	texte = texte.replace("éi", "éê")
+def diminution_SFBs_e_circ(texte):
+	texte = texte.replace("eo", "êe")
+	texte = texte.replace("oe", "eê")
 	return texte
-def diminution_sfbs_a_grave(texte):
-	texte = texte.replace("oe", "oà")
-	texte = texte.replace("eo", "ào")
-	texte = texte.replace("bu", "àu")
-	texte = texte.replace("ub", "uà")
-	texte = texte.replace("u,", "à,")
-	texte = texte.replace("u.", "à.")
+def diminution_SFBs_e_grave(texte):
+	texte = texte.replace("éi", "èy")
+	texte = texte.replace("ié", "yè")
+	texte = texte.replace("bu", "èu")
+	texte = texte.replace("Bu", "Èu")
+	texte = texte.replace("ub", "uè")
+	texte = texte.replace("Ub", "Uè")
+	texte = texte.replace("u,", "è,")
+	texte = texte.replace("u.", "è.")
+	return texte
+
+def suffixes_a_grave(texte):
+	texte = texte.replace("aire", "àa")
+	texte = texte.replace("ence", "àc")
+	texte = texte.replace("ould", "àd")
+	texte = texte.replace("ying", "àé")
+	texte = texte.replace("able", "àê")
+	texte = texte.replace("iste", "àf")
+	texte = texte.replace("ought", "àg")
+	texte = texte.replace("techn", "àh")
+	texte = texte.replace("ight", "ài")
+	texte = texte.replace("ique", "àk")
+	texte = texte.replace("elle", "àl")
+	texte = texte.replace("isme", "àm")
+	texte = texte.replace("ation", "àn")
+	texte = texte.replace("ique", "àq")
+	texte = texte.replace("erre", "àr")
+	texte = texte.replace("ement", "às")
+	texte = texte.replace("ction", "àt")
+	texte = texte.replace("ieux", "àx")
 	return texte
 
 
@@ -149,9 +155,8 @@ def roulements_main_droite(texte):
 	texte = texte.replace("ght", "ghc")
 	texte = texte.replace("GHT", "GHC")
 
-	texte = texte.replace("wh", "hc")
-	texte = texte.replace("Wh", "Hc")
-	texte = texte.replace("WH", "HC")
+	texte = texte.replace("q'", "p'")
+	texte = texte.replace("Q'", "P'")
 
 	texte = texte.replace("wh", "hc")
 	texte = texte.replace("Wh", "Hc")
@@ -161,26 +166,6 @@ def roulements_main_droite(texte):
 	texte = texte.replace("Gt", "Gx")
 	texte = texte.replace("GT", "GX")
 	return texte
-
-
-
-
-
-
-
-# La touche A devient un J si elle est suivie d’une voyelle
-def virgule_devient_j(texte):
-	texte = texte.replace("ja", ",a")
-	texte = texte.replace("je", ",e")
-	texte = texte.replace("ji", ",i")
-	texte = texte.replace("jo", ",o")
-	texte = texte.replace("ju", ",ê")
-	texte = texte.replace("jé", ",é")
-	texte = texte.replace("j'", ",'")
-	return texte
-
-
-
 
 
 
@@ -203,6 +188,8 @@ def touche_repetition(texte):
 	texte = texte.replace("ÉÉ", "É★")
 	texte = texte.replace("èè", "è★")
 	texte = texte.replace("ÈÈ", "È★")
+	texte = texte.replace("êê", "ê★")
+	texte = texte.replace("ÊÊ", "Ê★")
 	texte = texte.replace("ff", "f★")
 	texte = texte.replace("FF", "F★")
 	texte = texte.replace("gg", "g★")
@@ -265,11 +252,22 @@ def touche_repetition(texte):
 	texte = texte.replace("))", ")★")
 	texte = texte.replace("[", "[★")
 	texte = texte.replace("]", "]★")
-	texte = texte.replace("  ", " ")
+	# texte = texte.replace("  ", " ")
 	# texte = texte.replace("\n\n", "\n★")
-
-	texte = texte.replace("★u", "★ê")
+	texte = texte.replace("★u", "★ê") # Évite les SFBs comme con★u en tapant con★ê
 	return texte
+
+
+
+# Archives
+
+# def conversion_minuscules(texte):
+# 	texte = texte.lower()
+# 	return texte
+
+# def autocorrection(texte):
+# 	texte = texte.replace("www.", "ww")
+# 	return texte
 
 
 
@@ -292,23 +290,29 @@ for nom_fichier in os.listdir("original"):
 		input.close()
 		
 		nouveau_texte = ancien_texte
-		nouveau_texte = conversion_minuscules(nouveau_texte)
-		nouveau_texte = conversion_apostrophe_typo(nouveau_texte)
-		nouveau_texte = raccourcis_magique(nouveau_texte)
+		nouveau_texte = conversion_apostrophe_typo(nouveau_texte) # Tout le reste des fonctions part du principe qu’on est en apostrophe droite
+		nouveau_texte = raccourcis_magique(nouveau_texte) # Avant de s’embêter à faire les combinaisons pour réduire les SFBs, etc. autant directement taper un mot entier avec la touche ★
 
 		nouveau_texte = conversion_qu(nouveau_texte)
+		nouveau_texte = touche_morte_circonflexe(nouveau_texte)
 
-		nouveau_texte = raccourcis_virgule(nouveau_texte)
+		nouveau_texte = diminution_SFBs_virgule(nouveau_texte)
 		nouveau_texte = virgule_devient_j(nouveau_texte)
 
-		nouveau_texte = diminution_sfbs_e_circ(nouveau_texte)
-		nouveau_texte = diminution_sfbs_a_grave(nouveau_texte)
 		nouveau_texte = roulements_main_droite(nouveau_texte)
+		nouveau_texte = diminution_SFBs_e_circ(nouveau_texte)
+		nouveau_texte = diminution_SFBs_e_grave(nouveau_texte)
+		nouveau_texte = suffixes_a_grave(nouveau_texte)
 
-		nouveau_texte = touche_morte_circonflexe(nouveau_texte)
-		nouveau_texte = autocorrection(nouveau_texte)
 		nouveau_texte = touche_repetition(nouveau_texte)
+		# nouveau_texte = nouveau_texte.replace("★,", "★à") # Correction pour éviter les SFBs comme pex★, donnant "par exemple,"
+		# nouveau_texte = nouveau_texte.replace("★.", "★àé") # Correction pour éviter les SFBs comme pex★, donnant "par exemple."
 
-		output = open("modifie/" + nom_fichier + " (converti).txt", "w", encoding="utf-8")
+		# Créer le dossier s'il n'existe pas
+		dossier = "modifie/"
+		if not os.path.exists(dossier):
+			os.makedirs(dossier)
+		
+		output = open(dossier + nom_fichier + " (converti).txt", "w", encoding="utf-8")
 		output.write(nouveau_texte)
 		output.close()

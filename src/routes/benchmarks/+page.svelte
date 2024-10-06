@@ -4,6 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
+	import CommentComparer from './comment_comparer.svelte';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
@@ -73,103 +74,7 @@
 		serait meilleur que les autres.
 	</div>
 
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Comment bien utiliser KLAnext</h2>
-	<section>
-		<p>
-			Pour bien utiliser des comparateurs de disposition, il faut <span class="important"
-				>comparer ce qui est comparable</span
-			>. Ceci est très important, car si vous ne le faites pas, alors vos résultats n’auront aucune
-			valeur.
-		</p>
-		<mini-espace />
-		<h3 data-aos="fade-right" data-aos-mirror="true">Comparer le même type de clavier</h3>
-		<p>
-			Ne comparez pas une disposition ISO avec une disposition Ergodox. Sinon, logiquement la
-			disposition Ergodox sera mieux notée. Elle aura en effet une distance aux touches moindre, car
-			les pouces seront beaucoup plus mis à contribution. En outre, les <SFB />s seront diminués,
-			car <kbd>Shift</kbd>, <kbd>Enter</kbd>, etc. ne seront plus sur les auriculaires mais sur les
-			pouces.
-		</p>
-
-		<mini-espace />
-		<h3 data-aos="fade-right" data-aos-mirror="true">
-			Comparer des claviers possédant une touche pour tous les caractères du corpus
-		</h3>
-		<p>
-			Un autre point à bien faire attention est de <span class="important"
-				>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</span
-			>. Une disposition faite pour la langue anglaise aura de très bons scores pour des textes
-			français. Cela s’explique parce que tous les caractères accentués seront "sautés", n’existant
-			pas dans la disposition anglophone.
-		</p>
-
-		<mini-espace />
-		<h3 data-aos="fade-right" data-aos-mirror="true">
-			Conclusion sur la comparaison de dispositions
-		</h3>
-		<p>
-			Comparer des dispositions n’est pas aussi simple qu’on pourrait de prime abord le penser. Il
-			ne suffit pas de balancer son texte et sa disposition dans un comparateur et de le faire
-			tourner.
-		</p>
-
-		<p>
-			En outre, la philosophie derrière la construction du clavier doit être prise en compte.
-			Certaines dispositions comme Optimot préfèrent mettre l’apostrophe droite en accès direct
-			plutôt que celle typographique, partant du principe que la plupart des éditeurs de texte la
-			remplaceront de toute manière par l’apostrophe typographique. Dans ce cas précis, le caractère
-			faisant office d’"apostrophe" est l’apostrophe droite, alors que d’autres dispositions comme
-			une version précédente d’<Nom /> font la distinction entre les deux.
-		</p>
-		<p>
-			Pour comparer avec le plus d’exactitude les dispositions, il faudrait alors les modifier pour
-			soit remplacer l’apostrophe typographique par une apostrophe droite, soit en ajoutant une
-			apostrophe typographique dans la disposition n’en ayant pas.
-		</p>
-		<p class="important">
-			➜ Comparer ce qui est comparable. Si le symbole n’existe pas dans la disposition, la touche ne
-			sera pas tapée.
-		</p>
-	</section>
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">La question du corpus</h2>
-	<section>
-		<p>
-			Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste
-			encore la <span class="important">question fondamentale du corpus</span>. Effectivement, vos
-			résultats vont sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de
-			dialogues aura beaucoup de "je", un corpus plus "sérieux" aura beaucoup de z dû au vouvoiement
-			tandis qu’un corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée
-			du mot "wagon".
-		</p>
-		<p>
-			Évidemment, plus votre corpus sera volumineux, plus vos résultats seront crédibles. Toutefois,
-			cela augmentera d’autant les temps de calcul.
-		</p>
-
-		<p>
-			En conclusion, <span class="important"
-				>ne prenez les résultats des benchmarks que comme des tendances générales</span
-			>. Une disposition meilleure de 2,48% sur un certain corpus n’implique pas que la disposition
-			soit meilleure de 2,48% en général. En outre, passé une certaine performance, les gains sont
-			marginaux.
-		</p>
-		<p>
-			Par exemple, il serait probablement possible d’améliorer encore les résultats de <Nom /> sur KLAnext,
-			mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le comfort général
-			ou la disparition de certains roulements. Autre exemple, certaines dispositions optimisent tellement
-			que les chiffres ne sont pas dans l’ordre mais plutôt du genre 3210987654. Cela rend la disposition
-			beaucoup moins logique et donc plus difficile à apprendre, pour seulement optimiser légèrement
-			leurs scores.
-		</p>
-		<p>
-			Il serait aussi possible de faire cela pour les majuscules. Cela nous paraît évident que la
-			majuscule d’une lettre soit en Shift + Lettre. Pourtant, il serait tout à fait possible que
-			cela ne soit pas le cas, mais cela impliquerait alors d’apprendre deux fois plus de choses :
-			où sont les lettres, et où sont les majuscules. Tout cela pour peu de gains si ce n’est
-			d’avoir un score légèrement supérieur sur les comparateurs de dispositions.
-		</p>
-	</section>
+	<CommentComparer></CommentComparer>
 
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Résultats de benchmarks</h2>
 	<section>
@@ -236,7 +141,6 @@
 			{/if}
 		</div>
 	</div>
-
 	<mini-espace />
 	<div class="image">
 		{#if langue === 'fr'}
@@ -268,6 +172,87 @@
 		width="100%"
 		height="600px"
 	/>
+
+	<section class="contenu">
+		<h2 data-aos="zoom-out" data-aos-mirror="true">
+			Analyse de la vraie disposition <NomPlus></NomPlus>
+		</h2>
+		<p>
+			Une réelle analyse de <NomPlus></NomPlus> nécessite de modifier le corpus afin d’y refléter les
+			nouvelles manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres
+			du corpus pour les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB
+			></SFB>s pris en charge par <NomPlus></NomPlus>, comme <kbd-sortie>sc</kbd-sortie> en
+			<kbd>,s</kbd>
+			doivent être remplacés. Un <a href="/corpus/0_conversion_corpus.py">simple script Python</a> permet
+			de faire ces modifications.
+		</p>
+		<p>
+			Toutefois, modifier le corpus rend la comparaison avec les autres dispositions plus
+			compliquée, car ce ne sera pas le même corpus pour toutes. Utiliser le même corpus modifié
+			pour les autres dispositions peut engendrer des très bonnes performances chez elles, ceci car
+			la touche <kbd>★</kbd> ne sera pas parmi leurs touches et sera donc systématiquement ignorée, améliorant
+			sensiblement leurs stats.
+		</p>
+		<p>
+			Voici les résultats de <NomPlus></NomPlus> obtenus sur le corpus français-anglais Essais :
+		</p>
+		<div class="image">
+			<img src="/resultats/hypertexte+_reduction_SFBs.jpg" />
+		</div>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Analyse des <SFB></SFB>s</h3>
+		<p>
+			Cette analyse met en lumière la quasi-suppression des <SFB></SFB>s, avec une valeur d’environ
+			3. Pour rappel, la valeur de cette métrique avec un corpus non modifié est de 25 pour la même
+			disposition. Ainsi, l’utilisation d’<NomPlus></NomPlus> divise par environ 8 le nombre de <SFB
+			></SFB>s de <Nom></Nom>.
+		</p>
+		<p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
+		<p><Nom></Nom> :</p>
+		<div class="image">
+			<img src="/resultats/SFBs_hypertexte.jpg" />
+		</div>
+		<p><NomPlus></NomPlus> :</p>
+		<div class="image">
+			<img src="/resultats/SFBs_hypertexte+.jpg" />
+		</div>
+		<p>
+			Plusieurs <SFB></SFB>s se produisent maintenant sur l’index gauche en <kbd>★,</kbd> et
+			<kbd>★.</kbd>, même s’ils sont déjà deux fois moins nombreux qu’avec <NomPlus></NomPlus>. Il y
+			a sans doute possiblité d’améliorer cela, c’est un point à l’étude. En dehors de cela, les
+			réductions de <SFB></SFB>s sont spectaculaires, en particulier sur les annulaires et
+			auriculaires. Enfin, l’index droit voit son nombre de <SFB></SFB>s (<kbd>SC</kbd>,
+			<kbd>DS</kbd>, etc.) chuter drastiquement, de 27 000 à 2500, soit une division par 10 !
+		</p>
+		<h3 data-aos="fade-right" data-aos-mirror="true">Analyse de la distance parcourue</h3>
+		<p>
+			Les gains de touches tapées ne sont pas reflétés sur la capture d’écran de résumé des scores.
+			Avec le corpus normal, nous avions 50 306 touches tapées par <Nom></Nom>. Ce nombre tombe à 45
+			525 touches tapées avec <NomPlus></NomPlus>. Cela peut paraître dérisoire, mais c’est quand
+			même un gain de 10% de touches en moins à taper ! Ou autrement dit une augmentation de la
+			vitesse de 10% sans effort (si ce n’est mémoriser les raccourcis de <NomPlus></NomPlus>).
+		</p>
+		<p>
+			Les gains de touche peuvent encore s’accroître si vous personnalisez votre disposition pour y
+			ajouter vos propres raccourcis. Dans la version <NomPlus></NomPlus> testés, seule une petite vingtaine
+			de mots très courants ont été remplacés par un raccourci. Parmi ceux-ci :
+			<kbd-sortie>ainsi</kbd-sortie>
+			en <kbd>a★</kbd>, <kbd-sortie>exemple</kbd-sortie> en <kbd>x★</kbd> et
+			<kbd-sortie>faire</kbd-sortie>
+			en <kbd>f★</kbd>.
+		</p>
+		<h3 data-aos="fade-right" data-aos-mirror="true">
+			Analyse de fréquence d’utilisation des doigts
+		</h3>
+		<div class="image">
+			<img src="/resultats/finger_usage_comparison.jpg" />
+		</div>
+		<p>
+			Comme vous pouvez le constater sur l’image ci-dessous, l’index gauche est plus utilisé (6% vs
+			8%) avec <NomPlus></NomPlus>. Cela vient des nombreuses utilisations de la touche
+			<kbd>★</kbd>, dont la fréquence d’utilisation est désormais comparable à celle de la touche
+			<kbd>É</kbd>, soit un peu moins de 2%.
+		</p>
+	</section>
 </div>
 
 <style>
