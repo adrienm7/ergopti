@@ -2,10 +2,10 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-	import Genese from '../accueil/old/genese.svelte';
 
 	import Autocritiques from './autocritiques.svelte';
 	import Contact from './contact.svelte';
+	import GeneseSources from './genese_sources.svelte';
 	import License from './license.svelte';
 </script>
 
