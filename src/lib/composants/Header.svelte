@@ -228,7 +228,7 @@
 		align-items: center;
 		justify-content: center;
 		height: 100%;
-		margin-left: 10px;
+		margin-left: clamp(3px, 1vw, 10px);
 		/* margin-left: var(--marge-bords-menu); */
 	}
 	header .header-logo p {
@@ -253,7 +253,7 @@
 			border-top: 1px solid rgba(255, 255, 255, 0.2);
 			overflow: scroll; /* Pour désactiver le scroll derrière le menu (1/3) */
 			overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu (2/3) */
-			transition: height 0.25s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
+			transition: height 0.15s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
 			overflow: hidden;
 			z-index: 98;
 		}
@@ -289,7 +289,7 @@
 			position: relative;
 			width: var(--longueur-traits-hamburger);
 			height: 2px;
-			transition: background 0.2s ease-out;
+			transition: background 0.1s ease-out;
 			background: var(--couleur-icone-hamburger);
 		}
 
@@ -300,7 +300,7 @@
 			display: block;
 			height: 100%;
 			position: absolute;
-			transition: all 0.2s ease-out;
+			transition: all 0.1s ease-out;
 			width: 100%;
 		}
 
