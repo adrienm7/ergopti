@@ -1,4 +1,6 @@
 <script>
+	import '$lib/css/orb.css';
+
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
@@ -430,7 +432,7 @@
 		animation: bounce7 2s infinite;
 	}
 
-	@-webkit-keyframes bounce7 {
+	@keyframes bounce7 {
 		0% {
 			-webkit-transform: translate(0, -20px);
 			opacity: 0;

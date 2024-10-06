@@ -13,14 +13,12 @@
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
 	import '$lib/css/espacements.css';
-	import '$lib/css/typography.css';
 	import '$lib/css/titres.css';
+	import '$lib/css/typographie.css';
+	import '$lib/css/images.css';
 	import '$lib/css/hypertexte_plus.css';
 	import '$lib/css/buttons.css';
-	import '$lib/css/accordion.css';
 	import '$lib/css/aos.css';
-	import '$lib/css/orb.css';
-	import '$lib/css/miscellaneous.css';
 
 	import '$lib/icons/fontawesome/css/fontawesome.min.css';
 	import '$lib/icons/fontawesome/css/regular.min.css';
@@ -48,9 +46,10 @@
 	<p>En construction</p>
 </div> -->
 
-<button id="afficher-clavier-reference" on:click={toggleZIndex}
-	><i class="fad fa-keyboard"></i></button
->
+<button id="afficher-clavier-reference" on:click={toggleZIndex}>
+	<i class="fad fa-keyboard" style="display:{affiche === 'none' ? 'block' : 'none'}"></i>
+	<i class="fad fa-times" style="display:{affiche}"></i>
+</button>
 
 <div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 	<div>
@@ -76,14 +75,31 @@
 		z-index: 99;
 		bottom: 1rem;
 		right: 1rem;
-		padding: 12px;
+		padding: 0.5rem;
+		margin: 0 auto;
+		height: 3.5rem;
+		width: 3.5rem;
 		background-color: rgba(0, 1, 14, 0.9);
 		cursor: pointer;
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
 		font-size: 1.5rem;
 		box-shadow: 0px 0px 7px 3px #0087b4b1;
+		animation: glowing 3s infinite alternate ease-in-out;
 	}
+
+	@keyframes glowing {
+		0% {
+			box-shadow: 0px 0px 7px 3px #0087b4b1;
+		}
+		50% {
+			box-shadow: 0px 0px 7px 5px #0087b4b1;
+		}
+		100% {
+			box-shadow: 0px 0px 7px 7px #0087b4b1;
+		}
+	}
+
 	#afficher-clavier-reference i {
 		color: #3088ed;
 	}

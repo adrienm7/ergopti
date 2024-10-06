@@ -19,7 +19,17 @@
 </svelte:head>
 
 <header>
-	<img src="img/logo/logo_hypertexte.png" class="logo" />
+	<img
+		src="img/logo/logo_hypertexte.png"
+		style="	display: block;
+	margin: 0 auto;	margin-top: 30px;
+	margin-bottom: -30px;
+	width: 80px;
+	height: auto;	
+	border-radius: 100px;
+	border: 2px solid rgba(255, 255, 255, 0.7);
+	box-shadow: rgba(255, 255, 255, 0.24) 0px 3px 8px;"
+	/>
 	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"
 			><span class="hyper">Hyper</span><span class="texte">Texte</span><span class="glow">+</span
@@ -118,43 +128,3 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">➄ Raccourcis</h2>
 	<Raccourcis />
 </div>
-
-<style>
-	.logo {
-		display: block;
-		margin: 0 auto;
-		margin-top: 30px;
-		margin-bottom: -30px;
-		width: 80px;
-		border: 1px solid rgba(255, 255, 255, 0.7);
-		border-radius: 100px;
-		box-shadow: rgba(255, 255, 255, 0.24) 0px 3px 8px;
-	}
-	.container {
-		perspective: 1000px;
-	}
-
-	.block {
-		position: relative;
-		margin: 0 auto;
-		width: fit-content;
-		transform: rotateX(25deg) translateZ(5px);
-		transform-style: preserve-3d;
-	}
-
-	.block::before {
-		border-radius: var(--arrondi-clavier);
-		content: '';
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate3d(
-			-50%,
-			-50%,
-			-20px
-		); /* mettre la même valeur en négatif que la valeur de l'épaisseur */
-		width: calc(100% + 4px);
-		height: 100%;
-		background-color: black; /* ou la couleur de fond de votre choix */
-	}
-</style>
