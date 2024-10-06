@@ -1,7 +1,13 @@
 import * as stores_infos from '$lib/stores_infos.js';
+
 import characterFrequencies from '$lib/clavier/characterFrequencies.json';
 // Créer la clé "max" contenant la valeur maximale parmi les fréquences (souvent la fréquence en E)
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
+characterFrequencies.min = Math.min(...Object.values(characterFrequencies));
+// Permet de mieux étaler les valeurs des fréquences
+function transformLogarithmique(x, k) {
+	return Math.log(1 + k * x) / Math.log(1 + k);
+}
 
 async function loadData(version) {
 	try {
@@ -228,11 +234,16 @@ export class Clavier {
 						}
 					}
 					toucheClavier.style.setProperty('--taille', res['taille']);
-					let frequence =
-						characterFrequencies[contenuTouche[this.infos_clavier.couche]] /
-						characterFrequencies['max'];
+					let frequence = characterFrequencies[contenuTouche[this.infos_clavier.couche]];
 					toucheClavier.style.setProperty('--frequence', frequence);
-					toucheClavier.style.setProperty('--frequence-log', Math.log(frequence));
+					let frequence_normalisee =
+						(characterFrequencies[contenuTouche[this.infos_clavier.couche]] -
+							characterFrequencies['min']) /
+						(characterFrequencies['max'] - characterFrequencies['min']); // Entre 0 et 1 avec 1 pour la lettre la plus fréquente
+					toucheClavier.style.setProperty(
+						'--frequence-normalisee',
+						transformLogarithmique(frequence_normalisee, 40)
+					);
 				}
 			}
 		}
