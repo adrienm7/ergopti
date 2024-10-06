@@ -34,7 +34,7 @@ export const emulation = writable({
 	type: 'iso',
 	couche: 'Primary',
 	plus: 'oui',
-	couleur: 'non',
+	couleur: 'oui',
 	controles: 'non'
 });
 
