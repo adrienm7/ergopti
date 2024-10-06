@@ -5,8 +5,7 @@
 </script>
 
 <h2 data-aos="zoom-out" data-aos-mirror="true">Autocritiques</h2>
-
-<section>
+<section class="contenu">
 	<h3>L’importance des compromis</h3>
 	<p>
 		Il n’est évidemment pas possible de maximiser tous ces paramètres en même temps. Par conséquent,
@@ -20,11 +19,11 @@
 		possiblement fait des <SFB />s avec le <kbd>E</kbd>. <kbd>E</kbd> s’associe avec quasiment
 		toutes les lettres, donc ce serait une très mauvaise idée. Au contraire, la voyelle <kbd>U</kbd>
 		ne s’associe pas avec beaucoup de lettres, donc elle est bien mieux à cet emplacement. D’autant que
-		cet arrangemement des voyelles permet alors de très bons roulements.
+		cet arrangement des voyelles permet alors de très bons roulements.
 	</p>
 </section>
 
-<section>
+<section class="contenu">
 	<h3>Points d’amélioration</h3>
 	<p>
 		Bien que largement supérieure à certaines dispositions telles que l’AZERTY et même le BÉPO, <Nom
@@ -89,14 +88,14 @@
 		elle a cependant été enlevée au profit de la touche inédite <kbd>★</kbd>.
 	</p>
 	<p>
-		Peu de touches mortes et de couches de symboles. <Nom /> ne se prétend pas être exhaustive en incorporant
-		tous les alphabets des langueus européennes comme le BÉPO, ou encore l’écriture phonétique comme
-		Optimot. Ces couches n’intéressent que peu d’utilisateurs et occupent des emplacements du clavier
-		très accessibles pour une utilisation tê rare. La philosophie derrière <Nom /> est de fournir une
-		base de réflexion, mais pas nécessairement de promouvoir l’utilisation de la disposition « HyperTexte ».
-		Rien ne vaut une disposition créée sur-mesure pour vos usages. Si vous utilisez énormément Latex,
-		peut-être voudrez-vous ramener le \ encore plus proche de vos doigts. De même, si vous voulez écrire
-		régulièrement en allemand, il serait judicieux de mettre la touche morte des trémats à un endroit
-		plus accessible, voire en accès direct.
+		<Nom></Nom> possède peu de touches mortes et de couches de symboles. En effet, la disposition ne
+		se prétend pas être exhaustive en incorporant tous les alphabets des langueus européennes comme le
+		BÉPO, ou encore l’écriture phonétique comme Optimot. Ces couches n’intéressent que peu d’utilisateurs
+		et occupent des emplacements du clavier très accessibles pour une utilisation très rare. La philosophie
+		derrière <Nom /> est de fournir une base de réflexion, mais pas nécessairement de promouvoir l’utilisation
+		de la disposition « HyperTexte ». Rien ne vaut une disposition créée sur-mesure pour vos usages.
+		Si vous utilisez énormément Latex, peut-être voudrez-vous ramener le \ encore plus proche de vos
+		doigts. De même, si vous voulez écrire régulièrement en allemand, il serait judicieux de mettre la
+		touche morte des trémats à un endroit plus accessible.
 	</p>
 </section>

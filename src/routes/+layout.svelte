@@ -76,7 +76,7 @@
 		bottom: 1rem;
 		right: 1rem;
 		padding: 12px;
-		background-color: rgba(0, 1, 14, 0.8);
+		background-color: rgba(0, 1, 14, 0.9);
 		cursor: pointer;
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
