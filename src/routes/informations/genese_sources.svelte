@@ -73,7 +73,7 @@
 		entre les premières versions d’Optim7 et la version finale de <Nom></Nom>.
 	</p>
 
-	<h3 data-aos="zoom-out" data-aos-mirror="true">Comment la disposition a été créée</h3>
+	<h3 data-aos="fade-right" data-aos-mirror="true">Comment la disposition a été créée</h3>
 	<p>
 		➀ La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
 		: main gauche et main droite.
