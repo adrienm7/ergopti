@@ -23,8 +23,9 @@
 </script>
 
 <header>
-	<div class="logo">
-		<p class="italic">
+	<div class="header-logo">
+		<a href="/"><img src="img/logo/logo_hypertexte_transparant.png" style="height: 55px;" /></a>
+		<p style="font-variant: small-caps;">
 			<a href="/">Disposition clavier </a><span class="hyper"
 				><a href="/">HyperTexte</a>
 				<div class="myselect">
@@ -97,7 +98,7 @@
 		box-decoration-break: clone;
 		background-image: inherit;
 		border: none;
-		font-style: italic;
+		font-variant: small-caps;
 	}
 
 	.myselect {
@@ -112,19 +113,19 @@
 		box-decoration-break: clone;
 		background-image: inherit;
 		border: none;
-		font-style: italic;
+		font-variant: small-caps;
 	}
 
 	.myselect::after {
 		content: '';
 		position: absolute;
-		right: 0px;
+		right: -1px;
 		top: 8px;
 		width: 0;
 		height: 0;
 		border-left: 8px solid transparent;
 		border-right: 8px solid transparent;
-		border-top: 8px solid rgba(255, 255, 255, 1);
+		border-top: 8px solid rgb(255, 255, 255);
 		pointer-events: none;
 	}
 
@@ -222,14 +223,15 @@
 		background-image: linear-gradient(to right, var(--gradient-purple));
 	} */
 
-	header .logo {
+	header .header-logo {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		height: 100%;
-		margin-left: var(--marge-bords-menu);
+		margin-left: 10px;
+		/* margin-left: var(--marge-bords-menu); */
 	}
-	header .logo p {
+	header .header-logo p {
 		display: inline;
 		font-family: 'Times New Roman', Times, serif;
 	}

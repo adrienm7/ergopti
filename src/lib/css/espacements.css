@@ -1,4 +1,4 @@
-main p:not(:first-child){
+main p:not(:first-child) {
 	margin-top: 1rem;
 }
 
@@ -9,8 +9,6 @@ section ul li {
 .margin0 {
 	margin: 0;
 }
-
-
 
 mini-espace {
 	display: block;
@@ -32,15 +30,18 @@ grand-espace {
 	height: 30vh;
 }
 
-enorme-espace {
+giga-espace {
 	display: block;
 	height: 50vh;
 }
-	
-
 
 hr {
-    border: 0;
-    height: 1px;
-    background-image: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+	border: 0;
+	height: 1px;
+	background-image: linear-gradient(
+		to right,
+		rgba(255, 255, 255, 0),
+		rgba(255, 255, 255, 0.75),
+		rgba(255, 255, 255, 0)
+	);
 }

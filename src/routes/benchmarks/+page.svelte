@@ -142,13 +142,13 @@
 		</div>
 	</div>
 	<mini-espace />
-	<div class="image">
+	<bloc-image>
 		{#if langue === 'fr'}
 			<img src="/resultats/{versionValue}/{clavier}/{corpus_fr}.jpg" />
 		{:else}
 			<img src="/resultats/{versionValue}/{clavier}/{corpus_en}.jpg" />
 		{/if}
-	</div>
+	</bloc-image>
 	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse Ergo-L</h3>
 	<p>
 		Réalisée à l’aide de l’analyseur disponible ici : <a
@@ -196,9 +196,9 @@
 		<p>
 			Voici les résultats de <NomPlus></NomPlus> obtenus sur le corpus français-anglais Essais :
 		</p>
-		<div class="image">
+		<bloc-image>
 			<img src="/resultats/hypertexte+_reduction_SFBs.jpg" />
-		</div>
+		</bloc-image>
 		<h3 data-aos="fade-right" data-aos-mirror="true">Analyse des <SFB></SFB>s</h3>
 		<p>
 			Cette analyse met en lumière la quasi-suppression des <SFB></SFB>s, avec une valeur d’environ
@@ -208,13 +208,13 @@
 		</p>
 		<p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
 		<p><Nom></Nom> :</p>
-		<div class="image">
+		<bloc-image>
 			<img src="/resultats/SFBs_hypertexte.jpg" />
-		</div>
+		</bloc-image>
 		<p><NomPlus></NomPlus> :</p>
-		<div class="image">
+		<bloc-image>
 			<img src="/resultats/SFBs_hypertexte+.jpg" />
-		</div>
+		</bloc-image>
 		<p>
 			Plusieurs <SFB></SFB>s se produisent maintenant sur l’index gauche en <kbd>★,</kbd> et
 			<kbd>★.</kbd>, même s’ils sont déjà deux fois moins nombreux qu’avec <NomPlus></NomPlus>. Il y
@@ -243,9 +243,9 @@
 		<h3 data-aos="fade-right" data-aos-mirror="true">
 			Analyse de fréquence d’utilisation des doigts
 		</h3>
-		<div class="image">
+		<bloc-image>
 			<img src="/resultats/finger_usage_comparison.jpg" />
-		</div>
+		</bloc-image>
 		<p>
 			Comme vous pouvez le constater sur l’image ci-dessous, l’index gauche est plus utilisé (6% vs
 			8%) avec <NomPlus></NomPlus>. Cela vient des nombreuses utilisations de la touche
@@ -254,24 +254,3 @@
 		</p>
 	</section>
 </div>
-
-<style>
-	.image {
-		margin: 0 auto;
-		text-align: center;
-	}
-
-	.image img {
-		width: 100%;
-		margin: 0 auto;
-		border: 10px solid rgb(255, 255, 255);
-		border-radius: 10px;
-		box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px;
-		text-align: center;
-	}
-
-	.image p {
-		font-size: 1.3rem;
-		font-weight: bold;
-	}
-</style>
