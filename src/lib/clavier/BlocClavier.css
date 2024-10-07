@@ -469,6 +469,9 @@ bloc-touche[data-touche='enter'] {
 	/* Bordure des touches des touches spéciales en blanc pour mieux les mettre en relief */
 	--couleur-bordure-touche: hsla(var(--couleur-touche), 100%, 100%, 35%);
 	--effet-3d: hsla(var(--couleur-touche), 0%, calc(100% - 20%), 70%);
+	/* Bordure de la version Ergodox */
+	--couleur-touche: 0deg !important;
+	--couleur-touche-saturation: 0% !important;
 }
 
 /* === Si couleur, ou couleur spéciale === */

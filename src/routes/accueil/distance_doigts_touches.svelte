@@ -112,7 +112,6 @@
 			</bloc-ligne>
 			<legende-clavier>Rangée du milieu en HyperTexte</legende-clavier>
 		</bloc-clavier>
-
 		<p>
 			En français et en anglais, le <kbd>E</kbd>
 			est de loin la lettre la plus fréquente. Viennent ensuite les voyelles <kbd>A</kbd>,
@@ -159,8 +158,8 @@
 		</p>
 
 		<mini-espace />
-
 		<BlocClavier nom="frequences" />
+		<mini-espace />
 
 		<p>
 			Comme vous pouvez le constater sur le clavier ci-dessus, les lettres les plus fréquentes sont

@@ -55,3 +55,12 @@ export const roulements = writable({
 	couleur: 'non',
 	controles: 'non'
 });
+
+export const controle = writable({
+	emplacement: 'clavier_controle',
+	type: 'iso',
+	couche: 'Ctrl',
+	plus: 'non',
+	couleur: 'non',
+	controles: 'oui'
+});
