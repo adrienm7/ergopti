@@ -11,6 +11,8 @@ export function typography(searchNode = document.body) {
 		'iframe',
 		'pre',
 		'kbd',
+		'kbd-sortie',
+		'kbd-non',
 		'code',
 		'textarea',
 		'noscript',

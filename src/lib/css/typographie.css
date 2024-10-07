@@ -128,6 +128,7 @@ strong,
 
 .hypertexte {
 	/* font-style: italic; */
+	display: inline-block;
 	text-shadow:
 		-1px 0px 4px #00000011,
 		1px 0px 4px #00000011;

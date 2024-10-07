@@ -240,7 +240,7 @@
 		display: none;
 	}
 
-	@media (max-width: 1200px) {
+	@media (max-width: 1400px) {
 		header #menu {
 			position: fixed;
 			top: var(--hauteur-header);
@@ -346,7 +346,7 @@
 		}
 	}
 
-	@media (min-width: 1200px) {
+	@media (min-width: 1400px) {
 		header #menu {
 			display: flex !important;
 			flex-direction: row;
