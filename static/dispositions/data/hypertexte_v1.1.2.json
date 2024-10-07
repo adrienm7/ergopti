@@ -2045,6 +2045,7 @@
 			"AltGr": "Ctrl",
 			"ShiftAltGr": "Ctrl",
 			"Ctrl": "Ctrl",
+			"Ctrl+": "Shift",
 			"e": "Ctrl",
 			"i": "Ctrl",
 			"R": "Ctrl",

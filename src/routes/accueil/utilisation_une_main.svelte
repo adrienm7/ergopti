@@ -2,6 +2,8 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
+
+	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 </script>
 
 <section>
@@ -32,6 +34,9 @@
 			<kbd>=</kbd>. En effet, normalement le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
 			<kbd>L</kbd>.
 		</p>
+		<mini-espace />
+		<BlocClavier nom="controle" />
+		<mini-espace />
 		<p>
 			Les raccourcis <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>X</kbd-sortie>,
 			<kbd-sortie>Ctrl</kbd-sortie>

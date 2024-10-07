@@ -1,8 +1,11 @@
 import { Clavier } from '$lib/clavier/Clavier.js';
+import remplacements from '$lib/clavier/remplacementsMagique.json';
+
 export class EmulationClavier extends Clavier {
 	constructor(id) {
 		super(id);
 		this.shift = false;
+		this.alt = false;
 		this.altgr = false;
 		this.control = false;
 		this.e = false;
@@ -17,19 +20,48 @@ export class EmulationClavier extends Clavier {
 	}
 
 	activationModificateur(event) {
-		if (event.code === 'AltRight') {
+		if (event.code === 'AltRight' || event.code === 'AltGraph') {
 			this.altgr = true;
 			return true;
-		}
-		if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+		} else if (
+			event.code === 'ShiftLeft' ||
+			event.code === 'ShiftRight' ||
+			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'oui')
+		) {
 			this.shift = true;
 			return true;
-		}
-		if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
+		} else if (event.code === 'AltLeft') {
+			this.alt = true;
+			return true;
+		} else if (
+			event.code === 'ControlLeft' ||
+			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'non')
+		) {
 			this.control = true;
 			return true;
 		}
 		return false;
+	}
+
+	relacherModificateurs(event) {
+		if (event.code === 'AltRight' || event.code === 'AltGraph') {
+			this.altgr = false;
+		} else if (
+			event.code === 'ShiftLeft' ||
+			event.code === 'ShiftRight' ||
+			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'oui')
+		) {
+			this.shift = false;
+		} else if (event.code === 'AltLeft') {
+			this.alt = false;
+		} else if (
+			event.code === 'ControlLeft' ||
+			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'non')
+		) {
+			this.control = false;
+		}
+		this.setCouche();
+		this.majClavier();
 	}
 
 	setCouche() {
@@ -40,6 +72,8 @@ export class EmulationClavier extends Clavier {
 			this.couche = 'AltGr';
 		} else if (this.shift) {
 			this.couche = 'Shift';
+		} else if (this.control) {
+			this.couche = 'Ctrl';
 		} else if (this.e) {
 			this.couche = 'e';
 		} else if (this.i) {
@@ -63,14 +97,24 @@ export class EmulationClavier extends Clavier {
 	}
 
 	emulationClavier(event) {
-		this.activationModificateur(event); // Activation des éventuelles touches modificatrices
-		this.setCouche();
+		console.log(event.code);
 
-		// Ne pas intercepter les raccourcis avec Ctrl
-		if (this.control & !this.altgr) {
-			// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
+		let modificateurActive = this.activationModificateur(event); // Activation des éventuelles touches modificatrices
+		this.setCouche();
+		if (this.alt && this.infos_clavier['plus'] === 'oui') {
+			this.envoiTouche_ReplacerCurseur('Enter');
+			this.alt = false;
 			return true;
 		}
+		if (modificateurActive) {
+			return true;
+		}
+
+		// Ne pas intercepter les raccourcis avec Ctrl
+		// if (this.control & !this.altgr) {
+		// 	// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
+		// 	return true;
+		// }
 
 		// Si touche normale
 		let keyPressed = event.code;
@@ -80,16 +124,27 @@ export class EmulationClavier extends Clavier {
 			let toucheClavier = this.data.touches.find((el) => el['touche'] == res['touche']);
 			this.presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			let touche;
-			if (keyPressed === 'CapsLock' || keyPressed === 'Backspace') {
+			if (
+				this.control &&
+				(keyPressed === 'Backspace' ||
+					(keyPressed === 'CapsLock' && this.infos_clavier['plus'] === 'oui'))
+			) {
+				this.envoiTouche_ReplacerCurseur('Ctrl-Backspace');
+				return true;
+			} else if (
+				keyPressed === 'Delete' ||
+				(this.shift && keyPressed === 'CapsLock' && this.infos_clavier['plus'] === 'oui')
+			) {
+				this.envoiTouche_ReplacerCurseur('Delete');
+				return true;
+			} else if (
+				keyPressed === 'Backspace' ||
+				(keyPressed === 'CapsLock' && this.infos_clavier['plus'] === 'oui')
+			) {
 				this.envoiTouche_ReplacerCurseur('Backspace');
 				return true;
-			}
-			if (keyPressed === 'Enter') {
+			} else if (keyPressed === 'Enter') {
 				this.envoiTouche_ReplacerCurseur('Enter');
-				// } else if (keyPressed === 'AltRight' && this.infos_clavier['plus'] === 'oui') {
-				// 	this.envoiTouche_ReplacerCurseur('Tab');
-				// } else if (keyPressed === 'ControlRight' && this.infos_clavier['plus'] === 'oui') {
-				// 	this.envoiTouche_ReplacerCurseur('a');
 			} else if (this.e) {
 				if (keyPressed === 'Space') {
 					touche = ' ';
@@ -189,6 +244,17 @@ export class EmulationClavier extends Clavier {
 		if (touche === 'Backspace') {
 			this.textarea.value = texteAvantCurseur.substring(0, positionCurseur - 1) + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur - 1;
+		} else if (touche === 'Ctrl-Backspace') {
+			let texteAvantSuppression = texteAvantCurseur;
+			let texteApresSuppression = texteAvantCurseur.replace(/\S+$/, '');
+			this.textarea.value = texteApresSuppression + texteApresCurseur;
+			let caracteresSupprimes = texteAvantSuppression.length - texteApresSuppression.length;
+			nouvellePositionCurseur = positionCurseur - caracteresSupprimes;
+		} else if (touche === 'Delete') {
+			console.log('Delete');
+			this.textarea.value =
+				texteAvantCurseur + texteApresCurseur.substring(1, texteApresCurseur.length);
+			nouvellePositionCurseur = positionCurseur;
 		} else if (touche === 'Enter') {
 			this.textarea.value = texteAvantCurseur + '\n' + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + 1;
@@ -231,6 +297,7 @@ export class EmulationClavier extends Clavier {
 			this.textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + touche.length;
 		}
+
 		/* Convertir les touches mortes avec la voyelle suivante */
 		this.textarea.value = this.textarea.value
 			.replace(/◌̂a/g, 'â')
@@ -254,6 +321,11 @@ export class EmulationClavier extends Clavier {
 			.replace(/◌̈I/g, 'Ï')
 			.replace(/◌̈O/g, 'Ö')
 			.replace(/◌̈U/g, 'Ü');
+
+		/* Évite le SFB NNU par exemple qui est N★U normalement, mais se fait N★Ê */
+		/* Sauf pour le R, car "arrêt" existe en français */
+		this.textarea.value = this.textarea.value.replace(/([^\Wr]){2}ê/g, '$1$1u');
+
 		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 
@@ -270,33 +342,4 @@ export class EmulationClavier extends Clavier {
 			.querySelector("bloc-touche[data-touche='" + touche + "']")
 			.classList.add('touche-active');
 	}
-
-	relacherModificateurs(event) {
-		if (event.code === 'AltRight') {
-			this.altgr = false;
-		} else if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
-			this.shift = false;
-		} else if (event.code === 'ControlLeft' || event.code === 'ControlRight') {
-			this.control = false;
-		}
-		this.setCouche();
-		this.majClavier();
-	}
 }
-
-const remplacements = {
-	a: 'ainsi',
-	c: 'c’est',
-	ct: 'c’était',
-	d: 'donc',
-	f: 'faire',
-	g: 'j’ai',
-	gt: 'j’étais',
-	h: 'heure',
-	m: 'mais',
-	p: 'prendre',
-	q: 'question',
-	r: 'rien',
-	s: 'sous',
-	très: 't'
-};

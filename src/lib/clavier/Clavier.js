@@ -283,7 +283,11 @@ export class Clavier {
 		if (this.infos_clavier.couche === 'Ctrl' && lCtrl !== null) {
 			lCtrl.classList.add('touche-active');
 		}
-		if (this.infos_clavier.couche === 'Ctrl' && rCtrl !== null) {
+		if (
+			this.infos_clavier.couche === 'Ctrl' &&
+			rCtrl !== null &&
+			this.infos_clavier.plus === 'non'
+		) {
 			rCtrl.classList.add('touche-active');
 		}
 		if (this.infos_clavier.couche === 'AltGr' && altGr !== null) {
