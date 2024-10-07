@@ -289,14 +289,15 @@ bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='LAlt
 }
 
 /* Taille plus petite pour la légende Win+V */
-bloc-clavier[data-couche='Layer'][data-plus='oui'] bloc-touche[data-touche='Coller'] div {
+bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Coller'] div {
 	font-size: 0.85em;
 }
 
 /* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */
-bloc-clavier[data-couche='Layer'] bloc-touche div {
+bloc-clavier[data-couche='Layer'] bloc-touche:not([data-doigt='pouce']) div {
 	font-size: 0.8em;
 }
+
 bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Copier'] div,
 bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Couper'] div {
 	font-size: var(--taille-texte-touche);
@@ -458,29 +459,6 @@ bloc-clavier[data-type='ergodox'] bloc-touche[data-doigt='pouce'] {
 	background-color: rgba(0, 46, 96, 0.3);
 }
 
-/* Pas de changement en hover sur les touches sur le bord du clavier SAUF celles activables */
-bloc-touche[data-touche='Escape']:not(.touche-active):hover,
-bloc-touche[data-type='Escape']:not(.touche-active):active,
-bloc-touche[data-touche='Delete']:not(.touche-active):hover,
-bloc-touche[data-type='Delete']:not(.touche-active):active,
-bloc-touche[data-touche='BackSpace']:not(.touche-active):hover,
-bloc-touche[data-type='BackSpace']:not(.touche-active):active,
-bloc-touche[data-touche='Tab']:not(.touche-active):hover,
-bloc-touche[data-type='Tab']:not(.touche-active):active,
-bloc-touche[data-touche='CapsLock']:not(.touche-active):hover,
-bloc-touche[data-type='CapsLock']:not(.touche-active):active,
-bloc-touche[data-touche='Win']:not(.touche-active):hover,
-bloc-touche[data-type='Win']:not(.touche-active):active,
-bloc-touche[data-touche='LAlt']:not(.touche-active):hover,
-bloc-touche[data-type='LAlt']:not(.touche-active):active,
-bloc-touche[data-touche='Option']:not(.touche-active):hover,
-bloc-touche[data-type='Option']:not(.touche-active):active,
-bloc-touche[data-type='space']:not(.touche-active):hover,
-bloc-touche[data-type='space']:not(.touche-active):active {
-	/* background-color: rgb(7, 7, 7)!important;
-	color: white!important; */
-}
-
 /* === Couleur des touches spéciales === */
 
 bloc-touche[data-type='space'],
@@ -488,15 +466,7 @@ bloc-touche[data-type='special'],
 bloc-touche[data-touche='enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
-	/* Bordure de la touche en blanc transparent */
-	--couleur-touche: 0deg !important;
-	--couleur-touche-saturation: 0% !important;
-}
-
-/* La bordure des touches des touches spéciales est en blanc pour mieux les mettre en relief */
-bloc-touche[data-type='special'],
-bloc-touche[data-type='space'],
-bloc-touche[data-type='enter'] {
+	/* Bordure des touches des touches spéciales en blanc pour mieux les mettre en relief */
 	--couleur-bordure-touche: hsla(var(--couleur-touche), 100%, 100%, 35%);
 	--effet-3d: hsla(var(--couleur-touche), 0%, calc(100% - 20%), 70%);
 }

@@ -2067,7 +2067,8 @@
 			"e": "Alt",
 			"i": "Alt",
 			"R": "Alt",
-			"Layer": "Layer",
+			"Layer": "Alt",
+			"Layer+": "Layer",
 			"À": "Alt",
 			",": "Alt",
 			"type": "special"
