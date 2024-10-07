@@ -85,7 +85,7 @@
 		border-radius: 5px;
 		font-size: 1.5rem;
 		box-shadow: 0px 0px 7px 3px #0087b4b1;
-		animation: glowing 3s infinite alternate ease-in-out;
+		animation: glowing 2s infinite alternate ease-in-out;
 	}
 
 	@keyframes glowing {

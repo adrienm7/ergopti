@@ -7,7 +7,9 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Optimisation pour l’utilisation à une main</h2>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">
+		Optimisation pour l’utilisation à&nbsp;une&nbsp;main
+	</h2>
 
 	<div class="content">
 		<p>
@@ -47,7 +49,7 @@
 			Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>, <kbd>Ctrl</kbd> +
 			<kbd>É</kbd>,
 			<kbd>Ctrl</kbd>
-			+ <kbd>À</kbd> et <kbd>Ctrl</kbd> + <kbd>È</kbd>
+			+ <kbd>À</kbd> et <kbd>Ctrl</kbd> + <kbd>È</kbd>.
 		</p>
 
 		<h3 data-aos="fade-right" data-aos-mirror="true">
@@ -77,7 +79,10 @@
 			une touche envoie un raccourci, mais la presser la fait se comporter normalement. Cela permet
 			d’intégrer des touches
 			<kbd>Copier</kbd>, <kbd>Coller</kbd> et <kbd>Alt+Tab</kbd> respectivement sur
-			<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>.
+			<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>. En outre, un layer de navigation ainsi
+			que les touches
+			<kbd>Backspace</kbd>
+			et <kbd>Entrée</kbd> sont également disponibles à gauche du clavier avec <NomPlus></NomPlus>.
 		</p>
 	</div>
 </section>

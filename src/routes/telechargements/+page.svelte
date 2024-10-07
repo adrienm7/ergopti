@@ -33,7 +33,8 @@
 	<button on:click={() => (isCollapsed = !isCollapsed)}>
 		{#if isCollapsed}
 			Afficher les abréviations implémentées
-		{:else}
+		{/if}
+		{#if !isCollapsed}
 			Masquer les abréviations implémentées
 		{/if}
 	</button>
