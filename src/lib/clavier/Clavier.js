@@ -114,9 +114,10 @@ export class Clavier {
 						toucheClavier.removeAttribute(attribute);
 					}
 				});
-				toucheClavier.dataset['touche'] = ''; // Suppression du contenu de la touche
-				toucheClavier.classList.remove('touche-active'); // Suppression de la classe css pour les touches pressées
+				// Suppression du contenu de la touche
+				toucheClavier.dataset['touche'] = '';
 				toucheClavier.dataset['plus'] = 'non';
+				toucheClavier.classList.remove('touche-active'); // Suppression de la classe css pour les touches pressées
 
 				if (res !== undefined) {
 					const contenuTouche = this.data.touches.find((el) => el['touche'] === res['touche']);

@@ -19,15 +19,15 @@
 	<meta name="description" content="Fichiers pour utiliser HyperTexte" />
 </svelte:head>
 
-<div class="contenu">
-	<h1 data-aos="zoom-in" data-aos-mirror="true">Utiliser HyperTexte</h1>
+<h1 data-aos="zoom-in" data-aos-mirror="true">Utiliser HyperTexte</h1>
 
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
-	<EmulationClavier />
-	<Installation></Installation>
-	<ComparateursDispositions></ComparateursDispositions>
+<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
+<EmulationClavier />
 
-	<!-- <h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
+<Installation></Installation>
+<ComparateursDispositions></ComparateursDispositions>
+
+<!-- <h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
 	<h3>Instructions générales</h3>
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
@@ -37,4 +37,3 @@
 	<petit-espace />
 	<h3>Comment installer la disposition sur Windows</h3>
 	<p>[À faire]</p> -->
-</div>
