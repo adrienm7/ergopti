@@ -47,7 +47,7 @@
 
 <petit-espace />
 
-<div class="contenu">
+<div>
 	<hr />
 	<div class="encart-introduction">
 		<p>

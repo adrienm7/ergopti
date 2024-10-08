@@ -17,7 +17,7 @@
 	import '$lib/css/typographie.css';
 	import '$lib/css/images.css';
 	import '$lib/css/hypertexte_plus.css';
-	import '$lib/css/buttons.css';
+	import '$lib/css/boutons.css';
 	import '$lib/css/aos.css';
 
 	import '$lib/icons/fontawesome/css/fontawesome.min.css';
@@ -85,18 +85,18 @@
 		border-radius: 5px;
 		font-size: 1.5rem;
 		box-shadow: 0px 0px 7px 3px #0087b4b1;
-		animation: glowing 2s infinite alternate ease-in-out;
+		animation: glowing 3s infinite alternate ease-in-out;
 	}
 
 	@keyframes glowing {
 		0% {
-			box-shadow: 0px 0px 7px 3px #0087b4b1;
+			box-shadow: 0px 0px 1px 1px #0087b4b1;
 		}
-		50% {
-			box-shadow: 0px 0px 7px 5px #0087b4b1;
+		70% {
+			box-shadow: 0px 0px 1px 1px #0087b4b1;
 		}
 		100% {
-			box-shadow: 0px 0px 7px 7px #0087b4b1;
+			box-shadow: 0px 0px 20px 7px #0087b4b1;
 		}
 	}
 

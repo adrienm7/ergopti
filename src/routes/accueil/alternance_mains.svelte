@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<section class="contenu">
+<section>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Alternance des mains</h2>
 	<p>
 		L’alternance des mains est très importante pour garantir une bonne <span class="important"

@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<section class="contenu">
+<section>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">License</h2>
 	<p>À définir</p>
 </section>
