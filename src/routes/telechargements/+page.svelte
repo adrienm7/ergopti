@@ -29,16 +29,15 @@
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
 	<EmulationClavier />
 	<mini-espace />
-	<!-- Bouton pour basculer l'affichage -->
-	<button on:click={() => (isCollapsed = !isCollapsed)}>
-		{#if isCollapsed}
+	{#if isCollapsed}
+		<button on:click={() => (isCollapsed = !isCollapsed)}>
 			Afficher les abréviations implémentées
-		{/if}
-		{#if !isCollapsed}
-			Masquer les abréviations implémentées
-		{/if}
-	</button>
+		</button>
+	{/if}
 	{#if !isCollapsed}
+		<button on:click={() => (isCollapsed = !isCollapsed)}>
+			Masquer les abréviations implémentées
+		</button>
 		<mini-espace />
 		<table>
 			<thead>

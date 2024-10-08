@@ -77,8 +77,8 @@
 		right: 1rem;
 		padding: 0.5rem;
 		margin: 0 auto;
-		height: 3.5rem;
-		width: 3.5rem;
+		height: 3rem;
+		width: 3rem;
 		background-color: rgba(0, 1, 14, 0.9);
 		cursor: pointer;
 		border: 1px solid rgba(0, 0, 0, 0.5);

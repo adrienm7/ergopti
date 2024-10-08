@@ -114,9 +114,9 @@
 		<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
 			<button on:click={toggleLangue} style="height:2.5rem;">
 				{#if langue === 'fr'}
-					{@html '<p><strong class="hyper">Français</strong>➜&nbsp;<span class="texte">Anglais</span></p>'}
+					{@html '<p><strong class="hyper">Français</strong>➜&nbsp;<span class="htexte">Anglais</span></p>'}
 				{:else}
-					{@html '<p><strong class="texte">Anglais</strong> ➜&nbsp;<span class="hyper">Français</span></p>'}
+					{@html '<p><strong class="htexte">Anglais</strong> ➜&nbsp;<span class="hyper">Français</span></p>'}
 				{/if}
 			</button>
 

@@ -172,7 +172,7 @@
 	</p>
 	<mini-espace />
 	<div class="encadre">
-		<p class="important">Ainsi, il est facile de se rappeler où est quoi :</p>
+		<p class="important margin0">Ainsi, il est facile de se rappeler où est quoi :</p>
 		<ul class="margin0">
 			<li>le français est en <kbd>Shift</kbd> ;</li>
 			<li class="margin0">la programmation est en <kbd>AltGr</kbd>.</li>
