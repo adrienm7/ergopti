@@ -24,7 +24,7 @@
 
 <header>
 	<div class="header-logo">
-		<a href="/"><img src="img/logo/logo_hypertexte_transparant.png" style="height: 55px;" /></a>
+		<a href="/"><img src="img/logo/logo_hypertexte_transparent.png" style="height: 55px;" /></a>
 		<p style="font-variant: small-caps;">
 			<a href="/">Disposition clavier </a><span class="hyper"
 				><a href="/">HyperTexte</a>
