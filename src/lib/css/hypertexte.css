@@ -1,4 +1,4 @@
-.hypertexte {
+nom-hypertexte {
 	/* font-style: italic; */
 	display: inline-block;
 	text-shadow:
@@ -23,6 +23,10 @@
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
 	-moz-text-fill-color: transparent;
+}
+
+.nowrap {
+	white-space: nowrap;
 }
 
 .glow {
