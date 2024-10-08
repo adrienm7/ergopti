@@ -97,7 +97,6 @@ RewriteRule ^(.*)$ $1.html [L]
     ExpiresByType text/css                  "access plus 10 years"
     ExpiresByType text/javascript           "access plus 10 years"
     ExpiresByType application/javascript    "access plus 10 years"
-
 </IfModule>
 
 

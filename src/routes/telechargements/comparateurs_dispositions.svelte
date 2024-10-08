@@ -10,7 +10,7 @@
 	});
 </script>
 
-<section class="contenu">
+<section>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Fichiers pour les comparateurs de dispositions</h2>
 	<mini-espace />
 	<p>

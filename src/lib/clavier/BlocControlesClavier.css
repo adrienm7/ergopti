@@ -13,7 +13,7 @@ controles-clavier {
 	margin: 0 auto;
 	width: fit-content; /* Pour centrer */
 	display: flex;
-	font-size: 0.7rem;
+	font-size: 0.75rem;
 }
 
 controles-clavier > :first-child {
@@ -24,7 +24,7 @@ controles-clavier > :first-child {
 controles-clavier button,
 controles-clavier select {
 	border-radius: 0;
-	background-color: rgba(0, 0, 0, 0.3);
+	background-color: rgb(0, 0, 0, 0.5);
 	color: white;
 	padding: 10px;
 	border: 2px solid white;
@@ -38,7 +38,7 @@ controles-clavier select {
 }
 
 controles-clavier select {
-	background-image: linear-gradient(to right, var(--gradient-purple));
+	background-image: linear-gradient(to top, #2e0037 0%, #c800ff 50%);
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;
@@ -72,7 +72,7 @@ controles-clavier select option {
 	left: 0;
 	width: 100%;
 	height: 100%;
-	background-color: rgba(0, 0, 0, 0.3);
+	background-color: rgba(0, 0, 0, 0.5);
 	border-radius: 0 calc(var(--arrondi-bouton) - 3px) calc(var(--arrondi-bouton) - 3px) 0;
 	z-index: 0;
 }
@@ -116,4 +116,22 @@ section controles-clavier > :last-child {
 section controles-clavier button:hover {
 	background-color: rgb(0, 0, 0);
 	color: rgba(255, 255, 255, 0.8);
+}
+
+/* Couleur du texte des boutons */
+
+.ergodox-text-gradient {
+	background: linear-gradient(to top, #128500 0%, #1aff00 70%);
+	background-clip: text;
+	-webkit-background-clip: text;
+	color: transparent;
+	line-height: 1.1em;
+}
+
+.couleur-text-gradient {
+	background: linear-gradient(to top, rgb(255, 47, 0) 0%, rgb(255, 174, 0) 70%);
+	background-clip: text;
+	-webkit-background-clip: text;
+	color: transparent;
+	line-height: 1.1em;
 }

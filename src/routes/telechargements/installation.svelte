@@ -10,7 +10,7 @@
 	});
 </script>
 
-<section class="contenu">
+<section>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
 	<div class="encadre">
 		<span style="font-weight:bold">Note :</span> Les fichiers d’installation n’existent au complet qu’à

@@ -153,30 +153,6 @@ strong,
 	-moz-text-fill-color: transparent;
 }
 
-.ergodox-text-gradient {
-	background: linear-gradient(to right, #128500, #1aff00);
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	line-height: 1.1em;
-}
-
-.red-text-gradient {
-	background: linear-gradient(to right, rgb(255, 47, 0), rgb(255, 174, 0));
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	line-height: 1.1em;
-}
-
-.rainbow-text-gradient {
-	background: -webkit-linear-gradient(right, rgb(255, 0, 119), orange, rgb(0, 179, 255));
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	line-height: 1.1em;
-}
-
 /* Divers */
 
 .lettrine::first-letter {
@@ -188,13 +164,4 @@ strong,
 	margin-top: 6px;
 	margin-right: 10px;
 	border-radius: 2px;
-}
-
-.text-glow {
-	--couleur: rgb(0, 110, 255);
-	/* color: var(--couleur); */
-	text-shadow:
-		0 0 2px var(--couleur),
-		0 0 6px var(--couleur),
-		0 0 12px var(--couleur);
 }

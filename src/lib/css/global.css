@@ -1,5 +1,4 @@
 :root {
-	--bg-color: hsl(217, 100%, 12%);
 	--gradient-blue: #3088ed 0%, #02c9db 100%;
 	--gradient-purple: #f06cf2 0%, #9311b8 100%;
 }
@@ -25,7 +24,7 @@ body {
 }
 
 .bg-blue {
-	background: var(--bg-color);
+	background: hsl(217, 100%, 12%); /* Fallback */
 	background: linear-gradient(
 		45deg,
 		hsl(205, 100%, 5%) 0%,
@@ -36,28 +35,17 @@ body {
 	background-attachment: fixed;
 }
 
-/* @media (max-width: 800px) {
-	.bg-blue {
-		--couleur: 70;
-	}
-}
-
-@media (max-width: 400px) {
-	.bg-blue {
-		--couleur: 60;
-	}
-} */
-
-.contenu {
+section {
 	line-height: 1.4;
 	max-width: 850px;
-	max-width: clamp(200px, 95vw, 850px);
 	margin: 0 auto;
-	padding: 0;
+	padding: min(3.5vw, 35px);
 }
 
-section {
-	padding: min(5vw, 35px);
+hr,
+p {
+	max-width: 850px;
+	margin: 0 auto;
 }
 
 section ul {

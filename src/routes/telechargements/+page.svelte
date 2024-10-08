@@ -25,7 +25,7 @@
 
 <h1 data-aos="zoom-in" data-aos-mirror="true">Utiliser HyperTexte</h1>
 
-<section class="contenu">
+<section>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
 	<EmulationClavier />
 	<mini-espace />

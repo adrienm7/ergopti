@@ -47,7 +47,8 @@
 			on:click={fermerMenu}
 		>
 			<a href="/hypertexte-plus"
-				><i class="fad fa-star"></i> HyperTexte<span class="glow">+</span></a
+				><i class="fad fa-star"></i>
+				<span class="titre">HyperTexte<span class="glow">+</span></span></a
 			>
 		</p>
 		<p
@@ -55,20 +56,25 @@
 			on:click={fermerMenu}
 		>
 			<a href="/benchmarks"
-				><span class="couleur"><i class="fad fa-analytics"></i></span> Benchmarks</a
+				><span class="couleur"><i class="fad fa-analytics"></i></span>
+				<span class="titre">Benchmarks</span></a
 			>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/telechargements"><i class="fad fa-download"></i> Téléchargements</a>
+			<a href="/telechargements"
+				><i class="fad fa-download"></i> <span class="titre">Téléchargements</span></a
+			>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/informations"><i class="fad fa-info-circle"></i> Informations</a>
+			<a href="/informations"
+				><i class="fad fa-info-circle"></i> <span class="titre">Informations</span></a
+			>
 		</p>
 	</nav>
 </header>
@@ -201,7 +207,7 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	} */
 
-	header #menu p:not([aria-current='page']) a:hover {
+	header #menu p:not([aria-current='page']) .titre:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -212,7 +218,7 @@
 		/* line-height: 6rem; */
 	}
 
-	/* header #menu p:not([aria-current='page']) a:hover::after {
+	/* header #menu p:not([aria-current='page']) .titre:hover::after {
 		content: '';
 		display: block;
 		position: relative;

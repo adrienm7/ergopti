@@ -1,0 +1,87 @@
+<script>
+	import Nom from '$lib/composants/Nom.svelte';
+	import NomPlus from '$lib/composants/NomPlus.svelte';
+	import SFB from '$lib/composants/SFB.svelte';
+</script>
+
+<section>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">
+		Analyse de la vraie disposition <NomPlus></NomPlus>
+	</h2>
+	<p>
+		Une réelle analyse de <NomPlus></NomPlus> nécessite de modifier le corpus afin d’y refléter les nouvelles
+		manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres du corpus
+		pour les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB></SFB>s pris en
+		charge par <NomPlus></NomPlus>, comme <kbd-sortie>sc</kbd-sortie> en
+		<kbd>,s</kbd>
+		doivent être remplacés. Un <a href="/corpus/0_conversion_corpus.py">simple script Python</a> permet
+		de faire ces modifications.
+	</p>
+	<p>
+		Toutefois, modifier le corpus rend la comparaison avec les autres dispositions plus compliquée,
+		car ce ne sera pas le même corpus pour toutes. Utiliser le même corpus modifié pour les autres
+		dispositions peut engendrer des très bonnes performances chez elles, ceci car la touche <kbd
+			>★</kbd
+		> ne sera pas parmi leurs touches et sera donc systématiquement ignorée, améliorant sensiblement
+		leurs stats.
+	</p>
+	<p>
+		Voici les résultats de <NomPlus></NomPlus> obtenus sur le corpus français-anglais Essais :
+	</p>
+	<bloc-image>
+		<img src="/resultats/hypertexte+_reduction_SFBs.jpg" />
+	</bloc-image>
+	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse des <SFB></SFB>s</h3>
+	<p>
+		Cette analyse met en lumière la quasi-suppression des <SFB></SFB>s, avec une valeur d’environ 3.
+		Pour rappel, la valeur de cette métrique avec un corpus non modifié est de 25 pour la même
+		disposition. Ainsi, l’utilisation d’<NomPlus></NomPlus> divise par environ 8 le nombre de <SFB
+		></SFB>s de <Nom></Nom>.
+	</p>
+	<p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
+	<p><Nom></Nom> :</p>
+	<bloc-image>
+		<img src="/resultats/SFBs_hypertexte.jpg" />
+	</bloc-image>
+	<p><NomPlus></NomPlus> :</p>
+	<bloc-image>
+		<img src="/resultats/SFBs_hypertexte+.jpg" />
+	</bloc-image>
+	<p>
+		Plusieurs <SFB></SFB>s se produisent maintenant sur l’index gauche en <kbd>★,</kbd> et
+		<kbd>★.</kbd>, même s’ils sont déjà deux fois moins nombreux qu’avec <NomPlus></NomPlus>. Il y a
+		sans doute possiblité d’améliorer cela, c’est un point à l’étude. En dehors de cela, les
+		réductions de <SFB></SFB>s sont spectaculaires, en particulier sur les annulaires et
+		auriculaires. Enfin, l’index droit voit son nombre de <SFB></SFB>s (<kbd>SC</kbd>,
+		<kbd>DS</kbd>, etc.) chuter drastiquement, de 27 000 à 2500, soit une division par 10 !
+	</p>
+	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse de la distance parcourue</h3>
+	<p>
+		Les gains de touches tapées ne sont pas reflétés sur la capture d’écran de résumé des scores.
+		Avec le corpus normal, nous avions 50 306 touches tapées par <Nom></Nom>. Ce nombre tombe à 45
+		525 touches tapées avec <NomPlus></NomPlus>. Cela peut paraître dérisoire, mais c’est quand même
+		un gain de 10% de touches en moins à taper ! Ou autrement dit une augmentation de la vitesse de
+		10% sans effort (si ce n’est mémoriser les raccourcis de <NomPlus></NomPlus>).
+	</p>
+	<p>
+		Les gains de touche peuvent encore s’accroître si vous personnalisez votre disposition pour y
+		ajouter vos propres raccourcis. Dans la version <NomPlus></NomPlus> testés, seule une petite vingtaine
+		de mots très courants ont été remplacés par un raccourci. Parmi ceux-ci :
+		<kbd-sortie>ainsi</kbd-sortie>
+		en <kbd>a★</kbd>, <kbd-sortie>exemple</kbd-sortie> en <kbd>x★</kbd> et
+		<kbd-sortie>faire</kbd-sortie>
+		en <kbd>f★</kbd>.
+	</p>
+	<h3 data-aos="fade-right" data-aos-mirror="true">
+		Analyse de fréquence d’utilisation des doigts
+	</h3>
+	<bloc-image>
+		<img src="/resultats/finger_usage_comparison.jpg" />
+	</bloc-image>
+	<p>
+		Comme vous pouvez le constater sur l’image ci-dessous, l’index gauche est plus utilisé (6% vs
+		8%) avec <NomPlus></NomPlus>. Cela vient des nombreuses utilisations de la touche
+		<kbd>★</kbd>, dont la fréquence d’utilisation est désormais comparable à celle de la touche
+		<kbd>É</kbd>, soit un peu moins de 2%.
+	</p>
+</section>

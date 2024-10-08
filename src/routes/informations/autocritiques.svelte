@@ -4,8 +4,9 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<h2 data-aos="zoom-out" data-aos-mirror="true">Autocritiques</h2>
-<section class="contenu">
+<section>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Autocritiques</h2>
+
 	<h3 data-aos="fade-right" data-aos-mirror="true">L’importance des compromis</h3>
 	<p>
 		Il n’est évidemment pas possible de maximiser tous ces paramètres en même temps. Par conséquent,
@@ -21,9 +22,7 @@
 		ne s’associe pas avec beaucoup de lettres, donc elle est bien mieux à cet emplacement. D’autant que
 		cet arrangement des voyelles permet alors de très bons roulements.
 	</p>
-</section>
 
-<section class="contenu">
 	<h3 data-aos="fade-right" data-aos-mirror="true">Points d’amélioration</h3>
 	<p>
 		Bien que largement supérieure à certaines dispositions telles que l’AZERTY et même le BÉPO, <Nom
@@ -37,6 +36,7 @@
 		En outre, parfois tous les emplacements sont mauvais pour une touche, et il faut choisir le
 		moins pire. Par conséquent, <Nom /> a évidemment des défauts, dont voici les principaux :
 	</p>
+
 	<h4>Distances non optimales</h4>
 	<ul>
 		<li><kbd>E</kbd> est sur le majeur et non sur l’index.</li>

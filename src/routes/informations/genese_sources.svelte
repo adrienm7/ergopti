@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<section class="contenu">
+<section>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">Genèse et sources</h2>
 	<p>
 		La genèse de la disposition <Nom></Nom> remonte à 2022, à la suite de la découverte d'Optimot. Les
