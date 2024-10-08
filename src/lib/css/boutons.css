@@ -1,6 +1,6 @@
 button {
 	cursor: pointer;
-	padding: 7px;
+	padding: 10px;
 }
 
 button p {
@@ -8,11 +8,10 @@ button p {
 }
 
 .bouton-telechargement {
-	padding: 10px;
 	background-color: rgba(0, 0, 0, 0.8);
-	color: white;
 	border: 1px solid rgba(255, 255, 255, 0.6);
 	border-radius: 3px;
+	color: white;
 }
 
 /* Boutons kbd */
@@ -50,9 +49,13 @@ kbd-non {
 	/* width: calc(calc(.6*100vw/15)*1 - 2*calc(.6*.35vw)); */
 }
 
+kbd {
+	background-color: hsl(0, 0%, 14%);
+}
+
 kbd-sortie {
-	background-color: #1a1a1ae5;
 	background-color: hsla(0, 0%, 100%, 0.9);
+	border: 1px solid rgba(0, 0, 0, 0.3);
 	color: black;
 }
 
@@ -67,20 +70,7 @@ kbd-non:active,
 kbd:hover,
 kbd-sortie:hover,
 kbd-non:hover {
-	box-shadow: rgba(204, 204, 204, 0.7) 0 0.766667px 0 0;
 	position: relative;
 	top: calc(calc(0.6 * 0.25vw) - calc(0.6 * 0.1vw));
-}
-
-section kbd {
-	background-color: hsl(0, 0%, 14%);
-	/* background: linear-gradient(
-		90deg,
-		rgba(0, 0, 50, 1) 0%,
-		rgba(0, 0, 70, 1) 100%
-	); */
-}
-
-section kbd-sortie {
-	border: 1px solid rgba(0, 0, 0, 0.3);
+	box-shadow: rgba(204, 204, 204, 0.7) 0 0.766667px 0 0;
 }

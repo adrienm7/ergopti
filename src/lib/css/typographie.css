@@ -126,33 +126,6 @@ strong,
 	}
 }
 
-.hypertexte {
-	/* font-style: italic; */
-	display: inline-block;
-	text-shadow:
-		-1px 0px 4px #00000011,
-		1px 0px 4px #00000011;
-}
-
-/* h2, */
-.hyper {
-	-webkit-background-clip: text;
-	background-clip: text;
-	-webkit-text-fill-color: transparent;
-	color: transparent;
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
-	background-image: linear-gradient(to right, var(--gradient-blue));
-}
-.texte {
-	background: linear-gradient(#e8c5ff, #db4bff);
-	background-clip: text;
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	-moz-background-clip: text;
-	-moz-text-fill-color: transparent;
-}
-
 /* Divers */
 
 .lettrine::first-letter {

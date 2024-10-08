@@ -5,6 +5,7 @@
 </script>
 
 <section>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Diminution des SFBs</h2>
 	<p>L’un des avantages majeurs de <NomPlus /> est qu’il réduit presque totalement les <SFB />s.</p>
 	<p>
 		Les <SFB />s les plus fréquents de la disposition sont : <kbd>SC</kbd>,

@@ -21,7 +21,7 @@
 	<title>Disposition HyperTexte</title>
 	<meta
 		name="description"
-		content="La disposition HyperTexte est optimisée pour le français et l’anglais"
+		content="La disposition HyperTexte est optimisée pour le français, l’anglais et le code"
 	/>
 </svelte:head>
 

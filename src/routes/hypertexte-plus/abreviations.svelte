@@ -5,6 +5,7 @@
 </script>
 
 <section>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Abréviations</h2>
 	<h3 data-aos="fade-right" data-aos-mirror="true">Remplacement de texte avec <kbd>★</kbd></h3>
 	<p>
 		Le comportement par défaut de la touche <kbd>★</kbd> est de répéter dernière touche tapée.

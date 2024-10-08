@@ -19,7 +19,7 @@ body {
 	font-size: 100%;
 	font-size: clamp(14px, 0.3vw + 14px, 24px);
 	scroll-behavior: smooth;
-	color: #333;
+	color: white;
 	background: black;
 }
 
@@ -33,21 +33,4 @@ body {
 		hsl(205, 100%, 25%) 100%
 	);
 	background-attachment: fixed;
-}
-
-section {
-	line-height: 1.4;
-	max-width: 850px;
-	margin: 0 auto;
-	padding: min(3.5vw, 35px);
-}
-
-hr,
-p {
-	max-width: 850px;
-	margin: 0 auto;
-}
-
-section ul {
-	padding-left: 35px;
 }

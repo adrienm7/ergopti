@@ -15,8 +15,8 @@
 	import '$lib/css/espacements.css';
 	import '$lib/css/titres.css';
 	import '$lib/css/typographie.css';
+	import '$lib/css/hypertexte.css';
 	import '$lib/css/images.css';
-	import '$lib/css/hypertexte_plus.css';
 	import '$lib/css/boutons.css';
 	import '$lib/css/aos.css';
 
