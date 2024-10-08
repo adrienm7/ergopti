@@ -40,7 +40,7 @@
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
 		<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/"><i class="fad fa-keyboard"></i> HyperTexte</a>
+			<a href="/"><i class="fad fa-keyboard"></i> <span class="titre">HyperTexte</span></a>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
@@ -185,9 +185,6 @@
 	}
 
 	header #menu p[aria-current='page'] a {
-		/* background-color: #f4f4f4;
-			color: black !important;
-			border-radius: 3px; */
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -196,16 +193,6 @@
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
-	/* header #menu p[aria-current='page'] a::after {
-		content: '';
-		display: block;
-		position: relative;
-		bottom: -5px;
-		width: 100%;
-		height: 3px;
-		border-radius: 5px;
-		background-image: linear-gradient(to right, var(--gradient-blue));
-	} */
 
 	header #menu p:not([aria-current='page']) .titre:hover {
 		-webkit-background-clip: text;
@@ -215,19 +202,7 @@
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
-		/* line-height: 6rem; */
 	}
-
-	/* header #menu p:not([aria-current='page']) .titre:hover::after {
-		content: '';
-		display: block;
-		position: relative;
-		bottom: -5px;
-		width: 100%;
-		height: 3px;
-		border-radius: 5px;
-		background-image: linear-gradient(to right, var(--gradient-purple));
-	} */
 
 	header .header-logo {
 		display: inline-flex;
@@ -246,6 +221,7 @@
 		display: none;
 	}
 
+	/* Menu mobile */
 	@media (max-width: 1400px) {
 		header #menu {
 			position: fixed;
@@ -352,6 +328,7 @@
 		}
 	}
 
+	/* Menu ordinateur */
 	@media (min-width: 1400px) {
 		header #menu {
 			display: flex !important;
@@ -396,5 +373,27 @@
 		header #menu p:last-child a {
 			padding-right: 0;
 		}
+
+		header #menu p[aria-current='page'] a::after {
+			content: '';
+			display: block;
+			position: relative;
+			bottom: -5px;
+			width: 100%;
+			height: 3px;
+			border-radius: 5px;
+			background-image: linear-gradient(to right, var(--gradient-blue));
+		}
+
+		/* header #menu p:not([aria-current='page']) .titre:hover::after {
+		content: '';
+		display: block;
+		position: relative;
+		bottom: -5px;
+		width: 100%;
+		height: 3px;
+		border-radius: 5px;
+		background-image: linear-gradient(to right, var(--gradient-purple));
+	} */
 	}
 </style>

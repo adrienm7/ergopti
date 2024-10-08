@@ -27,7 +27,7 @@
 
 <header>
 	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
-		Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="texte"
+		Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="htexte"
 			>Texte&nbsp;—</span
 		>
 	</h1>
@@ -98,306 +98,9 @@
 	</h2>
 	<div id="orb">
 		<div class="wrap">
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
-			<div class="c" />
+			{#each Array(300) as _, index}
+				<div class="c" />
+			{/each}
 		</div>
 		<h2
 			class="text-orange-gradient text-center"
@@ -501,6 +204,22 @@
 	@media (min-width: 900px) {
 		.cards {
 			grid-template-columns: repeat(3, 1fr);
+		}
+	}
+
+	.text-orange-gradient {
+		color: #ff6300;
+	}
+
+	@supports (background-clip: text) or (-webkit-background-clip: text) {
+		.text-orange-gradient {
+			-webkit-background-clip: text;
+			background-clip: text;
+			-webkit-text-fill-color: transparent;
+			color: transparent;
+			-webkit-box-decoration-break: clone;
+			box-decoration-break: clone;
+			background-image: linear-gradient(90deg, #fcaa00 30%, #ff6300 50%, #ff0063 100%);
 		}
 	}
 </style>

@@ -87,7 +87,6 @@ const handleInlineBlockPunctuation = (node) => {
 		if (match) {
 			const newElement = document.createElement('span'); // Création d'un nouvel élément span pour contenir le nœud actuel et la ponctuation
 			newElement.classList.add('nowrap'); // Ajout de la classe 'nowrap' pour éviter les sauts de ligne
-			newElement.style.backgroundColor = 'red'; // Ajout d'un fond rouge pour débogage
 			newElement.appendChild(node.cloneNode(true)); // Ajout du nœud actuel
 			newElement.innerHTML += match[0]; // Ajout de la ponctuation
 

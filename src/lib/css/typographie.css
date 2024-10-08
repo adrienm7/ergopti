@@ -98,31 +98,9 @@ strong,
 	font-size: 1.7rem;
 }
 
-.no-max-width {
-	max-width: 90vw;
-}
-
 @media (max-width: 600px) {
 	.font-size-medium {
 		font-size: 1.5rem;
-	}
-}
-
-/* Couleurs de texte */
-
-.text-orange-gradient {
-	color: #ff6300;
-}
-
-@supports (background-clip: text) or (-webkit-background-clip: text) {
-	.text-orange-gradient {
-		-webkit-background-clip: text;
-		background-clip: text;
-		-webkit-text-fill-color: transparent;
-		color: transparent;
-		-webkit-box-decoration-break: clone;
-		box-decoration-break: clone;
-		background-image: linear-gradient(90deg, #fcaa00 30%, #ff6300 50%, #ff0063 100%);
 	}
 }
 

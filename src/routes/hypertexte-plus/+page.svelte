@@ -31,10 +31,7 @@
 	box-shadow: rgba(255, 255, 255, 0.24) 0px 3px 8px;"
 	/>
 	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
-		Disposition clavier<br /><span style="line-height: 0.75!important;"
-			><span class="hyper">Hyper</span><span class="texte">Texte</span><span class="glow">+</span
-			></span
-		>
+		Disposition clavier<br /><span style="line-height: 0.75!important;"><NomPlus></NomPlus></span>
 	</h1>
 	<div class="container">
 		<div class="block">
@@ -74,7 +71,7 @@
 			>outils de programmation de clavier spécifiques.
 		</span>
 		<span>
-			Sur Windows, le programme <span class="texte"><span class="important">AutoHotkey</span></span>
+			Sur Windows, le programme <span class="important">AutoHotkey</span>
 			est utilisé afin de réaliser ces changements. Il est également possible de programmer le firmware
 			de son clavier (avec QMK ou ZMK) pour ce faire.
 		</span>

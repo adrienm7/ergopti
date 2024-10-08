@@ -3,5 +3,5 @@
 </script>
 
 <nom-hypertexte-plus>
-	<Nom /><span class="glow" style="margin-left:1px">+</span>
+	<Nom /><span class="glow">+</span>
 </nom-hypertexte-plus>
