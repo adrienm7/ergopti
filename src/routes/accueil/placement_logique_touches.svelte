@@ -170,8 +170,9 @@
 		<kbd>Shift</kbd>, tout en programmant normalement avec la couche <kbd>AltGr</kbd>, qui contient
 		d’ailleurs tout le reste des symboles nécessaires à l’écriture de code.
 	</p>
+	<mini-espace />
 	<div class="encadre">
-		<p class="important" style="margin:0;">Ainsi, il est facile de se rappeler où est quoi :</p>
+		<p class="important">Ainsi, il est facile de se rappeler où est quoi :</p>
 		<ul class="margin0">
 			<li>le français est en <kbd>Shift</kbd> ;</li>
 			<li class="margin0">la programmation est en <kbd>AltGr</kbd>.</li>

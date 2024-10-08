@@ -1,9 +1,23 @@
-main p:not(:first-child) {
-	margin-top: 1rem;
+main {
+	max-width: 850px;
+	margin: 0 auto; /* Centrer le bloc main horizontalement */
+	line-height: 1.5;
+	padding: min(
+		3.5vw,
+		35px
+	); /* Espaces entre le texte et les bords de l'écran, notamment sur mobile */
 }
 
-section ul li {
-	margin-top: 1rem; /* Cela doit être assez élevé car les touches de clavier sont hautes */
+main p {
+	margin-bottom: 1rem; /* Espacement entre les différents paragraphes */
+}
+
+main ul {
+	padding-left: 35px;
+}
+
+main ul li {
+	margin-top: 1rem; /* Cela doit être assez élevé, car les touches de clavier sont hautes */
 }
 
 .margin0 {

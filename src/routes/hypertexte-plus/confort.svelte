@@ -5,6 +5,7 @@
 </script>
 
 <section>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Confort</h2>
 	<h3 data-aos="fade-right" data-aos-mirror="true">
 		Touche <kbd>BackSpace</kbd> à la place de Capslock
 	</h3>

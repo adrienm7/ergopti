@@ -5,6 +5,7 @@
 </script>
 
 <section>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Ajout d’excellents roulements</h2>
 	<p>Des roulements pour plus de confort ont été ajoutés :</p>
 	<ul class="margin-top-2">
 		<li><kbd>HC</kbd> ➜ <kbd-sortie>WH</kbd-sortie></li>

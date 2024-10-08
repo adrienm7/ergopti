@@ -5,6 +5,7 @@
 </script>
 
 <section>
+	<h2 data-aos="zoom-out" data-aos-mirror="true">Raccourcis</h2>
 	<h3 data-aos="fade-right" data-aos-mirror="true">Raccourcis avec AltGr</h3>
 	<ul>
 		<li><kbd>AltGr</kbd> + <kbd>Tab</kbd> ➜ <kbd-sortie>Capsword</kbd-sortie></li>

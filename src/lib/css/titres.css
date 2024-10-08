@@ -47,6 +47,11 @@ h3 {
 	font-weight: normal;
 }
 
+/* Réduit la margin-top si h3 suit directement un h2, sans texte entre */
+h2 + h3 {
+	margin-top: 20vh;
+}
+
 h4 {
 	margin-top: 13vh;
 	margin-bottom: 5vh;

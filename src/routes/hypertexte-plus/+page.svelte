@@ -112,19 +112,9 @@
 		</p>
 	</section>
 	<p class="important">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➀ Confort</h2>
 	<Confort />
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➁ Ajout d’excellents roulements</h2>
 	<Roulements />
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➂ Diminution des SFBs</h2>
 	<Reduction_SFBs />
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➃ Abréviations</h2>
 	<Abreviations />
-
-	<h2 data-aos="zoom-out" data-aos-mirror="true">➄ Raccourcis</h2>
 	<Raccourcis />
 </div>
