@@ -8,7 +8,6 @@
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import { matomo } from '$lib/js/code-matomo.js';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -25,7 +24,6 @@
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 
 	afterUpdate(() => {
-		matomo();
 		AOS.init();
 		typography(document.getElementById('page'));
 	});
@@ -65,6 +63,20 @@
 	</main>
 
 	<Footer />
+	<!-- Matomo -->
+<script type="text/javascript">
+	var _paq = window._paq = window._paq || [];
+	_paq.push(['trackPageView']);
+	_paq.push(['enableLinkTracking']);
+	(function() {
+		var u = 'https://stats.beseven.fr/';
+	  _paq.push(['setTrackerUrl', u+'matomo.php']);
+	  _paq.push(['setSiteId', '6']);
+	  var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+	  g.type='text/javascript'; g.async=true; g.src=u+'matomo.js'; s.parentNode.insertBefore(g,s);
+	})();
+  </script>
+  <!-- End Matomo Code -->
 </div>
 
 <style>
