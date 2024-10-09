@@ -8,7 +8,7 @@
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import Matomo, { matomo } from '@dexlib/svelte-matomo';
+	import { matomo } from '$lib/js/code-matomo.js';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -25,7 +25,7 @@
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 
 	afterUpdate(() => {
-		matomo.trackPageView();
+		matomo();
 		AOS.init();
 		typography(document.getElementById('page'));
 	});
@@ -39,8 +39,6 @@
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
 </script>
-
-<Matomo url="https://stats.beseven.fr" siteId={6} />
 
 <!-- <div class="banner">
 	<p>En construction</p>
