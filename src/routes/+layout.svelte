@@ -24,13 +24,19 @@
 	import '$lib/icons/fontawesome/css/fontawesome.min.css';
 	import '$lib/icons/fontawesome/css/regular.min.css';
 	import '$lib/icons/fontawesome/css/duotone.min.css';
-	import { log } from 'console';
 
 	/* Lancer Matomo lors de l’arrivée sur le site */
 	onMount(() => {
 		matomo();
 	});
-	$: if($navigating) matomo(); /* Lancer Matomo lors du changement de page */
+	/* Lancer Matomo lors du changement de page */
+	$: if ($navigating) {
+		/* Il est nécessaire de modifier le titre et l’url, car sinon ils sont identiques à la page d’entrée */
+		matomo(
+			$navigating.to.url.pathname,
+			'https://hypertexte.beseven.fr/' + $navigating.to.url.pathname
+		);
+	}
 
 	afterUpdate(() => {
 		AOS.init();
