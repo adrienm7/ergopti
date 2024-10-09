@@ -24,6 +24,24 @@
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 	import { log } from 'console';
 
+	onMount(() => {
+		console.log("Matomo");
+		var _paq = window._paq = window._paq || [];
+		_paq.push(['trackPageView']);
+		_paq.push(['enableLinkTracking']);
+		(function() {
+			var u = 'https://stats.beseven.fr/';
+			_paq.push(['setTrackerUrl', u+'matomo.php']);
+			_paq.push(['setSiteId', '6']);
+			var d=document;
+			var g=d.createElement('script');
+			g.type='text/javascript';
+			g.async=true;
+			g.src=u+'matomo.js';
+			d.body.appendChild(g);
+		})();	
+	});
+
 	afterUpdate(() => {
 		AOS.init();
 		typography(document.getElementById('page'));
