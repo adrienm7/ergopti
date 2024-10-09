@@ -180,20 +180,7 @@
 		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
-	header #menu p[aria-current='page'] a::first-letter {
-		background-image: linear-gradient(to right, var(--gradient-blue));
-	}
-
-	header #menu p[aria-current='page'] a {
-		-webkit-background-clip: text;
-		background-clip: text;
-		-webkit-text-fill-color: transparent;
-		color: transparent;
-		-webkit-box-decoration-break: clone;
-		box-decoration-break: clone;
-		background-image: linear-gradient(to right, var(--gradient-blue));
-	}
-
+	header #menu p[aria-current='page'] .titre,
 	header #menu p:not([aria-current='page']) .titre:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
