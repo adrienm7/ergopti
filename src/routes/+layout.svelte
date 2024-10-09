@@ -34,7 +34,7 @@
 		/* Il est nécessaire de modifier le titre et l’url, car sinon ils sont identiques à la page d’entrée */
 		matomo(
 			$navigating.to.url.pathname,
-			'https://hypertexte.beseven.fr/' + $navigating.to.url.pathname
+			'https://hypertexte.beseven.fr' + $navigating.to.url.pathname
 		);
 	}
 
