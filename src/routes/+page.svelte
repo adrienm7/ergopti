@@ -91,8 +91,12 @@
 	<ChiffresAccesDirect />
 	<UtilisationUneMain />
 </div>
-<div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);"></div>
-<div style="background:black; padding: 50px 0; margin-bottom:-10vh;">
+<moyen-espace></moyen-espace>
+<div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);" class="fullwidth"></div>
+<div
+	style="background:black; padding-top: 10px; padding-bottom: 100px; margin-bottom:-15vh;"
+	class="fullwidth"
+>
 	<h2 data-aos="zoom-out" data-aos-mirror="true">
 		<span class="glow">★</span>
 	</h2>
@@ -108,12 +112,12 @@
 		>
 			Pour aller encore <b>+</b> loin
 		</h2>
-		<div class="texte-orb">
+		<div class="texte-orb" style="max-width: 850px; margin:0 auto; margin-top:-50px">
 			<hr />
 			<p class="encart-introduction">
 				<NomPlus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
-				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.<br
-				/>Découvrez cette amélioration de la disposition en consultant sa page associée :
+				les roulements sont améliorés et les doigts ont encore moins de distance à
+				parcourir.Découvrez cette amélioration de la disposition en consultant sa page associée :
 			</p>
 			<a href="/hypertexte-plus" style="text-decoration: none;"
 				><button

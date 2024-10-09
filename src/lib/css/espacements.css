@@ -8,6 +8,11 @@ main {
 	); /* Espaces entre le texte et les bords de l'écran, notamment sur mobile */
 }
 
+main .fullwidth {
+	width: 100vw;
+	margin-left: calc(50% - 50vw); /* Centrer le div */
+}
+
 main p {
 	margin-bottom: 1rem; /* Espacement entre les différents paragraphes */
 }
