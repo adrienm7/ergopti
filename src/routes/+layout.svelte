@@ -26,7 +26,10 @@
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 	import { log } from 'console';
 
-	matomo(); /* Lancer Matomo lors de l’arrivée sur le site */
+	/* Lancer Matomo lors de l’arrivée sur le site */
+	onMount(() => {
+		matomo();
+	});
 	$: if($navigating) matomo(); /* Lancer Matomo lors du changement de page */
 
 	afterUpdate(() => {
