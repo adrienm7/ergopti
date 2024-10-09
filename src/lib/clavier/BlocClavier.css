@@ -158,6 +158,7 @@ bloc-clavier[data-couche='Visuel'] bloc-touche[data-type='français'] div {
 bloc-clavier[data-couche='Visuel'] bloc-touche[data-type='ponctuation'] div {
 	font-size: calc(var(--taille-texte-touche) * 0.7);
 	font-weight: bolder;
+	line-height: 1;
 }
 
 /* Cas particulier de la touche Q qui fait Qu */
