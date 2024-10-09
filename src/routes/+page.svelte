@@ -116,8 +116,8 @@
 			<hr />
 			<p class="encart-introduction">
 				<NomPlus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
-				les roulements sont améliorés et les doigts ont encore moins de distance à
-				parcourir.Découvrez cette amélioration de la disposition en consultant sa page associée :
+				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
+				Découvrez cette amélioration de la disposition en consultant la page associée :
 			</p>
 			<a href="/hypertexte-plus" style="text-decoration: none;"
 				><button
