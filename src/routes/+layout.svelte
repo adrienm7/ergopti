@@ -90,7 +90,7 @@
 
 <div id="page" class="bg-blue">
 	<Header />
-	<div style="display: flex; width:100vw;">
+	<div id="content">
 		<div
 			id="sidebar"
 			style="width: 25vw; padding-top: calc(var(--hauteur-header) + 1rem); padding-bottom: calc(var(--hauteur-footer) + 1rem);"
@@ -107,14 +107,25 @@
 </div>
 
 <style>
+	#bloc-main {
+		overflow-x: hidden; /* Très important pour que les animations css horizontales n’agrandissent pas l’écran */
+		overflow-y: hidden; /* Pour éviter une scrollbar qui se rajoute dans le main */
+	}
+	#content {
+		display: flex;
+		width: 100vw;
+	}
 	#page-toc {
+		position: sticky;
+		top: calc(var(--hauteur-header) + 1rem);
 		width: 25vw;
-		height: 70vh;
+		max-height: calc(100vh - var(--hauteur-header) - 2rem);
 		overflow-y: scroll;
 		padding-right: 1rem;
-		background: rgb(42, 42, 42);
+		background: rgba(0, 0, 0, 0.5);
 		border: 2px solid rgb(25, 25, 25);
 		border-radius: 0 10px 10px 0;
+		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
 	}
 
 	@media (max-width: 1400px) {
@@ -235,7 +246,6 @@
 		margin: 0;
 		padding: 0;
 		min-height: 100vh;
-		overflow-x: hidden; /* Très important pour que les animations css horizontales n’agrandissent pas l’écran */
 		color: white; /* Couleur par défaut du texte */
 	}
 	main {
