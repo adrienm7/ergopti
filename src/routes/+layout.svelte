@@ -9,7 +9,8 @@
 	import { navigating } from '$app/stores';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import { matomo } from '$lib/js/code-matomo';
+	import { matomo } from '$lib/js/code-matomo.js';
+	import { makeIds } from '$lib/js/make-ids.js';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
@@ -25,9 +26,24 @@
 	import '$lib/icons/fontawesome/css/regular.min.css';
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 
-	/* Lancer Matomo lors de l’arrivée sur le site */
+	import tocbot from 'tocbot';
+	tocbot.init();
+
 	onMount(() => {
-		matomo();
+		matomo(); /* Lancer Matomo lors de l’arrivée sur le site */
+		tocbot.init({
+			// Where to render the table of contents.
+			tocSelector: '#page-toc',
+			// Where to grab the headings to build the table of contents.
+			contentSelector: 'main',
+			// Which headings to grab inside of the contentSelector element.
+			headingSelector: 'h2, h3, h4, h5, h6',
+			// For headings inside relative or absolute positioned containers within content.
+			hasInnerContainers: true
+			// Prend en compte la hauteur du header pour le scroll
+			// headingsOffset: 100,
+			// scrollSmoothOffset: -100
+		});
 	});
 	/* Lancer Matomo lors du changement de page */
 	$: if ($navigating) {
@@ -40,6 +56,8 @@
 
 	afterUpdate(() => {
 		AOS.init();
+		makeIds(document.getElementById('page'));
+		tocbot.refresh();
 		typography(document.getElementById('page'));
 	});
 
@@ -72,15 +90,42 @@
 
 <div id="page" class="bg-blue">
 	<Header />
-
-	<main>
-		<slot />
-	</main>
-
+	<div style="display: flex; width:100vw;">
+		<div
+			id="sidebar"
+			style="width: 25vw; padding-top: calc(var(--hauteur-header) + 1rem); padding-bottom: calc(var(--hauteur-footer) + 1rem);"
+		>
+			<div id="page-toc"></div>
+		</div>
+		<div id="bloc-main" style="width:75vw;">
+			<main>
+				<slot />
+			</main>
+		</div>
+	</div>
 	<Footer />
 </div>
 
 <style>
+	#page-toc {
+		width: 25vw;
+		height: 70vh;
+		overflow-y: scroll;
+		padding-right: 1rem;
+		background: rgb(42, 42, 42);
+		border: 2px solid rgb(25, 25, 25);
+		border-radius: 0 10px 10px 0;
+	}
+
+	@media (max-width: 1400px) {
+		#sidebar {
+			display: none;
+		}
+		#bloc-main {
+			width: 100vw !important;
+		}
+	}
+
 	#afficher-clavier-reference {
 		position: fixed;
 		z-index: 99;
@@ -142,12 +187,6 @@
 		box-shadow:
 			rgba(0, 0, 0, 0.6) 0px -2px 4px,
 			rgba(0, 0, 0, 0.7) 0px 3px 8px;
-	}
-
-	@media (max-width: 700px) {
-		.banner {
-			display: none;
-		}
 	}
 
 	.banner p {

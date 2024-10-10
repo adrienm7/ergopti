@@ -92,7 +92,7 @@
 		</p> -->
 
 	<h3 data-aos="fade-right" data-aos-mirror="true">
-		Utilisation de la touche <kbd>,</kbd> + <kbd>Voyelle</kbd> : en tant que J
+		Utilisation de la touche <kbd>,</kbd> + <kbd>Voyelle</kbd> en tant que <kbd>J</kbd>
 	</h3>
 
 	<p>
