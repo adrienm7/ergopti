@@ -1,0 +1,46 @@
+/* Le code ci-dessous permet (notamment) de toujours placer le footer en bas de la page */
+
+/* « Je vous conseille fortement d’utiliser un conteneur global, comme ici avec #page, pour réaliser ce genre de mise en page.
+ * En effet, définir un contexte flex directement sur <body> comme on peut le voir sur d’autres d’articles peut causer des problèmes avec les plugins
+ * qui créent des éléments en bas de page avant </body> (popup, autocomplete, etc.).
+ * Ces éléments risquent de ne pas s’afficher correctement, à cause du contexte flex hérité. Just saying. »
+ */
+
+#page {
+	display: flex;
+	flex-direction: row;
+	min-height: 100vh;
+	width: 100vw;
+	margin: 0;
+	padding: 0;
+}
+
+#main-content {
+	flex-grow: 1;
+	margin-top: calc(var(--hauteur-header)); /* Pour que le contenu soit en-dessous du header */
+	width: var(--largeur-main);
+	overflow-x: hidden; /* Très important pour que les animations css horizontales n’agrandissent pas l’écran */
+}
+
+#sidebar {
+	position: sticky;
+	top: calc(var(--hauteur-header) + 1rem);
+	width: calc(100vw - var(--largeur-main));
+	max-height: calc(100vh - var(--hauteur-header) - 2rem);
+	height: fit-content;
+	overflow-y: scroll;
+	padding: 1rem;
+	background: rgba(0, 0, 0, 0.5);
+	border: 2px solid rgb(25, 25, 25);
+	border-radius: 0 10px 10px 0;
+	box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
+}
+
+@media (max-width: 1400px) {
+	#sidebar {
+		display: none;
+	}
+	#main-content {
+		width: 100vw;
+	}
+}

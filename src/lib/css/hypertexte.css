@@ -17,7 +17,7 @@ nom-hypertexte {
 	background-image: linear-gradient(to right, var(--gradient-blue));
 }
 .htexte {
-	background: linear-gradient(#e8c5ff, #db4bff);
+	background: linear-gradient(to right, var(--gradient-purple));
 	background-clip: text;
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;

@@ -1,6 +1,8 @@
 :root {
 	--gradient-blue: #3088ed 0%, #02c9db 100%;
-	--gradient-purple: #f06cf2 0%, #9311b8 100%;
+	--gradient-purple: #e8c5ff, #db4bff 100%;
+
+	--largeur-main: 75vw;
 }
 
 *,
