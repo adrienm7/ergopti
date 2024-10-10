@@ -125,6 +125,14 @@ export class EmulationClavier extends Clavier {
 			this.presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			let touche;
 			if (
+				this.altgr &&
+				this.shift &&
+				keyPressed === 'CapsLock' &&
+				this.infos_clavier['plus'] === 'oui'
+			) {
+				this.envoiTouche_ReplacerCurseur('Ctrl-Delete');
+				return true;
+			} else if (
 				this.control &&
 				(keyPressed === 'Backspace' ||
 					(keyPressed === 'CapsLock' && this.infos_clavier['plus'] === 'oui'))
@@ -246,10 +254,16 @@ export class EmulationClavier extends Clavier {
 			nouvellePositionCurseur = positionCurseur - 1;
 		} else if (touche === 'Ctrl-Backspace') {
 			let texteAvantSuppression = texteAvantCurseur;
-			let texteApresSuppression = texteAvantCurseur.replace(/\S+$/, '');
+			let texteApresSuppression = texteAvantCurseur.replace(/\S+\s*/, '');
 			this.textarea.value = texteApresSuppression + texteApresCurseur;
 			let caracteresSupprimes = texteAvantSuppression.length - texteApresSuppression.length;
 			nouvellePositionCurseur = positionCurseur - caracteresSupprimes;
+		} else if (touche === 'Ctrl-Delete') {
+			let texteAvantSuppression = texteApresCurseur;
+			let texteApresSuppression = texteApresCurseur.replace(/^\S+\s*/, '');
+			this.textarea.value = texteAvantCurseur + texteApresSuppression;
+			let caracteresSupprimes = texteAvantSuppression.length - texteApresSuppression.length;
+			nouvellePositionCurseur = positionCurseur;
 		} else if (touche === 'Delete') {
 			console.log('Delete');
 			this.textarea.value =
