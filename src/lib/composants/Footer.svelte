@@ -8,8 +8,13 @@
 </footer>
 
 <style>
+	:root {
+		--hauteur-footer: 60px;
+	}
+
 	footer {
 		display: block;
+		height: var(--hauteur-footer);
 		margin: 0;
 		margin-top: 10vh;
 		padding: 2px;

@@ -97,9 +97,6 @@
 	style="background:black; padding-top: 10px; padding-bottom: 100px; margin-bottom:-15vh;"
 	class="fullwidth"
 >
-	<h2 data-aos="zoom-out" data-aos-mirror="true">
-		<span class="glow">★</span>
-	</h2>
 	<div id="orb">
 		<div class="wrap">
 			{#each Array(300) as _, index}
@@ -108,9 +105,9 @@
 		</div>
 		<h2
 			class="text-orange-gradient text-center"
-			style="margin: 0 auto; padding-top: 20vh; padding-bottom:10vh; border:none; box-shadow: none; font-weight:bolder;"
+			style="margin: 0 auto; margin-top: 30vh; padding-top: 15vh; padding-bottom:10vh; border:none; box-shadow: none; font-weight:bolder;"
 		>
-			Pour aller encore <b>+</b> loin
+			★ Pour aller encore <b>+</b> loin ★
 		</h2>
 		<div class="texte-orb" style="max-width: 850px; margin:0 auto; margin-top:-50px">
 			<hr />
