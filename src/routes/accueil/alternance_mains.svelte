@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Alternance des mains</h2>
+	<h2>Alternance des mains</h2>
 	<p>
 		L’alternance des mains est très importante pour garantir une bonne <span class="important"
 			>fluidité de frappe</span

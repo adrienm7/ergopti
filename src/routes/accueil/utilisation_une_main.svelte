@@ -7,9 +7,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">
-		Optimisation pour l’utilisation à&nbsp;une&nbsp;main
-	</h2>
+	<h2>Optimisation pour l’utilisation à&nbsp;une&nbsp;main</h2>
 
 	<p>
 		Lors de l’utilisation d’un ordinateur, la plupart du temps la souris est tenue de la main droite
@@ -50,7 +48,7 @@
 		+ <kbd>À</kbd> et <kbd>Ctrl</kbd> + <kbd>È</kbd>.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Touches de raccourci sur la version Ergodox</h3>
+	<h3>Touches de raccourci sur la version Ergodox</h3>
 	<p>
 		La version d’<Nom /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
 		à une main, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
@@ -59,7 +57,7 @@
 		type Ergodox peuvent en effet être programmés pour ajouter et déplacer des touches.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Touches de raccourci sur la version ISO</h3>
+	<h3>Touches de raccourci sur la version ISO</h3>
 	<p>
 		La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier des
 		touches de raccourci de la version Ergodox, car les touches à sa gauche sont déjà occupées par

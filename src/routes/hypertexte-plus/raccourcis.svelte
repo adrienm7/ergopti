@@ -5,8 +5,8 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Raccourcis</h2>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Raccourcis avec AltGr</h3>
+	<h2>Raccourcis</h2>
+	<h3>Raccourcis avec AltGr</h3>
 	<ul>
 		<li><kbd>AltGr</kbd> + <kbd>Tab</kbd> ➜ <kbd-sortie>Capsword</kbd-sortie></li>
 		<p>
@@ -59,7 +59,7 @@
 			</p> -->
 	</ul>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Autres raccourcis sur "Capslock" (BackSpace)</h3>
+	<h3>Autres raccourcis sur "Capslock" (BackSpace)</h3>
 	<ul>
 		<li>
 			<kbd>Shift</kbd> + <kbd>"Capslock"</kbd> (BackSpace) ➜ <kbd-sortie>Delete</kbd-sortie>
@@ -69,7 +69,7 @@
 		</li>
 	</ul>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Tap-hold</h3>
+	<h3>Tap-hold</h3>
 	<p>
 		Le tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et
 		une lors de son maintien. C’est particulièrement adapté pour les touches modificatrices (<kbd

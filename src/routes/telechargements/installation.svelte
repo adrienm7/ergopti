@@ -11,14 +11,14 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
+	<h2>Installation</h2>
 	<div class="encadre">
 		<span style="font-weight:bold">Note :</span> Les fichiers d’installation n’existent au complet qu’à
 		partir de la 1.1.2, c’est pourquoi le toggle de version n’a aucun impact sur cette page mis à part
 		sur l’émulation du clavier.
 	</div>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Installer la disposition sur Windows</h3>
+	<h3>Installer la disposition sur Windows</h3>
 	<mini-espace />
 	<div>
 		<a href="/pilotes/kbdedit/HyperTexte v{version}.exe" download
@@ -40,7 +40,7 @@
 	</div>
 	<petit-espace />
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Installer la disposition — Avec Kalamine</h3>
+	<h3>Installer la disposition — Avec Kalamine</h3>
 	<p>
 		Kalamine permet de générer des fichiers d’installation pour plusieurs systèmes d’exploitation.
 		Cependant, les fichiers plus bas n’ont pas encore été testés. De plus, certaines fonctionnalités

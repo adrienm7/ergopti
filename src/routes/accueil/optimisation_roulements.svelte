@@ -41,7 +41,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Optimisation des roulements</h2>
+	<h2>Optimisation des roulements</h2>
 	<p>
 		L’optimisation de l’alternance des mains engendre que lors de l’utilisation d’une main pour
 		frapper une touche, il y a de fortes probabilités que le frappe suivante se produise avec
@@ -68,7 +68,7 @@
 		sur des doigts consécutifs dans un mouvement horizontal.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Très bons bigrammes voyelle-voyelle</h3>
+	<h3>Très bons bigrammes voyelle-voyelle</h3>
 	<ul>
 		<li><kbd>AI</kbd></li>
 		<li><kbd>IE</kbd> et <kbd>EI</kbd></li>
@@ -86,7 +86,7 @@
 		<li><kbd>YOU</kbd></li>
 	</ul>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Très bons bigrammes consonne-consonne</h3>
+	<h3>Très bons bigrammes consonne-consonne</h3>
 	<ul>
 		<li><kbd>NS</kbd> et <kbd>SN</kbd></li>
 		<li><kbd>NT</kbd></li>
@@ -109,7 +109,7 @@
 		<li><kbd>PR</kbd></li>
 		<li><kbd>GR</kbd></li>
 	</ul>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Autres bons bigrammes</h3>
+	<h3>Autres bons bigrammes</h3>
 	<ul>
 		<li>
 			<kbd>OW</kbd> très utilisé en anglais (ALL<span class="hyper text-bold">OW</span>, D<span

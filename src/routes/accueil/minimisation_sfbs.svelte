@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Minimisation des SFBs</h2>
+	<h2>Minimisation des SFBs</h2>
 	<p>
 		La disposition AZERTY est extrêmement mauvaise au vu de la distance nécessaire pour atteindre
 		les touches les plus fréquentes. Toutefois, c’est loin d’être son seul défaut. L’un de ses

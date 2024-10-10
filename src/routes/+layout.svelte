@@ -55,8 +55,15 @@
 	}
 
 	afterUpdate(() => {
-		AOS.init();
+		document.querySelectorAll('h2').forEach(function (h2) {
+			h2.setAttribute('data-aos', 'zoom-out');
+		});
+		document.querySelectorAll('h3').forEach(function (h3) {
+			h3.setAttribute('data-aos', 'fade-right');
+		});
 		makeIds(document.getElementById('page'));
+
+		AOS.init({ mirror: true, offset: -100, anchorPlacement: 'top-bottom' });
 		tocbot.refresh();
 		typography(document.getElementById('page'));
 	});

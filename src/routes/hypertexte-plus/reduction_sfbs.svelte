@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Diminution des SFBs</h2>
+	<h2>Diminution des SFBs</h2>
 	<p>L’un des avantages majeurs de <NomPlus /> est qu’il réduit presque totalement les <SFB />s.</p>
 	<p>
 		Les <SFB />s les plus fréquents de la disposition sont : <kbd>SC</kbd>,
@@ -18,7 +18,7 @@
 		de nombreux autres encore moins fréquents.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h3>
 		Utilisation de la touche <kbd>,</kbd> + <kbd>Consonne</kbd>
 	</h3>
 	<p>
@@ -52,7 +52,7 @@
 		Comme vous pouvez le constater, la touche <kbd>,</kbd> est vraiment pour supprimer les derniers
 		petits <SFB />s restants. La disposition <Nom /> éliminait déjà la majorité d’entre eux.
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Utilisation de la touche <kbd>È</kbd></h3>
+	<h3>Utilisation de la touche <kbd>È</kbd></h3>
 	<p>
 		La touche <kbd>È</kbd> permet de se débarrasser des quelques <SFB />s en <kbd>I</kbd>,
 		<kbd>E</kbd>
@@ -69,7 +69,7 @@
 		<li><kbd>È,</kbd> ➜ <kbd-sortie>U,</kbd-sortie></li>
 		<li><kbd>È.</kbd> ➜ <kbd-sortie>U.</kbd-sortie></li>
 	</ul>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Utilisation de roulements</h3>
+	<h3>Utilisation de roulements</h3>
 	<ul class="margin-top-2">
 		<li><kbd>ÊÉ</kbd> ➜ <kbd-sortie>AÎ</kbd-sortie></li>
 		<li><kbd>ÉÊ</kbd> ➜ <kbd-sortie>Â</kbd-sortie></li>
@@ -83,7 +83,7 @@
 		<kbd-sortie>GX</kbd-sortie> (par exemple pour écrire "Yu-Gi-Oh GX"). Les autres remplacements sont
 		quant à eux sur des combinaisons qui ne sont a priori jamais réalisées.
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Touche <kbd>★</kbd> de répétition</h3>
+	<h3>Touche <kbd>★</kbd> de répétition</h3>
 	<p>
 		De nombreux <SFB />s se produisent non pas à cause de deux touches devant être tapées par le
 		même doigt, mais aussi lors de la répétition de la même touche. C’est par exemple le cas avec

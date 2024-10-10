@@ -80,7 +80,7 @@
 	<Corpus></Corpus>
 
 	<section>
-		<h2 data-aos="zoom-out" data-aos-mirror="true">Résultats de benchmarks</h2>
+		<h2>Résultats de benchmarks</h2>
 		<p>
 			Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Nom
 			/>
@@ -110,7 +110,7 @@
 			emplacements.
 		</p>
 
-		<h3 data-aos="fade-right" data-aos-mirror="true">Analyse KLAnext</h3>
+		<h3>Analyse KLAnext</h3>
 		<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
 			<button on:click={toggleLangue} style="height:2.5rem;">
 				{#if langue === 'fr'}
@@ -152,7 +152,7 @@
 				<img src="/resultats/{versionValue}/{clavier}/{corpus_en}.jpg" />
 			{/if}
 		</bloc-image>
-		<h3 data-aos="fade-right" data-aos-mirror="true">Analyse Ergo-L</h3>
+		<h3>Analyse Ergo-L</h3>
 		<p>
 			Réalisée à l’aide de l’analyseur disponible ici : <a
 				href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
