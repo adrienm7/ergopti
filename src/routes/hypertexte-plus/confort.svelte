@@ -36,7 +36,7 @@
 		<kbd>POURQOI</kbd>.
 	</p>
 
-	<h3>[OÙ]</h3>
+	<h3>Touche [OÙ]</h3>
 	<p>
 		La touche <kbd>Ù</kbd> n’est utilisée que pour écrire <kbd>OÙ</kbd>. Ainsi, autant transformer
 		cette touche en raccourci pour écrire <kbd-sortie>OÙ</kbd-sortie> afin d’économiser une frappe

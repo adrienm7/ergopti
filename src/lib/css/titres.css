@@ -1,6 +1,5 @@
 h1 {
 	margin: 0;
-	margin-top: 3vh;
 	margin-bottom: 15vh;
 	line-height: auto;
 	font-size: 3rem;
@@ -56,4 +55,45 @@ h4 {
 	margin-top: 13vh;
 	margin-bottom: 5vh;
 	font-size: 1.4rem;
+}
+
+.toc-list {
+	margin: 0;
+	padding: 0;
+	list-style-type: none;
+	text-align: left;
+	font-size: 0.9rem;
+}
+.toc-list .toc-list {
+	margin-left: 1rem;
+	list-style: inside;
+}
+
+.toc-list .node-name--H2 {
+	font-weight: bold !important;
+}
+
+.toc-list .toc-link {
+	/* background-image: linear-gradient(to right, var(--gradient-blue));
+	background-clip: text;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	-moz-background-clip: text;
+	-moz-text-fill-color: transparent; */
+	color: rgb(49, 190, 255);
+}
+.toc-list .is-active-link {
+	background: linear-gradient(#f2dfff, #db4bff);
+	background-clip: text;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	-moz-background-clip: text;
+	-moz-text-fill-color: transparent;
+}
+
+.toc-list li {
+	margin-top: 1rem;
+}
+.toc-list .toc-list li {
+	margin-top: 0;
 }

@@ -11,9 +11,11 @@
 	import { typography } from '$lib/js/typography.js';
 	import { matomo } from '$lib/js/code-matomo.js';
 	import { makeIds } from '$lib/js/make-ids.js';
+	import tocbot from 'tocbot';
 
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
+	import '$lib/css/layout.css';
 	import '$lib/css/espacements.css';
 	import '$lib/css/titres.css';
 	import '$lib/css/typographie.css';
@@ -26,9 +28,6 @@
 	import '$lib/icons/fontawesome/css/regular.min.css';
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 
-	import tocbot from 'tocbot';
-	tocbot.init();
-
 	onMount(() => {
 		matomo(); /* Lancer Matomo lors de l’arrivée sur le site */
 		tocbot.init({
@@ -39,10 +38,11 @@
 			// Which headings to grab inside of the contentSelector element.
 			headingSelector: 'h2, h3, h4, h5, h6',
 			// For headings inside relative or absolute positioned containers within content.
-			hasInnerContainers: true
+			hasInnerContainers: true,
 			// Prend en compte la hauteur du header pour le scroll
-			// headingsOffset: 100,
-			// scrollSmoothOffset: -100
+			headingsOffset: 120,
+			scrollSmoothOffset: -120,
+			orderedList: false
 		});
 	});
 	/* Lancer Matomo lors du changement de page */
@@ -64,8 +64,8 @@
 		makeIds(document.getElementById('page'));
 
 		AOS.init({ mirror: true, offset: -100, anchorPlacement: 'top-bottom' });
-		tocbot.refresh();
 		typography(document.getElementById('page'));
+		tocbot.refresh();
 	});
 
 	let zIndex = -999;
@@ -95,55 +95,23 @@
 	</div>
 </div>
 
+<Header />
 <div id="page" class="bg-blue">
-	<Header />
-	<div id="content">
-		<div
-			id="sidebar"
-			style="width: 25vw; padding-top: calc(var(--hauteur-header) + 1rem); padding-bottom: calc(var(--hauteur-footer) + 1rem);"
-		>
-			<div id="page-toc"></div>
-		</div>
-		<div id="bloc-main" style="width:75vw;">
-			<main>
-				<slot />
-			</main>
-		</div>
+	<aside id="sidebar">
+		<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
+			Contenu de la page
+		</p>
+		<div id="page-toc"></div>
+	</aside>
+	<div id="main-content">
+		<main>
+			<slot />
+		</main>
 	</div>
-	<Footer />
 </div>
+<Footer />
 
 <style>
-	#bloc-main {
-		overflow-x: hidden; /* Très important pour que les animations css horizontales n’agrandissent pas l’écran */
-		overflow-y: hidden; /* Pour éviter une scrollbar qui se rajoute dans le main */
-	}
-	#content {
-		display: flex;
-		width: 100vw;
-	}
-	#page-toc {
-		position: sticky;
-		top: calc(var(--hauteur-header) + 1rem);
-		width: 25vw;
-		max-height: calc(100vh - var(--hauteur-header) - 2rem);
-		overflow-y: scroll;
-		padding-right: 1rem;
-		background: rgba(0, 0, 0, 0.5);
-		border: 2px solid rgb(25, 25, 25);
-		border-radius: 0 10px 10px 0;
-		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
-	}
-
-	@media (max-width: 1400px) {
-		#sidebar {
-			display: none;
-		}
-		#bloc-main {
-			width: 100vw !important;
-		}
-	}
-
 	#afficher-clavier-reference {
 		position: fixed;
 		z-index: 99;
@@ -238,25 +206,5 @@
 		flex-direction: column;
 		min-height: calc(100vh - var(--hauteur-header) - 2 * var(--marge) + 1px);
 		margin: var(--marge) 0;
-	}
-
-	/* Le code ci-dessous permet de toujours placer le footer en bas de la page */
-
-	/* « Je vous conseille fortement d’utiliser un conteneur global, comme ici avec #page, pour réaliser ce genre de mise en page.
- * En effet, définir un contexte flex directement sur <body> comme on peut le voir sur d’autres d’articles peut causer des problèmes avec les plugins
- * qui créent des éléments en bas de page avant </body> (popup, autocomplete, etc.).
- * Ces éléments risquent de ne pas s’afficher correctement, à cause du contexte flex hérité. Just saying. »
- */
-	#page {
-		display: flex;
-		flex-direction: column;
-		margin: 0;
-		padding: 0;
-		min-height: 100vh;
-		color: white; /* Couleur par défaut du texte */
-	}
-	main {
-		flex-grow: 1;
-		margin-top: var(--hauteur-header); /* Pour que le contenu soit en-dessous du header */
 	}
 </style>
