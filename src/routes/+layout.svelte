@@ -1,11 +1,14 @@
 <script>
 	import Header from '$lib/composants/Header.svelte';
 	import Footer from '$lib/composants/Footer.svelte';
+	import IntroductionHypertexte from './accueil/introduction_hypertexte.svelte';
+	import HypertextePlus from './accueil/hypertexte_plus.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import { navigating } from '$app/stores';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
@@ -63,7 +66,7 @@
 		});
 		makeIds(document.getElementById('page'));
 
-		AOS.init({ mirror: true, offset: -100, anchorPlacement: 'top-bottom' });
+		AOS.init({ mirror: true, offset: 0, anchorPlacement: 'top-bottom' });
 		typography(document.getElementById('page'));
 		tocbot.refresh();
 	});
@@ -96,7 +99,10 @@
 </div>
 
 <Header />
-<div id="page" class="bg-blue">
+<!-- <div style="width:100vw; display: block; background: red">
+	<slot name="preSlot"></slot>
+</div> -->
+<div id="page">
 	<aside id="sidebar">
 		<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
 			Contenu de la page
@@ -109,6 +115,9 @@
 		</main>
 	</div>
 </div>
+{#if $page.url.pathname === '/'}
+	<HypertextePlus></HypertextePlus>
+{/if}
 <Footer />
 
 <style>

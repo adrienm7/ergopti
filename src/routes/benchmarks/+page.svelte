@@ -79,14 +79,13 @@
 	<CommentComparer></CommentComparer>
 	<Corpus></Corpus>
 
-	<section>
-		<h2>Résultats de benchmarks</h2>
-		<p>
-			Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Nom
-			/>
-			fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
-		</p>
-		<!-- <p>
+	<h2>Résultats de benchmarks</h2>
+	<p>
+		Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Nom
+		/>
+		fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
+	</p>
+	<!-- <p>
 			À noter qu’en version ISO, la version Thumbshift d’Optimot fait systématiquement mieux qu’<Nom
 			/>, avec notamment une grande différence en distance parcourue. C’était un résultat attendu,
 			car dans cette disposition <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> tandis que
@@ -94,87 +93,86 @@
 			est quant à lui déplacé en <kbd>Alt</kbd>. Cela explique aussi les excellents scores de
 			Engram, qui a le même placement des touches <kbd>Shift</kbd> et <kbd>AltGr</kbd>.
 		</p> -->
-		<p>
-			En version Ergodox, <Nom /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
-			la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
-			est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
-			de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
-			a une faible alternance des mains ainsi que la touche E sur le pouce gauche, ce qui peut entraver
-			la fluidité lors de l’écriture de texte ainsi que le confort général.
-		</p>
-		<p>
-			Enfin, gardez en tête que les dispositions dont le nom est préfixé par « en » plutôt que « fr
-			» ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles vont
-			donc forcément surperformer sur les corpus français. Et même sur les corpus anglais, elles
-			feront un peu mieux car il y aura moins de touches à disposer et donc davantage de bons
-			emplacements.
-		</p>
+	<p>
+		En version Ergodox, <Nom /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
+		la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
+		est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
+		de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
+		a une faible alternance des mains ainsi que la touche E sur le pouce gauche, ce qui peut entraver
+		la fluidité lors de l’écriture de texte ainsi que le confort général.
+	</p>
+	<p>
+		Enfin, gardez en tête que les dispositions dont le nom est préfixé par « en » plutôt que « fr »
+		ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles vont donc
+		forcément surperformer sur les corpus français. Et même sur les corpus anglais, elles feront un
+		peu mieux car il y aura moins de touches à disposer et donc davantage de bons emplacements.
+	</p>
 
-		<h3>Analyse KLAnext</h3>
-		<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
-			<button on:click={toggleLangue} style="height:2.5rem;">
-				{#if langue === 'fr'}
-					{@html '<p><strong class="hyper">Français</strong>➜&nbsp;<span class="htexte">Anglais</span></p>'}
-				{:else}
-					{@html '<p><strong class="htexte">Anglais</strong> ➜&nbsp;<span class="hyper">Français</span></p>'}
-				{/if}
-			</button>
-
-			<button on:click={toggleClavier} style="height:2.5rem;">
-				{#if clavier === 'ergodox'}
-					{@html '<p><strong class="ergodox-text-gradient">Ergodox</strong> ➜&nbsp;ISO</p>'}
-				{:else}
-					{@html '<p><strong>ISO</strong> ➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
-				{/if}
-			</button>
-			<div style="display:inline-block;">
-				{#if langue === 'fr'}
-					<select bind:value={corpus_fr} style="height:2.5rem;">
-						{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
-								>{infos_benchmark[0]}</option
-							>{/each}
-					</select>
-				{/if}
-				{#if langue === 'en'}
-					<select bind:value={corpus_en} style="height:2.5rem;">
-						{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
-								>{infos_benchmark[0]}</option
-							>{/each}
-					</select>
-				{/if}
-			</div>
-		</div>
-		<mini-espace />
-		<bloc-image>
+	<h3>Analyse KLAnext</h3>
+	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
+		<button on:click={toggleLangue} style="height:2.5rem;">
 			{#if langue === 'fr'}
-				<img src="/resultats/{versionValue}/{clavier}/{corpus_fr}.jpg" />
+				{@html '<p><strong class="hyper">Français</strong>➜&nbsp;<span class="htexte">Anglais</span></p>'}
 			{:else}
-				<img src="/resultats/{versionValue}/{clavier}/{corpus_en}.jpg" />
+				{@html '<p><strong class="htexte">Anglais</strong> ➜&nbsp;<span class="hyper">Français</span></p>'}
 			{/if}
-		</bloc-image>
-		<h3>Analyse Ergo-L</h3>
-		<p>
-			Réalisée à l’aide de l’analyseur disponible ici : <a
-				href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
-			>.
-		</p>
-		<div style="display:flex; align-items:center; justify-content:space-between;">
-			<select bind:value={ergol} style="height: 2rem">
-				<option value="en_fr">Français + Anglais</option>
-				<option value="fr">Français</option>
-				<option value="en">Anglais</option>
-			</select>
-			<a href="/resultats/{versionValue}/analyse_ergol_{ergol}.pdf" style="height: 2rem"
-				><button>Télécharger l’analyse Ergo-L</button></a
-			>
+		</button>
+
+		<button on:click={toggleClavier} style="height:2.5rem;">
+			{#if clavier === 'ergodox'}
+				{@html '<p><strong class="ergodox-text-gradient">Ergodox</strong> ➜&nbsp;ISO</p>'}
+			{:else}
+				{@html '<p><strong>ISO</strong> ➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
+			{/if}
+		</button>
+		<div style="display:inline-block;">
+			{#if langue === 'fr'}
+				<select bind:value={corpus_fr} style="height:2.5rem;">
+					{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
+							>{infos_benchmark[0]}</option
+						>{/each}
+				</select>
+			{/if}
+			{#if langue === 'en'}
+				<select bind:value={corpus_en} style="height:2.5rem;">
+					{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
+							>{infos_benchmark[0]}</option
+						>{/each}
+				</select>
+			{/if}
 		</div>
-		<mini-espace />
-		<embed
-			src="/resultats/{versionValue}/analyse_ergol_{ergol}.pdf"
-			type="application/pdf"
-			width="100%"
-			height="600px"
-		/>
-	</section>
+	</div>
+	<mini-espace />
+	<bloc-image>
+		{#if langue === 'fr'}
+			<img src="/resultats/{versionValue}/{clavier}/{corpus_fr}.jpg" />
+		{:else}
+			<img src="/resultats/{versionValue}/{clavier}/{corpus_en}.jpg" />
+		{/if}
+	</bloc-image>
+	<h3>Analyse Ergo-L</h3>
+	<p>
+		Réalisée à l’aide de l’analyseur disponible ici : <a
+			href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
+		>.
+	</p>
+	<div style="display:flex; align-items:center; justify-content:space-between;">
+		<select bind:value={ergol} style="height: 2rem">
+			<option value="en_fr">Français + Anglais</option>
+			<option value="fr">Français</option>
+			<option value="en">Anglais</option>
+		</select>
+		<a href="/resultats/{versionValue}/analyse_ergol_{ergol}.pdf" style="height: 2rem"
+			><button>Télécharger l’analyse Ergo-L</button></a
+		>
+	</div>
+	<mini-espace />
+	<embed
+		src="/resultats/{versionValue}/analyse_ergol_{ergol}.pdf"
+		type="application/pdf"
+		width="100%"
+		height="600px"
+	/>
+
 	<AnalyseHypertextePlus></AnalyseHypertextePlus>
 </div>

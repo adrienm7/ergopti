@@ -78,6 +78,7 @@
 		</p>
 	</nav>
 </header>
+<div style="height: var(--hauteur-header);"></div>
 
 <style>
 	:root {
