@@ -552,17 +552,12 @@ bloc-clavier[data-couleur='oui'] bloc-touche[data-doigt='pouce'] {
 	}
 }
 
-section bloc-clavier,
+bloc-clavier,
 #clavier_emulation {
 	--taille-touche: min(47px, 100vw / 20) !important;
 	--marge-touche: min(3px, 0.35vw) !important;
 	--profondeur-touche: 1px !important;
 	--profondeur-touche-pressee: 0.5px !important;
-}
-
-.accordion bloc-clavier {
-	background-color: var(--bg-color);
-	box-shadow: none;
 }
 
 /*

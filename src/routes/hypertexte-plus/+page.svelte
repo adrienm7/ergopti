@@ -78,36 +78,37 @@
 	</div>
 
 	<petit-espace />
-	<section>
-		<p class="lettrine">
-			⚠ Attention, ces nombreux avantages viennent à un prix. D’abord, il y a un effort
-			d’apprentissage supplémentaire à effectuer. C’est d’autant plus difficile que ces raccourcis
-			ne sont pas marqués sur le clavier, il faut donc les apprendre par cœur car regarder ses
-			touches ne fournira aucune information. Le bon côté est que vous n’êtes pas obligé de tous les
-			utiliser d’un coup, ce ne sont que des possibilités supplémentaires. Ainsi, le passage de <Nom
-			/> vers <NomPlus /> se fait en douceur.
-		</p>
-		<p>
-			☒ Ensuite, et c’est le plus grand inconvénient, dans de très rares cas ces raccourcis vous
-			empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <NomPlus />, les
-			combinaisons de touches extrêmement rares comme <kbd>HC</kbd> sont transformées en d’autres
-			bien plus utiles comme <kbd-sortie>WH</kbd-sortie>. Cela signifie que dans les cas où vous
-			voulez vraiment écrire
-			<kbd>HC</kbd>, il faudra remettre à zéro le remplacement de texte.
-		</p>
-		<p>
-			➜ La remise à zéro du remplacement de texte peut notamment se réaliser en utilisant les
-			flèches de navigation, la touche Échap, en cliquant quelque part, etc. Ces manipulations ne
-			devraient arriver que très rarement, mais tout dépend de votre utilisation. Par exemple,
-			l’enchaînement <kbd>XG</kbd>
-			est très peu commun, mais les data scientists l’utiliseront régulièrement pour écrire
-			<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
-			/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
-			macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
-			XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était
-			qu’un exemple illustratif.
-		</p>
-	</section>
+
+	<p class="lettrine">
+		⚠ Attention, ces nombreux avantages viennent à un prix. D’abord, il y a un effort
+		d’apprentissage supplémentaire à effectuer. C’est d’autant plus difficile que ces raccourcis ne
+		sont pas marqués sur le clavier, il faut donc les apprendre par cœur car regarder ses touches ne
+		fournira aucune information. Le bon côté est que vous n’êtes pas obligé de tous les utiliser
+		d’un coup, ce ne sont que des possibilités supplémentaires. Ainsi, le passage de <Nom /> vers <NomPlus
+		/> se fait en douceur.
+	</p>
+	<p>
+		☒ Ensuite, et c’est le plus grand inconvénient, dans de très rares cas ces raccourcis vous
+		empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <NomPlus />, les
+		combinaisons de touches extrêmement rares comme <kbd>HC</kbd> sont transformées en d’autres bien
+		plus utiles comme <kbd-sortie>WH</kbd-sortie>. Cela signifie que dans les cas où vous voulez
+		vraiment écrire
+		<kbd>HC</kbd>, il faudra remettre à zéro le remplacement de texte.
+	</p>
+	<p>
+		➜ La remise à zéro du remplacement de texte peut notamment se réaliser en utilisant les flèches
+		de navigation, la touche Échap, en cliquant quelque part, etc. Ces manipulations ne devraient
+		arriver que très rarement, mais tout dépend de votre utilisation. Par exemple, l’enchaînement <kbd
+			>XG</kbd
+		>
+		est très peu commun, mais les data scientists l’utiliseront régulièrement pour écrire
+		<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
+		/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
+		macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
+		XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était qu’un
+		exemple illustratif.
+	</p>
+
 	<p class="important">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
 	<Confort />
 	<Roulements />

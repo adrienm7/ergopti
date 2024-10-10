@@ -17,7 +17,9 @@ h1 {
 
 h2 {
 	display: block;
-	margin: 33vh 0 10vh 0;
+	margin: 0;
+	margin-top: 33vh;
+	margin-bottom: 10vh;
 	color: white;
 	text-align: center;
 	font-size: 2.5rem;
@@ -44,6 +46,10 @@ h3 {
 	font-size: 1.5rem;
 	line-height: 1.2;
 	font-weight: normal;
+}
+
+h2:first-of-type {
+	margin-top: 0;
 }
 
 /* Réduit la margin-top si h3 suit directement un h2, sans texte entre */

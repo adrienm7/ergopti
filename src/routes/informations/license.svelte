@@ -4,7 +4,5 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<section>
-	<h2>License</h2>
-	<p>À définir</p>
-</section>
+<h2>License</h2>
+<p>À définir</p>

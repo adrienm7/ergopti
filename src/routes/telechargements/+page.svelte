@@ -25,38 +25,36 @@
 
 <h1 data-aos="zoom-in" data-aos-mirror="true">Utiliser HyperTexte</h1>
 
-<section>
-	<h2>Tester la disposition en ligne</h2>
-	<EmulationClavier />
+<h2>Tester la disposition en ligne</h2>
+<EmulationClavier />
+<mini-espace />
+{#if isCollapsed}
+	<button on:click={() => (isCollapsed = !isCollapsed)}>
+		Afficher les abréviations implémentées
+	</button>
+{/if}
+{#if !isCollapsed}
+	<button on:click={() => (isCollapsed = !isCollapsed)}>
+		Masquer les abréviations implémentées
+	</button>
 	<mini-espace />
-	{#if isCollapsed}
-		<button on:click={() => (isCollapsed = !isCollapsed)}>
-			Afficher les abréviations implémentées
-		</button>
-	{/if}
-	{#if !isCollapsed}
-		<button on:click={() => (isCollapsed = !isCollapsed)}>
-			Masquer les abréviations implémentées
-		</button>
-		<mini-espace />
-		<table>
-			<thead>
+	<table>
+		<thead>
+			<tr>
+				<th>Abréviation</th>
+				<th>Remplacement</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each Object.entries(remplacements) as [key, value]}
 				<tr>
-					<th>Abréviation</th>
-					<th>Remplacement</th>
+					<td>{key}★</td>
+					<td>{value}</td>
 				</tr>
-			</thead>
-			<tbody>
-				{#each Object.entries(remplacements) as [key, value]}
-					<tr>
-						<td>{key}★</td>
-						<td>{value}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	{/if}
-</section>
+			{/each}
+		</tbody>
+	</table>
+{/if}
 
 <Installation></Installation>
 <ComparateursDispositions></ComparateursDispositions>
