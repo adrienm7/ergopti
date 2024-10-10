@@ -5,6 +5,6 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">License</h2>
+	<h2>License</h2>
 	<p>À définir</p>
 </section>

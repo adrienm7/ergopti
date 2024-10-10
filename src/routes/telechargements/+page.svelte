@@ -26,7 +26,7 @@
 <h1 data-aos="zoom-in" data-aos-mirror="true">Utiliser HyperTexte</h1>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Tester la disposition en ligne</h2>
+	<h2>Tester la disposition en ligne</h2>
 	<EmulationClavier />
 	<mini-espace />
 	{#if isCollapsed}
@@ -61,7 +61,7 @@
 <Installation></Installation>
 <ComparateursDispositions></ComparateursDispositions>
 
-<!-- <h2 data-aos="zoom-out" data-aos-mirror="true">Installation</h2>
+<!-- <h2>Installation</h2>
 	<h3>Instructions générales</h3>
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script

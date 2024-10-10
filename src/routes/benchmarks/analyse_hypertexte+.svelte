@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">
+	<h2>
 		Analyse de la vraie disposition <NomPlus></NomPlus>
 	</h2>
 	<p>
@@ -31,7 +31,7 @@
 	<bloc-image>
 		<img src="/resultats/hypertexte+_reduction_SFBs.jpg" />
 	</bloc-image>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse des <SFB></SFB>s</h3>
+	<h3>Analyse des <SFB></SFB>s</h3>
 	<p>
 		Cette analyse met en lumière la quasi-suppression des <SFB></SFB>s, avec une valeur d’environ 3.
 		Pour rappel, la valeur de cette métrique avec un corpus non modifié est de 25 pour la même
@@ -55,7 +55,7 @@
 		auriculaires. Enfin, l’index droit voit son nombre de <SFB></SFB>s (<kbd>SC</kbd>,
 		<kbd>DS</kbd>, etc.) chuter drastiquement, de 27 000 à 2500, soit une division par 10 !
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Analyse de la distance parcourue</h3>
+	<h3>Analyse de la distance parcourue</h3>
 	<p>
 		Les gains de touches tapées ne sont pas reflétés sur la capture d’écran de résumé des scores.
 		Avec le corpus normal, nous avions 50 306 touches tapées par <Nom></Nom>. Ce nombre tombe à 45
@@ -72,9 +72,7 @@
 		<kbd-sortie>faire</kbd-sortie>
 		en <kbd>f★</kbd>.
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">
-		Analyse de fréquence d’utilisation des doigts
-	</h3>
+	<h3>Analyse de fréquence d’utilisation des doigts</h3>
 	<bloc-image>
 		<img src="/resultats/finger_usage_comparison.jpg" />
 	</bloc-image>

@@ -5,8 +5,8 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Confort</h2>
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h2>Confort</h2>
+	<h3>
 		Touche <kbd>BackSpace</kbd> à la place de Capslock
 	</h3>
 	<p>
@@ -22,7 +22,7 @@
 		Idéalement, il serait même mieux de la mettre sur une touche activée par un pouce. Toutefois,
 		sur les claviers non Ergodox c’est difficilement réalisable.
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">[QU] automatiques avant les voyelles</h3>
+	<h3>[QU] automatiques avant les voyelles</h3>
 	<p>
 		La touche <kbd>Q</kbd> est à 99% suivie de <kbd>U</kbd> si une voyelle vient ensuite. Par
 		conséquent, lors de la frappe de <kbd>Q</kbd> + <kbd>Voyelle</kbd>, un <kbd>U</kbd>
@@ -36,14 +36,14 @@
 		<kbd>POURQOI</kbd>.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">[OÙ]</h3>
+	<h3>[OÙ]</h3>
 	<p>
 		La touche <kbd>Ù</kbd> n’est utilisée que pour écrire <kbd>OÙ</kbd>. Ainsi, autant transformer
 		cette touche en raccourci pour écrire <kbd-sortie>OÙ</kbd-sortie> afin d’économiser une frappe
 		certaine sur la touche <kbd>O</kbd> et améliorer l’alternance des mains.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h3>
 		<kbd>Ê</kbd> fait office de <kbd>^</kbd>
 	</h3>
 
@@ -72,7 +72,7 @@
 		<kbd>ÉÊ</kbd>. Ils offrent en outre des roulements très confortables.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h3>
 		Remplacement automatique des <kbd>'</kbd> par <kbd>’</kbd> en français
 	</h3>
 
@@ -91,7 +91,7 @@
 			auriculaire, annulaire].
 		</p> -->
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h3>
 		Utilisation de la touche <kbd>,</kbd> + <kbd>Voyelle</kbd> en tant que <kbd>J</kbd>
 	</h3>
 

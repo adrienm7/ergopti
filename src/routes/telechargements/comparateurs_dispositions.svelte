@@ -11,7 +11,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Fichiers pour les comparateurs de dispositions</h2>
+	<h2>Fichiers pour les comparateurs de dispositions</h2>
 	<mini-espace />
 	<p>
 		Pour notamment les utiliser sur le site <a href="https://klanext.keyboard-design.com/"

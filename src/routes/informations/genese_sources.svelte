@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Genèse et sources</h2>
+	<h2>Genèse et sources</h2>
 	<p>
 		La genèse de la disposition <Nom></Nom> remonte à 2022, à la suite de la découverte d'Optimot. Les
 		améliorations de la disposition Optimot par rapport au BÉPO sont vraiment significatives. Les tests
@@ -38,7 +38,7 @@
 		<kbd>★</kbd>
 		et du déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h3>
 		Simplification et utilisation de la couche <kbd>AltGr</kbd>
 	</h3>
 	<p>
@@ -58,7 +58,7 @@
 		mathématiques. En outre, les chiffres sont quant à eux passés en accès direct, un changement très
 		appréciable lors de l'utilisation quotidienne.
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Évolution incrémentale</h3>
+	<h3>Évolution incrémentale</h3>
 	<p>
 		À un certain stade de développement, il devint évident que la disposition n'était plus
 		simplement une variante d'Optimot. Le besoin de renommer ce projet s’est alors imposé. Grâce à
@@ -73,7 +73,7 @@
 		entre les premières versions d’Optim7 et la version finale de <Nom></Nom>.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Comment la disposition a été créée</h3>
+	<h3>Comment la disposition a été créée</h3>
 	<p>
 		➀ La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
 		: main gauche et main droite.
@@ -110,7 +110,7 @@
 		déplacer une touche à un autre emplacement ne va pas empirer la situation.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h3>
 		Atouts de <NomPlus></NomPlus>
 	</h3>
 	<p>

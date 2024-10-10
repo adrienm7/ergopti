@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Placement logique des touches</h2>
+	<h2>Placement logique des touches</h2>
 	<p>
 		Afin de <span class="important"> faciliter la mémorisation</span> ainsi que de
 		<span class="important">réduire la charge cognitive</span>, les touches de la disposition sont,
@@ -147,7 +147,7 @@
 			<kbd>$</kbd>
 			se trouve sur la touche <kbd>★</kbd>.
 		</p> -->
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Ponctuations avec espace insécable automatique</h2>
+	<h2>Ponctuations avec espace insécable automatique</h2>
 	<p>
 		Enfin, les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une
 		particularité. En effet, lors de l’utilisation de <kbd>Shift</kbd>, elles sont

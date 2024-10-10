@@ -5,8 +5,8 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Abréviations</h2>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Remplacement de texte avec <kbd>★</kbd></h3>
+	<h2>Abréviations</h2>
+	<h3>Remplacement de texte avec <kbd>★</kbd></h3>
 	<p>
 		Le comportement par défaut de la touche <kbd>★</kbd> est de répéter dernière touche tapée.
 		Cependant, dans le cas où une abréviation terminant par cette touche existe dans la liste
@@ -36,7 +36,7 @@
 		<li><kbd>R★</kbd> ➜ <kbd-sortie>RIEN</kbd-sortie></li>
 	</ul>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">
+	<h3>
 		Ajout des suffixes les plus communs en <kbd>À</kbd>
 	</h3>
 	<p>

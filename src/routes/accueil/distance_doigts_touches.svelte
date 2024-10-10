@@ -7,8 +7,8 @@
 </script>
 
 <section>
-	<h2 data-aos="fade-up" data-aos-mirror="true">Distance des doigts aux touches</h2>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Optimisation de la rangée du milieu</h3>
+	<h2>Distance des doigts aux touches</h2>
+	<h3>Optimisation de la rangée du milieu</h3>
 
 	<p>
 		Lors de l’apprentissage de la dactylographie, il est enseigné que les doigts doivent reposer sur
@@ -117,7 +117,7 @@
 		plus utilisées sur la rangée du milieu. En résulte immédiatement un déplacement des doigts largement
 		diminué et un meilleur confort.
 	</p>
-	<h3 data-aos="fade-right" data-aos-mirror="true">Optimisation selon la force des doigts</h3>
+	<h3>Optimisation selon la force des doigts</h3>
 	<p>
 		Une fois que les lettres les plus fréquentes ont été placées sur la rangée du milieu, il reste
 		encore beaucoup à faire. En effet, <span class="important"

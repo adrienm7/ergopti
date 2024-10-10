@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">La question du corpus</h2>
+	<h2>La question du corpus</h2>
 	<p>
 		Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste encore
 		la <span class="important">question fondamentale du corpus</span>. Effectivement, vos résultats

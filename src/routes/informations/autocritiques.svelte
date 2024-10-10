@@ -5,9 +5,9 @@
 </script>
 
 <section>
-	<h2 data-aos="zoom-out" data-aos-mirror="true">Autocritiques</h2>
+	<h2>Autocritiques</h2>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">L’importance des compromis</h3>
+	<h3>L’importance des compromis</h3>
 	<p>
 		Il n’est évidemment pas possible de maximiser tous ces paramètres en même temps. Par conséquent,
 		certains choix ont dus être faits.
@@ -23,7 +23,7 @@
 		cet arrangement des voyelles permet alors de très bons roulements.
 	</p>
 
-	<h3 data-aos="fade-right" data-aos-mirror="true">Points d’amélioration</h3>
+	<h3>Points d’amélioration</h3>
 	<p>
 		Bien que largement supérieure à certaines dispositions telles que l’AZERTY et même le BÉPO, <Nom
 		/> est malheureusement encore loin d’être parfaite. En effet, la création d’une disposition est une
