@@ -39,17 +39,33 @@ export function typography(searchNode = document.body) {
 			enhanceTypography(node); // Traitement du nœud de texte
 		} else if (node.nodeType === 1) {
 			// Vérification si le nœud est un élément
-			if (inlineTags.includes(node.tagName.toLowerCase())) {
-				// Traitement spécifique pour les balises en ligne
-				handleInlineBlockPunctuation(node);
-			}
-			if (!excludedTags.includes(node.tagName.toLowerCase())) {
-				// Vérification si la balise n'est pas exclue
-				typography(node); // Appel récursif pour traiter les enfants de ce nœud
+
+			// Vérification si le nœud, ou ses enfants, ne contiennent pas les classes 'nowrap' ou 'insecable', pour éviter des [espace][espace]? infinis
+			if (!containsNoWrapOrInsecable(node)) {
+				if (inlineTags.includes(node.tagName.toLowerCase())) {
+					// Traitement spécifique pour les balises en ligne
+					handleInlineBlockPunctuation(node);
+				}
+				if (!excludedTags.includes(node.tagName.toLowerCase())) {
+					// Vérification si la balise n'est pas exclue
+					typography(node); // Appel récursif pour traiter les enfants de ce nœud
+				}
 			}
 		}
 	});
 }
+
+// Fonction pour vérifier si un nœud ou ses enfants contiennent les classes 'nowrap' ou 'insecable'
+const containsNoWrapOrInsecable = (node) => {
+	if (
+		node.classList &&
+		(node.classList.contains('nowrap') || node.classList.contains('insecable'))
+	) {
+		return true;
+	}
+	// Parcourt les enfants de manière récursive pour vérifier si l'un des enfants contient les classes
+	return Array.from(node.childNodes).some((child) => containsNoWrapOrInsecable(child));
+};
 
 // Fonction pour traiter les nœuds de texte
 const enhanceTypography = (node) => {
