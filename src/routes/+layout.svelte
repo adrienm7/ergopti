@@ -30,6 +30,10 @@
 	import '$lib/icons/fontawesome/css/fontawesome.min.css';
 	import '$lib/icons/fontawesome/css/regular.min.css';
 	import '$lib/icons/fontawesome/css/duotone.min.css';
+	import IntroductionHypertextePlus from './hypertexte-plus/introduction_hypertexte_plus.svelte';
+	import IntroductionBenchmarks from './benchmarks/introduction_benchmarks.svelte';
+	import IntroductionTelechargements from './telechargements/introduction_telechargements.svelte';
+	import IntroductionInformations from './informations/introduction_informations.svelte';
 
 	onMount(() => {
 		matomo(); /* Lancer Matomo lors de l’arrivée sur le site */
@@ -45,6 +49,7 @@
 			// Prend en compte la hauteur du header pour le scroll
 			headingsOffset: 120,
 			scrollSmoothOffset: -120,
+			scrollSmoothDuration: 300,
 			orderedList: false
 		});
 	});
@@ -58,16 +63,19 @@
 	}
 
 	afterUpdate(() => {
+		document.querySelectorAll('h1').forEach(function (h1) {
+			h1.setAttribute('data-aos', 'zoom-in');
+		});
 		document.querySelectorAll('h2').forEach(function (h2) {
 			h2.setAttribute('data-aos', 'zoom-out');
 		});
 		document.querySelectorAll('h3').forEach(function (h3) {
 			h3.setAttribute('data-aos', 'fade-right');
 		});
-		makeIds(document.getElementById('page'));
+		makeIds(document.getElementsByTagName('main')[0]);
 
 		AOS.init({ mirror: true, offset: 0, anchorPlacement: 'top-bottom' });
-		typography(document.getElementById('page'));
+		typography(document.getElementsByTagName('main')[0]);
 		tocbot.refresh();
 	});
 
@@ -99,9 +107,23 @@
 </div>
 
 <Header />
-<!-- <div style="width:100vw; display: block; background: red">
-	<slot name="preSlot"></slot>
-</div> -->
+<div style="width:100vw; display: block;">
+	{#if $page.url.pathname === '/'}
+		<IntroductionHypertexte></IntroductionHypertexte>
+	{/if}
+	{#if $page.url.pathname === '/hypertexte-plus'}
+		<IntroductionHypertextePlus></IntroductionHypertextePlus>
+	{/if}
+	{#if $page.url.pathname === '/benchmarks'}
+		<IntroductionBenchmarks></IntroductionBenchmarks>
+	{/if}
+	{#if $page.url.pathname === '/telechargements'}
+		<IntroductionTelechargements></IntroductionTelechargements>
+	{/if}
+	{#if $page.url.pathname === '/informations'}
+		<IntroductionInformations></IntroductionInformations>
+	{/if}
+</div>
 <div id="page">
 	<aside id="sidebar">
 		<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
