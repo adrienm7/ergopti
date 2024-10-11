@@ -36,7 +36,7 @@
 	import IntroductionInformations from './informations/introduction_informations.svelte';
 
 	onMount(() => {
-		matomo(); /* Lancer Matomo lors de l’arrivée sur le site */
+		matomo(true); /* Lancer Matomo lors de l’arrivée sur le site */
 		tocbot.init({
 			// Where to render the table of contents.
 			tocSelector: '#page-toc',
@@ -57,6 +57,7 @@
 	$: if ($navigating) {
 		/* Il est nécessaire de modifier le titre et l’url, car sinon ils sont identiques à la page d’entrée */
 		matomo(
+			false,
 			$navigating.to.url.pathname,
 			'https://hypertexte.beseven.fr' + $navigating.to.url.pathname
 		);
@@ -133,7 +134,7 @@
 			<div id="page-toc"></div>
 		</aside>
 		<div id="main-content">
-			<main>
+			<main class="no-overflow-x">
 				<slot />
 			</main>
 		</div>
