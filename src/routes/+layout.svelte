@@ -106,41 +106,43 @@
 	</div>
 </div>
 
-<Header />
-<div style="width:100vw; display: block;">
-	{#if $page.url.pathname === '/'}
-		<IntroductionHypertexte></IntroductionHypertexte>
-	{/if}
-	{#if $page.url.pathname === '/hypertexte-plus'}
-		<IntroductionHypertextePlus></IntroductionHypertextePlus>
-	{/if}
-	{#if $page.url.pathname === '/benchmarks'}
-		<IntroductionBenchmarks></IntroductionBenchmarks>
-	{/if}
-	{#if $page.url.pathname === '/telechargements'}
-		<IntroductionTelechargements></IntroductionTelechargements>
-	{/if}
-	{#if $page.url.pathname === '/informations'}
-		<IntroductionInformations></IntroductionInformations>
-	{/if}
-</div>
-<div id="page">
-	<aside id="sidebar">
-		<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
-			Contenu de la page
-		</p>
-		<div id="page-toc"></div>
-	</aside>
-	<div id="main-content">
-		<main>
-			<slot />
-		</main>
+<div class="bg-blue">
+	<Header />
+	<div style="width:100vw; display: block;">
+		{#if $page.url.pathname === '/'}
+			<IntroductionHypertexte></IntroductionHypertexte>
+		{/if}
+		{#if $page.url.pathname === '/hypertexte-plus'}
+			<IntroductionHypertextePlus></IntroductionHypertextePlus>
+		{/if}
+		{#if $page.url.pathname === '/benchmarks'}
+			<IntroductionBenchmarks></IntroductionBenchmarks>
+		{/if}
+		{#if $page.url.pathname === '/telechargements'}
+			<IntroductionTelechargements></IntroductionTelechargements>
+		{/if}
+		{#if $page.url.pathname === '/informations'}
+			<IntroductionInformations></IntroductionInformations>
+		{/if}
 	</div>
+	<div id="page" class="bg-blue">
+		<aside id="sidebar">
+			<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
+				Contenu de la page
+			</p>
+			<div id="page-toc"></div>
+		</aside>
+		<div id="main-content">
+			<main>
+				<slot />
+			</main>
+		</div>
+	</div>
+	{#if $page.url.pathname === '/'}
+		<HypertextePlus></HypertextePlus>
+	{/if}
+	<Footer />
 </div>
-{#if $page.url.pathname === '/'}
-	<HypertextePlus></HypertextePlus>
-{/if}
-<Footer />
 
 <style>
 	#afficher-clavier-reference {

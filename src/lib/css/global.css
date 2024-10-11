@@ -22,6 +22,9 @@ body {
 	font-size: clamp(14px, 0.3vw + 14px, 24px);
 	scroll-behavior: smooth;
 	color: white;
+}
+
+.bg-blue {
 	background: hsl(217, 100%, 12%); /* Fallback */
 	background: linear-gradient(
 		45deg,
