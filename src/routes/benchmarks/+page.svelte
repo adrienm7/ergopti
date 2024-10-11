@@ -7,6 +7,7 @@
 	import AnalyseHypertextePlus from './analyse_hypertexte+.svelte';
 	import CommentComparer from './comment_comparer.svelte';
 	import Corpus from './corpus.svelte';
+	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
@@ -65,17 +66,6 @@
 </svelte:head>
 
 <div>
-	<h1 data-aos="zoom-in" data-aos-mirror="true">Benchmarks</h1>
-
-	<div class="encadre">
-		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
-		<span class="important">KLAnext</span> est l’un d’entre eux et est gratuitement accessible à
-		l’adresse
-		<a href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a>. C’est
-		l’un des comparateurs en ligne les plus utilisés en raison de son algorithme de notation qui
-		serait meilleur que les autres.
-	</div>
-
 	<CommentComparer></CommentComparer>
 	<Corpus></Corpus>
 

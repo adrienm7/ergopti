@@ -25,8 +25,6 @@
 	/>
 </svelte:head>
 
-<IntroductionHypertexte />
-
 <DistanceDoigtsTouches />
 <MinimisationSfbs />
 <AlternanceMains />

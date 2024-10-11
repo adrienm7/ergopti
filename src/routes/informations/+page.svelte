@@ -14,7 +14,6 @@
 	<meta name="description" content="Informations sur la disposition HyperTexte" />
 </svelte:head>
 
-<h1 data-aos="zoom-in" data-aos-mirror="true">Informations sur la disposition <Nom></Nom></h1>
 <GeneseSources></GeneseSources>
 <Autocritiques></Autocritiques>
 <License></License>

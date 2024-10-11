@@ -77,7 +77,7 @@
 	<li><kbd>ÉE</kbd></li>
 </ul>
 
-Avec même quelques trigrammes très confortables :
+<p>Avec même quelques trigrammes très confortables :</p>
 <ul>
 	<li><kbd>AIE</kbd> notamment pour écrire <span class="hyper text-bold">AIE</span>NT</li>
 	(avec en plus NT qui est lui aussi un roulement, que demander de plus ?)
