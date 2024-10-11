@@ -1,4 +1,4 @@
-export function matomo(title, url) {
+export function matomo(init, title, url) {
 	// console.log('Matomo');
 	var _paq = (window._paq = window._paq || []);
 	if (title != null) {
@@ -13,11 +13,13 @@ export function matomo(title, url) {
 		var u = 'https://stats.beseven.fr/';
 		_paq.push(['setTrackerUrl', u + 'matomo.php']);
 		_paq.push(['setSiteId', '6']);
-		var d = document;
-		var g = d.createElement('script');
-		g.type = 'text/javascript';
-		g.async = true;
-		g.src = u + 'matomo.js';
-		d.body.appendChild(g);
+		if (init) {
+			var d = document;
+			var g = d.createElement('script');
+			g.type = 'text/javascript';
+			g.async = true;
+			g.src = u + 'matomo.js';
+			d.body.appendChild(g);
+		}
 	})();
 }
