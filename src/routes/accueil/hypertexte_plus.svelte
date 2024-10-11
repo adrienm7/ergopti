@@ -6,11 +6,8 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);" class="fullwidth"></div>
-<div
-	style="background:black; padding-top: 10px; padding-bottom: 100px; margin-bottom:-15vh;"
-	class="fullwidth"
->
+<div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);"></div>
+<div style="background:black; padding-top: 10px; padding-bottom: 100px; margin-bottom:-10vh;">
 	<div id="orb">
 		<div class="wrap">
 			{#each Array(300) as _, index}
