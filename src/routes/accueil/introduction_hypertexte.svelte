@@ -35,7 +35,7 @@
 </div>
 <hr />
 <mini-espace />
-<div class="cards">
+<div class="cards main">
 	<div class="card">
 		➀ <span class="text-bold">Diminution de la distance parcourue</span> pour moins de fatigue et plus
 		de confort

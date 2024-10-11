@@ -21,11 +21,11 @@ body {
 	font-size: 100%;
 	font-size: clamp(14px, 0.3vw + 14px, 24px);
 	scroll-behavior: smooth;
+	background: black;
 	color: white;
 }
 
 .bg-blue {
-	background: hsl(217, 100%, 12%); /* Fallback */
 	background: linear-gradient(
 		45deg,
 		hsl(205, 100%, 5%) 0%,

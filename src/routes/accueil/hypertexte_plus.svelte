@@ -14,12 +14,13 @@
 				<div class="c" />
 			{/each}
 		</div>
-		<h2
+		<p
 			class="text-orange-gradient text-center"
-			style="margin: 0 auto; margin-top: 30vh; padding-top: 15vh; padding-bottom:10vh; border:none; box-shadow: none; font-weight:bolder;"
+			style="margin-top: 30vh; padding-top: 15vh; padding-bottom:8vh; border:none; box-shadow: none; font-weight:bolder; font-size:2rem"
+			data-aos="none"
 		>
 			★ Pour aller encore <b>+</b> loin ★
-		</h2>
+		</p>
 		<div class="texte-orb" style="max-width: 850px; margin:0 auto; margin-top:-50px">
 			<hr />
 			<p class="encart-introduction">
