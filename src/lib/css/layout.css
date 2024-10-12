@@ -16,6 +16,11 @@
 	overflow-x: hidden; /* Très important pour que les animations AOS horizontales n’agrandissent pas l’écran */
 }
 
+main,
+.main {
+	overflow-x: hidden; /* Très important pour que les animations AOS horizontales n’agrandissent pas l’écran */
+}
+
 #sidebar {
 	position: sticky;
 	top: calc(var(--hauteur-header) + 1rem);

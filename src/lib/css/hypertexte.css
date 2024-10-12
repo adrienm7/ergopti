@@ -9,6 +9,8 @@ nom-hypertexte-plus {
 }
 
 .hyper {
+	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
+	margin: -0.5em;
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
@@ -19,12 +21,14 @@ nom-hypertexte-plus {
 }
 
 .htexte {
-	background: linear-gradient(to right, var(--gradient-purple));
+	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
+	margin: -0.5em;
 	background-clip: text;
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
 	-moz-text-fill-color: transparent;
+	background-image: linear-gradient(to right, var(--gradient-purple));
 }
 
 .nowrap {
