@@ -13,9 +13,11 @@
 	corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée du mot "wagon".
 </p>
 <p>
-	Évidemment, plus votre corpus sera volumineux, plus vos résultats seront crédibles. Toutefois,
-	cela augmentera d’autant les temps de calcul.
+	Évidemment, plus votre corpus sera volumineux et diversifié, plus vos résultats seront crédibles.
+	Toutefois, cela augmentera d’autant les temps de calcul.
 </p>
+
+<mini-espace></mini-espace>
 
 <p>
 	En conclusion, <span class="important"
@@ -33,8 +35,9 @@
 </p>
 <p>
 	Il serait aussi possible de faire cela pour les majuscules. Cela nous paraît évident que la
-	majuscule d’une lettre soit en Shift + Lettre. Pourtant, il serait tout à fait possible que cela
-	ne soit pas le cas, mais cela impliquerait alors d’apprendre deux fois plus de choses : où sont
-	les lettres, et où sont les majuscules. Tout cela pour peu de gains si ce n’est d’avoir un score
-	légèrement supérieur sur les comparateurs de dispositions.
+	majuscule d’une lettre soit en <kbd>Shift</kbd> + <kbd>Lettre</kbd>. Pourtant, il serait tout à
+	fait possible que cela ne soit pas le cas, notamment pour optimiser les <SFB></SFB>s. Toutefois,
+	cela impliquerait dans ce cas d’apprendre deux fois plus de choses : où sont les lettres, et où
+	sont les majuscules. Tout cela pour peu de gains si ce n’est d’avoir un score légèrement supérieur
+	sur les comparateurs de dispositions.
 </p>

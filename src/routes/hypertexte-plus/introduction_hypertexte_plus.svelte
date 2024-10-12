@@ -19,7 +19,7 @@
 	border: 2px solid rgba(255, 255, 255, 0.7);
 	box-shadow: rgba(255, 255, 255, 0.24) 0px 3px 8px;"
 	/>
-	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
+	<h1 data-aos="zoom-in" class="hypertexte-title">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"><NomPlus></NomPlus></span>
 	</h1>
 	<div class="container">

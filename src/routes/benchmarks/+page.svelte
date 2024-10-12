@@ -30,7 +30,7 @@
 	}
 
 	let liste_benchmarks_fr = [
-		['Corpus Panaché (Pyjam)', 'panache'],
+		['Panaché (Pyjam)', 'panache'],
 		['Essais (Pyjam)', 'essais'],
 		['Corpus Johnix Mails', 'corgus_johnix_mails'],
 		['Romans (24M)', 'romans']
@@ -102,9 +102,9 @@
 	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
 		<button on:click={toggleLangue} style="height:2.5rem;">
 			{#if langue === 'fr'}
-				{@html '<p><strong class="hyper">Français</strong>➜&nbsp;<span class="htexte">Anglais</span></p>'}
+				{@html '<p><strong class="hyper">Français</strong> ➜&nbsp;<span class="">Anglais</span></p>'}
 			{:else}
-				{@html '<p><strong class="htexte">Anglais</strong> ➜&nbsp;<span class="hyper">Français</span></p>'}
+				{@html '<p><strong class="htexte">Anglais</strong> ➜&nbsp;<span class="">Français</span></p>'}
 			{/if}
 		</button>
 
@@ -112,7 +112,7 @@
 			{#if clavier === 'ergodox'}
 				{@html '<p><strong class="ergodox-text-gradient">Ergodox</strong> ➜&nbsp;ISO</p>'}
 			{:else}
-				{@html '<p><strong>ISO</strong> ➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
+				{@html '<p><strong>ISO</strong> ➜ <span class="">Ergodox</span></p>'}
 			{/if}
 		</button>
 		<div style="display:inline-block;">

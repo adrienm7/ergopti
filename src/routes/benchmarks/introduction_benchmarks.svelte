@@ -5,13 +5,13 @@
 </script>
 
 <div class="main">
-	<h1>Benchmarks</h1>
-	<div class="encadre">
+	<h1 data-aos="zoom-in">Benchmarks</h1>
+	<p>
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
 		<span class="important">KLAnext</span> est l’un d’entre eux et est gratuitement accessible à
 		l’adresse
 		<a href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a>. C’est
 		l’un des comparateurs en ligne les plus utilisés en raison de son algorithme de notation qui
-		serait meilleur que les autres.
-	</div>
+		serait meilleur que ses autres dérivés en ligne.
+	</p>
 </div>

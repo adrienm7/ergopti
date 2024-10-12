@@ -42,13 +42,20 @@
 	dispositions comme Optimot préfèrent mettre l’apostrophe droite en accès direct plutôt que celle
 	typographique, partant du principe que la plupart des éditeurs de texte la remplaceront de toute
 	manière par l’apostrophe typographique. Dans ce cas précis, le caractère faisant office
-	d’"apostrophe" est l’apostrophe droite, alors que d’autres dispositions comme une version
-	précédente d’<Nom /> font la distinction entre les deux.
+	d’"apostrophe" est l’apostrophe droite, alors que d’autres dispositions (comme une version
+	précédente d’<Nom />) font la distinction entre les deux. Pour comparer avec le plus d’exactitude
+	les dispositions, il faudrait alors les modifier pour soit remplacer l’apostrophe typographique
+	par une apostrophe droite, soit en ajoutant une apostrophe typographique dans la disposition n’en
+	ayant pas.
 </p>
 <p>
-	Pour comparer avec le plus d’exactitude les dispositions, il faudrait alors les modifier pour soit
-	remplacer l’apostrophe typographique par une apostrophe droite, soit en ajoutant une apostrophe
-	typographique dans la disposition n’en ayant pas.
+	De même, si une disposition part du principe que l’appui sur la touche <kbd>Q</kbd> donne
+	<kbd-sortie>QU</kbd-sortie>
+	comme le proposent Optimot ou <NomPlus></NomPlus>, alors il faut s’assurer que le corpus reflète
+	aussi cette modification. Pour cela, il convient de remplacer tous les "qu" par des "q" dans le
+	corpus. Cela permet alors de placer le <kbd>Q</kbd> sur la colonne du <kbd>U</kbd> sans que cela
+	ne génère de <SFB></SFB>s. Oublier de modifier le corpus va entraîner une énorme augmentation des <SFB
+	></SFB>s alors que ce n’est pas "mérité".
 </p>
 <p class="important">
 	➜ Comparer ce qui est comparable. Si le symbole n’existe pas dans la disposition, la touche ne

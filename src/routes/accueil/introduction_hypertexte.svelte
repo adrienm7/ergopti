@@ -8,7 +8,7 @@
 </script>
 
 <div>
-	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
+	<h1 data-aos="zoom-in" class="hypertexte-title">
 		Disposition clavier<br /><span class="italic"
 			><span class="hyper">—&nbsp;Hyper</span><span class="htexte">Texte&nbsp;—</span></span
 		>

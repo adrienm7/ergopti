@@ -5,5 +5,5 @@
 </script>
 
 <div class="main">
-	<h1>Informations sur la disposition <Nom></Nom></h1>
+	<h1 data-aos="zoom-in">Informations sur la disposition <Nom></Nom></h1>
 </div>
