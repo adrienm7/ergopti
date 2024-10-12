@@ -67,7 +67,7 @@
 	sur des doigts consécutifs dans un mouvement horizontal.
 </p>
 
-<h3>Très bons bigrammes voyelle-voyelle</h3>
+<h3>Bons bigrammes voyelle-voyelle</h3>
 <ul>
 	<li><kbd>AI</kbd></li>
 	<li><kbd>IE</kbd> et <kbd>EI</kbd></li>
@@ -80,12 +80,12 @@
 <p>Avec même quelques trigrammes très confortables :</p>
 <ul>
 	<li><kbd>AIE</kbd> notamment pour écrire <span class="hyper text-bold">AIE</span>NT</li>
-	(avec en plus NT qui est lui aussi un roulement, que demander de plus ?)
+	(avec en plus NT qui est lui aussi un roulement, que demander de plus ?)
 	<li><kbd>IEU</kbd></li>
 	<li><kbd>YOU</kbd></li>
 </ul>
 
-<h3>Très bons bigrammes consonne-consonne</h3>
+<h3>Bons bigrammes consonne-consonne</h3>
 <ul>
 	<li><kbd>NS</kbd> et <kbd>SN</kbd></li>
 	<li><kbd>NT</kbd></li>
@@ -127,7 +127,7 @@
 	<li><kbd>+=</kbd> utilisé en programmation pour incrémenter</li>
 </ul>
 
-<petit-espace />
+<h3>Visualisation des roulements</h3>
 <p>Vous pouvez visualiser les roulements présentés précédemment ci-dessous :</p>
 <BlocClavier nom="roulements" />
 <div style="height: 20px" />

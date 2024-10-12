@@ -17,23 +17,35 @@
 </p>
 <p>Liste de quelques-unes des abréviations (liste modifiable par vos soins) :</p>
 <ul>
-	<li><kbd>A★</kbd> ➜ <kbd-sortie>AINSI</kbd-sortie></li>
-	<li><kbd>AVV★</kbd> ➜ <kbd-sortie>AVEZ-VOUS</kbd-sortie></li>
-	<li><kbd>C★</kbd> ➜ <kbd-sortie>C’EST</kbd-sortie></li>
-	<li><kbd>CT★</kbd> ➜ <kbd-sortie>C’ÉTAIT</kbd-sortie></li>
-	<li><kbd>D★</kbd> ➜ <kbd-sortie>DONC</kbd-sortie></li>
-	<li><kbd>DÉ★</kbd> ➜ <kbd-sortie>DÉJÀ</kbd-sortie></li>
-	<li><kbd>Ê★</kbd> ➜ <kbd-sortie>ÊTRE</kbd-sortie></li>
-	<li><kbd>EEF★</kbd> ➜ <kbd-sortie>EN EFFET</kbd-sortie></li>
-	<li><kbd>F★</kbd> ➜ <kbd-sortie>FAIRE</kbd-sortie></li>
-	<li><kbd>G★</kbd> ➜ <kbd-sortie>J’AI</kbd-sortie></li>
-	<li><kbd>GT★</kbd> ➜ <kbd-sortie>J’ÉTAIS</kbd-sortie></li>
-	<li><kbd>M★</kbd> ➜ <kbd-sortie>MAIS</kbd-sortie></li>
-	<li><kbd>PCQ★</kbd> ➜ <kbd-sortie>PARCE QUE</kbd-sortie></li>
-	<li><kbd>PÊ★</kbd> ➜ <kbd-sortie>PEUT-ÊTRE</kbd-sortie></li>
-	<li><kbd>PEX★</kbd> ➜ <kbd-sortie>PAR EXEMPLE</kbd-sortie></li>
-	<li><kbd>R★</kbd> ➜ <kbd-sortie>RIEN</kbd-sortie></li>
+	<li><kbd>A★</kbd> ➜ <kbd-sortie>AINSI</kbd-sortie> ;</li>
+	<li><kbd>AVV★</kbd> ➜ <kbd-sortie>AVEZ-VOUS</kbd-sortie> ;</li>
+	<li><kbd>C★</kbd> ➜ <kbd-sortie>C’EST</kbd-sortie> ;</li>
+	<li><kbd>CT★</kbd> ➜ <kbd-sortie>C’ÉTAIT</kbd-sortie> ;</li>
+	<li><kbd>D★</kbd> ➜ <kbd-sortie>DONC</kbd-sortie> ;</li>
+	<li><kbd>DÉ★</kbd> ➜ <kbd-sortie>DÉJÀ</kbd-sortie> ;</li>
+	<li><kbd>Ê★</kbd> ➜ <kbd-sortie>ÊTRE</kbd-sortie> ;</li>
+	<li><kbd>EEF★</kbd> ➜ <kbd-sortie>EN EFFET</kbd-sortie> ;</li>
+	<li><kbd>F★</kbd> ➜ <kbd-sortie>FAIRE</kbd-sortie> ;</li>
+	<li><kbd>G★</kbd> ➜ <kbd-sortie>J’AI</kbd-sortie> ;</li>
+	<li><kbd>GT★</kbd> ➜ <kbd-sortie>J’ÉTAIS</kbd-sortie> ;</li>
+	<li><kbd>M★</kbd> ➜ <kbd-sortie>MAIS</kbd-sortie> ;</li>
+	<li><kbd>PCQ★</kbd> ➜ <kbd-sortie>PARCE QUE</kbd-sortie> ;</li>
+	<li><kbd>PÊ★</kbd> ➜ <kbd-sortie>PEUT-ÊTRE</kbd-sortie> ;</li>
+	<li><kbd>PEX★</kbd> ➜ <kbd-sortie>PAR EXEMPLE</kbd-sortie> ;</li>
+	<li><kbd>R★</kbd> ➜ <kbd-sortie>RIEN</kbd-sortie> ;</li>
+	<li>etc.</li>
 </ul>
+<p>
+	Avec cette fonction d’abréviations, <NomPlus></NomPlus>
+	<span class="important">devient plus qu’une disposition clavier</span>. Elle devient un outil de
+	productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes les plus
+	fréquents.
+</p>
+<p>
+	C’est une fonctionnalité tout à fait optionnelle, libre à vous de ne pas utiliser les abréviations
+	et de seulement utiliser la touche <kbd>★</kbd> afin de doubler la précédente lettre. Cependant, bien
+	utilisée, cette touche peut être encore plus puissante.
+</p>
 
 <h3>
 	Ajout des suffixes les plus communs en <kbd>À</kbd>

@@ -58,10 +58,10 @@ export const roulements = writable({
 
 export const controle = writable({
 	emplacement: 'clavier_controle',
-	type: 'iso',
+	type: 'ergodox',
 	couche: 'Ctrl',
 	plus: 'non',
-	couleur: 'non',
+	couleur: 'oui',
 	controles: 'oui'
 });
 
@@ -70,6 +70,24 @@ export const raccourcis_ergodox = writable({
 	type: 'ergodox',
 	couche: 'Ctrl',
 	plus: 'non',
+	couleur: 'oui',
+	controles: 'oui'
+});
+
+export const symboles = writable({
+	emplacement: 'clavier_symboles',
+	type: 'iso',
+	couche: 'AltGr',
+	plus: 'non',
 	couleur: 'non',
 	controles: 'oui'
+});
+
+export const magique = writable({
+	emplacement: 'clavier_magique',
+	type: 'iso',
+	couche: 'Visuel',
+	plus: 'oui',
+	couleur: 'non',
+	controles: 'non'
 });

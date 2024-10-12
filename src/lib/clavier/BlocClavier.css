@@ -560,6 +560,32 @@ bloc-clavier,
 	--profondeur-touche-pressee: 0.5px !important;
 }
 
+#clavier_controle bloc-touche[data-colonne]:nth-child(n + 8):nth-child(-n + 17),
+#clavier_controle bloc-touche[data-colonne='0'],
+#clavier_raccourcis_ergodox bloc-touche[data-colonne]:nth-child(n + 8):nth-child(-n + 17) {
+	display: none;
+}
+#clavier_controle bloc-touche[data-colonne='6'],
+#clavier_raccourcis_ergodox bloc-touche[data-colonne='6'] {
+	margin-right: 0;
+}
+
+#clavier_magique bloc-touche[data-plus='oui']:not([data-touche='magique']) {
+	background: unset !important;
+	--couleur-touche-saturation: 100% !important;
+	--couleur-touche-luminosite: 70% !important;
+	background-color: var(--couleur-fond-touche) !important;
+}
+#clavier_magique bloc-touche[data-plus='oui']:not([data-touche='magique']):hover {
+	background-color: rgba(255, 255, 255, 0.85) !important;
+}
+#clavier_magique bloc-touche[data-plus='oui'][data-type='special'] {
+	background-color: rgb(10, 10, 10) !important;
+}
+#clavier_magique bloc-touche[data-touche='magique'] {
+	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
+}
+
 /*
 ======================
 ======= Divers =======

@@ -17,14 +17,18 @@
 <style>
 	.tooltip {
 		display: inline-block;
-		border-bottom: 2px dotted black;
+		border-bottom: 2px dotted white;
 		white-space: normal;
 	}
 
 	.tooltip .tooltiptext {
+		display: inline-block;
+		position: relative;
+		z-index: 2;
 		visibility: hidden;
 		width: 90%;
-		background-color: black;
+		max-width: 600px;
+		background-color: rgba(0, 13, 27, 0.95);
 		border: 1px solid rgba(255, 255, 255, 0.2);
 		color: white;
 		border-radius: 8px;
