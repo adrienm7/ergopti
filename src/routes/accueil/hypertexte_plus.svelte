@@ -7,7 +7,10 @@
 </script>
 
 <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);"></div>
-<div style="background:black; padding-top: 10px; padding-bottom: 100px; margin-bottom:-10vh;">
+<div
+	style="background:black; padding-top: 10px; padding-bottom: 100px; margin-bottom:-10vh;
+	overflow-x: hidden; /* Très important pour que les animations AOS horizontales n’agrandissent pas l’écran */"
+>
 	<div id="orb">
 		<div class="wrap">
 			{#each Array(300) as _, index}
