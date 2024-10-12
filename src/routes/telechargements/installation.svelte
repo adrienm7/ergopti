@@ -13,8 +13,8 @@
 <h2>Installation</h2>
 <div class="encadre">
 	<span style="font-weight:bold">Note :</span> Les fichiers d’installation n’existent au complet qu’à
-	partir de la 1.1.2, c’est pourquoi le toggle de version n’a aucun impact sur cette page mis à part
-	sur l’émulation du clavier.
+	partir de la 1.1.2, c’est pourquoi le sélecteur de version n’a pour le moment aucun impact sur cette
+	page mis à part sur l’émulation du clavier.
 </div>
 
 <h3>Installer la disposition sur Windows</h3>
@@ -40,11 +40,11 @@
 
 <h3>Installer la disposition — Avec Kalamine</h3>
 <p>
-	Kalamine permet de générer des fichiers d’installation pour plusieurs systèmes d’exploitation.
-	Cependant, les fichiers plus bas n’ont pas encore été testés. De plus, certaines fonctionnalités
-	vont manquer, comme la modification de la touche Ctrl pour avoir les raccourcis <kbd-sortie
-		>Ctrl</kbd-sortie
-	>
+	<a href="https://github.com/OneDeadKey/kalamine">Kalamine</a> permet de générer des fichiers
+	d’installation pour plusieurs systèmes d’exploitation. Cependant, les fichiers plus bas n’ont pas
+	encore été testés. De plus, certaines fonctionnalités vont manquer, comme la modification de la
+	touche <kbd>Ctrl</kbd> pour avoir les raccourcis
+	<kbd-sortie>Ctrl</kbd-sortie>
 	+ <kbd-sortie>X</kbd-sortie>,
 	<kbd-sortie>Ctrl</kbd-sortie>
 	+ <kbd-sortie>C</kbd-sortie>, <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>V</kbd-sortie> et
@@ -55,6 +55,12 @@
 	Si vous êtes sur Windows, il est fortement recommandé d’utiliser plutôt les fichiers ci-dessus et
 	non ceux pour Windows générés par Kalamine. Si vous n’utilisez pas Windows, vous pouvez les
 	utiliser, mais en vous rappelant de leurs limites.
+</p>
+<p>
+	Les instructions d’installation se trouvent ici : <a
+		href="https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts"
+		>https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts</a
+	>
 </p>
 <mini-espace />
 <div>

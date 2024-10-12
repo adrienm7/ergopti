@@ -8,9 +8,9 @@
 
 <h3>L’importance des compromis</h3>
 <p>
-	Il n’est évidemment pas possible de maximiser plusieurs paramètres en même temps. Par conséquent,
-	certains choix ont dus être faits afin de maximiser chacun de ceux-ci sans trop sacrifier les
-	autres.
+	Il est évident qu’il n’est pas possible de maximiser plusieurs paramètres simultanément. Par
+	conséquent, des choix ont dû être effectués pour maximiser chacun d’entre eux sans trop
+	compromettre les autres.
 </p>
 <p>
 	Par exemple, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Cela peut sembler
@@ -22,7 +22,7 @@
 	aux autres touches soient visibles et comparables.
 </p>
 <p>
-	Pourtant, cette lettre n’a pas été placée sur l’index notamment afin de réduire les <SFB />s. En
+	Pourtant, cette lettre n’a pas été placée sur l’index, notamment afin de réduire les <SFB />s. En
 	effet, si le
 	<kbd>E</kbd>
 	avait été sur l’index, alors les 6 touches tapées par ce doigt auraient possiblement générées des <SFB
@@ -80,13 +80,12 @@
 		<kbd-sortie>CK</kbd-sortie>, etc.
 	</li>
 	<li>
-		Le bigramme <kbd>SH</kbd> n’est pas très agréable sur un clavier standard à cause du décalage des
-		colonnes.
+		<kbd>SH</kbd> n’est pas agréable à réaliser sur un clavier standard à cause du décalage des colonnes.
 	</li>
 </ul>
 <p class="encadre">
 	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation de <NomPlus
-	></NomPlus>, y compris les <SFB></SFB>s encore plus rares.
+	></NomPlus>, y compris pour les <SFB></SFB>s encore plus rares qui ne sont pas listés ici.
 	<i class="fa-duotone fa-face-smile"></i>
 </p>
 
@@ -107,17 +106,17 @@
 <p>
 	<Nom></Nom> possède peu de touches mortes et de couches de symboles. En effet, la disposition ne se
 	prétend pas être exhaustive en incorporant tous les alphabets des langues européennes comme le BÉPO,
-	ou encore l’écriture phonétique comme Optimot. Ces couches n’intéressent que peu d’utilisateurs et
-	occupent des emplacements du clavier très accessibles pour une utilisation très rare. En outre, <Nom
-	></Nom> a été optimisée pour le français et l’anglais, et n’est pas la disposition la plus adaptée
-	pour les autres langues.
+	ou encore le cyrillique, l’écriture phonétique, les pièces d’échec, etc. comme Optimot. Ces couches
+	n’intéressent que peu d’utilisateurs et occupent des emplacements du clavier très accessibles pour
+	une utilisation très rare. En outre, <Nom></Nom> a été optimisée pour le français et l’anglais, et
+	n’est pas la disposition la plus adaptée pour les autres langues.
 </p>
 <p>
 	La philosophie derrière <Nom /> est de fournir une base de réflexion, mais pas nécessairement de promouvoir
 	l’utilisation de la disposition « HyperTexte ». Rien ne vaut une disposition créée sur-mesure pour
 	vos usages. Par exemple, si vous voulez écrire régulièrement en allemand, il serait judicieux de mettre
-	la touche morte des trémats à un endroit plus accessible. De même, si vous écrivez souvent en espagnol,
-	il faudra que vous trouviez un emplacement pour la lettre <kbd>Ñ</kbd>, etc. Sachant tout de même
-	que <Nom></Nom> n’a pas été optimisée pour ces langages et n’est peut-être pas la disposition la plus
-	adaptée si vous écrivez principalement dans celles-ci.
+	la touche morte des trémas à un endroit plus accessible. De même, si vous écrivez souvent en espagnol,
+	il faudrait trouver un emplacement pour la lettre <kbd>Ñ</kbd>, etc. Sachant tout de même que <Nom
+	></Nom> n’a pas été optimisée pour ces langages et n’est probablement pas la disposition la plus adaptée
+	si vous écrivez principalement dans celles-ci.
 </p>

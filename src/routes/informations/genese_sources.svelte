@@ -6,10 +6,11 @@
 
 <h2>Genèse et inspirations</h2>
 <p>
-	La genèse de la disposition <Nom></Nom> remonte à début 2022, suite à la découverte d'Optimot, utilisant
-	auparavant BÉPO. Les améliorations de la disposition Optimot par rapport au BÉPO sont vraiment significatives.
-	Les analyses sont sans appel et montrent notamment une nette diminution des bigrammes à un doigt (<SFB
-	/>s).
+	La genèse de la disposition <Nom></Nom> remonte à début 2022, suite à la découverte d'<a
+		href="https://optimot.fr/">Optimot</a
+	>, utilisant encore à ce moment-là le <a href="https://bepo.fr/">BÉPO</a>. Les améliorations de la
+	disposition Optimot par rapport au BÉPO sont vraiment significatives. Les analyses sont sans appel
+	et montrent notamment une forte diminution des bigrammes à un doigt (<SFB />s).
 </p>
 <p>
 	À cette époque, étant utilisateur de la disposition BÉPO, l'idée d'apprendre Optimot, pour
@@ -26,13 +27,18 @@
 
 <p>
 	Rapidement, <Nom></Nom> s'est éloignée d'Optimot sur plusieurs aspects fondamentaux. L'un des points
-	clés était ma volonté d'optimiser les <em>roulements</em>, entraînant de nombreux tests sur la
+	clés était ma volonté d'optimiser les <i>roulements</i>, entraînant de nombreux tests sur la
 	disposition des touches principales, notamment sur la partie droite avec les consonnes. L'une des
 	décisions majeures fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que
-	<kbd>TSRN</kbd>, car le bigramme <kbd>NT</kbd> est très fréquent, et il semblait pertinent de
-	l'optimiser pour qu'il se réalise sur des doigts consécutifs. L’agencement final des quatre
-	lettres de la rangée principale a été soigneusement conçu pour maximiser les bigrammes
-	consonantiques, avec une disposition harmonieuse. Seuls les bigrammes <kbd>ST</kbd> et
+	<kbd>TSRN</kbd>, car le bigramme <kbd>NT</kbd> est très fréquent, et il semblait pertinent de l'optimiser
+	pour qu'il se réalise sur des doigts consécutifs.
+</p>
+<p>
+	L’agencement final des quatre lettres de la rangée principale a été soigneusement conçu pour
+	maximiser les bigrammes consonantiques, avec une disposition harmonieuse. Seuls les bigrammes <kbd
+		>ST</kbd
+	>
+	et
 	<kbd>TS</kbd> (comme dans « <kbd>ST</kbd>A<kbd>TS</kbd> ») ne profitent malheureusement pas de cette
 	optimisation en roulement.
 </p>
@@ -43,29 +49,9 @@
 	<kbd>★</kbd>
 	et le déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 </p>
-<h3>
-	Simplification et utilisation de la couche <kbd>AltGr</kbd>
-</h3>
-<p>
-	<Nom /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire drastiquement
-	les distances parcourues pour atteindre certaines touches. Un autre avantage est le fait que cette
-	touche modificatrice est aisément atteignable par le pouce droit sur un clavier standard. Cela
-	permet donc de mettre ce doigt à contribution, contrairement à l’AZERTY qui ne l’exploite pas
-	suffisamment.
-</p>
-<p>
-	N’ayant nullement besoin de tous les caractères exotiques et touches mortes du BÉPO ou d’Optimot,
-	la majeure partie fut supprimée pour ne conserver que l’essentiel. Cette simplification permit de
-	libérer de nombreux excellents emplacements sur la couche <kbd>AltGr</kbd> et me laissa assez de place
-	pour y loger tous les symboles.
-</p>
-<p>
-	Ainsi, je n’avais plus besoins d’étendre mes doigts pour atteindre la rangée des nombres pour
-	taper des parenthèses, guillemets ou opérateurs mathématiques. En outre, les chiffres sont quant à
-	eux passés en accès direct, un changement très appréciable lors de l'utilisation quotidienne.
-</p>
 
-<h3>Évolution incrémentale</h3>
+<mini-espace />
+
 <p>
 	À un certain stade de développement, il devint évident que la disposition n'était plus simplement
 	une variante d'Optimot. Le besoin de renommer ce projet s’est alors imposé. Grâce à la suggestion
@@ -73,7 +59,7 @@
 	aussi remarquablement bien trouvé que celui d’Optimot, le nom <Nom></Nom> fut retenu.
 </p>
 <p>
-	Bien que la création de <Nom></Nom> ait été un processus étalé sur plusieurs mois, voir années, près
+	Bien que la création de <Nom></Nom> ait été un processus étalé sur plusieurs mois, voire années, près
 	de 90% de la disposition est restée constante. Les ajustements concernaient principalement le déplacement
 	de certaines lettres, nécessitant ainsi des phases de réapprentissage régulières. Néanmoins, la plupart
 	des changements se sont avérés non pertinents, ce qui explique l'absence de modifications majeures
@@ -123,22 +109,48 @@
 </p>
 
 <h3>
+	Simplification et utilisation de la couche <kbd>AltGr</kbd>
+</h3>
+<p>
+	<Nom /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire drastiquement
+	les distances parcourues pour atteindre certaines touches. Un autre avantage est le fait que cette
+	touche modificatrice est aisément atteignable par le pouce droit sur un clavier standard. Cela
+	permet donc de mettre ce doigt à contribution, contrairement à l’AZERTY qui ne l’exploite pas
+	suffisamment.
+</p>
+<p>
+	N’ayant nullement besoin de tous les caractères exotiques et touches mortes du BÉPO ou d’Optimot,
+	la majeure partie fut supprimée pour ne conserver que l’essentiel. Cette simplification permit de
+	libérer de nombreux excellents emplacements sur la couche <kbd>AltGr</kbd> et me laissa assez de place
+	pour y loger tous les symboles.
+</p>
+<p>
+	Ainsi, je n’avais plus besoins d’étendre mes doigts pour atteindre la rangée des nombres pour
+	taper des parenthèses, guillemets ou opérateurs mathématiques. En outre, les chiffres sont quant à
+	eux passés en accès direct, un changement très appréciable lors de l'utilisation quotidienne.
+</p>
+
+<h3>
 	Atouts de <NomPlus></NomPlus>
 </h3>
 <p>
 	La singularité de <Nom></Nom> ne réside pas seulement dans ses excellents scores en français, anglais
 	et en programmation, où elle rivalise avec les meilleures dispositions actuelles. Sa version étendue,
 	<NomPlus></NomPlus>, pousse encore plus loin l’efficacité de cette disposition déjà très
-	performante, en la rendant véritablement exceptionnelle. Le qualificatif d’exceptionnel n’est pas
-	exagéré : <NomPlus></NomPlus> permet, une fois maîtrisée, de réduire presque totalement les <SFB
-	></SFB>s, y compris ceux liés à la répétition d'une même touche. Cela est rendu possible grâce à
-	la touche spéciale <kbd>★</kbd>, permettant de réitérer la frappe de la touche précédente avec une
-	fluidité inédite.
+	performante, en la rendant véritablement exceptionnelle.
 </p>
 <p>
-	Il convient de préciser que l’idée de cette touche de répétition n’est pas une invention propre,
-	mais provient d'une disposition anglophone dont je ne retrouve plus le nom. D'autres éléments ont
-	également été empruntés, comme l'utilisation d'AHK (AutoHotKey) dans la disposition Boo, pour
-	modifier le comportement des combinaisons de touches. Ce système permet d'optimiser encore
+	Le qualificatif d’exceptionnel n’est pas exagéré : <NomPlus></NomPlus> permet, une fois maîtrisée,
+	de réduire presque totalement les <SFB></SFB>s, y compris ceux liés à la répétition d'une même
+	touche. Cela est rendu possible grâce à la touche spéciale <kbd>★</kbd>, permettant de réitérer la
+	frappe de la touche précédente avec une fluidité inédite, ainsi qu’à la touche <kbd>,</kbd> de
+	réduction des <SFB></SFB>s.
+</p>
+<p>
+	Il convient de préciser que l’idée de cette touche de répétition n’est pas de mon invention. Elle
+	provient d'une (voire plus) disposition anglophone dont je ne retrouve plus le nom. D'autres
+	éléments ont également été empruntés, comme l'utilisation d'AHK (AutoHotKey) dans la disposition <a
+		href="https://ballerboo.github.io/boolayout/">Boo</a
+	>, pour modifier le comportement des combinaisons de touches. Ce système permet d'optimiser encore
 	davantage les roulements sur les touches adjacentes qui n'engendrent pas de bigrammes habituels.
 </p>
