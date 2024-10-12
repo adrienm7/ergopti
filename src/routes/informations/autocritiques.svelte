@@ -79,6 +79,10 @@
 		<kbd-sortie>SK</kbd-sortie>,
 		<kbd-sortie>CK</kbd-sortie>, etc.
 	</li>
+	<li>
+		Le bigramme <kbd>SH</kbd> n’est pas très agréable sur un clavier standard à cause du décalage des
+		colonnes.
+	</li>
 </ul>
 <p class="encadre">
 	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation de <NomPlus

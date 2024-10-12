@@ -31,7 +31,7 @@
 	<div class="header-logo">
 		<a href="/"><img src="img/logo/logo_hypertexte_transparent.png" style="height: 55px;" /></a>
 		<p style="font-variant: small-caps;">
-			<a href="/">Disposition clavier </a><span class="hyper"
+			<a href="/">Disposition clavier </a><span class="hyper" style="padding:0; margin:0"
 				><a href="/">HyperTexte</a>
 				<div class="myselect">
 					<select id="selection-version" bind:value={versionValue} on:change={handleVersionChange}>

@@ -34,27 +34,47 @@
 <petit-espace />
 
 <hr />
-<div class="encart-introduction">
-	<p>
-		<NomPlus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très près
-		de la <span class="important">disposition clavier idéale</span>. Effectivement, elle :
-	</p>
-	<ul class="margin0" style="text-align:left!important">
-		<li>éradique la quasi-totalité des <SFB />s ;</li>
-		<li>rajoute de merveilleux roulements ;</li>
-		<li>réduit les distances parcourues par les doigts, en particulier l’auriculaire droit ;</li>
-		<li>divise par 2 le nombre de touches frappées pour écrire certains mots ;</li>
-		<li>
-			ajoute divers raccourcis tels qu’une touche <kbd-sortie>Alt + Tab</kbd-sortie> et
-			<kbd-sortie>Capsword</kbd-sortie>.
-			<!-- ou encore <kbd-sortie>Dot-Space-Shift</kbd-sortie>. -->
-		</li>
-	</ul>
+<p class="main">
+	<NomPlus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très près de
+	la <span class="important">disposition clavier idéale</span>. Effectivement, elle :
+</p>
+<div class="cards">
+	<div class="card">
+		<i class="fa-duotone fa-circle-1"></i>
+		Ajoute de
+		<span class="text-bold">nouveaux roulements</span>
+	</div>
+	<div class="card">
+		<i class="fa-duotone fa-circle-2"></i>
+		<span class="important">Éradique la quasi-totalité des <SFB />s </span> pour une frappe ultra-fluide
+		sans inconfort
+	</div>
+	<div class="card">
+		<i class="fa-duotone fa-circle-3"></i>
+		<span class="text-bold">Réduit les distances parcourues par les doigts</span>, en particulier
+		l’auriculaire droit
+	</div>
+	<div class="card">
+		<i class="fa-duotone fa-circle-4"></i> ajoute divers raccourcis tels qu’une touche
+		<kbd-sortie>Alt + Tab</kbd-sortie>
+		et
+		<kbd-sortie>Capsword</kbd-sortie>.
+	</div>
+	<div class="card">
+		<i class="fa-duotone fa-circle-5"></i>
+		<span class="text-bold">divise par 2 le nombre de touches frappées</span> pour écrire certains mots
+	</div>
+	<div class="card">
+		<i class="fa-duotone fa-circle-6"></i> Les fonctionnalités sont optionnelles et
+		<span class="important">peuvent être intégrées au fil du temps</span>
+	</div>
 </div>
+<mini-espace></mini-espace>
 <hr />
 
+<petit-espace />
+
 <div class="main">
-	<petit-espace />
 	<div class="encadre">
 		Toutefois, l’utilisation de cette version nécessite des <span class="important"
 			>outils de programmation de clavier spécifiques.

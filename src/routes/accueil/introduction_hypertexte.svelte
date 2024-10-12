@@ -18,7 +18,7 @@
 	<BlocControlesClavier nom="presentation" />
 </div>
 
-<div style="margin: 0 auto; text-align:center; padding-top: 10px;">
+<div style="margin: 0 auto; text-align:center; padding-top: 5px;">
 	<a href="#debut"><i class="far fa-chevron-down icon-chevron-down scrollez"></i></a>
 </div>
 <div id="debut">
@@ -95,62 +95,6 @@
 	@media (prefers-reduced-motion: reduce) {
 		.scrollez {
 			animation: none;
-		}
-	}
-
-	.cards {
-		max-width: 1000px;
-		margin: 0 auto;
-		display: grid;
-		gap: 1rem;
-		/* grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); */
-	}
-
-	.card {
-		display: block;
-		align-items: center;
-		background-color: rgba(38, 0, 110, 0.6);
-		padding: 1rem;
-		border-radius: 7px;
-	}
-
-	.cards .card:nth-child(even) {
-		background-color: rgba(0, 0, 0, 0.8);
-		color: white;
-	}
-	.cards .card:nth-child(odd) {
-		background-color: rgba(255, 255, 255, 0.9);
-		color: black;
-	}
-
-	.cards .card:nth-child(odd) i {
-		color: rgb(0, 4, 43) !important;
-	}
-
-	/* Screen larger than 500px? 2 column */
-	@media (min-width: 500px) and (max-width: 900px) {
-		.cards {
-			grid-template-columns: repeat(2, 1fr);
-		}
-
-		.cards .card:nth-child(1),
-		.cards .card:nth-child(4),
-		.cards .card:nth-child(5) {
-			background-color: rgba(0, 0, 0, 0.8);
-			color: white;
-		}
-		.cards .card:nth-child(2),
-		.cards .card:nth-child(3),
-		.cards .card:nth-child(6) {
-			background-color: rgba(255, 255, 255, 0.9);
-			color: black;
-		}
-	}
-
-	/* Screen larger than 900px? 3 columns */
-	@media (min-width: 900px) {
-		.cards {
-			grid-template-columns: repeat(3, 1fr);
 		}
 	}
 </style>

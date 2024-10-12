@@ -30,6 +30,6 @@
 	{#if plusValue === 'oui'}
 		{@html '<p><span class="hyper">Plus</span>&nbsp;➜ Standard</p>'}
 	{:else}
-		{@html '<p>Standard ➜&nbsp;<span class="hyper">Plus</span></p>'}
+		{@html '<p>Standard ➜&nbsp;<span class="hyper" style = "padding:0; margin:0">Plus</span></p>'}
 	{/if}
 </button>

@@ -24,6 +24,7 @@
 	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
 	import '$lib/css/layout.css';
+	import '$lib/css/cards.css';
 	import '$lib/css/espacements.css';
 	import '$lib/css/titres.css';
 	import '$lib/css/typographie.css';
