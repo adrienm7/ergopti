@@ -64,3 +64,12 @@ export const controle = writable({
 	couleur: 'non',
 	controles: 'oui'
 });
+
+export const raccourcis_ergodox = writable({
+	emplacement: 'clavier_raccourcis_ergodox',
+	type: 'ergodox',
+	couche: 'Ctrl',
+	plus: 'non',
+	couleur: 'non',
+	controles: 'oui'
+});

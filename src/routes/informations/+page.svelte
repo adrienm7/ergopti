@@ -4,6 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import Autocritiques from './autocritiques.svelte';
+	import Changelog from './changelog.svelte';
 	import Contact from './contact.svelte';
 	import GeneseSources from './genese_sources.svelte';
 	import License from './license.svelte';
@@ -16,5 +17,6 @@
 
 <GeneseSources></GeneseSources>
 <Autocritiques></Autocritiques>
+<!-- <Changelog></Changelog> -->
 <License></License>
 <Contact></Contact>

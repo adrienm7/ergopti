@@ -38,7 +38,7 @@ controles-clavier select {
 }
 
 controles-clavier select {
-	background-image: linear-gradient(to top, #2e0037 0%, #c800ff 50%);
+	background-image: linear-gradient(to top, #600074 20%, #d400ff 30%);
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;

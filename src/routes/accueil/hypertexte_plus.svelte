@@ -19,14 +19,15 @@
 			style="margin-top: 30vh; padding-top: 15vh; padding-bottom:8vh; border:none; box-shadow: none; font-weight:bolder; font-size:2rem"
 			data-aos="none"
 		>
-			★ Pour aller encore <b>+</b> loin ★
+			★&nbsp;Pour aller encore <b>+</b> loin&nbsp;★
 		</p>
 		<div class="texte-orb" style="max-width: 850px; margin:0 auto; margin-top:-50px">
 			<hr />
 			<p class="encart-introduction">
 				<NomPlus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
 				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
-				Découvrez cette amélioration de la disposition en consultant la page associée :
+				Découvrez cette amélioration (optionnelle) de la disposition en consultant la page associée
+				:
 			</p>
 			<a href="/hypertexte-plus" style="text-decoration: none;"
 				><button
