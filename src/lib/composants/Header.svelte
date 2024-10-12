@@ -19,6 +19,11 @@
 		version.set(versionValue);
 	}
 
+	function toggleOverflowMenu() {
+		document.body.style.overflowY =
+			document.body.style.overflowY === 'hidden' ? 'visible' : 'hidden'; // if current styling is *hidden* then change to visible, otherwise change to hidden
+	}
+
 	let liste_versions = ['1.0.5', '1.0.12', '1.0.16', '1.0.19', '1.1.2'];
 </script>
 
@@ -36,7 +41,7 @@
 			>
 		</p>
 	</div>
-	<input class="menu-btn" type="checkbox" id="menu-btn" />
+	<input class="menu-btn" type="checkbox" id="menu-btn" on:click={toggleOverflowMenu} />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
 		<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
@@ -221,8 +226,6 @@
 			background-color: var(--couleur-header-mobile);
 			backdrop-filter: blur(30px);
 			border-top: 1px solid rgba(255, 255, 255, 0.2);
-			overflow: scroll; /* Pour désactiver le scroll derrière le menu (1/3) */
-			overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu (2/3) */
 			transition: height 0.15s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
 			overflow: hidden;
 			z-index: 98;
@@ -291,11 +294,6 @@
 
 		header .menu-btn:checked ~ #menu {
 			height: calc(100vh - var(--hauteur-header));
-		}
-		header .menu-btn:checked ~ #menu ul {
-			min-height: calc(
-				100vh - var(--hauteur-header)
-			); /* Pour désactiver le scroll derrière le menu (3/3) */
 		}
 
 		header .menu-btn:checked ~ .menu-icon .navicon {
