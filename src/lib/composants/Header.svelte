@@ -45,14 +45,17 @@
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
 		<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/"><i class="fad fa-keyboard"></i> <span class="titre">HyperTexte</span></a>
+			<a href="/"
+				><i class="fa-duotone fa-keyboard"></i>
+				<span class="titre">HyperTexte</span></a
+			>
 		</p>
 		<p
 			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
 			<a href="/hypertexte-plus"
-				><i class="fad fa-star"></i>
+				><i class="fa-duotone fa-circle-star"></i>
 				<span class="titre">HyperTexte<span class="glow">+</span></span></a
 			>
 		</p>
@@ -61,7 +64,7 @@
 			on:click={fermerMenu}
 		>
 			<a href="/benchmarks"
-				><span class="couleur"><i class="fad fa-analytics"></i></span>
+				><span class="couleur"><i class="fa-duotone fa-chart-mixed"></i></span>
 				<span class="titre">Benchmarks</span></a
 			>
 		</p>
@@ -70,7 +73,8 @@
 			on:click={fermerMenu}
 		>
 			<a href="/telechargements"
-				><i class="fad fa-download"></i> <span class="titre">Téléchargements</span></a
+				><i class="fa-duotone fa-download"></i>
+				<span class="titre">Téléchargements</span></a
 			>
 		</p>
 		<p
@@ -78,7 +82,8 @@
 			on:click={fermerMenu}
 		>
 			<a href="/informations"
-				><i class="fad fa-info-circle"></i> <span class="titre">Informations</span></a
+				><i class="fa-duotone fa-circle-info"></i>
+				<span class="titre">Informations</span></a
 			>
 		</p>
 	</nav>
@@ -171,19 +176,6 @@
 
 	header #menu p {
 		display: inline-block;
-	}
-
-	header #menu i {
-		color: #3088ed;
-	}
-	header #menu i::before {
-		-webkit-background-clip: text;
-		background-clip: text;
-		-webkit-text-fill-color: transparent;
-		color: transparent;
-		-webkit-box-decoration-break: clone;
-		box-decoration-break: clone;
-		background-image: linear-gradient(to right, var(--gradient-blue));
 	}
 
 	header #menu p[aria-current='page'] .titre,

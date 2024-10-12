@@ -21,9 +21,8 @@
 <div style="margin: 0 auto; text-align:center; padding-top: 10px;">
 	<a href="#debut"><i class="far fa-chevron-down icon-chevron-down scrollez"></i></a>
 </div>
-<petit-espace />
-
 <div id="debut">
+	<petit-espace />
 	<hr />
 	<p class="encart-introduction">
 		<Nom /> est une disposition clavier
@@ -37,26 +36,29 @@
 <mini-espace />
 <div class="cards main">
 	<div class="card">
-		➀ <span class="text-bold">Diminution de la distance parcourue</span> pour moins de fatigue et plus
+		<i class="fa-duotone fa-circle-1"></i>
+		<span class="text-bold">Diminution de la distance parcourue</span> pour moins de fatigue et plus
 		de confort
 	</div>
 	<div class="card">
-		➁ <span class="important">Frappe extrêmement fluide</span> par élimination de la quasi-totalité
-		des <SFB />s
+		<i class="fa-duotone fa-circle-2"></i> <span class="important">Frappe extrêmement fluide</span>
+		par élimination de la quasi-totalité des <SFB />s
 	</div>
 	<div class="card">
-		➂ <span class="text-bold">Alternance des mains</span> favorisée pour paralléliser la frappe et ainsi
-		écrire plus vite
+		<i class="fa-duotone fa-circle-3"></i> <span class="text-bold">Alternance des mains</span> favorisée
+		pour paralléliser la frappe et ainsi écrire plus vite
 	</div>
 	<div class="card">
-		➃ <span class="important">Frappe ultra-confortable</span> grâce à une optimisation des roulements
+		<i class="fa-duotone fa-circle-4"></i> <span class="important">Frappe ultra-confortable</span> grâce
+		à une optimisation des roulements
 	</div>
 	<div class="card">
-		➄ <span class="text-bold">Placement logique</span> des touches, permettant de s’en souvenir aisément
+		<i class="fa-duotone fa-circle-5"></i> <span class="text-bold">Placement logique</span> des touches,
+		permettant de s’en souvenir aisément
 	</div>
 	<div class="card">
-		➅ <span class="important">Chiffres en accès direct</span>, raccourcis sur la main gauche,
-		ponctuations insécables, etc.
+		<i class="fa-duotone fa-circle-6"></i> <span class="important">Chiffres en accès direct</span>,
+		raccourcis sur la main gauche, ponctuations insécables, etc.
 	</div>
 </div>
 <mini-espace />
@@ -119,6 +121,10 @@
 	.cards .card:nth-child(odd) {
 		background-color: rgba(255, 255, 255, 0.9);
 		color: black;
+	}
+
+	.cards .card:nth-child(odd) i {
+		color: rgb(0, 4, 43) !important;
 	}
 
 	/* Screen larger than 500px? 2 column */

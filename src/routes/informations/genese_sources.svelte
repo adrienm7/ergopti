@@ -82,8 +82,8 @@
 
 <h3>Comment la disposition a été créée</h3>
 <p>
-	➀ La première étape dans la création d’<Nom /> a été de partager les touches du clavier en deux groupes
-	: main gauche et main droite.
+	<i class="fa-duotone fa-circle-1"></i> La première étape dans la création d’<Nom /> a été de partager
+	les touches du clavier en deux groupes : main gauche et main droite.
 </p>
 <p>
 	Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
@@ -104,21 +104,22 @@
 <mini-espace />
 
 <p>
-	➁ La deuxième étape dans la création de la disposition a été de placer les touches les plus
-	souvent utilisées le plus proche possible des doigts. Les doigts sont effectivement toujours
-	censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est donc logique de
-	chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les déplacements
+	<i class="fa-duotone fa-circle-2"></i> La deuxième étape dans la création de la disposition a été de
+	placer les touches les plus souvent utilisées le plus proche possible des doigts. Les doigts sont effectivement
+	toujours censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est donc logique
+	de chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les déplacements
 	des doigts aux touches.
 </p>
 
 <mini-espace />
 
 <p>
-	➂ La troisième étape a été de déplacer les lettres pour réduire au maximum le nombre de <SFB />s,
-	tout en maximisant les roulements. Cette étape est la plus difficile, car intervertir seulement
-	deux touches peut faire passer d’une disposition excellente à une disposition très moyenne. Il
-	faut effectivement avoir en tête les bigrammes les plus fréquents et s’assurer que déplacer une
-	touche à un autre emplacement ne va pas empirer la situation.
+	<i class="fa-duotone fa-circle-3"></i> La troisième étape a été de déplacer les lettres pour
+	réduire au maximum le nombre de <SFB />s, tout en maximisant les roulements. Cette étape est la
+	plus difficile, car intervertir seulement deux touches peut faire passer d’une disposition
+	excellente à une disposition très moyenne. Il faut effectivement avoir en tête les bigrammes les
+	plus fréquents et s’assurer que déplacer une touche à un autre emplacement ne va pas empirer la
+	situation.
 </p>
 
 <h3>

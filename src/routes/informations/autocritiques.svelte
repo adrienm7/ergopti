@@ -83,7 +83,7 @@
 <p class="encadre">
 	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation de <NomPlus
 	></NomPlus>, y compris les <SFB></SFB>s encore plus rares.
-	<i class="fad fa-smile" style="color:var(--couleur-bleue)"></i>
+	<i class="fa-duotone fa-face-smile"></i>
 </p>
 
 <h4>Alternance des mains non maximale</h4>

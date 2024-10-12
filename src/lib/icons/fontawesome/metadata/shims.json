@@ -2,7 +2,7 @@
   [
     "glass",
     null,
-    "glass-martini"
+    "martini-glass-empty"
   ],
   [
     "meetup",
@@ -17,22 +17,22 @@
   [
     "remove",
     null,
-    "times"
+    "xmark"
   ],
   [
     "close",
     null,
-    "times"
+    "xmark"
   ],
   [
     "gear",
     null,
-    "cog"
+    "gear"
   ],
   [
     "trash-o",
     "far",
-    "trash-alt"
+    "trash-can"
   ],
   [
     "file-o",
@@ -47,32 +47,32 @@
   [
     "arrow-circle-o-down",
     "far",
-    "arrow-alt-circle-down"
+    "circle-down"
   ],
   [
     "arrow-circle-o-up",
     "far",
-    "arrow-alt-circle-up"
+    "circle-up"
   ],
   [
     "play-circle-o",
     "far",
-    "play-circle"
+    "circle-play"
   ],
   [
     "repeat",
     null,
-    "redo"
+    "arrow-rotate-forward"
   ],
   [
     "rotate-right",
     null,
-    "redo"
+    "arrow-rotate-forward"
   ],
   [
     "refresh",
     null,
-    "sync"
+    "arrows-rotate"
   ],
   [
     "list-alt",
@@ -105,44 +105,44 @@
     "image"
   ],
   [
-    "pencil",
-    null,
-    "pencil-alt"
-  ],
-  [
     "map-marker",
     null,
-    "map-marker-alt"
+    "location-dot"
   ],
   [
     "pencil-square-o",
     "far",
-    "edit"
+    "pen-to-square"
+  ],
+  [
+    "edit",
+    "far",
+    "pen-to-square"
   ],
   [
     "share-square-o",
     "far",
-    "share-square"
+    "share-from-square"
   ],
   [
     "check-square-o",
     "far",
-    "check-square"
+    "square-check"
   ],
   [
     "arrows",
     null,
-    "arrows-alt"
+    "up-down-left-right"
   ],
   [
     "times-circle-o",
     "far",
-    "times-circle"
+    "circle-xmark"
   ],
   [
     "check-circle-o",
     "far",
-    "check-circle"
+    "circle-check"
   ],
   [
     "mail-forward",
@@ -152,12 +152,12 @@
   [
     "expand",
     null,
-    "expand-alt"
+    "up-right-and-down-left-from-center"
   ],
   [
     "compress",
     null,
-    "compress-alt"
+    "down-left-and-up-right-to-center"
   ],
   [
     "eye",
@@ -172,22 +172,22 @@
   [
     "warning",
     null,
-    "exclamation-triangle"
+    "triangle-exclamation"
   ],
   [
     "calendar",
     null,
-    "calendar-alt"
+    "calendar-days"
   ],
   [
     "arrows-v",
     null,
-    "arrows-alt-v"
+    "up-down"
   ],
   [
     "arrows-h",
     null,
-    "arrows-alt-h"
+    "left-right"
   ],
   [
     "bar-chart",
@@ -212,7 +212,7 @@
   [
     "gears",
     null,
-    "cogs"
+    "gears"
   ],
   [
     "thumbs-o-up",
@@ -232,7 +232,7 @@
   [
     "sign-out",
     null,
-    "sign-out-alt"
+    "right-from-bracket"
   ],
   [
     "linkedin-square",
@@ -247,12 +247,12 @@
   [
     "external-link",
     null,
-    "external-link-alt"
+    "up-right-from-square"
   ],
   [
     "sign-in",
     null,
-    "sign-in-alt"
+    "right-to-bracket"
   ],
   [
     "github-square",
@@ -307,7 +307,7 @@
   [
     "hdd-o",
     "far",
-    "hdd"
+    "hard-drive"
   ],
   [
     "hand-o-right",
@@ -332,7 +332,7 @@
   [
     "arrows-alt",
     null,
-    "expand-arrows-alt"
+    "maximize"
   ],
   [
     "group",
@@ -347,7 +347,12 @@
   [
     "scissors",
     null,
-    "cut"
+    "scissors"
+  ],
+  [
+    "cut",
+    null,
+    "scissors"
   ],
   [
     "files-o",
@@ -357,7 +362,12 @@
   [
     "floppy-o",
     "far",
-    "save"
+    "floppy-disk"
+  ],
+  [
+    "save",
+    "far",
+    "floppy-disk"
   ],
   [
     "navicon",
@@ -392,7 +402,7 @@
   [
     "money",
     "far",
-    "money-bill-alt"
+    "money-bill-1"
   ],
   [
     "unsorted",
@@ -417,7 +427,7 @@
   [
     "rotate-left",
     null,
-    "undo"
+    "arrow-left-rotate"
   ],
   [
     "legal",
@@ -427,12 +437,12 @@
   [
     "tachometer",
     null,
-    "tachometer-alt"
+    "gauge"
   ],
   [
     "dashboard",
     null,
-    "tachometer-alt"
+    "gauge"
   ],
   [
     "comment-o",
@@ -467,17 +477,17 @@
   [
     "exchange",
     null,
-    "exchange-alt"
+    "right-left"
   ],
   [
     "cloud-download",
     null,
-    "cloud-download-alt"
+    "cloud-arrow-down"
   ],
   [
     "cloud-upload",
     null,
-    "cloud-upload-alt"
+    "cloud-arrow-up"
   ],
   [
     "bell-o",
@@ -492,7 +502,7 @@
   [
     "file-text-o",
     "far",
-    "file-alt"
+    "file-lines"
   ],
   [
     "building-o",
@@ -507,17 +517,17 @@
   [
     "tablet",
     null,
-    "tablet-alt"
+    "tablet-screen-button"
   ],
   [
     "mobile",
     null,
-    "mobile-alt"
+    "mobile-screen-button"
   ],
   [
     "mobile-phone",
     null,
-    "mobile-alt"
+    "mobile-screen-button"
   ],
   [
     "circle-o",
@@ -547,17 +557,17 @@
   [
     "smile-o",
     "far",
-    "smile"
+    "face-smile"
   ],
   [
     "frown-o",
     "far",
-    "frown"
+    "face-frown"
   ],
   [
     "meh-o",
     "far",
-    "meh"
+    "face-meh"
   ],
   [
     "keyboard-o",
@@ -597,12 +607,17 @@
   [
     "chain-broken",
     null,
-    "unlink"
+    "link-slash"
+  ],
+  [
+    "unlink",
+    null,
+    "link-slash"
   ],
   [
     "shield",
     null,
-    "shield-alt"
+    "shield-blank"
   ],
   [
     "calendar-o",
@@ -627,32 +642,32 @@
   [
     "ticket",
     null,
-    "ticket-alt"
+    "ticket-simple"
   ],
   [
     "minus-square-o",
     "far",
-    "minus-square"
+    "square-minus"
   ],
   [
     "level-up",
     null,
-    "level-up-alt"
+    "turn-up"
   ],
   [
     "level-down",
     null,
-    "level-down-alt"
+    "turn-down"
   ],
   [
     "pencil-square",
     null,
-    "pen-square"
+    "square-pen"
   ],
   [
     "external-link-square",
     null,
-    "external-link-square-alt"
+    "square-up-right"
   ],
   [
     "compass",
@@ -662,32 +677,32 @@
   [
     "caret-square-o-down",
     "far",
-    "caret-square-down"
+    "square-caret-down"
   ],
   [
     "toggle-down",
     "far",
-    "caret-square-down"
+    "square-caret-down"
   ],
   [
     "caret-square-o-up",
     "far",
-    "caret-square-up"
+    "square-caret-up"
   ],
   [
     "toggle-up",
     "far",
-    "caret-square-up"
+    "square-caret-up"
   ],
   [
     "caret-square-o-right",
     "far",
-    "caret-square-right"
+    "square-caret-right"
   ],
   [
     "toggle-right",
     "far",
-    "caret-square-right"
+    "square-caret-right"
   ],
   [
     "eur",
@@ -702,7 +717,7 @@
   [
     "gbp",
     null,
-    "pound-sign"
+    "sterling-sign"
   ],
   [
     "usd",
@@ -782,37 +797,37 @@
   [
     "file-text",
     null,
-    "file-alt"
+    "file-lines"
   ],
   [
     "sort-alpha-asc",
     null,
-    "sort-alpha-down"
+    "arrow-down-a-z"
   ],
   [
     "sort-alpha-desc",
     null,
-    "sort-alpha-down-alt"
+    "arrow-down-z-a"
   ],
   [
     "sort-amount-asc",
     null,
-    "sort-amount-down"
+    "arrow-down-wide-short"
   ],
   [
     "sort-amount-desc",
     null,
-    "sort-amount-down-alt"
+    "arrow-down-short-wide"
   ],
   [
     "sort-numeric-asc",
     null,
-    "sort-numeric-down"
+    "arrow-down-1-9"
   ],
   [
     "sort-numeric-desc",
     null,
-    "sort-numeric-down-alt"
+    "arrow-down-9-1"
   ],
   [
     "youtube-square",
@@ -887,22 +902,22 @@
   [
     "long-arrow-down",
     null,
-    "long-arrow-alt-down"
+    "down-long"
   ],
   [
     "long-arrow-up",
     null,
-    "long-arrow-alt-up"
+    "up-long"
   ],
   [
     "long-arrow-left",
     null,
-    "long-arrow-alt-left"
+    "left-long"
   ],
   [
     "long-arrow-right",
     null,
-    "long-arrow-alt-right"
+    "right-long"
   ],
   [
     "apple",
@@ -992,27 +1007,27 @@
   [
     "arrow-circle-o-right",
     "far",
-    "arrow-alt-circle-right"
+    "circle-right"
   ],
   [
     "arrow-circle-o-left",
     "far",
-    "arrow-alt-circle-left"
+    "circle-left"
   ],
   [
     "caret-square-o-left",
     "far",
-    "caret-square-left"
+    "square-caret-left"
   ],
   [
     "toggle-left",
     "far",
-    "caret-square-left"
+    "square-caret-left"
   ],
   [
     "dot-circle-o",
     "far",
-    "dot-circle"
+    "circle-dot"
   ],
   [
     "vimeo-square",
@@ -1032,7 +1047,7 @@
   [
     "plus-square-o",
     "far",
-    "plus-square"
+    "square-plus"
   ],
   [
     "slack",
@@ -1052,12 +1067,12 @@
   [
     "institution",
     null,
-    "university"
+    "bank"
   ],
   [
     "bank",
     null,
-    "university"
+    "bank"
   ],
   [
     "mortar-board",
@@ -1127,7 +1142,7 @@
   [
     "spoon",
     null,
-    "utensil-spoon"
+    "spoon"
   ],
   [
     "behance",
@@ -1150,14 +1165,14 @@
     null
   ],
   [
-    "automobile",
-    null,
-    "car"
-  ],
-  [
     "envelope-o",
     "far",
     "envelope"
+  ],
+  [
+    "cab",
+    null,
+    "taxi"
   ],
   [
     "spotify",
@@ -1212,12 +1227,12 @@
   [
     "file-archive-o",
     "far",
-    "file-archive"
+    "file-zipper"
   ],
   [
     "file-zip-o",
     "far",
-    "file-archive"
+    "file-zipper"
   ],
   [
     "file-audio-o",
@@ -1387,17 +1402,17 @@
   [
     "sliders",
     null,
-    "sliders-h"
+    "sliders"
   ],
   [
     "futbol-o",
     "far",
-    "futbol"
+    "futbol-ball"
   ],
   [
     "soccer-ball-o",
     "far",
-    "futbol"
+    "futbol-ball"
   ],
   [
     "slideshare",
@@ -1467,7 +1482,7 @@
   [
     "trash",
     null,
-    "trash-alt"
+    "trash-can"
   ],
   [
     "copyright",
@@ -1692,7 +1707,7 @@
   [
     "sticky-note-o",
     "far",
-    "sticky-note"
+    "note-sticky"
   ],
   [
     "cc-jcb",
@@ -1722,7 +1737,7 @@
   [
     "hourglass-2",
     null,
-    "hourglass-half"
+    "hourglass"
   ],
   [
     "hourglass-3",
@@ -1877,7 +1892,7 @@
   [
     "calendar-times-o",
     "far",
-    "calendar-times"
+    "calendar-xmark"
   ],
   [
     "calendar-check-o",
@@ -1972,12 +1987,12 @@
   [
     "pause-circle-o",
     "far",
-    "pause-circle"
+    "circle-pause"
   ],
   [
     "stop-circle-o",
     "far",
-    "stop-circle"
+    "circle-stop"
   ],
   [
     "bluetooth",
@@ -2017,7 +2032,7 @@
   [
     "question-circle-o",
     "far",
-    "question-circle"
+    "circle-question"
   ],
   [
     "volume-control-phone",
@@ -2027,17 +2042,17 @@
   [
     "asl-interpreting",
     null,
-    "american-sign-language-interpreting"
+    "hands-asl-interpreting"
   ],
   [
     "deafness",
     null,
-    "deaf"
+    "ear-deaf"
   ],
   [
     "hard-of-hearing",
     null,
-    "deaf"
+    "ear-deaf"
   ],
   [
     "glide",
@@ -2052,7 +2067,7 @@
   [
     "signing",
     null,
-    "sign-language"
+    "hands"
   ],
   [
     "viadeo",
@@ -2157,7 +2172,7 @@
   [
     "user-circle-o",
     "far",
-    "user-circle"
+    "circle-user"
   ],
   [
     "user-o",
@@ -2202,32 +2217,32 @@
   [
     "thermometer-4",
     null,
-    "thermometer-full"
+    "temperature-full"
   ],
   [
     "thermometer",
     null,
-    "thermometer-full"
+    "temperature-full"
   ],
   [
     "thermometer-3",
     null,
-    "thermometer-three-quarters"
+    "temperature-three-quarters"
   ],
   [
     "thermometer-2",
     null,
-    "thermometer-half"
+    "temperature-half"
   ],
   [
     "thermometer-1",
     null,
-    "thermometer-quarter"
+    "temperature-quarter"
   ],
   [
     "thermometer-0",
     null,
-    "thermometer-empty"
+    "temperature-empty"
   ],
   [
     "bathtub",
@@ -2252,17 +2267,17 @@
   [
     "times-rectangle",
     null,
-    "window-close"
+    "rectangle-xmark"
   ],
   [
     "window-close-o",
     "far",
-    "window-close"
+    "rectangle-xmark"
   ],
   [
     "times-rectangle-o",
     "far",
-    "window-close"
+    "rectangle-xmark"
   ],
   [
     "bandcamp",
@@ -2310,8 +2325,8 @@
     null
   ],
   [
-    "cab",
+    "automobile",
     null,
-    "taxi"
+    "car"
   ]
 ]

@@ -135,8 +135,8 @@
 
 <div>
 	<button id="afficher-clavier-reference" on:click={toggleZIndex}>
-		<i class="fad fa-keyboard" style="display:{affiche === 'none' ? 'block' : 'none'}"></i>
-		<i class="fad fa-times" style="display:{affiche}"></i>
+		<i class="fa-duotone fa-keyboard" style="display:{affiche === 'none' ? 'block' : 'none'}"></i>
+		<i class="fa-duotone fa-square-xmark" style="display:{affiche}"></i>
 	</button>
 
 	<div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
