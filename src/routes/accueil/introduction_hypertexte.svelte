@@ -31,10 +31,12 @@
 		>. Fruit de nombreuses réflexions et expérimentations, elle se veut la plus optimale possible
 		<span class="important">pour&nbsp;un&nbsp;confort&nbsp;d’exception</span>.
 	</p>
+	<hr />
 </div>
-<hr />
+
 <mini-espace />
-<div class="cards main">
+
+<div class="cards">
 	<div class="card">
 		<i class="fa-duotone fa-circle-1"></i>
 		<span class="text-bold">Diminution de la distance parcourue</span> pour moins de fatigue et plus
@@ -61,12 +63,15 @@
 		raccourcis sur la main gauche, ponctuations insécables, etc.
 	</div>
 </div>
+
 <mini-espace />
+
 <div style="text-align:center;">
 	<a href="/telechargements">
 		<button class="bouton-telechargement">➜ Essayer en ligne / Installation</button>
 	</a>
 </div>
+
 <grand-espace />
 
 <style>

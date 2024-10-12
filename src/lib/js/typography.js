@@ -23,7 +23,7 @@ const excludedTags = [
 const inlineTags = ['kbd', 'kbd-sortie', 'kbd-non', 'nom-hypertexte', 'nom-hypertexte-plus'];
 
 // Expressions régulières pour traiter les espaces, les apostrophes et la ponctuation
-const spaceRegex = /(\u00AB)(?:\s+)?|(?:\s+)?([\?!;\u00BB])/g;
+const spaceRegex = /(\u00AB)(?:\s+)?|(?:\s+)?([\?!:;\u00BB])/g;
 const apostropheRegex = /'/g;
 const punctuationRegex = /^[\.,;:!?)]/; // Expression régulière pour la ponctuation
 

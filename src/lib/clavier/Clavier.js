@@ -343,7 +343,6 @@ export class Clavier {
 		let touchePressee = toucheModificatrice.dataset.touche;
 		let coucheActuelle = this.infos_clavier.couche;
 		let nouvelleCouche = coucheActuelle;
-		console.log(touchePressee, coucheActuelle, nouvelleCouche, this.infos_clavier.plus);
 
 		// Touche pressée = AltGr
 		if (touchePressee === 'RAlt' && coucheActuelle === 'AltGr') {
