@@ -275,6 +275,8 @@ export class Clavier {
 			let altGr = emplacementClavier.querySelector("[data-touche='RAlt']");
 			let aGrave = emplacementClavier.querySelector("[data-touche='à']");
 			let virgule = emplacementClavier.querySelector("[data-touche=',']");
+			let circonflexe = emplacementClavier.querySelector("[data-touche='^']");
+			let trema = emplacementClavier.querySelector("[data-touche='trema']");
 			let lalt = emplacementClavier.querySelector("[data-touche='LAlt']");
 			let space = emplacementClavier.querySelector("[data-touche='Space']");
 
@@ -415,6 +417,16 @@ export class Clavier {
 			nouvelleCouche = 'Shift';
 		}
 
+		// Touche pressée = ^
+		if (touchePressee === '^' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
+			nouvelleCouche = '^';
+		}
+
+		// Touche pressée = trema
+		if (touchePressee === 'trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
+			nouvelleCouche = 'trema';
+		}
+
 		// Touche pressée = E
 		if (touchePressee === 'e' && coucheActuelle === 'ShiftAltGr') {
 			nouvelleCouche = 'e';
@@ -469,6 +481,8 @@ export class Clavier {
 			let toucheE = emplacementClavier.querySelector("bloc-touche[data-touche='e']");
 			let toucheR = emplacementClavier.querySelector("bloc-touche[data-touche='r']");
 			let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
+			let toucheCirconflexe = emplacementClavier.querySelector("bloc-touche[data-touche='^']");
+			let toucheTrema = emplacementClavier.querySelector("bloc-touche[data-touche='trema']");
 			let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
 
 			// On ajoute une action au clic sur chacune des touches modificatrices
@@ -478,6 +492,8 @@ export class Clavier {
 				toucheRShift,
 				toucheLCtrl,
 				toucheRCtrl,
+				toucheCirconflexe,
+				toucheTrema,
 				toucheA,
 				toucheE,
 				toucheR

@@ -14,14 +14,16 @@
 		['➂ AltGr', 'AltGr'],
 		['➃ Shift + AltGr', 'ShiftAltGr'],
 		['Ctrl', 'Ctrl'],
+		['Circonflexe', '^'],
+		['Tréma', 'trema'],
 		['Exposant', 'e'],
 		['Indice', 'i'],
 		['ℝ', 'R']
 	];
 	let couches_plus = couches_standard.concat([
 		['★ Layer', 'Layer'],
-		['★ Touche Virgule', ','],
-		['★ Touche À', 'À']
+		['★ Virgule', ','],
+		['★ À', 'À']
 	]);
 
 	function toggleCouche(nouvelleCouche) {
