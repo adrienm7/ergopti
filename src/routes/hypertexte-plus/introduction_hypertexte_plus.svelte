@@ -42,31 +42,31 @@
 	<div class="card">
 		<i class="fa-duotone fa-circle-1"></i>
 		Ajoute de
-		<span class="text-bold">nouveaux roulements</span>
+		<span class="text-bold">nouveaux roulements</span>.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i>
 		<span class="important">Éradique la quasi-totalité des <SFB />s </span> pour une frappe ultra-fluide
-		sans inconfort
+		sans inconfort.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-3"></i>
 		<span class="text-bold">Réduit les distances parcourues par les doigts</span>, en particulier
-		l’auriculaire droit
+		l’auriculaire droit.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-4"></i> ajoute divers raccourcis tels qu’une touche
-		<kbd-sortie>Alt + Tab</kbd-sortie>
+		<i class="fa-duotone fa-circle-4"></i> Ajoute divers raccourcis tels que des touches
+		<kbd-sortie>OneShotShift</kbd-sortie>, <kbd-sortie>Alt + Tab</kbd-sortie>
 		et
 		<kbd-sortie>Capsword</kbd-sortie>.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-5"></i>
-		<span class="text-bold">divise par 2 le nombre de touches frappées</span> pour écrire certains mots
+		<span class="text-bold">Divise par 2 le nombre de touches frappées</span> pour écrire certains mots.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-6"></i> Les fonctionnalités sont optionnelles et
-		<span class="important">peuvent être intégrées au fil du temps</span>
+		<span class="important">peuvent être intégrées au fil du temps</span>.
 	</div>
 </div>
 <mini-espace></mini-espace>

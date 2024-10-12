@@ -40,23 +40,23 @@
 	<div class="card">
 		<i class="fa-duotone fa-circle-1"></i>
 		<span class="text-bold">Diminution de la distance parcourue</span> pour moins de fatigue et plus
-		de confort
+		de confort.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i> <span class="important">Frappe extrêmement fluide</span>
-		par élimination de la quasi-totalité des <SFB />s
+		par élimination de la quasi-totalité des <SFB />s.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-3"></i> <span class="text-bold">Alternance des mains</span> favorisée
-		pour paralléliser la frappe et ainsi écrire plus vite
+		pour paralléliser la frappe et ainsi écrire plus vite.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-4"></i> <span class="important">Frappe ultra-confortable</span> grâce
-		à une optimisation des roulements
+		à une optimisation des roulements.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-5"></i> <span class="text-bold">Placement logique</span> des touches,
-		permettant de s’en souvenir aisément
+		permettant de s’en souvenir aisément.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-6"></i> <span class="important">Chiffres en accès direct</span>,
