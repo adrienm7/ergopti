@@ -16,6 +16,20 @@ bloc-image p {
 	font-weight: bold;
 }
 
+/* Icônes */
+i {
+	color: #3088ed !important;
+}
+i::before {
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	color: transparent;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	background-image: linear-gradient(to right, var(--gradient-blue));
+}
+
 /* Clavier en 3D */
 .container {
 	perspective: 1000px;
