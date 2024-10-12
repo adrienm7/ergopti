@@ -1,38 +1,68 @@
-# create-svelte
+# Disposition HyperTexte
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+https://hypertexte.beseven.fr
 
-## Creating a project
+HyperTexte est une disposition de clavier ergonomique possédant les caractéristiques suivantes :
+- Disposition **optimisée pour le français, l’anglais et le code** ;
+- **Chiffres en accès direct** ;
+- Couche AltGr permettant d’accéder aux symboles de programmation ;
+- **Conservation de raccourcis usuels** : les raccourcis <kbd>Ctrl-{A, C, V, X, Z}</kbd> sont disponibles à gauche du clavier ;
+- Support de tous les caractères spéciaux utilisés en français (diacritiques, majuscules accentuées, lettres entrelacées, symboles de ponctuation…);
+- **Version « HyperTexte + » avec de nombreuses autres fonctionnalités** : 
+   - touche ★ de répétition (par exemple <kbd>el★e</kbd> donne « elle ») ;
+   - touche ★ d’abréviations (par exemple <kbd>pex★</kbd> donne « par exemple » ;
+   - suppression de tous les SFBs restants (par exemple <kbd>,s</kbd> donne « sc ») ;
+   - la touche <kbd>q</kbd> donne « qu » ;
+   - divers raccourcis dont des tap-holds ;
+   - ajout de roulements ;
+   - etc.
 
-If you're seeing this, you've probably already done this step. Congrats!
+Le site de présentation du projet fonctionne à l’aide de SvelteKit (https://kit.svelte.dev/).
 
+Les claviers sur le site ont été réalisés en partant de zéro, en créant une matrice de 16×6 touches vide.
+Une fonction va ensuite remplir ces touches grâce aux valeurs d’un fichier json, selon la couche choisie, l’emplacement de la touche, si la version HyperTexte+ est activée, etc.
+Le code de génération de ces claviers est fait sur-mesure pour mes besoins (nouvelles couches telle qu’une couche Layer, une couche Indices, Exposants, etc.) mais pourrait probablement être utilisé sur un autre projet moyennant des adaptations. En particulier, il faudrait voir comment faire pour utiliser la fonction de génération de clavier en dehors de SvelteKit.
+
+
+
+
+
+## Développement
+
+Après avoir cloné le projet, se placer dans le répertoire hypertexte.
+Puis, installer les dépendances :
 ```bash
-# create a new project in the current directory
-npm create svelte@latest
-
-# create a new project in my-app
-npm create svelte@latest my-app
+npm install  # ou pnpm install ou yarn
 ```
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
+Une fois cela fait, démarrer un serveur de développement avec la commande suivante :
 ```bash
 npm run dev
+```
+Cela devrait ouvrir un serveur local à l’adresse http://localhost:5173/.
 
-# or start the server and open the app in a new browser tab
+Il est également possible de démarrer le serveur et d’ouvrir automatiquement l'application dans un nouvel onglet de navigateur :
+```bash
 npm run dev -- --open
 ```
 
-## Building
 
-To create a production version of your app:
 
+
+
+## Build
+
+Pour créer une version de production de l'application, utiliser :
 ```bash
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+Une fois cela fait, pour prévisualiser la version de production, exécuter :
+```bash
+npm run preview
+```
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+
+### Déploiement
+
+Pour déployer l'application, il peut être nécessaire d'installer un adaptateur en fonction de l'environnement cible.
