@@ -7,7 +7,7 @@
 	import Changelog from './changelog.svelte';
 	import Contact from './contact.svelte';
 	import GeneseSources from './genese_sources.svelte';
-	import License from './license.svelte';
+	import Licence from './licence.svelte';
 </script>
 
 <svelte:head>
@@ -18,5 +18,5 @@
 <GeneseSources></GeneseSources>
 <Autocritiques></Autocritiques>
 <!-- <Changelog></Changelog> -->
-<License></License>
+<Licence></Licence>
 <Contact></Contact>
