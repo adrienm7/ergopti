@@ -8,6 +8,8 @@ export class EmulationClavier extends Clavier {
 		this.alt = false;
 		this.altgr = false;
 		this.control = false;
+		this.circonflexe = false;
+		this.trema = false;
 		this.e = false;
 		this.i = false;
 		this.R = false;
@@ -74,6 +76,10 @@ export class EmulationClavier extends Clavier {
 			this.couche = 'Shift';
 		} else if (this.control) {
 			this.couche = 'Ctrl';
+		} else if (this.circonflexe) {
+			this.couche = '^';
+		} else if (this.trema) {
+			this.couche = 'trema';
 		} else if (this.e) {
 			this.couche = 'e';
 		} else if (this.i) {
@@ -159,6 +165,22 @@ export class EmulationClavier extends Clavier {
 				}
 				this.e = false;
 				this.envoiTouche_ReplacerCurseur(touche);
+			} else if (this.circonflexe) {
+				if (keyPressed === 'Space') {
+					touche = ' ';
+				} else {
+					touche = toucheClavier['^'];
+				}
+				this.circonflexe = false;
+				this.envoiTouche_ReplacerCurseur(touche);
+			} else if (this.trema) {
+				if (keyPressed === 'Space') {
+					touche = ' ';
+				} else {
+					touche = toucheClavier['trema'];
+				}
+				this.trema = false;
+				this.envoiTouche_ReplacerCurseur(touche);
 			} else if (this.i) {
 				if (keyPressed === 'Space') {
 					touche = ' ';
@@ -243,6 +265,14 @@ export class EmulationClavier extends Clavier {
 		var texteAvantCurseur = this.textarea.value.substring(0, positionCurseur);
 		var texteApresCurseur = this.textarea.value.substring(positionCurseur);
 
+		if (touche === '◌̂') {
+			this.circonflexe = true;
+			touche = ''; /* Ne pas afficher la touche morte */
+		}
+		if (touche === '◌̈') {
+			this.trema = true;
+			touche = ''; /* Ne pas afficher la touche morte */
+		}
 		if (touche === 'ᵉ') {
 			this.e = true;
 			touche = ''; /* Ne pas afficher la touche morte */
@@ -326,30 +356,6 @@ export class EmulationClavier extends Clavier {
 			this.textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + touche.length;
 		}
-
-		/* Convertir les touches mortes avec la voyelle suivante */
-		this.textarea.value = this.textarea.value
-			.replace(/◌̂a/g, 'â')
-			.replace(/◌̂e/g, 'ê')
-			.replace(/◌̂i/g, 'î')
-			.replace(/◌̂o/g, 'ô')
-			.replace(/◌̂u/g, 'û')
-			.replace(/◌̂A/g, 'Â')
-			.replace(/◌̂E/g, 'Ê')
-			.replace(/◌̂I/g, 'Î')
-			.replace(/◌̂O/g, 'Ô')
-			.replace(/◌̂U/g, 'Û');
-		this.textarea.value = this.textarea.value
-			.replace(/◌̈a/g, 'ä')
-			.replace(/◌̈e/g, 'ë')
-			.replace(/◌̈i/g, 'ï')
-			.replace(/◌̈o/g, 'ö')
-			.replace(/◌̈u/g, 'ü')
-			.replace(/◌̈A/g, 'Ä')
-			.replace(/◌̈E/g, 'Ë')
-			.replace(/◌̈I/g, 'Ï')
-			.replace(/◌̈O/g, 'Ö')
-			.replace(/◌̈U/g, 'Ü');
 
 		/* Évite le SFB NNU par exemple qui est N★U normalement, mais se fait N★Ê */
 		/* Sauf pour le R, car "arrêt" existe en français */
