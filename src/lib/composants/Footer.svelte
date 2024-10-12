@@ -4,7 +4,10 @@
 </script>
 
 <footer>
-	<p>Copyright © {date} — <span class="important">HyperTexte</span></p>
+	<p>
+		<span class="important">HyperTexte</span> —
+		<a href="https://github.com/adrienm7/hypertexte">GitHub</a>
+	</p>
 </footer>
 
 <style>

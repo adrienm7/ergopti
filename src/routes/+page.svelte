@@ -15,6 +15,7 @@
 	import UtilisationUneMain from './accueil/utilisation_une_main.svelte';
 	import OptimisationRoulements from './accueil/optimisation_roulements.svelte';
 	import IntroductionHypertexte from './accueil/introduction_hypertexte.svelte';
+	import EspaceInsecableAutomatique from './accueil/espace_insecable_automatique.svelte';
 </script>
 
 <svelte:head>
@@ -30,5 +31,6 @@
 <AlternanceMains />
 <OptimisationRoulements />
 <PlacementLogiqueTouches />
+<EspaceInsecableAutomatique />
 <ChiffresAccesDirect />
 <UtilisationUneMain />

@@ -13,7 +13,7 @@
 	pour l’écrire.
 </p>
 <p>
-	Le passage des chiffres en accès direct permet d’<span class="important"
+	Avoir les chiffres en accès direct permet d’<span class="important"
 		>écrire très rapidement des nombres</span
 	>
 	en milieu de phrase. La rangée des nombres n’est de toute façon pas très accessible, donc il vaut mieux

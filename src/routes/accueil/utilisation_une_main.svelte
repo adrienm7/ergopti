@@ -17,21 +17,26 @@
 </p>
 <p>
 	Par conséquent, il est également important de s’assurer que, grâce à sa disposition clavier,
-	beaucoup d’actions courantes puissent se réaliser avec la seule main gauche afin de <span
-		class="important">ne pas avoir à lâcher la souris</span
+	beaucoup d’actions courantes puissent se réaliser avec la seule main gauche <span
+		class="important">afin de ne pas avoir à lâcher la souris</span
 	>. À noter que sur ce point AZERTY est très bon car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
 	et de nombreuses autres lettres fréquemment utilisées pour faire des raccourcis en combinaison avec
 	<kbd>Ctrl</kbd> sont du côté gauche.
 </p>
 <p>
 	Avec <Nom />, le <kbd>=</kbd> a ainsi été dupliqué à gauche pour être mis en accès direct. Cela
-	permet de faire facilement les raccourcis sur Excel comme <kbd>=</kbd> et
+	permet de faire facilement des raccourcis, notamment sur Excel, tels que <kbd>=</kbd> et
 	<kbd>Alt</kbd>
 	+
 	<kbd>=</kbd>. En effet, normalement le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
 	<kbd>L</kbd>.
 </p>
-<mini-espace />
+
+<h3>
+	Conservation des raccourcis <kbd>Ctrl</kbd> + <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd> et
+	<kbd>Z</kbd>
+</h3>
+
 <BlocClavier nom="controle" />
 <mini-espace />
 <p>
@@ -48,6 +53,8 @@
 </p>
 
 <h3>Touches de raccourci sur la version Ergodox</h3>
+<BlocClavier nom="raccourcis_ergodox" />
+<mini-espace></mini-espace>
 <p>
 	La version d’<Nom /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
 	à une main, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
@@ -67,11 +74,13 @@
 <p>
 	<NomPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
 	<span class="important">mécanisme de tap-hold</span>. L’idée du tap-hold est qu’il est possible
-	d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold (maitenir
-	pressé). Grâce au tap-hold, il est possible d’avoir le comportement suivant : taper une touche
+	d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir
+	pressé). Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une touche
 	envoie un raccourci, mais la presser la fait se comporter normalement. Cela permet d’intégrer des
 	touches
-	<kbd>Copier</kbd>, <kbd>Coller</kbd> et <kbd>Alt+Tab</kbd> respectivement sur
+	<kbd-sortie>Copier</kbd-sortie>, <kbd-sortie>Coller</kbd-sortie> et
+	<kbd-sortie>Alt+Tab</kbd-sortie>
+	respectivement sur
 	<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>. En outre, un layer de navigation ainsi que
 	les touches
 	<kbd>Backspace</kbd>

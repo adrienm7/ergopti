@@ -6,10 +6,9 @@ bloc-image {
 bloc-image img {
 	width: 100%;
 	margin: 0 auto;
-	border: 10px solid rgb(255, 255, 255);
+	border: 10px solid rgba(0, 0, 0, 0.5);
 	border-radius: 10px;
-	box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px;
-	text-align: center;
+	/* box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px; */
 }
 
 bloc-image p {
@@ -41,5 +40,5 @@ bloc-image p {
 	); /* mettre la même valeur en négatif que la valeur de l'épaisseur */
 	width: calc(100% + 4px);
 	height: 100%;
-	background-color: black; /* ou la couleur de fond de votre choix */
+	background-color: black;
 }

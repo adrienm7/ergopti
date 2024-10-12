@@ -9,8 +9,8 @@
 
 <div>
 	<h1 class="hypertexte-title" data-aos="zoom-in" data-aos-mirror="true">
-		Disposition clavier<br /><span class="hyper">—&nbsp;Hyper</span><span class="htexte"
-			>Texte&nbsp;—</span
+		Disposition clavier<br /><span class="italic"
+			><span class="hyper">—&nbsp;Hyper</span><span class="htexte">Texte&nbsp;—</span></span
 		>
 	</h1>
 	<BlocClavier nom="presentation" />
@@ -55,7 +55,8 @@
 		➄ <span class="text-bold">Placement logique</span> des touches, permettant de s’en souvenir aisément
 	</div>
 	<div class="card">
-		➅ <span class="important">Et bien d’autres</span> améliorations, voire révolutions...
+		➅ <span class="important">Chiffres en accès direct</span>, raccourcis sur la main gauche,
+		ponctuations insécables, etc.
 	</div>
 </div>
 <mini-espace />

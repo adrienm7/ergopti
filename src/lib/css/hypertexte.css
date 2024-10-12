@@ -1,9 +1,6 @@
 nom-hypertexte {
-	/* font-style: italic; */
+	font-style: italic;
 	display: inline-block;
-	text-shadow:
-		-1px 0px 4px #00000011,
-		1px 0px 4px #00000011;
 	white-space: nowrap;
 }
 
@@ -16,6 +13,7 @@ nom-hypertexte {
 	box-decoration-break: clone;
 	background-image: linear-gradient(to right, var(--gradient-blue));
 }
+
 .htexte {
 	background: linear-gradient(to right, var(--gradient-purple));
 	background-clip: text;
