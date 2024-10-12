@@ -91,3 +91,12 @@ export const magique = writable({
 	couleur: 'non',
 	controles: 'non'
 });
+
+export const layer = writable({
+	emplacement: 'clavier_layer',
+	type: 'iso',
+	couche: 'Layer',
+	plus: 'oui',
+	couleur: 'non',
+	controles: 'oui'
+});

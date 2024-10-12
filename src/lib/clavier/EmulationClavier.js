@@ -97,8 +97,6 @@ export class EmulationClavier extends Clavier {
 	}
 
 	emulationClavier(event) {
-		console.log(event.code);
-
 		let modificateurActive = this.activationModificateur(event); // Activation des éventuelles touches modificatrices
 		this.setCouche();
 		if (this.alt && this.infos_clavier['plus'] === 'oui') {
@@ -111,10 +109,10 @@ export class EmulationClavier extends Clavier {
 		}
 
 		// Ne pas intercepter les raccourcis avec Ctrl
-		// if (this.control & !this.altgr) {
-		// 	// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
-		// 	return true;
-		// }
+		if (this.control & !this.altgr) {
+			// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
+			return true;
+		}
 
 		// Si touche normale
 		let keyPressed = event.code;
@@ -204,6 +202,23 @@ export class EmulationClavier extends Clavier {
 	}
 
 	envoiTouche(event, toucheClavier) {
+		/* Ctrl + touche renvoie Ctrl + émulation de touche */
+		/* Ne fonctionne pas actuellement */
+		// if (this.control & !this.altgr) {
+		// 	// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
+		// 	console.log(toucheClavier.touche);
+		// 	// Crée un nouvel événement clavier pour "Ctrl + lettre".
+		// 	const ctrlEvent = new KeyboardEvent('keydown', {
+		// 		key: toucheClavier.touche,
+		// 		ctrlKey: true, // Spécifie que la touche Ctrl est enfoncée
+		// 		bubbles: true,
+		// 		cancelable: true
+		// 	});
+		// 	// Envoie l'événement au même input
+		// 	this.textarea.dispatchEvent(ctrlEvent);
+		// 	return true;
+		// }
+
 		let touche = '';
 		if (this.infos_clavier['plus'] === 'oui') {
 			if (toucheClavier[this.couche + '+'] !== undefined) {
@@ -340,6 +355,38 @@ export class EmulationClavier extends Clavier {
 		/* Sauf pour le R, car "arrêt" existe en français */
 		this.textarea.value = this.textarea.value.replace(/([^\Wr]){2}ê/g, '$1$1u');
 
+		/* Apostrophe droite en typographique */
+		this.textarea.value = this.textarea.value.replace(/([cdjlmnst])'/gi, '$1’');
+
+		/* Correction de SFBs avec la touche È */
+		this.textarea.value = this.textarea.value
+			.replace(/èo/g, 'oe')
+			.replace(/èe/g, 'eo')
+			.replace(/uè/g, 'uè')
+			.replace(/èu/g, 'bu')
+			.replace(/è./g, 'u.')
+			.replace(/è,/g, 'u,');
+
+		/* Nouveaux roulements */
+		this.textarea.value = this.textarea.value
+			.replace(/yè/g, 'éi')
+			.replace(/èy/g, 'ié')
+			.replace(/gx/g, 'gt')
+			.replace(/hc/g, 'wh');
+		this.textarea.value = this.textarea.value.replace(/êé/g, 'aî');
+		({ nouveauTexte: this.textarea.value, nouvellePositionCurseur } = remplacerEtAjuster(
+			this.textarea.value,
+			/éê/g,
+			'â',
+			nouvellePositionCurseur
+		));
+		({ nouveauTexte: this.textarea.value, nouvellePositionCurseur } = remplacerEtAjuster(
+			this.textarea.value,
+			/p'/g,
+			'qu’',
+			nouvellePositionCurseur
+		));
+
 		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 
@@ -356,4 +403,13 @@ export class EmulationClavier extends Clavier {
 			.querySelector("bloc-touche[data-touche='" + touche + "']")
 			.classList.add('touche-active');
 	}
+}
+
+function remplacerEtAjuster(texte, regex, remplacement, positionCurseur) {
+	// Compte les occurrences dev par exemple, "p'", car on remplaçe deux lettres par trois, il faut donc changer la position du curseur
+	let count = (texte.match(regex) || []).length;
+	return {
+		nouveauTexte: texte.replace(regex, remplacement),
+		nouvellePositionCurseur: positionCurseur + count * (remplacement.length - regex.source.length)
+	};
 }

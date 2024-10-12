@@ -15,12 +15,16 @@
 	Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée en haut à droite du
 	clavier. Par conséquent, il est logique de vouloir la placer sur un emplacement très accessible.
 	C’est pour cela que la touche <kbd>BackSpace</kbd> a été dupliquée sur la touche
-	<kbd>Capslock</kbd>
-	en <NomPlus />.
+	<kbd>"Capslock"</kbd>
+	avec <NomPlus />.
 </p>
 <p>
 	Idéalement, il serait même mieux de la mettre sur une touche activée par un pouce. Toutefois, sur
 	les claviers non Ergodox c’est difficilement réalisable.
+</p>
+<p>
+	La touche <kbd>Delete</kbd> se trouve quant à elle sur la combinaison <kbd>Shift</kbd> +
+	<kbd>"CapsLock"</kbd>.
 </p>
 
 <h3>[QU] automatiques avant les voyelles</h3>
