@@ -72,9 +72,6 @@
 
 	afterUpdate(() => {
 		makeIds(document.getElementsByTagName('main')[0]);
-		document.querySelectorAll('h1').forEach(function (h1) {
-			h1.setAttribute('data-aos', 'zoom-in');
-		});
 		document.querySelectorAll('h2').forEach(function (h2) {
 			h2.setAttribute('data-aos', 'zoom-out');
 		});

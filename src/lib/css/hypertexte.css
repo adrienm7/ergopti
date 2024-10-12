@@ -4,6 +4,10 @@ nom-hypertexte {
 	white-space: nowrap;
 }
 
+nom-hypertexte-plus {
+	white-space: nowrap;
+}
+
 .hyper {
 	-webkit-background-clip: text;
 	background-clip: text;

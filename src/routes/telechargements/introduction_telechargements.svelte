@@ -17,7 +17,7 @@
 </script>
 
 <div class="main">
-	<h1>Utiliser HyperTexte</h1>
+	<h1 data-aos="zoom-in">Utiliser HyperTexte</h1>
 
 	<h2>Tester la disposition en ligne</h2>
 	<EmulationClavier />

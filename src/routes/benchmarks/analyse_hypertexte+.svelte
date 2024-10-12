@@ -38,11 +38,11 @@
 	></SFB>s de <Nom></Nom>.
 </p>
 <p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
-<p><Nom></Nom> :</p>
+<h4><Nom></Nom></h4>
 <bloc-image>
 	<img src="/resultats/SFBs_hypertexte.jpg" />
 </bloc-image>
-<p><NomPlus></NomPlus> :</p>
+<h4><NomPlus></NomPlus></h4>
 <bloc-image>
 	<img src="/resultats/SFBs_hypertexte+.jpg" />
 </bloc-image>
@@ -58,14 +58,19 @@
 <p>
 	Les gains de touches tapées ne sont pas reflétés sur la capture d’écran de résumé des scores. Avec
 	le corpus normal, nous avions 50 306 touches tapées par <Nom></Nom>. Ce nombre tombe à 45 525
-	touches tapées avec <NomPlus></NomPlus>. Cela peut paraître dérisoire, mais c’est quand même un
-	gain de 10% de touches en moins à taper ! Ou autrement dit une augmentation de la vitesse de 10%
-	sans effort (si ce n’est mémoriser les raccourcis de <NomPlus></NomPlus>).
+	touches tapées avec <NomPlus></NomPlus>. Le gain de 10% s’explique probablement surtout par les
+	raccourcis de suffixes en
+	<kbd>À</kbd>.
 </p>
 <p>
-	Les gains de touche peuvent encore s’accroître si vous personnalisez votre disposition pour y
-	ajouter vos propres raccourcis. Dans la version <NomPlus></NomPlus> testés, seule une petite vingtaine
-	de mots très courants ont été remplacés par un raccourci. Parmi ceux-ci :
+	Ce gain peut paraître dérisoire, mais c’est quand même un gain de 10% de touches en moins à taper
+	! Ou autrement dit une augmentation de la vitesse de 10% sans effort (si ce n’est mémoriser les
+	raccourcis de <NomPlus></NomPlus>).
+</p>
+<p>
+	La réduction du nombre de touches à taper peut encore s’accroître en personnalisant sa disposition
+	pour y ajouter ses propres raccourcis. Dans la version <NomPlus></NomPlus> testés, seule une petite
+	vingtaine de mots très courants ont été remplacés par un raccourci. Parmi ceux-ci :
 	<kbd-sortie>ainsi</kbd-sortie>
 	en <kbd>a★</kbd>, <kbd-sortie>exemple</kbd-sortie> en <kbd>x★</kbd> et
 	<kbd-sortie>faire</kbd-sortie>

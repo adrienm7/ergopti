@@ -4,23 +4,28 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<h2>Genèse et sources</h2>
+<h2>Genèse et inspirations</h2>
 <p>
-	La genèse de la disposition <Nom></Nom> remonte à 2022, à la suite de la découverte d'Optimot. Les
-	améliorations de la disposition Optimot par rapport au BÉPO sont vraiment significatives. Les tests
-	sont sans appel et montrent notamment une nette diminution des bigrammes à un doigt (<SFB />s).
+	La genèse de la disposition <Nom></Nom> remonte à début 2022, suite à la découverte d'Optimot, utilisant
+	auparavant BÉPO. Les améliorations de la disposition Optimot par rapport au BÉPO sont vraiment significatives.
+	Les analyses sont sans appel et montrent notamment une nette diminution des bigrammes à un doigt (<SFB
+	/>s).
 </p>
 <p>
-	Les premières versions de ce projet, baptisées <strong>Optim7</strong>, étaient des dérivés
-	directs d'Optimot. L'objectif initial était de peaufiner légèrement les scores sur les analyseurs
-	de dispositions existants. À cette époque, étant utilisateur de la disposition BÉPO, l'idée
-	d'apprendre Optimot, pour peut-être découvrir encore une version améliorée par la suite, était peu
-	attrayante. La meilleure façon de m’assurer de ne pas avoir à passer mon temps à apprendre de
-	nouvelles dispositions était de créer la mienne, optimisée pour mes besoins, même si cela
-	nécessitait un investissement en temps considérable.
+	À cette époque, étant utilisateur de la disposition BÉPO, l'idée d'apprendre Optimot, pour
+	peut-être découvrir encore une version améliorée par la suite, était peu attrayante. La meilleure
+	façon de m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions était
+	de créer la mienne, optimisée pour mes besoins, même si cela nécessitait un investissement en
+	temps considérable. Les premières versions de ce projet, baptisées <span class="important"
+		>Optim7</span
+	>, étaient des dérivés directs d'Optimot. L'objectif initial était de peaufiner légèrement les
+	scores sur les analyseurs de dispositions existants.
 </p>
+
+<mini-espace />
+
 <p>
-	Rapidement, <Nom></Nom> s'est éloigné d'Optimot sur plusieurs aspects fondamentaux. L'un des points
+	Rapidement, <Nom></Nom> s'est éloignée d'Optimot sur plusieurs aspects fondamentaux. L'un des points
 	clés était ma volonté d'optimiser les <em>roulements</em>, entraînant de nombreux tests sur la
 	disposition des touches principales, notamment sur la partie droite avec les consonnes. L'une des
 	décisions majeures fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que
@@ -28,14 +33,15 @@
 	l'optimiser pour qu'il se réalise sur des doigts consécutifs. L’agencement final des quatre
 	lettres de la rangée principale a été soigneusement conçu pour maximiser les bigrammes
 	consonantiques, avec une disposition harmonieuse. Seuls les bigrammes <kbd>ST</kbd> et
-	<kbd>TS</kbd> (comme dans "STaTS") ne profitent pas de cette optimisation en roulement.
+	<kbd>TS</kbd> (comme dans « <kbd>ST</kbd>A<kbd>TS</kbd> ») ne profitent malheureusement pas de cette
+	optimisation en roulement.
 </p>
 <p>
 	La disposition a beaucoup évoluée au fil du temps. En particulier, la touche sur l’index gauche a
 	plusieurs fois changé :
 	<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd> et enfin la création d’une touche spéciale
 	<kbd>★</kbd>
-	et du déplacement de <kbd>É</kbd> sur l’annulaire gauche.
+	et le déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 </p>
 <h3>
 	Simplification et utilisation de la couche <kbd>AltGr</kbd>
@@ -50,48 +56,53 @@
 <p>
 	N’ayant nullement besoin de tous les caractères exotiques et touches mortes du BÉPO ou d’Optimot,
 	la majeure partie fut supprimée pour ne conserver que l’essentiel. Cette simplification permit de
-	libérer de nombreux excellents emplacements sur la couche <bkd>AltGr</bkd> et me laissa assez de place
-	pour y loger tous les symboles. Ainsi, je n’avais plus besoins d’étendre mes doigts pour atteindre
-	la rangée des nombres pour taper des parenthèses, guillemets ou opérateurs mathématiques. En outre,
-	les chiffres sont quant à eux passés en accès direct, un changement très appréciable lors de l'utilisation
-	quotidienne.
+	libérer de nombreux excellents emplacements sur la couche <kbd>AltGr</kbd> et me laissa assez de place
+	pour y loger tous les symboles.
 </p>
+<p>
+	Ainsi, je n’avais plus besoins d’étendre mes doigts pour atteindre la rangée des nombres pour
+	taper des parenthèses, guillemets ou opérateurs mathématiques. En outre, les chiffres sont quant à
+	eux passés en accès direct, un changement très appréciable lors de l'utilisation quotidienne.
+</p>
+
 <h3>Évolution incrémentale</h3>
 <p>
 	À un certain stade de développement, il devint évident que la disposition n'était plus simplement
 	une variante d'Optimot. Le besoin de renommer ce projet s’est alors imposé. Grâce à la suggestion
-	d’un utilisateur nommé <strong>Zigmund</strong> sur Discord, après avoir longtemps cherché une
-	alternative aussi marquante que celui d’Optimot, le nom <Nom></Nom> fut retenu.
+	d’un utilisateur nommé <strong>Zigmund</strong> sur Discord, après avoir longtemps cherché un nom
+	aussi remarquablement bien trouvé que celui d’Optimot, le nom <Nom></Nom> fut retenu.
 </p>
 <p>
-	Bien que la création de <Nom></Nom> ait été un processus étalé sur plusieurs mois, près de 80% de la
-	disposition est restée constante. Les ajustements concernaient principalement le déplacement de certaines
-	lettres, nécessitant ainsi des phases de réapprentissage régulières. Néanmoins, la plupart des changements
-	se sont avérés non pertinents, ce qui explique l'absence de modifications majeures entre les premières
-	versions d’Optim7 et la version finale de <Nom></Nom>.
+	Bien que la création de <Nom></Nom> ait été un processus étalé sur plusieurs mois, voir années, près
+	de 90% de la disposition est restée constante. Les ajustements concernaient principalement le déplacement
+	de certaines lettres, nécessitant ainsi des phases de réapprentissage régulières. Néanmoins, la plupart
+	des changements se sont avérés non pertinents, ce qui explique l'absence de modifications majeures
+	entre les premières versions d’Optim7 et la version finale de <Nom></Nom>.
 </p>
 
 <h3>Comment la disposition a été créée</h3>
 <p>
-	➀ La première étape dans la création d’<Nom /> a été de classer les touches du clavier en deux groupes
+	➀ La première étape dans la création d’<Nom /> a été de partager les touches du clavier en deux groupes
 	: main gauche et main droite.
 </p>
 <p>
 	Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
 	étant majoritairement précédées et suivies de consonnes, cela amène immédiatement une grande
 	alternance des mains. À noter que cette idée est loin d’être nouvelle, car elle est déjà appliquée
-	dans presque toutes les dispositions alternatives : Dvorak, BÉPO, etc.
+	dans presque toutes les dispositions alternatives : Dvorak, BÉPO, Optimot, etc.
 </p>
 <p>
 	Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que sur la
-	plupart des claviers (i.e ceux qui sont non matriciels) il y a moins de touches sur ce côté. Le
-	côté droit a en effet trois colonnes de touches pour l’auriculaire alors que l’auriculaire gauche
-	n’en a qu’une. Ces nombreux emplacements sont précieux, surtout pour les langues ayant besoin de
-	caractères supplémentaires comme les accents en français. Le nombre de consonnes étant largement
-	supérieur au nombre de voyelles, même en comptant les voyelles accentuées du français, les placer
-	du côté avec le plus de touches était logique.
+	plupart des claviers standards il y a moins de touches sur ce côté. Le côté droit a en effet trois
+	colonnes de touches pour l’auriculaire alors que l’auriculaire gauche n’en a qu’une. Ces nombreux
+	emplacements sont précieux, surtout pour les langues ayant besoin de caractères supplémentaires,
+	comme les accents en français. Le nombre de consonnes étant largement supérieur au nombre de
+	voyelles, même en comptant les voyelles accentuées du français, les placer du côté avec le plus de
+	touches était logique.
 </p>
-<petit-espace />
+
+<mini-espace />
+
 <p>
 	➁ La deuxième étape dans la création de la disposition a été de placer les touches les plus
 	souvent utilisées le plus proche possible des doigts. Les doigts sont effectivement toujours
@@ -99,7 +110,9 @@
 	chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les déplacements
 	des doigts aux touches.
 </p>
-<petit-espace />
+
+<mini-espace />
+
 <p>
 	➂ La troisième étape a été de déplacer les lettres pour réduire au maximum le nombre de <SFB />s,
 	tout en maximisant les roulements. Cette étape est la plus difficile, car intervertir seulement
