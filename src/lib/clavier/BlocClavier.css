@@ -264,6 +264,7 @@ bloc-touche[data-touche='AltTab'] div {
 }
 
 bloc-touche[data-touche='BackSpace'] div,
+bloc-touche[data-touche='Delete'] div,
 bloc-clavier[data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
 	font-size: 0.9em;
 }
