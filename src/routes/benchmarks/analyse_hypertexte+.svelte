@@ -5,7 +5,7 @@
 </script>
 
 <h2>
-	Analyse de la vraie disposition <NomPlus></NomPlus>
+	Analyse de la vraie disposition<br /><NomPlus></NomPlus>
 </h2>
 <p>
 	Une réelle analyse de <NomPlus></NomPlus> nécessite de modifier le corpus afin d’y refléter les nouvelles

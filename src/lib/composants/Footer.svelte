@@ -17,7 +17,9 @@
 	}
 
 	footer {
-		display: block;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		height: var(--hauteur-footer);
 		margin: 0;
 		margin-top: 10vh;
