@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<h2>Licence</h2>
+<h2 id="licence">Licence</h2>
 
 <p>
 	La disposition de clavier <Nom /> ainsi que son site de présentation
