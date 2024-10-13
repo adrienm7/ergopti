@@ -76,7 +76,7 @@
 	<kbd-sortie>faire</kbd-sortie>
 	en <kbd>f★</kbd>.
 </p>
-<h3>Analyse de fréquence d’utilisation des doigts</h3>
+<h3>Analyse de la fréquence d’utilisation des doigts</h3>
 <bloc-image>
 	<img src="/resultats/finger_usage_comparison.jpg" />
 </bloc-image>
