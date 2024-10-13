@@ -1,11 +1,12 @@
 <script>
+	import Nom from '$lib/composants/Nom.svelte';
 	import { page } from '$app/stores';
 	const date = new Date().getFullYear();
 </script>
 
 <footer>
 	<p>
-		<span class="important">HyperTexte</span> —
+		<Nom></Nom> — <a href="/informations#licence" style="color:white">License MIT</a> |
 		<a href="https://github.com/adrienm7/hypertexte">GitHub</a>
 	</p>
 </footer>
