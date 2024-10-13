@@ -1,5 +1,5 @@
 .cards {
-	max-width: 1000px;
+	max-width: min(1000px, 95vw);
 	margin: 0 auto;
 	display: grid;
 	gap: 1rem;

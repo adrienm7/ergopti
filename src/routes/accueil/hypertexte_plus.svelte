@@ -22,7 +22,7 @@
 			style="margin-top: 30vh; padding-top: 15vh; padding-bottom:8vh; border:none; box-shadow: none; font-weight:bolder; font-size:2rem"
 			data-aos="none"
 		>
-			★&nbsp;Pour aller encore <b>+</b> loin&nbsp;★
+			★&nbsp;Pour aller encore <b>+</b>&nbsp;loin&nbsp;★
 		</p>
 		<div class="texte-orb" style="max-width: 850px; margin:0 auto; margin-top:-50px">
 			<hr />
