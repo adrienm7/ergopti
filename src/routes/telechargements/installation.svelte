@@ -30,12 +30,42 @@
 		><button>Fichier source Kbdedit de HyperTexte {version}</button></a
 	>
 </div>
-<mini-espace />
+<petit-espace />
 <div>
-	<a aria-disabled="true" disabled href="" download
-		><button class="bouton-telechargement">☛ HyperTextePlus.exe — Pas encore disponible</button></a
+	<a href="/pilotes/plus/HyperTextePlus_v{version}.ahk" download
+		><button class="bouton-telechargement">☛ HyperTextePlus.ahk</button></a
 	>
 </div>
+<p>
+	Afin que le code source HyperTextePlus.ahk fonctionne, il faut auparavant installer
+	<a href="https://www.autohotkey.com/">AutoHotkey v2</a>. Une fois cela fait, il suffit de
+	double-cliquer sur le fichier HyperTextePlus.ahk pour l’exécuter avec AutoHotkey.
+</p>
+<p>
+	Ce fichier se modifie avec un éditeur de texte afin que vous puissiez l’adapter selon vos envies,
+	notamment pour en désactiver des fonctionnalités ou en ajouter. N’oubliez pas de le relancer pour
+	appliquer vos modifications. Le raccourci <kbd>AltGr</kbd> + <kbd>BackSpace</kbd> a été implémenté
+	afin de relancer facilement le script après une modification.
+</p>
+<p>
+	Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
+	désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement du
+	script HyperTextePlus au démarrage, il est possible de suivre les étapes suivantes :
+</p>
+<ul>
+	<li>
+		Presser simultanément la touche Windows et la touche R. Ce raccourci <kbd>Win</kbd> +
+		<kbd>R</kbd> permet d'ouvrir la fenêtre « Exécuter » de Windows ;
+	</li>
+	<li>Saisir <em>shell:startup</em> et valider en cliquant sur le bouton « OK » ;</li>
+	<li>
+		Le dossier qui vient de s'ouvrir correspond au dossier de démarrage. Tout élément dedans est
+		exécuté au démarrage de Windows. Créer un raccourci dans ce dossier pointant vers l'emplacement
+		où vous allez sauvegarder votre fichier <em>HyperTextePlus.ahk</em>. Vous pouvez par exemple le
+		mettre dans votre dossier Documents.
+	</li>
+</ul>
+
 <petit-espace />
 
 <h3>Installer la disposition — Avec Kalamine</h3>
