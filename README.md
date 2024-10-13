@@ -2,7 +2,11 @@
 
 ![Couche de base](static/img/hypertexte_visuel.jpg)
 
+---
+
 ➜ https://hypertexte.beseven.fr
+
+---
 
 HyperTexte est une disposition de clavier ergonomique possédant les caractéristiques suivantes :
 
@@ -12,7 +16,7 @@ HyperTexte est une disposition de clavier ergonomique possédant les caractéris
   ![Couche AltGr](static/img/hypertexte_altgr.jpg)
 - **Conservation de raccourcis usuels** : les raccourcis <kbd>Ctrl-{A, C, V, X, Z}</kbd> sont disponibles à gauche du clavier ;
   ![Couche Ctrl](static/img/hypertexte_ctrl.jpg)
-- Support de tous les caractères spéciaux utilisés en français (diacritiques, majuscules accentuées, lettres entrelacées, symboles de ponctuation…);
+- Support de tous les caractères spéciaux utilisés en français (diacritiques, majuscules accentuées, lettres entrelacées, symboles de ponctuation…) ;
 - **Version « HyperTexte + » avec de nombreuses autres fonctionnalités** :
   ![Couche de base +](static/img/hypertexte_plus.jpg)
   - touche ★ de répétition (par exemple <kbd>el★e</kbd> donne « elle ») ;
@@ -20,10 +24,14 @@ HyperTexte est une disposition de clavier ergonomique possédant les caractéris
   - suppression de tous les SFBs restants (par exemple <kbd>,s</kbd> donne « sc ») ;
   - la touche <kbd>q</kbd> donne « qu » ;
   - divers raccourcis dont des tap-holds ;
-  - ajout de roulements ;
+  - ajout de nouveaux roulements (par exemple <kbd>hc</kbd> donne « wh ») ;
   - etc.
 
-Le site de présentation du projet fonctionne à l’aide de SvelteKit (https://kit.svelte.dev/).
+---
+
+Le site de présentation du projet fonctionne à l’aide de [SvelteKit](https://kit.svelte.dev/).
+
+---
 
 ## Génération des claviers
 
