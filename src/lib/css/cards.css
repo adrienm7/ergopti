@@ -22,7 +22,7 @@
 }
 
 .cards .card:nth-child(odd) i {
-	color: rgb(0, 4, 43) !important;
+	color: rgb(0, 4, 43);
 }
 
 /* Screen larger than 500px? 2 column */
@@ -37,6 +37,7 @@
 		background-color: rgba(0, 0, 0, 0.8);
 		color: white;
 	}
+
 	.cards .card:nth-child(2),
 	.cards .card:nth-child(3),
 	.cards .card:nth-child(6) {

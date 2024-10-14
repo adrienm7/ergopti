@@ -15,6 +15,11 @@
 </texte-sfb>
 
 <style>
+	texte-sfb {
+		display: inline-block;
+		width: fit-content;
+	}
+
 	.tooltip {
 		display: inline-block;
 		border-bottom: 2px dotted white;
