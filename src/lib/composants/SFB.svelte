@@ -16,7 +16,6 @@
 
 <style>
 	texte-sfb {
-		display: inline-block;
 		width: fit-content;
 	}
 
