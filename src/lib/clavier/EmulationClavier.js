@@ -299,7 +299,7 @@ export class EmulationClavier extends Clavier {
 			nouvellePositionCurseur = positionCurseur - 1;
 		} else if (touche === 'Ctrl-Backspace') {
 			let texteAvantSuppression = texteAvantCurseur;
-			let texteApresSuppression = texteAvantCurseur.replace(/\S+\s*/, '');
+			let texteApresSuppression = texteAvantCurseur.replace(/\s*\S*$/, '');
 			this.textarea.value = texteApresSuppression + texteApresCurseur;
 			let caracteresSupprimes = texteAvantSuppression.length - texteApresSuppression.length;
 			nouvellePositionCurseur = positionCurseur - caracteresSupprimes;

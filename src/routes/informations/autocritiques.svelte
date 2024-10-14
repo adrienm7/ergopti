@@ -48,13 +48,18 @@
 
 <h4>Distances non optimales</h4>
 <ul>
-	<li><kbd>E</kbd> est sur le majeur et non sur l’index.</li>
-	<p>
-		Théoriquement, l’index est plus fort et devrait donc être l’endroit idéal pour la lettre <kbd
-			>E</kbd
-		> qui est de loin la lettre la plus fréquente, loin devant la deuxième lettre la plus fréquente de
-		l’alphabet.
-	</p>
+	<li>
+		<kbd>E</kbd> est sur le majeur et non sur l’index. Théoriquement, l’index est plus fort et
+		devrait donc être l’endroit idéal pour la lettre <kbd>E</kbd> qui est de loin la lettre la plus fréquente,
+		loin devant la deuxième lettre la plus fréquente de l’alphabet.
+	</li>
+	<li>
+		Le <kbd>K</kbd>, bien que très rare en français et peu fréquent en anglais, est à une position
+		assez lointaine sur un clavier ISO, car en plein milieu du clavier. Il est notamment utilisé en
+		anglais avec les combinaisons <kbd-sortie>SK</kbd-sortie>,
+		<kbd-sortie>CK</kbd-sortie>, etc. Sur un clavier Ergodox, ce problème s’atténue, en particulier
+		sur les claviers concaves de type Kinesis Advantage ou Glove80.
+	</li>
 </ul>
 
 <h4>Quelques <SFB />s restants</h4>
@@ -75,12 +80,8 @@
 		fréquents en anglais (people, does, etc.)
 	</li>
 	<li>
-		<kbd>K</kbd> est assez loin sur clavier ISO, surtout pour l’anglais avec ses
-		<kbd-sortie>SK</kbd-sortie>,
-		<kbd-sortie>CK</kbd-sortie>, etc.
-	</li>
-	<li>
-		<kbd>SH</kbd> n’est pas agréable à réaliser sur un clavier standard à cause du décalage des colonnes.
+		<kbd>SH</kbd> n’est pas très agréable à réaliser sur un clavier ISO à cause du décalage des colonnes.
+		En revanche, sur un clavier Ergodox, c’est une combinaison très agréable à réaliser.
 	</li>
 </ul>
 <p class="encadre">
@@ -102,21 +103,39 @@
 	</li>
 </ul>
 
+<h4>Manque de logique pour certains placements de touches</h4>
+<p>
+	La touche <kbd>À</kbd> était auparavant au-dessus du <kbd>A</kbd> et la touche <kbd>È</kbd>
+	en-dessous du <kbd>E</kbd>. C’était logique, le A avec le A et le E avec le E. En outre,
+	<kbd>AltGr</kbd>
+	+ <kbd>È</kbd> donnait <kbd-sortie>\</kbd-sortie>, en miroir de <kbd>AltGr</kbd> + <kbd>É</kbd>
+	qui donne <kbd-sortie>/</kbd-sortie>, tandis que <kbd>AltGr</kbd> + <kbd>À</kbd> donnait
+	<kbd-sortie>`</kbd-sortie>.
+</p>
+<p>
+	Cependant, les touches <kbd>À</kbd> et <kbd>È</kbd> ont depuis été interverties. En effet, <NomPlus
+	></NomPlus> utilisant beaucoup la touche <kbd>À</kbd>, il convenait de la mettre sous un doigt
+	fort et non plus sur l’auriculaire. Les symboles en <kbd>AltGr</kbd> ont en revanche été
+	conservés, car le <kbd>\</kbd> est plus fréquemment utilisé que le <kbd>`</kbd>, en particulier en
+	LaTeX. En résulte un placement moins logique des caractères en <kbd>AltGr</kbd> pour ces deux touches.
+</p>
+
 <h4>Manque de caractères et non optimisation pour les autres langues</h4>
 <p>
 	<Nom></Nom> possède peu de touches mortes et de couches de symboles. En effet, la disposition ne se
 	prétend pas être exhaustive en incorporant tous les alphabets des langues européennes comme le BÉPO,
 	ou encore le cyrillique, l’écriture phonétique, les pièces d’échec, etc. comme Optimot. Ces couches
 	n’intéressent que peu d’utilisateurs et occupent des emplacements du clavier très accessibles pour
-	une utilisation très rare. En outre, <Nom></Nom> a été optimisée pour le français et l’anglais, et
-	n’est pas la disposition la plus adaptée pour les autres langues.
+	une utilisation très rare. En outre, <Nom></Nom> a été optimisée pour le français et l’anglais, elle
+	n’a pas été pensée pour être utilisée dans d’autres langues.
 </p>
 <p>
 	La philosophie derrière <Nom /> est de fournir une base de réflexion, mais pas nécessairement de promouvoir
 	l’utilisation de la disposition « HyperTexte ». Rien ne vaut une disposition créée sur-mesure pour
 	vos usages. Par exemple, si vous voulez écrire régulièrement en allemand, il serait judicieux de mettre
 	la touche morte des trémas à un endroit plus accessible. De même, si vous écrivez souvent en espagnol,
-	il faudrait trouver un emplacement pour la lettre <kbd>Ñ</kbd>, etc. Sachant tout de même que <Nom
-	></Nom> n’a pas été optimisée pour ces langages et n’est probablement pas la disposition la plus adaptée
-	si vous écrivez principalement dans celles-ci.
+	il faudrait trouver un emplacement pour la lettre <kbd>Ñ</kbd> (actuellement réalisable en
+	<kbd>^</kbd>
+	+ <kbd>N</kbd>), etc. Sachant tout de même que <Nom></Nom> n’a pas été optimisée pour ces langages
+	et n’est probablement pas la disposition la plus adaptée si vous écrivez principalement dans celles-ci.
 </p>
