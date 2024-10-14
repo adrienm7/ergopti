@@ -7,16 +7,18 @@
 <h2 id="licence">Licence</h2>
 
 <p>
-	La disposition de clavier <Nom /> ainsi que son site de présentation
-	<a href="https://hypertexte.beseven.fr">hypertexte.beseven.fr</a>
-	sont distribués sous la licence <strong class="important">MIT</strong>. Il s'agit d'une licence
-	permissive, simple et courte, qui n'impose que quelques conditions, notamment la préservation des
-	mentions de droits d'auteur et de licence.
+	La disposition de clavier <Nom />, ses pilotes ainsi que son site de présentation
+	<a href="https://hypertexte.beseven.fr">https://hypertexte.beseven.fr</a>
+	sont distribués sous la <strong class="important">licence MIT</strong>. Le code source est
+	librement disponible sur
+	<a href="https://github.com/adrienm7/hypertexte">https://github.com/adrienm7/hypertexte</a>.
 </p>
 <p>
-	Les travaux sous cette licence, y compris les modifications et œuvres dérivées, peuvent être
-	redistribués sous d'autres termes, et ce, même sans fournir le code source. La seule condition est
-	de conserver les mentions de licence et de droits d'auteur.
+	La license MIT est une licence permissive, simple et courte, qui n'impose que quelques conditions,
+	notamment la préservation des mentions de droits d'auteur et de licence. Les travaux sous cette
+	licence, y compris les modifications et œuvres dérivées, peuvent être redistribués sous d'autres
+	termes, et ce, même sans fournir le code source. La seule condition est de conserver les mentions
+	de licence et de droits d'auteur.
 </p>
 
 <h3>Permissions</h3>

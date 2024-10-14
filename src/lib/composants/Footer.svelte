@@ -6,8 +6,7 @@
 
 <footer>
 	<p>
-		<Nom></Nom> — <a href="/informations#licence" style="color:white">License MIT</a> |
-		<a href="https://github.com/adrienm7/hypertexte">GitHub</a>
+		<Nom></Nom> — <a href="https://github.com/adrienm7/hypertexte">Repo GitHub</a>
 	</p>
 </footer>
 
