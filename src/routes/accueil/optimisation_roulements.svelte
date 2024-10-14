@@ -27,7 +27,9 @@
 		'ch',
 		'd’',
 		'ld',
+		'gr',
 		'nc',
+		'nd',
 		'ng',
 		'ns',
 		'nt',
@@ -35,8 +37,9 @@
 		'pl',
 		'pr',
 		'rs',
-		'tr',
-		'th'
+		'sh',
+		'th',
+		'tr'
 	];
 </script>
 
@@ -69,44 +72,47 @@
 
 <h3>Bons bigrammes voyelle-voyelle</h3>
 <ul>
-	<li><kbd>AI</kbd></li>
-	<li><kbd>IE</kbd> et <kbd>EI</kbd></li>
-	<li><kbd>EU</kbd></li>
-	<li><kbd>IO</kbd> et <kbd>OI</kbd></li>
-	<li><kbd>OU</kbd></li>
-	<li><kbd>ÉE</kbd></li>
+	<li><kbd>AI</kbd> ;</li>
+	<li><kbd>IE</kbd> et <kbd>EI</kbd> ;</li>
+	<li><kbd>EU</kbd> ;</li>
+	<li><kbd>IO</kbd> et <kbd>OI</kbd> ;</li>
+	<li><kbd>OU</kbd> ;</li>
+	<li><kbd>ÉE</kbd>.</li>
 </ul>
 
 <p>Avec même quelques trigrammes très confortables :</p>
 <ul>
-	<li><kbd>AIE</kbd> notamment pour écrire <span class="hyper text-bold">AIE</span>NT</li>
+	<li><kbd>AIE</kbd> notamment pour écrire <span class="hyper text-bold">AIE</span>NT ;</li>
 	(avec en plus NT qui est lui aussi un roulement, que demander de plus ?)
-	<li><kbd>IEU</kbd></li>
-	<li><kbd>YOU</kbd></li>
+	<li><kbd>IEU</kbd> ;</li>
+	<li><kbd>YOU</kbd>.</li>
 </ul>
 
 <h3>Bons bigrammes consonne-consonne</h3>
 <ul>
-	<li><kbd>NS</kbd> et <kbd>SN</kbd></li>
-	<li><kbd>NT</kbd></li>
-	<li><kbd>TR</kbd> et <kbd>RT</kbd></li>
-	<li><kbd>RS</kbd></li>
+	<li><kbd>NS</kbd> et <kbd>SN</kbd> ;</li>
+	<li><kbd>NT</kbd> ;</li>
+	<li><kbd>TR</kbd> et <kbd>RT</kbd> ;</li>
+	<li><kbd>RS</kbd> ;</li>
 	<li>
-		<kbd>CH</kbd> ce bigramme est extraordinaire, une fois habitué il est difficile de s’en passer
+		<kbd>CH</kbd> ce bigramme est extraordinaire, une fois habitué il est difficile de s’en passer ;
 	</li>
-	<li><kbd>PL</kbd></li>
+	<li><kbd>PL</kbd> ;</li>
 	<li>
 		<kbd>LD</kbd> surtout fréquent en anglais (O<span class="hyper text-bold">LD</span>, COU<span
 			class="hyper text-bold">LD</span
 		>, SHOU<span class="hyper text-bold">LD</span>, WOU<span class="hyper text-bold">LD</span>,
-		etc.)
+		etc.) ;
 	</li>
-	<li><kbd>D’</kbd></li>
-	<li><kbd>NC</kbd></li>
-	<li><kbd>NG</kbd> pour tous les -I<span class="hyper text-bold">NG</span> en anglais</li>
-	<li><kbd>TH</kbd></li>
-	<li><kbd>PR</kbd></li>
-	<li><kbd>GR</kbd></li>
+	<li><kbd>D’</kbd> ;</li>
+	<li><kbd>NC</kbd> ;</li>
+	<li>
+		<kbd>ND</kbd> notamment pour tous les A<span class="hyper text-bold">ND</span> en anglais ;
+	</li>
+	<li><kbd>NG</kbd> pour tous les -I<span class="hyper text-bold">NG</span> en anglais ;</li>
+	<li><kbd>TH</kbd> ;</li>
+	<li><kbd>PR</kbd> ;</li>
+	<li><kbd>GR</kbd>.</li>
 </ul>
 <h3>Autres bons bigrammes</h3>
 <ul>
@@ -116,15 +122,15 @@
 		>N, FOLL<span class="hyper text-bold">OW</span>, H<span class="hyper text-bold">OW</span>, KN<span
 			class="hyper text-bold">OW</span
 		>, N<span class="hyper text-bold">OW</span>,
-		<span class="hyper text-bold">OW</span>N, SH<span class="hyper text-bold">OW</span>, etc.)
+		<span class="hyper text-bold">OW</span>N, SH<span class="hyper text-bold">OW</span>, etc.) ;
 	</li>
 	<li>
 		<kbd>WO</kbd> très utilisé en anglais (T<span class="hyper text-bold">WO</span>,
 		<span class="hyper text-bold">WO</span>MAN, <span class="hyper text-bold">WO</span>RD,
 		<span class="hyper text-bold">WO</span>RK, <span class="hyper text-bold">WO</span>RLD,
-		<span class="hyper text-bold">WO</span>RTH, <span class="hyper text-bold">WO</span>ULD, etc.)
+		<span class="hyper text-bold">WO</span>RTH, <span class="hyper text-bold">WO</span>ULD, etc.) ;
 	</li>
-	<li><kbd>+=</kbd> utilisé en programmation pour incrémenter</li>
+	<li><kbd>+=</kbd> utilisé en programmation pour incrémenter.</li>
 </ul>
 
 <h3>Visualisation des roulements</h3>
