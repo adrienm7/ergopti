@@ -72,7 +72,7 @@
 	}
 
 	afterUpdate(() => {
-		makeIds(document.getElementsByTagName('main')[0]);
+		makeIds(document.getElementById('main-content'));
 		document.querySelectorAll('h2').forEach(function (h2) {
 			h2.setAttribute('data-aos', 'zoom-out');
 		});

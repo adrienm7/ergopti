@@ -593,7 +593,7 @@ bloc-clavier,
 ======================
 */
 
-espace-insecable {
+bloc-clavier espace-insecable {
 	display: inline-block;
 	margin-right: 2px;
 	height: 0.75em;
