@@ -8,35 +8,34 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     steps:
-    - name: Get latest code
-      uses: actions/checkout@v4
+      - name: Get latest code
+        uses: actions/checkout@v4
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-    - name: 🔨 Build Project
-      run: |
-        npm install
-        npm run build
-    - name: Upload from public_html via FTP
-      uses: airvzxf/ftp-deployment-action@latest
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        user: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        local_dir: "./build"
-        remote_dir: ""
-        delete: "true"
-        max_retries: "7"
-        no_symlinks: "false"
-        ftp_ssl_allow: "false"
-        ftp_use_feat: "true"
-        ftp_nop_interval: "9"
-        net_max_retries: "3"
-        net_persist_retries: "11"
-        net_timeout: "30s"
-        dns_max_retries: "30"
-        dns_fatal_timeout: "never"
-        lftp_settings: "set cache:cache-empty-listings true; set cmd:status-interval 1s; set http:user-agent 'firefox';"
+      - name: 🔨 Build Project
+        run: |
+          npm install
+          npm run build
+      - name: Upload from public_html via FTP
+        uses: airvzxf/ftp-deployment-action@latest
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          user: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local_dir: './build'
+          remote_dir: ''
+          delete: 'true'
+          max_retries: '7'
+          no_symlinks: 'false'
+          ftp_ssl_allow: 'false'
+          ftp_use_feat: 'true'
+          ftp_nop_interval: '9'
+          net_max_retries: '3'
+          net_persist_retries: '11'
+          net_timeout: '30s'
+          dns_max_retries: '30'
+          dns_fatal_timeout: 'never'
