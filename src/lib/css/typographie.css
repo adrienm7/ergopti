@@ -112,3 +112,8 @@ strong,
 	margin-right: 10px;
 	border-radius: 2px;
 }
+
+/* Correction d’un bug d’affichage entre SFB et s dans l’introduction de la page d’accueil */
+.nowrap texte-sfb {
+	display: inline-block;
+}
