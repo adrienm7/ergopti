@@ -285,7 +285,7 @@ SC034:: Send("G")
 ; On est forcé d’utiliser des Send ici, sinon la touche Ctrl reste activée dans certains cas
 ; Mais le problème est que les remplacements de texte ne fonctionnent alors plus
 ; Ce problème est résolu en utilisant l’envoi Unicode ! (j’ai l’impression, à vérifier)
-
+#HotIf pilote_azerty
 <^>!SC039:: Send("_") ; Sur la barre d’espace
 
 ; === Rangée des chiffres ===

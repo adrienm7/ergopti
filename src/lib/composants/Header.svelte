@@ -37,8 +37,7 @@
 			.then((data) => {
 				data_disposition.set(data);
 				version.set(versionValue);
-				console.log(data);
-				// console.log('Données chargées :', this.data);
+				// console.log('Données chargées :', data);
 			})
 			.catch((error) => {
 				console.error('Erreur lors du chargement des données :', error);
@@ -47,8 +46,11 @@
 	handleVersionChange();
 
 	function toggleOverflowMenu() {
-		document.body.style.overflowY =
-			document.body.style.overflowY === 'hidden' ? 'visible' : 'hidden'; // if current styling is *hidden* then change to visible, otherwise change to hidden
+		if (document.getElementById('menu-btn').checked) {
+			document.body.style.overflowY = 'hidden';
+		} else {
+			document.body.style.overflowY = 'visible';
+		}
 	}
 
 	let liste_versions = ['1.0.5', '1.0.12', '1.0.16', '1.0.19', '1.1.2'];
