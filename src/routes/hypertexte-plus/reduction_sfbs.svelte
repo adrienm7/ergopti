@@ -125,10 +125,16 @@
 	La nouvelle touche <kbd>★</kbd>
 	<span class="important">va répéter la dernière touche tapée</span>. Ainsi, <kbd>L★</kbd>
 	va envoyer
-	<kbd-sortie>LL</kbd-sortie>, tandis que <kbd>R★</kbd> va envoyer <kbd-sortie>RR</kbd-sortie>.
-	L’utilisation de cette touche va instantanément fluidifier la fra<kbd>p★</kbd>e et réduire le
-	nombre de <SFB />s. Une fois qu’on y est habitué, l’écriture au clavier devient encore un peu plus
-	rapide et efficace, car même les lettres doublées peuvent être parallélisées. D’autant que
+	<kbd-sortie>LL</kbd-sortie>, tandis que <kbd>R★</kbd> va envoyer <kbd-sortie>RR</kbd-sortie>. Cela
+	engendrera cependant un petit <SFB></SFB> pour les lettres doublées suivies d’un <kbd>U</kbd>, tel
+	que « connu » ou « battu ». La combinaison <kbd>★Ê</kbd> permet d’éviter ce problème. Ainsi, «
+	connu » pourra s’écrire <kbd>CON★Ê</kbd> et « battu » pourra s’écrire <kbd>BAT★Ê</kbd>.
+</p>
+<p>
+	L’utilisation de la touche <kbd>★</kbd> va instantanément fluidifier la fra<kbd>p★</kbd>e et
+	réduire le nombre de <SFB />s. Une fois qu’on y est habitué, l’écriture au clavier devient encore
+	un peu plus rapide et efficace, car même les lettres doublées peuvent être parallélisées. D’autant
+	que
 	<span class="important"
 		>doubler les lettres est loin d’être la seule fonction de la touche
 	</span><kbd>★</kbd>…

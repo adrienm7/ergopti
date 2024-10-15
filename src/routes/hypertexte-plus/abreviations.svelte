@@ -2,6 +2,8 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
+
+	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 </script>
 
 <h2>Abréviations</h2>
@@ -52,10 +54,10 @@
 	Ajout des suffixes les plus communs en <kbd>À</kbd>
 </h3>
 <p>
-	Il y a toujours un espace ou une ponctuation après un <kbd>À</kbd>, car les deux seuls mots
-	l’utilisant sont
-	<kbd-sortie>À</kbd-sortie>
-	et <kbd-sortie>DÉJÀ</kbd-sortie>. Par conséquent, toute combinaison de type <kbd>ÀS</kbd> ou
+	Il y a toujours un espace ou une ponctuation après un <kbd>À</kbd>, car les seuls mots l’utilisant
+	sont
+	<kbd-sortie>À</kbd-sortie>, <kbd-sortie>LÀ</kbd-sortie> et <kbd-sortie>DÉJÀ</kbd-sortie>. Par
+	conséquent, toute combinaison de type <kbd>ÀS</kbd> ou
 	<kbd>ÀC</kbd> n’est jamais tapée. Cela donne une opportunité extraordinaire de raccourcis pour
 	augmenter sa vitesse et son confort de frappe. Par exemple, au lieu de taper 5 lettres pour écrire
 	le suffixe
@@ -106,3 +108,6 @@
 	<li><kbd>À★</kbd> ➜ <kbd-sortie>BU</kbd-sortie> ;</li>
 	<li><kbd>À’</kbd> ➜ Rien pour le moment.</li>
 </ul>
+
+<mini-espace />
+<BlocClavier nom="a" />
