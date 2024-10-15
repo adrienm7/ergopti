@@ -69,9 +69,6 @@
 		<kbd>ÈO</kbd> ➜ <kbd-sortie>EO</kbd-sortie> et <kbd>ÈE</kbd> ➜ <kbd-sortie>OE</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>ÈU</kbd> ➜ <kbd-sortie>BU</kbd-sortie> et <kbd>UÈ</kbd> ➜ <kbd-sortie>UB</kbd-sortie> ;
-	</li>
-	<li>
 		<kbd>È,</kbd> ➜ <kbd-sortie>U,</kbd-sortie> et <kbd>È.</kbd> ➜ <kbd-sortie>U.</kbd-sortie> ;
 	</li>
 	<li>

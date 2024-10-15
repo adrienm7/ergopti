@@ -368,8 +368,6 @@ export class EmulationClavier extends Clavier {
 		this.textarea.value = this.textarea.value
 			.replace(/èo/g, 'oe')
 			.replace(/èe/g, 'eo')
-			.replace(/uè/g, 'uè')
-			.replace(/èu/g, 'bu')
 			.replace(/è./g, 'u.')
 			.replace(/è,/g, 'u,');
 
