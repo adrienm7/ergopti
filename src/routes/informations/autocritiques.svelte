@@ -62,6 +62,33 @@
 	</li>
 </ul>
 
+<h4>Non compatible avec les claviers compacts</h4>
+<p>
+	Certains claviers ont moins de touches, par exemple en n’ayant que 6 colonnes, voire seulement 5,
+	par main. <Nom></Nom> a été conçu pour exploiter toutes les touches d’un clavier standard, donc 6 colonnes
+	à gauche et 7 à droite. Sur la dernière colonne de droite, il n’y a cependant que les touches mortes
+	<kbd class="morte">◌̂</kbd>
+	et <kbd class="morte">◌̈</kbd> qui seront beaucoup plus rarement utilisées. Avec <NomPlus
+	></NomPlus>, ces touches deviennent même inutiles, car elles sont réalisables autrement.
+</p>
+<p>
+	Il n’en demeure pas moins que <Nom></Nom> n’est pas 1DFH (1u distance from home). Les lettres accentuées
+	du français étant en accès direct avec <Nom></Nom>, il est impossible de réaliser une disposition
+	1DFH, car il y a trop de touches à placer. La disposition <a href="https://ergol.org">Ergo-L</a> est
+	quant à elle une disposition 1DFH, mais au prix d’une touche morte permettant de réaliser les accents.
+</p>
+<p>
+	Une solution simple pour adapter <Nom></Nom> à un clavier plus compact serait de supprimer la touche
+	<kbd class="morte">◌̈</kbd>
+	qui peut déjà être réalisée en <kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> (T pour Tréma).
+	De même, la touche <kbd>Ê</kbd> pourrait être remplacée par la touche morte
+	<kbd class="morte">◌̂</kbd>. En Fait, la touche morte de tréma pourrait même être en
+	<kbd>Shift</kbd> de cette touche morte circonflexe. Mais tout ceci n’est pas idéal, et les espaces
+	insécables et fine insécables respectivement disponibles en <kbd>Shift</kbd> +
+	<kbd class="morte">◌̂</kbd>
+	et <kbd>AltGr</kbd> + <kbd class="morte">◌̈</kbd> ne seront plus disponibles.
+</p>
+
 <h4>Quelques <SFB />s restants</h4>
 <ul>
 	<li>

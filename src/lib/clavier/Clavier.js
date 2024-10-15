@@ -358,21 +358,21 @@ export class Clavier {
 		}
 
 		// Touche pressée = Shift
-		if ((touchePressee === 'LShift' || touchePressee === 'RShift') & (coucheActuelle === 'AltGr')) {
+		if ((touchePressee === 'LShift' || touchePressee === 'RShift') && coucheActuelle === 'AltGr') {
 			nouvelleCouche = 'ShiftAltGr';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &
-			(coucheActuelle === 'Shift')
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'Shift'
 		) {
 			nouvelleCouche = 'Visuel';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &
-			(coucheActuelle === 'ShiftAltGr')
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'ShiftAltGr'
 		) {
 			nouvelleCouche = 'AltGr';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &
-			((coucheActuelle === 'À') | (coucheActuelle === ','))
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(coucheActuelle === 'À' || coucheActuelle === ',')
 		) {
 			nouvelleCouche = 'Shift';
 		} else if (touchePressee === 'LShift' || touchePressee === 'RShift') {
@@ -388,30 +388,34 @@ export class Clavier {
 
 		// Touche pressée = LAlt (devient Layer)
 		if (
-			((touchePressee === 'LAlt') & (this.infos_clavier.type === 'iso')) |
-				((touchePressee === 'Space') & (this.infos_clavier.type === 'ergodox')) &&
-			this.infos_clavier.plus === 'oui' &&
-			coucheActuelle === 'Layer'
+			(touchePressee === 'LAlt' && this.infos_clavier.type === 'iso') ||
+			(touchePressee === 'Space' &&
+				this.infos_clavier.type === 'ergodox' &&
+				this.infos_clavier.plus === 'oui' &&
+				coucheActuelle === 'Layer')
 		) {
 			nouvelleCouche = 'Visuel';
 		} else if (
-			((touchePressee === 'LAlt') & (this.infos_clavier.type === 'iso')) |
-				((touchePressee === 'Space') & (this.infos_clavier.type === 'ergodox')) &&
-			this.infos_clavier.plus === 'oui'
+			(touchePressee === 'LAlt' && this.infos_clavier.type === 'iso') ||
+			(touchePressee === 'Space' &&
+				this.infos_clavier.type === 'ergodox' &&
+				this.infos_clavier.plus === 'oui')
 		) {
 			nouvelleCouche = 'Layer';
 		}
 
 		// Touche pressée = RCtrl (devient Shift)
 		if (
-			((touchePressee === 'RCtrl') & (this.infos_clavier.type === 'iso')) |
-				((touchePressee === 'Space') & (this.infos_clavier.type === 'ergodox')) &&
-			this.infos_clavier.plus === 'oui' &&
-			coucheActuelle === 'Shift'
+			(touchePressee === 'RCtrl' && this.infos_clavier.type === 'iso') ||
+			(touchePressee === 'Space' &&
+				this.infos_clavier.type === 'ergodox' &&
+				this.infos_clavier.plus === 'oui' &&
+				coucheActuelle === 'Shift')
 		) {
 			nouvelleCouche = 'Visuel';
 		} else if (
-			(touchePressee === 'RCtrl') & (this.infos_clavier.type === 'iso') &&
+			touchePressee === 'RCtrl' &&
+			this.infos_clavier.type === 'iso' &&
 			this.infos_clavier.plus === 'oui'
 		) {
 			nouvelleCouche = 'Shift';
@@ -421,9 +425,12 @@ export class Clavier {
 		if (touchePressee === '^' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
 			nouvelleCouche = '^';
 		}
-
+		console.log(touchePressee, coucheActuelle);
 		// Touche pressée = trema
-		if (touchePressee === 'trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
+		if (
+			(touchePressee === 'trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
+			(touchePressee === 't' && coucheActuelle === 'ShiftAltGr')
+		) {
 			nouvelleCouche = 'trema';
 		}
 
@@ -480,6 +487,7 @@ export class Clavier {
 			let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 			let toucheE = emplacementClavier.querySelector("bloc-touche[data-touche='e']");
 			let toucheR = emplacementClavier.querySelector("bloc-touche[data-touche='r']");
+			let toucheT = emplacementClavier.querySelector("bloc-touche[data-touche='t']");
 			let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
 			let toucheCirconflexe = emplacementClavier.querySelector("bloc-touche[data-touche='^']");
 			let toucheTrema = emplacementClavier.querySelector("bloc-touche[data-touche='trema']");
@@ -496,7 +504,8 @@ export class Clavier {
 				toucheTrema,
 				toucheA,
 				toucheE,
-				toucheR
+				toucheR,
+				toucheT
 			]) {
 				if (toucheModificatrice !== null) {
 					toucheModificatrice.addEventListener(
