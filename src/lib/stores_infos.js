@@ -2,6 +2,8 @@ import { writable } from 'svelte/store';
 export const derniere_version = writable('1.1.2');
 export const version = writable('1.1.2'); // Par défaut c’est la dernière version
 
+export const data_disposition = writable();
+
 export const presentation = writable({
 	emplacement: 'clavier_presentation',
 	type: 'iso',

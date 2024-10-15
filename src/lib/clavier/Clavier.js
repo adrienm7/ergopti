@@ -9,21 +9,6 @@ function transformLogarithmique(x, k) {
 	return Math.log(1 + k * x) / Math.log(1 + k);
 }
 
-async function loadData(version) {
-	try {
-		// Utilisation de fetch pour récupérer le fichier JSON depuis le dossier static
-		const response = await fetch(`/dispositions/data/hypertexte_v${version}.json`);
-		if (!response.ok) {
-			throw new Error('Erreur lors du chargement du fichier JSON');
-		}
-		const data = await response.json(); // Parse les données JSON
-		// console.log('Données chargées :', data);
-		return data;
-	} catch (error) {
-		console.error('Erreur lors du chargement des données :', error);
-	}
-}
-
 export class Clavier {
 	constructor(id) {
 		this.id = id;
@@ -31,17 +16,11 @@ export class Clavier {
 		// S'abonner au store pour la version
 		stores_infos['version'].subscribe((value) => {
 			this.version = value;
-
-			// Charger les données en fonction de la version
-			loadData(value)
-				.then((data) => {
-					this.data = data;
-					this.majClavier(); // Très important, sinon les claviers seront vides
-					// console.log('Données chargées :', this.data);
-				})
-				.catch((error) => {
-					console.error('Erreur lors du chargement des données :', error);
-				});
+			this.majClavier();
+		});
+		stores_infos['data_disposition'].subscribe((value) => {
+			this.data_disposition = value;
+			this.majClavier();
 		});
 
 		// Liaison avec le store spécifique au clavier (data_clavier)
@@ -87,7 +66,7 @@ export class Clavier {
 	}
 
 	majTouches() {
-		if (this.data === undefined) {
+		if (this.data_disposition === undefined) {
 			return;
 		}
 		try {
@@ -95,7 +74,7 @@ export class Clavier {
 			for (let ligne = 1; ligne <= 7; ligne++) {
 				for (let j = 0; j <= 15; j++) {
 					// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
-					const res = this.data[this.infos_clavier.type].find(
+					const res = this.data_disposition[this.infos_clavier.type].find(
 						(el) => el['ligne'] == ligne && el['colonne'] == j
 					);
 
@@ -131,7 +110,9 @@ export class Clavier {
 					toucheClavier.classList.remove('touche-active'); // Suppression de la classe css pour les touches pressées
 
 					if (res !== undefined) {
-						const contenuTouche = this.data.touches.find((el) => el['touche'] === res['touche']);
+						const contenuTouche = this.data_disposition.touches.find(
+							(el) => el['touche'] === res['touche']
+						);
 
 						if (
 							this.infos_clavier.couche !== 'Visuel' &&
