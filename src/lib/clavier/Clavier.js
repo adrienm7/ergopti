@@ -406,7 +406,7 @@ export class Clavier {
 		if (touchePressee === '^' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
 			nouvelleCouche = '^';
 		}
-		console.log(touchePressee, coucheActuelle);
+
 		// Touche pressée = trema
 		if (
 			(touchePressee === 'trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
