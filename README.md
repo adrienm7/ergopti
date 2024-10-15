@@ -26,6 +26,8 @@ HyperTexte est une disposition de clavier ergonomique possédant les caractéris
   - divers raccourcis dont des tap-holds ;
   - ajout de nouveaux roulements (par exemple <kbd>hc</kbd> donne « wh ») ;
   - etc.
+ 
+➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://hypertexte.beseven.fr/telechargements#clavier_emulation.
 
 ---
 
