@@ -152,6 +152,11 @@
 		<kbd>Shift</kbd> + <kbd>"CapsLock"</kbd> (BackSpace) ➜ <kbd-sortie>Delete</kbd-sortie> ;
 	</li>
 	<li>
+		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> (BackSpace) ➜
+		<kbd-sortie>Ctrl</kbd-sortie>
+		+ <kbd-sortie>Delete</kbd-sortie> ;
+	</li>
+	<li>
 		<kbd>Windows</kbd> + <kbd>"CapsLock"</kbd> (BackSpace) ➜ <kbd-sortie>CapsLock</kbd-sortie>.
 	</li>
 </ul>

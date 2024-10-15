@@ -23,7 +23,9 @@
 	les claviers non Ergodox c’est difficilement réalisable.
 </p>
 <p>
-	La touche <kbd>Delete</kbd> se trouve quant à elle sur la combinaison <kbd>Shift</kbd> +
+	La touche <kbd-sortie>Delete</kbd-sortie> se trouve quant à elle sur la combinaison
+	<kbd>Shift</kbd>
+	+
 	<kbd>"CapsLock"</kbd>.
 </p>
 
@@ -126,7 +128,7 @@
 	Dans les rares cas où l’on souhaite écrire <kbd>J</kbd> + <kbd>Consonne</kbd>, il est possible
 	d’écrire par exemple <kbd>JA</kbd> et de supprimer la voyelle. Une autre possibilité est de
 	réaliser la suite de touches <kbd>,</kbd> + <kbd>À</kbd> ou <kbd>,</kbd> + <kbd>È</kbd> qui
-	donnent la lettre <kbd>J</kbd>.
+	donnent à chaque fois la lettre <kbd>J</kbd>.
 </p>
 <mini-espace></mini-espace>
 <p class="text-bold">En résumé :</p>

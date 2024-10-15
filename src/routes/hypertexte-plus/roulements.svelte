@@ -22,5 +22,5 @@
 	<kbd-sortie>GT</kbd-sortie>
 	nécessite de réaliser un <SFB></SFB> sur l’annulaire droit, tandis que
 	<kbd-sortie>QU’</kbd-sortie>
-	nécessite de réaliser un <SFB></SFB> sur l’auriculaire droit.
+	requiert un <SFB></SFB> sur l’auriculaire droit.
 </p>

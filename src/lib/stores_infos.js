@@ -100,3 +100,12 @@ export const layer = writable({
 	couleur: 'non',
 	controles: 'oui'
 });
+
+export const a = writable({
+	emplacement: 'clavier_a',
+	type: 'iso',
+	couche: 'À',
+	plus: 'oui',
+	couleur: 'non',
+	controles: 'oui'
+});
