@@ -1595,42 +1595,6 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("EO")
 }
 
-; bu
-:*?C:uè::
-{
-    Send("ub")
-}
-:*?C:uÈ::
-{
-    Send("uB")
-}
-:*?C:Uè::
-{
-    Send("Ub")
-}
-:*?C:UÈ::
-{
-    Send("UB")
-}
-
-; ub
-:*?C:èu::
-{
-    Send("bu")
-}
-:*?C:èU::
-{
-    Send("bU")
-}
-:*?C:Èu::
-{
-    Send("Bu")
-}
-:*?C:ÈU::
-{
-    Send("BU")
-}
-
 ; u.
 :*?C:è.::
 {
