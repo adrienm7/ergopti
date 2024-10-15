@@ -7,29 +7,18 @@
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 </script>
 
-<header>
-	<img
-		src="img/logo/logo_hypertexte.png"
-		style="	display: block;
-	margin: 0 auto;	margin-top: 30px;
-	margin-bottom: -30px;
-	width: 80px;
-	height: auto;	
-	border-radius: 100px;
-	border: 2px solid rgba(255, 255, 255, 0.7);
-	box-shadow: rgba(255, 255, 255, 0.24) 0px 3px 8px;"
-	/>
+<div>
 	<h1 data-aos="zoom-in" class="hypertexte-title">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"><NomPlus></NomPlus></span>
 	</h1>
-	<div class="container">
-		<div class="block">
-			<BlocClavier nom="presentation_plus" />
-		</div>
-	</div>
+	<!-- <div class="container">
+		<div class="block"> -->
+	<BlocClavier nom="presentation_plus" />
+	<!-- </div>
+	</div> -->
 	<mini-espace />
 	<BlocControlesClavier nom="presentation_plus" />
-</header>
+</div>
 
 <petit-espace />
 
