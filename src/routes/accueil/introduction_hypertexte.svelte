@@ -44,7 +44,8 @@
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i> <span class="important">Frappe extrêmement fluide</span>
-		par élimination de la quasi-totalité des <SFB />s.
+		par élimination de la quasi-totalité des
+		<span class="nowrap"><SFB />s.</span>
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-3"></i> <span class="text-bold">Alternance des mains</span> favorisée
