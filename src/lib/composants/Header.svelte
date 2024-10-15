@@ -8,16 +8,43 @@
 			'-999'; /* Si le clavier était ouvert, on le ferme */
 	}
 
-	import { version } from '$lib/stores_infos.js';
+	import { version, data_disposition } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
 	});
 
+	async function loadData(version) {
+		try {
+			// Utilisation de fetch pour récupérer le fichier JSON depuis le dossier static
+			const response = await fetch(`/dispositions/data/hypertexte_v${version}.json`);
+			if (!response.ok) {
+				throw new Error('Erreur lors du chargement du fichier JSON');
+			}
+			const data = await response.json(); // Parse les données JSON
+			// console.log('Données chargées :', data);
+			return data;
+		} catch (error) {
+			console.error('Erreur lors du chargement des données :', error);
+		}
+	}
+
 	// Utiliser `set` pour mettre à jour la version dans le store
 	function handleVersionChange() {
-		version.set(versionValue);
+		// S'abonner au store pour la version
+		// Charger les données en fonction de la version
+		loadData(versionValue)
+			.then((data) => {
+				data_disposition.set(data);
+				version.set(versionValue);
+				console.log(data);
+				// console.log('Données chargées :', this.data);
+			})
+			.catch((error) => {
+				console.error('Erreur lors du chargement des données :', error);
+			});
 	}
+	handleVersionChange();
 
 	function toggleOverflowMenu() {
 		document.body.style.overflowY =
@@ -29,7 +56,7 @@
 
 <header>
 	<div class="header-logo">
-		<a href="/"><img src="img/logo/logo_hypertexte_transparent.png" style="height: 55px;" /></a>
+		<a href="/"><img src="img/logo/logo_hypertexte_transparent.png" class="logo" /></a>
 		<p style="font-variant: small-caps;">
 			<a href="/">Disposition clavier </a><span class="hyper" style="padding:0; margin:0"
 				><a href="/">HyperTexte</a>
@@ -204,6 +231,11 @@
 
 	header .menu-btn {
 		display: none;
+	}
+
+	.logo {
+		height: 55px;
+		width: 55px;
 	}
 
 	/* Menu mobile */
