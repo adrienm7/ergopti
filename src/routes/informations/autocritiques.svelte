@@ -6,6 +6,19 @@
 
 <h2>Autocritiques</h2>
 
+<p>
+	Bien que largement supérieure à certaines dispositions telles que l’AZERTY et même le BÉPO, <Nom
+	/> est malheureusement encore loin d’être parfaite. En effet, la création d’une disposition est une
+	affaire de compromis. Il est impossible de maximiser tous les aspects, car en maximisant le critère
+	de distance aux touches, le <kbd>E</kbd> serait logiquement sur l’index, voire le pouce. Or, avoir
+	cela engendrera beaucoup plus de <SFB />s, ce qui rendra impossible la maximisation de cet autre
+	critère.
+</p>
+<p>
+	En outre, parfois tous les emplacements sont mauvais pour une touche, et il faut choisir le moins
+	pire. Par conséquent, <Nom /> a évidemment des défauts, dont les principaux sont recensés ici.
+</p>
+
 <h3>L’importance des compromis</h3>
 <p>
 	Il est évident qu’il n’est pas possible de maximiser plusieurs paramètres simultanément. Par
@@ -32,21 +45,7 @@
 	D’autant que cet arrangement des voyelles permet alors de très bons roulements.
 </p>
 
-<h3>Points d’amélioration</h3>
-<p>
-	Bien que largement supérieure à certaines dispositions telles que l’AZERTY et même le BÉPO, <Nom
-	/> est malheureusement encore loin d’être parfaite. En effet, la création d’une disposition est une
-	affaire de compromis. Il est impossible de maximiser tous les aspects, car en maximisant le critère
-	de distance aux touches, le <kbd>E</kbd> serait logiquement sur l’index, voire le pouce. Or, avoir
-	cela engendrera beaucoup plus de <SFB />s, ce qui rendra impossible la maximisation de cet autre
-	critère.
-</p>
-<p>
-	En outre, parfois tous les emplacements sont mauvais pour une touche, et il faut choisir le moins
-	pire. Par conséquent, <Nom /> a évidemment des défauts, dont voici les principaux :
-</p>
-
-<h4>Distances non optimales</h4>
+<h3>Distances non optimales</h3>
 <ul>
 	<li>
 		<kbd>E</kbd> est sur le majeur et non sur l’index. Théoriquement, l’index est plus fort et
@@ -62,7 +61,7 @@
 	</li>
 </ul>
 
-<h4>Non compatible avec les claviers compacts</h4>
+<h3>Non compatible avec les claviers compacts</h3>
 <p>
 	Certains claviers ont moins de touches, par exemple en n’ayant que 6 colonnes, voire seulement 5,
 	par main. <Nom></Nom> a été conçu pour exploiter toutes les touches d’un clavier standard, donc 6 colonnes
@@ -84,12 +83,12 @@
 	De même, la touche <kbd>Ê</kbd> pourrait être remplacée par la touche morte
 	<kbd class="morte">◌̂</kbd>. En Fait, la touche morte de tréma pourrait même être en
 	<kbd>Shift</kbd> de cette touche morte circonflexe. Mais tout ceci n’est pas idéal, et les espaces
-	insécables et fine insécables respectivement disponibles en <kbd>Shift</kbd> +
-	<kbd class="morte">◌̂</kbd>
-	et <kbd>AltGr</kbd> + <kbd class="morte">◌̈</kbd> ne seront plus disponibles.
+	insécables et fines insécables respectivement disponibles en <kbd>AltGr</kbd> +
+	<kbd class="morte">◌̈</kbd>
+	et <kbd>Shift</kbd> + <kbd class="morte">◌̈</kbd> ne seront plus disponibles.
 </p>
 
-<h4>Quelques <SFB />s restants</h4>
+<h3>Quelques <SFB />s restants</h3>
 <ul>
 	<li>
 		<kbd>SC</kbd> engendre beaucoup de <SFB />s, mais c’est à la moins pire combinaison (en
@@ -117,7 +116,7 @@
 	<i class="fa-duotone fa-face-smile"></i>
 </p>
 
-<h4>Alternance des mains non maximale</h4>
+<h3>Alternance des mains non maximale</h3>
 <ul>
 	<li>
 		<kbd>W</kbd> devrait théoriquement plutôt être du côté droit du clavier, car cette lettre est
@@ -130,7 +129,7 @@
 	</li>
 </ul>
 
-<h4>Manque de logique pour certains placements de touches</h4>
+<h3>Manque de logique pour certains placements de touches</h3>
 <p>
 	La touche <kbd>À</kbd> était auparavant au-dessus du <kbd>A</kbd> et la touche <kbd>È</kbd>
 	en-dessous du <kbd>E</kbd>. C’était logique, le A avec le A et le E avec le E. En outre,
@@ -147,7 +146,7 @@
 	LaTeX. En résulte un placement moins logique des caractères en <kbd>AltGr</kbd> pour ces deux touches.
 </p>
 
-<h4>Manque de caractères et non optimisation pour les autres langues</h4>
+<h3>Manque de caractères et non optimisation pour les autres langues</h3>
 <p>
 	<Nom></Nom> possède peu de touches mortes et de couches de symboles. En effet, la disposition ne se
 	prétend pas être exhaustive en incorporant tous les alphabets des langues européennes comme le BÉPO,
@@ -161,8 +160,9 @@
 	l’utilisation de la disposition « HyperTexte ». Rien ne vaut une disposition créée sur-mesure pour
 	vos usages. Par exemple, si vous voulez écrire régulièrement en allemand, il serait judicieux de mettre
 	la touche morte des trémas à un endroit plus accessible. De même, si vous écrivez souvent en espagnol,
-	il faudrait trouver un emplacement pour la lettre <kbd>Ñ</kbd> (actuellement réalisable en
+	il faudrait trouver un emplacement pour la lettre <kbd-sortie>Ñ</kbd-sortie> (actuellement
+	réalisable en
 	<kbd>^</kbd>
-	+ <kbd>N</kbd>), etc. Sachant tout de même que <Nom></Nom> n’a pas été optimisée pour ces langages
-	et n’est probablement pas la disposition la plus adaptée si vous écrivez principalement dans celles-ci.
+	+ <kbd>N</kbd>), etc. Sachant tout de même que <Nom></Nom> n’a pas été optimisée pour ces langues et
+	n’est probablement pas la disposition la plus adaptée si vous écrivez principalement dans celles-ci.
 </p>
