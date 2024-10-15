@@ -6,7 +6,7 @@
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 </script>
 
-<h2>Chiffres en accès direct<br />et couche AltGr de symboles</h2>
+<h2>Chiffres en accès direct et couche AltGr de symboles</h2>
 <p>
 	Les chiffres sont en accès direct sur les dispositions QWERTY ou encore DVORAK, mais pas en
 	AZERTY. Chaque manière de faire a ses avantages, car en AZERTY les symboles sont alors directement
