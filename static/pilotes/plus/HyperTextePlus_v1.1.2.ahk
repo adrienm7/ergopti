@@ -714,14 +714,16 @@ SC022::
 
 ; Tap-hold sur RControl
 $SC11D:: {
-    ; ErrorLevel := KeyWait("SC11D", "T.25") ; Attente de la touche pour un temps de 200ms
-    ; if ErrorLevel and A_PriorKey == "RControl" { ; Si la touche est relâchée avant le temps d’attente
+    Send("{LControl Up}{LShift Down}")
     OneShotShift()
-    ; } else {
-    ;     Send("{LShift Down}")
-    ;     KeyWait("SC11D")
-    ;     Send("{LShift Up}")
-    ; }
+    ErrorLevel := KeyWait("SC11D", "T.2") ; Attente de la touche pour un temps de 200ms
+    if ErrorLevel and A_PriorKey == "RControl" { ; Si la touche est relâchée avant le temps d’attente
+        ; OneShotShift()
+        Send("{LControl Up}{LShift Up}")
+    } else {
+        KeyWait("SC11D")
+        Send("{LControl Up}{LShift Up}")
+    }
 }
 
 OneShotShift() {
