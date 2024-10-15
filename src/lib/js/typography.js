@@ -11,6 +11,7 @@ const excludedTags = [
 	'iframe',
 	'pre',
 	'code',
+	'a',
 	'textarea',
 	'noscript',
 	'bloc-clavier',
