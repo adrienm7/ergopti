@@ -74,3 +74,7 @@ kbd-non:hover {
 	top: calc(calc(0.6 * 0.25vw) - calc(0.6 * 0.1vw));
 	box-shadow: rgba(204, 204, 204, 0.7) 0 0.766667px 0 0;
 }
+
+kbd.morte {
+	font-weight: normal;
+}
