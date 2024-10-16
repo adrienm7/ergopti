@@ -1,6 +1,7 @@
 <script>
 	import { page } from '$app/stores';
 	import Nom from '../composants/Nom.svelte';
+	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 
 	function fermerMenu() {
 		document.getElementById('menu-btn').checked = false;
@@ -52,6 +53,10 @@
 			document.body.style.overflowY = 'visible';
 		}
 	}
+
+	afterUpdate(() => {
+		toggleOverflowMenu();
+	});
 
 	let liste_versions = ['1.0.5', '1.0.12', '1.0.16', '1.0.19', '1.1.2'];
 </script>
