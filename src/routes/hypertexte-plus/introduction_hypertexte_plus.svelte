@@ -35,8 +35,10 @@
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i>
-		<span class="important">Éradique la quasi-totalité des <SFB />s </span> pour une frappe ultra-fluide
-		sans inconfort.
+		<span class="important"
+			>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span> pour une frappe ultra-fluide
+			sans inconfort.
+		</span>
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-3"></i>
@@ -95,10 +97,9 @@
 	</p>
 	<p>
 		➜ La remise à zéro du remplacement de texte peut notamment se réaliser en utilisant les flèches
-		de navigation, la touche Échap, en cliquant quelque part, etc. Ces manipulations ne devraient
-		arriver que très rarement, mais tout dépend de votre utilisation. Par exemple, l’enchaînement <kbd
-			>XG</kbd
-		>
+		de navigation, la touche <kbd>Échap</kbd>, en cliquant quelque part, etc. Ces manipulations ne
+		devraient arriver que très rarement, mais tout dépend de votre utilisation. Par exemple,
+		l’enchaînement <kbd>XG</kbd>
 		est très peu commun, mais les data scientists l’utiliseront régulièrement pour écrire
 		<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
 		/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
