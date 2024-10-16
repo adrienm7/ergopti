@@ -41,7 +41,7 @@
 	background-image: linear-gradient(to right, var(--gradient-blue));
 }
 
-#clavier-ref {
+clavier-reference {
 	--couleur: 60;
 	position: fixed;
 	bottom: 0;
@@ -54,7 +54,7 @@
 	overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
 }
 
-#clavier-ref .conteneur {
+clavier-reference .conteneur {
 	/* Permet d’avoir une div qui ne scrolle pas ce qui est dessous */
 	--marge: 10vh;
 	display: flex;

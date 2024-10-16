@@ -94,7 +94,7 @@ controles-clavier select option {
 
 /* Cas où le fond est blanc */
 
-section controles-clavier button,
+/* section controles-clavier button,
 section controles-clavier select {
 	color: #333;
 	border: 2px solid rgba(0, 0, 0, 0.8);
@@ -116,7 +116,7 @@ section controles-clavier > :last-child {
 section controles-clavier button:hover {
 	background-color: rgb(0, 0, 0);
 	color: rgba(255, 255, 255, 0.8);
-}
+} */
 
 /* Couleur du texte des boutons */
 

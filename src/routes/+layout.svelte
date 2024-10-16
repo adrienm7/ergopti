@@ -94,10 +94,10 @@
 	}
 </script>
 
-<div id="page" class="bg-blue">
+<bloc-page id="page" class="bg-blue">
 	<div style="flex-grow:1">
 		<Header />
-		<div>
+		<bloc-introduction>
 			{#if $page.url.pathname === '/'}
 				<IntroductionHypertexte></IntroductionHypertexte>
 			{/if}
@@ -113,8 +113,8 @@
 			{#if $page.url.pathname === '/informations'}
 				<IntroductionInformations></IntroductionInformations>
 			{/if}
-		</div>
-		<div style="display:flex; flex-direction:row">
+		</bloc-introduction>
+		<bloc-main style="display:flex; flex-direction:row">
 			<aside id="sidebar">
 				<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
 					Contenu de la page
@@ -126,28 +126,30 @@
 					<slot />
 				</main>
 			</div>
-		</div>
-		{#if $page.url.pathname === '/'}
-			<HypertextePlus></HypertextePlus>
-		{/if}
+		</bloc-main>
+		<bloc-fin>
+			{#if $page.url.pathname === '/'}
+				<HypertextePlus></HypertextePlus>
+			{/if}
+		</bloc-fin>
 	</div>
 	<Footer />
-</div>
+</bloc-page>
 
-<div>
+<bloc-clavier-reference>
 	<button id="afficher-clavier-reference" on:click={toggleZIndex}>
 		<i class="fa-duotone fa-keyboard" style="display:{affiche === 'none' ? 'block' : 'none'}"></i>
 		<i class="fa-duotone fa-square-xmark" style="display:{affiche}"></i>
 	</button>
 
-	<div id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
+	<clavier-reference class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 		<div class="conteneur">
 			<BlocClavier nom="reference" />
 			<mini-espace />
 			<BlocControlesClavier nom="reference" />
 		</div>
-	</div>
-</div>
+	</clavier-reference>
+</bloc-clavier-reference>
 
 <!-- <div class="banner">
 	<p>En construction</p>
