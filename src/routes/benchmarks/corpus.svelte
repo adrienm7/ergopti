@@ -9,11 +9,10 @@
 	Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste encore
 	la <span class="important">question fondamentale du corpus</span>. Effectivement, vos résultats
 	vont sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de dialogues aura
-	beaucoup de "je", un corpus plus "sérieux" aura beaucoup de z dû au vouvoiement tandis qu’un
-	corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée du mot "wagon".
+	de nombreux "je", un corpus plus "sérieux" aura une sur-représentation de <kbd>Z</kbd> à cause du vouvoiement, tandis qu’un	corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée du mot "wagon".
 </p>
 <p>
-	Évidemment, plus votre corpus sera volumineux et diversifié, plus vos résultats seront crédibles.
+	Évidemment, plus le corpus sera volumineux et diversifié, plus les résultats obtenus seront crédibles.
 	Toutefois, cela augmentera d’autant les temps de calcul.
 </p>
 
@@ -27,7 +26,7 @@
 </p>
 <p>
 	Par exemple, il serait probablement possible d’améliorer encore les résultats de <Nom /> sur KLAnext,
-	mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le comfort général
+	mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le confort général
 	ou la disparition de certains roulements. Autre exemple, certaines dispositions optimisent tellement
 	que les chiffres ne sont pas dans l’ordre mais plutôt du genre 3210987654. Cela rend la disposition
 	beaucoup moins logique et donc plus difficile à apprendre, pour seulement optimiser légèrement leurs
