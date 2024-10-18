@@ -12,8 +12,7 @@
 	manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres du corpus pour
 	les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB></SFB>s pris en charge
 	par <NomPlus></NomPlus>, comme <kbd-sortie>sc</kbd-sortie> en
-	<kbd>,s</kbd>
-	doivent être remplacés. Un <a href="/corpus/0_conversion_corpus.py">simple script Python</a> permet
+	<kbd>,s</kbd>, doivent être remplacés. Un <a href="/corpus/0_conversion_corpus.py">simple script Python</a> permet
 	de faire ces modifications.
 </p>
 <p>
