@@ -1,4 +1,4 @@
-<texte-sfb class="nowrap">
+<div class="nowrap texte-sfb">
 	<div class="tooltip">
 		SFB
 		<div class="tooltiptext">
@@ -12,10 +12,11 @@
 			tellement fréquent en français…)
 		</div>
 	</div>
-</texte-sfb>
+</div>
 
 <style>
-	texte-sfb {
+	.texte-sfb {
+		display: inline;
 		width: fit-content;
 	}
 
