@@ -115,8 +115,8 @@ SC008:: Send("{U+0037}") ; 7
 SC009:: Send("{U+0038}") ; 8
 SC00A:: Send("{U+0039}") ; 9
 SC00B:: Send("{U+0030}") ; 0
-SC00C:: Send("{U+0025}") ; %
-SC00D:: Send("{U+20AC}") ; €
+SC00C:: Send("{U+20AC}") ; €
+SC00D:: Send("{U+0025}") ; %
 
 ; === Rangée du haut ===
 
@@ -146,7 +146,6 @@ SC024::s
 SC025::n
 SC026::t
 SC027::r
-#SC027::#r
 SC028::q
 SC02B::SC01A ; SC01A est la touche morte ^ en AZERTY
 
@@ -186,12 +185,12 @@ SC035::x
 +SC00C:: {
     Send(" ")
     Sleep(50)
-    Send("%")
+    Send("{U+20AC}") ; €
 }
 +SC00D:: {
     Send(" ")
     Sleep(50)
-    Send("{U+20AC}") ; €
+    Send("%")
 }
 
 ; === Rangée du haut ===
@@ -282,10 +281,11 @@ SC034:: Send("G")
 ; ======= 1.3) AltGr =======
 ; ==========================
 
+#HotIf pilote_azerty
 ; On est forcé d’utiliser des Send ici, sinon la touche Ctrl reste activée dans certains cas
 ; Mais le problème est que les remplacements de texte ne fonctionnent alors plus
 ; Ce problème est résolu en utilisant l’envoi Unicode ! (j’ai l’impression, à vérifier)
-#HotIf pilote_azerty
+
 <^>!SC039:: Send("_") ; Sur la barre d’espace
 
 ; === Rangée des chiffres ===
@@ -301,8 +301,8 @@ SC034:: Send("G")
 <^>!SC009:: Send("8") ; AltGr + 8
 <^>!SC00A:: Send("9") ; AltGr + 9
 <^>!SC00B:: Send("°") ; AltGr + 0
-<^>!SC00C:: Send("‰")
-<^>!SC00D:: Send("£")
+<^>!SC00C:: Send("£")
+<^>!SC00D:: Send("‰")
 
 ; === Rangée du haut ===
 
@@ -364,8 +364,8 @@ SC034:: Send("G")
 +^!SC009:: Send("⁸")
 +^!SC00A:: Send("⁹")
 +^!SC00B:: Send("ª")
-+^!SC00C:: Send("‱")
-+^!SC00D:: return
++^!SC00C:: return
++^!SC00D:: Send("‱")
 
 ; === Rangée du haut ===
 
