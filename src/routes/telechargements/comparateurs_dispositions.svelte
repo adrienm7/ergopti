@@ -50,25 +50,27 @@
 
 <h3>Ergo-L</h3>
 <div>
-	<span>Analyseur Ergo-L — Version à utiliser sur le site : </span><a
-		href="/pilotes/kalamine/{version}/hypertexte_K.json"
-		download><button>hypertexte_K.json</button></a
-	>
-</div>
-<mini-espace />
-<div>
-	<span>Analyseur Ergo-L — Version théorique : </span><a
+	<span>Version pour l’analyseur Ergo-L : </span><a
 		href="/pilotes/kalamine/{version}/hypertexte.json"
 		download><button>hypertexte.json</button></a
 	>
 	<p>
-		Sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les touches
-		assignées à chaque doigt diffèrent. La touche <kbd>À</kbd>
-		par exemple est assignée à l’annulaire et non au majeur. Cela entraîne un <SFB />, car la touche
+		À noter que sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les
+		touches assignées à chaque doigt diffèrent. Par exemple, la touche <kbd>À</kbd>
+		est assignée à l’annulaire et non au majeur. Cela entraîne un <SFB />, car la touche
 		<kbd>J</kbd>
 		se retrouve sur le même doigt que la touche <kbd>E</kbd>. Le <kbd>J</kbd> doit normalement être
-		sous le <kbd>U</kbd>. D’où la nécessité de la version K, qui corrige ce problème, mais place le
+		sous le <kbd>U</kbd>. D’où la nécessité de déplacer le <kbd>K</kbd>, qui corrige ce problème,
+		mais qui place alors le
 		<kbd>K</kbd>
 		sous le <kbd>A</kbd> au lieu de sous le <kbd>U</kbd>.
+	</p>
+	<p>
+		En résumé, l’analyse Ergo-L ne sera pas tout à fait avec la vraie disposition, ceci à cause de
+		ce déplacement du <kbd>K</kbd>. Toutefois, les résultats seront quand même très similaires,
+		peut-être avec un tout petit plus de <SFB></SFB>s sur le <kbd>A</kbd> que dans la réalité, car
+		il y a plus de
+		<kbd-sortie>KA</kbd-sortie>
+		que de <kbd-sortie>KU</kbd-sortie>.
 	</p>
 </div>
