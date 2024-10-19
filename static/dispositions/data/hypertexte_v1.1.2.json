@@ -103,7 +103,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "%",
+			"touche": "€",
 			"code": "Minus",
 			"main": "droite",
 			"doigt": "auriculaire",
@@ -112,7 +112,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "€",
+			"touche": "%",
 			"code": "Equal",
 			"main": "droite",
 			"doigt": "auriculaire",
