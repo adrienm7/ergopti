@@ -190,7 +190,10 @@ bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='special'] div {
 
 /* Style de toutes les touches qui changent avec HyperTexte+ */
 bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui'],
-bloc-clavier[data-plus='oui'][data-type='ergodox'] bloc-touche[data-touche='Space'] {
+bloc-clavier[data-plus='oui'][data-type='ergodox'][data-couche='Visuel']
+	bloc-touche[data-touche='Space'],
+bloc-clavier[data-plus='oui'][data-type='ergodox'][data-couche='Primary']
+	bloc-touche[data-touche='Space'] {
 	--couleur-touche-saturation: 0%;
 	--couleur-touche-luminosite: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));

@@ -182,7 +182,11 @@ export class Clavier {
 						}
 
 						// Corrections localisées
-						if (this.infos_clavier.type === 'ergodox' && res.touche === 'Space') {
+						if (
+							this.infos_clavier.type === 'ergodox' &&
+							res.touche === 'Space' &&
+							['Visuel', 'Primary'].includes(this.infos_clavier.couche)
+						) {
 							toucheClavier.innerHTML = '<div>␣</div>';
 						}
 						if (
