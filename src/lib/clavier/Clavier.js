@@ -412,7 +412,7 @@ export class Clavier {
 			touchePressee === 'LAlt' &&
 			this.infos_clavier.type === 'iso' &&
 			this.infos_clavier.plus === 'oui' &&
-			coucheActuelle !== 'Layer'
+			['Visuel', 'Primary'].includes(coucheActuelle)
 		) {
 			nouvelleCouche = 'Layer';
 		} else if (
