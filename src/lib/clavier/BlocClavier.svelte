@@ -1,10 +1,13 @@
 <script>
 	import '$lib/clavier/BlocClavier.css';
 	import { Clavier } from '$lib/clavier/Clavier.js';
-	import { onMount } from 'svelte';
+	import { onMount, afterUpdate } from 'svelte';
 
 	export let nom;
 	let clavier = new Clavier(nom);
+	onMount(() => {
+		clavier.majClavier();
+	});
 </script>
 
 <bloc-clavier id={'clavier_' + nom}>
