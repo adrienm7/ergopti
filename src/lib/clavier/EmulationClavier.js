@@ -1,6 +1,6 @@
 import { Clavier } from '$lib/clavier/Clavier.js';
 import remplacements from '$lib/clavier/remplacementsMagique.json';
-import data from '$lib/hypertexte_v1.1.2.json'
+
 export class EmulationClavier extends Clavier {
 	constructor(id) {
 		super(id);
@@ -16,10 +16,9 @@ export class EmulationClavier extends Clavier {
 		this.a_grave = false;
 		this.virgule = false;
 		this.couche = 'Primary'; // Couche par défaut
-		// La portée de this est modifiée dans le textinput sinon et this.data est undefined
+		// La portée de this est modifiée dans le textinput sinon et this.data_disposition est undefined
 		this.emulationClavier = this.emulationClavier.bind(this);
 		this.relacherModificateurs = this.relacherModificateurs.bind(this);
-		this.data = data;
 	}
 
 	activationModificateur(event) {
@@ -123,10 +122,10 @@ export class EmulationClavier extends Clavier {
 
 		// Si touche normale
 		let keyPressed = event.code;
-		let res = this.data[this.infos_clavier.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
+		let res = this.data_disposition[this.infos_clavier.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
-			let toucheClavier = this.data.touches.find((el) => el['touche'] == res['touche']);
+			let toucheClavier = this.data_disposition.touches.find((el) => el['touche'] == res['touche']);
 			this.presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
 			let touche;
 			if (

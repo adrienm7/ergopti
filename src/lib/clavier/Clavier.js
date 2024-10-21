@@ -1,4 +1,5 @@
 import * as stores_infos from '$lib/stores_infos.js';
+import { getData } from '$lib/clavier/getData.js';
 
 import characterFrequencies from '$lib/clavier/characterFrequencies.json';
 // Créer la clé "max" contenant la valeur maximale parmi les fréquences (souvent la fréquence en E)
@@ -47,6 +48,9 @@ export class Clavier {
 	}
 
 	majClavier() {
+		if (this.data_disposition === undefined) {
+			this.data_disposition = getData(this.version);
+		}
 		this.majTouches();
 		this.activerModificateurs();
 
