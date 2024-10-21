@@ -369,58 +369,67 @@ export class Clavier {
 		}
 
 		// Touche pressée = Ctrl
-		if ((touchePressee === 'LCtrl' || touchePressee === 'RCtrl') && coucheActuelle !== 'Ctrl') {
+		if (touchePressee === 'LCtrl' && coucheActuelle !== 'Ctrl') {
 			nouvelleCouche = 'Ctrl';
-		} else if (touchePressee === 'LCtrl' || touchePressee === 'RCtrl') {
+		} else if (touchePressee === 'LCtrl') {
 			nouvelleCouche = 'Visuel';
 		}
 
-		// Touche pressée = LAlt (devient Layer)
+		// Touche pressée = RCtrl
 		if (
-			(touchePressee === 'LAlt' && this.infos_clavier.type === 'iso') ||
-			(touchePressee === 'Space' &&
-				this.infos_clavier.type === 'ergodox' &&
-				this.infos_clavier.plus === 'oui' &&
-				coucheActuelle === 'Layer')
+			touchePressee === 'RCtrl' &&
+			((this.infos_clavier.type === 'iso' && this.infos_clavier.plus === 'non') ||
+				this.infos_clavier.type === 'ergodox') &&
+			coucheActuelle !== 'Ctrl'
 		) {
-			nouvelleCouche = 'Visuel';
+			nouvelleCouche = 'Ctrl';
 		} else if (
-			(touchePressee === 'LAlt' && this.infos_clavier.type === 'iso') ||
-			(touchePressee === 'Space' &&
-				this.infos_clavier.type === 'ergodox' &&
-				this.infos_clavier.plus === 'oui')
-		) {
-			nouvelleCouche = 'Layer';
-		}
-
-		// Touche pressée = RCtrl (devient Shift)
-		if (
-			(touchePressee === 'RCtrl' && this.infos_clavier.type === 'iso') ||
-			(touchePressee === 'Space' &&
-				this.infos_clavier.type === 'ergodox' &&
-				this.infos_clavier.plus === 'oui' &&
-				coucheActuelle === 'Shift')
+			touchePressee === 'RCtrl' &&
+			((this.infos_clavier.type === 'iso' && this.infos_clavier.plus === 'non') ||
+				this.infos_clavier.type === 'ergodox')
 		) {
 			nouvelleCouche = 'Visuel';
+		}
+
+		// Touche pressée = RCtrl en ISO+ (devient Shift)
+		if (
+			touchePressee === 'RCtrl' &&
+			this.infos_clavier.type === 'iso' &&
+			this.infos_clavier.plus === 'oui' &&
+			coucheActuelle !== 'Shift'
+		) {
+			nouvelleCouche = 'Shift';
 		} else if (
 			touchePressee === 'RCtrl' &&
 			this.infos_clavier.type === 'iso' &&
 			this.infos_clavier.plus === 'oui'
 		) {
-			nouvelleCouche = 'Shift';
+			nouvelleCouche = 'Visuel';
 		}
 
-		// Touche pressée = ^
-		if (touchePressee === '^' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
-			nouvelleCouche = '^';
-		}
-
-		// Touche pressée = trema
+		// Touche pressée = LAlt (devient Layer en ISO+)
 		if (
-			(touchePressee === 'trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
-			(touchePressee === 't' && coucheActuelle === 'ShiftAltGr')
+			touchePressee === 'LAlt' &&
+			this.infos_clavier.type === 'iso' &&
+			this.infos_clavier.plus === 'oui' &&
+			coucheActuelle !== 'Layer'
 		) {
-			nouvelleCouche = 'trema';
+			nouvelleCouche = 'Layer';
+		} else if (
+			touchePressee === 'LAlt' &&
+			this.infos_clavier.type === 'iso' &&
+			this.infos_clavier.plus === 'oui'
+		) {
+			nouvelleCouche = 'Visuel';
+		}
+
+		// Touche pressée = À
+		if (
+			touchePressee === 'à' &&
+			['Visuel', 'Primary', 'Shift'].includes(coucheActuelle) &&
+			this.infos_clavier.plus === 'oui'
+		) {
+			nouvelleCouche = 'À';
 		}
 
 		// Touche pressée = E
@@ -438,13 +447,20 @@ export class Clavier {
 			nouvelleCouche = 'R';
 		}
 
-		// Touche pressée = À
+		// Touche pressée = Space (devient Layer en Ergodox+)
 		if (
-			touchePressee === 'à' &&
-			['Visuel', 'Primary', 'Shift'].includes(coucheActuelle) &&
+			touchePressee === 'Space' &&
+			this.infos_clavier.type === 'ergodox' &&
+			this.infos_clavier.plus === 'oui' &&
+			coucheActuelle !== 'Layer'
+		) {
+			nouvelleCouche = 'Layer';
+		} else if (
+			touchePressee === 'Space' &&
+			this.infos_clavier.type === 'ergodox' &&
 			this.infos_clavier.plus === 'oui'
 		) {
-			nouvelleCouche = 'À';
+			nouvelleCouche = 'Visuel';
 		}
 
 		// Touche pressée = ,
@@ -454,6 +470,19 @@ export class Clavier {
 			this.infos_clavier.plus === 'oui'
 		) {
 			nouvelleCouche = ',';
+		}
+
+		// Touche pressée = ^
+		if (touchePressee === '^' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
+			nouvelleCouche = '^';
+		}
+
+		// Touche pressée = trema
+		if (
+			(touchePressee === 'trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
+			(touchePressee === 't' && coucheActuelle === 'ShiftAltGr')
+		) {
+			nouvelleCouche = 'trema';
 		}
 
 		// Une fois que la nouvelle couche est déterminée, on actualise la valeur de la couche, puis le clavier
@@ -467,34 +496,37 @@ export class Clavier {
 	ajouterBoutonsChangerCouche() {
 		try {
 			const emplacementClavier = this.getEmplacementClavier();
+			let toucheLAlt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
 			let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
 			let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
 			let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
 			let toucheLCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='LCtrl']");
 			let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
-			let toucheLAlt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
 			let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 			let toucheE = emplacementClavier.querySelector("bloc-touche[data-touche='e']");
 			let toucheR = emplacementClavier.querySelector("bloc-touche[data-touche='r']");
 			let toucheT = emplacementClavier.querySelector("bloc-touche[data-touche='t']");
+			let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
 			let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
 			let toucheCirconflexe = emplacementClavier.querySelector("bloc-touche[data-touche='^']");
 			let toucheTrema = emplacementClavier.querySelector("bloc-touche[data-touche='trema']");
-			let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
 
 			// On ajoute une action au clic sur chacune des touches modificatrices
 			for (let toucheModificatrice of [
+				toucheLAlt,
 				toucheRAlt,
 				toucheLShift,
 				toucheRShift,
 				toucheLCtrl,
 				toucheRCtrl,
-				toucheCirconflexe,
-				toucheTrema,
 				toucheA,
 				toucheE,
 				toucheR,
-				toucheT
+				toucheT,
+				toucheVirgule,
+				toucheEspace,
+				toucheCirconflexe,
+				toucheTrema
 			]) {
 				if (toucheModificatrice !== null) {
 					toucheModificatrice.addEventListener(
@@ -504,17 +536,6 @@ export class Clavier {
 						},
 						{ passive: true }
 					);
-				}
-			}
-
-			// Les boutons de touches modificatrices À et Space ne sont ajoutées que si + est activé
-			if (this.infos_clavier.plus === 'oui') {
-				for (let toucheModificatrice of [toucheLAlt, toucheVirgule, toucheEspace]) {
-					if (toucheModificatrice !== null) {
-						toucheModificatrice.addEventListener('click', () => {
-							this.changerCouche(toucheModificatrice);
-						});
-					}
 				}
 			}
 		} catch (error) {
