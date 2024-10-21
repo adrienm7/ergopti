@@ -1,6 +1,6 @@
 import { Clavier } from '$lib/clavier/Clavier.js';
 import remplacements from '$lib/clavier/remplacementsMagique.json';
-
+import data from '$lib/hypertexte_v1.1.2.json'
 export class EmulationClavier extends Clavier {
 	constructor(id) {
 		super(id);
@@ -19,6 +19,7 @@ export class EmulationClavier extends Clavier {
 		// La portée de this est modifiée dans le textinput sinon et this.data est undefined
 		this.emulationClavier = this.emulationClavier.bind(this);
 		this.relacherModificateurs = this.relacherModificateurs.bind(this);
+		this.data = data;
 	}
 
 	activationModificateur(event) {
