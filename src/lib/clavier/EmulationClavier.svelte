@@ -1,14 +1,14 @@
 <script>
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import { EmulationClavier } from '$lib/clavier/EmulationClavier.js';
-	import { onMount } from 'svelte';
+	import { onMount, afterUpdate } from 'svelte';
 
+	let champTexte = '';
 	let clavier = new EmulationClavier('emulation');
 	onMount(() => {
 		clavier.textarea = document.getElementById('input-text');
+		clavier.majClavier();
 	});
-
-	let champTexte = '';
 </script>
 
 <BlocClavier nom="emulation" />
