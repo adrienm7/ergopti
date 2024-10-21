@@ -17,7 +17,6 @@ export class Clavier {
 		// S'abonner au store pour la version
 		stores_infos['version'].subscribe((value) => {
 			this.version = value;
-			this.majClavier();
 		});
 		stores_infos['data_disposition'].subscribe((value) => {
 			this.data_disposition = value;
@@ -48,9 +47,10 @@ export class Clavier {
 	}
 
 	majClavier() {
-		if (this.data_disposition === undefined) {
-			this.data_disposition = getData(this.version);
-		}
+		// On n’en a pas besoin, et si c’est activé cela multiplie les requêtes inutiles (1 par clavier)
+		// if (this.data_disposition === undefined) {
+		// 	this.data_disposition = getData(this.version);
+		// }
 		this.majTouches();
 		this.activerModificateurs();
 
