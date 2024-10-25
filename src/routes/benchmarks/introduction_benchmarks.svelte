@@ -12,6 +12,7 @@
 		l’adresse
 		<a href="https://klanext.keyboard-design.com">https://klanext.keyboard-design.com</a>. C’est
 		l’un des comparateurs en ligne les plus utilisés en raison de son algorithme de notation qui
-		serait meilleur que ses autres dérivés en ligne.
+		serait "meilleur" que ses autres dérivés en ligne. Cf. par exemple
+		<a href="https://sites.google.com/alanreiser.com/handsdown/home/statistics">ici</a>.
 	</p>
 </div>
