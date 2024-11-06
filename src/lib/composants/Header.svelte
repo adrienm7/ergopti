@@ -1,43 +1,21 @@
 <script>
-	import { page } from '$app/stores';
 	import Nom from '../composants/Nom.svelte';
+
+	import { page } from '$app/stores';
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 
-	function fermerMenu() {
-		document.getElementById('menu-btn').checked = false;
-		document.getElementById('clavier-ref').style.zIndex =
-			'-999'; /* Si le clavier était ouvert, on le ferme */
-	}
-
+	import { loadData } from '$lib/clavier/getData.js';
 	import { version, data_disposition } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
 	});
 
-	async function loadData(version) {
-		try {
-			// Utilisation de fetch pour récupérer le fichier JSON depuis le dossier static
-			const response = await fetch(`/dispositions/data/hypertexte_v${version}.json`);
-			if (!response.ok) {
-				throw new Error('Erreur lors du chargement du fichier JSON');
-			}
-			const data = await response.json(); // Parse les données JSON
-			// console.log('Données chargées :', data);
-			return data;
-		} catch (error) {
-			console.error('Erreur lors du chargement des données :', error);
-		}
-	}
-
-	// Utiliser `set` pour mettre à jour la version dans le store
 	function handleVersionChange() {
-		// S'abonner au store pour la version
-		// Charger les données en fonction de la version
 		loadData(versionValue)
 			.then((data) => {
 				data_disposition.set(data);
-				version.set(versionValue);
+				version.set(versionValue); // Utiliser `set` pour mettre à jour la version dans le store
 				// console.log('Données chargées :', data);
 			})
 			.catch((error) => {
@@ -45,6 +23,12 @@
 			});
 	}
 	handleVersionChange();
+
+	function fermerMenu() {
+		document.getElementById('menu-btn').checked = false;
+		document.getElementById('clavier-ref').style.zIndex =
+			'-999'; /* Si le clavier était ouvert, on le ferme */
+	}
 
 	function toggleOverflowMenu() {
 		if (document.getElementById('menu-btn').checked) {
