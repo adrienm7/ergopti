@@ -22,7 +22,7 @@
 	<title>Disposition HyperTexte</title>
 	<meta
 		name="description"
-		content="La disposition HyperTexte est optimisée pour le français, l’anglais et le code"
+		content="HyperTexte, une disposition clavier ergonomique optimisée pour le français, l’anglais et le code"
 	/>
 </svelte:head>
 
