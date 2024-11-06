@@ -2,14 +2,9 @@
 	<div class="tooltip">
 		SFB
 		<div class="tooltiptext">
-			« Same Finger Bigram », c’est-à-dire nécessiter le même doigt pour taper deux lettres qui se
-			suivent. Par exemple, cela peut être utiliser l’index droit pour taper <span class="nowrap"
-				><kbd>SC</kbd>,</span
-			>
-			car
-			<kbd>S</kbd> et <kbd>C</kbd> sont tous deux sur la colonne de ce doigt dans la disposition
-			HyperTexte. Un autre exemple en AZERTY de SFB sur ce même doigt est <kbd>UN</kbd> (qui est pourtant
-			tellement fréquent en français…)
+			« Same Finger Bigram », c’est-à-dire nécessiter le même doigt pour taper deux lettres qui se suivent.
+			Par exemple, en AZERTY un SFB serait <kbd>UN</kbd> qui implique d’utiliser l’index droit pour appuyer successivement sur ces deux touches.
+			Et pourtant, cette combinaison est si fréquente en français…
 		</div>
 	</div>
 </div>
