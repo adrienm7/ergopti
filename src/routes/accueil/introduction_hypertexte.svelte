@@ -25,11 +25,9 @@
 	<petit-espace />
 	<hr />
 	<p class="encart-introduction">
-		<Nom /> est une disposition clavier
-		<strong
-			>destinée à taper majoritairement du français, de l’anglais et du code informatique</strong
-		>. Fruit de nombreuses réflexions et expérimentations, elle se veut la plus optimale possible
-		<span class="important">pour&nbsp;un&nbsp;confort&nbsp;d’exception</span>.
+		<Nom /> est une <strong class="important">disposition clavier ergonomique</strong> pour le <strong>français</strong>, l’<strong>anglais</strong> et la <strong>programmation</strong>.
+		Fruit de nombreuses réflexions et expérimentations, elle se veut la plus optimale possible pour une frappe rapide, fluide et 
+		<span class="important">un&nbsp;confort&nbsp;d’exception</span>.
 	</p>
 	<hr />
 </div>
@@ -39,8 +37,7 @@
 <div class="cards">
 	<div class="card">
 		<i class="fa-duotone fa-circle-1"></i>
-		<span class="text-bold">Diminution de la distance parcourue</span> pour moins de fatigue et plus
-		de confort.
+		<span class="text-bold">Diminution de la distance parcourue</span> par les doigts pour moins de fatigue.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i> <span class="important">Frappe extrêmement fluide</span>
