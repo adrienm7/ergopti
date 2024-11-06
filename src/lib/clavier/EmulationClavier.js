@@ -321,37 +321,31 @@ export class EmulationClavier extends Clavier {
 			this.textarea.value = texteAvantCurseur + '\t' + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + 1;
 		} else if (touche === '★') {
-			let mot = texteAvantCurseur.split(' ').slice(-1).toString();
+			let mot = texteAvantCurseur.split(/\s+/).slice(-1)[0];
 
 			if (mot.toLowerCase() in remplacements) {
 				let remplacement = remplacements[mot.toLowerCase()];
-
-				let casse = 'minuscules';
+			
 				if (mot === mot.toUpperCase() && mot.length > 1) {
-					casse = 'majuscules';
-				} else if (mot === mot.charAt(0).toUpperCase() + mot.slice(1).toLowerCase()) {
-					casse = 'titelcase';
-				}
-
-				if (casse === 'minuscules') {
-					remplacement = remplacement.toLowerCase();
-				} else if (casse === 'titelcase') {
-					remplacement = remplacement.charAt(0).toUpperCase() + remplacement.slice(1).toLowerCase();
-				} else if (casse === 'majuscules') {
 					remplacement = remplacement.toUpperCase();
+				} else if (mot === mot.charAt(0).toUpperCase() + mot.slice(1).toLowerCase()) {
+					remplacement = remplacement.charAt(0).toUpperCase() + remplacement.slice(1).toLowerCase();
+				} else {
+					remplacement = remplacement.toLowerCase();
 				}
-
+			
+				let regex = /(\s*)(\S+)$/;
+				let match = texteAvantCurseur.match(regex);
+				let prefix = match ? match[1] : '';
+			
 				this.textarea.value =
-					texteAvantCurseur.split(' ').slice(0, -1).join(' ') +
-					' ' +
-					remplacement +
+					texteAvantCurseur.replace(regex, prefix + remplacement) +
 					texteApresCurseur;
 				nouvellePositionCurseur = positionCurseur + remplacement.length;
 			} else {
-				let toucheRepetee = texteAvantCurseur.slice(-1);
-				this.textarea.value = texteAvantCurseur + toucheRepetee + texteApresCurseur;
+				this.textarea.value = texteAvantCurseur + texteAvantCurseur.slice(-1) + texteApresCurseur;
 				nouvellePositionCurseur = positionCurseur + 1;
-			}
+			}			
 		} else {
 			this.textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + touche.length;
@@ -368,7 +362,7 @@ export class EmulationClavier extends Clavier {
 		this.textarea.value = this.textarea.value
 			.replace(/èo/g, 'oe')
 			.replace(/èe/g, 'eo')
-			.replace(/è./g, 'u.')
+			.replace(/è\./g, 'u.')
 			.replace(/è,/g, 'u,');
 
 		/* Nouveaux roulements */
