@@ -142,7 +142,7 @@
 		<i class="fa-duotone fa-square-xmark" style="display:{affiche}"></i>
 	</button>
 
-	<clavier-reference class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
+	<clavier-reference id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 		<div class="conteneur">
 			<BlocClavier nom="reference" />
 			<mini-espace />

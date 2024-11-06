@@ -16,7 +16,7 @@
 	},
 	"keyboardType": "european",
 	"author": "Adrien Moyaux",
-	"authorUrl": "https://www.beseven.fr",
+	"authorUrl": "https://hypertexte.beseven.fr",
 	"moreInfoUrl": "",
 	"moreInfoText": "",
 	"keys": [
@@ -120,21 +120,21 @@
 			"numpad": -1
 		},
 		{
-			"primary": -1,
-			"shift": -1,
-			"finger": 10,
-			"id": 11,
-			"altGr": 8240,
-			"shiftAltGr": 8241,
-			"numpad": -1
-		},
-		{
 			"primary": 8364,
 			"shift": 163,
 			"finger": 10,
-			"id": 12,
+			"id": 11,
 			"altGr": -1,
 			"shiftAltGr": -1,
+			"numpad": -1
+		},
+		{
+			"primary": -1,
+			"shift": -1,
+			"finger": 10,
+			"id": 12,
+			"altGr": 8240,
+			"shiftAltGr": 8241,
 			"numpad": -1
 		},
 		{
