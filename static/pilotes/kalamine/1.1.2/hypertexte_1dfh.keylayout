@@ -40,7 +40,7 @@
   ┃         ┃ A ⩽ │ I ⩾ │ E   │ U   │ K   │ V   │ S   │ N   │ T   │ R   │     │     ┃      ┃
   ┃ ⇬       ┃   < │   > │   { │   } │   \ │   | │   ( │   ) │   [ │   ] │     │     ┃      ┃
   ┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
-  ┃      ┃     │ : … │ J   │ À   │*¨   │ : · │ M   │ C   │ H   │ G   │ X × ┃               ┃
+  ┃      ┃     │ : … │ J   │ À   │*¨   │ ; · │ M   │ C   │ H   │ G   │ X × ┃               ┃
   ┃ ⇧    ┃     │ . : │   / │   = │** " │ , ; │   & │   ^ │   # │   ~ │   * ┃ ⇧             ┃
   ┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
   ┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
@@ -240,7 +240,7 @@
       <key code="7"   action="ab02_J" />
       <key code="8"   action="ab03_À" />
       <key code="9"   action="dead_diaeresis" />
-      <key code="11"  action="ab05_:" />
+      <key code="11"  output=";" />
       <key code="45"  action="ab06_M" />
       <key code="46"  action="ab07_C" />
       <key code="43"  action="ab08_H" />
@@ -849,10 +849,6 @@
     <action id="ab03_À">
       <when state="none"       output="À" />
       <when state="1dk"        output="Ê" />
-    </action>
-    <action id="ab05_:">
-      <when state="none"       output=":" />
-      <when state="1dk"        output="Ù" />
     </action>
     <action id="ab06_m">
       <when state="none"       output="m" />
