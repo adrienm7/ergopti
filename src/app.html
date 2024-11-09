@@ -4,6 +4,7 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="author" content="Adrien MOYAUX" />
+		<meta name="color-scheme" content="light dark" />
 		<link type="text/plain" rel="author" href="https://static.beseven.fr/humans.txt" />
 
 		<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -15,4 +16,13 @@
 	<body data-sveltekit-prefetch>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
+	<script>
+		window.onload = function () {
+			if (navigator.userAgent.match(/samsungbrowser/i)) {
+				alert(
+					'Votre navigateur (Samsung Internet) peut mal afficher le contenu de ce site si le mode sombre est activé. Si c’est le cas chez vous, nous vous recommandons d’utiliser Google Chrome, Firefox ou Microsoft Edge. Une solution peut aussi être d’activer l’option « internet://flags/#enable-adaptive-force-dark » de votre navigateur Samsung. Votre navigateur impose le style de son mode sombre, même si le site consulté en a un de prévu. Modifier ce flag, qui n’est pas encore la valeur par défaut, vous évitera ce problème à l’avenir sur d’autres sites. Merci de votre compréhension.'
+				);
+			}
+		};
+	</script>
 </html>
