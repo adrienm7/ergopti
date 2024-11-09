@@ -148,20 +148,20 @@
 			href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
 		>.
 	</p>
-	<div style="display:flex; align-items:center; justify-content:space-between; min-height:2rem">
-		<select bind:value={ergol} style="height: 2rem; display:block">
+	<div style="display:flex; align-items:center; justify-content:left; flex-wrap: wrap;">
+		<select bind:value={ergol} style="height: 2.5rem; display:block; margin-right: 15px">
 			<option value="en_fr">Français + Anglais</option>
 			<option value="fr">Français</option>
 			<option value="en">Anglais</option>
 		</select>
-		<select bind:value={version_1dfh} style="height: 2rem; display:block">
+		<select bind:value={version_1dfh} style="height: 2.5rem; display:block;">
 			<option value="">Standard</option>
 			<option value="_1dfh">1DFH</option>
 		</select>
-		<a href="/resultats/{versionValue}/ergol/analyse_ergol_hypertexte{version_1dfh}_{ergol}.pdf"
-			><button style="min-height: 2rem; display:block">Télécharger l’analyse Ergo-L</button></a
-		>
 	</div>
+	<a href="/resultats/{versionValue}/ergol/analyse_ergol_hypertexte{version_1dfh}_{ergol}.pdf"
+		><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo-L</button></a
+	>
 	<mini-espace />
 	<embed
 		src="/resultats/{versionValue}/ergol/analyse_ergol_hypertexte{version_1dfh}_{ergol}.pdf"

@@ -87,6 +87,10 @@
 	<kbd class="morte">◌̈</kbd>
 	et <kbd>Shift</kbd> + <kbd class="morte">◌̈</kbd> ne seront plus disponibles.
 </p>
+<p class="encadre">
+	<b>Note :</b> Une version 1DFH de <Nom></Nom> a été développée. Elle est disponible sur la page de
+	benchmarks ainsi que sur la page de téléchargements, par installation via Kalamine.
+</p>
 
 <h3>Quelques <SFB />s restants</h3>
 <ul>
