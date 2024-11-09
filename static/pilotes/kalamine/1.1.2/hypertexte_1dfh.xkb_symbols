@@ -24,7 +24,7 @@
 // ┃         ┃ A   │ I   │ E   │ U   │ K   │ V   │ S   │ N   │ T   │ R   │     │     ┃      ┃
 // ┃ ⇬       ┃   è │   é │   œ │     │     │     │     │   ô │     │     │     │     ┃      ┃
 // ┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
-// ┃      ┃     │ :   │ J   │ À   │*¨   │ :   │ M   │ C   │ H   │ G   │ X   ┃               ┃
+// ┃      ┃     │ :   │ J   │ À   │*¨   │ ;   │ M   │ C   │ H   │ G   │ X   ┃               ┃
 // ┃ ⇧    ┃     │ . ù │   æ │   ê │***¨ │ ,   │   ñ │   ç │   î │     │   â ┃ ⇧             ┃
 // ┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
 // ┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
@@ -95,7 +95,7 @@ xkb_symbols "Standard" {
     key <AB02> {[ j               , J               , slash           , VoidSymbol      , ae              , AE              ]}; // j J /   æ Æ
     key <AB03> {[ agrave          , Agrave          , equal           , VoidSymbol      , ecircumflex     , Ecircumflex     ]}; // à À =   ê Ê
     key <AB04> {[ ISO_Level5_Latch, dead_diaeresis  , quotedbl        , VoidSymbol      , dead_diaeresis  , VoidSymbol      ]}; // *¨ ¨ "   ¨
-    key <AB05> {[ comma           , colon           , semicolon       , periodcentered  , VoidSymbol      , VoidSymbol      ]}; // , : ; ·
+    key <AB05> {[ comma           , semicolon       , semicolon       , periodcentered  , VoidSymbol      , VoidSymbol      ]}; // , ; ; ·
     key <AB06> {[ m               , M               , ampersand       , VoidSymbol      , ntilde          , Ntilde          ]}; // m M &   ñ Ñ
     key <AB07> {[ c               , C               , asciicircum     , VoidSymbol      , ccedilla        , Ccedilla        ]}; // c C ^   ç Ç
     key <AB08> {[ h               , H               , numbersign      , VoidSymbol      , icircumflex     , Icircumflex     ]}; // h H #   î Î

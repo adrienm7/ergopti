@@ -217,7 +217,7 @@ SendKey(base, deadkeymap) {
 +SC2f::SendKey("*¨", {"*¨": "¨"})
 
  SC30::SendKey("U+002c", {}) ; ,
-+SC30::SendKey("U+003a", {"**": "U+00d9"}) ; :
++SC30::SendKey("U+003b", {}) ; ;
 
  SC31::SendKey("U+006d", {"**": "U+00f1"}) ; m
 +SC31::SendKey("U+004d", {"**": "U+00d1"}) ; M
