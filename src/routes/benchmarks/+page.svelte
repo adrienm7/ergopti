@@ -56,6 +56,7 @@
 	let clavier = 'iso';
 	let langue = 'fr';
 	let ergol = 'en_fr';
+	let version_1dfh = '';
 	let corpus_fr = 'panache';
 	let corpus_en = 'chained_english_bigrams_9';
 </script>
@@ -88,8 +89,8 @@
 		la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
 		est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
 		de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
-		a une faible alternance des mains ainsi que la touche <kbd>E</kbd> sur le pouce gauche, ce qui peut entraver
-		la fluidité lors de l’écriture de texte ainsi que le confort général.
+		a une faible alternance des mains ainsi que la touche <kbd>E</kbd> sur le pouce gauche, ce qui peut
+		entraver la fluidité lors de l’écriture de texte ainsi que le confort général.
 	</p>
 	<p>
 		Enfin, gardez en tête que les dispositions dont le nom est suffixé par « en » plutôt que « fr »
@@ -153,13 +154,18 @@
 			<option value="fr">Français</option>
 			<option value="en">Anglais</option>
 		</select>
-		<a href="/resultats/{versionValue}/analyse_ergol_{ergol}.pdf" style="height: 2rem"
-			><button>Télécharger l’analyse Ergo-L</button></a
+		<select bind:value={version_1dfh} style="height: 2rem">
+			<option value="">Standard</option>
+			<option value="_1dfh">1DFH</option>
+		</select>
+		<a
+			href="/resultats/{versionValue}/ergol/analyse_ergol_hypertexte{version_1dfh}_{ergol}.pdf"
+			style="height: 2rem"><button>Télécharger l’analyse Ergo-L</button></a
 		>
 	</div>
 	<mini-espace />
 	<embed
-		src="/resultats/{versionValue}/analyse_ergol_{ergol}.pdf"
+		src="/resultats/{versionValue}/ergol/analyse_ergol_hypertexte{version_1dfh}_{ergol}.pdf"
 		type="application/pdf"
 		width="100%"
 		height="600px"

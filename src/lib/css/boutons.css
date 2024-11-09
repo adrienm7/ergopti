@@ -1,6 +1,10 @@
 button {
 	cursor: pointer;
 	padding: 10px;
+	background-color: rgba(255, 255, 255, 0.8);
+	border: 1px solid rgba(0, 0, 0, 0.6);
+	border-radius: 3px;
+	color: black;
 }
 
 button p {
