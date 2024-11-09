@@ -118,39 +118,39 @@ SendKey(base, deadkeymap) {
 
 ;  Digits
 
- SC02::SendKey("U+0031", {"*^": "U+00b9"}) ; 1
+ SC02::SendKey("U+0031", {}) ; 1
 
- SC03::SendKey("U+0032", {"*^": "U+00b2"}) ; 2
+ SC03::SendKey("U+0032", {}) ; 2
 
- SC04::SendKey("U+0033", {"*^": "U+00b3"}) ; 3
+ SC04::SendKey("U+0033", {}) ; 3
 
- SC05::SendKey("U+0034", {"*^": "U+2074"}) ; 4
+ SC05::SendKey("U+0034", {}) ; 4
 
- SC06::SendKey("U+0035", {"*^": "U+2075"}) ; 5
+ SC06::SendKey("U+0035", {}) ; 5
 
- SC07::SendKey("U+0036", {"*^": "U+2076"}) ; 6
+ SC07::SendKey("U+0036", {}) ; 6
 
- SC08::SendKey("U+0037", {"*^": "U+2077"}) ; 7
+ SC08::SendKey("U+0037", {}) ; 7
 
- SC09::SendKey("U+0038", {"*^": "U+2078"}) ; 8
+ SC09::SendKey("U+0038", {}) ; 8
 
- SC0a::SendKey("U+0039", {"*^": "U+2079"}) ; 9
+ SC0a::SendKey("U+0039", {}) ; 9
 
- SC0b::SendKey("U+0030", {"*^": "U+2070"}) ; 0
+ SC0b::SendKey("U+0030", {}) ; 0
 
 ;  Letters, first row
 
- SC10::SendKey("U+00e8", {}) ; è
-+SC10::SendKey("U+00c8", {}) ; È
+ SC10::SendKey("U+007a", {"**": "U+00e1"}) ; z
++SC10::SendKey("U+005a", {"**": "U+00c1"}) ; Z
 
- SC11::SendKey("U+0079", {"*^": "U+0177", "*¨": "U+00ff"}) ; y
-+SC11::SendKey("U+0059", {"*^": "U+0176", "*¨": "U+0178"}) ; Y
+ SC11::SendKey("U+0079", {"**": "U+00ed", "*¨": "U+00ff"}) ; y
++SC11::SendKey("U+0059", {"**": "U+00cd", "*¨": "U+0178"}) ; Y
 
- SC12::SendKey("U+006f", {"*^": "U+00f4", "*¨": "U+00f6"}) ; o
-+SC12::SendKey("U+004f", {"*^": "U+00d4", "*¨": "U+00d6"}) ; O
+ SC12::SendKey("U+006f", {"*¨": "U+00f6"}) ; o
++SC12::SendKey("U+004f", {"*¨": "U+00d6"}) ; O
 
- SC13::SendKey("U+0077", {"*^": "U+0175", "*¨": "U+1e85"}) ; w
-+SC13::SendKey("U+0057", {"*^": "U+0174", "*¨": "U+1e84"}) ; W
+ SC13::SendKey("U+0077", {"*¨": "U+1e85"}) ; w
++SC13::SendKey("U+0057", {"*¨": "U+1e84"}) ; W
 
  SC14::SendKey("U+0062", {}) ; b
 +SC14::SendKey("U+0042", {}) ; B
@@ -161,28 +161,28 @@ SendKey(base, deadkeymap) {
  SC16::SendKey("U+0064", {}) ; d
 +SC16::SendKey("U+0044", {}) ; D
 
- SC17::SendKey("U+006c", {}) ; l
-+SC17::SendKey("U+004c", {}) ; L
+ SC17::SendKey("U+006c", {"**": "U+00fb"}) ; l
++SC17::SendKey("U+004c", {"**": "U+00db"}) ; L
 
- SC18::SendKey("U+0070", {}) ; p
-+SC18::SendKey("U+0050", {}) ; P
+ SC18::SendKey("U+0070", {"**": "U+0071"}) ; p
++SC18::SendKey("U+0050", {"**": "U+0051"}) ; P
 
- SC19::SendKey("U+0027", {}) ; '
-+SC19::SendKey("U+0027", {}) ; '
+ SC19::SendKey("U+2019", {}) ; ’
++SC19::SendKey("U+003f", {}) ; ?
 
 ;  Letters, second row
 
- SC1e::SendKey("U+0061", {"*^": "U+00e2", "*¨": "U+00e4"}) ; a
-+SC1e::SendKey("U+0041", {"*^": "U+00c2", "*¨": "U+00c4"}) ; A
+ SC1e::SendKey("U+0061", {"**": "U+00e8", "*¨": "U+00e4"}) ; a
++SC1e::SendKey("U+0041", {"**": "U+00c8", "*¨": "U+00c4"}) ; A
 
- SC1f::SendKey("U+0069", {"*^": "U+00ee", "*¨": "U+00ef"}) ; i
-+SC1f::SendKey("U+0049", {"*^": "U+00ce", "*¨": "U+00cf"}) ; I
+ SC1f::SendKey("U+0069", {"**": "U+00e9", "*¨": "U+00ef"}) ; i
++SC1f::SendKey("U+0049", {"**": "U+00c9", "*¨": "U+00cf"}) ; I
 
- SC20::SendKey("U+0065", {"*^": "U+00ea", "*¨": "U+00eb"}) ; e
-+SC20::SendKey("U+0045", {"*^": "U+00ca", "*¨": "U+00cb"}) ; E
+ SC20::SendKey("U+0065", {"**": "U+0153", "*¨": "U+00eb"}) ; e
++SC20::SendKey("U+0045", {"**": "U+0152", "*¨": "U+00cb"}) ; E
 
- SC21::SendKey("U+0075", {"*^": "U+00fb", "*¨": "U+00fc"}) ; u
-+SC21::SendKey("U+0055", {"*^": "U+00db", "*¨": "U+00dc"}) ; U
+ SC21::SendKey("U+0075", {"*¨": "U+00fc"}) ; u
++SC21::SendKey("U+0055", {"*¨": "U+00dc"}) ; U
 
  SC22::SendKey("U+006b", {}) ; k
 +SC22::SendKey("U+004b", {}) ; K
@@ -190,11 +190,11 @@ SendKey(base, deadkeymap) {
  SC23::SendKey("U+0076", {}) ; v
 +SC23::SendKey("U+0056", {}) ; V
 
- SC24::SendKey("U+0073", {"*^": "U+015d"}) ; s
-+SC24::SendKey("U+0053", {"*^": "U+015c"}) ; S
+ SC24::SendKey("U+0073", {}) ; s
++SC24::SendKey("U+0053", {}) ; S
 
- SC25::SendKey("U+006e", {}) ; n
-+SC25::SendKey("U+004e", {}) ; N
+ SC25::SendKey("U+006e", {"**": "U+00f4"}) ; n
++SC25::SendKey("U+004e", {"**": "U+00d4"}) ; N
 
  SC26::SendKey("U+0074", {"*¨": "U+1e97"}) ; t
 +SC26::SendKey("U+0054", {}) ; T
@@ -204,55 +204,44 @@ SendKey(base, deadkeymap) {
 
 ;  Letters, third row
 
- SC2c::SendKey("U+002e", {}) ; .
+ SC2c::SendKey("U+002e", {"**": "U+00f9"}) ; .
++SC2c::SendKey("U+003a", {"**": "U+00d9"}) ; :
 
- SC2d::SendKey("U+00e9", {}) ; é
-+SC2d::SendKey("U+00c9", {}) ; É
+ SC2d::SendKey("U+006a", {"**": "U+00e6"}) ; j
++SC2d::SendKey("U+004a", {"**": "U+00c6"}) ; J
 
- SC2e::SendKey("U+00e0", {}) ; à
-+SC2e::SendKey("U+00c0", {}) ; À
+ SC2e::SendKey("U+00e0", {"**": "U+00ea"}) ; à
++SC2e::SendKey("U+00c0", {"**": "U+00ca"}) ; À
 
- SC2f::SendKey("U+006a", {"*^": "U+0135"}) ; j
-+SC2f::SendKey("U+004a", {"*^": "U+0134"}) ; J
+ SC2f::SendKey("**", {"**": "*¨"})
++SC2f::SendKey("*¨", {"*¨": "¨"})
 
  SC30::SendKey("U+002c", {}) ; ,
++SC30::SendKey("U+003a", {"**": "U+00d9"}) ; :
 
- SC31::SendKey("U+006d", {}) ; m
-+SC31::SendKey("U+004d", {}) ; M
+ SC31::SendKey("U+006d", {"**": "U+00f1"}) ; m
++SC31::SendKey("U+004d", {"**": "U+00d1"}) ; M
 
- SC32::SendKey("U+0063", {"*^": "U+0109"}) ; c
-+SC32::SendKey("U+0043", {"*^": "U+0108"}) ; C
+ SC32::SendKey("U+0063", {"**": "U+00e7"}) ; c
++SC32::SendKey("U+0043", {"**": "U+00c7"}) ; C
 
- SC33::SendKey("U+0068", {"*^": "U+0125", "*¨": "U+1e27"}) ; h
-+SC33::SendKey("U+0048", {"*^": "U+0124", "*¨": "U+1e26"}) ; H
+ SC33::SendKey("U+0068", {"**": "U+00ee", "*¨": "U+1e27"}) ; h
++SC33::SendKey("U+0048", {"**": "U+00ce", "*¨": "U+1e26"}) ; H
 
- SC34::SendKey("U+0067", {"*^": "U+011d"}) ; g
-+SC34::SendKey("U+0047", {"*^": "U+011c"}) ; G
+ SC34::SendKey("U+0067", {}) ; g
++SC34::SendKey("U+0047", {}) ; G
 
- SC35::SendKey("U+0078", {"*¨": "U+1e8d"}) ; x
-+SC35::SendKey("U+0058", {"*¨": "U+1e8c"}) ; X
+ SC35::SendKey("U+0078", {"**": "U+00e2", "*¨": "U+1e8d"}) ; x
++SC35::SendKey("U+0058", {"**": "U+00c2", "*¨": "U+1e8c"}) ; X
 
 ;  Pinky keys
 
  SC0c::SendKey("U+20ac", {}) ; €
 
- SC1a::SendKey("U+007a", {"*^": "U+1e91"}) ; z
-+SC1a::SendKey("U+005a", {"*^": "U+1e90"}) ; Z
-
- SC1b::SendKey("*¨", {"*¨": "¨"})
-
- SC28::SendKey("U+0071", {}) ; q
-+SC28::SendKey("U+0051", {}) ; Q
-
- SC2b::SendKey("*^", {"*^": "^"})
-
- SC56::SendKey("U+00ea", {}) ; ê
-+SC56::SendKey("U+00ca", {}) ; Ê
-
 ;  Space bar
 
- SC39::SendKey("U+0020", {"*^": "U+005e", "*¨": "U+0022"}) ;  
-+SC39::SendKey("U+002d", {"*^": "U+005e", "*¨": "U+0022"}) ; -
+ SC39::SendKey("U+0020", {"**": "U+00a0", "*¨": "U+0022"}) ;  
++SC39::SendKey("U+002d", {"**": "U+00a0", "*¨": "U+0022"}) ; -
 
 
 ;-------------------------------------------------------------------------------
@@ -264,50 +253,52 @@ SendKey(base, deadkeymap) {
 ;  Letters, first row
 
  <^>!SC10::SendKey("U+0060", {}) ; `
-<^>!+SC10::SendKey("U+00e6", {}) ; æ
+<^>!+SC10::SendKey("U+201e", {}) ; „
 
  <^>!SC11::SendKey("U+0040", {}) ; @
-<^>!+SC11::SendKey("U+00ed", {}) ; í
+<^>!+SC11::SendKey("U+201e", {}) ; „
 
- <^>!SC12::SendKey("U+0153", {}) ; œ
-<^>!+SC12::SendKey("U+0152", {}) ; Œ
+ <^>!SC12::SendKey("U+0025", {}) ; %
 
- <^>!SC13::SendKey("U+00f9", {}) ; ù
-<^>!+SC13::SendKey("U+00d9", {}) ; Ù
+ <^>!SC13::SendKey("U+0021", {}) ; !
 
  <^>!SC14::SendKey("U+00ab", {}) ; «
+<^>!+SC14::SendKey("U+201c", {}) ; “
 
  <^>!SC15::SendKey("U+00bb", {}) ; »
+<^>!+SC15::SendKey("U+201d", {}) ; ”
 
  <^>!SC16::SendKey("U+0024", {}) ; $
+<^>!+SC16::SendKey("U+00a7", {}) ; §
 
- <^>!SC17::SendKey("U+003d", {"*^": "U+207c"}) ; =
+ <^>!SC17::SendKey("U+003d", {}) ; =
+<^>!+SC17::SendKey("U+2260", {}) ; ≠
 
- <^>!SC18::SendKey("U+002b", {"*^": "U+207a"}) ; +
+ <^>!SC18::SendKey("U+002b", {}) ; +
+<^>!+SC18::SendKey("U+00b1", {}) ; ±
 
- <^>!SC19::SendKey("U+003f", {}) ; ?
+ <^>!SC19::SendKey("U+0027", {}) ; '
 
 ;  Letters, second row
 
  <^>!SC1e::SendKey("U+003c", {}) ; <
-<^>!+SC1e::SendKey("U+2264", {}) ; ≤
+<^>!+SC1e::SendKey("U+2a7d", {}) ; ⩽
 
  <^>!SC1f::SendKey("U+003e", {}) ; >
-<^>!+SC1f::SendKey("U+2265", {}) ; ≥
+<^>!+SC1f::SendKey("U+2a7e", {}) ; ⩾
 
  <^>!SC20::SendKey("U+007b", {}) ; {
 
  <^>!SC21::SendKey("U+007d", {}) ; }
 
- <^>!SC22::SendKey("U+2026", {}) ; …
+ <^>!SC22::SendKey("U+005c", {}) ; \
 
  <^>!SC23::SendKey("U+007c", {}) ; |
 <^>!+SC23::SendKey("U+00a6", {}) ; ¦
 
- <^>!SC24::SendKey("U+0028", {"*^": "U+207d"}) ; (
+ <^>!SC24::SendKey("U+0028", {}) ; (
 
- <^>!SC25::SendKey("U+0029", {"*^": "U+207e"}) ; )
-<^>!+SC25::SendKey("U+00f1", {}) ; ñ
+ <^>!SC25::SendKey("U+0029", {}) ; )
 
  <^>!SC26::SendKey("U+005b", {}) ; [
 
@@ -315,41 +306,35 @@ SendKey(base, deadkeymap) {
 
 ;  Letters, third row
 
- <^>!SC2c::SendKey("U+003a", {}) ; :
-<^>!+SC2c::SendKey("U+00b7", {}) ; ·
+ <^>!SC2c::SendKey("U+003a", {"**": "U+00d9"}) ; :
+<^>!+SC2c::SendKey("U+2026", {}) ; …
 
  <^>!SC2d::SendKey("U+002f", {}) ; /
 
- <^>!SC2e::SendKey("U+005c", {}) ; \
-<^>!+SC2e::SendKey("U+00e1", {}) ; á
+ <^>!SC2e::SendKey("U+003d", {}) ; =
 
  <^>!SC2f::SendKey("U+0022", {}) ; "
 
  <^>!SC30::SendKey("U+003b", {}) ; ;
+<^>!+SC30::SendKey("U+00b7", {}) ; ·
 
  <^>!SC31::SendKey("U+0026", {}) ; &
 
- <^>!SC32::SendKey("U+00e7", {}) ; ç
-<^>!+SC32::SendKey("U+00c7", {}) ; Ç
+ <^>!SC32::SendKey("U+005e", {}) ; ^
 
  <^>!SC33::SendKey("U+0023", {}) ; #
 
  <^>!SC34::SendKey("U+007e", {}) ; ~
 
  <^>!SC35::SendKey("U+002a", {}) ; *
+<^>!+SC35::SendKey("U+00d7", {}) ; ×
 
 ;  Pinky keys
 
- <^>!SC1a::SendKey("U+0021", {}) ; !
-
- <^>!SC28::SendKey("U+0025", {}) ; %
-
- <^>!SC56::SendKey("U+005e", {}) ; ^
-
 ;  Space bar
 
- <^>!SC39::SendKey("U+005f", {"*^": "U+005e", "*¨": "U+0022"}) ; _
-<^>!+SC39::SendKey("U+0020", {"*^": "U+005e", "*¨": "U+0022"}) ;  
+ <^>!SC39::SendKey("U+005f", {"**": "U+00a0", "*¨": "U+0022"}) ; _
+<^>!+SC39::SendKey("U+0020", {"**": "U+00a0", "*¨": "U+0022"}) ;  
 
 ; Special Keys
 
@@ -367,6 +352,9 @@ $<^>!Backspace:: Send {SC0e}
 ;  Digits
 
 ;  Letters, first row
+
+ ^SC10::Send  ^z
+^+SC10::Send ^+Z
 
  ^SC11::Send  ^y
 ^+SC11::Send ^+Y
@@ -426,8 +414,8 @@ $<^>!Backspace:: Send {SC0e}
 
 ;  Letters, third row
 
- ^SC2f::Send  ^j
-^+SC2f::Send ^+J
+ ^SC2d::Send  ^j
+^+SC2d::Send ^+J
 
  ^SC31::Send  ^m
 ^+SC31::Send ^+M
@@ -445,12 +433,6 @@ $<^>!Backspace:: Send {SC0e}
 ^+SC35::Send ^+X
 
 ;  Pinky keys
-
- ^SC1a::Send  ^z
-^+SC1a::Send ^+Z
-
- ^SC28::Send  ^q
-^+SC28::Send ^+Q
 
 ;  Space bar
 
