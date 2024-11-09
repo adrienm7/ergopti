@@ -111,7 +111,7 @@
 <style>
 	:root {
 		--couleur-header: rgba(0, 0, 0, 0.9);
-		--couleur-header-mobile: rgba(0, 16, 36, 0.9);
+		--couleur-header-mobile: rgba(0, 16, 36, 0.975);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
 		--espacement-items-menu: clamp(5px, 0.45vw, 14px);

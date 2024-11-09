@@ -1,7 +1,7 @@
 button {
 	cursor: pointer;
 	padding: 10px;
-	background-color: rgba(255, 255, 255, 0.8);
+	background-color: white;
 	border: 1px solid rgba(0, 0, 0, 0.6);
 	border-radius: 3px;
 	color: black;
@@ -11,11 +11,16 @@ button p {
 	margin: 0;
 }
 
-.bouton-telechargement {
+.bouton-telechargement,
+select {
 	background-color: rgba(0, 0, 0, 0.8);
 	border: 1px solid rgba(255, 255, 255, 0.6);
 	border-radius: 3px;
 	color: white;
+}
+
+select {
+	padding: 5px;
 }
 
 /* Boutons kbd */

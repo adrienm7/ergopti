@@ -9,7 +9,7 @@ export const presentation = writable({
 	type: 'iso',
 	couche: 'Visuel',
 	plus: 'non',
-	couleur: 'non',
+	couleur: 'oui',
 	controles: 'oui'
 });
 
