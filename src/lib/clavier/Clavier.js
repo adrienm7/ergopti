@@ -199,7 +199,7 @@ export class Clavier {
 							this.infos_clavier.couche === 'Visuel'
 							// this.infos_clavier.plus === 'non'
 						) {
-							toucheClavier.innerHTML = '<div>HyperTexte v.' + this.version + '</div>';
+							toucheClavier.innerHTML = '<div>' + this.data_disposition.nom + '</div>';
 						}
 						// if (
 						// 	this.infos_clavier.type === 'iso' &&
