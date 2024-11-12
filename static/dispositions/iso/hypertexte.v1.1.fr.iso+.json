@@ -1,5 +1,5 @@
 {
-	"label": "hypertexte.v1.1.2.fr.iso+",
+	"label": "hypertexte.v1.1.fr.iso+",
 	"fingerStart": {
 		"1": 29,
 		"2": 30,
@@ -15,7 +15,7 @@
 		"false": -1
 	},
 	"keyboardType": "european",
-	"author": "Adrien Moyaux",
+	"author": "Adrien MOYAUX",
 	"authorUrl": "https://hypertexte.beseven.fr",
 	"moreInfoUrl": "",
 	"moreInfoText": "",

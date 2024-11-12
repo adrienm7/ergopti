@@ -5,7 +5,7 @@
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 
 	import { loadData } from '$lib/clavier/getData.js';
-	import { version, data_disposition } from '$lib/stores_infos.js';
+	import { version, data_disposition, liste_versions } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
@@ -41,8 +41,6 @@
 	afterUpdate(() => {
 		toggleOverflowMenu();
 	});
-
-	let liste_versions = ['1.0.5', '1.0.12', '1.0.16', '1.0.19', '1.1.2'];
 </script>
 
 <header>
