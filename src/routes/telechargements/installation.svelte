@@ -3,7 +3,12 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
-	import { derniere_version } from '$lib/stores_infos.js';
+	import {
+		derniere_version,
+		version_mineure_kbdedit,
+		version_mineure_ahk,
+		version_mineure_kalamine
+	} from '$lib/stores_infos.js';
 	let version = derniere_version;
 
 	let variante_hypertexte = 'hypertxt';
@@ -19,20 +24,24 @@
 <h3>Installer la disposition sur Windows</h3>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/HyperTexte v{version}.exe" download
-		><button class="bouton-telechargement">☛ HyperTexte {version}.exe</button></a
+	<a href="/pilotes/kbdedit/HyperTexte v{version}.{version_mineure_kbdedit}.exe" download
+		><button class="bouton-telechargement"
+			>☛ HyperTexte v{version}.{version_mineure_kbdedit}.exe</button
+		></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/HyperTexte v{version}.kbe" download
-		><button>Fichier source KbdEdit de HyperTexte {version}</button></a
+	<a href="/pilotes/kbdedit/HyperTexte v{version}.{version_mineure_kbdedit}.kbe" download
+		><button>Fichier source KbdEdit de HyperTexte v{version}.{version_mineure_kbdedit}</button></a
 	>
 </div>
 <petit-espace />
 <div>
-	<a href="/pilotes/plus/HyperTextePlus_v{version}.ahk" download
-		><button class="bouton-telechargement">☛ HyperTextePlus_v{version}.ahk</button></a
+	<a href="/pilotes/plus/HyperTextePlus_v{version}.{version_mineure_ahk}.ahk" download
+		><button class="bouton-telechargement"
+			>☛ HyperTextePlus_v{version}.{version_mineure_ahk}.ahk</button
+		></a
 	>
 </div>
 <p>
@@ -69,7 +78,7 @@
 
 <h3>Installer la disposition — Avec Kalamine</h3>
 <select bind:value={variante_hypertexte} style="height: 2rem">
-	<option value="hypertxt" selected>Standard</option>
+	<option value="hypertxt">Standard</option>
 	<option value="hyper1dk">1DFH</option>
 </select>
 <p>
@@ -97,44 +106,56 @@
 </p>
 <mini-espace />
 <div>
-	<a href="/pilotes/kalamine/{version}/{variante_hypertexte}.toml" download
-		><button>{variante_hypertexte}.toml</button></a
+	<a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.toml"
+		download><button>{variante_hypertexte}.toml</button></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a href="/pilotes/kalamine/{version}/{variante_hypertexte}.svg" download
-		><button>{variante_hypertexte}.svg</button></a
+	<a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.svg"
+		download><button>{variante_hypertexte}.svg</button></a
 	>
 </div>
 <div>
 	<h4>Windows</h4>
-	<a href="/pilotes/kalamine/{version}/{variante_hypertexte}.ahk" download
+	<a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.ahk"
+		download
 		><button class="bouton-telechargement">{variante_hypertexte} Kalamine AHK (user)</button></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a href="/pilotes/kalamine/{version}/{variante_hypertexte}.klc" download
+	<a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.klc"
+		download
 		><button class="bouton-telechargement">{variante_hypertexte} Kalamine KLC (admin)</button></a
 	>
 </div>
 <h4>MacOS</h4>
 <div>
-	<a href="/pilotes/kalamine/{version}/{variante_hypertexte}.keylayout" download
+	<a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.keylayout"
+		download
 		><button class="bouton-telechargement">{variante_hypertexte} Kalamine Keylayout</button></a
 	>
 </div>
 <h4>Linux</h4>
 <div>
-	<a href="/pilotes/kalamine/{version}/{variante_hypertexte}.xkb_keymap" download
+	<a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.xkb_keymap"
+		download
 		><button class="bouton-telechargement">{variante_hypertexte} Kalamine Xkb_keymap (user)</button
 		></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a href="/pilotes/kalamine/{version}/{variante_hypertexte}.xkb_symbols" download
+	<a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.xkb_symbols"
+		download
 		><button class="bouton-telechargement">{variante_hypertexte} Kalamine Xkb_symbols (root)</button
 		></a
 	>

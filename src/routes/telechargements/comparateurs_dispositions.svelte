@@ -3,7 +3,13 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
-	import { derniere_version } from '$lib/stores_infos.js';
+	import {
+		derniere_version,
+		version_mineure_kla_iso,
+		version_mineure_kla_iso_plus,
+		version_mineure_kla_ergodox,
+		version_mineure_kalamine
+	} from '$lib/stores_infos.js';
 	let version = derniere_version;
 
 	let variante_hypertexte = 'hypertxt';
@@ -19,15 +25,16 @@
 </p>
 <mini-espace />
 <div>
-	<span>Version ISO : </span><a href="/dispositions/iso/hypertexte.v{version}.fr.iso.json" download
-		><button>hypertexte.v{version}.fr.iso</button></a
+	<span>Version ISO : </span><a
+		href="/dispositions/iso/hypertexte.v{version}.{version_mineure_kla_iso}.fr.iso.json"
+		download><button>hypertexte.v{version}.{version_mineure_kla_iso}.fr.iso.json</button></a
 	>
 </div>
 <mini-espace />
 <div>
 	<span>Version ISO+ : </span><a
-		href="/dispositions/iso/hypertexte.v{version}.fr.iso+.json"
-		download><button>hypertexte.v{version}.fr.iso+</button></a
+		href="/dispositions/iso/hypertexte.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json"
+		download><button>hypertexte.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
 	>
 	<p>
 		➜ Il n’y a de loin pas toutes les fonctionnalités de <NomPlus></NomPlus> dans ce fichier ISO+, car
@@ -42,19 +49,22 @@
 <mini-espace />
 <div>
 	<span>Version Ergodox : </span><a
-		href="/dispositions/ergodox/hypertexte.v{version}.fr.ergodox.json"
-		download><button>hypertexte.v{version}.fr.ergodox</button></a
+		href="/dispositions/ergodox/hypertexte.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json"
+		download><button>hypertexte.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
 	>
 </div>
 
 <h3>Ergo-L</h3>
 <div>
-	<select bind:value={variante_hypertexte} style="height: 2rem">
-		<option value="hypertxt" selected>Standard</option>
-		<option value="hyper1dk">1DFH</option>
-	</select>
+	<div>
+		<select bind:value={variante_hypertexte} style="height: 2rem">
+			<option value="hypertxt">Standard</option>
+			<option value="hyper1dk">1DFH</option>
+		</select>
+	</div>
+	<mini-espace />
 	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{version}/{variante_hypertexte}.json"
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.json"
 		download><button>{variante_hypertexte}.json</button></a
 	>
 	<p>
