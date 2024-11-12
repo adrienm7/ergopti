@@ -4,10 +4,9 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import { derniere_version } from '$lib/stores_infos.js';
-	let version;
-	derniere_version.subscribe((value) => {
-		version = value;
-	});
+	let version = derniere_version;
+
+	let variante_hypertexte = 'hypertxt';
 </script>
 
 <h2>Fichiers pour les comparateurs de dispositions</h2>
@@ -50,9 +49,13 @@
 
 <h3>Ergo-L</h3>
 <div>
+	<select bind:value={variante_hypertexte} style="height: 2rem">
+		<option value="hypertxt" selected>Standard</option>
+		<option value="hyper1dk">1DFH</option>
+	</select>
 	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{version}/hypertexte.json"
-		download><button>hypertexte.json</button></a
+		href="/pilotes/kalamine/{version}/{variante_hypertexte}.json"
+		download><button>{variante_hypertexte}.json</button></a
 	>
 	<p>
 		À noter que sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les

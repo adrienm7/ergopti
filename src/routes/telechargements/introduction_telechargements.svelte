@@ -6,12 +6,6 @@
 	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
 	import remplacements from '$lib/clavier/remplacementsMagique.json';
 
-	import { derniere_version } from '$lib/stores_infos.js';
-	let version;
-	derniere_version.subscribe((value) => {
-		version = value;
-	});
-
 	// Variable pour contrôler l'affichage du tableau d’abréviations
 	let isCollapsed = true;
 </script>
