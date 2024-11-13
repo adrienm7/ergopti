@@ -675,10 +675,10 @@
       <g class="letterKey" finger="l2" id="KeyG" transform="translate(345)">
         <rect width="52" height="52" rx="5" ry="5" />
         <g class="key" text-anchor="middle">
-          <text x="12.8" y="43.4" class="level1" />
-          <text x="12.8" y="20.6" class="level2">K</text>
-          <text x="38.0" y="43.4" class="level3">…</text>
-          <text x="38.0" y="20.6" class="level4" />
+          <text x="12.8" y="43.4" class="level1">.</text>
+          <text x="12.8" y="20.6" class="level2">:</text>
+          <text x="38.0" y="43.4" class="level3">:</text>
+          <text x="38.0" y="20.6" class="level4">·</text>
           <text x="38.0" y="43.4" class="level5" />
           <text x="38.0" y="20.6" class="level6" />
         </g>
@@ -787,17 +787,6 @@
       <g class="letterKey" finger="l5" id="KeyZ" transform="translate(135)">
         <rect width="52" height="52" rx="5" ry="5" />
         <g class="key" text-anchor="middle">
-          <text x="12.8" y="43.4" class="level1">.</text>
-          <text x="12.8" y="20.6" class="level2">:</text>
-          <text x="38.0" y="43.4" class="level3">:</text>
-          <text x="38.0" y="20.6" class="level4">·</text>
-          <text x="38.0" y="43.4" class="level5" />
-          <text x="38.0" y="20.6" class="level6" />
-        </g>
-      </g>
-      <g class="letterKey" finger="l4" id="KeyX" transform="translate(195)">
-        <rect width="52" height="52" rx="5" ry="5" />
-        <g class="key" text-anchor="middle">
           <text x="12.8" y="43.4" class="level1" />
           <text x="12.8" y="20.6" class="level2">É</text>
           <text x="38.0" y="43.4" class="level3">/</text>
@@ -806,7 +795,7 @@
           <text x="38.0" y="20.6" class="level6" />
         </g>
       </g>
-      <g class="letterKey" finger="l3" id="KeyC" transform="translate(255)">
+      <g class="letterKey" finger="l4" id="KeyX" transform="translate(195)">
         <rect width="52" height="52" rx="5" ry="5" />
         <g class="key" text-anchor="middle">
           <text x="12.8" y="43.4" class="level1" />
@@ -817,7 +806,7 @@
           <text x="38.0" y="20.6" class="level6" />
         </g>
       </g>
-      <g class="letterKey" finger="l2" id="KeyV" transform="translate(315)">
+      <g class="letterKey" finger="l3" id="KeyC" transform="translate(255)">
         <rect width="52" height="52" rx="5" ry="5" />
         <g class="key" text-anchor="middle">
           <text x="12.8" y="43.4" class="level1" />
@@ -828,12 +817,23 @@
           <text x="38.0" y="20.6" class="level6" />
         </g>
       </g>
-      <g class="letterKey" finger="l2" id="KeyB" transform="translate(375)">
+      <g class="letterKey" finger="l2" id="KeyV" transform="translate(315)">
         <rect width="52" height="52" rx="5" ry="5" />
         <g class="key" text-anchor="middle">
           <text x="12.8" y="43.4" class="level1">,</text>
           <text x="12.8" y="20.6" class="level2">;</text>
           <text x="38.0" y="43.4" class="level3">;</text>
+          <text x="38.0" y="20.6" class="level4">’</text>
+          <text x="38.0" y="43.4" class="level5" />
+          <text x="38.0" y="20.6" class="level6" />
+        </g>
+      </g>
+      <g class="letterKey" finger="l2" id="KeyB" transform="translate(375)">
+        <rect width="52" height="52" rx="5" ry="5" />
+        <g class="key" text-anchor="middle">
+          <text x="12.8" y="43.4" class="level1" />
+          <text x="12.8" y="20.6" class="level2">K</text>
+          <text x="38.0" y="43.4" class="level3">…</text>
           <text x="38.0" y="20.6" class="level4" />
           <text x="38.0" y="43.4" class="level5" />
           <text x="38.0" y="20.6" class="level6" />

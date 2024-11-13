@@ -12,7 +12,7 @@
 	} from '$lib/stores_infos.js';
 	let version = derniere_version;
 
-	let variante_hypertexte = 'hypertxt';
+	let variante_hypertexte = 'hyper1dk';
 </script>
 
 <h2>Fichiers pour les comparateurs de dispositions</h2>
@@ -58,8 +58,8 @@
 <div>
 	<div>
 		<select bind:value={variante_hypertexte} style="height: 2rem">
-			<option value="hypertxt">Standard</option>
 			<option value="hyper1dk">1DFH</option>
+			<option value="hypertxt_analyse">Standard — Analyse</option>
 		</select>
 	</div>
 	<mini-espace />
