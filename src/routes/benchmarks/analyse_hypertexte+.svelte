@@ -2,6 +2,12 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
+
+	import { version } from '$lib/stores_infos.js';
+	let versionValue;
+	version.subscribe((value) => {
+		versionValue = value;
+	});
 </script>
 
 <h2>
@@ -12,7 +18,7 @@
 	manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres du corpus pour
 	les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB></SFB>s pris en charge
 	par <NomPlus></NomPlus>, comme <kbd-sortie>sc</kbd-sortie> en
-	<kbd>,s</kbd>, doivent être remplacés. Un <a href="/corpus/0_conversion_corpus.py">simple script Python</a> permet
+	<kbd>,s</kbd>, doivent être remplacés. Un <a href="/corpus/conversion_corpus.py">simple script Python</a> permet
 	de faire ces modifications.
 </p>
 <p>
@@ -27,7 +33,7 @@
 	Voici les résultats de <NomPlus></NomPlus> obtenus sur le corpus français-anglais Essais :
 </p>
 <bloc-image>
-	<img src="/resultats/hypertexte+_reduction_SFBs.jpg" />
+	<img src="/resultats/{versionValue}/plus/hypertexte+_reduction_SFBs.jpg" />
 </bloc-image>
 <h3>Analyse des <SFB></SFB>s</h3>
 <p>
@@ -39,11 +45,11 @@
 <p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
 <h4><Nom></Nom></h4>
 <bloc-image>
-	<img src="/resultats/SFBs_hypertexte.jpg" />
+	<img src="/resultats/{versionValue}/plus/SFBs_hypertexte.jpg" />
 </bloc-image>
 <h4><NomPlus></NomPlus></h4>
 <bloc-image>
-	<img src="/resultats/SFBs_hypertexte+.jpg" />
+	<img src="/resultats/{versionValue}/plus/SFBs_hypertexte+.jpg" />
 </bloc-image>
 <p>
 	Plusieurs <SFB></SFB>s se produisent maintenant sur l’index gauche en <kbd>★,</kbd> et
@@ -77,7 +83,7 @@
 </p>
 <h3>Analyse de la fréquence d’utilisation des doigts</h3>
 <bloc-image>
-	<img src="/resultats/finger_usage_comparison.jpg" />
+	<img src="/resultats/{versionValue}/plus/finger_usage_comparison.jpg" />
 </bloc-image>
 <p>
 	Comme vous pouvez le constater sur l’image ci-dessous, l’index gauche est plus utilisé (6% vs 8%)
