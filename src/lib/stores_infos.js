@@ -4,11 +4,11 @@ export const derniere_version = liste_versions[liste_versions.length - 1];
 export let version = writable(derniere_version); // Par défaut c’est la dernière version
 
 export const version_mineure_kbdedit = '0';
-export const version_mineure_ahk = '0';
+export const version_mineure_ahk = '3';
 export const version_mineure_kalamine = '0';
-export const version_mineure_kla_iso = '0';
-export const version_mineure_kla_iso_plus = '0';
-export const version_mineure_kla_ergodox = '0';
+export const version_mineure_kla_iso = '3';
+export const version_mineure_kla_iso_plus = '3';
+export const version_mineure_kla_ergodox = '3';
 
 export const data_disposition = writable();
 
