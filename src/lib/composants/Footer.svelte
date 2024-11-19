@@ -21,7 +21,6 @@
 		justify-content: center;
 		height: var(--hauteur-footer);
 		margin: 0;
-		margin-top: 10vh;
 		padding: 2px;
 		background-color: rgba(0, 0, 0, 0.8);
 		color: white;

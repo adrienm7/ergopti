@@ -114,12 +114,14 @@
 				<IntroductionInformations></IntroductionInformations>
 			{/if}
 		</bloc-introduction>
-		<bloc-main style="display:flex; flex-direction:row">
+		<bloc-main>
 			<aside id="sidebar">
-				<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
-					Contenu de la page
-				</p>
-				<div id="page-toc"></div>
+				<div>
+					<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
+						Contenu de la page
+					</p>
+					<div id="page-toc"></div>
+				</div>
 			</aside>
 			<div id="main-content">
 				<main>
