@@ -21,19 +21,35 @@
 	page mis à part sur l’émulation du clavier.
 </div>
 
-<h3>Installer la disposition sur Windows</h3>
+<h3 id="kbdedit">Installation KbdEdit (méthode préférée)</h3>
+<p>
+	<a href="https://www.kbdedit.com/">KbdEdit</a> est un logiciel payant sur Windows, mais très
+	complet et permettant de créer des dispositions de clavier. Il est en mesure de créer des pilotes
+	pour Windows, et depuis peu pour Mac. Seul Linux n’est pas supporté. Dans le cas de Linux, vous
+	pouvez utiliser <a href="#kalamine">la génération par Kalamine</a>.
+</p>
+<p>
+	<strong
+		>Si vous êtes sur Windows ou Mac, il est fortement conseillé d’utiliser cette installation
+		plutôt que celle de Kalamine</strong
+	>. En effet, vous serez alors certain d’avoir toutes les fonctionnalités (touches mortes,
+	raccourcis clavier, etc.). La version Kalamine est une version allégée, car Kalamine n’a pas
+	encore toutes les fonctionnalités de KbdEdit.
+</p>
+
+<h4>Windows</h4>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/HyperTexte v{version}.{version_mineure_kbdedit}.exe" download
+	<a href="/pilotes/kbdedit/HyperTexte_v{version}.{version_mineure_kbdedit}.exe" download
 		><button class="bouton-telechargement"
-			>☛ HyperTexte v{version}.{version_mineure_kbdedit}.exe</button
+			>☛ HyperTexte_v{version}.{version_mineure_kbdedit}.exe</button
 		></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/HyperTexte v{version}.{version_mineure_kbdedit}.kbe" download
-		><button>Fichier source KbdEdit de HyperTexte v{version}.{version_mineure_kbdedit}</button></a
+	<a href="/pilotes/kbdedit/HyperTexte_v{version}.{version_mineure_kbdedit}.kbe" download
+		><button>Fichier source KbdEdit de HyperTexte_v{version}.{version_mineure_kbdedit}</button></a
 	>
 </div>
 <petit-espace />
@@ -55,6 +71,16 @@
 	appliquer vos modifications. Le raccourci <kbd>AltGr</kbd> + <kbd>BackSpace</kbd> a été implémenté
 	afin de relancer facilement le script après une modification.
 </p>
+<div class="encadre">
+	Il est possible d’utiliser HyperTexte sans même installer de pilote. Pour cela, il suffit de
+	passer à 1 la variable de la ligne 8 du fichier HyperTextePlus.ahk. Idéalement, il vaut mieux
+	utiliser le vrai pilote, notamment pour que le clavier soit HyperTexte même sur l’écran de
+	démarrage pour taper son mot de passe de session. Toutefois, la version sans pilote peut être
+	utile <strong
+		>pour tester HyperTexte sans l’installer, ou sur des ordinateurs professionnels où l’on n’a pas
+		les droits d’administrateur</strong
+	>.
+</div>
 <p>
 	Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
 	désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement du
@@ -73,10 +99,19 @@
 		mettre dans votre dossier Documents.
 	</li>
 </ul>
+<h4>macOS</h4>
+<mini-espace />
+<div>
+	<a href="/pilotes/kbdedit/HyperTexte_v{version}.{version_mineure_kbdedit}.keylayout" download
+		><button class="bouton-telechargement"
+			>☛ HyperTexte_v{version}.{version_mineure_kbdedit}.keylayout</button
+		></a
+	>
+</div>
 
 <petit-espace />
 
-<h3>Installer la disposition — Avec Kalamine</h3>
+<h3 id="kalamine">Installation Kalamine</h3>
 <select bind:value={variante_hypertexte} style="height: 2rem">
 	<option value="hypertxt">Standard</option>
 	<option value="hyper1dk">1DFH</option>
@@ -85,7 +120,7 @@
 	<a href="https://github.com/OneDeadKey/kalamine">Kalamine</a> permet de générer des fichiers
 	d’installation pour plusieurs systèmes d’exploitation. Cependant, les fichiers plus bas n’ont pas
 	encore été testés. De plus, certaines fonctionnalités vont manquer, comme la modification de la
-	touche <kbd>Ctrl</kbd> pour avoir les raccourcis
+	couche <kbd>Ctrl</kbd> pour avoir les raccourcis
 	<kbd-sortie>Ctrl</kbd-sortie>
 	+ <kbd-sortie>X</kbd-sortie>,
 	<kbd-sortie>Ctrl</kbd-sortie>
@@ -94,9 +129,10 @@
 	+ <kbd-sortie>Z</kbd-sortie> sur la main gauche.
 </p>
 <p>
-	Si vous êtes sur Windows, il est fortement recommandé d’utiliser plutôt les fichiers ci-dessus et
-	non ceux pour Windows générés par Kalamine. Si vous n’utilisez pas Windows, vous pouvez les
-	utiliser, mais en vous rappelant de leurs limites.
+	Si vous êtes sur Windows ou macOS, il est fortement recommandé d’utiliser plutôt <a
+		href="#kbdedit">les fichiers générés par KbdEdit</a
+	> et non ceux pour Windows générés par Kalamine. Si vous les utilisez quand même, rappelez-vous de
+	leurs limites.
 </p>
 <p>
 	Les instructions d’installation se trouvent ici : <a
