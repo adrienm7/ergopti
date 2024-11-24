@@ -14,15 +14,15 @@
 	import ChiffresAccesDirect from './accueil/chiffres_acces_direct.svelte';
 	import UtilisationUneMain from './accueil/utilisation_une_main.svelte';
 	import OptimisationRoulements from './accueil/optimisation_roulements.svelte';
-	import IntroductionHypertexte from './accueil/introduction_hypertexte.svelte';
+	import IntroductionHypertexte from './accueil/introduction_ergopti.svelte';
 	import EspaceInsecableAutomatique from './accueil/espace_insecable_automatique.svelte';
 </script>
 
 <svelte:head>
-	<title>Disposition HyperTexte</title>
+	<title>Disposition Ergopti</title>
 	<meta
 		name="description"
-		content="HyperTexte, une disposition clavier ergonomique optimisée pour le français, l’anglais et le code"
+		content="Ergopti, une disposition clavier ergonomique optimisée pour le français, l’anglais et le code"
 	/>
 </svelte:head>
 

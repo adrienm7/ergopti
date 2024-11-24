@@ -12,7 +12,7 @@
 	} from '$lib/stores_infos.js';
 	let version = derniere_version;
 
-	let variante_hypertexte = 'hyper1dk';
+	let variante_ergopti = 'hyper1dk';
 </script>
 
 <h2>Fichiers pour les comparateurs de dispositions</h2>
@@ -26,15 +26,15 @@
 <mini-espace />
 <div>
 	<span>Version ISO : </span><a
-		href="/dispositions/iso/hypertexte.v{version}.{version_mineure_kla_iso}.fr.iso.json"
-		download><button>hypertexte.v{version}.{version_mineure_kla_iso}.fr.iso.json</button></a
+		href="/dispositions/iso/ergopti.v{version}.{version_mineure_kla_iso}.fr.iso.json"
+		download><button>ergopti.v{version}.{version_mineure_kla_iso}.fr.iso.json</button></a
 	>
 </div>
 <mini-espace />
 <div>
 	<span>Version ISO+ : </span><a
-		href="/dispositions/iso/hypertexte.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json"
-		download><button>hypertexte.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
+		href="/dispositions/iso/ergopti.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json"
+		download><button>ergopti.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
 	>
 	<p>
 		➜ Il n’y a de loin pas toutes les fonctionnalités de <NomPlus></NomPlus> dans ce fichier ISO+, car
@@ -49,23 +49,23 @@
 <mini-espace />
 <div>
 	<span>Version Ergodox : </span><a
-		href="/dispositions/ergodox/hypertexte.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json"
-		download><button>hypertexte.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
+		href="/dispositions/ergodox/ergopti.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json"
+		download><button>ergopti.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
 	>
 </div>
 
 <h3>Ergo-L</h3>
 <div>
 	<div>
-		<select bind:value={variante_hypertexte} style="height: 2rem">
+		<select bind:value={variante_ergopti} style="height: 2rem">
 			<option value="hyper1dk">1DFH</option>
 			<option value="hypertxt_analyse">Standard — Analyse</option>
 		</select>
 	</div>
 	<mini-espace />
 	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.json"
-		download><button>{variante_hypertexte}.json</button></a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.json"
+		download><button>{variante_ergopti}.json</button></a
 	>
 	<p>
 		À noter que sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les

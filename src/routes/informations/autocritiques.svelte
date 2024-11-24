@@ -161,8 +161,8 @@
 </p>
 <p>
 	La philosophie derrière <Nom /> est de fournir une base de réflexion, mais pas nécessairement de promouvoir
-	l’utilisation de la disposition « HyperTexte ». Rien ne vaut une disposition créée sur-mesure pour
-	vos usages. Par exemple, si vous voulez écrire régulièrement en allemand, il serait judicieux de mettre
+	l’utilisation de la disposition « Ergopti ». Rien ne vaut une disposition créée sur-mesure pour vos
+	usages. Par exemple, si vous voulez écrire régulièrement en allemand, il serait judicieux de mettre
 	la touche morte des trémas à un endroit plus accessible. De même, si vous écrivez souvent en espagnol,
 	il faudrait trouver un emplacement pour la lettre <kbd-sortie>Ñ</kbd-sortie> (actuellement
 	réalisable en

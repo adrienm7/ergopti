@@ -21,7 +21,7 @@ const excludedTags = [
 ];
 
 // Liste des balises en ligne à traiter de manière spécifique pour créer des spans nowrap pour la ponctuation
-const inlineTags = ['kbd', 'kbd-sortie', 'kbd-non', 'nom-hypertexte', 'nom-hypertexte-plus'];
+const inlineTags = ['kbd', 'kbd-sortie', 'kbd-non', 'nom-disposition', 'nom-disposition-plus'];
 
 // Expressions régulières pour traiter les espaces, les apostrophes et la ponctuation
 const spaceRegex = /(\u00AB)(?:\s+)?|(?:\s+)?([\?!:;\u00BB])/g;

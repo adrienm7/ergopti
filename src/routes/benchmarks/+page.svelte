@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
-	import AnalyseHypertextePlus from './analyse_hypertexte+.svelte';
+	import AnalyseHypertextePlus from './analyse_ergopti+.svelte';
 	import CommentComparer from './comment_comparer.svelte';
 	import Corpus from './corpus.svelte';
 	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
@@ -63,7 +63,7 @@
 
 <svelte:head>
 	<title>Benchmarks</title>
-	<meta name="description" content="Benchmarks de la disposition HyperTexte" />
+	<meta name="description" content="Benchmarks de la disposition Ergopti" />
 </svelte:head>
 
 <div>
@@ -159,12 +159,12 @@
 			<option value="_1dfh">1DFH</option>
 		</select>
 	</div>
-	<a href="/resultats/{versionValue}/ergol/analyse_ergol_hypertexte{version_1dfh}_{ergol}.pdf"
+	<a href="/resultats/{versionValue}/ergol/analyse_ergol_ergopti{version_1dfh}_{ergol}.pdf"
 		><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo-L</button></a
 	>
 	<mini-espace />
 	<embed
-		src="/resultats/{versionValue}/ergol/analyse_ergol_hypertexte{version_1dfh}_{ergol}.pdf"
+		src="/resultats/{versionValue}/ergol/analyse_ergol_ergopti{version_1dfh}_{ergol}.pdf"
 		type="application/pdf"
 		width="100%"
 		height="600px"

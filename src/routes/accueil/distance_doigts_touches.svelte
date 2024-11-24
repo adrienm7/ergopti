@@ -78,7 +78,7 @@
 	l’écriture de chaque mot.
 </p>
 
-<bloc-clavier data-couleur="hypertexte">
+<bloc-clavier data-couleur="ergopti">
 	<bloc-ligne class="center">
 		<bloc-touche data-doigt="auriculaire" data-main="gauche" style="--taille: 1;"
 			><div>A</div></bloc-touche
@@ -106,7 +106,7 @@
 			><div>R</div></bloc-touche
 		>
 	</bloc-ligne>
-	<legende-clavier>Rangée du milieu en HyperTexte</legende-clavier>
+	<legende-clavier>Rangée du milieu en Ergopti</legende-clavier>
 </bloc-clavier>
 <p>
 	En français et en anglais, le <kbd>E</kbd>

@@ -2,12 +2,12 @@
 	import Header from '$lib/composants/Header.svelte';
 	import Footer from '$lib/composants/Footer.svelte';
 
-	import IntroductionHypertexte from './accueil/introduction_hypertexte.svelte';
-	import IntroductionHypertextePlus from './hypertexte-plus/introduction_hypertexte_plus.svelte';
+	import IntroductionHypertexte from './accueil/introduction_ergopti.svelte';
+	import IntroductionHypertextePlus from './ergopti-plus/introduction_ergopti_plus.svelte';
 	import IntroductionBenchmarks from './benchmarks/introduction_benchmarks.svelte';
 	import IntroductionTelechargements from './telechargements/introduction_telechargements.svelte';
 	import IntroductionInformations from './informations/introduction_informations.svelte';
-	import HypertextePlus from './accueil/hypertexte_plus.svelte';
+	import HypertextePlus from './accueil/ergopti_plus.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
@@ -28,7 +28,7 @@
 	import '$lib/css/espacements.css';
 	import '$lib/css/titres.css';
 	import '$lib/css/typographie.css';
-	import '$lib/css/hypertexte.css';
+	import '$lib/css/ergopti.css';
 	import '$lib/css/images.css';
 	import '$lib/css/clavier_reference.css';
 	import '$lib/css/boutons.css';
@@ -67,7 +67,7 @@
 		matomo(
 			false,
 			$navigating.to.url.pathname,
-			'https://hypertexte.beseven.fr' + $navigating.to.url.pathname
+			'https://ergopti.beseven.fr' + $navigating.to.url.pathname
 		);
 	}
 
@@ -101,7 +101,7 @@
 			{#if $page.url.pathname === '/'}
 				<IntroductionHypertexte></IntroductionHypertexte>
 			{/if}
-			{#if $page.url.pathname === '/hypertexte-plus'}
+			{#if $page.url.pathname === '/ergopti-plus'}
 				<IntroductionHypertextePlus></IntroductionHypertextePlus>
 			{/if}
 			{#if $page.url.pathname === '/benchmarks'}

@@ -6,7 +6,7 @@
 
 <footer>
 	<p>
-		<Nom></Nom> — <a href="https://github.com/adrienm7/hypertexte">Repo GitHub</a>
+		<Nom></Nom> — <a href="https://github.com/adrienm7/ergopti">Repo GitHub</a>
 	</p>
 </footer>
 

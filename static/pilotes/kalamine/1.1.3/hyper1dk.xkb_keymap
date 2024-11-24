@@ -6,12 +6,12 @@
 // DO NOT COPY THIS INTO xkb/symbols: THIS WOULD MESS UP YOUR XKB CONFIG.
 //
 // File          : hyper1dk.xkb_keymap
-// Project page  : https://hypertexte.beseven.fr
+// Project page  : https://ergopti.beseven.fr
 // Author        : Adrien MOYAUX
 // Version       : 1.1.2
 // License       : WTFPL - Do What The Fuck You Want Public License
 //
-// Disposition HyperTexte, pour une saisie plus rapide de texte.
+// Disposition Ergopti, pour une saisie plus rapide de texte.
 //
 
 xkb_keymap {
@@ -62,7 +62,7 @@ xkb_keymap {
     // with xkbcomp, so let’s use two groups instead and make the AltGr key a
     // group selector.
 
-    name[group1]= "Disposition HyperTexte, pour une saisie plus rapide de texte.";
+    name[group1]= "Disposition Ergopti, pour une saisie plus rapide de texte.";
     name[group2]= "AltGr";
 
     key.type[group1] = "FOUR_LEVEL";

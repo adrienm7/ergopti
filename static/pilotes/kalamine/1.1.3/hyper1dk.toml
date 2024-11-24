@@ -1,10 +1,10 @@
-name        = "HyperTexte"
+name        = "Ergopti"
 name8       = "hyper1dk"
 locale      = "fr"
 variant     = "1DK"
 author      = "Adrien MOYAUX"
-description = "Disposition HyperTexte, pour une saisie plus rapide de texte."
-url         = "https://hypertexte.beseven.fr"
+description = "Disposition Ergopti, pour une saisie plus rapide de texte."
+url         = "https://ergopti.beseven.fr"
 geometry    = "ERGO"
 version     = "1.1.3"
 

@@ -8,8 +8,8 @@
 </script>
 
 <svelte:head>
-	<title>Utiliser HyperTexte</title>
-	<meta name="description" content="Fichiers pour utiliser HyperTexte" />
+	<title>Utiliser Ergopti</title>
+	<meta name="description" content="Fichiers pour utiliser Ergopti" />
 </svelte:head>
 
 <Installation></Installation>

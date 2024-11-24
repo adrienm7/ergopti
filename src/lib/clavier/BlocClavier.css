@@ -184,11 +184,11 @@ bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='special'] div {
 
 /*
 ==================================
-======= Style HyperTexte + =======
+======= Style Ergopti + =======
 ==================================
 */
 
-/* Style de toutes les touches qui changent avec HyperTexte+ */
+/* Style de toutes les touches qui changent avec Ergopti+ */
 bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui']:not([data-touche='Space']),
 bloc-clavier[data-plus='oui'][data-type='ergodox'][data-couche='Visuel']
 	bloc-touche[data-touche='Space'],
@@ -503,10 +503,10 @@ bloc-clavier[data-couleur='azerty'] legende-clavier {
 	color: hsl(200, 100%, 80%);
 }
 
-bloc-clavier[data-couleur='hypertexte'] bloc-touche {
+bloc-clavier[data-couleur='ergopti'] bloc-touche {
 	--couleur-touche: 300 !important;
 }
-bloc-clavier[data-couleur='hypertexte'] legende-clavier {
+bloc-clavier[data-couleur='ergopti'] legende-clavier {
 	color: hsl(300, 100%, 85%);
 }
 
