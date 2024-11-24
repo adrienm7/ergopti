@@ -10,8 +10,10 @@
 <div>
 	<h1 data-aos="zoom-in" class="ergopti-title">
 		Disposition clavier<br /><span class="italic"
-			><span class="hyper">—&nbsp;Hyper</span><span class="htexte">Texte&nbsp;—</span></span
-		>
+			><span>—&nbsp;</span><span style="line-height: 0.75!important;"
+				><Nom></Nom><span>&nbsp;—</span></span
+			>
+		</span>
 	</h1>
 	<BlocClavier nom="presentation" />
 	<mini-espace />
