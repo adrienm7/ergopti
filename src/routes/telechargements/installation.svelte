@@ -11,7 +11,7 @@
 	} from '$lib/stores_infos.js';
 	let version = derniere_version;
 
-	let variante_ergopti = 'hypertxt';
+	let variante_ergopti = 'ergopti';
 </script>
 
 <h2>Installation</h2>
@@ -113,7 +113,7 @@
 <h3 id="kalamine">Installation Kalamine</h3>
 <select bind:value={variante_ergopti} style="height: 2rem">
 	<option value="hypertxt">Standard</option>
-	<option value="hyper1dk">1DFH</option>
+	<option value="ergo_1dk">1DFH</option>
 </select>
 <p>
 	<a href="https://github.com/OneDeadKey/kalamine">Kalamine</a> permet de générer des fichiers

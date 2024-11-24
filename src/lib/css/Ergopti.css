@@ -1,10 +1,10 @@
-nom-ergopti {
+nom-disposition {
 	font-style: italic;
 	display: inline-block;
 	white-space: nowrap;
 }
 
-nom-ergopti-plus {
+nom-disposition-plus {
 	white-space: nowrap;
 }
 
@@ -31,7 +31,7 @@ nom-ergopti-plus {
 	background-image: linear-gradient(to right, var(--gradient-purple));
 }
 
-.ergopti {
+.namecolor {
 	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	margin: -0.5em;
 	background-clip: text;

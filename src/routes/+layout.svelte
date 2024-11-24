@@ -2,12 +2,12 @@
 	import Header from '$lib/composants/Header.svelte';
 	import Footer from '$lib/composants/Footer.svelte';
 
-	import IntroductionHypertexte from './accueil/introduction_ergopti.svelte';
-	import IntroductionHypertextePlus from './ergopti-plus/introduction_ergopti_plus.svelte';
+	import IntroductionDisposition from './accueil/introduction_ergopti.svelte';
+	import IntroductionDispositionPlus from './ergopti-plus/introduction_ergopti_plus.svelte';
 	import IntroductionBenchmarks from './benchmarks/introduction_benchmarks.svelte';
 	import IntroductionTelechargements from './telechargements/introduction_telechargements.svelte';
 	import IntroductionInformations from './informations/introduction_informations.svelte';
-	import HypertextePlus from './accueil/ergopti_plus.svelte';
+	import DispositionPlus from './accueil/ergopti_plus.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
@@ -99,10 +99,10 @@
 		<Header />
 		<bloc-introduction>
 			{#if $page.url.pathname === '/'}
-				<IntroductionHypertexte></IntroductionHypertexte>
+				<IntroductionDisposition></IntroductionDisposition>
 			{/if}
 			{#if $page.url.pathname === '/ergopti-plus'}
-				<IntroductionHypertextePlus></IntroductionHypertextePlus>
+				<IntroductionDispositionPlus></IntroductionDispositionPlus>
 			{/if}
 			{#if $page.url.pathname === '/benchmarks'}
 				<IntroductionBenchmarks></IntroductionBenchmarks>
@@ -131,7 +131,7 @@
 		</bloc-main>
 		<bloc-fin>
 			{#if $page.url.pathname === '/'}
-				<HypertextePlus></HypertextePlus>
+				<DispositionPlus></DispositionPlus>
 			{/if}
 		</bloc-fin>
 	</div>
