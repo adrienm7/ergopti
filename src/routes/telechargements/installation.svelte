@@ -10,7 +10,7 @@
 		version_mineure_kalamine
 	} from '$lib/stores_infos.js';
 	let version = derniere_version;
-	let variante_ergopti;
+	let variante_ergopti = 'ergopti';
 </script>
 
 <h2>Installation</h2>
@@ -111,7 +111,7 @@
 
 <h3 id="kalamine">Installation Kalamine</h3>
 <select bind:value={variante_ergopti} style="height: 2rem">
-	<option value="ergopti" selected>Standard</option>
+	<option value="ergopti">Standard</option>
 	<option value="ergo_1dk">1DFH</option>
 </select>
 <p>
