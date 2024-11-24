@@ -45,10 +45,10 @@
 
 <header>
 	<div class="header-logo">
-		<a href="/"><img src="img/logo/logo_hypertexte_transparent.png" class="logo" /></a>
+		<a href="/"><img src="img/logo/logo_ergopti_transparent.png" class="logo" /></a>
 		<p style="font-variant: small-caps;">
 			<a href="/">Disposition clavier </a><span class="hyper" style="padding:0; margin:0"
-				><a href="/">HyperTexte</a>
+				><a href="/">Ergopti</a>
 				<div class="myselect">
 					<select id="selection-version" bind:value={versionValue} on:change={handleVersionChange}>
 						{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
@@ -63,16 +63,16 @@
 		<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
 			<a href="/"
 				><i class="fa-duotone fa-keyboard"></i>
-				<span class="titre">HyperTexte</span></a
+				<span class="titre">Ergopti</span></a
 			>
 		</p>
 		<p
-			aria-current={$page.url.pathname === '/hypertexte-plus' ? 'page' : undefined}
+			aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
 			on:click={fermerMenu}
 		>
-			<a href="/hypertexte-plus"
+			<a href="/ergopti-plus"
 				><i class="fa-duotone fa-circle-star"></i>
-				<span class="titre">HyperTexte<span class="glow">+</span></span></a
+				<span class="titre">Ergopti<span class="glow">+</span></span></a
 			>
 		</p>
 		<p

@@ -208,7 +208,7 @@ export class Clavier {
 						// 	this.infos_clavier.plus === 'oui'
 						// ) {
 						// 	toucheClavier.innerHTML =
-						// 		"<div>Layer de navigation<br><span class='tap'>HyperTexte v." +
+						// 		"<div>Layer de navigation<br><span class='tap'>Ergopti v." +
 						// 		this.version +
 						// 		'</span></div>';
 						// }

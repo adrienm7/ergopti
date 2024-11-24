@@ -11,7 +11,7 @@
 	} from '$lib/stores_infos.js';
 	let version = derniere_version;
 
-	let variante_hypertexte = 'hypertxt';
+	let variante_ergopti = 'hypertxt';
 </script>
 
 <h2>Installation</h2>
@@ -40,30 +40,30 @@
 <h4>Windows</h4>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/HyperTexte_v{version}.{version_mineure_kbdedit}.exe" download
+	<a href="/pilotes/kbdedit/Ergopti_v{version}.{version_mineure_kbdedit}.exe" download
 		><button class="bouton-telechargement"
-			>☛ HyperTexte_v{version}.{version_mineure_kbdedit}.exe</button
+			>☛ Ergopti_v{version}.{version_mineure_kbdedit}.exe</button
 		></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/HyperTexte_v{version}.{version_mineure_kbdedit}.kbe" download
-		><button>Fichier source KbdEdit de HyperTexte_v{version}.{version_mineure_kbdedit}</button></a
+	<a href="/pilotes/kbdedit/Ergopti_v{version}.{version_mineure_kbdedit}.kbe" download
+		><button>Fichier source KbdEdit de Ergopti_v{version}.{version_mineure_kbdedit}</button></a
 	>
 </div>
 <petit-espace />
 <div>
-	<a href="/pilotes/plus/HyperTextePlus_v{version}.{version_mineure_ahk}.ahk" download
+	<a href="/pilotes/plus/ErgoptiPlus_v{version}.{version_mineure_ahk}.ahk" download
 		><button class="bouton-telechargement"
-			>☛ HyperTextePlus_v{version}.{version_mineure_ahk}.ahk</button
+			>☛ ErgoptiPlus_v{version}.{version_mineure_ahk}.ahk</button
 		></a
 	>
 </div>
 <p>
-	Afin que le code source HyperTextePlus.ahk fonctionne, il faut auparavant installer
+	Afin que le code source ErgoptiPlus.ahk fonctionne, il faut auparavant installer
 	<a href="https://www.autohotkey.com/">AutoHotkey v2</a>. Une fois cela fait, il suffit de
-	double-cliquer sur le fichier HyperTextePlus.ahk pour l’exécuter avec AutoHotkey.
+	double-cliquer sur le fichier ErgoptiPlus.ahk pour l’exécuter avec AutoHotkey.
 </p>
 <p>
 	Ce fichier se modifie avec un éditeur de texte afin que vous puissiez l’adapter selon vos envies,
@@ -72,19 +72,18 @@
 	afin de relancer facilement le script après une modification.
 </p>
 <div class="encadre">
-	Il est possible d’utiliser HyperTexte sans même installer de pilote. Pour cela, il suffit de
-	passer à 1 la variable de la ligne 8 du fichier HyperTextePlus.ahk. Idéalement, il vaut mieux
-	utiliser le vrai pilote, notamment pour que le clavier soit HyperTexte même sur l’écran de
-	démarrage pour taper son mot de passe de session. Toutefois, la version sans pilote peut être
-	utile <strong
-		>pour tester HyperTexte sans l’installer, ou sur des ordinateurs professionnels où l’on n’a pas
-		les droits d’administrateur</strong
+	Il est possible d’utiliser Ergopti sans même installer de pilote. Pour cela, il suffit de passer à
+	1 la variable de la ligne 8 du fichier ErgoptiPlus.ahk. Idéalement, il vaut mieux utiliser le vrai
+	pilote, notamment pour que le clavier soit Ergopti même sur l’écran de démarrage pour taper son
+	mot de passe de session. Toutefois, la version sans pilote peut être utile <strong
+		>pour tester Ergopti sans l’installer, ou sur des ordinateurs professionnels où l’on n’a pas les
+		droits d’administrateur</strong
 	>.
 </div>
 <p>
 	Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
 	désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement du
-	script HyperTextePlus au démarrage, il est possible de suivre les étapes suivantes :
+	script ErgoptiPlus au démarrage, il est possible de suivre les étapes suivantes :
 </p>
 <ul>
 	<li>
@@ -95,16 +94,16 @@
 	<li>
 		Le dossier qui vient de s'ouvrir correspond au dossier de démarrage. Tout élément dedans est
 		exécuté au démarrage de Windows. Créer un raccourci dans ce dossier pointant vers l'emplacement
-		où vous allez sauvegarder votre fichier <em>HyperTextePlus.ahk</em>. Vous pouvez par exemple le
+		où vous allez sauvegarder votre fichier <em>ErgoptiPlus.ahk</em>. Vous pouvez par exemple le
 		mettre dans votre dossier Documents.
 	</li>
 </ul>
 <h4>macOS</h4>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/HyperTexte_v{version}.{version_mineure_kbdedit}.keylayout" download
+	<a href="/pilotes/kbdedit/Ergopti_v{version}.{version_mineure_kbdedit}.keylayout" download
 		><button class="bouton-telechargement"
-			>☛ HyperTexte_v{version}.{version_mineure_kbdedit}.keylayout</button
+			>☛ Ergopti_v{version}.{version_mineure_kbdedit}.keylayout</button
 		></a
 	>
 </div>
@@ -112,7 +111,7 @@
 <petit-espace />
 
 <h3 id="kalamine">Installation Kalamine</h3>
-<select bind:value={variante_hypertexte} style="height: 2rem">
+<select bind:value={variante_ergopti} style="height: 2rem">
 	<option value="hypertxt">Standard</option>
 	<option value="hyper1dk">1DFH</option>
 </select>
@@ -142,57 +141,49 @@
 </p>
 <mini-espace />
 <div>
-	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.toml"
-		download><button>{variante_hypertexte}.toml</button></a
+	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.toml" download
+		><button>{variante_ergopti}.toml</button></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.svg"
-		download><button>{variante_hypertexte}.svg</button></a
+	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.svg" download
+		><button>{variante_ergopti}.svg</button></a
 	>
 </div>
 <div>
 	<h4>Windows</h4>
-	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.ahk"
-		download
-		><button class="bouton-telechargement">{variante_hypertexte} Kalamine AHK (user)</button></a
+	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.ahk" download
+		><button class="bouton-telechargement">{variante_ergopti} Kalamine AHK (user)</button></a
 	>
 </div>
 <mini-espace />
 <div>
-	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.klc"
-		download
-		><button class="bouton-telechargement">{variante_hypertexte} Kalamine KLC (admin)</button></a
+	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.klc" download
+		><button class="bouton-telechargement">{variante_ergopti} Kalamine KLC (admin)</button></a
 	>
 </div>
 <h4>MacOS</h4>
 <div>
 	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.keylayout"
-		download
-		><button class="bouton-telechargement">{variante_hypertexte} Kalamine Keylayout</button></a
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.keylayout"
+		download><button class="bouton-telechargement">{variante_ergopti} Kalamine Keylayout</button></a
 	>
 </div>
 <h4>Linux</h4>
 <div>
 	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.xkb_keymap"
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.xkb_keymap"
 		download
-		><button class="bouton-telechargement">{variante_hypertexte} Kalamine Xkb_keymap (user)</button
-		></a
+		><button class="bouton-telechargement">{variante_ergopti} Kalamine Xkb_keymap (user)</button></a
 	>
 </div>
 <mini-espace />
 <div>
 	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_hypertexte}.xkb_symbols"
+		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.xkb_symbols"
 		download
-		><button class="bouton-telechargement">{variante_hypertexte} Kalamine Xkb_symbols (root)</button
+		><button class="bouton-telechargement">{variante_ergopti} Kalamine Xkb_symbols (root)</button
 		></a
 	>
 </div>

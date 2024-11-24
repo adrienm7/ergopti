@@ -11,7 +11,7 @@
 		if (plusValue === 'oui') {
 			plusValue = 'non';
 			if (coucheValue === 'À' || coucheValue === 'Layer') {
-				// Dans le cas où l’on est sur une couche spécifique à HyperTexte+, on change la couche pour une qui existe dans la version standard
+				// Dans le cas où l’on est sur une couche spécifique à Ergopti+, on change la couche pour une qui existe dans la version standard
 				coucheValue = 'Visuel';
 			}
 		} else {

@@ -6,12 +6,12 @@
 //     $XKB_CONFIG_ROOT/symbols/custom
 //
 // File          : hyper1dk.xkb_symbols
-// Project page  : https://hypertexte.beseven.fr
+// Project page  : https://ergopti.beseven.fr
 // Author        : Adrien MOYAUX
 // Version       : 1.1.2
 // License       : WTFPL - Do What The Fuck You Want Public License
 //
-// Disposition HyperTexte, pour une saisie plus rapide de texte.
+// Disposition Ergopti, pour une saisie plus rapide de texte.
 //
 // Base layer + dead key
 // ╭╌╌╌╌╌┰─────┬─────┬─────┬─────┬─────┰─────┬─────┬─────┬─────┬─────┰╌╌╌╌╌┬╌╌╌╌╌╮
@@ -45,7 +45,7 @@
 
 partial alphanumeric_keys modifier_keys
 xkb_symbols "1DK" {
-    name[group1]= "Disposition HyperTexte, pour une saisie plus rapide de texte.";
+    name[group1]= "Disposition Ergopti, pour une saisie plus rapide de texte.";
     key.type[group1] = "EIGHT_LEVEL";
 
     // Digits

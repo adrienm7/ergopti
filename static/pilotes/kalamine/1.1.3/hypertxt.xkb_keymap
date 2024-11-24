@@ -6,12 +6,12 @@
 // DO NOT COPY THIS INTO xkb/symbols: THIS WOULD MESS UP YOUR XKB CONFIG.
 //
 // File          : hypertxt.xkb_keymap
-// Project page  : https://hypertexte.beseven.fr
+// Project page  : https://ergopti.beseven.fr
 // Author        : Adrien MOYAUX
 // Version       : 1.1.3
 // License       : WTFPL - Do What The Fuck You Want Public License
 //
-// Disposition HyperTexte, pour une saisie plus rapide de texte.
+// Disposition Ergopti, pour une saisie plus rapide de texte.
 //
 
 xkb_keymap {
@@ -42,7 +42,7 @@ xkb_keymap {
     include "inet(evdev)"
     include "level3(ralt_switch)"
 
-    name[group1]= "Disposition HyperTexte, pour une saisie plus rapide de texte.";
+    name[group1]= "Disposition Ergopti, pour une saisie plus rapide de texte.";
     key.type[group1] = "FOUR_LEVEL";
 
     // Digits

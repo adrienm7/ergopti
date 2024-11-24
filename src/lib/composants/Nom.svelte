@@ -1,3 +1,3 @@
-<nom-hypertexte>
-	<span class="hyper">Hyper</span><span class="htexte">Texte</span>
-</nom-hypertexte>
+<nom-disposition>
+	<span class="hypertexte">Ergopti</span>
+</nom-disposition>
