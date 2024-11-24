@@ -111,7 +111,7 @@
 
 <h3 id="kalamine">Installation Kalamine</h3>
 <select bind:value={variante_ergopti} style="height: 2rem">
-	<option value="hypertxt" selected>Standard</option>
+	<option value="ergopti" selected>Standard</option>
 	<option value="ergo_1dk">1DFH</option>
 </select>
 <p>
