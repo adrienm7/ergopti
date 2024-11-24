@@ -28,7 +28,7 @@
 	import '$lib/css/espacements.css';
 	import '$lib/css/titres.css';
 	import '$lib/css/typographie.css';
-	import '$lib/css/ergopti.css';
+	import '$lib/css/nom.css';
 	import '$lib/css/images.css';
 	import '$lib/css/clavier_reference.css';
 	import '$lib/css/boutons.css';
