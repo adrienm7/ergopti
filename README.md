@@ -8,7 +8,7 @@
 
 ---
 
-Ergopti est une disposition de clavier ergonomique possédant les caractéristiques suivantes :
+Ergopti est une disposition de clavier ergonomique et optimisée possédant les caractéristiques suivantes :
 
 - Disposition **optimisée pour le français, l’anglais et le code** ;
 - **Chiffres en accès direct** ;
