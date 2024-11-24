@@ -1,3 +1,3 @@
 <nom-disposition>
-	<span class="hypertexte">Ergopti</span>
+	<span class="namecolor">Ergopti</span>
 </nom-disposition>
