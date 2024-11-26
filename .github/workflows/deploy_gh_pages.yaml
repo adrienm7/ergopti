@@ -1,0 +1,60 @@
+name: Build and Deploy to GitHub Pages
+
+on:
+  # Déclenchement sur un push vers la branche principale
+  push:
+    branches: ["main"]
+
+  # Permet de lancer manuellement depuis l'onglet Actions
+  workflow_dispatch:
+
+# Permissions nécessaires pour déployer sur GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un seul déploiement peut être en cours à la fois
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Étape de build
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Récupération du code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Configuration de Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Installation des dépendances et génération du site
+      - name: Install dependencies and build
+        run: |
+          npm install
+          npm run build
+
+      # Envoi des fichiers générés comme artefact
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./build  # Modifier si le dossier de sortie est différent
+
+  # Étape de déploiement
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      # Déploiement sur GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
