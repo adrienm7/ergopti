@@ -67,7 +67,7 @@
 		matomo(
 			false,
 			$navigating.to.url.pathname,
-			'https://ergopti.beseven.fr' + $navigating.to.url.pathname
+			'https://ergopti.fr' + $navigating.to.url.pathname
 		);
 	}
 
