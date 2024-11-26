@@ -4,7 +4,7 @@
 
 ---
 
-➜ https://ergopti.beseven.fr
+➜ https://ergopti.fr
 
 ---
 
@@ -27,7 +27,7 @@ Ergopti est une disposition de clavier ergonomique et optimisée possédant les 
   - ajout de nouveaux roulements (par exemple <kbd>hc</kbd> donne « wh ») ;
   - etc.
  
-➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.beseven.fr/telechargements#clavier_emulation.
+➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/telechargements#clavier_emulation.
 
 ---
 

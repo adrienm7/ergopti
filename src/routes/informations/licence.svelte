@@ -8,7 +8,7 @@
 
 <p>
 	La disposition de clavier <Nom />, ses pilotes ainsi que son site de présentation
-	<a href="https://ergopti.beseven.fr">https://ergopti.beseven.fr</a>
+	<a href="https://ergopti.fr">https://ergopti.fr</a>
 	sont distribués sous la <strong class="important">licence MIT</strong>. Le code source est
 	librement disponible sur
 	<a href="https://github.com/adrienm7/ergopti">https://github.com/adrienm7/ergopti</a>.
