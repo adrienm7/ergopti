@@ -12,32 +12,40 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 
 	switch (name) {
 		case 'kbdedit_exe':
-			files = import.meta.glob('/static/pilotes/kbdedit/*.exe');
+			files = import.meta.globEager('/static/pilotes/kbdedit/*.exe');
 			break;
 		case 'kbdedit_kbe':
-			files = import.meta.glob('/static/pilotes/kbdedit/*.kbe');
+			files = import.meta.globEager('/static/pilotes/kbdedit/*.kbe');
 			break;
 		case 'kbdedit_mac':
-			files = import.meta.glob('/static/pilotes/kbdedit/*.keylayout');
+			files = import.meta.globEager('/static/pilotes/kbdedit/*.keylayout');
 			break;
 		case 'ahk':
-			files = import.meta.glob('/static/pilotes/ahk/*.ahk');
+			files = import.meta.globEager('/static/pilotes/ahk/*.ahk');
 			break;
 		case 'kla_iso':
-			files = import.meta.glob('/static/dispositions/iso/*.json');
+			files = import.meta.globEager('/static/dispositions/iso/*.json');
 			break;
 		case 'kla_iso_plus':
-			files = import.meta.glob('/static/dispositions/iso/*+.json');
+			files = import.meta.globEager('/static/dispositions/iso/*+.json');
 			break;
 		case 'kla_ergodox':
-			files = import.meta.glob('/static/dispositions/ergodox/*.json');
+			files = import.meta.globEager('/static/dispositions/ergodox/*.json');
 			break;
-		case 'kalamine':
-			// TODO : Ajouter le code nécessaire pour 'kalamine'
-			files = import.meta.glob('/static/dispositions/ergodox/*.json'); // Ajuste ce chemin selon le besoin
+		case 'kalamine_1dk':
+			files = import.meta.globEager('/static/pilotes/kalamine/1dk/*.toml');
+			break;
+		case 'kalamine_analyse':
+			files = import.meta.globEager('/static/pilotes/kalamine/standard/*_analyse.toml');
+			break;
+		case 'kalamine_standard':
+			files = import.meta.globEager('/static/pilotes/kalamine/standard/*.toml');
+			files = Object.fromEntries(
+				Object.entries(files).filter(([key]) => !key.endsWith('_analyse.toml'))
+			);
 			break;
 		default:
-			files = import.meta.glob('/static/dispositions/ergodox/*.json'); // Valeur par défaut
+			files = import.meta.globEager('/static/dispositions/ergodox/*.json'); // Valeur par défaut
 			break;
 	}
 
