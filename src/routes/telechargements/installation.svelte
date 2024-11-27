@@ -22,7 +22,6 @@
 		version_mineure_kalamine_standard = getLatestVersion('kalamine_standard', versionValue);
 	});
 
-	let variante_kalamine;
 	let nom_variante_kalamine;
 	let version_mineure_kalamine;
 	// Déclaration réactive pour exécuter le code à chaque changement de `variante_kalamine`
@@ -31,10 +30,12 @@
 			version_mineure_kalamine = version_mineure_kalamine_standard;
 			nom_variante_kalamine = 'ergopti';
 		} else {
+			variante_kalamine = '1dk';
 			version_mineure_kalamine = version_mineure_kalamine_1dk;
 			nom_variante_kalamine = 'ergo_1dk';
 		}
 	}
+	let variante_kalamine = 'standard';
 </script>
 
 <h2>Installation</h2>
@@ -139,7 +140,7 @@
 
 <h3 id="kalamine">Installation Kalamine</h3>
 <select bind:value={variante_kalamine} style="height: 2rem">
-	<option value="standard">Standard</option>
+	<option value="standard" selected>Standard</option>
 	<option value="1dk">1DFH avec la 1DK</option>
 </select>
 <p>
