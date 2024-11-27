@@ -9,17 +9,27 @@
 		version_mineure_kla_iso,
 		version_mineure_kla_iso_plus,
 		version_mineure_kla_ergodox,
-		version_mineure_kalamine;
+		version_mineure_kalamine_1dk,
+		version_mineure_kalamine_analyse;
 	version.subscribe((value) => {
 		versionValue = value;
 		version_mineure_kla_iso = getLatestVersion('kla_iso', versionValue);
 		version_mineure_kla_iso_plus = getLatestVersion('kla_iso_plus', versionValue);
 		version_mineure_kla_ergodox = getLatestVersion('kla_ergodox', versionValue);
-		version_mineure_kalamine = getLatestVersion('kalamine', versionValue);
-		console.log(version_mineure_kla_ergodox);
+		version_mineure_kalamine_1dk = getLatestVersion('kalamine_1dk', versionValue);
+		version_mineure_kalamine_analyse = getLatestVersion('kalamine_analyse', versionValue);
 	});
 
-	let variante_ergopti = 'ergo_1dk';
+	let variante_kalamine;
+	let version_mineure_kalamine;
+	let nom_variante_kalamine;
+	if (variante_kalamine == 'standard') {
+		version_mineure_kalamine = version_mineure_kalamine_analyse;
+		nom_variante_kalamine = 'ergopti';
+	} else {
+		version_mineure_kalamine = version_mineure_kalamine_1dk;
+		nom_variante_kalamine = 'ergo_1dk';
+	}
 </script>
 
 <h2>Fichiers pour les comparateurs de dispositions</h2>
@@ -64,15 +74,15 @@
 <h3>Ergo-L</h3>
 <div>
 	<div>
-		<select bind:value={variante_ergopti} style="height: 2rem">
+		<select bind:value={variante_kalamine} style="height: 2rem">
 			<option value="ergo_1dk">1DFH</option>
 			<option value="ergopti_analyse">Standard — Analyse</option>
 		</select>
 	</div>
 	<mini-espace />
 	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{versionValue}.{version_mineure_kalamine}/{variante_ergopti}.json"
-		download><button>{variante_ergopti}.json</button></a
+		href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}.toml"
+		download><button>{nom_variante_kalamine}_v{version_mineure_kalamine}.toml</button></a
 	>
 	<p>
 		À noter que sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les
