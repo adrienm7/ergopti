@@ -20,16 +20,21 @@
 		version_mineure_kalamine_analyse = getLatestVersion('kalamine_analyse', versionValue);
 	});
 
-	let variante_kalamine;
 	let version_mineure_kalamine;
 	let nom_variante_kalamine;
-	if (variante_kalamine == 'standard') {
-		version_mineure_kalamine = version_mineure_kalamine_analyse;
-		nom_variante_kalamine = 'ergopti';
-	} else {
-		version_mineure_kalamine = version_mineure_kalamine_1dk;
-		nom_variante_kalamine = 'ergo_1dk';
+	let suffixe_nom_variante_kalamine;
+	$: {
+		if (variante_kalamine == 'standard') {
+			version_mineure_kalamine = version_mineure_kalamine_analyse;
+			nom_variante_kalamine = 'ergopti';
+			suffixe_nom_variante_kalamine = '_analyse';
+		} else {
+			version_mineure_kalamine = version_mineure_kalamine_1dk;
+			nom_variante_kalamine = 'ergo_1dk';
+			suffixe_nom_variante_kalamine = '';
+		}
 	}
+	let variante_kalamine = 'standard';
 </script>
 
 <h2>Fichiers pour les comparateurs de dispositions</h2>
@@ -75,14 +80,17 @@
 <div>
 	<div>
 		<select bind:value={variante_kalamine} style="height: 2rem">
-			<option value="ergo_1dk">1DFH</option>
-			<option value="ergopti_analyse">Standard — Analyse</option>
+			<option value="1dk" selected>1DFH</option>
+			<option value="standard">Standard — Analyse</option>
 		</select>
 	</div>
 	<mini-espace />
 	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}.toml"
-		download><button>{nom_variante_kalamine}_v{version_mineure_kalamine}.toml</button></a
+		href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
+		download
+		><button
+			>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</button
+		></a
 	>
 	<p>
 		À noter que sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les
