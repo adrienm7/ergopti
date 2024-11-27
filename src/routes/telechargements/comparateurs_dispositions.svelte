@@ -3,14 +3,21 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
-	import {
-		derniere_version,
+	import { version } from '$lib/stores_infos.js';
+	import { getLatestVersion } from '$lib/js/getVersions.js';
+	let versionValue,
 		version_mineure_kla_iso,
 		version_mineure_kla_iso_plus,
 		version_mineure_kla_ergodox,
-		version_mineure_kalamine
-	} from '$lib/stores_infos.js';
-	let version = derniere_version;
+		version_mineure_kalamine;
+	version.subscribe((value) => {
+		versionValue = value;
+		version_mineure_kla_iso = getLatestVersion('kla_iso', versionValue);
+		version_mineure_kla_iso_plus = getLatestVersion('kla_iso_plus', versionValue);
+		version_mineure_kla_ergodox = getLatestVersion('kla_ergodox', versionValue);
+		version_mineure_kalamine = getLatestVersion('kalamine', versionValue);
+		console.log(version_mineure_kla_ergodox);
+	});
 
 	let variante_ergopti = 'ergo_1dk';
 </script>
@@ -26,15 +33,15 @@
 <mini-espace />
 <div>
 	<span>Version ISO : </span><a
-		href="/dispositions/iso/ergopti.v{version}.{version_mineure_kla_iso}.fr.iso.json"
-		download><button>ergopti.v{version}.{version_mineure_kla_iso}.fr.iso.json</button></a
+		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso}.fr.iso.json"
+		download><button>ergopti.v{version_mineure_kla_iso}.fr.iso.json</button></a
 	>
 </div>
 <mini-espace />
 <div>
 	<span>Version ISO+ : </span><a
-		href="/dispositions/iso/ergopti.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json"
-		download><button>ergopti.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
+		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json"
+		download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
 	>
 	<p>
 		➜ Il n’y a de loin pas toutes les fonctionnalités de <NomPlus></NomPlus> dans ce fichier ISO+, car
@@ -49,8 +56,8 @@
 <mini-espace />
 <div>
 	<span>Version Ergodox : </span><a
-		href="/dispositions/ergodox/ergopti.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json"
-		download><button>ergopti.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
+		href="/dispositions/ergodox/ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json"
+		download><button>ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
 	>
 </div>
 
@@ -64,7 +71,7 @@
 	</div>
 	<mini-espace />
 	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.json"
+		href="/pilotes/kalamine/{versionValue}.{version_mineure_kalamine}/{variante_ergopti}.json"
 		download><button>{variante_ergopti}.json</button></a
 	>
 	<p>
