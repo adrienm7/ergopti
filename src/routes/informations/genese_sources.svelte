@@ -13,27 +13,27 @@
 	Cependant, l'idée d'apprendre Optimot, pour	peut-être découvrir encore par la suite une disposition encore meilleure, était peu attrayante.
 </p>
 <p>
-	Pour m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions, toutes meilleures les unes que les autres, la solution a été radicale : créer la mienne, optimisée pour mes besoins.
+	Pour m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions, toutes meilleures les unes que les autres, la solution a été radicale : développer la mienne, optimisée pour mes besoins.
 	Évidemment, une telle tâche nécessite un investissement en temps considérable.
 	Il faut déjà comprendre ce qui fait une bonne disposition, puis réarranger les touches pour en créer une au moins aussi bonne, si ce n’est meilleure, que les autres dispositions déjà disponibles.
 	Enfin, il faut tester soi-même la disposition, car certains défauts n’apparaissent pas toujours sur un analyseur théorique. Et pour la tester, il faut réapprendre totalement à taper au clavier.
 </p>
-<p>Les premières versions de ce projet, baptisées <span class="important"
->Optim7</span
->, étaient des dérivés directs d'Optimot. L'objectif initial était de peaufiner légèrement les
-scores sur les analyseurs de disposition existants et de corriger des choix qui ne me convenaient pas.
-Par exemple, je voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot, l’auteur préférant y mettre les symboles.
-</p>
 
 <mini-espace />
 
+<p>Les premières versions de ce projet, baptisées <span class="important"
+	>Optim7</span
+	>, étaient des dérivés directs d'Optimot. L'objectif initial était de peaufiner légèrement les
+	scores sur les analyseurs de disposition existants et de corriger des choix qui ne me convenaient pas.
+	Par exemple, je voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot, l’auteur préférant y mettre les symboles.
+</p>
 <p>
 	Rapidement, <Nom></Nom> s'éloigna d'Optimot sur plusieurs aspects fondamentaux. L'un des points
 	clés était ma volonté d'optimiser les <i>roulements</i>, entraînant de nombreux tests de
-	dispositions des touches de la homerow, notamment sur la partie droite avec les consonnes. L'une des
-	décisions majeures fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le
-	<kbd>TSRN</kbd> du BÉPO/Optimot.
-	En effet, le bigramme <kbd>NT</kbd> est très fréquent, et il semblait pertinent de l'optimiser
+	dispositions des touches de la homerow, notamment sur la partie droite avec les consonnes.
+	Un des choix majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le
+	<kbd>TSRN</kbd> du BÉPO et d’Optimot.
+	En effet, le bigramme <kbd>NT</kbd> est le plus fréquent des bigrammes consonne-consonne, et il semblait pertinent de l'optimiser
 	pour qu'il se réalise sur des doigts consécutifs. D’autant que <kbd>NTR</kbd> se réalise également en roulement.
 </p>
 <p>
@@ -74,7 +74,7 @@ Par exemple, je voulais les chiffres en accès direct, ce qui n’est pas le cas
 	Le site de présentation n’apparaissait même pas en première page des résultats.
 </p>
 <p>
-	Environ un mois après la sortie publique de la disposition, HyperTexte fut renommée en <Nom></Nom>, son nom final.
+	Environ un mois après la sortie publique de la disposition, HyperTexte fut renommée <Nom></Nom>, son nom final.
 	Ce nouveau nom reflète à la fois l’ergonomie de la disposition et l’optimisation de celle-ci, la lettre <kbd>O</kbd> faisant le lien entre les deux (ergo[nomie] & opti[misation]).
 	En outre, il est court, d’une longueur idéale de 7 lettres, et peu présent en ligne.
 	Ce nouveau nom adopté, le nom de domaine <a href = "https://ergopti.fr">https://ergopti.fr</a> fut également acquéri à ce moment-là.
@@ -140,7 +140,7 @@ Par exemple, je voulais les chiffres en accès direct, ce qui n’est pas le cas
 	pour y loger tous les symboles.
 </p>
 <p>
-	Ainsi, je n’avais plus besoins d’étendre mes doigts pour atteindre la rangée des nombres pour
+	Ainsi, plus besoin d’étendre les doigts pour atteindre la rangée des chiffres pour
 	taper des parenthèses, guillemets ou opérateurs mathématiques. En outre, les chiffres sont quant à
 	eux passés en accès direct, un changement très appréciable lors de l'utilisation quotidienne.
 </p>
