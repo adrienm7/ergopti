@@ -32,15 +32,31 @@
 	}
 
 	function toggleOverflowMenu() {
-		if (document.getElementById('menu-btn').checked) {
+		const menuBtn = document.getElementById('menu-btn');
+		const siteWidth = document.documentElement.clientWidth;
+		const toc = document.querySelector('#page-toc');
+		const tocPc = document.querySelector('#page-toc-pc');
+		const tocMobile = document.querySelector('#page-toc-mobile');
+
+		// Si le menu est ouvert et que la largeur de l'écran est inférieure ou égale à 1400px
+		if (menuBtn.checked && siteWidth <= 1400) {
 			document.body.style.overflowY = 'hidden';
 		} else {
 			document.body.style.overflowY = 'visible';
 		}
+
+		// Changement de l'emplacement du menu de la page selon qu’on soit sur pc ou mobile
+		if (siteWidth <= 1400) {
+			tocMobile.appendChild(toc);
+		} else {
+			tocPc.appendChild(toc);
+		}
 	}
 
+	// Exécuter la fonction après la mise à jour et au redimensionnement
 	afterUpdate(() => {
 		toggleOverflowMenu();
+		window.addEventListener('resize', toggleOverflowMenu);
 	});
 </script>
 
@@ -66,48 +82,59 @@
 	<input class="menu-btn" type="checkbox" id="menu-btn" on:click={toggleOverflowMenu} />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
-		<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
-			<a href="/"
-				><i class="fa-duotone fa-keyboard"></i>
-				<span class="titre">Ergopti</span></a
+		<div id="menu-pages">
+			<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
+				<a href="/"
+					><i class="fa-duotone fa-keyboard"></i>
+					<span class="titre">Ergopti</span></a
+				>
+			</p>
+			<p
+				aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
+				on:click={fermerMenu}
 			>
-		</p>
-		<p
-			aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
-			on:click={fermerMenu}
-		>
-			<a href="/ergopti-plus"
-				><i class="fa-duotone fa-circle-star"></i>
-				<span class="titre">Ergopti<span class="glow">+</span></span></a
+				<a href="/ergopti-plus"
+					><i class="fa-duotone fa-circle-star"></i>
+					<span class="titre">Ergopti<span class="glow">+</span></span></a
+				>
+			</p>
+			<p
+				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
+				on:click={fermerMenu}
 			>
-		</p>
-		<p
-			aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
-			on:click={fermerMenu}
-		>
-			<a href="/benchmarks"
-				><span class="couleur"><i class="fa-duotone fa-chart-mixed"></i></span>
-				<span class="titre">Benchmarks</span></a
+				<a href="/benchmarks"
+					><span class="couleur"><i class="fa-duotone fa-chart-mixed"></i></span>
+					<span class="titre">Benchmarks</span></a
+				>
+			</p>
+			<p
+				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
+				on:click={fermerMenu}
 			>
-		</p>
-		<p
-			aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
-			on:click={fermerMenu}
-		>
-			<a href="/telechargements"
-				><i class="fa-duotone fa-download"></i>
-				<span class="titre">Téléchargements</span></a
+				<a href="/telechargements"
+					><i class="fa-duotone fa-download"></i>
+					<span class="titre">Téléchargements</span></a
+				>
+			</p>
+			<p
+				aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
+				on:click={fermerMenu}
 			>
-		</p>
-		<p
-			aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
-			on:click={fermerMenu}
-		>
-			<a href="/informations"
-				><i class="fa-duotone fa-circle-info"></i>
-				<span class="titre">Informations</span></a
-			>
-		</p>
+				<a href="/informations"
+					><i class="fa-duotone fa-circle-info"></i>
+					<span class="titre">Informations</span></a
+				>
+			</p>
+		</div>
+		<div id="menu-contenu">
+			<p style="text-align:center; font-weight:bold; padding-top: 30px; padding-bottom: 15px;">
+				Contenu de la page
+			</p>
+			<hr />
+			<br />
+			<div id="page-toc-mobile"></div>
+			<div style="height:30px"></div>
+		</div>
 	</nav>
 </header>
 <div style="height: var(--hauteur-header);"></div>
@@ -205,12 +232,12 @@
 		text-decoration: none;
 	}
 
-	header #menu p {
+	header #menu #menu-pages p {
 		display: inline-block;
 	}
 
-	header #menu p[aria-current='page'] .titre,
-	header #menu p:not([aria-current='page']) .titre:hover {
+	header #menu #menu-pages p[aria-current='page'] .titre,
+	header #menu #menu-pages p:not([aria-current='page']) .titre:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -328,6 +355,7 @@
 
 		header .menu-btn:checked ~ #menu {
 			height: calc(100vh - var(--hauteur-header));
+			overflow: scroll;
 		}
 
 		header .menu-btn:checked ~ .menu-icon .navicon {
@@ -350,7 +378,7 @@
 
 	/* Menu ordinateur */
 	@media (min-width: 1400px) {
-		header #menu {
+		header #menu #menu-pages {
 			display: flex !important;
 			flex-direction: row;
 			background-color: transparent;
@@ -361,7 +389,7 @@
 			padding-right: var(--marge-bords-menu);
 		}
 
-		header #menu p {
+		header #menu #menu-pages p {
 			display: flex;
 			justify-content: center;
 			align-items: center;
@@ -374,7 +402,7 @@
 			font-size: 1rem;
 		}
 
-		header #menu p:not(:last-child)::after {
+		header #menu #menu-pages p:not(:last-child)::after {
 			content: '';
 			background-color: transparent;
 			height: 100%;
@@ -384,17 +412,17 @@
 			box-shadow: 2px 0 2px 0px var(--couleur-ombre);
 		}
 
-		header #menu p a {
+		header #menu #menu-pages p a {
 			padding: calc(2 * var(--espacement-items-menu));
 		}
-		header #menu p a p {
+		header #menu #menu-pages p a p {
 			text-align: center; /* Dans le cas où le texte passe sur deux lignes car trop long */
 		}
-		header #menu p:last-child a {
+		header #menu #menu-pages p:last-child a {
 			padding-right: 0;
 		}
 
-		header #menu p[aria-current='page'] a::after {
+		header #menu #menu-pages p[aria-current='page'] a::after {
 			content: '';
 			display: block;
 			position: relative;
@@ -405,7 +433,7 @@
 			background-image: linear-gradient(to right, var(--gradient-blue));
 		}
 
-		/* header #menu p:not([aria-current='page']) .titre:hover::after {
+		/* header #menu #menu-pages p:not([aria-current='page']) .titre:hover::after {
 		content: '';
 		display: block;
 		position: relative;

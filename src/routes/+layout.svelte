@@ -64,11 +64,7 @@
 	/* Lancer Matomo lors du changement de page */
 	$: if ($navigating) {
 		/* Il est nécessaire de modifier le titre et l’url, car sinon ils sont identiques à la page d’entrée */
-		matomo(
-			false,
-			$navigating.to.url.pathname,
-			'https://ergopti.fr' + $navigating.to.url.pathname
-		);
+		matomo(false, $navigating.to.url.pathname, 'https://ergopti.fr' + $navigating.to.url.pathname);
 	}
 
 	afterUpdate(() => {
@@ -120,7 +116,7 @@
 					<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
 						Contenu de la page
 					</p>
-					<div id="page-toc"></div>
+					<div id="page-toc-pc"><div id="page-toc"></div></div>
 				</div>
 			</aside>
 			<div id="main-content">
