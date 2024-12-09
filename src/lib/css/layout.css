@@ -57,4 +57,13 @@ main,
 	#main-content {
 		width: 100vw;
 	}
+	#menu-contenu {
+		display: block;
+		padding-left: var(--marge-fenetre);
+	}
+}
+@media (min-width: 1401px) {
+	#menu-contenu {
+		display: none;
+	}
 }
