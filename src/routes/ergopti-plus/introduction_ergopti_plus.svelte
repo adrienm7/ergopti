@@ -36,9 +36,8 @@
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i>
 		<span class="important"
-			>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span> pour une frappe ultra-fluide
-			sans inconfort.
-		</span>
+			>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span></span
+		> pour une frappe ultra-fluide et sans inconfort.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-3"></i>
@@ -46,7 +45,8 @@
 		l’auriculaire droit.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-4"></i> Ajoute divers raccourcis tels que des touches
+		<i class="fa-duotone fa-circle-4"></i> Ajoute <span class="important">divers raccourcis</span>
+		tels que des touches
 		<kbd-sortie>OneShotShift</kbd-sortie>, <kbd-sortie>Alt + Tab</kbd-sortie>
 		et
 		<kbd-sortie>Capsword</kbd-sortie>.
