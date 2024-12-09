@@ -133,7 +133,7 @@
 			<hr />
 			<br />
 			<div id="page-toc-mobile"></div>
-			<div style="height:30px"></div>
+			<div style="height:70px"></div>
 		</div>
 	</nav>
 </header>
