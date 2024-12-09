@@ -1,5 +1,6 @@
 <script>
 	import Nom from '../composants/Nom.svelte';
+	import NomPlus from '../composants/NomPlus.svelte';
 
 	import { page } from '$app/stores';
 	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
@@ -45,12 +46,17 @@
 
 <header>
 	<div class="header-logo">
-		<a href="/"><img src="img/logo/logo_ergopti.png" class="logo" /></a>
+		<!-- <a href="/"><img src="img/logo/logo_ergopti.png" class="logo" /></a> -->
 		<p style="font-variant: small-caps;">
 			<a href="/">Disposition clavier </a><span class="hyper" style="padding:0; margin:0"
 				><a href="/">Ergopti</a>
 				<div class="myselect">
-					<select id="selection-version" bind:value={versionValue} on:change={handleVersionChange}>
+					<select
+						id="selection-version"
+						bind:value={versionValue}
+						on:change={handleVersionChange}
+						data-version={versionValue}
+					>
 						{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
 					</select>
 				</div></span
@@ -132,6 +138,15 @@
 		background-image: inherit;
 		border: none;
 		font-variant: small-caps;
+	}
+
+	#selection-version[data-version='1.1'],
+	#selection-version[data-version='2.0'] {
+		width: 2.5em;
+	}
+
+	#selection-version[data-version='1.0.5'] {
+		width: 3.25em;
 	}
 
 	.myselect {
