@@ -59,6 +59,8 @@ main,
 	}
 	#menu-contenu {
 		display: block;
+	}
+	#page-toc-mobile {
 		padding-left: var(--marge-fenetre);
 	}
 }
