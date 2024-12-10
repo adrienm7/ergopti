@@ -64,9 +64,9 @@
 	<div class="header-logo">
 		<!-- <a href="/"><img src="img/logo/logo_ergopti.png" class="logo" /></a> -->
 		<p style="margin-left: 0.5em; font-variant: small-caps;">
-			<a href="/">Disposition clavier </a><span class="hyper" style="padding:0; margin:0"
+			<a href="/">Disposition clavier&nbsp;</a><span class="hyper" style="padding:0; margin:0"
 				><a href="/">Ergopti</a>
-				<div class="myselect">
+				<span class="myselect">
 					<select
 						id="selection-version"
 						bind:value={versionValue}
@@ -75,7 +75,7 @@
 					>
 						{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
 					</select>
-				</div></span
+				</span></span
 			>
 		</p>
 	</div>
