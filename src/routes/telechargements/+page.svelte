@@ -5,6 +5,29 @@
 
 	import ComparateursDispositions from './comparateurs_dispositions.svelte';
 	import Installation from './installation.svelte';
+
+	import { version } from '$lib/stores_infos.js';
+
+	let versionValue;
+
+	// Fonction pour comparer deux versions
+	function compareVersions(versionA, versionB) {
+		const aParts = versionA.split('.').map(Number);
+		const bParts = versionB.split('.').map(Number);
+
+		for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+			const a = aParts[i] || 0;
+			const b = bParts[i] || 0;
+			if (a > b) return 1;
+			if (a < b) return -1;
+		}
+		return 0;
+	}
+
+	// Abonnement à la valeur du store
+	version.subscribe((value) => {
+		versionValue = value;
+	});
 </script>
 
 <svelte:head>
@@ -12,8 +35,10 @@
 	<meta name="description" content="Fichiers pour utiliser Ergopti" />
 </svelte:head>
 
-<Installation></Installation>
-<ComparateursDispositions></ComparateursDispositions>
+<Installation />
+{#if versionValue && compareVersions(versionValue, '1.1.0') >= 0}
+	<ComparateursDispositions />
+{/if}
 
 <!-- <h2>Installation</h2>
 	<h3>Instructions générales</h3>
