@@ -3,21 +3,45 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
-	import {
-		derniere_version,
-		version_mineure_kbdedit,
+	import { version } from '$lib/stores_infos.js';
+	import { getLatestVersion } from '$lib/js/getVersions.js';
+	let versionValue,
+		version_mineure_kbdedit_exe,
+		version_mineure_kbdedit_kbe,
+		version_mineure_kbdedit_mac,
 		version_mineure_ahk,
-		version_mineure_kalamine
-	} from '$lib/stores_infos.js';
-	let version = derniere_version;
-	let variante_ergopti = 'ergopti';
+		version_mineure_kalamine_1dk,
+		version_mineure_kalamine_standard;
+	version.subscribe((value) => {
+		versionValue = value;
+		version_mineure_kbdedit_exe = getLatestVersion('kbdedit_exe', versionValue);
+		version_mineure_kbdedit_kbe = getLatestVersion('kbdedit_kbe', versionValue);
+		version_mineure_kbdedit_mac = getLatestVersion('kbdedit_mac', versionValue);
+		version_mineure_ahk = getLatestVersion('ahk', versionValue);
+		version_mineure_kalamine_1dk = getLatestVersion('kalamine_1dk', versionValue);
+		version_mineure_kalamine_standard = getLatestVersion('kalamine_standard', versionValue);
+	});
+
+	let nom_variante_kalamine;
+	let version_mineure_kalamine;
+	// Déclaration réactive pour exécuter le code à chaque changement de `variante_kalamine`
+	$: {
+		if (variante_kalamine === 'standard') {
+			version_mineure_kalamine = version_mineure_kalamine_standard;
+			nom_variante_kalamine = 'ergopti';
+		} else {
+			variante_kalamine = '1dk';
+			version_mineure_kalamine = version_mineure_kalamine_1dk;
+			nom_variante_kalamine = 'ergo_1dk';
+		}
+	}
+	let variante_kalamine = 'standard';
 </script>
 
 <h2>Installation</h2>
-<div class="encadre">
-	<span style="font-weight:bold">Note :</span> Les fichiers d’installation n’existent au complet qu’à
-	partir de la 1.1, c’est pourquoi le sélecteur de version n’a pour le moment aucun impact sur cette
-	page mis à part sur l’émulation du clavier.
+<div class="encadre text-center">
+	<span style="font-weight:bold;">Note :</span> Les fichiers d’installation n’existent au complet qu’à
+	partir de la 1.1.
 </div>
 
 <h3 id="kbdedit">Installation KbdEdit (méthode préférée)</h3>
@@ -39,25 +63,28 @@
 <h4>Windows</h4>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/Ergopti_v{version}.{version_mineure_kbdedit}.exe" download
-		><button class="bouton-telechargement"
-			>☛ Ergopti_v{version}.{version_mineure_kbdedit}.exe</button
-		></a
-	>
+	{#if version_mineure_kbdedit_exe !== undefined}
+		<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
+			<button class="bouton-telechargement">☛ Ergopti_v{version_mineure_kbdedit_exe}.exe</button>
+		</a>
+	{/if}
 </div>
+
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/Ergopti_v{version}.{version_mineure_kbdedit}.kbe" download
-		><button>Fichier source KbdEdit de Ergopti_v{version}.{version_mineure_kbdedit}</button></a
-	>
+	{#if version_mineure_kbdedit_kbe !== undefined}
+		<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download
+			><button>Fichier source KbdEdit de Ergopti_v{version_mineure_kbdedit_kbe}</button></a
+		>
+	{/if}
 </div>
 <petit-espace />
 <div>
-	<a href="/pilotes/plus/ErgoptiPlus_v{version}.{version_mineure_ahk}.ahk" download
-		><button class="bouton-telechargement"
-			>☛ ErgoptiPlus_v{version}.{version_mineure_ahk}.ahk</button
-		></a
-	>
+	{#if version_mineure_ahk !== undefined}
+		<a href="/pilotes/ahk/ErgoptiPlus_v{version_mineure_ahk}.ahk" download
+			><button class="bouton-telechargement">☛ ErgoptiPlus_v{version_mineure_ahk}.ahk</button></a
+		>
+	{/if}
 </div>
 <p>
 	Afin que le code source ErgoptiPlus.ahk fonctionne, il faut auparavant installer
@@ -100,19 +127,21 @@
 <h4>macOS</h4>
 <mini-espace />
 <div>
-	<a href="/pilotes/kbdedit/Ergopti_v{version}.{version_mineure_kbdedit}.keylayout" download
-		><button class="bouton-telechargement"
-			>☛ Ergopti_v{version}.{version_mineure_kbdedit}.keylayout</button
-		></a
-	>
+	{#if version_mineure_kbdedit_mac !== undefined}
+		<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_mac}.keylayout" download
+			><button class="bouton-telechargement"
+				>☛ Ergopti_v{version_mineure_kbdedit_mac}.keylayout</button
+			></a
+		>
+	{/if}
 </div>
 
 <petit-espace />
 
 <h3 id="kalamine">Installation Kalamine</h3>
-<select bind:value={variante_ergopti} style="height: 2rem">
-	<option value="ergopti">Standard</option>
-	<option value="ergo_1dk">1DFH</option>
+<select bind:value={variante_kalamine} style="height: 2rem">
+	<option value="standard" selected>Standard</option>
+	<option value="1dk">1DFH avec la 1DK</option>
 </select>
 <p>
 	<a href="https://github.com/OneDeadKey/kalamine">Kalamine</a> permet de générer des fichiers
@@ -138,52 +167,69 @@
 		>https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts</a
 	>
 </p>
-<mini-espace />
-<div>
-	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.toml" download
-		><button>{variante_ergopti}.toml</button></a
-	>
-</div>
-<mini-espace />
-<div>
-	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.svg" download
-		><button>{variante_ergopti}.svg</button></a
-	>
-</div>
-<div>
-	<h4>Windows</h4>
-	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.ahk" download
-		><button class="bouton-telechargement">{variante_ergopti} Kalamine AHK (user)</button></a
-	>
-</div>
-<mini-espace />
-<div>
-	<a href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.klc" download
-		><button class="bouton-telechargement">{variante_ergopti} Kalamine KLC (admin)</button></a
-	>
-</div>
-<h4>MacOS</h4>
-<div>
-	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.keylayout"
-		download><button class="bouton-telechargement">{variante_ergopti} Kalamine Keylayout</button></a
-	>
-</div>
-<h4>Linux</h4>
-<div>
-	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.xkb_keymap"
-		download
-		><button class="bouton-telechargement">{variante_ergopti} Kalamine Xkb_keymap (user)</button></a
-	>
-</div>
-<mini-espace />
-<div>
-	<a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.xkb_symbols"
-		download
-		><button class="bouton-telechargement">{variante_ergopti} Kalamine Xkb_symbols (root)</button
-		></a
-	>
-</div>
-<petit-espace />
+{#if version_mineure_kalamine !== undefined}
+	<mini-espace />
+	<div>
+		<a
+			href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}.toml"
+			download><button>{nom_variante_kalamine}_{version_mineure_kalamine}.toml</button></a
+		>
+	</div>
+	<mini-espace />
+	<div>
+		<a
+			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.svg"
+			download><button>{nom_variante_kalamine}_{version_mineure_kalamine}.svg</button></a
+		>
+	</div>
+	<div>
+		<h4>Windows</h4>
+		<a
+			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.ahk"
+			download
+			><button class="bouton-telechargement"
+				>{nom_variante_kalamine} v{version_mineure_kalamine} Kalamine AHK (user)</button
+			></a
+		>
+	</div>
+	<mini-espace />
+	<div>
+		<a
+			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.klc"
+			download
+			><button class="bouton-telechargement"
+				>{nom_variante_kalamine} v{version_mineure_kalamine} Kalamine KLC (admin)</button
+			></a
+		>
+	</div>
+	<h4>MacOS</h4>
+	<div>
+		<a
+			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.keylayout"
+			download
+			><button class="bouton-telechargement"
+				>{nom_variante_kalamine} v{version_mineure_kalamine} Kalamine Keylayout</button
+			></a
+		>
+	</div>
+	<h4>Linux</h4>
+	<div>
+		<a
+			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.xkb_keymap"
+			download
+			><button class="bouton-telechargement"
+				>{nom_variante_kalamine} v{version_mineure_kalamine} Kalamine Xkb_keymap (user)</button
+			></a
+		>
+	</div>
+	<mini-espace />
+	<div>
+		<a
+			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.xkb_symbols"
+			download
+			><button class="bouton-telechargement"
+				>{nom_variante_kalamine} v{version_mineure_kalamine} Kalamine Xkb_symbols (root)</button
+			></a
+		>
+	</div>
+{/if}

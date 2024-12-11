@@ -3,16 +3,38 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
-	import {
-		derniere_version,
+	import { version } from '$lib/stores_infos.js';
+	import { getLatestVersion } from '$lib/js/getVersions.js';
+	let versionValue,
 		version_mineure_kla_iso,
 		version_mineure_kla_iso_plus,
 		version_mineure_kla_ergodox,
-		version_mineure_kalamine
-	} from '$lib/stores_infos.js';
-	let version = derniere_version;
+		version_mineure_kalamine_1dk,
+		version_mineure_kalamine_analyse;
+	version.subscribe((value) => {
+		versionValue = value;
+		version_mineure_kla_iso = getLatestVersion('kla_iso', versionValue);
+		version_mineure_kla_iso_plus = getLatestVersion('kla_iso_plus', versionValue);
+		version_mineure_kla_ergodox = getLatestVersion('kla_ergodox', versionValue);
+		version_mineure_kalamine_1dk = getLatestVersion('kalamine_1dk', versionValue);
+		version_mineure_kalamine_analyse = getLatestVersion('kalamine_analyse', versionValue);
+	});
 
-	let variante_ergopti = 'ergo_1dk';
+	let version_mineure_kalamine;
+	let nom_variante_kalamine;
+	let suffixe_nom_variante_kalamine;
+	$: {
+		if (variante_kalamine == 'standard') {
+			version_mineure_kalamine = version_mineure_kalamine_analyse;
+			nom_variante_kalamine = 'ergopti';
+			suffixe_nom_variante_kalamine = '_analyse';
+		} else {
+			version_mineure_kalamine = version_mineure_kalamine_1dk;
+			nom_variante_kalamine = 'ergo_1dk';
+			suffixe_nom_variante_kalamine = '';
+		}
+	}
+	let variante_kalamine = 'standard';
 </script>
 
 <h2>Fichiers pour les comparateurs de dispositions</h2>
@@ -26,15 +48,15 @@
 <mini-espace />
 <div>
 	<span>Version ISO : </span><a
-		href="/dispositions/iso/ergopti.v{version}.{version_mineure_kla_iso}.fr.iso.json"
-		download><button>ergopti.v{version}.{version_mineure_kla_iso}.fr.iso.json</button></a
+		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso}.fr.iso.json"
+		download><button>ergopti.v{version_mineure_kla_iso}.fr.iso.json</button></a
 	>
 </div>
 <mini-espace />
 <div>
 	<span>Version ISO+ : </span><a
-		href="/dispositions/iso/ergopti.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json"
-		download><button>ergopti.v{version}.{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
+		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json"
+		download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
 	>
 	<p>
 		➜ Il n’y a de loin pas toutes les fonctionnalités de <NomPlus></NomPlus> dans ce fichier ISO+, car
@@ -49,23 +71,26 @@
 <mini-espace />
 <div>
 	<span>Version Ergodox : </span><a
-		href="/dispositions/ergodox/ergopti.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json"
-		download><button>ergopti.v{version}.{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
+		href="/dispositions/ergodox/ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json"
+		download><button>ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
 	>
 </div>
 
 <h3>Ergo-L</h3>
 <div>
 	<div>
-		<select bind:value={variante_ergopti} style="height: 2rem">
-			<option value="ergo_1dk">1DFH</option>
-			<option value="ergopti_analyse">Standard — Analyse</option>
+		<select bind:value={variante_kalamine} style="height: 2rem">
+			<option value="1dk" selected>1DFH</option>
+			<option value="standard">Standard — Analyse</option>
 		</select>
 	</div>
 	<mini-espace />
 	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{version}.{version_mineure_kalamine}/{variante_ergopti}.json"
-		download><button>{variante_ergopti}.json</button></a
+		href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
+		download
+		><button
+			>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</button
+		></a
 	>
 	<p>
 		À noter que sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les
