@@ -62,7 +62,7 @@
 
 <header>
 	<div class="header-logo">
-		<!-- <a href="/"><img src="img/logo/logo_ergopti.png" class="logo" /></a> -->
+		<a href="/"><img src="img/logo/logo_ergopti.png" class="logo" /></a>
 		<p style="margin-left: 0.5em; font-variant: small-caps;">
 			<a href="/">Disposition clavier&nbsp;</a><span class="hyper" style="padding:0; margin:0"
 				><a href="/">Ergopti</a>
@@ -267,12 +267,14 @@
 	.logo {
 		height: 55px;
 		width: 55px;
-		margin: 5px;
+		margin: 0px;
+		/*  
 		margin-right: 10px;
 		padding: 3px;
 		background-color: #010017;
 		border: 1px solid white;
 		border-radius: 10px;
+		*/
 	}
 
 	/* Menu mobile */
