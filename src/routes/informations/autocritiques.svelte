@@ -57,7 +57,7 @@
 <h3>Non compatible avec les claviers compacts</h3>
 <p>
 	Certains claviers ont moins de touches, par exemple en n’ayant que 6 colonnes, voire seulement 5,
-	par main. <Nom></Nom> a été conçu pour exploiter toutes les touches d’un clavier standard, donc 6 colonnes
+	par main. <Nom></Nom> a été conçue pour exploiter toutes les touches d’un clavier standard, donc 6 colonnes
 	à gauche et 7 à droite. Sur la dernière colonne de droite, il n’y a cependant que les touches mortes
 	<kbd class="morte">◌̂</kbd>
 	et <kbd class="morte">◌̈</kbd> qui seront beaucoup plus rarement utilisées. Avec <NomPlus
@@ -154,7 +154,7 @@
 </p>
 <p>
 	La philosophie derrière <Nom /> est de fournir une base de réflexion, mais pas nécessairement de promouvoir
-	l’utilisation de la disposition « Ergopti ». Rien ne vaut une disposition créée sur-mesure pour vos
+	l’utilisation de la disposition « <Nom /> ». Rien ne vaut une disposition créée sur-mesure pour vos
 	usages. Par exemple, si vous voulez écrire régulièrement en allemand, il serait judicieux de mettre
 	la touche morte des trémas à un endroit plus accessible. De même, si vous écrivez souvent en espagnol,
 	il faudrait trouver un emplacement pour la lettre <kbd-sortie>Ñ</kbd-sortie> (actuellement
