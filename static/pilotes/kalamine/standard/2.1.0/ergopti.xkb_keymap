@@ -8,7 +8,7 @@
 // File          : ergopti.xkb_keymap
 // Project page  : https://ergopti.fr
 // Author        : Adrien MOYAUX
-// Version       : 1.1.3
+// Version       : 2.1.0
 // License       : WTFPL - Do What The Fuck You Want Public License
 //
 // Disposition ergonomique optimisée pour le français, l’anglais et le code
@@ -23,14 +23,14 @@ xkb_keymap {
   // │     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
   // │     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
   // ┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
-  // ┃        ┃ È æ │ Y í │ O   │ W   │ B   │ F   │ D   │ L   │ P   │ ?   │ Z   │     ┃       ┃
-  // ┃ ↹      ┃   ` │   @ │   œ │   ù │   « │   » │   $ │   = │   + │ ' ? │   ! │     ┃       ┃
+  // ┃        ┃ È æ │ Y í │ O   │ W   │ B   │ F   │ G ≈ │ H   │ C   │ X × │ Z ‰ │   £ ┃       ┃
+  // ┃ ↹      ┃   ` │   @ │   œ │   ù │   « │   » │   ~ │   # │   ç │   * │   % │*¨   ┃       ┃
   // ┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
-  // ┃         ┃ A   │ I   │ E   │ U   │ : · │ V   │ S   │ N ñ │ T   │ R   │ Q   │     ┃      ┃
-  // ┃ ⇬       ┃   < │   > │   { │   } │ . : │   | │   ( │   ) │   [ │   ] │   % │     ┃      ┃
+  // ┃         ┃ A   │ I   │ E   │ U   │ : · │ V   │ S   │ N ñ │ T   │ R   │ Q € │ ! ¡ ┃      ┃
+  // ┃ ⇬       ┃   < │   > │   { │   } │ . : │   | │   ( │   ) │   [ │   ] │   ’ │*^ ! ┃      ┃
   // ┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
-  // ┃      ┃ Ê   │ É   │ À á │ J   │ ; ’ │ K   │ M   │ C   │ H   │ G   │ X   ┃               ┃
-  // ┃ ⇧    ┃   ^ │   / │   \ │   " │ , ; │   … │   & │   ç │   # │   ~ │   * ┃ ⇧             ┃
+  // ┃      ┃ Ê   │ É   │ À á │ J   │ ; ’ │ K   │ M   │ D § │ L ≠ │ P ± │ ? ¿ ┃               ┃
+  // ┃ ⇧    ┃   ^ │   / │   \ │   " │ , ; │   … │   & │   $ │   = │   + │ ' ? ┃ ⇧             ┃
   // ┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
   // ┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
   // ┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
@@ -64,10 +64,10 @@ xkb_keymap {
     key <AD04> {[ w               , W               , ugrave          , Ugrave          ]}; // w W ù Ù
     key <AD05> {[ b               , B               , guillemotleft   , VoidSymbol      ]}; // b B «
     key <AD06> {[ f               , F               , guillemotright  , VoidSymbol      ]}; // f F »
-    key <AD07> {[ d               , D               , dollar          , VoidSymbol      ]}; // d D $
-    key <AD08> {[ l               , L               , equal           , VoidSymbol      ]}; // l L =
-    key <AD09> {[ p               , P               , plus            , VoidSymbol      ]}; // p P +
-    key <AD10> {[ apostrophe      , question        , question        , VoidSymbol      ]}; // ' ? ?
+    key <AD07> {[ g               , G               , asciitilde      , U2248           ]}; // g G ~ ≈
+    key <AD08> {[ h               , H               , numbersign      , VoidSymbol      ]}; // h H #
+    key <AD09> {[ c               , C               , ccedilla        , Ccedilla        ]}; // c C ç Ç
+    key <AD10> {[ x               , X               , asterisk        , multiply        ]}; // x X * ×
 
     // Letters, second row
     key <AC01> {[ a               , A               , less            , lessthanequal   ]}; // a A < ≤
@@ -88,21 +88,21 @@ xkb_keymap {
     key <AB04> {[ comma           , semicolon       , semicolon       , U2019           ]}; // , ; ; ’
     key <AB05> {[ k               , K               , ellipsis        , VoidSymbol      ]}; // k K …
     key <AB06> {[ m               , M               , ampersand       , VoidSymbol      ]}; // m M &
-    key <AB07> {[ c               , C               , ccedilla        , Ccedilla        ]}; // c C ç Ç
-    key <AB08> {[ h               , H               , numbersign      , VoidSymbol      ]}; // h H #
-    key <AB09> {[ g               , G               , asciitilde      , VoidSymbol      ]}; // g G ~
-    key <AB10> {[ x               , X               , asterisk        , VoidSymbol      ]}; // x X *
+    key <AB07> {[ d               , D               , dollar          , section         ]}; // d D $ §
+    key <AB08> {[ l               , L               , equal           , notequal        ]}; // l L = ≠
+    key <AB09> {[ p               , P               , plus            , plusminus       ]}; // p P + ±
+    key <AB10> {[ apostrophe      , question        , question        , questiondown    ]}; // ' ? ? ¿
 
     // Pinky keys
-    key <AE11> {[ EuroSign        , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; // €
+    key <AE11> {[ VoidSymbol      , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; //
     key <AE12> {[ VoidSymbol      , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; //
     key <AE13> {[ VoidSymbol      , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; //
-    key <AD11> {[ z               , Z               , exclam          , VoidSymbol      ]}; // z Z !
-    key <AD12> {[ dead_diaeresis  , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; // ¨
-    key <AC11> {[ q               , Q               , percent         , VoidSymbol      ]}; // q Q %
+    key <AD11> {[ z               , Z               , percent         , U2030           ]}; // z Z % ‰
+    key <AD12> {[ dead_diaeresis  , U202F           , nobreakspace    , sterling        ]}; // ¨     £
+    key <AC11> {[ q               , Q               , U2019           , EuroSign        ]}; // q Q ’ €
     key <AB11> {[ VoidSymbol      , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; //
     key <TLDE> {[ VoidSymbol      , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; //
-    key <BKSL> {[ dead_circumflex , VoidSymbol      , VoidSymbol      , VoidSymbol      ]}; // ^
+    key <BKSL> {[ dead_circumflex , exclam          , exclam          , exclamdown      ]}; // ^ ! ! ¡
     key <LSGT> {[ ecircumflex     , Ecircumflex     , asciicircum     , VoidSymbol      ]}; // ê Ê ^
 
     // Space bar

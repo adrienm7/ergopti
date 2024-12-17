@@ -168,17 +168,17 @@ SendKey(base, deadkeymap) {
  SC15::SendKey("U+0066", {}) ; f
 +SC15::SendKey("U+0046", {}) ; F
 
- SC16::SendKey("U+0064", {}) ; d
-+SC16::SendKey("U+0044", {}) ; D
+ SC16::SendKey("U+0067", {}) ; g
++SC16::SendKey("U+0047", {}) ; G
 
- SC17::SendKey("U+006c", {"**": "U+00fb"}) ; l
-+SC17::SendKey("U+004c", {"**": "U+00db"}) ; L
+ SC17::SendKey("U+0068", {"**": "U+00fb", "*¨": "U+1e27"}) ; h
++SC17::SendKey("U+0048", {"**": "U+00db", "*¨": "U+1e26"}) ; H
 
- SC18::SendKey("U+0070", {"**": "U+0071"}) ; p
-+SC18::SendKey("U+0050", {"**": "U+0051"}) ; P
+ SC18::SendKey("U+0063", {"**": "U+00e7"}) ; c
++SC18::SendKey("U+0043", {"**": "U+00c7"}) ; C
 
- SC19::SendKey("U+2019", {"**": "U+003f"}) ; ’
-+SC19::SendKey("U+003f", {}) ; ?
+ SC19::SendKey("U+0078", {"**": "U+00e2", "*¨": "U+1e8d"}) ; x
++SC19::SendKey("U+0058", {"**": "U+00c2", "*¨": "U+1e8c"}) ; X
 
 ;  Letters, second row
 
@@ -200,8 +200,8 @@ SendKey(base, deadkeymap) {
  SC23::SendKey("U+0076", {}) ; v
 +SC23::SendKey("U+0056", {}) ; V
 
- SC24::SendKey("U+0073", {}) ; s
-+SC24::SendKey("U+0053", {}) ; S
+ SC24::SendKey("U+0073", {"**": "U+0071"}) ; s
++SC24::SendKey("U+0053", {"**": "U+0051"}) ; S
 
  SC25::SendKey("U+006e", {"**": "U+00f4"}) ; n
 +SC25::SendKey("U+004e", {"**": "U+00d4"}) ; N
@@ -232,17 +232,17 @@ SendKey(base, deadkeymap) {
  SC31::SendKey("U+006d", {"**": "U+00f1"}) ; m
 +SC31::SendKey("U+004d", {"**": "U+00d1"}) ; M
 
- SC32::SendKey("U+0063", {"**": "U+00e7"}) ; c
-+SC32::SendKey("U+0043", {"**": "U+00c7"}) ; C
+ SC32::SendKey("U+0064", {}) ; d
++SC32::SendKey("U+0044", {}) ; D
 
- SC33::SendKey("U+0068", {"**": "U+00ee", "*¨": "U+1e27"}) ; h
-+SC33::SendKey("U+0048", {"**": "U+00ce", "*¨": "U+1e26"}) ; H
+ SC33::SendKey("U+006c", {"**": "U+00ee"}) ; l
++SC33::SendKey("U+004c", {"**": "U+00ce"}) ; L
 
- SC34::SendKey("U+0067", {}) ; g
-+SC34::SendKey("U+0047", {}) ; G
+ SC34::SendKey("U+0070", {}) ; p
++SC34::SendKey("U+0050", {}) ; P
 
- SC35::SendKey("U+0078", {"**": "U+00e2", "*¨": "U+1e8d"}) ; x
-+SC35::SendKey("U+0058", {"**": "U+00c2", "*¨": "U+1e8c"}) ; X
+ SC35::SendKey("U+2019", {"**": "U+003f"}) ; ’
++SC35::SendKey("U+003f", {}) ; ?
 
 ;  Pinky keys
 
@@ -330,17 +330,17 @@ SendKey(base, deadkeymap) {
  <^>!SC15::SendKey("U+00bb", {}) ; »
 <^>!+SC15::SendKey("U+201d", {}) ; ”
 
- <^>!SC16::SendKey("U+0024", {}) ; $
-<^>!+SC16::SendKey("U+00a7", {}) ; §
+ <^>!SC16::SendKey("U+005e", {}) ; ^
+<^>!+SC16::SendKey("U+20ac", {}) ; €
 
- <^>!SC17::SendKey("U+003d", {}) ; =
-<^>!+SC17::SendKey("U+2260", {}) ; ≠
+ <^>!SC17::SendKey("U+0023", {}) ; #
+<^>!+SC17::SendKey("U+00a3", {}) ; £
 
- <^>!SC18::SendKey("U+002b", {}) ; +
-<^>!+SC18::SendKey("U+00b1", {}) ; ±
+ <^>!SC18::SendKey("U+007e", {}) ; ~
+<^>!+SC18::SendKey("U+2248", {}) ; ≈
 
- <^>!SC19::SendKey("U+0027", {}) ; '
-<^>!+SC19::SendKey("U+00bf", {}) ; ¿
+ <^>!SC19::SendKey("U+002a", {}) ; *
+<^>!+SC19::SendKey("U+00d7", {}) ; ×
 
 ;  Letters, second row
 
@@ -386,17 +386,17 @@ SendKey(base, deadkeymap) {
  <^>!SC31::SendKey("U+0026", {}) ; &
 <^>!+SC31::SendKey("U+2212", {}) ; −
 
- <^>!SC32::SendKey("U+005e", {}) ; ^
-<^>!+SC32::SendKey("U+20ac", {}) ; €
+ <^>!SC32::SendKey("U+0024", {}) ; $
+<^>!+SC32::SendKey("U+00a7", {}) ; §
 
- <^>!SC33::SendKey("U+0023", {}) ; #
-<^>!+SC33::SendKey("U+00a3", {}) ; £
+ <^>!SC33::SendKey("U+003d", {}) ; =
+<^>!+SC33::SendKey("U+2260", {}) ; ≠
 
- <^>!SC34::SendKey("U+007e", {}) ; ~
-<^>!+SC34::SendKey("U+2248", {}) ; ≈
+ <^>!SC34::SendKey("U+002b", {}) ; +
+<^>!+SC34::SendKey("U+00b1", {}) ; ±
 
- <^>!SC35::SendKey("U+002a", {}) ; *
-<^>!+SC35::SendKey("U+00d7", {}) ; ×
+ <^>!SC35::SendKey("U+0027", {}) ; '
+<^>!+SC35::SendKey("U+00bf", {}) ; ¿
 
 ;  Pinky keys
 
@@ -440,14 +440,17 @@ $<^>!Backspace:: Send {SC0e}
  ^SC15::Send  ^f
 ^+SC15::Send ^+F
 
- ^SC16::Send  ^d
-^+SC16::Send ^+D
+ ^SC16::Send  ^g
+^+SC16::Send ^+G
 
- ^SC17::Send  ^l
-^+SC17::Send ^+L
+ ^SC17::Send  ^h
+^+SC17::Send ^+H
 
- ^SC18::Send  ^p
-^+SC18::Send ^+P
+ ^SC18::Send  ^c
+^+SC18::Send ^+C
+
+ ^SC19::Send  ^x
+^+SC19::Send ^+X
 
 ;  Letters, second row
 
@@ -489,17 +492,14 @@ $<^>!Backspace:: Send {SC0e}
  ^SC31::Send  ^m
 ^+SC31::Send ^+M
 
- ^SC32::Send  ^c
-^+SC32::Send ^+C
+ ^SC32::Send  ^d
+^+SC32::Send ^+D
 
- ^SC33::Send  ^h
-^+SC33::Send ^+H
+ ^SC33::Send  ^l
+^+SC33::Send ^+L
 
- ^SC34::Send  ^g
-^+SC34::Send ^+G
-
- ^SC35::Send  ^x
-^+SC35::Send ^+X
+ ^SC34::Send  ^p
+^+SC34::Send ^+P
 
 ;  Pinky keys
 

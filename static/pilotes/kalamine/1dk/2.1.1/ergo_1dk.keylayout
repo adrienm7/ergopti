@@ -5,7 +5,7 @@
   File          : ergo_1dk.keylayout
   Project page  : https://ergopti.fr
   Author        : Adrien MOYAUX
-  Version       : 1.1.3
+  Version       : 2.1.1
   License       : WTFPL - Do What The Fuck You Want Public License
   Reference     : https://developer.apple.com/library/archive/technotes/tn2056/_index.html
 
@@ -34,14 +34,14 @@
   ┆ +   ┃ 1 ¹ │ 2 ² │ 3 ³ │ 4 ⁴ │ 5 ⁵ ┃ 6 ⁶ │ 7 ⁷ │ 8 ⁸ │ 9 ⁹ │ º ⁰ ┃ €   ┆ %   ┆
   ┆ =   ┃ 1 ₁ │ 2 ₂ │ 3 ₃ │ 4 ₄ │ 5 ₅ ┃ 6 ₆ │ 7 ₇ │ 8 ₈ │ 9 ₉ │ 0 ₀ ┃ €   ┆ %   ┆
   ╰╌╌╌╌╌╂─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┼╌╌╌╌╌┤
-        ┃ Z „ │ Y „ │ O   │ W   │ B “ ┃ F ” │ D § │ L ≠ │ P ± │ ? ¿ ┃ {   ┆ }   ┆
-        ┃   ` │   @ │   % │   ! │   « ┃   » │   $ │   = │   + │ ’ ' ┃ [   ┆ ]   ┆
+        ┃ Z „ │ Y „ │ O   │ W   │ B “ ┃ F ” │ G € │ H £ │ C ≈ │ X × ┃ {   ┆ }   ┆
+        ┃   ` │   @ │   % │   ! │   « ┃   » │   ^ │   # │   ~ │   * ┃ [   ┆ ]   ┆
         ┠─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┼╌╌╌╌╌┤
         ┃ A   │ I   │ E   │ U   │ K   ┃ V   │ S — │ N – │ T   │ R   ┃ "   ┆ |   ┆
         ┃   < │   > │   { │   } │   \ ┃   | │   ( │   ) │   [ │   ] ┃ '   ┆ \   ┆
   ╭╌╌╌╌╌╂─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┴╌╌╌╌╌╯
-  ┆ Ê   ┃ : … │ J   │ À   │*¨   │ ; · ┃ M − │ C € │ H £ │ G ≈ │ X × ┃
-  ┆     ┃ . : │   / │   = │** " │ , ; ┃   & │   ^ │   # │   ~ │   * ┃
+  ┆ Ê   ┃ : … │ J   │ À   │*¨   │ ; · ┃ M − │ D § │ L ≠ │ P ± │ ? ¿ ┃
+  ┆     ┃ . : │   / │   = │** " │ , ; ┃   & │   $ │   = │   + │ ’ ' ┃
   ╰╌╌╌╌╌┸─────┴─────┴─────┴─────┴─────┸─────┴─────┴─────┴─────┴─────┚
   -->
 <keyboard group="0" id="0" name="Disposition ergonomique optimisée pour le français, l’anglais et le code" maxout="1">
@@ -88,10 +88,10 @@
       <key code="15"  action="ad04_w" />
       <key code="17"  output="b" />
       <key code="16"  output="f" />
-      <key code="32"  output="d" />
-      <key code="34"  action="ad08_l" />
-      <key code="31"  action="ad09_p" />
-      <key code="35"  action="ad10_’" />
+      <key code="32"  output="g" />
+      <key code="34"  action="ad08_h" />
+      <key code="31"  action="ad09_c" />
+      <key code="35"  action="ad10_x" />
 
       <!-- Letters, second row -->
       <key code="0"   action="ac01_a" />
@@ -100,7 +100,7 @@
       <key code="3"   action="ac04_u" />
       <key code="5"   output="k" />
       <key code="4"   output="v" />
-      <key code="38"  output="s" />
+      <key code="38"  action="ac07_s" />
       <key code="40"  action="ac08_n" />
       <key code="37"  output="t" />
       <key code="41"  output="r" />
@@ -112,10 +112,10 @@
       <key code="9"   action="dead_1dk" />
       <key code="11"  output="," />
       <key code="45"  action="ab06_m" />
-      <key code="46"  action="ab07_c" />
-      <key code="43"  action="ab08_h" />
-      <key code="47"  output="g" />
-      <key code="44"  action="ab10_x" />
+      <key code="46"  output="d" />
+      <key code="43"  action="ab08_l" />
+      <key code="47"  output="p" />
+      <key code="44"  action="ab10_’" />
 
       <!-- Pinky keys -->
       <key code="27"  output="€" />
@@ -215,10 +215,10 @@
       <key code="15"  action="ad04_W" />
       <key code="17"  output="B" />
       <key code="16"  output="F" />
-      <key code="32"  output="D" />
-      <key code="34"  action="ad08_L" />
-      <key code="31"  action="ad09_P" />
-      <key code="35"  output="?" />
+      <key code="32"  output="G" />
+      <key code="34"  action="ad08_H" />
+      <key code="31"  action="ad09_C" />
+      <key code="35"  action="ad10_X" />
 
       <!-- Letters, second row -->
       <key code="0"   action="ac01_A" />
@@ -227,7 +227,7 @@
       <key code="3"   action="ac04_U" />
       <key code="5"   output="K" />
       <key code="4"   output="V" />
-      <key code="38"  output="S" />
+      <key code="38"  action="ac07_S" />
       <key code="40"  action="ac08_N" />
       <key code="37"  output="T" />
       <key code="41"  output="R" />
@@ -239,10 +239,10 @@
       <key code="9"   action="dead_diaeresis" />
       <key code="11"  output=";" />
       <key code="45"  action="ab06_M" />
-      <key code="46"  action="ab07_C" />
-      <key code="43"  action="ab08_H" />
-      <key code="47"  output="G" />
-      <key code="44"  action="ab10_X" />
+      <key code="46"  output="D" />
+      <key code="43"  action="ab08_L" />
+      <key code="47"  output="P" />
+      <key code="44"  output="?" />
 
       <!-- Pinky keys -->
       <key code="27"  output="€" />
@@ -342,10 +342,10 @@
       <key code="15"  action="ad04_W" />
       <key code="17"  output="B" />
       <key code="16"  output="F" />
-      <key code="32"  output="D" />
-      <key code="34"  action="ad08_L" />
-      <key code="31"  action="ad09_P" />
-      <key code="35"  action="ad10_’" />
+      <key code="32"  output="G" />
+      <key code="34"  action="ad08_H" />
+      <key code="31"  action="ad09_C" />
+      <key code="35"  action="ad10_X" />
 
       <!-- Letters, second row -->
       <key code="0"   action="ac01_A" />
@@ -354,7 +354,7 @@
       <key code="3"   action="ac04_U" />
       <key code="5"   output="K" />
       <key code="4"   output="V" />
-      <key code="38"  output="S" />
+      <key code="38"  action="ac07_S" />
       <key code="40"  action="ac08_N" />
       <key code="37"  output="T" />
       <key code="41"  output="R" />
@@ -366,10 +366,10 @@
       <key code="9"   action="dead_1dk" />
       <key code="11"  output="," />
       <key code="45"  action="ab06_M" />
-      <key code="46"  action="ab07_C" />
-      <key code="43"  action="ab08_H" />
-      <key code="47"  output="G" />
-      <key code="44"  action="ab10_X" />
+      <key code="46"  output="D" />
+      <key code="43"  action="ab08_L" />
+      <key code="47"  output="P" />
+      <key code="44"  action="ab10_’" />
 
       <!-- Pinky keys -->
       <key code="27"  output="€" />
@@ -469,10 +469,10 @@
       <key code="15"  output="!" />
       <key code="17"  output="«" />
       <key code="16"  output="»" />
-      <key code="32"  output="$" />
-      <key code="34"  output="=" />
-      <key code="31"  output="+" />
-      <key code="35"  output="'" />
+      <key code="32"  output="^" />
+      <key code="34"  output="#" />
+      <key code="31"  output="~" />
+      <key code="35"  output="*" />
 
       <!-- Letters, second row -->
       <key code="0"   output="&#x003c;" />
@@ -493,10 +493,10 @@
       <key code="9"   output="&#x0022;" />
       <key code="11"  output=";" />
       <key code="45"  output="&#x0026;" />
-      <key code="46"  output="^" />
-      <key code="43"  output="#" />
-      <key code="47"  output="~" />
-      <key code="44"  output="*" />
+      <key code="46"  output="$" />
+      <key code="43"  output="=" />
+      <key code="47"  output="+" />
+      <key code="44"  output="'" />
 
       <!-- Pinky keys -->
       <key code="27"  output="&#x0010;" />
@@ -596,10 +596,10 @@
       <key code="15"  output="&#x0010;" />
       <key code="17"  output="“" />
       <key code="16"  output="”" />
-      <key code="32"  output="§" />
-      <key code="34"  output="≠" />
-      <key code="31"  output="±" />
-      <key code="35"  output="¿" />
+      <key code="32"  output="€" />
+      <key code="34"  output="£" />
+      <key code="31"  output="≈" />
+      <key code="35"  output="×" />
 
       <!-- Letters, second row -->
       <key code="0"   output="≤" />
@@ -620,10 +620,10 @@
       <key code="9"   output="&#x0010;" />
       <key code="11"  output="·" />
       <key code="45"  output="−" />
-      <key code="46"  output="€" />
-      <key code="43"  output="£" />
-      <key code="47"  output="≈" />
-      <key code="44"  output="×" />
+      <key code="46"  output="§" />
+      <key code="43"  output="≠" />
+      <key code="47"  output="±" />
+      <key code="44"  output="¿" />
 
       <!-- Pinky keys -->
       <key code="27"  output="&#x0010;" />
@@ -753,25 +753,33 @@
       <when state="none"       output="W" />
       <when state="diaeresis"  output="Ẅ" />
     </action>
-    <action id="ad08_l">
-      <when state="none"       output="l" />
+    <action id="ad08_h">
+      <when state="none"       output="h" />
       <when state="1dk"        output="û" />
+      <when state="diaeresis"  output="ḧ" />
     </action>
-    <action id="ad08_L">
-      <when state="none"       output="L" />
+    <action id="ad08_H">
+      <when state="none"       output="H" />
       <when state="1dk"        output="Û" />
+      <when state="diaeresis"  output="Ḧ" />
     </action>
-    <action id="ad09_p">
-      <when state="none"       output="p" />
-      <when state="1dk"        output="q" />
+    <action id="ad09_c">
+      <when state="none"       output="c" />
+      <when state="1dk"        output="ç" />
     </action>
-    <action id="ad09_P">
-      <when state="none"       output="P" />
-      <when state="1dk"        output="Q" />
+    <action id="ad09_C">
+      <when state="none"       output="C" />
+      <when state="1dk"        output="Ç" />
     </action>
-    <action id="ad10_’">
-      <when state="none"       output="’" />
-      <when state="1dk"        output="?" />
+    <action id="ad10_x">
+      <when state="none"       output="x" />
+      <when state="1dk"        output="â" />
+      <when state="diaeresis"  output="ẍ" />
+    </action>
+    <action id="ad10_X">
+      <when state="none"       output="X" />
+      <when state="1dk"        output="Â" />
+      <when state="diaeresis"  output="Ẍ" />
     </action>
 
     <!-- Letters, second row -->
@@ -812,6 +820,14 @@
     <action id="ac04_U">
       <when state="none"       output="U" />
       <when state="diaeresis"  output="Ü" />
+    </action>
+    <action id="ac07_s">
+      <when state="none"       output="s" />
+      <when state="1dk"        output="q" />
+    </action>
+    <action id="ac07_S">
+      <when state="none"       output="S" />
+      <when state="1dk"        output="Q" />
     </action>
     <action id="ac08_n">
       <when state="none"       output="n" />
@@ -863,33 +879,17 @@
       <when state="none"       output="M" />
       <when state="1dk"        output="Ñ" />
     </action>
-    <action id="ab07_c">
-      <when state="none"       output="c" />
-      <when state="1dk"        output="ç" />
-    </action>
-    <action id="ab07_C">
-      <when state="none"       output="C" />
-      <when state="1dk"        output="Ç" />
-    </action>
-    <action id="ab08_h">
-      <when state="none"       output="h" />
+    <action id="ab08_l">
+      <when state="none"       output="l" />
       <when state="1dk"        output="î" />
-      <when state="diaeresis"  output="ḧ" />
     </action>
-    <action id="ab08_H">
-      <when state="none"       output="H" />
+    <action id="ab08_L">
+      <when state="none"       output="L" />
       <when state="1dk"        output="Î" />
-      <when state="diaeresis"  output="Ḧ" />
     </action>
-    <action id="ab10_x">
-      <when state="none"       output="x" />
-      <when state="1dk"        output="â" />
-      <when state="diaeresis"  output="ẍ" />
-    </action>
-    <action id="ab10_X">
-      <when state="none"       output="X" />
-      <when state="1dk"        output="Â" />
-      <when state="diaeresis"  output="Ẍ" />
+    <action id="ab10_’">
+      <when state="none"       output="’" />
+      <when state="1dk"        output="?" />
     </action>
 
     <!-- Pinky keys -->
