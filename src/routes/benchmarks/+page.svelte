@@ -137,11 +137,12 @@
 	<mini-espace />
 	<bloc-image>
 		{#if langue === 'fr'}
-			<img src="/resultats/{versionValue}/{clavier}/{corpus_fr}.jpg" />
+			<img src="/benchmarks/{versionValue}/{clavier}/{corpus_fr}.jpg" />
 		{:else}
-			<img src="/resultats/{versionValue}/{clavier}/{corpus_en}.jpg" />
+			<img src="/benchmarks/{versionValue}/{clavier}/{corpus_en}.jpg" />
 		{/if}
 	</bloc-image>
+
 	<h3>Analyse Ergo-L</h3>
 	<p>
 		Réalisée à l’aide de l’analyseur disponible ici : <a

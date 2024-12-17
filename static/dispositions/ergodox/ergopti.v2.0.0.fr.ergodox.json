@@ -21,11 +21,11 @@
 	"moreInfoText": "",
 	"keys": [
 		{
-			"primary": 37,
+			"primary": -1,
 			"finger": 1,
 			"id": 0,
 			"shift": -1,
-			"altGr": 8240,
+			"altGr": -1,
 			"shiftAltGr": -1,
 			"numpad": -1
 		},
@@ -264,12 +264,12 @@
 			"numpad": -1
 		},
 		{
-			"primary": 107,
-			"shift": 75,
+			"primary": 122,
+			"shift": 90,
 			"finger": 10,
 			"id": 27,
-			"altGr": 8230,
-			"shiftAltGr": -1,
+			"altGr": 37,
+			"shiftAltGr": 8240,
 			"numpad": -1
 		},
 		{
@@ -372,12 +372,12 @@
 			"numpad": -1
 		},
 		{
-			"primary": 122,
+			"primary": 113,
 			"finger": 10,
 			"id": 39,
-			"shift": 90,
-			"altGr": 37,
-			"shiftAltGr": 8240,
+			"shift": 81,
+			"altGr": 8217,
+			"shiftAltGr": -1,
 			"numpad": -1
 		},
 		{
@@ -498,11 +498,11 @@
 			"numpad": -1
 		},
 		{
-			"primary": 33,
+			"primary": 776,
 			"finger": 10,
 			"id": 53,
 			"shift": -1,
-			"altGr": -1,
+			"altGr": 33,
 			"shiftAltGr": -1,
 			"numpad": -1
 		},
@@ -516,7 +516,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 8592,
+			"primary": -1,
 			"finger": 1,
 			"id": 55,
 			"shift": -1,
@@ -525,7 +525,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 8594,
+			"primary": -1,
 			"finger": 2,
 			"id": 56,
 			"shift": -1,
@@ -534,7 +534,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 8593,
+			"primary": -1,
 			"finger": 3,
 			"id": 57,
 			"shift": -1,
@@ -543,25 +543,25 @@
 			"numpad": -1
 		},
 		{
-			"primary": 8595,
-			"shift": -1,
+			"primary": 107,
+			"shift": 75,
 			"finger": 4,
 			"id": 58,
+			"altGr": 8230,
+			"shiftAltGr": -1,
+			"numpad": -1
+		},
+		{
+			"primary": 8592,
+			"finger": 7,
+			"id": 59,
+			"shift": -1,
 			"altGr": -1,
 			"shiftAltGr": -1,
 			"numpad": -1
 		},
 		{
-			"primary": 113,
-			"finger": 7,
-			"id": 59,
-			"shift": 81,
-			"altGr": 8217,
-			"shiftAltGr": -1,
-			"numpad": -1
-		},
-		{
-			"primary": 776,
+			"primary": 8594,
 			"shift": -1,
 			"finger": 8,
 			"id": 60,
@@ -570,7 +570,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": -1,
+			"primary": 8593,
 			"shift": -1,
 			"finger": 9,
 			"id": 61,
@@ -579,7 +579,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": -1,
+			"primary": 8595,
 			"shift": -1,
 			"finger": 10,
 			"id": 62,

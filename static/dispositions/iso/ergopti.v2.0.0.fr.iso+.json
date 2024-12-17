@@ -1,5 +1,5 @@
 {
-	"label": "ergopti.v2.0.0.fr.iso",
+	"label": "ergopti.v2.0.0.fr.iso+",
 	"fingerStart": {
 		"1": 29,
 		"2": 30,
@@ -138,7 +138,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 8,
+			"primary": -1,
 			"finger": 10,
 			"id": 13,
 			"shift": -1,
@@ -147,7 +147,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 9,
+			"primary": 18,
 			"finger": 1,
 			"id": 14,
 			"shift": -1,
@@ -264,7 +264,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 13,
+			"primary": -1,
 			"shift": -1,
 			"finger": 10,
 			"id": 27,
@@ -273,11 +273,11 @@
 			"numpad": -1
 		},
 		{
-			"primary": 20,
+			"primary": 8,
 			"finger": 1,
 			"id": 28,
 			"shift": -1,
-			"altGr": -1,
+			"altGr": 20,
 			"shiftAltGr": -1,
 			"numpad": -1
 		},
@@ -390,7 +390,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 16,
+			"primary": -91,
 			"finger": 1,
 			"id": 41,
 			"shift": -1,
@@ -440,7 +440,7 @@
 			"finger": 4,
 			"id": 46,
 			"altGr": 59,
-			"shiftAltGr": 8217,
+			"shiftAltGr": -1,
 			"numpad": -1
 		},
 		{
@@ -498,7 +498,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": -16,
+			"primary": -1,
 			"finger": 10,
 			"id": 53,
 			"shift": -1,
@@ -516,7 +516,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": -91,
+			"primary": 9,
 			"finger": 5,
 			"id": 55,
 			"shift": -1,
@@ -525,7 +525,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": 18,
+			"primary": 13,
 			"finger": 5,
 			"id": 56,
 			"shift": -1,
@@ -552,10 +552,10 @@
 			"numpad": -1
 		},
 		{
-			"primary": 17,
+			"primary": 16,
 			"finger": 6,
 			"id": 59,
-			"shift": -1,
+			"shift": -16,
 			"altGr": -1,
 			"shiftAltGr": -1,
 			"numpad": -1
@@ -570,7 +570,7 @@
 			"numpad": -1
 		},
 		{
-			"primary": -1,
+			"primary": 17,
 			"finger": 6,
 			"id": 61,
 			"shift": -1,
