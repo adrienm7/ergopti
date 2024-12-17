@@ -7,7 +7,7 @@
 	import AnalyseHypertextePlus from './analyse_ergopti+.svelte';
 	import CommentComparer from './comment_comparer.svelte';
 	import Corpus from './corpus.svelte';
-	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
+
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
@@ -21,19 +21,15 @@
 		}
 	}
 
-	function toggleLangue() {
-		if (langue === 'fr') {
-			langue = 'en';
-		} else {
-			langue = 'fr';
-		}
-	}
-
 	let liste_benchmarks_fr = [
 		['Panaché (Pyjam)', 'panache'],
 		['Essais (Pyjam)', 'essais'],
-		['Corpus Johnix Mails', 'corgus_johnix_mails'],
-		['Romans (24M)', 'romans']
+		['Corpus Johnix Mails', 'corpus_johnix_mails'],
+		['Romans (24M)', 'romans'],
+		['Corpus Nemolivier', 'corpus_nemolivier'],
+		['Don Quichotte', 'don_quichotte'],
+		['Corpus Leipzig news', 'leipzig_fra_news_2023_10K-sentences'],
+		['Corpus Leipzig Wikipedia', 'leipzig_fra_wikipedia_2021_10K-sentences']
 	];
 
 	let liste_benchmarks_en = [
@@ -43,6 +39,11 @@
 		['500 Common Words in Prose (664K)', '500_common_words_in_prose'],
 		['Common English Words (6K)', 'common_english_words'],
 		['Common SAT Words (9K)', 'common_sat_words'],
+		['Basic Words (5K)', 'basic_words'],
+		['Difficult Words (11K)', 'difficult_words']
+	];
+
+	let liste_benchmarks_code = [
 		['Chained Code Bigrams 7 (1M)', 'chained_code_bigrams_7'],
 		['Programming Ponctuation (10K)', 'programming_punctuation'],
 		['Python for Everybody (437K)', 'python_for_everybody'],
@@ -54,11 +55,9 @@
 	];
 
 	let clavier = 'iso';
-	let langue = 'fr';
+	let corpus = 'fr/panache';
 	let ergol = 'en_fr';
 	let version_1dfh = '';
-	let corpus_fr = 'panache';
-	let corpus_en = 'chained_english_bigrams_9';
 </script>
 
 <svelte:head>
@@ -109,38 +108,26 @@
 			{/if}
 		</button>
 
-		<button on:click={toggleLangue} style="height:2.5rem;">
-			{#if langue === 'fr'}
-				{@html '<p><strong class="hyper">Français</strong> ➜&nbsp;<span class="">Anglais</span></p>'}
-			{:else}
-				{@html '<p><strong class="htexte">Anglais</strong> ➜&nbsp;<span class="">Français</span></p>'}
-			{/if}
-		</button>
-
 		<div style="display:inline-block;">
-			{#if langue === 'fr'}
-				<select bind:value={corpus_fr} style="height:2.5rem;">
-					{#each liste_benchmarks_fr as infos_benchmark}<option value={infos_benchmark[1]}
-							>{infos_benchmark[0]}</option
-						>{/each}
-				</select>
-			{/if}
-			{#if langue === 'en'}
-				<select bind:value={corpus_en} style="height:2.5rem;">
-					{#each liste_benchmarks_en as infos_benchmark}<option value={infos_benchmark[1]}
-							>{infos_benchmark[0]}</option
-						>{/each}
-				</select>
-			{/if}
+			<select bind:value={corpus} style="height:2.5rem;">
+				<option disabled>Français</option>
+				{#each liste_benchmarks_fr as infos_benchmark}<option value={'fr/' + infos_benchmark[1]}
+						>{infos_benchmark[0]}</option
+					>{/each}
+				<option disabled>Anglais</option>
+				{#each liste_benchmarks_en as infos_benchmark}<option value={'en/' + infos_benchmark[1]}
+						>{infos_benchmark[0]}</option
+					>{/each}
+				<option disabled>Code</option>
+				{#each liste_benchmarks_code as infos_benchmark}<option value={'code/' + infos_benchmark[1]}
+						>{infos_benchmark[0]}</option
+					>{/each}
+			</select>
 		</div>
 	</div>
 	<mini-espace />
 	<bloc-image>
-		{#if langue === 'fr'}
-			<img src="/benchmarks/{versionValue}/{clavier}/{corpus_fr}.jpg" />
-		{:else}
-			<img src="/benchmarks/{versionValue}/{clavier}/{corpus_en}.jpg" />
-		{/if}
+		<img src="/benchmarks/{clavier}/{corpus}.jpg" />
 	</bloc-image>
 
 	<h3>Analyse Ergo-L</h3>
