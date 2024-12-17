@@ -141,18 +141,21 @@
 			<option value="en_fr">Français + Anglais</option>
 			<option value="fr">Français</option>
 			<option value="en">Anglais</option>
+			<option value="panache">Panaché (Pyjam)</option>
+			<option value="essais">Essais (Pyjam)</option>
 		</select>
 		<select bind:value={version_1dfh} style="height: 2.5rem; display:block;">
 			<option value="">Standard</option>
-			<option value="_1dfh">1DFH</option>
+			<option value="_1dk">1DFH avec touche 1DK</option>
 		</select>
 	</div>
-	<a href="/resultats/{versionValue}/ergol/analyse_ergol_ergopti{version_1dfh}_{ergol}.pdf"
+	<a
+		href="/benchmarks/ergol/v{versionValue}/analyse_ergol_ergopti{version_1dfh}_v{versionValue}_{ergol}.pdf"
 		><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo-L</button></a
 	>
 	<mini-espace />
 	<embed
-		src="/resultats/{versionValue}/ergol/analyse_ergol_ergopti{version_1dfh}_{ergol}.pdf"
+		src="/benchmarks/ergol/{versionValue}/analyse_ergol_ergopti{version_1dfh}_v{versionValue}_{ergol}.pdf"
 		type="application/pdf"
 		width="100%"
 		height="600px"
