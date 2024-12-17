@@ -9,7 +9,7 @@
 		version_mineure_kbdedit_exe,
 		version_mineure_kbdedit_kbe,
 		version_mineure_kbdedit_mac,
-		version_mineure_ahk,
+		version_mineure_plus,
 		version_mineure_kalamine_1dk,
 		version_mineure_kalamine_standard;
 	version.subscribe((value) => {
@@ -17,7 +17,7 @@
 		version_mineure_kbdedit_exe = getLatestVersion('kbdedit_exe', versionValue);
 		version_mineure_kbdedit_kbe = getLatestVersion('kbdedit_kbe', versionValue);
 		version_mineure_kbdedit_mac = getLatestVersion('kbdedit_mac', versionValue);
-		version_mineure_ahk = getLatestVersion('ahk', versionValue);
+		version_mineure_plus = getLatestVersion('plus', versionValue);
 		version_mineure_kalamine_1dk = getLatestVersion('kalamine_1dk', versionValue);
 		version_mineure_kalamine_standard = getLatestVersion('kalamine_standard', versionValue);
 	});
@@ -80,9 +80,9 @@
 </div>
 <petit-espace />
 <div>
-	{#if version_mineure_ahk !== undefined}
-		<a href="/pilotes/ahk/ErgoptiPlus_v{version_mineure_ahk}.ahk" download
-			><button class="bouton-telechargement">☛ ErgoptiPlus_v{version_mineure_ahk}.ahk</button></a
+	{#if version_mineure_plus !== undefined}
+		<a href="/pilotes/plus/ErgoptiPlus_v{version_mineure_plus}.ahk" download
+			><button class="bouton-telechargement">☛ ErgoptiPlus_v{version_mineure_plus}.ahk</button></a
 		>
 	{/if}
 </div>

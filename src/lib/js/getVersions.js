@@ -20,8 +20,8 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 		case 'kbdedit_mac':
 			files = import.meta.glob('/static/pilotes/kbdedit/*.keylayout');
 			break;
-		case 'ahk':
-			files = import.meta.glob('/static/pilotes/ahk/*.ahk');
+		case 'plus':
+			files = import.meta.glob('/static/pilotes/plus/*.ahk');
 			break;
 		case 'kla_iso':
 			files = import.meta.glob('/static/dispositions/iso/*.json');
