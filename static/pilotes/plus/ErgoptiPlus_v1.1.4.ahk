@@ -5,7 +5,7 @@ SetWorkingDir(A_ScriptDir) ; Ensures a consistent starting directory.
 #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t  
 
 global clavier_iso := 1		; 0 = clavier ZMK 		 | 	1 = clavier ISO. Le clavier ZMK désactive les tap-holds pour éviter les conflits.
-global pilote_azerty := 0	; 0 = pilote HYPERTEXTE	 | 	1 = pilote AZERTY. En mettant cette variable à 1, plus besoin de changer le pilote, le script va modifier chaque touche pour la faire correspondre à sa valeur en Ergopti.
+global pilote_azerty := 0	; 0 = pilote Ergopti	 | 	1 = pilote AZERTY. En mettant cette variable à 1, plus besoin de changer le pilote, le script va modifier chaque touche pour la faire correspondre à sa valeur en Ergopti.
 global autocorrection := 1
 
 ; Initialisation des variables, ne pas toucher
@@ -60,14 +60,14 @@ global deadkey_indice_nb := { touche1: "₁", touche2: "₂", touche3: "₃", to
 ^!Delete:: Edit ; Modification du script avec AltGr + Suppr
 #SuspendExempt False
 
-; =========================================================
-; =========================================================
-; =========================================================
-; ================ 1/ AZERTY ➜ HYPERTEXTE ================
-; ======== Convertit un pilote AZERTY en HYPERTEXTE =======
-; =========================================================
-; =========================================================
-; =========================================================
+; ======================================================
+; ======================================================
+; ======================================================
+; ================ 1/ AZERTY ➜ ERGOPTI ================
+; ======== Convertit un pilote AZERTY en ERGOPTI =======
+; ======================================================
+; ======================================================
+; ======================================================
 
 #HotIf pilote_azerty
 #InputLevel 50 ; Très important, il faut être en InputLevel le plus haut pour le remappage AZERTY vers Ergopti

@@ -126,9 +126,9 @@ SC012::o
 SC013::w
 SC014::b
 SC015::f
-SC016::c
+SC016::g
 SC017::h
-SC018::g
+SC018::c
 SC019::x
 SC01A::z
 SC01B::+SC01A ; La touche morte tréma
@@ -201,9 +201,9 @@ SC035::'
 +SC013:: Send("W")
 +SC014:: Send("B")
 +SC015:: Send("F")
-+SC016:: Send("C")
++SC016:: Send("G")
 +SC017:: Send("H")
-+SC018:: Send("G")
++SC018:: Send("C")
 +SC019:: Send("X")
 +SC01A:: Send("Z")
 +SC01B:: Send(" ") ; Espace fine insécable
@@ -312,9 +312,9 @@ SC034:: Send("P")
 <^>!SC013:: Send("où") ; Sur W
 <^>!SC014:: Send("« ")
 <^>!SC015:: Send(" »")
-<^>!SC016:: Send("{U+00E7}") ; ç
+<^>!SC016:: Send("{U+007E}") ; ~
 <^>!SC017:: Send("{U+0023}") ; #
-<^>!SC018:: Send("{U+007E}") ; ~
+<^>!SC018:: Send("{U+00E7}") ; ç
 <^>!SC019:: Send("{U+002A}") ; *
 <^>!SC01A:: Send("{!}")
 <^>!SC01B:: Send(" ") ; Espace insécable
@@ -375,9 +375,9 @@ SC034:: Send("P")
 +^!SC013:: Send("Où")
 +^!SC014:: Send("“")
 +^!SC015:: Send("”")
-+^!SC016:: Send("Ç")
++^!SC016:: Send("≈")
 +^!SC017:: return
-+^!SC018:: Send("≈")
++^!SC018:: Send("Ç")
 +^!SC019:: Send("×")
 +^!SC01A:: Send("¡")
 +^!SC01B:: Send("¡")
