@@ -1,6 +1,6 @@
 {
   "name": "Ergopti",
-  "description": "Disposition Ergopti, pour une saisie plus rapide de texte.",
+  "description": "Disposition ergonomique optimisée pour le français, l’anglais et le code",
   "geometry": "iso",
   "keymap": {
     "Digit1": [ "1" ],
