@@ -155,7 +155,7 @@
 	>
 	<mini-espace />
 	<embed
-		src="/benchmarks/ergol/{versionValue}/analyse_ergol_ergopti{version_1dfh}_v{versionValue}_{ergol}.pdf"
+		src="/benchmarks/ergol/v{versionValue}/analyse_ergol_ergopti{version_1dfh}_v{versionValue}_{ergol}.pdf"
 		type="application/pdf"
 		width="100%"
 		height="600px"

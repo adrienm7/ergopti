@@ -33,7 +33,7 @@
 	Voici les résultats de <NomPlus></NomPlus> obtenus sur le corpus français-anglais Essais :
 </p>
 <bloc-image>
-	<img src="/resultats/{versionValue}/plus/ergopti+_reduction_SFBs.jpg" />
+	<img src="/benchmarks/plus/ergopti+_reduction_SFBs.jpg" />
 </bloc-image>
 <h3>Analyse des <SFB></SFB>s</h3>
 <p>
@@ -45,11 +45,11 @@
 <p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
 <h4><Nom></Nom></h4>
 <bloc-image>
-	<img src="/resultats/{versionValue}/plus/SFBs_ergopti.jpg" />
+	<img src="/benchmarks/plus/SFBs_ergopti.jpg" />
 </bloc-image>
 <h4><NomPlus></NomPlus></h4>
 <bloc-image>
-	<img src="/resultats/{versionValue}/plus/SFBs_ergopti+.jpg" />
+	<img src="/benchmarks/plus/SFBs_ergopti+.jpg" />
 </bloc-image>
 <p>
 	Plusieurs <SFB></SFB>s se produisent maintenant sur l’index gauche en <kbd>★,</kbd> et
@@ -83,7 +83,7 @@
 </p>
 <h3>Analyse de la fréquence d’utilisation des doigts</h3>
 <bloc-image>
-	<img src="/resultats/{versionValue}/plus/finger_usage_comparison.jpg" />
+	<img src="/benchmarks/plus/finger_usage_comparison.jpg" />
 </bloc-image>
 <p>
 	Comme vous pouvez le constater sur l’image ci-dessous, l’index gauche est plus utilisé (6% vs 8%)
