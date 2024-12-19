@@ -5,33 +5,41 @@
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
-	<modifierMap id="f4" defaultIndex="0">
+		<modifierMap id="commonModifiers" defaultIndex="0">
 		<keyMapSelect mapIndex="0">
 			<modifier keys=""/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="1">
-			<modifier keys="caps"/>
-		</keyMapSelect>
-		<keyMapSelect mapIndex="2">
 			<modifier keys="anyShift"/>
 		</keyMapSelect>
+		<keyMapSelect mapIndex="2">
+			<modifier keys="caps"/>
+		</keyMapSelect>
 		<keyMapSelect mapIndex="3">
-			<modifier keys="caps anyShift"/>
+			<modifier keys="anyShift caps"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="4">
-			<modifier keys="anyControl"/>
-		</keyMapSelect>
-		<keyMapSelect mapIndex="5">
 			<modifier keys="anyOption"/>
 		</keyMapSelect>
+		<keyMapSelect mapIndex="5">
+			<modifier keys="anyShift anyOption"/>
+		</keyMapSelect>
 		<keyMapSelect mapIndex="6">
-			<modifier keys="anyOption caps"/>
+			<modifier keys="anyShift caps anyOption"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="7">
-			<modifier keys="anyOption anyShift"/>
+			<modifier keys="caps anyOption"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="8">
-			<modifier keys="anyOption caps anyShift"/>
+			<modifier keys="anyShift anyOption control caps?"/>
+		</keyMapSelect>
+		<keyMapSelect mapIndex="9">
+			<modifier keys="command caps? anyOption? control?"/>
+			<modifier keys="control caps? anyOption?"/>
+		</keyMapSelect>
+		<keyMapSelect mapIndex="10">
+			<modifier keys="anyShift command caps? anyOption? control?"/>
+			<modifier keys="anyShift control caps?"/>
 		</keyMapSelect>
 	</modifierMap>
 	<keyMapSet id="16c">
@@ -412,6 +420,10 @@
 			<key code="126" output="&#x001E;"/>
 		</keyMap>
 		<keyMap index="4">
+			<key code="6" output="c"/> <!-- Sur É -->
+			<key code="7" action="v"/> <!-- Sur À -->
+			<key code="50" output="x"/> <!-- Sur Ê -->
+			<key code="12" action="z"/> <!-- Sur È -->
 			<key code="36" output="&#x000A;"/>
 			<key code="53" output="&#x001B;"/>
 			<key code="71" output="&#x001B;"/>
@@ -762,6 +774,12 @@
 			<key code="125" output="&#x001F;"/>
 			<key code="126" output="&#x001E;"/>
 		</keyMap>
+		<keyMap index="9">
+			<key code="6" output="c"/> <!-- Sur É -->
+			<key code="7" action="v"/> <!-- Sur À -->
+			<key code="50" output="x"/> <!-- Sur Ê -->
+			<key code="12" action="z"/> <!-- Sur È -->
+		</keyMap>
 	</keyMapSet>
 	<actions>
 		<action id="&#x0008;">
@@ -788,7 +806,7 @@
 			<when state="s2" output="£"/>
 		</action>
 		<action id="&amp;">
-			<when state="none" output="&amp;"/>
+			<when state="none" output="&#x0026;"/>
 			<when state="s2" output="৳"/>
 		</action>
 		<action id="(">
