@@ -7,46 +7,7 @@ def modify_and_copy_keylayout_files():
     # Répertoire contenant le script
     directory_path = Path(__file__).parent
 
-    # Nouveau contenu pour remplacer <modifierMap id="f4" defaultIndex="0">
-    modifier_map_replacement = """\t<modifierMap id="commonModifiers" defaultIndex="0">
-\t\t<keyMapSelect mapIndex="0">
-\t\t\t<modifier keys=""/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="1">
-\t\t\t<modifier keys="anyShift"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="2">
-\t\t\t<modifier keys="caps"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="3">
-\t\t\t<modifier keys="anyShift caps"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="4">
-\t\t\t<modifier keys="anyOption"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="5">
-\t\t\t<modifier keys="anyShift anyOption"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="6">
-\t\t\t<modifier keys="anyShift caps anyOption"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="7">
-\t\t\t<modifier keys="caps anyOption"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="8">
-\t\t\t<modifier keys="anyShift anyOption control caps?"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="9">
-\t\t\t<modifier keys="command caps? anyOption? control?"/>
-\t\t\t<modifier keys="control caps? anyOption?"/>
-\t\t</keyMapSelect>
-\t\t<keyMapSelect mapIndex="10">
-\t\t\t<modifier keys="anyShift command caps? anyOption? control?"/>
-\t\t\t<modifier keys="anyShift control caps?"/>
-\t\t</keyMapSelect>
-\t</modifierMap>"""
-
-    # Contenu à ajouter sous <keyMap index="4"> et à créer pour <keyMap index="9">
+    # Contenu à ajouter pour <keyMap index="4"> et à créer pour <keyMap index="9">
     key_map_addition = """\t\t\t<key code="6" output="c"/> <!-- Sur É -->
 \t\t\t<key code="7" action="v"/> <!-- Sur À -->
 \t\t\t<key code="50" output="x"/> <!-- Sur Ê -->
@@ -56,6 +17,12 @@ def modify_and_copy_keylayout_files():
     key_map_index_9 = f"""<keyMap index="9">
 {key_map_addition}
 \t\t</keyMap>"""
+
+    # Ligne à ajouter pour <keyMapSelect mapIndex="9">
+    key_map_select_addition = """\t\t<keyMapSelect mapIndex="9">
+\t\t\t<modifier keys="command caps? anyOption? control?"/>
+\t\t\t<modifier keys="control caps? anyOption?"/>
+\t\t</keyMapSelect>"""
 
     # Parcourt tous les fichiers se terminant par _v0.keylayout
     for file_path in directory_path.glob("*_v0.keylayout"):
@@ -89,14 +56,6 @@ def modify_and_copy_keylayout_files():
         modified_content = re.sub(r'code="10"', 'code="50"', modified_content)
         modified_content = re.sub(r"TEMP_CODE", 'code="10"', modified_content)
 
-        # Remplacement du bloc <modifierMap id="f4" defaultIndex="0">
-        modified_content = re.sub(
-            r"<modifierMap id=\"f4\" defaultIndex=\"0\">.*?</modifierMap>",
-            modifier_map_replacement,
-            modified_content,
-            flags=re.DOTALL,
-        )
-
         # Ajout du contenu sous <keyMap index="4">
         modified_content = re.sub(
             r"(<keyMap index=\"4\">)",
@@ -112,6 +71,14 @@ def modify_and_copy_keylayout_files():
                 modified_content,
                 flags=re.DOTALL,
             )
+
+        # Ajout de <keyMapSelect mapIndex="9"> après <keyMapSelect mapIndex="8">
+        modified_content = re.sub(
+            r"(<keyMapSelect mapIndex=\"8\">.*?</keyMapSelect>)",
+            r"\1\n" + key_map_select_addition,
+            modified_content,
+            flags=re.DOTALL,
+        )
 
         # Écrit le contenu modifié dans un fichier avec le nouveau nom
         with new_file_path.open("w", encoding="utf-8") as new_file:

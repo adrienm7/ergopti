@@ -5,41 +5,37 @@
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
-		<modifierMap id="commonModifiers" defaultIndex="0">
+	<modifierMap id="f4" defaultIndex="0">
 		<keyMapSelect mapIndex="0">
 			<modifier keys=""/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="1">
-			<modifier keys="anyShift"/>
-		</keyMapSelect>
-		<keyMapSelect mapIndex="2">
 			<modifier keys="caps"/>
 		</keyMapSelect>
+		<keyMapSelect mapIndex="2">
+			<modifier keys="anyShift"/>
+		</keyMapSelect>
 		<keyMapSelect mapIndex="3">
-			<modifier keys="anyShift caps"/>
+			<modifier keys="caps anyShift"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="4">
-			<modifier keys="anyOption"/>
+			<modifier keys="anyControl"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="5">
-			<modifier keys="anyShift anyOption"/>
+			<modifier keys="anyOption"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="6">
-			<modifier keys="anyShift caps anyOption"/>
+			<modifier keys="anyOption caps"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="7">
-			<modifier keys="caps anyOption"/>
+			<modifier keys="anyOption anyShift"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="8">
-			<modifier keys="anyShift anyOption control caps?"/>
+			<modifier keys="anyOption caps anyShift"/>
 		</keyMapSelect>
 		<keyMapSelect mapIndex="9">
 			<modifier keys="command caps? anyOption? control?"/>
 			<modifier keys="control caps? anyOption?"/>
-		</keyMapSelect>
-		<keyMapSelect mapIndex="10">
-			<modifier keys="anyShift command caps? anyOption? control?"/>
-			<modifier keys="anyShift control caps?"/>
 		</keyMapSelect>
 	</modifierMap>
 	<keyMapSet id="16c">
