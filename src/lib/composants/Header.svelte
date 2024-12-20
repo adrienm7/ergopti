@@ -63,21 +63,28 @@
 <header>
 	<div class="header-logo">
 		<a href="/"><img src="img/logo/logo_ergopti.png" class="logo" /></a>
-		<p style="margin-left: 0.5em; font-variant: small-caps;">
-			<a href="/">Disposition clavier&nbsp;</a><span class="hyper" style="padding:0; margin:0"
-				><a href="/">Ergopti</a>
-				<span class="myselect">
-					<select
-						id="selection-version"
-						bind:value={versionValue}
-						on:change={handleVersionChange}
-						data-version={versionValue}
-					>
-						{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
-					</select>
-				</span></span
-			>
-		</p>
+		<div style="margin:0; margin-left: 0.5em; padding:0; text-align: left; width:max-content">
+			<p style="margin:0; font-weight:bold">
+				<a href="/">Disposition <span class="morespace">clavier </span></a>
+				<span class="hyper" style="padding:0; margin:0"
+					><a href="/">Ergopti</a>
+					<span class="myselect">
+						<select
+							id="selection-version"
+							bind:value={versionValue}
+							on:change={handleVersionChange}
+							data-version={versionValue}
+						>
+							{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
+						</select>
+					</span></span
+				>
+			</p>
+			<p style="margin:0; padding-top: 0; padding-left: 0; font-size: 0.8em">
+				<span class="hyper">Ergonomique et optimisée</span>
+				<span class="morespace2" style="color:white;"> pour le français, l’anglais et le code</span>
+			</p>
+		</div>
 	</div>
 	<input class="menu-btn" type="checkbox" id="menu-btn" on:click={toggleOverflowMenu} />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
@@ -154,6 +161,21 @@
 		--longueur-traits-hamburger: 18px;
 	}
 
+	.morespace,
+	.morespace2 {
+		display: none;
+	}
+	@media (min-width: 400px) {
+		.morespace {
+			display: inline;
+		}
+	}
+	@media (min-width: 600px) {
+		.morespace2 {
+			display: inline;
+		}
+	}
+
 	#selection-version {
 		margin: 0;
 		padding: 0;
@@ -164,16 +186,23 @@
 		box-decoration-break: clone;
 		background-image: inherit;
 		border: none;
-		font-variant: small-caps;
+		font-weight: bold;
+		width: min-content;
 	}
 
 	#selection-version[data-version='1.1'],
 	#selection-version[data-version='2.0'] {
-		width: 2.5em;
+		width: 2.6em;
+	}
+
+	#selection-version[data-version='1.0.12'],
+	#selection-version[data-version='1.0.16'],
+	#selection-version[data-version='1.0.19'] {
+		width: 4em;
 	}
 
 	#selection-version[data-version='1.0.5'] {
-		width: 3.25em;
+		width: 3.4em;
 	}
 
 	.myselect {
@@ -187,14 +216,13 @@
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: inherit;
-		border: none;
-		font-variant: small-caps;
+		font-weight: bold;
 	}
 
 	.myselect::after {
 		content: '';
 		position: absolute;
-		right: -1px;
+		right: 0px;
 		top: 8px;
 		width: 0;
 		height: 0;
@@ -208,6 +236,7 @@
 		background-color: white;
 		color: black;
 		font-style: normal;
+		font-weight: normal;
 	}
 
 	header {
@@ -255,11 +284,6 @@
 		margin-left: clamp(3px, 1vw, 10px);
 		/* margin-left: var(--marge-bords-menu); */
 	}
-	header .header-logo p {
-		display: inline;
-		font-family: 'Times New Roman', Times, serif;
-	}
-
 	header .menu-btn {
 		display: none;
 	}
