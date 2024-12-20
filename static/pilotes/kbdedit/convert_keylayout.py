@@ -3,11 +3,12 @@ from pathlib import Path
 import re
 
 
+# Corrige les .keylayouts sortis par KbdEdit
 def modify_and_copy_keylayout_files():
     # Répertoire contenant le script
     directory_path = Path(__file__).parent
 
-    # Contenu à ajouter pour <keyMap index="4"> et à créer pour <keyMap index="9">
+    # Raccourcis personnalisés sur les lettres accentuées
     key_map_addition = """\t\t\t<key code="6" output="c"/> <!-- Sur É -->
 \t\t\t<key code="7" action="v"/> <!-- Sur À -->
 \t\t\t<key code="50" output="x"/> <!-- Sur Ê -->
@@ -35,7 +36,7 @@ def modify_and_copy_keylayout_files():
         with file_path.open("r", encoding="utf-8") as original_file:
             content = original_file.read()
 
-        # Effectue les remplacements demandés
+        # Corrige le keylayout où les symboles <, > et & sont mal encodés et ne s’écrivent pas
         modified_content = (
             content.replace(
                 """\t\t<action id="&lt;">\n\t\t\t<when state="none" output="&lt;"/>""",
@@ -51,7 +52,7 @@ def modify_and_copy_keylayout_files():
             )
         )
 
-        # Remplacements bidirectionnels pour les codes
+        # Interversion des touches 10 et 50 (= et Ê) qui changent en ISO
         modified_content = re.sub(r'code="50"', "TEMP_CODE", modified_content)
         modified_content = re.sub(r'code="10"', 'code="50"', modified_content)
         modified_content = re.sub(r"TEMP_CODE", 'code="10"', modified_content)
