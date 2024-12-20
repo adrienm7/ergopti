@@ -64,7 +64,7 @@ main,
 		padding-left: var(--marge-fenetre);
 	}
 }
-@media (min-width: 1401px) {
+@media (min-width: 1400px) {
 	#menu-contenu {
 		display: none;
 	}
