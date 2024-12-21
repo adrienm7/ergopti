@@ -30,7 +30,7 @@
 <MinimisationSfbs />
 <AlternanceMains />
 <OptimisationRoulements />
+<ChiffresAccesDirect />
 <PlacementLogiqueTouches />
 <EspaceInsecableAutomatique />
-<ChiffresAccesDirect />
 <UtilisationUneMain />
