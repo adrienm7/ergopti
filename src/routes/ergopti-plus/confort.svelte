@@ -62,7 +62,7 @@
 <p>
 	La touche morte <kbd>^</kbd> est utilisée la majorité du temps suivie de <kbd>E</kbd> afin
 	d’écrire <kbd-sortie>Ê</kbd-sortie>. C’est pour cela qu’une touche <kbd>Ê</kbd> a été placée sur
-	l’annulaire gauche afin d’éviter un appui sur deux touches pour cette lettre circonflexe très
+	l’auriculaire gauche afin d’éviter un appui sur deux touches pour cette lettre circonflexe très
 	commune. Toutefois, dans de rares cas, il est nécessaire d’écrire <kbd>Â</kbd>, <kbd>Î</kbd>,
 	<kbd>Ô</kbd>
 	ou encore
@@ -75,8 +75,10 @@
 	Les plus attentifs d’entre vous remarqueront l’écriture de <kbd-sortie>Â</kbd-sortie> et de
 	<kbd-sortie>AÎ</kbd-sortie>
 	(par exemple pour écrire « paraît ») engendre des <SFB></SFB>s avec cette nouvelle méthode. C’est
-	pour cela qu’il est aussi possible de réaliser respectivement <kbd>ÉÊ</kbd> et <kbd>ÊÉ</kbd>. Ces
-	options offrent en outre des roulements extrêmement confortables.
+	pour cela qu’il est aussi possible de réaliser respectivement <kbd>ÉÊ</kbd> et <kbd>ÊÉ</kbd> pour
+	obtenir <kbd-sortie>Â</kbd-sortie> et <kbd-sortie>AÎ</kbd-sortie>. Ces options offrent en outre
+	des roulements extrêmement confortables sur des bigrammes qui n’existent pas et donc ne posent
+	aucun problème.
 </p>
 <p>
 	En outre, le mécanisme de correction automatique de <NomPlus /> permet de donner
@@ -128,7 +130,7 @@
 	Dans les rares cas où l’on souhaite écrire <kbd>J</kbd> + <kbd>Consonne</kbd>, il est possible
 	d’écrire par exemple <kbd>JA</kbd> et de supprimer la voyelle. Une autre possibilité est de
 	réaliser la suite de touches <kbd>,</kbd> + <kbd>À</kbd> ou <kbd>,</kbd> + <kbd>È</kbd> qui
-	donnent à chaque fois la lettre <kbd>J</kbd>.
+	donnent à chaque fois la lettre <kbd-sortie>J</kbd-sortie>.
 </p>
 <mini-espace></mini-espace>
 <p class="text-bold">En résumé :</p>
