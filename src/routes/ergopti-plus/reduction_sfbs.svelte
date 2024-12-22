@@ -28,6 +28,7 @@
 	ajoutées pour plus de confort, afin d’éviter de devoir sauter de 2 rangées avec des doigts
 	consécutifs pour écrire un bigramme. C’est le cas de <kbd>CL</kbd> ou encore de <kbd>PH</kbd>.
 </p>
+<BlocClavier nom="virgule" />
 <ul class="margin-top-2">
 	<li><kbd>,C</kbd> ➜ <kbd-sortie>CD</kbd-sortie> ;</li>
 	<li><kbd>,D</kbd> ➜ <kbd-sortie>DS</kbd-sortie> ;</li>
