@@ -74,6 +74,8 @@
 	écrira <kbd-sortie>IGHT</kbd-sortie> et <kbd>ÀP</kbd> écrira <kbd-sortie>OUGH</kbd-sortie>.
 </p>
 <mini-espace />
+<BlocClavier nom="a" />
+<mini-espace />
 <p class="text-bold">Liste des suffixes implémentés :</p>
 <ul>
 	<li><kbd>ÀA</kbd> ➜ <kbd-sortie>AIRE</kbd-sortie> ;</li>
@@ -108,6 +110,3 @@
 	<li><kbd>À★</kbd> ➜ <kbd-sortie>BU</kbd-sortie> ;</li>
 	<li><kbd>À’</kbd> ➜ Rien pour le moment.</li>
 </ul>
-
-<mini-espace />
-<BlocClavier nom="a" />

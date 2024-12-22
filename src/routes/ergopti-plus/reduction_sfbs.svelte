@@ -30,9 +30,9 @@
 </p>
 <BlocClavier nom="virgule" />
 <ul class="margin-top-2">
-	<li><kbd>,C</kbd> ➜ <kbd-sortie>CD</kbd-sortie> ;</li>
+	<li><kbd>,C</kbd> ➜ <kbd-sortie>Ç</kbd-sortie> ;</li>
 	<li><kbd>,D</kbd> ➜ <kbd-sortie>DS</kbd-sortie> ;</li>
-	<li><kbd>,F</kbd> ➜ <kbd-sortie>FS</kbd-sortie> ;</li>
+	<li><kbd>,F</kbd> ➜ <kbd-sortie>FL</kbd-sortie> ;</li>
 	<li><kbd>,G</kbd> ➜ <kbd-sortie>GL</kbd-sortie> ;</li>
 	<li><kbd>,H</kbd> ➜ <kbd-sortie>PH</kbd-sortie> ;</li>
 	<li><kbd>,L</kbd> ➜ <kbd-sortie>CL</kbd-sortie> ;</li>
@@ -41,13 +41,14 @@
 	<li><kbd>,P</kbd> ➜ <kbd-sortie>XP</kbd-sortie> ;</li>
 	<li><kbd>,Q</kbd> ➜ <kbd-sortie>QU’</kbd-sortie> ;</li>
 	<li><kbd>,R</kbd> ➜ <kbd-sortie>RQ</kbd-sortie> ;</li>
-	<li><kbd>,S</kbd> ➜ <kbd-sortie>SC</kbd-sortie> ;</li>
-	<li><kbd>,T</kbd> ➜ <kbd-sortie>PT</kbd-sortie> ;</li>
+	<li><kbd>,S</kbd> ➜ <kbd-sortie>Q</kbd-sortie> ;</li>
+	<li><kbd>,T</kbd> ➜ <kbd-sortie>CT</kbd-sortie> ;</li>
 	<li><kbd>,V</kbd> ➜ <kbd-sortie>DV</kbd-sortie> ;</li>
-	<li><kbd>,X</kbd> ➜ <kbd-sortie>'RE</kbd-sortie>, utilisé en anglais (we're) ;</li>
+	<li><kbd>,X</kbd> ➜ <kbd-sortie>PT</kbd-sortie> ;</li>
 	<li>
-		<kbd>,Y</kbd> ➜ <kbd-sortie>YI</kbd-sortie> pour tous les
-		<span class="hyper text-bold">YI</span> en anglais ;
+		<kbd>,Y</kbd> ➜ <kbd-sortie>YI</kbd-sortie> pour tous les -<span class="hyper text-bold"
+			>YI</span
+		>NG en anglais ;
 	</li>
 	<li><kbd>,'</kbd> ➜ <kbd-sortie>J’</kbd-sortie>.</li>
 </ul>
@@ -86,16 +87,8 @@
 <ul class="margin-top-2">
 	<li><kbd>ÊÉ</kbd> ➜ <kbd-sortie>AÎ</kbd-sortie> ;</li>
 	<li><kbd>ÉÊ</kbd> ➜ <kbd-sortie>Â</kbd-sortie> ;</li>
-	<li><kbd>GX</kbd> ➜ <kbd-sortie>GT</kbd-sortie>.</li>
+	<li><kbd>P'</kbd> ➜ <kbd-sortie>PT</kbd-sortie>.</li>
 </ul>
-<p>
-	Le bigramme <kbd>GT</kbd> est remplacé par le roulement <kbd>GX</kbd>. Ce roulement est très
-	confortable et plus judicieux que l’utilisation d’une combinaison avec la touche <kbd>,</kbd>, car
-	réaliser <kbd>NGT</kbd> (comme dans VI<span class="hyper text-bold">NGT</span>) devient alors très
-	rapide. Cependant, ce roulement empêche dans le même temps d’écrire normalement
-	<kbd-sortie>GX</kbd-sortie> (par exemple pour écrire "Yu-Gi-Oh GX"). Les autres remplacements sont
-	quant à eux sur des combinaisons qui ne sont a priori jamais réalisées.
-</p>
 
 <h3>Touche <kbd>★</kbd> de répétition</h3>
 <p>
@@ -133,7 +126,6 @@
 	réduire le nombre de <SFB />s. Une fois qu’on y est habitué, l’écriture au clavier devient encore
 	un peu plus rapide et efficace, car même les lettres doublées peuvent être parallélisées. D’autant
 	que
-	<span class="important"
-		>doubler les lettres est loin d’être la seule fonction de la touche
-	</span><kbd>★</kbd>…
+	<span class="important">doubler les lettres est loin d’être la seule fonction de la touche </span>
+	<kbd>★</kbd>…
 </p>
