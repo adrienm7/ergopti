@@ -191,7 +191,8 @@
 	}
 
 	#selection-version[data-version='1.1'],
-	#selection-version[data-version='2.0'] {
+	#selection-version[data-version='2.0'],
+	#selection-version[data-version='2.1'] {
 		width: 2.6em;
 	}
 

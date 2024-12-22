@@ -17,6 +17,6 @@
 
 <GeneseSources></GeneseSources>
 <Autocritiques></Autocritiques>
-<!-- <Changelog></Changelog> -->
+<Changelog></Changelog>
 <Licence></Licence>
 <Contact></Contact>
