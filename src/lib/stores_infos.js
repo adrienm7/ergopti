@@ -112,3 +112,12 @@ export const a = writable({
 	couleur: 'non',
 	controles: 'oui'
 });
+
+export const virgule = writable({
+	emplacement: 'clavier_virgule',
+	type: 'iso',
+	couche: ',',
+	plus: 'oui',
+	couleur: 'non',
+	controles: 'oui'
+});
