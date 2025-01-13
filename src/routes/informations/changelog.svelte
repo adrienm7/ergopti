@@ -10,7 +10,7 @@
 <p>
 	<Nom></Nom> v2.1 intervertit le <kbd>C</kbd> et le <kbd>G</kbd>. Les résultats sur les analyseurs
 	sont tous un peu moins bons avec ce changement, car le <SFB></SFB> <kbd>CT</kbd> est plus fréquent
-	que l'ancien qui était <kbd>SC</kbd>.
+	que l'ancien qui était <kbd>SC</kbd> et intervient sur l’annulaire au lieu de l’index.
 </p>
 <p>
 	Cependant, cette modification était importante à réaliser, car le <kbd>C</kbd> est désormais plus
@@ -29,7 +29,7 @@
 </p>
 <p>Ce changement n’est pas anodin et apporte les bénéfices suivants :</p>
 <ul>
-	<li>bigrammes <kbd>TH</kbd> et <kbd>SH</kbd> beaucoup plus confortables ;</li>
+	<li>bigrammes <kbd>TH</kbd> et <kbd>SH</kbd> beaucoup plus confortables sur clavier ISO ;</li>
 	<li>bigramme <kbd>ND</kbd> beaucoup plus confortable ;</li>
 	<li>
 		positionnement du <kbd>M</kbd> plus près du <kbd>P</kbd>, car désormais sur la même rangée et
@@ -50,7 +50,7 @@
 <p>
 	La raison pour laquelle le <kbd>TH</kbd> est beaucoup plus confortable avec la version 2.0 est que
 	le majeur et l’annulaire étant des doigts longs, ils ont plus de facilité à atteindre la rangée
-	supérieure que l’inférieure. Au contraire, l’index étant un peu plus court, c’est la rangée
+	supérieure que celle inférieure. Au contraire, l’index étant un peu plus court, c’est la rangée
 	inférieure qui est plus accessible pour ce doigt. C’est d’ailleurs aussi pour cela que la touche
 	<kbd>★</kbd> a été placée sur l’index gauche en rangée du bas et non du haut : car cette position est
 	la plus confortable.

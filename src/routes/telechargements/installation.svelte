@@ -46,10 +46,11 @@
 
 <h3 id="kbdedit">Installation KbdEdit (méthode préférée)</h3>
 <p>
-	<a href="https://www.kbdedit.com/">KbdEdit</a> est un logiciel payant sur Windows, mais très
-	complet et permettant de créer des dispositions de clavier. Il est en mesure de créer des pilotes
-	pour Windows, et depuis peu pour Mac. Seul Linux n’est pas supporté. Dans le cas de Linux, vous
-	pouvez utiliser <a href="#kalamine">la génération par Kalamine</a>.
+	Les fichiers de cette section ont été réalisées à l’aide de <a href="https://www.kbdedit.com/">KbdEdit</a>.
+	C’est un logiciel très complet qui permet de modifier des dispositions de clavier sur Windows.
+	Il est en mesure de créer des pilotes pour Windows, et depuis peu pour Mac.
+	Seul Linux n’est pas supporté.
+	Dans le cas de Linux, il est possible d’utiliser la <a href="#kalamine">génération par Kalamine</a>.
 </p>
 <p>
 	<strong
@@ -111,19 +112,19 @@
 	désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement du
 	script ErgoptiPlus au démarrage, il est possible de suivre les étapes suivantes :
 </p>
-<ul>
+<ol>
 	<li>
 		Presser simultanément la touche Windows et la touche R. Ce raccourci <kbd>Win</kbd> +
 		<kbd>R</kbd> permet d'ouvrir la fenêtre « Exécuter » de Windows ;
 	</li>
-	<li>Saisir <em>shell:startup</em> et valider en cliquant sur le bouton « OK » ;</li>
+	<li>Saisir <kbd>shell:startup</kbd> et valider en cliquant sur le bouton « OK » ;</li>
 	<li>
 		Le dossier qui vient de s'ouvrir correspond au dossier de démarrage. Tout élément dedans est
 		exécuté au démarrage de Windows. Créer un raccourci dans ce dossier pointant vers l'emplacement
 		où vous allez sauvegarder votre fichier <em>ErgoptiPlus.ahk</em>. Vous pouvez par exemple le
 		mettre dans votre dossier Documents.
 	</li>
-</ul>
+</ol>
 <h4>macOS</h4>
 <mini-espace />
 <div>

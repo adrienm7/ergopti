@@ -81,7 +81,7 @@
 				>
 			</p>
 			<p style="margin:0; padding-top: 0; padding-left: 0; font-size: 0.8em">
-				<span class="hyper">Ergonomique et optimisée</span>
+				<strong class="hyper">Ergonomique et optimisée</strong>
 				<span class="morespace2" style="color:white;"> pour le français, l’anglais et le code</span>
 			</p>
 		</div>
@@ -210,7 +210,9 @@
 		position: relative;
 		display: inline-block;
 		margin: 0;
+		margin-left: -0.25em;
 		padding: 0;
+		padding-right: 0.15em;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
 		color: transparent;
@@ -224,7 +226,7 @@
 		content: '';
 		position: absolute;
 		right: 0px;
-		top: 8px;
+		top: 9px;
 		width: 0;
 		height: 0;
 		border-left: 8px solid transparent;
