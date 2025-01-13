@@ -29,6 +29,7 @@
 		document.getElementById('menu-btn').checked = false;
 		document.getElementById('clavier-ref').style.zIndex =
 			'-999'; /* Si le clavier était ouvert, on le ferme */
+		document.body.style.overflowY = 'visible';
 	}
 
 	function toggleOverflowMenu() {
@@ -66,7 +67,7 @@
 		<div style="margin:0; margin-left: 0.5em; padding:0; text-align: left; width:max-content">
 			<p style="margin:0; font-weight:bold">
 				<a href="/">Disposition <span class="morespace">clavier </span></a>
-				<span class="hyper" style="padding:0; margin:0"
+				<span class="hyper" style="display:inline-block"
 					><a href="/">Ergopti</a>
 					<span class="myselect">
 						<select
@@ -139,7 +140,7 @@
 			</p>
 			<hr />
 			<br />
-			<div id="page-toc-mobile"></div>
+			<div id="page-toc-mobile" on:click={fermerMenu}></div>
 			<div style="height:70px"></div>
 		</div>
 	</nav>
@@ -188,6 +189,8 @@
 		border: none;
 		font-weight: bold;
 		width: min-content;
+		-webkit-appearance: none;
+		-moz-appearance: none;
 	}
 
 	#selection-version[data-version='1.1'],
@@ -210,7 +213,6 @@
 		position: relative;
 		display: inline-block;
 		margin: 0;
-		margin-left: -0.25em;
 		padding: 0;
 		padding-right: 0.15em;
 		background-clip: text;

@@ -57,7 +57,7 @@
 	let clavier = 'iso';
 	let corpus = 'fr/panache';
 	let ergol = 'en_fr';
-	let version_1dfh = '';
+	let version_1dfh = '_1dk';
 </script>
 
 <svelte:head>
@@ -145,8 +145,8 @@
 			<option value="essais">Essais (Pyjam)</option>
 		</select>
 		<select bind:value={version_1dfh} style="height: 2.5rem; display:block;">
-			<option value="">Standard</option>
 			<option value="_1dk">1DFH avec touche 1DK</option>
+			<option value="">Standard</option>
 		</select>
 	</div>
 	<a
