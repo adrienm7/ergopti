@@ -9,6 +9,7 @@
 		version_mineure_kbdedit_exe,
 		version_mineure_kbdedit_kbe,
 		version_mineure_kbdedit_mac,
+		version_mineure_ahk,
 		version_mineure_plus,
 		version_mineure_kalamine_1dk,
 		version_mineure_kalamine_standard;
@@ -17,6 +18,7 @@
 		version_mineure_kbdedit_exe = getLatestVersion('kbdedit_exe', versionValue);
 		version_mineure_kbdedit_kbe = getLatestVersion('kbdedit_kbe', versionValue);
 		version_mineure_kbdedit_mac = getLatestVersion('kbdedit_mac', versionValue);
+		version_mineure_ahk = getLatestVersion('ahk', versionValue);
 		version_mineure_plus = getLatestVersion('plus', versionValue);
 		version_mineure_kalamine_1dk = getLatestVersion('kalamine_1dk', versionValue);
 		version_mineure_kalamine_standard = getLatestVersion('kalamine_standard', versionValue);
@@ -46,11 +48,12 @@
 
 <h3 id="kbdedit">Installation KbdEdit (méthode préférée)</h3>
 <p>
-	Les fichiers de cette section ont été réalisées à l’aide de <a href="https://www.kbdedit.com/">KbdEdit</a>.
-	C’est un logiciel très complet qui permet de modifier des dispositions de clavier sur Windows.
-	Il est en mesure de créer des pilotes pour Windows, et depuis peu pour Mac.
-	Seul Linux n’est pas supporté.
-	Dans le cas de Linux, il est possible d’utiliser la <a href="#kalamine">génération par Kalamine</a>.
+	Les fichiers de cette section ont été réalisées à l’aide de <a href="https://www.kbdedit.com/"
+		>KbdEdit</a
+	>. C’est un logiciel très complet qui permet de modifier des dispositions de clavier sur Windows.
+	Il est en mesure de créer des pilotes pour Windows, et depuis peu pour Mac. Seul Linux n’est pas
+	supporté. Dans le cas de Linux, il est possible d’utiliser la
+	<a href="#kalamine">génération par Kalamine</a>.
 </p>
 <p>
 	<strong
@@ -77,6 +80,22 @@
 		<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download
 			><button>Fichier source KbdEdit de Ergopti_v{version_mineure_kbdedit_kbe}</button></a
 		>
+	{/if}
+</div>
+<petit-espace />
+<div>
+	{#if version_mineure_ahk !== undefined}
+		<a href="/pilotes/ahk/Ergopti_v{version_mineure_ahk}.exe" download
+			><button class="bouton-telechargement"
+				>☛ Ergopti_v{version_mineure_ahk} sans aucune installation</button
+			></a
+		>
+		<p>
+			Ce fichier est un exécutable qui permet de lancer Ergopti sans aucune installation. C’est un
+			script AutoHotkey compilé en exécutable, il ne nécessite donc même pas d’installer AutoHotkey.
+			Il suffit de le lancer pour que le clavier passe en Ergopti. Une icône bleue en forme d’étoile
+			apparaîtra dans la barre des tâches pour indiquer que l’émulation en Ergopti est en cours.
+		</p>
 	{/if}
 </div>
 <petit-espace />

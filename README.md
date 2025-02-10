@@ -11,20 +11,21 @@
 Ergopti est une disposition de clavier ergonomique et optimisée possédant les caractéristiques suivantes :
 
 - Disposition **optimisée pour le français, l’anglais et le code** ;
+- Licence libre (MIT) ;
 - **Chiffres en accès direct** ;
-- Couche AltGr permettant d’accéder aux symboles de programmation ;
+- Couche AltGr permettant d’accéder aux symboles de programmation, avec un placement logique pour faciliter la mémorisation ;
   ![Couche AltGr](static/img/ergopti_altgr.jpg)
 - **Conservation de raccourcis usuels** : les raccourcis <kbd>Ctrl-{A, C, V, X, Z}</kbd> sont disponibles à gauche du clavier ;
   ![Couche Ctrl](static/img/ergopti_ctrl.jpg)
 - Support de tous les caractères spéciaux utilisés en français (diacritiques, majuscules accentuées, lettres entrelacées, symboles de ponctuation…) ;
 - **Version « Ergopti + » avec de nombreuses autres fonctionnalités** :
   ![Couche de base +](static/img/ergopti_plus.jpg)
-  - touche ★ de répétition (par exemple <kbd>el★e</kbd> donne « elle ») ;
-  - touche ★ d’abréviations (par exemple <kbd>pex★</kbd> donne « par exemple ») ;
-  - suppression de tous les SFBs restants (par exemple <kbd>,s</kbd> donne « sc ») ;
-  - la touche <kbd>q</kbd> donne « qu » ;
+  - touche <kbd>★</kbd> de répétition (par exemple <kbd>el★e</kbd> donne <kbd>elle</kbd>) ;
+  - touche <kbd>★</kbd> d’abréviations (par exemple <kbd>pex★</kbd> donne <kbd>par exemple</kbd>) ;
+  - suppression de tous les SFBs restants (par exemple <kbd>,s</kbd> donne <kbd>sc</kbd>) ;
+  - la touche <kbd>q</kbd> donne <kbd>qu</kbd> ;
   - divers raccourcis dont des tap-holds ;
-  - ajout de nouveaux roulements (par exemple <kbd>hc</kbd> donne « wh ») ;
+  - ajout de nouveaux roulements (par exemple <kbd>hc</kbd> donne <kbd>wh</kbd>) ;
   - etc.
  
 ➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/telechargements#clavier_emulation.
