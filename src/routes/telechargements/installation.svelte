@@ -84,22 +84,6 @@
 </div>
 <petit-espace />
 <div>
-	{#if version_mineure_ahk !== undefined}
-		<a href="/pilotes/ahk/Ergopti_v{version_mineure_ahk}.exe" download
-			><button class="bouton-telechargement"
-				>☛ Ergopti_v{version_mineure_ahk} sans aucune installation</button
-			></a
-		>
-		<p>
-			Ce fichier est un exécutable qui permet de lancer Ergopti sans aucune installation. C’est un
-			script AutoHotkey compilé en exécutable, il ne nécessite donc même pas d’installer AutoHotkey.
-			Il suffit de le lancer pour que le clavier passe en Ergopti. Une icône bleue en forme d’étoile
-			apparaîtra dans la barre des tâches pour indiquer que l’émulation en Ergopti est en cours.
-		</p>
-	{/if}
-</div>
-<petit-espace />
-<div>
 	{#if version_mineure_plus !== undefined}
 		<a href="/pilotes/plus/ErgoptiPlus_v{version_mineure_plus}.ahk" download
 			><button class="bouton-telechargement">☛ ErgoptiPlus_v{version_mineure_plus}.ahk</button></a
@@ -144,6 +128,7 @@
 		mettre dans votre dossier Documents.
 	</li>
 </ol>
+
 <h4>macOS</h4>
 <mini-espace />
 <div>
@@ -157,6 +142,38 @@
 </div>
 
 <petit-espace />
+
+<h3 id="ahk">Installation AutoHotkey</h3>
+<p>
+	Sur Windows, il est possible d’utiliser la disposition sans avoir à installer de pilote, et donc
+	sans droits administrateurs. C’est particulièrement utile en contexte professionnel où
+	l’installation de programmes est bloquée. Cette méthode utilise le programme AutoHotkey afin
+	d’émuler la disposition.
+</p>
+<div>
+	{#if version_mineure_ahk !== undefined}
+		<div>
+			<a href="/pilotes/ahk/Ergopti_v{version_mineure_ahk}.exe" download
+				><button class="bouton-telechargement"
+					>☛ Ergopti_v{version_mineure_ahk} sans aucune installation</button
+				></a
+			>
+		</div>
+		<mini-espace />
+		<div>
+			<a href="/pilotes/ahk/Ergopti_v{version_mineure_ahk}.ahk" download
+				><button>Fichier source ahk de Ergopti_v{version_mineure_ahk}</button></a
+			>
+		</div>
+		<mini-espace />
+		<p>
+			Ce fichier est un exécutable qui permet de lancer Ergopti sans aucune installation. C’est un
+			script AutoHotkey compilé en exécutable, il ne nécessite donc même pas d’installer AutoHotkey.
+			Il suffit de le lancer pour que le clavier passe en Ergopti. Une icône bleue en forme d’étoile
+			apparaîtra dans la barre des tâches pour indiquer que l’émulation en Ergopti est en cours.
+		</p>
+	{/if}
+</div>
 
 <h3 id="kalamine">Installation Kalamine</h3>
 <select bind:value={variante_kalamine} style="height: 2rem">
