@@ -23,14 +23,16 @@
 	Si la touche suivante est sur la même main que la touche précédente (sauf éventuellement avec un
 	roulement, cf. le point suivant), la frappe sera moins confortable. Imaginez que vous deviez
 	atteindre le <kbd>C</kbd>
-	de l’AZERTY, puis le <kbd>T</kbd>, pour écrire <kbd>CT</kbd>, un bigramme très courant en français
+	de l’AZERTY, puis le <kbd>R</kbd>, pour écrire <kbd>CR</kbd>, un bigramme très courant en français
 	et anglais. Dans ce cas, vous devez d’abord légèrement abaisser votre main pour que le majeur
 	atteigne la rangée du bas pour taper
 	<kbd>C</kbd>. Puis, il faut que l’index atteigne quant à lui la rangée du haut pour taper
-	<kbd>T</kbd>. En résulte un sentiment d’inconfort avec deux doigts proches mais qui doivent aller
-	dans des directions différentes. Au contraire,
+	<kbd>R</kbd>. En résulte un sentiment d’inconfort avec deux doigts proches mais qui doivent aller
+	dans des directions différentes. Le terme technique pour un enchaînement de ce type est appelé
+	<i>ciseau</i>, car les doigts font un grand écart pour atteindre des rangées complètement
+	différentes. Au contraire,
 	<span class="important">en "parallélisant" les frappes sur les deux mains</span>, le résultat se
-	révèle bien plus satisfaisant.
+	révèle bien plus satisfaisant et ces ciseaux sont évités.
 </p>
 <p>
 	L’alternance des mains a une limite. Il est impossible d’alterner parfaitement à chaque frappe.
