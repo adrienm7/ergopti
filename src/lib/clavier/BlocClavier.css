@@ -240,7 +240,7 @@ bloc-touche[data-style='different'] {
 	--couleur-touche-luminosite: 100% !important;
 	--opacite-touche: 5% !important;
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
-	font-family: default;
+	font-family: sans-serif;
 	font-weight: normal;
 }
 
@@ -311,7 +311,7 @@ bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Couper'] div {
 }
 
 /* Layer À, pour éviter que les touches avec 4 symboles débordent */
-bloc-clavier[data-couche='À'] bloc-touche div {
+bloc-clavier[data-couche='À'] bloc-touche:not([data-type='special']) div {
 	font-size: 0.7em;
 }
 

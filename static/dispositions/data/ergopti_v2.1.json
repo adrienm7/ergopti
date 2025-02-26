@@ -1,5 +1,5 @@
 {
-	"nom": "Ergopti v2.1.0",
+	"nom": "Ergopti v2.1.2",
 	"auteur": "Adrien MOYAUX",
 	"site": "https://ergopti.fr",
 	"iso": [
@@ -1228,7 +1228,7 @@
 			"i": "",
 			"R": "ℂ",
 			"Layer": "⊞+⇦",
-			"À": "ence",
+			"À": "ction",
 			",": "ç",
 			"type": "lettre"
 		},
@@ -1297,7 +1297,7 @@
 			"i": "",
 			"R": "",
 			"Layer": "⊞⇨",
-			"À": "ight",
+			"À": "ought",
 			",": "gl",
 			"type": "lettre"
 		},
@@ -1331,7 +1331,7 @@
 			"i": "ᵢ",
 			"R": "",
 			"Layer": "⇧",
-			"À": "",
+			"À": "ight",
 			",": "ji",
 			"type": "lettre"
 		},
@@ -1451,7 +1451,7 @@
 			"i": "ₚ",
 			"R": "ℙ",
 			"Layer": "+⇨",
-			"À": "ought",
+			"À": "ence",
 			",": "xp",
 			"type": "lettre"
 		},
@@ -1523,8 +1523,8 @@
 			"i": "ₜ",
 			"R": "",
 			"Layer": "⇨",
-			"À": "ction",
-			",": "ct",
+			"À": "ettre",
+			",": "pt",
 			"type": "lettre"
 		},
 		{
@@ -1558,7 +1558,7 @@
 			"i": "ᵥ",
 			"R": "",
 			"Layer": "⇤",
-			"À": "ance",
+			"À": "ment",
 			",": "dv",
 			"type": "lettre"
 		},
@@ -1716,7 +1716,7 @@
 			"i": "",
 			"R": "",
 			"Layer": "^+⇨",
-			"À": "",
+			"À": "ance",
 			",": "j’",
 			"type": "ponctuation"
 		},
@@ -1727,7 +1727,7 @@
 			"Shift": "<espace-insecable></espace-insecable>!",
 			"AltGr": "!",
 			"ShiftAltGr": "¡",
-			"Ctrl": "!",
+			"Ctrl": "",
 			"^": "",
 			"trema": "",
 			"e": "",
@@ -1745,7 +1745,7 @@
 			"Shift": "<espace-insecable></espace-insecable>",
 			"AltGr": "<espace-insecable></espace-insecable>",
 			"ShiftAltGr": "£",
-			"Ctrl": "!",
+			"Ctrl": "",
 			"^": "",
 			"trema": "",
 			"e": "",
@@ -1809,7 +1809,7 @@
 			"R": "",
 			"Layer": "^+⇤",
 			"À": "",
-			",": "j",
+			",": "z",
 			"type": "français"
 		},
 		{

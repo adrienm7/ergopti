@@ -141,6 +141,6 @@
 	<li><kbd>,É</kbd> ➜ <kbd-sortie>JÉ</kbd-sortie> ;</li>
 	<li><kbd>,O</kbd> ➜ <kbd-sortie>JO</kbd-sortie> ;</li>
 	<li><kbd>,Ê</kbd> ➜ <kbd-sortie>JU</kbd-sortie> pour éviter un <SFB /> ;</li>
-	<li><kbd>,À</kbd> et <kbd>,È</kbd> ➜ <kbd-sortie>J</kbd-sortie>.</li>
+	<li><kbd>,À</kbd> ➜ <kbd-sortie>J</kbd-sortie>.</li>
 	<li><kbd>,'</kbd> ➜ <kbd-sortie>J’</kbd-sortie></li>
 </ul>
