@@ -8,9 +8,12 @@
 <p>
 	Afin de <span class="important">faciliter la mémorisation</span> ainsi que de
 	<span class="important">réduire la charge cognitive</span>, les touches de la disposition sont, le
-	plus possible, <span style="text-decoration: underline;">placées logiquement</span>.
-	C’est notamment le cas grâce à une séparation des lettres par main : les voyelles sont toutes présentes à gauche et les consonnes à droite (sauf le <kdb>W</kdb>, le <kdb>B</kdb> et le <kdb>K</kdb>).
-	En outre, le placement logique des caractères est particulièrement présent sur la couche <kbd>AltGr</kbd> :</p>
+	plus possible, <span style="text-decoration: underline;">placées logiquement</span>. C’est
+	notamment le cas grâce à une séparation des lettres par main : les voyelles sont toutes présentes
+	à gauche et les consonnes à droite (sauf le <kbd>W</kbd>, le <kbd>B</kbd> et le <kbd>K</kbd>). En
+	outre, le placement logique des caractères est particulièrement présent sur la couche
+	<kbd>AltGr</kbd> :
+</p>
 <ul>
 	<li>
 		<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>\</kbd-sortie> car le
