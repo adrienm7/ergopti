@@ -9,11 +9,12 @@
 <h2>Diminution des SFBs</h2>
 <p>L’un des avantages majeurs de <NomPlus /> est qu’il réduit presque totalement les <SFB />s.</p>
 <p>
-	Les <SFB />s les plus fréquents de la disposition sont : <kbd>SC</kbd>,
+	Les <SFB />s les plus fréquents de la disposition sont : <kbd>CT</kbd>,
 	<kbd>PT</kbd>, <kbd>EO</kbd>, <kbd>OE</kbd>,
-	<kbd>UB</kbd>, <kbd>BU</kbd> et <kbd>GT</kbd>. <kbd>SC</kbd> est de loin le plus fréquent. En
-	outre, <kbd>EO</kbd> et
-	<kbd>OE</kbd> sont également relativement fréquents en anglais (pour écrire
+	<kbd>UB</kbd>, <kbd>BU</kbd> et <kbd>DS</kbd>. <kbd>CT</kbd> est de loin le plus fréquent.
+	<kbd>EO</kbd>
+	et
+	<kbd>OE</kbd> sont aussi relativement fréquents en anglais (pour écrire
 	<kbd-sortie>DOES</kbd-sortie>,
 	<kbd-sortie>PEOPLE</kbd-sortie>, etc.) Tous ces <SFB />s sont supprimés avec <NomPlus />, plus de
 	nombreux autres encore plus rares.
@@ -26,32 +27,11 @@
 	La touche <kbd>,</kbd> est l’une des plus importantes dans <NomPlus />. C’est grâce à elle que la
 	plupart des <SFB />s restants sont supprimés. De plus, certaines combinaisons ont aussi été
 	ajoutées pour plus de confort, afin d’éviter de devoir sauter de 2 rangées avec des doigts
-	consécutifs pour écrire un bigramme. C’est le cas de <kbd>CL</kbd> ou encore de <kbd>PH</kbd>.
+	consécutifs pour écrire un bigramme (donc éviter les <i>ciseaux</i>). C’est le cas de
+	<kbd>CL</kbd>
+	ou encore de <kbd>PH</kbd>.
 </p>
 <BlocClavier nom="virgule" />
-<ul class="margin-top-2">
-	<li><kbd>,C</kbd> ➜ <kbd-sortie>Ç</kbd-sortie> ;</li>
-	<li><kbd>,D</kbd> ➜ <kbd-sortie>DS</kbd-sortie> ;</li>
-	<li><kbd>,F</kbd> ➜ <kbd-sortie>FL</kbd-sortie> ;</li>
-	<li><kbd>,G</kbd> ➜ <kbd-sortie>GL</kbd-sortie> ;</li>
-	<li><kbd>,H</kbd> ➜ <kbd-sortie>PH</kbd-sortie> ;</li>
-	<li><kbd>,L</kbd> ➜ <kbd-sortie>CL</kbd-sortie> ;</li>
-	<li><kbd>,M</kbd> ➜ <kbd-sortie>MPL</kbd-sortie> ;</li>
-	<li><kbd>,N</kbd> ➜ <kbd-sortie>NL</kbd-sortie> ;</li>
-	<li><kbd>,P</kbd> ➜ <kbd-sortie>XP</kbd-sortie> ;</li>
-	<li><kbd>,Q</kbd> ➜ <kbd-sortie>QU’</kbd-sortie> ;</li>
-	<li><kbd>,R</kbd> ➜ <kbd-sortie>RQ</kbd-sortie> ;</li>
-	<li><kbd>,S</kbd> ➜ <kbd-sortie>Q</kbd-sortie> ;</li>
-	<li><kbd>,T</kbd> ➜ <kbd-sortie>CT</kbd-sortie> ;</li>
-	<li><kbd>,V</kbd> ➜ <kbd-sortie>DV</kbd-sortie> ;</li>
-	<li><kbd>,X</kbd> ➜ <kbd-sortie>PT</kbd-sortie> ;</li>
-	<li>
-		<kbd>,Y</kbd> ➜ <kbd-sortie>YI</kbd-sortie> pour tous les -<span class="hyper text-bold"
-			>YI</span
-		>NG en anglais ;
-	</li>
-	<li><kbd>,'</kbd> ➜ <kbd-sortie>J’</kbd-sortie>.</li>
-</ul>
 <p>
 	Comme vous pouvez le constater, la touche <kbd>,</kbd> est vraiment pour supprimer les derniers
 	petits <SFB />s restants. La disposition <Nom /> éliminait déjà la majorité d’entre eux.
@@ -60,7 +40,7 @@
 <h3>Utilisation de la touche <kbd>È</kbd></h3>
 <p>
 	La touche <kbd>È</kbd> permet de se débarrasser des quelques <SFB />s se trouvant sur la main
-	gauche. Plus particulièrement, ce sont les <SFB />s se sur les touches
+	gauche. Plus particulièrement, ce sont les <SFB />s sur les touches
 	<kbd>I</kbd>,
 	<kbd>E</kbd>
 	ainsi qu’en
@@ -80,14 +60,14 @@
 		Même si, idéalement, cela devrait plutôt être l’inverse afin d’être plus logique (le son YÈ
 		donnant IÉ). Toutefois,
 		<kbd-sortie>IÉ</kbd-sortie> étant beaucoup plus fréquent, il mérite d’avoir le roulement vers l’intérieur
-		qui est beaucoup plus confortable.
+		qui est plus confortable.
 	</p>
 </ul>
 <h3>Utilisation de roulements</h3>
 <ul class="margin-top-2">
 	<li><kbd>ÊÉ</kbd> ➜ <kbd-sortie>AÎ</kbd-sortie> ;</li>
 	<li><kbd>ÉÊ</kbd> ➜ <kbd-sortie>Â</kbd-sortie> ;</li>
-	<li><kbd>P'</kbd> ➜ <kbd-sortie>PT</kbd-sortie>.</li>
+	<li><kbd>P'</kbd> ➜ <kbd-sortie>CT</kbd-sortie>.</li>
 </ul>
 
 <h3>Touche <kbd>★</kbd> de répétition</h3>

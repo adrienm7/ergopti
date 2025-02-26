@@ -8,8 +8,7 @@
 <p>Des roulements pour plus de confort ont été ajoutés :</p>
 <ul class="margin-top-2">
 	<li><kbd>HC</kbd> ➜ <kbd-sortie>WH</kbd-sortie> ;</li>
-	<li><kbd>GX</kbd> ➜ <kbd-sortie>GT</kbd-sortie> ;</li>
-	<li><kbd>P'</kbd> ➜ <kbd-sortie>QU’</kbd-sortie>.</li>
+	<li><kbd>P'</kbd> ➜ <kbd-sortie>CT</kbd-sortie>.</li>
 </ul>
 <p>
 	Le roulement <kbd>CH</kbd> était déjà l’un des atouts majeur de la disposition <Nom />, car cette
@@ -17,10 +16,6 @@
 	roulement donnant <kbd-sortie>WH</kbd-sortie> permet d’avoir une frappe en anglais encore plus fluide.
 </p>
 <p>
-	Quant aux roulements donnant <kbd-sortie>GT</kbd-sortie> et <kbd-sortie>QU’</kbd-sortie>, ils
-	permettent d’éviter des <SFB></SFB>s. En effet, avec <Nom></Nom>, écrire
-	<kbd-sortie>GT</kbd-sortie>
-	nécessite de réaliser un <SFB></SFB> sur l’annulaire droit, tandis que
-	<kbd-sortie>QU’</kbd-sortie>
-	requiert un <SFB></SFB> sur l’auriculaire droit.
+	Quant au roulement donnant <kbd-sortie>CT</kbd-sortie>, il permet d’éviter le pire <SFB></SFB> de la
+	disposition pour le transformer en roulement très confortable.
 </p>

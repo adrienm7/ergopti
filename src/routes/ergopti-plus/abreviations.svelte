@@ -66,47 +66,4 @@
 	les suffixes les plus communs,
 	<span class="important">entraînant une augmentation de vitesse</span>.
 </p>
-<p>
-	Le confort est aussi visé, par exemple pour la combinaison <kbd-sortie>GHT</kbd-sortie> qui est un
-	peu inconfortable à faire en <Nom />, car il faut frapper de l’annulaire droit, du majeur droit,
-	puis encore de l’annulaire droit. Ce n’est pas un beau roulement, alors qu’au contraire
-	<kbd>ÀG</kbd>
-	écrira <kbd-sortie>IGHT</kbd-sortie> et <kbd>ÀP</kbd> écrira <kbd-sortie>OUGH</kbd-sortie>.
-</p>
-<mini-espace />
 <BlocClavier nom="a" />
-<mini-espace />
-<p class="text-bold">Liste des suffixes implémentés :</p>
-<ul>
-	<li><kbd>ÀA</kbd> ➜ <kbd-sortie>AIRE</kbd-sortie> ;</li>
-	<li><kbd>ÀB</kbd> ➜ Rien, car peu confortable ;</li>
-	<li><kbd>ÀC</kbd> ➜ <kbd-sortie>ENCE</kbd-sortie> ;</li>
-	<li><kbd>ÀD</kbd> ➜ <kbd-sortie>OULD</kbd-sortie> ;</li>
-	<li><kbd>ÀE</kbd> ➜ Rien, pour éviter un <SFB /> ;</li>
-	<li><kbd>ÀÉ</kbd> ➜ <kbd-sortie>YING</kbd-sortie> ;</li>
-	<li><kbd>ÀÈ</kbd> ➜ Rien, car peu confortable ;</li>
-	<li><kbd>ÀÊ</kbd> ➜ <kbd-sortie>ABLE</kbd-sortie> ;</li>
-	<li><kbd>ÀF</kbd> ➜ <kbd-sortie>ISTE</kbd-sortie> ;</li>
-	<li><kbd>ÀG</kbd> ➜ <kbd-sortie>IGHT</kbd-sortie> ;</li>
-	<li><kbd>ÀH</kbd> ➜ <kbd-sortie>TECHN</kbd-sortie> ;</li>
-	<li><kbd>ÀI</kbd> ➜ <kbd-sortie>IGHT</kbd-sortie> ;</li>
-	<li><kbd>ÀJ</kbd> ➜ Rien, car peu confortable ;</li>
-	<li><kbd>ÀK</kbd> ➜ <kbd-sortie>IQUE</kbd-sortie> ;</li>
-	<li><kbd>ÀL</kbd> ➜ <kbd-sortie>ELLE</kbd-sortie> ;</li>
-	<li><kbd>ÀM</kbd> ➜ <kbd-sortie>ISME</kbd-sortie> ;</li>
-	<li><kbd>ÀN</kbd> ➜ <kbd-sortie>ATION</kbd-sortie> ;</li>
-	<li><kbd>ÀO</kbd> ➜ Rien, pour éviter un <SFB /> ;</li>
-	<li><kbd>ÀP</kbd> ➜ <kbd-sortie>OUGHT</kbd-sortie> ;</li>
-	<li><kbd>ÀQ</kbd> ➜ <kbd-sortie>IQUE</kbd-sortie> ;</li>
-	<li><kbd>ÀR</kbd> ➜ <kbd-sortie>ERRE</kbd-sortie> ;</li>
-	<li><kbd>ÀS</kbd> ➜ <kbd-sortie>EMENT</kbd-sortie> ;</li>
-	<li><kbd>ÀT</kbd> ➜ <kbd-sortie>CTION</kbd-sortie> ;</li>
-	<li><kbd>ÀU</kbd> ➜ <kbd-sortie>UB</kbd-sortie> ;</li>
-	<li><kbd>ÀV</kbd> ➜ <kbd-sortie>ANCE</kbd-sortie> ;</li>
-	<li><kbd>ÀW</kbd> ➜ Rien, car peu confortable</li>
-	<li><kbd>ÀX</kbd> ➜ <kbd-sortie>IEUX</kbd-sortie> ;</li>
-	<li><kbd>ÀY</kbd> ➜ Rien, car peu confortable ;</li>
-	<li><kbd>ÀZ</kbd> ➜ <kbd-sortie>EZ-VOUS</kbd-sortie> ;</li>
-	<li><kbd>À★</kbd> ➜ <kbd-sortie>BU</kbd-sortie> ;</li>
-	<li><kbd>À’</kbd> ➜ Rien pour le moment.</li>
-</ul>

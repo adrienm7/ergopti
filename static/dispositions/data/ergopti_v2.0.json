@@ -1,5 +1,5 @@
 {
-	"nom": "Ergopti v2.0.0",
+	"nom": "Ergopti v2.0.1",
 	"auteur": "Adrien MOYAUX",
 	"site": "https://ergopti.fr",
 	"iso": [
@@ -1727,7 +1727,7 @@
 			"Shift": "<espace-insecable></espace-insecable>!",
 			"AltGr": "!",
 			"ShiftAltGr": "¡",
-			"Ctrl": "!",
+			"Ctrl": "",
 			"^": "",
 			"trema": "",
 			"e": "",
@@ -1745,7 +1745,7 @@
 			"Shift": "<espace-insecable></espace-insecable>",
 			"AltGr": "<espace-insecable></espace-insecable>",
 			"ShiftAltGr": "£",
-			"Ctrl": "!",
+			"Ctrl": "",
 			"^": "",
 			"trema": "",
 			"e": "",
