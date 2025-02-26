@@ -1481,15 +1481,11 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("GL")
 }
 
-; 're (pour we're, you're, etc.)
-:*?C:,x::
-{
-    Send("'re")
-}
+; Ç
 :*?C:,x::
 :*?C:,X::
 {
-    Send("'RE")
+    Send("Ç")
 }
 
 ; ==============================================================
