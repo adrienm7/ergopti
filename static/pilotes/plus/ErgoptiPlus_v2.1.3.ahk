@@ -1007,7 +1007,8 @@ SC02E:: Send("★") ; Remplacement par la touche ★ de : la touche "J" sur le p
 +<^>!SC017:: Send("{U+0025}") ; % sur Shift + AltGr + H
 <^>!SC018:: Send("{U+0021}") ; ! sur AltGr + C
 +<^>!SC018:: Send(" {U+0021}") ; ! sur Shift + AltGr + C
-+<^>!SC056:: Send("…") ; sur Shift + AltGr + Ê
++<^>!SC056::SC02B ; sur Shift + AltGr + Ê c’est la touche morte ^
++<^>!SC02F:: Send("…") ; sur Shift + AltGr + ,
 #InputLevel 49
 
 ; Capslock est transformé en BackSpace
