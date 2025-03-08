@@ -73,7 +73,6 @@
 		</a>
 	{/if}
 </div>
-
 <mini-espace />
 <div>
 	{#if version_mineure_kbdedit_kbe !== undefined}
@@ -82,7 +81,8 @@
 		>
 	{/if}
 </div>
-<petit-espace />
+
+<moyen-espace />
 <div>
 	{#if version_mineure_plus !== undefined}
 		<a href="/pilotes/plus/ErgoptiPlus_v{version_mineure_plus}.ahk" download
@@ -110,6 +110,9 @@
 		droits d’administrateur</strong
 	>.
 </div>
+
+<mini-espace />
+
 <p>
 	Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
 	désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement du
@@ -129,6 +132,23 @@
 	</li>
 </ol>
 
+<mini-espace />
+
+<p>Certains problèmes ont été rapportés avec le pilote d’Ergopti dans quelques logiciels :</p>
+<ul>
+	<li>
+		Microsoft Excel : Taper un <kbd>+</kbd> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause des problèmes
+		d’édition de la cellule : tout ce qui est tapé avant disparaît et le <kbd-sortie>+</kbd-sortie>
+		apparaît. Une solution est de faire <kbd>Shift</kbd> + <kbd>=</kbd> (touche tout en haut à
+		gauche, sur la rangée des chiffres), car le <kbd>+</kbd> est aussi à cet emplacement.
+	</li>
+</ul>
+<p>
+	Ces problèmes peuvent être résolus avec le script ErgoptiPlus.ahk. Il est possible de mettre les
+	variables de fonctionnalités supplémentaires du début de script à 0 afin de n’avoir que les
+	corrections.
+</p>
+
 <h4>macOS</h4>
 <mini-espace />
 <div>
@@ -143,34 +163,32 @@
 
 <petit-espace />
 
-<h3 id="ahk">Installation AutoHotkey</h3>
+<h3 id="ahk">Utilisation sans droits administrateur</h3>
 <p>
 	Sur Windows, il est possible d’utiliser la disposition sans avoir à installer de pilote, et donc
-	sans droits administrateurs. C’est particulièrement utile en contexte professionnel où
-	l’installation de programmes est bloquée. Cette méthode utilise le programme AutoHotkey afin
-	d’émuler la disposition.
+	sans droits administrateur. Cela est particulièrement utile en contexte professionnel où
+	l’installation de programmes est bloquée. Cette méthode utilise AutoHotkey afin d’émuler la
+	disposition.
 </p>
 <div>
 	{#if version_mineure_ahk !== undefined}
 		<div>
 			<a href="/pilotes/ahk/Ergopti_v{version_mineure_ahk}.exe" download
 				><button class="bouton-telechargement"
-					>☛ Ergopti_v{version_mineure_ahk} sans aucune installation</button
+					>☛ Ergopti_v{version_mineure_ahk} sans installation</button
 				></a
-			>
-		</div>
-		<mini-espace />
-		<div>
-			<a href="/pilotes/ahk/Ergopti_v{version_mineure_ahk}.ahk" download
-				><button>Fichier source ahk de Ergopti_v{version_mineure_ahk}</button></a
 			>
 		</div>
 		<mini-espace />
 		<p>
 			Ce fichier est un exécutable qui permet de lancer Ergopti sans aucune installation. C’est un
-			script AutoHotkey compilé en exécutable, il ne nécessite donc même pas d’installer AutoHotkey.
-			Il suffit de le lancer pour que le clavier passe en Ergopti. Une icône bleue en forme d’étoile
-			apparaîtra dans la barre des tâches pour indiquer que l’émulation en Ergopti est en cours.
+			script AutoHotkey compilé, il ne nécessite donc même pas d’installer AutoHotkey. Il suffit de
+			le lancer pour que le clavier passe en Ergopti. Une icône bleue en forme d’étoile apparaîtra
+			dans la barre des tâches pour indiquer que l’émulation en Ergopti est en cours.
+		</p>
+		<p>
+			Pour information, ce script repose sur le fichier ErgoptiPlus.ahk où les variables de
+			fonctionnalités supplémentaires ont été mises à 0.
 		</p>
 	{/if}
 </div>
