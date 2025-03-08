@@ -228,6 +228,13 @@ export class Clavier {
 							toucheClavier.dataset['style'] = contenuTouche['Primary' + '-style'];
 						} else {
 							if (
+								this.infos_clavier.plus === 'oui' &&
+								contenuTouche[this.infos_clavier.couche + '+' + '-style'] !== undefined &&
+								contenuTouche[this.infos_clavier.couche + '+' + '-style'] !== ''
+							) {
+								toucheClavier.dataset['style'] =
+									contenuTouche[this.infos_clavier.couche + '+' + '-style'];
+							} else if (
 								contenuTouche[this.infos_clavier.couche + '-style'] !== undefined &&
 								contenuTouche[this.infos_clavier.couche + '-style'] !== ''
 							) {
