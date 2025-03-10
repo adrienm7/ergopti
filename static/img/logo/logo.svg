@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-256 -256 512 512">
+
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background:  #343048;
+      --border:  #edebf0;
+
+      --red:     hsl(-10,  80%, 55%);
+      --yellow:  hsl( 45,  90%, 55%);
+      --green:   hsl(130,  80%, 40%);
+      --blue:    hsl(200, 100%, 40%);
+      --purple:  hsl(275,  75%, 55%);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #edebf0;
+        --border: #343048;
+      }
+    }
+    
+    .star {
+      fill:   var(--background);
+      stroke: var(--border);
+      stroke-width: 0.7px;
+    }
+
+    .letter {
+      fill: var(--border);
+      font-family: sans-serif;
+      font-size: 135px;
+      font-weight: bold;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+  </style>
+
+  <defs>
+    <path id="oif-segment" stroke="var(--border)" stroke-width="4" transform="rotate(36)"
+      d="M-65,0 L65,0 L0,-135 Z" />
+  </defs>
+
+  <g transform="scale(1.4)">
+    <use href="#oif-segment" fill="var(--green)"  transform="rotate(0)"   />
+    <use href="#oif-segment" fill="var(--purple)" transform="rotate(72)"  />
+    <use href="#oif-segment" fill="var(--red)"    transform="rotate(144)" />
+    <use href="#oif-segment" fill="var(--blue)"   transform="rotate(216)" />
+    <use href="#oif-segment" fill="var(--yellow)" transform="rotate(288)" />
+  </g>
+
+  <g transform="rotate(36)">
+    <path transform="scale(14) rotate(180)" class="star"
+          d="M0-16 3.652-4.76h11.817l-9.56 6.944 3.65 11.24L0 6.474l-9.561 6.947
+          3.652-11.24-9.56-6.943h11.817L0-16z"/>
+  </g>
+
+  <text x="0" y="0" class="letter">E</text>
+
+</svg>
