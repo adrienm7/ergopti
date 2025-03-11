@@ -294,9 +294,8 @@
 	}
 
 	.logo {
-		height: 55px;
-		width: 55px;
-		margin: 0px;
+		height: calc(0.8 * var(--hauteur-header));
+		margin-top: 3px;
 		/*  
 		margin-right: 10px;
 		padding: 3px;
