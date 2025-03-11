@@ -42,7 +42,7 @@
       d="M-65,0 L65,0 L0,-135 Z" />
   </defs>
 
-  <g transform="scale(1.5)">
+  <g transform="scale(1.4)">
     <use href="#oif-segment" fill="var(--green)"  transform="rotate(0)"   />
     <use href="#oif-segment" fill="var(--purple)" transform="rotate(72)"  />
     <use href="#oif-segment" fill="var(--red)"    transform="rotate(144)" />
