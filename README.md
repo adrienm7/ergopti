@@ -17,15 +17,15 @@ Ergopti est une disposition de clavier ergonomique et optimisée possédant les 
   ![Couche AltGr](static/img/ergopti_altgr.jpg)
 - **Conservation de raccourcis usuels** : les raccourcis <kbd>Ctrl-{A, C, V, X, Z}</kbd> sont disponibles à gauche du clavier ;
   ![Couche Ctrl](static/img/ergopti_ctrl.jpg)
-- Support de tous les caractères spéciaux utilisés en français (diacritiques, majuscules accentuées, lettres entrelacées, symboles de ponctuation…) ;
+- Support de tous les caractères spéciaux utilisés en français (majuscules accentuées, lettres entrelacées, symboles de ponctuation…) ;
 - **Version « Ergopti + » avec de nombreuses autres fonctionnalités** :
   ![Couche de base +](static/img/ergopti_plus.jpg)
   - touche <kbd>★</kbd> de répétition (par exemple <kbd>el★e</kbd> donne <kbd>elle</kbd>) ;
   - touche <kbd>★</kbd> d’abréviations (par exemple <kbd>pex★</kbd> donne <kbd>par exemple</kbd>) ;
-  - suppression de tous les SFBs restants (par exemple <kbd>,s</kbd> donne <kbd>sc</kbd>) ;
-  - la touche <kbd>q</kbd> donne <kbd>qu</kbd> ;
+  - suppression de tous les SFBs restants (par exemple <kbd>,t</kbd> donne <kbd>pt</kbd>) ;
+  - la touche <kbd>q</kbd> donne <kbd>qu</kbd> lorsque suivie d’une voyelle ;
   - divers raccourcis dont des tap-holds ;
-  - ajout de nouveaux roulements (par exemple <kbd>hc</kbd> donne <kbd>wh</kbd>) ;
+  - ajout de nouveaux roulements de confort (par exemple <kbd>hc</kbd> donne <kbd>wh</kbd>) ;
   - etc.
  
 ➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/telechargements#clavier_emulation.
