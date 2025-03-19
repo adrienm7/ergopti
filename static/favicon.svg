@@ -32,23 +32,28 @@
 
 <g transform="scale(1.85)">
     <path id="oif-segment-green" fill="#14b830"
-        stroke="#343048" stroke-width="4"
+        stroke="#edebf0" stroke-width="4"
+		class="segment"
         d="M 0 0 L 0 -135 A 135 135 0 0 1 128.8 -41.6 Z"
     />
     <path id="oif-segment-purple" fill="#9b36e2"
-        stroke="#343048" stroke-width="4"
+        stroke="#edebf0" stroke-width="4"
+		class="segment"
         d="M 0 0 L 128.8 -41.6 A 135 135 0 0 1 79.4 109.4 Z"
     />
     <path id="oif-segment-red" fill="#e83030"
-        stroke="#343048" stroke-width="4"
+        stroke="#edebf0" stroke-width="4"
+		class="segment"
         d="M 0 0 L 79.4 109.4 A 135 135 0 0 1 -79.4 109.4 Z"
     />
     <path id="oif-segment-blue" fill="#0088cc"
-        stroke="#343048" stroke-width="4"
+        stroke="#edebf0" stroke-width="4"
+		class="segment"
         d="M 0 0 L -79.4 109.4 A 135 135 0 0 1 -128.8 -41.6 Z"
     />
     <path id="oif-segment-yellow" fill="#f4c025"
-        stroke="#343048" stroke-width="4"
+        stroke="#edebf0" stroke-width="4"
+		class="segment"
         d="M 0 0 L -128.8 -41.6 A 135 135 0 0 1 0 -135 Z"
     />
 </g>
@@ -57,8 +62,8 @@
     <path 
 		transform="scale(14) rotate(180)"
 		style="
-			fill: transparent;
-			stroke: #343048;
+			fill: #343048;
+			stroke: #edebf0;
 			stroke-width: 3px;
 		"
 		class="star"
