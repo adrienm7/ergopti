@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
-	import AnalyseHypertextePlus from './analyse_ergopti+.svelte';
+	import AnalyseErgoptiPlus from './analyse_ergopti+.svelte';
 	import CommentComparer from './comment_comparer.svelte';
 	import Corpus from './corpus.svelte';
 
@@ -161,5 +161,5 @@
 		height="600px"
 	/>
 
-	<AnalyseHypertextePlus></AnalyseHypertextePlus>
+	<AnalyseErgoptiPlus></AnalyseErgoptiPlus>
 </div>
