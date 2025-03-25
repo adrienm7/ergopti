@@ -3,7 +3,6 @@
 	import NomPlus from '../composants/NomPlus.svelte';
 
 	import { page } from '$app/stores';
-	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
 
 	import { loadData } from '$lib/clavier/getData.js';
 	import { version, data_disposition, liste_versions } from '$lib/stores_infos.js';
@@ -55,7 +54,7 @@
 	}
 
 	// Exécuter la fonction après la mise à jour et au redimensionnement
-	afterUpdate(() => {
+	$effect(() => {
 		toggleOverflowMenu();
 		window.addEventListener('resize', toggleOverflowMenu);
 	});
@@ -67,13 +66,13 @@
 		<div style="margin:0; margin-left: 0.5em; padding:0; text-align: left; width:max-content">
 			<p style="margin:0; font-weight:bold">
 				<a href="/">Disposition <span class="morespace">clavier </span></a>
-				<span class="hyper" style="display:inline-block"
+				<span class="gradient1" style="display:inline-block"
 					><a href="/">Ergopti</a>
 					<span class="myselect">
 						<select
 							id="selection-version"
 							bind:value={versionValue}
-							on:change={handleVersionChange}
+							onchange={handleVersionChange}
 							data-version={versionValue}
 						>
 							{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
@@ -82,16 +81,16 @@
 				>
 			</p>
 			<p style="margin:0; padding-top: 0; padding-left: 0; font-size: 0.8em">
-				<strong class="hyper">Ergonomique et optimisée</strong>
+				<strong class="hyper" style="font-size:1.2em">Ergonomie optimisée</strong>
 				<span class="morespace2" style="color:white;"> pour le français, l’anglais et le code</span>
 			</p>
 		</div>
 	</div>
-	<input class="menu-btn" type="checkbox" id="menu-btn" on:click={toggleOverflowMenu} />
+	<input class="menu-btn" type="checkbox" id="menu-btn" onclick={toggleOverflowMenu} />
 	<label class="menu-icon" for="menu-btn"><span class="navicon" /></label>
 	<nav id="menu">
 		<div id="menu-pages">
-			<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} on:click={fermerMenu}>
+			<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} onclick={fermerMenu}>
 				<a href="/"
 					><i class="fa-duotone fa-keyboard"></i>
 					<span class="titre">Ergopti</span></a
@@ -99,7 +98,7 @@
 			</p>
 			<p
 				aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
-				on:click={fermerMenu}
+				onclick={fermerMenu}
 			>
 				<a href="/ergopti-plus"
 					><i class="fa-duotone fa-circle-star"></i>
@@ -108,7 +107,7 @@
 			</p>
 			<p
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
-				on:click={fermerMenu}
+				onclick={fermerMenu}
 			>
 				<a href="/benchmarks"
 					><span class="couleur"><i class="fa-duotone fa-chart-mixed"></i></span>
@@ -117,7 +116,7 @@
 			</p>
 			<p
 				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
-				on:click={fermerMenu}
+				onclick={fermerMenu}
 			>
 				<a href="/telechargements"
 					><i class="fa-duotone fa-download"></i>
@@ -126,7 +125,7 @@
 			</p>
 			<p
 				aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
-				on:click={fermerMenu}
+				onclick={fermerMenu}
 			>
 				<a href="/informations"
 					><i class="fa-duotone fa-circle-info"></i>
@@ -140,7 +139,7 @@
 			</p>
 			<hr />
 			<br />
-			<div id="page-toc-mobile" on:click={fermerMenu}></div>
+			<div id="page-toc-mobile" onclick={fermerMenu}></div>
 			<div style="height:70px"></div>
 		</div>
 	</nav>
