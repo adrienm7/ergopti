@@ -21,15 +21,12 @@ nom-disposition-plus {
 }
 
 .gradient1 {
-	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
-	margin: -0.5em;
-	-webkit-background-clip: text;
+	background: linear-gradient(#f2dfff, #db4bff);
 	background-clip: text;
+	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
-	color: transparent;
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
-	background-image: linear-gradient(to top, var(--gradient-purple));
+	-moz-background-clip: text;
+	-moz-text-fill-color: transparent;
 }
 
 .htexte {

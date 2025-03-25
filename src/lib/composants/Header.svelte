@@ -66,7 +66,7 @@
 		<div style="margin:0; margin-left: 0.5em; padding:0; text-align: left; width:max-content">
 			<p style="margin:0; font-weight:bold">
 				<a href="/">Disposition <span class="morespace">clavier </span></a>
-				<span class="gradient1" style="display:inline-block"
+				<span class="hyper" style="display:inline-block"
 					><a href="/">Ergopti</a>
 					<span class="myselect">
 						<select
