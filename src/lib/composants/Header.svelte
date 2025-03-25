@@ -81,7 +81,7 @@
 				>
 			</p>
 			<p style="margin:0; padding-top: 0; padding-left: 0; font-size: 0.8em">
-				<strong class="hyper" style="font-size:1.2em">Ergonomie optimisée</strong>
+				<strong class="hyper" style="font-size:1.1em">Ergonomie optimisée</strong>
 				<span class="morespace2" style="color:white;"> pour le français, l’anglais et le code</span>
 			</p>
 		</div>

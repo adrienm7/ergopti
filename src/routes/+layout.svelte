@@ -12,12 +12,11 @@
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
-	import { afterUpdate, beforeUpdate, onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { navigating } from '$app/stores';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
-	import { matomo } from '$lib/js/code-matomo.js';
 	import { makeIds } from '$lib/js/make-ids.js';
 	import tocbot from 'tocbot';
 
@@ -43,7 +42,6 @@
 	import '$lib/icons/fontawesome/css/duotone.min.css';
 
 	onMount(() => {
-		matomo(true); /* Lancer Matomo lors de l’arrivée sur le site */
 		tocbot.init({
 			// Where to render the table of contents.
 			tocSelector: '#page-toc',
@@ -61,13 +59,7 @@
 		});
 	});
 
-	/* Lancer Matomo lors du changement de page */
-	$: if ($navigating) {
-		/* Il est nécessaire de modifier le titre et l’url, car sinon ils sont identiques à la page d’entrée */
-		matomo(false, $navigating.to.url.pathname, 'https://ergopti.fr' + $navigating.to.url.pathname);
-	}
-
-	afterUpdate(() => {
+	$effect(() => {
 		makeIds(document.getElementById('main-content'));
 		document.querySelectorAll('h2').forEach(function (h2) {
 			h2.setAttribute('data-aos', 'zoom-out');
