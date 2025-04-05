@@ -12,9 +12,8 @@
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
-	import { onMount } from 'svelte';
+	import { afterUpdate, onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { navigating } from '$app/stores';
 	import AOS from 'aos';
 	import { typography } from '$lib/js/typography.js';
 	import { makeIds } from '$lib/js/make-ids.js';
@@ -59,7 +58,7 @@
 		});
 	});
 
-	$effect(() => {
+	afterUpdate(() => {
 		makeIds(document.getElementById('main-content'));
 		document.querySelectorAll('h2').forEach(function (h2) {
 			h2.setAttribute('data-aos', 'zoom-out');
