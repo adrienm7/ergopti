@@ -45,7 +45,7 @@
 
 	let liste_benchmarks_code = [
 		['Chained Code Bigrams 7 (1M)', 'chained_code_bigrams_7'],
-		['Programming Ponctuation (10K)', 'programming_punctuation'],
+		['Programming Punctuation (10K)', 'programming_punctuation'],
 		['Python for Everybody (437K)', 'python_for_everybody'],
 		['Think C++ (330K)', 'think_c++'],
 		['Think Java (380K)', 'think_java'],
