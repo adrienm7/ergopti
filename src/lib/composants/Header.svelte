@@ -62,7 +62,7 @@
 
 <header>
 	<div class="header-logo">
-		<a href="/"><img src="img/logo/logo_black.png" class="logo" /></a>
+		<a href="/"><img src="img/logo/logo.svg" class="logo" /></a>
 		<div style="margin:0; margin-left: 0.5em; padding:0; text-align: left; width:max-content">
 			<p style="margin:0; font-weight:bold">
 				<a href="/">Disposition <span class="morespace">clavier </span></a>
