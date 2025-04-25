@@ -187,25 +187,9 @@
 		background-image: inherit;
 		border: none;
 		font-weight: bold;
-		width: min-content;
+		width: 2.3em;
 		-webkit-appearance: none;
 		-moz-appearance: none;
-	}
-
-	#selection-version[data-version='1.1'],
-	#selection-version[data-version='2.0'],
-	#selection-version[data-version='2.1'] {
-		width: 2.6em;
-	}
-
-	#selection-version[data-version='1.0.12'],
-	#selection-version[data-version='1.0.16'],
-	#selection-version[data-version='1.0.19'] {
-		width: 4em;
-	}
-
-	#selection-version[data-version='1.0.5'] {
-		width: 3.4em;
 	}
 
 	.myselect {
@@ -213,7 +197,7 @@
 		display: inline-block;
 		margin: 0;
 		padding: 0;
-		padding-right: 0.15em;
+		padding-right: 0.25em;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
 		color: transparent;
@@ -227,12 +211,12 @@
 		content: '';
 		position: absolute;
 		right: 0px;
-		top: 9px;
+		top: 0.3em;
 		width: 0;
 		height: 0;
-		border-left: 8px solid transparent;
-		border-right: 8px solid transparent;
-		border-top: 8px solid rgb(255, 255, 255);
+		border-left: 0.45em solid transparent;
+		border-right: 0.45em solid transparent;
+		border-top: 0.7em solid rgb(255, 255, 255);
 		pointer-events: none;
 	}
 

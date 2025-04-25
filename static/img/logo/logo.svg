@@ -19,7 +19,7 @@
 	*/
 
     .segment {
-		stroke: var(--border) !important;
+		stroke: var(--background) !important;
     }
 
     .star {
@@ -35,7 +35,7 @@
 
 <g transform="scale(1.8)">
     <path id="oif-segment-green" fill="#14b830"
-        stroke="#edebf0" stroke-width="3"
+        stroke="#343048" stroke-width="3"
 		transform="rotate(0)"
 		class="segment"
         d="M74.363-55.96a96 96 0 0 0-12.776-22.795 100 100 90 0 0-92.302-16.446
@@ -43,7 +43,7 @@
          66.76-21.727a96 96 0 0 1 3.588 44.171 96 96 0 0 0 4.015-78.403z"
     />
     <path id="oif-segment-purple" fill="#9b36e2"
-        stroke="#edebf0" stroke-width="3"
+        stroke="#343048" stroke-width="3"
 		transform="rotate(72)"
 		class="segment"
         d="M74.363-55.96a96 96 0 0 0-12.776-22.795 100 100 90 0 0-92.302-16.446
@@ -51,7 +51,7 @@
          66.76-21.727a96 96 0 0 1 3.588 44.171 96 96 0 0 0 4.015-78.403z"
     />
     <path id="oif-segment-red" fill="#e83030"
-        stroke="#edebf0" stroke-width="3"
+        stroke="#343048" stroke-width="3"
 		transform="rotate(144)"
 		class="segment"
         d="M74.363-55.96a96 96 0 0 0-12.776-22.795 100 100 90 0 0-92.302-16.446
@@ -59,7 +59,7 @@
          66.76-21.727a96 96 0 0 1 3.588 44.171 96 96 0 0 0 4.015-78.403z"
     />
     <path id="oif-segment-blue" fill="#0088cc"
-        stroke="#edebf0" stroke-width="3"
+        stroke="#343048" stroke-width="3"
 		transform="rotate(216)"
 		class="segment"
         d="M74.363-55.96a96 96 0 0 0-12.776-22.795 100 100 90 0 0-92.302-16.446
@@ -67,7 +67,7 @@
          66.76-21.727a96 96 0 0 1 3.588 44.171 96 96 0 0 0 4.015-78.403z"
     />
     <path id="oif-segment-yellow" fill="#f4c025"
-        stroke="#edebf0" stroke-width="3"
+        stroke="#343048" stroke-width="3"
 		transform="rotate(288)"
 		class="segment"
         d="M74.363-55.96a96 96 0 0 0-12.776-22.795 100 100 90 0 0-92.302-16.446
@@ -80,9 +80,9 @@
     <path 
 		transform="scale(14) rotate(180) translate(-0.025 -0.3)"
 		style="
-			stroke: #343048;
-			fill: #edebf0;
-			stroke-width: 1px;
+			stroke: #edebf0;
+			fill: #343048;
+			stroke-width: 0.9px;
 		"
 		class="star"
 		d="M0-16 3.652-4.76h11.817l-9.56 6.944 3.65 11.24L0 6.474l-9.561 6.947
