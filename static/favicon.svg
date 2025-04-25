@@ -8,12 +8,15 @@
 		--border: #edebf0 !important;
     }
 
+	/* It looks better even in dark mode */
+	/*
     @media (prefers-color-scheme: dark) {
 		:root {
 			--background: #edebf0 !important;
 			--border: #343048 !important;
 		}
     }
+	*/
 
     .segment {
 		stroke: var(--border) !important;
