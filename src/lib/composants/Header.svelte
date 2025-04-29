@@ -277,7 +277,7 @@
 	}
 
 	.logo {
-		height: calc(0.8 * var(--hauteur-header));
+		height: calc(0.85 * var(--hauteur-header));
 		margin-top: 3px;
 		/*  
 		margin-right: 10px;
