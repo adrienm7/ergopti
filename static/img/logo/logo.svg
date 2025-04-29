@@ -4,22 +4,24 @@
 <style>
     :root {
 		color-scheme: light dark;
-		--background: #343048 !important;
-		--border: #edebf0 !important;
+		--black: #343048;
+		--white: #edebf0;
+
+		--background: var(--white);
+		--border:  var(--black);
     }
 
-	/* It looks better even in dark mode */
 	/*
     @media (prefers-color-scheme: dark) {
 		:root {
-			--background: #edebf0 !important;
-			--border: #343048 !important;
+		--background: var(--black);
+		--border: var(--white);
 		}
     }
 	*/
 
     .segment {
-		stroke: var(--background) !important;
+		stroke: var(--black) !important;
     }
 
     .star {
@@ -33,7 +35,7 @@
 </style>
 
 
-<g transform="scale(1.8)">
+<g transform="scale(1.8) rotate(-36)">
     <path id="oif-segment-green" fill="#14b830"
         stroke="#343048" stroke-width="3"
 		transform="rotate(0)"
