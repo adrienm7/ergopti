@@ -11,9 +11,10 @@
 	<li><kbd>P'</kbd> ➜ <kbd-sortie>CT</kbd-sortie>.</li>
 </ul>
 <p>
-	Le roulement <kbd>CH</kbd> était déjà l’un des atouts majeur de la disposition <Nom />, car cette
-	combinaison est très fréquente et ce roulement la rend extrêmement confortable. L’ajout du
-	roulement donnant <kbd-sortie>WH</kbd-sortie> permet d’avoir une frappe en anglais encore plus fluide.
+	Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Nom />, car cette
+	combinaison est très fréquente et se produit en roulement, ce qui la rend extrêmement confortable.
+	L’ajout du roulement donnant <kbd-sortie>WH</kbd-sortie> permet d’avoir une frappe en anglais encore
+	plus fluide.
 </p>
 <p>
 	Quant au roulement donnant <kbd-sortie>CT</kbd-sortie>, il permet d’éviter le pire <SFB></SFB> de la
