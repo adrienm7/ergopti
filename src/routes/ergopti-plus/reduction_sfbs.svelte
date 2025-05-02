@@ -85,7 +85,7 @@
 <BlocClavier nom="magique" />
 <mini-espace />
 <p>
-	La touche <kbd>★</kbd> est <span class="important">l’ajout majeur de</span>
+	La touche <kbd>★</kbd> est <span class="important">l’ajout principal de</span>
 	<NomPlus /> et mérite son excellent emplacement sous l’index gauche. Elle vient en remplacement de
 	la touche <kbd>J</kbd>
 	(mais pas le contenu des autres couches de la touche <kbd>J</kbd> tel qu’en

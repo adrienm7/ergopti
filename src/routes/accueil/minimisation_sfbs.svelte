@@ -15,7 +15,8 @@
 	<span class="important">devoir taper deux touches d’affilée avec exactement le même doigt</span>.
 	Par exemple, c’est taper <kbd>CE</kbd> en AZERTY : il faut d’abord utiliser le majeur gauche pour
 	descendre d’une rangée et atteindre le <kbd>C</kbd>, puis remonter de deux rangées pour atteindre
-	le <kbd>E</kbd>. Avec <Nom />, le <kbd>C</kbd> est sur l’index droit sur la rangée du haut et le
+	le <kbd>E</kbd>. Avec <Nom />, le <kbd>C</kbd> est sur l’annulaire droit sur la rangée du haut et
+	le
 	<kbd>E</kbd> est directement sur la rangée du milieu, sur le majeur gauche.
 </p>
 <p>

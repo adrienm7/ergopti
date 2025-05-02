@@ -6,44 +6,52 @@
 
 <h2>Genèse et inspirations</h2>
 <p>
-	La genèse de la disposition <Nom></Nom> remonte à début 2022, suite à la découverte de la disposition <a
-		href="https://optimot.fr/">Optimot</a
-	>. À ce moment-là, j’étais un utilisateur du <a href="https://bepo.fr/">BÉPO</a> depuis déjà de nombreuses années.
-	Les améliorations d’Optimot par rapport au BÉPO sont significatives, avec notamment une forte diminution des bigrammes à un doigt (<SFB />s) et un meilleur placement des lettres pour l’anglais.
-	Cependant, l'idée d'apprendre Optimot, pour	peut-être découvrir encore par la suite une disposition encore meilleure, était peu attrayante.
+	La genèse de la disposition <Nom></Nom> remonte à début 2022, suite à la découverte de la disposition
+	<a href="https://optimot.fr/">Optimot</a>. À ce moment-là, j’étais un utilisateur du
+	<a href="https://bepo.fr/">BÉPO</a>
+	depuis déjà de nombreuses années. Les améliorations d’Optimot par rapport au BÉPO sont significatives,
+	avec notamment une forte diminution des bigrammes à un doigt (<SFB />s) et un meilleur placement
+	des lettres pour l’anglais. Cependant, l'idée d'apprendre Optimot, pour peut-être découvrir encore
+	par la suite une disposition encore meilleure, était peu attrayante.
 </p>
 <p>
-	Pour m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions, toutes meilleures les unes que les autres, la solution a été radicale : développer la mienne, optimisée pour mes besoins.
-	Évidemment, une telle tâche nécessite un investissement en temps considérable.
-	Il faut déjà comprendre ce qui fait une bonne disposition, puis réarranger les touches pour en créer une au moins aussi bonne, si ce n’est meilleure, que les autres dispositions déjà disponibles.
-	Enfin, il faut tester soi-même la disposition, car certains défauts n’apparaissent pas toujours sur un analyseur théorique. Et pour la tester, il faut réapprendre totalement à taper au clavier.
+	Pour m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions, toutes
+	meilleures les unes que les autres, la solution a été radicale : développer la mienne, optimisée
+	pour mes besoins. Évidemment, une telle tâche nécessite un investissement en temps considérable.
+	Il faut déjà comprendre ce qui fait une bonne disposition, puis réarranger les touches pour en
+	créer une au moins aussi bonne, si ce n’est meilleure, que les autres dispositions déjà
+	disponibles. Enfin, il faut tester soi-même la disposition, car certains défauts n’apparaissent
+	pas toujours sur un analyseur théorique. Et pour la tester, il faut réapprendre totalement à taper
+	au clavier.
 </p>
 
 <mini-espace />
 
-<p>Les premières versions de ce projet, baptisées <span class="important"
-	>Optim7</span
+<p>
+	Les premières versions de ce projet, baptisées <span class="important"
+		><a href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux">Optim7</a></span
 	>, étaient des dérivés directs d'Optimot. L'objectif initial était de peaufiner légèrement les
-	scores sur les analyseurs de disposition existants et de corriger des choix qui ne me convenaient pas.
-	Par exemple, je voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot, l’auteur préférant y mettre les symboles.
+	scores sur les analyseurs de disposition existants et de corriger des choix qui ne me convenaient
+	pas. Par exemple, je voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot,
+	l’auteur préférant y mettre les symboles.
 </p>
 <p>
-	Rapidement, <Nom></Nom> s'éloigna d'Optimot sur plusieurs aspects fondamentaux. L'un des points
-	clés était ma volonté d'optimiser les <i>roulements</i>, entraînant de nombreux tests de
-	dispositions des touches de la homerow, notamment sur la partie droite avec les consonnes.
-	Un des choix majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le
-	<kbd>TSRN</kbd> du BÉPO et d’Optimot.
-	En effet, le bigramme <kbd>NT</kbd> est le plus fréquent des bigrammes consonne-consonne, et il semblait pertinent de l'optimiser
-	pour qu'il se réalise sur des doigts consécutifs. D’autant que <kbd>NTR</kbd> se réalise également en roulement.
+	Rapidement, <Nom></Nom> s'éloigna d'Optimot sur plusieurs aspects fondamentaux. L'un des points clés
+	était ma volonté d'optimiser les <i>roulements</i>, entraînant de nombreux tests de dispositions
+	des touches de la homerow, notamment sur la partie droite avec les consonnes. Un des choix majeurs
+	fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le
+	<kbd>TSRN</kbd> du BÉPO et d’Optimot. En effet, le bigramme <kbd>NT</kbd> est le plus fréquent des
+	bigrammes consonne-consonne, et il semblait pertinent de l'optimiser pour qu'il se réalise sur des
+	doigts consécutifs. D’autant que <kbd>NTR</kbd> se réalise également en roulement.
 </p>
 <p>
-	L’agencement final des quatre lettres de la rangée principale droite a été soigneusement conçu pour
-	maximiser les bigrammes consonantiques, avec une disposition harmonieuse. Seuls les bigrammes <kbd
+	L’agencement final des quatre lettres de la rangée principale droite a été soigneusement conçu
+	pour maximiser les bigrammes consonantiques, avec une disposition harmonieuse. Seuls les bigrammes <kbd
 		>ST</kbd
 	>
 	et
 	<kbd>TS</kbd> (comme dans « <kbd>ST</kbd>A<kbd>TS</kbd> ») ne profitent malheureusement pas de cette
-	optimisation en roulement.
+	optimisation de roulements.
 </p>
 <p>
 	La disposition a beaucoup évoluée au fil du temps. En particulier, la touche sur l’index gauche a
@@ -53,9 +61,9 @@
 	et le déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 </p>
 <p>
-	Bien que la création de <Nom></Nom> ait été un processus étalé sur plusieurs années, près
-	de 90% de la disposition est restée constante. Les ajustements concernaient principalement le déplacement
-	de certaines lettres, nécessitant ainsi des phases de réapprentissage régulières. Néanmoins, la plupart
+	Bien que la création de <Nom></Nom> ait été un processus étalé sur plusieurs années, près de 90% de
+	la disposition est restée constante. Les ajustements concernaient principalement le déplacement de
+	certaines lettres, nécessitant ainsi des phases de réapprentissage régulières. Néanmoins, la plupart
 	des changements se sont avérés non pertinents, ce qui explique l'absence de modifications majeures
 	entre les premières versions d’Optim7 et la version finale de <Nom></Nom>.
 </p>
@@ -63,23 +71,23 @@
 <mini-espace />
 
 <p>
-	À un certain stade de développement, il devint évident que ma disposition « Optim7 » n'était plus simplement
-	une variante d'Optimot. Le besoin de renommer ce projet s’est alors imposé. Grâce à la suggestion
-	d’un utilisateur nommé <strong>Zigmund</strong> sur Discord, après avoir longtemps cherché avec lui un nom
-	aussi remarquablement bien trouvé que celui d’Optimot, le nom <span class="important"
-	>HyperTexte</span
-	> fut d’abord retenu.
-	Cependant, il s’avéra par la suite que ce nom était mal choisi, car déjà utilisé sur de nombreux sites ailleurs (ce qui n’est pas étonnant, cf. « lien hypertexte »).
-	La découverte de la disposition, notamment grâce à un moteur de recherche, s'en trouvait compromise.
-	Le site de présentation n’apparaissait même pas en première page des résultats.
+	À un certain stade de développement, il devint évident que ma disposition « Optim7 » n'était plus
+	simplement une variante d'Optimot. Le besoin de renommer ce projet s’est alors imposé. Grâce à la
+	suggestion d’un utilisateur nommé <strong>Zigmund</strong> sur Discord, après avoir longtemps
+	cherché avec lui un nom aussi remarquablement bien trouvé que celui d’Optimot, le nom
+	<span class="important">HyperTexte</span> fut d’abord retenu. Cependant, il s’avéra par la suite que
+	ce nom était mal choisi, car déjà utilisé sur de nombreux sites ailleurs (ce qui n’est pas étonnant,
+	cf. « lien hypertexte »). La découverte de la disposition, notamment grâce à un moteur de recherche,
+	s'en trouvait compromise. Le site de présentation n’apparaissait même pas en première page des résultats.
 </p>
 <p>
-	Environ un mois après la sortie publique de la disposition, HyperTexte fut renommée <Nom></Nom>, son nom final.
-	Ce nouveau nom reflète à la fois l’ergonomie de la disposition et l’optimisation de celle-ci, la lettre <kbd>O</kbd> faisant le lien entre les deux (ergo[nomie] & opti[misation]).
-	En outre, il est court, d’une longueur idéale de 7 lettres, et peu présent en ligne.
-	Ce nouveau nom adopté, le nom de domaine <a href = "https://ergopti.fr">https://ergopti.fr</a> fut également acquéri à ce moment-là.
+	Environ un mois après la sortie publique de la disposition, HyperTexte fut renommée <Nom></Nom>,
+	son nom final. Ce nouveau nom reflète à la fois l’ergonomie de la disposition et l’optimisation de
+	celle-ci, la lettre <kbd>O</kbd> faisant le lien entre les deux (ergo[nomie] & opti[misation]). En
+	outre, il est court, d’une longueur idéale de 7 lettres, et peu présent en ligne. Ce nouveau nom
+	adopté, le nom de domaine <a href="https://ergopti.fr">https://ergopti.fr</a> fut également acquéri
+	à ce moment-là.
 </p>
-
 
 <h3>Comment la disposition a été créée</h3>
 <p>
@@ -140,9 +148,9 @@
 	pour y loger tous les symboles.
 </p>
 <p>
-	Ainsi, plus besoin d’étendre les doigts pour atteindre la rangée des chiffres pour
-	taper des parenthèses, guillemets ou opérateurs mathématiques. En outre, les chiffres sont quant à
-	eux passés en accès direct, un changement très appréciable lors de l'utilisation quotidienne.
+	Ainsi, plus besoin d’étendre les doigts pour atteindre la rangée des chiffres pour taper des
+	parenthèses, guillemets ou opérateurs mathématiques. En outre, les chiffres sont quant à eux
+	passés en accès direct, un changement très appréciable lors de l'utilisation quotidienne.
 </p>
 
 <h3>
