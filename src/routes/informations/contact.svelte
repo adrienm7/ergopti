@@ -15,7 +15,7 @@
 		ou un problème, notamment pour l’installation.
 	</p>
 	<p class="margin0">
-		Il est aussi possible de rejoindre le <a href="https://discord.com/invite/ymt5uCTudW"
+		Il est aussi possible de rejoindre le <a href="https://discord.gg/ptxRzBqcQP"
 			>serveur Discord BÉPO | Ergodis</a
 		>
 		où <Nom></Nom> dispose d’un canal dédié, simplifiant les échanges.
