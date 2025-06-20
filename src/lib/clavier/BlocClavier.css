@@ -30,7 +30,7 @@ bloc-clavier {
 	border: 1px solid hsla(227, 100%, 8%, 0.8);
 	border-radius: 7px; /* Arrondi des coins du clavier */
 	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
-	font-weight: lighter; /* La graisse est trop "grosse" pour les labels de touches sinon */
+	font-weight: 300; /* La graisse est trop "grosse" pour les labels de touches sinon */
 }
 
 bloc-ligne {
