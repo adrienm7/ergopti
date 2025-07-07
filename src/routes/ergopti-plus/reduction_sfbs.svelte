@@ -37,9 +37,9 @@
 	petits <SFB />s restants. La disposition <Nom /> éliminait déjà la majorité d’entre eux.
 </p>
 
-<h3>Utilisation de la touche <kbd>È</kbd></h3>
+<h3>Utilisation des touches <kbd>È</kbd> et <kbd>Ê</kbd></h3>
 <p>
-	La touche <kbd>È</kbd> permet de se débarrasser des quelques <SFB />s se trouvant sur la main
+	Les touches <kbd>È</kbd> et <kbd>Ê</kbd> permettent de se débarrasser des quelques <SFB />s se trouvant sur la main
 	gauche. Plus particulièrement, ce sont les <SFB />s sur les touches
 	<kbd>I</kbd>,
 	<kbd>E</kbd>
@@ -48,19 +48,27 @@
 </p>
 <ul class="margin-top-2">
 	<li>
-		<kbd>ÈO</kbd> ➜ <kbd-sortie>EO</kbd-sortie> et <kbd>ÈE</kbd> ➜ <kbd-sortie>OE</kbd-sortie> ;
+		<kbd>ÈO</kbd> ➜ <kbd-sortie>OE</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>È,</kbd> ➜ <kbd-sortie>U,</kbd-sortie> et <kbd>È.</kbd> ➜ <kbd-sortie>U.</kbd-sortie> ;
+		<kbd>ÈE</kbd> ou <kbd>ÊE</kbd> ➜ <kbd-sortie>EO</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>ÈY</kbd> ➜ <kbd-sortie>IÉ</kbd-sortie> et <kbd>YÈ</kbd> ➜ <kbd-sortie>ÉI</kbd-sortie>.
+		<kbd>È,</kbd> ou <kbd>Ê,</kbd> ➜ <kbd-sortie>U,</kbd-sortie> ;
+	</li>
+	<li>
+		<kbd>È.</kbd> ou <kbd>Ê.</kbd> ➜ <kbd-sortie>U.</kbd-sortie> ;
+	</li>
+	<li>
+		<kbd>ÈY</kbd> ➜ <kbd-sortie>IÉ</kbd-sortie> ;
+	</li>
+	<li>
+		<kbd>YÈ</kbd> ➜ <kbd-sortie>ÉI</kbd-sortie>
 	</li>
 	<p>
-		Même si, idéalement, cela devrait plutôt être l’inverse afin d’être plus logique (le son YÈ
-		donnant IÉ). Toutefois,
-		<kbd-sortie>IÉ</kbd-sortie> étant beaucoup plus fréquent, il mérite d’avoir le roulement vers l’intérieur
-		qui est plus confortable.
+		Idéalement, cela devrait plutôt être l’inverse afin d’être plus logique (le son YÈ donnant IÉ).
+		Toutefois, <kbd-sortie>IÉ</kbd-sortie> étant beaucoup plus fréquent,
+		il mérite d’avoir le roulement vers l’intérieur qui est plus confortable.
 	</p>
 </ul>
 <h3>Utilisation de roulements</h3>
