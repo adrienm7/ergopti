@@ -1098,7 +1098,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
                 if (el := UIA.GetFocusedElement()) and el.IsTextPatternAvailable {
                     Selection := el.GetSelection()[1].GetText()
                 }
-                SendInput(LeftSymbol Selection RightSymbol) ; SendInputi instead of Send to not activate the hotstrings
+                SendInput(LeftSymbol Selection RightSymbol) ; SendInput instead of Send to not activate the hotstrings
                 return
             }
         }
