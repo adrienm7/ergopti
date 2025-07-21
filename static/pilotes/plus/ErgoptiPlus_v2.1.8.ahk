@@ -1,10 +1,15 @@
 #Requires Autohotkey v2.0+
 #SingleInstance Force
-#include UIA\Lib\UIA.ahk ;https://github.com/Descolada/UIA-v2/tree/main
-InstallKeybdHook
 SetWorkingDir(A_ScriptDir) ; Ensures a consistent starting directory
-A_MenuMaskKey := "vkff"  ; Change the masking key to something
+InstallKeybdHook
+
+#Warn All
+#Warn VarUnset, Off ; Désactive les avertissements de variables non définies causé par l’import de UIA
+
+#include *i UIA\Lib\UIA.ahk ; Doit être téléchargé ici : https://github.com/Descolada/UIA-v2/tree/main, *i = pas d’erreur si le fichier n’existe pas
+
 #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t  
+A_MenuMaskKey := "vkff"  ; Change the masking key to something
 
 global clavier_iso := 1		; 0 = clavier ZMK 		 | 	1 = clavier ISO. Le clavier ZMK désactive les tap-holds pour éviter les conflits.
 global pilote_azerty := 1	; 0 = pilote Ergopti	 | 	1 = pilote AZERTY. En mettant cette variable à 1, plus besoin de changer le pilote, le script va modifier chaque touche pour la faire correspondre à sa valeur en Ergopti.
@@ -99,11 +104,12 @@ global deadkey_indice_nb := { touche1: "₁", touche2: "₂", touche3: "₃", to
 	-----------------------------------------------------------   -----------   ---------------
 */
 
-*SC010::z ; Ctrl + È donne Ctrl + Z
-*SC056::x ; Ctrl + Ê donne Ctrl + X
-*SC02C::c ; Ctrl + É donne Ctrl + C
-*SC02D::v ; Ctrl + À donne Ctrl + V
-#SC02D::#v ; Win + À donne Win + V
+*SC010::z ; Remappe tous les modificateurs de la touche È en Z (^è ➜ ^z, #è ➜ #z, etc.)
+*SC056::x ; Remappe tous les modificateurs de la touche Ê en X (^ê ➜ ^x, #ê ➜ #x, etc.)
+*SC02C::c ; Remappe tous les modificateurs de la touche É en C (^é ➜ ^c, #é ➜ #c, etc.)
+*SC02D::v ; Remappe tous les modificateurs de la touche À en V (^à ➜ ^v, #à ➜ #v, etc.)
+
+#SC02D::#v ; Win + À ➜ Win + V. Ne devrait pas être nécessaire, car c'est déjà fait par le remappage *SC02D::v
 
 ; =========================
 ; ======= 1.1) Base =======
@@ -176,7 +182,7 @@ SC035::'
 ; ======= 1.2) Shift =======
 ; ==========================
 
-+SC039:: Send("{U+002D}") ; - sur la barre d’espace
++SC039:: WrapTextIfSelected("{U+002D}", "{U+002D}", "{U+002D}") ; - sur la barre d’espace
 
 ; === Rangée des chiffres ===
 
@@ -284,7 +290,7 @@ SC056:: Send("Ê")
 SC02E:: Send("★")
 SC02F:: Send(",")
 SC034:: Send("P")
-SC035:: WrapSelectedTextIfSelected("'", "'")
+SC035:: WrapTextIfSelected("'", "'", "'")
 #HotIf
 
 ; ==========================
@@ -296,7 +302,7 @@ SC035:: WrapSelectedTextIfSelected("'", "'")
 ; Mais le problème est que les remplacements de texte ne fonctionnent alors plus
 ; Ce problème est résolu en utilisant l’envoi Unicode ! (j’ai l’impression, à vérifier)
 
-^!SC039:: Send("_") ; Sur la barre d’espace
+^!SC039:: WrapTextIfSelected("_", "_", "_") ; Sur la barre d’espace
 
 ; === Rangée des chiffres ===
 ; ^!SC029::
@@ -315,46 +321,46 @@ SC035:: WrapSelectedTextIfSelected("'", "'")
 
 ; === Rangée du haut ===
 
-^!SC010:: WrapSelectedTextIfSelected("{U+0060}", "{U+0060}") ; `
-^!SC011:: Send("{U+0040}") ; @
+^!SC010:: WrapTextIfSelected("{U+0060}", "{U+0060}", "{U+0060}") ; `
+^!SC011:: WrapTextIfSelected("{U+0040}", "{U+0040}", "{U+0040}") ; @
 ^!SC012:: Send("œ")
 ^!SC013:: Send("ù") ; Sur W
-^!SC014:: WrapSelectedText('« ',' »')
-^!SC015:: Send(" »")
-^!SC016:: Send("{U+007E}") ; ~
-^!SC017:: Send("{U+0023}") ; #
+^!SC014:: WrapTextIfSelected("« ", '« ', ' »')
+^!SC015:: WrapTextIfSelected(" »", '« ', ' »')
+^!SC016:: WrapTextIfSelected("{U+007E}", "{U+007E}", "{U+007E}") ; ~
+^!SC017:: WrapTextIfSelected("{U+0023}", "{U+0023}", "{U+0023}") ; #
 ^!SC018:: Send("{U+00E7}") ; ç
-^!SC019:: Send("{U+002A}") ; *
-^!SC01A:: Send("{U+0025}") ; %
+^!SC019:: WrapTextIfSelected("{U+002A}", "{U+002A}", "{U+002A}") ; *
+^!SC01A:: WrapTextIfSelected("{U+0025}", "{U+0025}", "{U+0025}") ; %
 ^!SC01B:: Send(" ") ; Espace insécable
 
 ; === Rangée du milieu ===
-^!SC01E:: WrapSelectedText("{U+003C}", "{U+003E}") ; <
-^!SC01F:: Send("{U+003E}") ; >
-^!SC020:: WrapSelectedText("{U+007B}","{U+007D}") ; {
-^!SC021:: Send("{U+007D}") ; }
-^!SC022:: Send("{U+003A}") ; :
-^!SC023:: Send("{U+007C}") ; |
-^!SC024:: WrapSelectedText("{U+0028}", "{U+0029}") ; (
-^!SC025:: Send("{U+0029}") ; )
-^!SC026:: WrapSelectedText("{U+005B}","{U+005D}") ; [
-^!SC027:: Send("{U+005D}") ; ]
+^!SC01E:: WrapTextIfSelected("{U+003C}", "{U+003C}", "{U+003E}") ; <
+^!SC01F:: WrapTextIfSelected("{U+003E}", "{U+003C}", "{U+003E}") ; >
+^!SC020:: WrapTextIfSelected("{U+007B}", "{U+007B}", "{U+007D}") ; {
+^!SC021:: WrapTextIfSelected("{U+007D}", "{U+007B}", "{U+007D}") ; }
+^!SC022:: WrapTextIfSelected("{U+003A}", "{U+003A}", "{U+003A}") ; :
+^!SC023:: WrapTextIfSelected("{U+007C}", "{U+007C}", "{U+007C}") ; |
+^!SC024:: WrapTextIfSelected("{U+0028}", "{U+0028}", "{U+0029}") ; (
+^!SC025:: WrapTextIfSelected("{U+0029}", "{U+0028}", "{U+0029}") ; )
+^!SC026:: WrapTextIfSelected("{U+005B}", "{U+005B}", "{U+005D}") ; [
+^!SC027:: WrapTextIfSelected("{U+005D}", "{U+005B}", "{U+005D}") ; ]
 ^!SC028:: Send("’")
-^!SC02B:: Send("{U+0021}") ; !
+^!SC02B:: WrapTextIfSelected("{U+0021}", "{U+0021}", "{U+0021}") ; !
 
 ; === Rangée du bas ===
 
-^!SC056:: Send("{U+005E}") ; ^
-^!SC02C:: Send("{U+002F}") ; /
-^!SC02D:: Send("{U+005C}") ; \
-^!SC02E:: Send("{U+0022}") ; "
-^!SC02F:: Send("{U+003B}") ; ;
+^!SC056:: WrapTextIfSelected("{U+005E}", "{U+005E}", "{U+005E}") ; ^
+^!SC02C:: WrapTextIfSelected("{U+002F}", "{U+002F}", "{U+002F}") ; /
+^!SC02D:: WrapTextIfSelected("{U+005C}", "{U+005C}", "{U+005C}") ; \
+^!SC02E:: WrapTextIfSelected("{U+0022}", "{U+0022}", "{U+0022}") ; "
+^!SC02F:: WrapTextIfSelected("{U+003B}", "{U+003B}", "{U+003B}") ; ;
 ^!SC030:: Send("…")
-^!SC031:: Send("{U+0026}") ; &
-^!SC032:: Send("{U+0024}") ; $
-^!SC033:: Send("{U+003D}") ; =
-^!SC034:: Send("{U+002B}") ; + Défini à un autre endroit du code à cause d’un bug sur Excel
-^!SC035:: Send("{U+003F}") ; ?
+^!SC031:: WrapTextIfSelected("{U+0026}", "{U+0026}", "{U+0026}") ; &
+^!SC032:: WrapTextIfSelected("{U+0024}", "{U+0024}", "{U+0024}") ; $
+^!SC033:: WrapTextIfSelected("{U+003D}", "{U+003D}", "{U+003D}") ; =
+^!SC034:: WrapTextIfSelected("{U+002B}", "{U+002B}", "{U+002B}") ; +
+^!SC035:: WrapTextIfSelected("{U+003F}", "{U+003F}", "{U+003F}") ; ?
 
 ; ==================================
 ; ======= 1.4) Shift + AltGr =======
@@ -557,7 +563,7 @@ $SC038::
     SetCapsLockState("AlwaysOff")
 }
 $SC038 Up:: {
-    layer_actif := FALSE
+    global layer_actif := FALSE
     SetCapsLockState("AlwaysOff")
 }
 
@@ -1078,38 +1084,27 @@ selection_mot() {
     return ancien_clipboard
 }
 
-WrapSelectedText(LeftSymbol, RightSymbol) {
-    if WinActive("ahk_exe Code.exe") {
-        Send LeftSymbol
+WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
+    if not isSet(UIA) or WinActive("ahk_exe Code.exe") {
+        Send(Symbol)
         return
     }
 
-    try {
-        if (el := UIA.GetFocusedElement()) && el.IsTextPatternAvailable {
-            Selection := el.GetSelection()[1].GetText()
-            Send LeftSymbol Selection RightSymbol
-        } else {
-            Selection := ""
-            Send LeftSymbol RightSymbol
-        }
-    
-        if Selection = "" {
-            Loop parse, RightSymbol, "" {
-                Send '{Left}'
+    if isSet(UIA) {
+        el := UIA.GetFocusedElement()
+        if (el.IsTextPatternAvailable and el.GetSelection()[1].GetText() != "") {
+            try {
+                Selection := ""
+                if (el := UIA.GetFocusedElement()) and el.IsTextPatternAvailable {
+                    Selection := el.GetSelection()[1].GetText()
+                }
+                SendInput(LeftSymbol Selection RightSymbol) ; SendInputi instead of Send to not activate the hotstrings
+                return
             }
         }
-    } catch {
-        Send LeftSymbol
-    }
-}
-
-WrapSelectedTextIfSelected(LeftSymbol, RightSymbol) {
-    if (el := UIA.GetFocusedElement()) && el.IsTextPatternAvailable && el.GetSelection()[1].GetText() != "" {
-        WrapSelectedText(LeftSymbol, RightSymbol)
-        return
     }
 
-    Send LeftSymbol
+    Send(Symbol)
 }
 
 ; ==============================================================================================
