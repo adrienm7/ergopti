@@ -10,6 +10,7 @@ InstallKeybdHook
 
 #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t  
 A_MenuMaskKey := "vkff"  ; Change the masking key to something
+A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed in the interval
 
 global clavier_iso := 1		; 0 = clavier ZMK 		 | 	1 = clavier ISO. Le clavier ZMK désactive les tap-holds pour éviter les conflits.
 global pilote_azerty := 1	; 0 = pilote Ergopti	 | 	1 = pilote AZERTY. En mettant cette variable à 1, plus besoin de changer le pilote, le script va modifier chaque touche pour la faire correspondre à sa valeur en Ergopti.
@@ -541,6 +542,7 @@ SC02A Up:: Send("{LShift Up}")
         Send("{LCtrl Down}v{LCtrl Up}")
     }
 }
+SC01D Up:: Send("{LControl Up}")
 
 ; Tap-hold sur "Alt" : Layer en hold, Enter en tap
 $SC038::
@@ -1035,6 +1037,8 @@ SC03A::BackSpace
 #SC032::#d ; Win + D (Afficher le bureau)
 
 #SC020::#e ; Win + E (Explorer)
+
+#SC01F::#i ; Win + I
 
 #SC021:: ; Win + U (Uppercase)
 ; Convertit ce qui est sélectionné en majuscules
@@ -2608,7 +2612,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*:~_::~{Space}
 :*:*_::*{Space}
 :*?:=_::={Space}
-:*:abime::abîme
+:*:abim::abîm
 :*:accroit::accroît
 :*:affut::affût
 ::agé::âgé
@@ -3369,7 +3373,6 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*:mvts★::mouvements
 :*:mzq★::montrez que
 :*:n★::nouveau
-:*:nat★::Natixis
 :*:nav★::navigation
 :*:nb★::nombre
 :*:nbs★::nombres
@@ -3544,10 +3547,8 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*:rmd★::R Markdown
 :*:rmq★::remarque
 :*:rmqs★::remarques
-:*:rn★::risque-neutre
 :*:rpz★::représente
 :*:rs★::résultat
-:*:rsls★::risques spéciaux lignes spécialisées
 :*:rss★::résultats
 :*:rt★::risque technique
 :*:s★::sous
