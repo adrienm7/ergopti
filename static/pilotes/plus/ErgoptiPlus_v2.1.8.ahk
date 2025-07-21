@@ -523,16 +523,15 @@ SC00F Up:: Send("{LAlt Up}")
 ; Tap-hold sur LShift : Shift en hold, Ctrl + C en tap
 ~$SC02A::
 {
-    if (KeyWait("LShift", "T0.25") and (A_PriorKey == "LShift")) { ;  If released before
+    if (KeyWait("LShift", "T0.35") and (A_PriorKey == "LShift")) { ;  If released before
         Send("{LShift Up}")
         Send("{LCtrl Down}c{LCtrl Up}")
-        Send("{LControl Up}{RAlt Up}")
     }
 }
 SC02A Up:: Send("{LShift Up}")
 
 ; Tap-hold sur LControl : Ctrl en hold, Ctrl + V en tap
-~$SC01D::
+$SC01D::
 {
     tap := KeyWait("LControl", "T0.25")
     if (
@@ -615,6 +614,11 @@ SC01D & ~SC138::
             SendInput("{Tab}")
         }
     }
+}
+SC01D & ~SC138 Up::
+RAlt Up::
+{
+    Send("{SC138 Up}{LControl Up}")
 }
 #HotIf
 
