@@ -531,7 +531,7 @@ SC00F Up:: Send("{LAlt Up}")
 SC02A Up:: Send("{LShift Up}")
 
 ; Tap-hold sur LControl : Ctrl en hold, Ctrl + V en tap
-$SC01D::
+$SC01D:: ; ~ ne doit pas être utilisé ici, sinon [AltGr] [AltGr] … [AltGr] qui est censé donner plusieurs fois Tab, va soudain se bloquer et activer Ctrl
 {
     tap := KeyWait("LControl", "T0.25")
     if (
@@ -609,7 +609,7 @@ SC01D & ~SC138::
         } else if GetKeyState("Shift") {
             SendInput("+{Tab}")
         } else if GetKeyState("LWin") {
-            SendInput("#{Tab}")
+            SendEvent("#{Tab}") ; SendInput ne fonctionne pas ici
         } else {
             SendInput("{Tab}")
         }
@@ -1725,7 +1725,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 ; Pour fermer des balises HTML plus confortablement
 :*?:<@::
 {
-    Send("</")
+    SendInput("</") ; SendInput au lieu de SendEvent, car Sinon </div> devient </divi à cause du tap-hold sur AltGr
 }
 
 ; Pour éviter le SFB ÉI
@@ -1785,11 +1785,11 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 ; Meilleur moyen de commenter, avec un roulement
 :*?:\"::
 {
-    Send("/*")
+    SendInput("/*") ; SendInput évite que d’autres hotstrings s’activent
 }
 :*?:"\::
 {
-    Send("*/")
+    SendInput("*/") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; ===========================================
@@ -1802,14 +1802,14 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*?:#ç::
 :*?:#!::
 {
-    Send(" := ")
+    SendInput(" := ") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; Roulement !=
 :*?:ç#::
 :*?:!#::
 {
-    Send(" {!}= ")
+    SendInput(" {!}= ") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; wh
@@ -1867,36 +1867,37 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 ; Roulement = ""
 :*?:[)::
 {
-    Send(" = `"`"{Left}")
+    SendInput(" = `"`"{Left}") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; Roulement ("
 :*?:(#::
 {
-    Send("(`"`"){Left 2}")
+    SendInput("(`"`"){Left 2}") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; Roulement ["
 :*?:[#::
 {
-    Send("[`"`"]{Left 2}")
+    SendInput("[`"`"]{Left 2}") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; ======= Rangée du bas =======
 
+; Roulement = ``
 :*?:=$::
 {
-    Send(" = `"`"{Left}")
+    SendInput(" = `"`"{Left}") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; Roulement assignation
 :*?:+?::
 {
-    Send("➜")
+    SendInput("➜") ; SendInput évite que d’autres hotstrings s’activent
 }
 :*?:?+::
 {
-    Send(" <- ")
+    SendInput(" <- ") ; SendInput évite que d’autres hotstrings s’activent
 }
 
 ; ct
