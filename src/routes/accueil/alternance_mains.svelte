@@ -21,7 +21,7 @@
 </p>
 <p>
 	Si la touche suivante est sur la même main que la touche précédente (sauf éventuellement avec un
-	roulement, cf. le point suivant), la frappe sera moins confortable. Imaginez que vous deviez
+	roulement, cf. la partie suivante), la frappe sera moins confortable. Imaginez que vous deviez
 	atteindre le <kbd>C</kbd>
 	de l’AZERTY, puis le <kbd>R</kbd>, pour écrire <kbd>CR</kbd>, un bigramme très courant en français
 	et anglais. Dans ce cas, vous devez d’abord légèrement abaisser votre main pour que le majeur
