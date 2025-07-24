@@ -35,7 +35,7 @@
 		'nt',
 		'ntr',
 		'pl',
-		'pr',
+		'cr',
 		'rs',
 		'sh',
 		'th',
@@ -110,8 +110,8 @@
 		<kbd>ND</kbd> notamment pour tous les A<span class="hyper text-bold">ND</span> en anglais ;
 	</li>
 	<li><kbd>NG</kbd> pour tous les -I<span class="hyper text-bold">NG</span> en anglais ;</li>
-	<li><kbd>TH</kbd> ;</li>
-	<li><kbd>PR</kbd> ;</li>
+	<li><kbd>TH</kbd> bigramme le plus fréquent (et de loin) en anglais ;</li>
+	<li><kbd>CR</kbd> ;</li>
 	<li><kbd>GR</kbd>.</li>
 </ul>
 <h3>Autres bons bigrammes</h3>
