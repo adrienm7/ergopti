@@ -618,7 +618,7 @@ SC01D & ~SC138::
 SC01D & ~SC138 Up::
 RAlt Up::
 {
-    Send("{SC138 Up}{LControl Up}")
+    Send("{RAlt Up}{SC138 Up}{LControl Up}")
 }
 #HotIf
 
@@ -648,6 +648,12 @@ OneShotShift() {
     } else {
         texte := Format("{:T}", ihvText.Input) ; Passe en titelcase
     }
+    ; Le code ci-dessous permet d’activer les hotstrings avant l’envoi de la majuscule
+    Send("{Space}")
+    SendMode("Input")
+    Sleep(100)
+    SendMode("Event")
+    Send("{Backspace}")
     Send(texte)
 }
 
@@ -1044,6 +1050,98 @@ SC03A::BackSpace
 
 #SC01F::#i ; Win + I
 
+#SC031:: ; Win + M (Mot)
+; Sélectionne le mot
+{
+    selection_mot()
+}
+
+#SC012:: ; Win + O pour entourer de parenthèses la ligne
+{
+    Send("{Home}{(}{End}{)}{Home}")
+}
+
+#HotIf !WinActive("ahk_exe explorer.exe")
+#SC024:: ; Win + S (Search)
+; Recherche Google de ce qui est sélectionné.
+; Si c’est sous la forme d’un chemin de fichier (C:\chemin\lien) ou d’une URL (protocole://lien), celui-ci est ouvert
+{
+    clipboard := A_Clipboard
+    Send("^c") ; Copier ce qui est sélectionné
+    Sleep(300)
+    lien_d_une_url := RegExMatch(A_Clipboard, "\w{3,}://.*") ; Booléen
+    lien_d_un_site := RegExMatch(A_Clipboard, "([\w\.-]{1,20}\.){0,4}[\w\.-]{2,20}\.[\w\.-]{2,6}.*") ; Booléen
+    lien_d_un_fichier := RegExMatch(A_Clipboard, "\w:[\\/]\w.*") ; Booléen, on échappe le \ avec \\ car c’est un caractère spécial
+    if lien_d_un_fichier {
+        Run "explorer.exe"
+        if WinWait("Explorateur de fichiers", , 3) {
+            ; Navigateur Ouvert
+            WinActivate("Explorateur de fichiers") ; On place le focus sur l’application pour être sûr d’être dessus
+            Sleep(200) ; Le temps que l’explorateur s’ouvre
+            Send("^l")
+            Sleep(100)
+            Send("^v{Enter}")
+        }
+    } else if (lien_d_une_url) {
+        Run(A_Clipboard)
+    } else if (lien_d_un_site) {
+        Run("https://" . A_Clipboard)
+    } else if (A_Clipboard == "") { ; Si rien n’a été copié
+        Run("https://www.google.com/")
+    } else {
+        url_recherche := "https://www.google.com/search?q=" . A_Clipboard
+        Run(url_recherche)
+    }
+}
+#HotIf
+#HotIf WinActive("ahk_exe explorer.exe")
+#SC024:: ; Win + S (Search), copie le chemin d’accès du fichier dans l’explorateur
+{
+
+    clipboard := A_Clipboard
+    Send("^c") ; Copier ce qui est sélectionné
+    Sleep(300)
+    chemin := ""
+    temp := A_Clipboard
+    paths := StrSplit(temp, "`r`n")
+    num_paths := paths.Length
+    if (num_paths == 1) {
+        chemin := temp
+        ; chemin:= '"' . temp . '"' ; Version avec des guillemets
+    } else {
+        output_string := "["
+        for key, path in paths {
+            path := '"' . path . '"'
+            output_string := output_string . path . ", "
+        }
+        output_string := SubStr(output_string, 1, -1 * (2))
+        output_string := output_string . "]"
+        chemin := output_string
+    }
+    chemin_avec_backslash := chemin
+    chemin_avec_slash := StrReplace(chemin, "\", "/")
+    A_Clipboard := chemin_avec_slash
+    #SingleInstance
+    SetTimer ChangeButtonNames, 50
+    Result := MsgBox("Le chemin`n" A_Clipboard "`na été copié dans le presse-papier. `n`nVoulez-vous la version avec des \ à la place des / ?",
+        "Copie du chemin d’accès", "YesNo")
+    if (Result = "Yes") {
+        A_Clipboard := chemin_avec_backslash
+        Sleep(200)
+        MsgBox("Le chemin`n" A_Clipboard "`na été copié dans le presse-papier.")
+    }
+}
+
+ChangeButtonNames() {
+    if !WinExist("Copie du chemin d’accès")
+        return  ; Keep waiting.
+    SetTimer ChangeButtonNames, 0
+    WinActivate()
+    ControlSetText("&Backslash (\)", "Button1")
+    ControlSetText("&Quitter", "Button2")
+}
+#HotIf
+
 #SC021:: ; Win + U (Uppercase)
 ; Convertit ce qui est sélectionné en majuscules
 ; Si le texte est déjà en majuscules, pasasge en minuscule
@@ -1115,6 +1213,19 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
     Send(Symbol)
 }
 
+chemin_selection() {
+    hwnd := WinExist("A")
+    for Window in ComObject("Shell.Application").Windows {
+        if (window.hwnd == hwnd) {
+            Selection := Window.Document.SelectedItems
+            for Items in Selection {
+                Path_to_Selection := Items.path
+            }
+            return Path_to_Selection
+        }
+    }
+}
+
 ; ==============================================================================================
 ; ==============================================================================================
 ; ==============================================================================================
@@ -1135,8 +1246,10 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("j")
 }
 :*?C: ;à::
+:*?C: :à::
 :*?C:,À::
 :*?C: ;À::
+:*?C: :À::
 {
     Send("J")
 }
@@ -1151,10 +1264,12 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("jA")
 }
 :*?C: ;a::
+:*?C: :a::
 {
     Send("Ja")
 }
 :*?C: ;A::
+:*?C: :A::
 {
     Send("JA")
 }
@@ -1169,10 +1284,12 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("jI")
 }
 :*?C: ;i::
+:*?C: :i::
 {
     Send("Ji")
 }
 :*?C: ;I::
+:*?C: :I::
 {
     Send("JI")
 }
@@ -1187,10 +1304,12 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("jE")
 }
 :*?C: ;e::
+:*?C: :e::
 {
     Send("Je")
 }
 :*?C: ;E::
+:*?C: :E::
 {
     Send("JE")
 }
@@ -1205,10 +1324,12 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("jO")
 }
 :*?C: ;o::
+:*?C: :o::
 {
     Send("Jo")
 }
 :*?C: ;O::
+:*?C: :O::
 {
     Send("JO")
 }
@@ -1225,12 +1346,16 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("jU")
 }
 :*?C: ;u::
+:*?C: :u::
 :*?C: ;ê::
+:*?C: :ê::
 {
     Send("Ju")
 }
 :*?C: ;U::
+:*?C: :U::
 :*?C: ;Ê::
+:*?C: :Ê::
 {
     Send("JU")
 }
@@ -1245,10 +1370,12 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("jÉ")
 }
 :*?C: ;é::
+:*?C: :é::
 {
     Send("Jé")
 }
 :*?C: ;É::
+:*?C: :É::
 {
     Send("JÉ")
 }
@@ -1259,10 +1386,12 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
     Send("j’")
 }
 :*?C: ;'::
+:*?C: :'::
 {
     Send("J’")
 }
 :*?CB0: ; ?::
+:*?CB0: : ?::
 {
     Send("{BackSpace 4}J’")
 }
@@ -2689,7 +2818,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*:cloture::clôture
 :*:clotures::clôtures
 :*:cloturé::clôturé
-::coeur::cœur
+:*:coeur::cœur
 :*:coincide::coïncide
 :*:cone::cône
 :*:cones::cônes
@@ -2837,10 +2966,12 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*:naive::naïve
 :*:naitre::naître
 :*:noel::Noël
+:*:noeud::nœud
 ::oecuméni::œcuméni
 :*:oeil::œil
 ::oesophage::œsophage
 :*:oeuf::œuf
+:*C?:OUi::Oui
 ::oeuvre::œuvre
 :*?:oiaque::oïaque
 :*?:froide::froide ; corrige le cas particulier pour ne pas avoir froïde
@@ -2890,6 +3021,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*:relache::relâche
 :*:roti::rôti
 :*:samourai::samouraï
+:*:serguei::Sergueï
 :*:sharepoint::SharePoint
 :*:soeur::sœur
 ::soule::soûle
@@ -2919,7 +3051,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 ::toles::tôles
 ::tolstoi::Tolstoï
 :*:traitr::traîtr
-:*?:traine::traîne
+:*:entrain::entraîn ; Attention à "trained" en anglais
 :*:trinome::trinôme
 :*?:trone::trône
 ::veuxtu::veux-tu
