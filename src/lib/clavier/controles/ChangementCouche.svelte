@@ -14,10 +14,14 @@
 		['➂ AltGr', 'AltGr'],
 		['➃ Shift + AltGr', 'ShiftAltGr'],
 		['Ctrl', 'Ctrl'],
-		['Circonflexe', '^'],
-		['Tréma', 'trema'],
-		['Exposant', 'e'],
-		['Indice', 'i'],
+		['Circonflexe', 'Circonflexe'],
+		['Circonflexe Shift', 'CirconflexeShift'],
+		['Tréma', 'Trema'],
+		['Tréma Shift', 'TremaShift'],
+		['Grec', 'Greek'],
+		['Grec Shift', 'GreekShift'],
+		['Exposant', 'Exposant'],
+		['Indice', 'Indice'],
 		['ℝ', 'R']
 	];
 	let couches_plus = couches_standard.concat([
