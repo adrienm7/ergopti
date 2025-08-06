@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-export const liste_versions = ['1.1', '2.0', '2.1'];
+export const liste_versions = ['1.1', '2.0', '2.1', '2.2'];
 export const derniere_version = liste_versions[liste_versions.length - 1];
 export let version = writable(derniere_version); // Par défaut c’est la dernière version
 

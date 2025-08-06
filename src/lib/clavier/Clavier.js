@@ -271,8 +271,8 @@ export class Clavier {
 			let altGr = emplacementClavier.querySelector("[data-touche='RAlt']");
 			let aGrave = emplacementClavier.querySelector("[data-touche='à']");
 			let virgule = emplacementClavier.querySelector("[data-touche=',']");
-			let circonflexe = emplacementClavier.querySelector("[data-touche='^']");
-			let trema = emplacementClavier.querySelector("[data-touche='trema']");
+			let circonflexe = emplacementClavier.querySelector("[data-touche='Circonflexe']");
+			let Trema = emplacementClavier.querySelector("[data-touche='Trema']");
 			let lalt = emplacementClavier.querySelector("[data-touche='LAlt']");
 			let space = emplacementClavier.querySelector("[data-touche='Space']");
 
@@ -332,6 +332,24 @@ export class Clavier {
 			) {
 				space.classList.add('touche-active');
 			}
+			if (this.infos_clavier.couche === 'CirconflexeShift' && lShift !== null) {
+				lShift.classList.add('touche-active');
+			}
+			if (this.infos_clavier.couche === 'CirconflexeShift' && rShift !== null) {
+				rShift.classList.add('touche-active');
+			}
+			if (this.infos_clavier.couche === 'TremaShift' && lShift !== null) {
+				lShift.classList.add('touche-active');
+			}
+			if (this.infos_clavier.couche === 'TremaShift' && rShift !== null) {
+				rShift.classList.add('touche-active');
+			}
+			if (this.infos_clavier.couche === 'GreekShift' && lShift !== null) {
+				lShift.classList.add('touche-active');
+			}
+			if (this.infos_clavier.couche === 'GreekShift' && rShift !== null) {
+				rShift.classList.add('touche-active');
+			}
 		} catch (error) {
 			return;
 		}
@@ -371,6 +389,46 @@ export class Clavier {
 			(coucheActuelle === 'À' || coucheActuelle === ',')
 		) {
 			nouvelleCouche = 'Shift';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'CirconflexeShift'
+		) {
+			nouvelleCouche = 'Circonflexe';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'Circonflexe'
+		) {
+			nouvelleCouche = 'CirconflexeShift';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'TremaShift'
+		) {
+			nouvelleCouche = 'Trema';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'Trema'
+		) {
+			nouvelleCouche = 'TremaShift';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'Exposant'
+		) {
+			nouvelleCouche = 'Shift';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'Indice'
+		) {
+			nouvelleCouche = 'Shift';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'GreekShift'
+		) {
+			nouvelleCouche = 'Greek';
+		} else if (
+			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			coucheActuelle === 'Greek'
+		) {
+			nouvelleCouche = 'GreekShift';
 		} else if (touchePressee === 'LShift' || touchePressee === 'RShift') {
 			nouvelleCouche = 'Shift';
 		}
@@ -438,15 +496,18 @@ export class Clavier {
 		) {
 			nouvelleCouche = 'À';
 		}
+		if (touchePressee === 'à' && coucheActuelle === 'ShiftAltGr') {
+			nouvelleCouche = 'Indice';
+		}
 
 		// Touche pressée = E
 		if (touchePressee === 'e' && coucheActuelle === 'ShiftAltGr') {
-			nouvelleCouche = 'e';
+			nouvelleCouche = 'Exposant';
 		}
 
-		// Touche pressée = I
-		if (touchePressee === 'à' && coucheActuelle === 'ShiftAltGr') {
-			nouvelleCouche = 'i';
+		// Touche pressée = U
+		if (touchePressee === 'u' && coucheActuelle === 'ShiftAltGr') {
+			nouvelleCouche = 'Greek';
 		}
 
 		// Touche pressée = R
@@ -479,17 +540,20 @@ export class Clavier {
 			nouvelleCouche = ',';
 		}
 
-		// Touche pressée = ^
-		if (touchePressee === '^' && ['Visuel', 'Primary'].includes(coucheActuelle)) {
-			nouvelleCouche = '^';
+		// Touche pressée = Circonflexe
+		if (
+			(touchePressee === 'Circonflexe' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
+			(touchePressee === 'ê' && coucheActuelle === 'ShiftAltGr')
+		) {
+			nouvelleCouche = 'Circonflexe';
 		}
 
-		// Touche pressée = trema
+		// Touche pressée = Trema
 		if (
-			(touchePressee === 'trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
+			(touchePressee === 'Trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
 			(touchePressee === 't' && coucheActuelle === 'ShiftAltGr')
 		) {
-			nouvelleCouche = 'trema';
+			nouvelleCouche = 'Trema';
 		}
 
 		// Une fois que la nouvelle couche est déterminée, on actualise la valeur de la couche, puis le clavier
@@ -511,12 +575,16 @@ export class Clavier {
 			let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
 			let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 			let toucheE = emplacementClavier.querySelector("bloc-touche[data-touche='e']");
+			let toucheECirc = emplacementClavier.querySelector("bloc-touche[data-touche='ê']");
 			let toucheR = emplacementClavier.querySelector("bloc-touche[data-touche='r']");
 			let toucheT = emplacementClavier.querySelector("bloc-touche[data-touche='t']");
+			let toucheU = emplacementClavier.querySelector("bloc-touche[data-touche='u']");
 			let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
 			let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
-			let toucheCirconflexe = emplacementClavier.querySelector("bloc-touche[data-touche='^']");
-			let toucheTrema = emplacementClavier.querySelector("bloc-touche[data-touche='trema']");
+			let toucheCirconflexe = emplacementClavier.querySelector(
+				"bloc-touche[data-touche='Circonflexe']"
+			);
+			let toucheTrema = emplacementClavier.querySelector("bloc-touche[data-touche='Trema']");
 
 			// On ajoute une action au clic sur chacune des touches modificatrices
 			for (let toucheModificatrice of [
@@ -528,8 +596,10 @@ export class Clavier {
 				toucheRCtrl,
 				toucheA,
 				toucheE,
+				toucheECirc,
 				toucheR,
 				toucheT,
+				toucheU,
 				toucheVirgule,
 				toucheEspace,
 				toucheCirconflexe,

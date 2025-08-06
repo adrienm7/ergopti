@@ -267,8 +267,7 @@ bloc-touche[data-touche='AltTab'] div {
 }
 
 bloc-touche[data-touche='BackSpace'] div,
-bloc-touche[data-touche='Delete'] div,
-bloc-clavier[data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
+bloc-touche[data-touche='Delete'] div {
 	font-size: 0.9em;
 }
 
@@ -283,6 +282,7 @@ bloc-clavier[data-couche='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche=
 	font-size: 0.85em;
 }
 
+bloc-clavier[data-couche='Shift'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
 bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
 bloc-clavier[data-couche='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
 bloc-clavier[data-couche='Ctrl'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
@@ -290,7 +290,7 @@ bloc-clavier[data-couche='Ctrl'][data-plus='oui'] bloc-touche[data-touche='CapsL
 }
 
 bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='LAlt'] div {
-	font-size: 0.6em;
+	font-size: 0.5em;
 }
 
 /* Taille plus petite pour la légende Win+V */
@@ -470,7 +470,7 @@ bloc-clavier[data-type='ergodox'] bloc-touche[data-doigt='pouce'] {
 
 bloc-touche[data-type='space'],
 bloc-touche[data-type='special'],
-bloc-touche[data-touche='enter'] {
+bloc-touche[data-touche='Enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
 	/* Bordure des touches des touches spéciales en blanc pour mieux les mettre en relief */
@@ -605,4 +605,8 @@ bloc-clavier espace-insecable {
 	width: 0.25em;
 	background-color: white;
 	border-radius: 1px;
+}
+
+.one-shot-shift {
+	font-size: 0.8em;
 }
