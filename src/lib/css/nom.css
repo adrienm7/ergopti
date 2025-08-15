@@ -48,7 +48,14 @@ nom-disposition-plus {
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
 	-moz-text-fill-color: transparent;
-	background-image: linear-gradient(to right, #3088ed 0%, #02c9db 50%, #df8eff 55%, #9702e7 100%);
+	background-image: linear-gradient(
+		to right,
+		#3088ed 0%,
+		#02c9db 35%,
+		#a4acff 50%,
+		#ff00bb 65%,
+		#ff0000 100%
+	);
 }
 
 .nowrap {
