@@ -55,12 +55,12 @@
 		à une optimisation des roulements.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-5"></i> <span class="text-bold">Placement logique</span> des touches,
+		<i class="fa-duotone fa-circle-5"></i> <span class="text-bold">Placement logique</span> des symboles,
 		permettant de s’en souvenir aisément.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-6"></i> <span class="important">Chiffres en accès direct</span>,
-		raccourcis sur la main gauche, ponctuations insécables, etc.
+		raccourcis sur la main gauche, ponctuations insécables, et plus…
 	</div>
 </div>
 
