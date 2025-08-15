@@ -11,8 +11,8 @@
 	<a href="https://bepo.fr/">BÉPO</a>
 	depuis déjà de nombreuses années. Les améliorations d’Optimot par rapport au BÉPO sont significatives,
 	avec notamment une forte diminution des bigrammes à un doigt (<SFB />s) et un meilleur placement
-	des lettres pour l’anglais. Cependant, l'idée d'apprendre Optimot, pour peut-être découvrir encore
-	par la suite une disposition encore meilleure, était peu attrayante.
+	des lettres pour l’anglais. Cependant, l'idée d'apprendre Optimot, pour peut-être découvrir par la
+	suite une disposition encore meilleure, était peu attrayante.
 </p>
 <p>
 	Pour m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions, toutes
