@@ -68,7 +68,7 @@
 	La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier des
 	touches de raccourci de la version Ergodox, car les touches à sa gauche sont déjà occupées par les
 	touches
-	<kbd>Shift</kbd>, <kbd>"Capslock"</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut placer
+	<kbd>Shift</kbd>, <kbd>"CapsLock"</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut placer
 	ces 3 touches sous les pouces.
 </p>
 <p>

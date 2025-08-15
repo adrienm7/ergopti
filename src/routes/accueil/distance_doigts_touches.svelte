@@ -61,10 +61,9 @@
 	Pourtant, le QWERTY est pire qu’une disposition aléatoire sur ce point. <span class="text-gray"
 		>La légende raconte que sa première rangée remonte à l’époque de l’invention de la machine à
 		écrire. Le choix de la disposition QWERTY aurait, entre autres raisons, été influencé par un
-		aspect purement marketing. En effet, à des fins de démonstrations, ont été placées sur la rangée
-		supérieure de la machine à écrire toutes les lettres nécessaires pour pouvoir écrire <kbd-sortie
-			>TYPEWRITER</kbd-sortie
-		>.</span
+		aspect purement marketing. En effet, à des fins de démonstrations, auraient été placées sur la
+		rangée supérieure de la machine à écrire toutes les lettres nécessaires pour pouvoir écrire
+		<kbd-sortie>TYPEWRITER</kbd-sortie>.</span
 	>
 </p>
 <p>
@@ -112,9 +111,9 @@
 	En français et en anglais, le <kbd>E</kbd>
 	est de loin la lettre la plus fréquente. Viennent ensuite les voyelles <kbd>A</kbd>,
 	<kbd>I</kbd>, <kbd>O</kbd> et <kbd>U</kbd>, ainsi que les consonnes
-	<kbd>S</kbd>, <kbd>N</kbd>, <kbd>T</kbd> et <kbd>R</kbd>. <Nom /> place évidemment les lettres les
-	plus utilisées sur la rangée du milieu. En résulte immédiatement un déplacement des doigts largement
-	diminué et un meilleur confort.
+	<kbd>S</kbd>, <kbd>N</kbd>, <kbd>T</kbd> et <kbd>R</kbd>. <Nom /> place ainsi les lettres les plus
+	utilisées sur la rangée du milieu. En résulte immédiatement un déplacement des doigts largement diminué
+	et un meilleur confort.
 </p>
 <h3>Optimisation selon la force des doigts</h3>
 <p>

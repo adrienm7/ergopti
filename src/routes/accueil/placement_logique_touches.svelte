@@ -4,7 +4,7 @@
 	import SFB from '$lib/composants/SFB.svelte';
 </script>
 
-<h2>Placement logique des touches</h2>
+<h2>Placement logique des symboles</h2>
 <p>
 	Afin de <span class="important">faciliter la mémorisation</span> ainsi que de
 	<span class="important">réduire la charge cognitive</span>, les touches de la disposition sont, le
@@ -28,10 +28,9 @@
 		car la cédille est sous le <span class="hyper text-bold">C</span> ;
 	</li>
 	<li>
-		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>★</kbd> ➜
-		<kbd-sortie>δ</kbd-sortie>
-		car cette touche morte permettant d’écrire les lettres grecques (α, β, γ, δ…) est sur la touche "magique"
-		<span class="hyper text-bold">★</span> ;
+		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>U</kbd> ➜
+		<kbd-sortie>µ</kbd-sortie>
+		car cette touche morte permettant d’écrire les lettres grecques (α, β, γ, δ…), dont µ (MU) ;
 	</li>
 	<li>
 		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>E</kbd> ➜
@@ -99,11 +98,11 @@
 		➜ <kbd-sortie>{'>'}</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>⩽</kbd-sortie> et
+		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>≤</kbd-sortie> et
 		<kbd>Shift</kbd>
 		+ <kbd>AltGr</kbd> +
 		<kbd>I</kbd>
-		➜ <kbd-sortie>⩾</kbd-sortie> ;
+		➜ <kbd-sortie>≥</kbd-sortie> ;
 	</li>
 	<li>
 		<kbd>AltGr</kbd> + <kbd>E</kbd> ➜ <kbd-sortie>{'{'}</kbd-sortie> et <kbd>AltGr</kbd> +
@@ -136,15 +135,6 @@
 <mini-espace />
 <p class="encadre">
 	À noter que les touches sont aussi placées le plus possible par distance selon leur fréquence
-	d’utilisation. Ainsi, les touches très utilisées comme les <kbd>()</kbd>,
-	<kbd>{'{}'}</kbd>, etc. sont toutes sur la rangée du milieu et sur les doigts les plus forts.
+	d’utilisation. Ainsi, les paires de touches très utilisées telles que <kbd>()</kbd>,
+	<kbd>{'{}'}</kbd>, <kbd>{'<>'}</kbd> et <kbd>[]</kbd> sont toutes sur la rangée du milieu.
 </p>
-<!-- <p class="encadre">
-			<span class="text-bold">⚠ Attention</span> : Le <kbd>$</kbd> est l’un des seuls symboles à ne
-			pas être sur un emplacement logique (le
-			<kbd>D</kbd>
-			de <span class="hyper text-bold">D</span>ollar). Ceci parce qu’il est plus intéressant de
-			mettre le <kbd>"</kbd> sur cette lettre, afin d’avoir un excellent roulement <kbd>="</kbd>. Le
-			<kbd>$</kbd>
-			se trouve sur la touche <kbd>★</kbd>.
-		</p> -->

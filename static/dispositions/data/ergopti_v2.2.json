@@ -1,5 +1,5 @@
 {
-	"nom": "Ergopti v2.2.0",
+	"nom": "Ergopti v2.2",
 	"auteur": "Adrien MOYAUX",
 	"site": "https://ergopti.fr",
 	"iso": [
@@ -1988,7 +1988,7 @@
 			"Shift": "<espace-insecable></espace-insecable>%",
 			"AltGr": "‰",
 			"ShiftAltGr": "‱",
-			"Ctrl": "+",
+			"Ctrl": "-",
 			"Circonflexe": "",
 			"CirconflexeShift": "",
 			"Trema": "",
@@ -2031,7 +2031,7 @@
 			"AltGr": "$",
 			"ShiftAltGr": "¤",
 			"ShiftAltGr-style": "morte",
-			"Ctrl": "-",
+			"Ctrl": "+",
 			"Circonflexe": "",
 			"CirconflexeShift": "",
 			"Trema": "",

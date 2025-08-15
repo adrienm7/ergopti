@@ -21,15 +21,19 @@
 <div style="margin: 0 auto; text-align:center; padding-top: 5px;">
 	<a href="#debut"><i class="far fa-chevron-down icon-chevron-down scrollez"></i></a>
 </div>
-<div id="debut">
+<div id="debut" class="encart-introduction">
 	<petit-espace />
 	<hr />
-	<p class="encart-introduction">
+	<p>
 		<Nom /> est une <strong class="important">disposition clavier ergonomique</strong> pour le
 		<strong>français</strong>, l’<strong>anglais</strong> et la <strong>programmation</strong>.
 		Fruit de nombreuses réflexions et expérimentations, elle se veut la plus optimale possible pour
 		une frappe rapide, fluide et
 		<span class="important">un&nbsp;confort&nbsp;d’exception</span>.
+	</p>
+	<p>
+		L’intégralité du code de la disposition et de ce site est disponible sur
+		<a href="https://github.com/adrienm7/ergopti">le GitHub du projet</a>.
 	</p>
 	<hr />
 </div>

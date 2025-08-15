@@ -7,7 +7,7 @@
 <h2>Confort</h2>
 
 <h3>
-	Touche <kbd>BackSpace</kbd> à la place de Capslock
+	Touche <kbd>BackSpace</kbd> à la place de CapsLock
 </h3>
 <p>
 	La touche <kbd>BackSpace</kbd> est l’une des touches les plus utilisées sur un clavier. En effet,
@@ -15,7 +15,7 @@
 	Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée en haut à droite du
 	clavier. Par conséquent, il est logique de vouloir la placer sur un emplacement très accessible.
 	C’est pour cela que la touche <kbd>BackSpace</kbd> a été dupliquée sur la touche
-	<kbd>"Capslock"</kbd>
+	<kbd>"CapsLock"</kbd>
 	avec <NomPlus />.
 </p>
 <p>
