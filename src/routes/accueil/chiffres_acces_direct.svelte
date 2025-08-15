@@ -18,10 +18,10 @@
 <p>
 	Avoir les chiffres en accès direct permet d’<span class="important"
 		>écrire très rapidement des nombres</span
-	>. C’est un réel gain en confort. La rangée des nombres n’est de toute façon pas très accessible,
-	donc il vaut mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>, plus
-	proches des mains car sur les 3 rangées du milieu pour ne pas avoir à trop bouger les doigts.
-	C’est exactement ce que fait <Nom />.
+	>. C’est un réel gain en confort. La rangée des nombres n’est de toute façon pas très accessible.
+	Par conséquent, il vaut mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>
+	qui est plus proche des doigts. C’est exactement ce que fait <Nom /> avec sa couche AltGr de symboles
+	qui amène les symboles directement sous les doigts.
 </p>
 <mini-espace></mini-espace>
 <BlocClavier nom="symboles" />

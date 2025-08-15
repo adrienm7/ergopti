@@ -17,8 +17,8 @@
 	Une réelle analyse de <NomPlus></NomPlus> nécessite de modifier le corpus afin d’y refléter les nouvelles
 	manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres du corpus pour
 	les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB></SFB>s pris en charge
-	par <NomPlus></NomPlus>, comme <kbd-sortie>sc</kbd-sortie> en
-	<kbd>,s</kbd>, doivent être remplacés. Un
+	par <NomPlus></NomPlus>, comme <kbd-sortie>pt</kbd-sortie> en
+	<kbd>,t</kbd>, doivent être remplacés. Un
 	<a href="/corpus/conversion_corpus.py">simple script Python</a> permet de faire ces modifications.
 </p>
 <p>
@@ -56,8 +56,8 @@
 	<kbd>★.</kbd>, même s’ils sont déjà deux fois moins nombreux qu’avec <NomPlus></NomPlus>. Il y a
 	sans doute possiblité d’améliorer cela, c’est un point à l’étude. En dehors de cela, les
 	réductions de <SFB></SFB>s sont spectaculaires, en particulier sur les annulaires et auriculaires.
-	Enfin, l’index droit voit son nombre de <SFB></SFB>s (<kbd>SC</kbd>,
-	<kbd>DS</kbd>, etc.) chuter drastiquement, de 27 000 à 2500, soit une division par 10 !
+	Enfin, l’index droit voit son nombre de <SFB></SFB>s chuter drastiquement, de 27 000 à 2500, soit
+	une division par 10 !
 </p>
 <h3>Analyse de la distance parcourue</h3>
 <p>
