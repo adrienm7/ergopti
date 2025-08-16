@@ -21,19 +21,16 @@
 <div style="margin: 0 auto; text-align:center; padding-top: 5px;">
 	<a href="#debut"><i class="far fa-chevron-down icon-chevron-down scrollez"></i></a>
 </div>
-<div id="debut" class="encart-introduction">
+<div id="debut">
 	<petit-espace />
 	<hr />
-	<p>
-		<Nom /> est une <strong class="important">disposition clavier ergonomique</strong> pour le
+	<p class="encart-introduction">
+		<strong><Nom></Nom></strong> est une
+		<strong class="gradient1">disposition clavier ergonomique et optimisée</strong>
+		pour le
 		<strong>français</strong>, l’<strong>anglais</strong> et la <strong>programmation</strong>.
-		Fruit de nombreuses réflexions et expérimentations, elle se veut la plus optimale possible pour
-		une frappe rapide, fluide et
-		<span class="important">un&nbsp;confort&nbsp;d’exception</span>.
-	</p>
-	<p>
-		L’intégralité du code de la disposition et de ce site est disponible sur
-		<a href="https://github.com/adrienm7/ergopti">le GitHub du projet</a>.
+		Fruit de nombreuses réflexions et expérimentations, elle permet une frappe rapide, fluide et
+		<strong class="gradient1">un&nbsp;confort&nbsp;d’exception</strong>.
 	</p>
 	<hr />
 </div>
@@ -67,6 +64,10 @@
 		raccourcis sur la main gauche, ponctuations insécables, et plus…
 	</div>
 </div>
+<p class="encart-introduction">
+	L’intégralité du code de la disposition et de ce site est disponible<br />sous licence MIT sur
+	<a href="https://github.com/adrienm7/ergopti">le GitHub du projet</a>.
+</p>
 
 <mini-espace />
 
