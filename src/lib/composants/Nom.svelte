@@ -1,3 +1,3 @@
 <nom-disposition>
-	<span class="namecolor">Ergopti</span>
+	<span class="gradient1">Ergopti</span>
 </nom-disposition>
