@@ -2397,7 +2397,6 @@
 		{
 			"touche": "LAlt",
 			"Primary": "Alt",
-			"Primary+": "Layer<br><span class='tap'>⌫</span>",
 			"Shift": "Alt",
 			"Shift+": "⌦",
 			"AltGr": "Alt",
@@ -2414,7 +2413,6 @@
 			"GreekShift": "Alt",
 			"R": "Alt",
 			"Layer": "Alt",
-			"Layer+": "Layer",
 			"À": "Alt",
 			",": "Alt",
 			"type": "special"
@@ -2488,6 +2486,7 @@
 		{
 			"touche": "Space",
 			"Primary": " ",
+			"Primary+": "Layer<br><span class='tap' style = 'display:block; margin-top:-0.4em'>␣</span>",
 			"Shift": "-",
 			"AltGr": "_",
 			"ShiftAltGr": "",
@@ -2501,7 +2500,7 @@
 			"Greek": "µ",
 			"GreekShift": "",
 			"R": "ℝ",
-			"Layer": "",
+			"Layer": "Layer",
 			"À": "",
 			",": "",
 			"type": "space"
