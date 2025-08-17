@@ -284,11 +284,10 @@ export class Clavier {
 			}
 			if (
 				this.infos_clavier.couche === 'Shift' &&
-				rCtrl !== null &&
 				this.infos_clavier.plus === 'oui' &&
 				this.infos_clavier.type === 'iso'
 			) {
-				rCtrl.classList.add('touche-active');
+				lalt.classList.add('touche-active');
 			}
 			if (this.infos_clavier.couche === 'Ctrl' && lCtrl !== null) {
 				lCtrl.classList.add('touche-active');
@@ -372,64 +371,95 @@ export class Clavier {
 		}
 
 		// Touche pressée = Shift
-		if ((touchePressee === 'LShift' || touchePressee === 'RShift') && coucheActuelle === 'AltGr') {
-			nouvelleCouche = 'ShiftAltGr';
-		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+		if (
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'Shift'
 		) {
 			nouvelleCouche = 'Visuel';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
+			coucheActuelle === 'AltGr'
+		) {
+			nouvelleCouche = 'ShiftAltGr';
+		} else if (
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'ShiftAltGr'
 		) {
 			nouvelleCouche = 'AltGr';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			(coucheActuelle === 'À' || coucheActuelle === ',')
 		) {
 			nouvelleCouche = 'Shift';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'CirconflexeShift'
 		) {
 			nouvelleCouche = 'Circonflexe';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'Circonflexe'
 		) {
 			nouvelleCouche = 'CirconflexeShift';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'TremaShift'
 		) {
 			nouvelleCouche = 'Trema';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'Trema'
 		) {
 			nouvelleCouche = 'TremaShift';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'Exposant'
 		) {
 			nouvelleCouche = 'Shift';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'Indice'
 		) {
 			nouvelleCouche = 'Shift';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'GreekShift'
 		) {
 			nouvelleCouche = 'Greek';
 		} else if (
-			(touchePressee === 'LShift' || touchePressee === 'RShift') &&
+			(touchePressee === 'LShift' ||
+				touchePressee === 'RShift' ||
+				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
 			coucheActuelle === 'Greek'
 		) {
 			nouvelleCouche = 'GreekShift';
-		} else if (touchePressee === 'LShift' || touchePressee === 'RShift') {
+		} else if (
+			touchePressee === 'LShift' ||
+			touchePressee === 'RShift' ||
+			(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')
+		) {
 			nouvelleCouche = 'Shift';
 		}
 
@@ -456,51 +486,14 @@ export class Clavier {
 			nouvelleCouche = 'Visuel';
 		}
 
-		// Touche pressée = RCtrl en ISO+ (devient Shift)
-		if (
-			touchePressee === 'RCtrl' &&
-			this.infos_clavier.type === 'iso' &&
-			this.infos_clavier.plus === 'oui' &&
-			coucheActuelle !== 'Shift'
-		) {
-			nouvelleCouche = 'Shift';
-		} else if (
-			touchePressee === 'RCtrl' &&
-			this.infos_clavier.type === 'iso' &&
-			this.infos_clavier.plus === 'oui'
-		) {
-			nouvelleCouche = 'Visuel';
-		}
-
-		// Touche pressée = Space (devient Layer en ISO+)
+		// Touche pressée = Space
 		if (
 			touchePressee === 'Space' &&
-			this.infos_clavier.type === 'iso' &&
 			this.infos_clavier.plus === 'oui' &&
 			['Visuel', 'Primary'].includes(coucheActuelle)
 		) {
 			nouvelleCouche = 'Layer';
-		} else if (
-			touchePressee === 'Space' &&
-			this.infos_clavier.type === 'iso' &&
-			this.infos_clavier.plus === 'oui'
-		) {
-			nouvelleCouche = 'Visuel';
-		}
-
-		// Touche pressée = Space (devient Layer en Ergodox+)
-		if (
-			touchePressee === 'Space' &&
-			this.infos_clavier.type === 'ergodox' &&
-			this.infos_clavier.plus === 'oui' &&
-			coucheActuelle !== 'Layer'
-		) {
-			nouvelleCouche = 'Layer';
-		} else if (
-			touchePressee === 'Space' &&
-			this.infos_clavier.type === 'ergodox' &&
-			this.infos_clavier.plus === 'oui'
-		) {
+		} else if (touchePressee === 'Space' && this.infos_clavier.plus === 'oui') {
 			nouvelleCouche = 'Visuel';
 		}
 
@@ -593,7 +586,6 @@ export class Clavier {
 				toucheLShift,
 				toucheRShift,
 				toucheLCtrl,
-				toucheRCtrl,
 				toucheA,
 				toucheE,
 				toucheECirc,
