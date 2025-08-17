@@ -1227,7 +1227,7 @@
 			"Exposant": "ᶜ",
 			"Indice": "",
 			"R": "ℂ",
-			"Layer": "⊞+⇦",
+			"Layer": "^+⇦",
 			"À": "ence",
 			",": "cd",
 			"type": "lettre"
@@ -1244,7 +1244,7 @@
 			"Exposant": "ᵈ",
 			"Indice": "",
 			"R": "",
-			"Layer": "^+⇦",
+			"Layer": "⊞+⇦",
 			"À": "ould",
 			",": "ds",
 			"type": "lettre"
@@ -1296,7 +1296,7 @@
 			"Exposant": "ᵍ",
 			"Indice": "",
 			"R": "",
-			"Layer": "⊞⇨",
+			"Layer": "+⇨",
 			"À": "ight",
 			",": "gl",
 			"type": "lettre"
@@ -1313,7 +1313,7 @@
 			"Exposant": "ʰ",
 			"Indice": "ₕ",
 			"R": "ℍ",
-			"Layer": "⊞⇦",
+			"Layer": "+⇦",
 			"À": "techn",
 			",": "ph",
 			"type": "lettre"
@@ -1382,7 +1382,7 @@
 			"Exposant": "ˡ",
 			"Indice": "ₗ",
 			"R": "",
-			"Layer": "+⇦",
+			"Layer": "⊞⇦",
 			"À": "elle",
 			",": "cl",
 			"type": "lettre"
@@ -1450,7 +1450,7 @@
 			"Exposant": "ᵖ",
 			"Indice": "ₚ",
 			"R": "ℙ",
-			"Layer": "+⇨",
+			"Layer": "⊞⇨",
 			"À": "ought",
 			",": "xp",
 			"type": "lettre"
@@ -1593,7 +1593,7 @@
 			"Exposant": "ˣ",
 			"Indice": "ₓ",
 			"R": "",
-			"Layer": "⊞+⇨",
+			"Layer": "^+⇨",
 			"À": "ieux",
 			",": "'re",
 			"type": "lettre"
@@ -1715,7 +1715,7 @@
 			"Exposant": "",
 			"Indice": "",
 			"R": "",
-			"Layer": "^+⇨",
+			"Layer": "⊞+⇨",
 			"À": "",
 			",": "j’",
 			"type": "ponctuation"
