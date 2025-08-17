@@ -185,7 +185,7 @@ export class Clavier {
 							}
 						}
 
-						// Corrections localisées
+						// Corrections localisées sur la barre d’espace
 						if (
 							this.infos_clavier.type === 'ergodox' &&
 							res.touche === 'Space' &&
@@ -196,22 +196,22 @@ export class Clavier {
 						if (
 							this.infos_clavier.type === 'iso' &&
 							res.touche === 'Space' &&
-							this.infos_clavier.couche === 'Visuel'
-							// this.infos_clavier.plus === 'non'
+							this.infos_clavier.couche === 'Visuel' &&
+							this.infos_clavier.plus === 'non'
 						) {
 							toucheClavier.innerHTML = '<div>' + this.data_disposition.nom + '</div>';
 						}
-						// if (
-						// 	this.infos_clavier.type === 'iso' &&
-						// 	res.touche === 'Space' &&
-						// 	this.infos_clavier.couche === 'Visuel' &&
-						// 	this.infos_clavier.plus === 'oui'
-						// ) {
-						// 	toucheClavier.innerHTML =
-						// 		"<div>Layer de navigation<br><span class='tap'>Ergopti v." +
-						// 		this.version +
-						// 		'</span></div>';
-						// }
+						if (
+							this.infos_clavier.type === 'iso' &&
+							res.touche === 'Space' &&
+							this.infos_clavier.couche === 'Visuel' &&
+							this.infos_clavier.plus === 'oui'
+						) {
+							toucheClavier.innerHTML =
+								"<div>Layer de navigation<br><span class='tap'>Ergopti v." +
+								this.version +
+								'</span></div>';
+						}
 
 						// On ajoute des this.infos_clavier dans les data attributes de la touche
 						toucheClavier.dataset['touche'] = res['touche'];
@@ -320,10 +320,10 @@ export class Clavier {
 			// }
 			if (
 				this.infos_clavier.couche === 'Layer' &&
-				lalt !== null &&
+				space !== null &&
 				this.infos_clavier.type === 'iso'
 			) {
-				lalt.classList.add('touche-active');
+				space.classList.add('touche-active');
 			}
 			if (
 				this.infos_clavier.couche === 'Layer' &&
@@ -472,17 +472,33 @@ export class Clavier {
 			nouvelleCouche = 'Visuel';
 		}
 
-		// Touche pressée = LAlt (devient Layer en ISO+)
+		// Touche pressée = Space (devient Layer en ISO+)
 		if (
-			touchePressee === 'LAlt' &&
+			touchePressee === 'Space' &&
 			this.infos_clavier.type === 'iso' &&
 			this.infos_clavier.plus === 'oui' &&
 			['Visuel', 'Primary'].includes(coucheActuelle)
 		) {
 			nouvelleCouche = 'Layer';
 		} else if (
-			touchePressee === 'LAlt' &&
+			touchePressee === 'Space' &&
 			this.infos_clavier.type === 'iso' &&
+			this.infos_clavier.plus === 'oui'
+		) {
+			nouvelleCouche = 'Visuel';
+		}
+
+		// Touche pressée = Space (devient Layer en Ergodox+)
+		if (
+			touchePressee === 'Space' &&
+			this.infos_clavier.type === 'ergodox' &&
+			this.infos_clavier.plus === 'oui' &&
+			coucheActuelle !== 'Layer'
+		) {
+			nouvelleCouche = 'Layer';
+		} else if (
+			touchePressee === 'Space' &&
+			this.infos_clavier.type === 'ergodox' &&
 			this.infos_clavier.plus === 'oui'
 		) {
 			nouvelleCouche = 'Visuel';
@@ -513,22 +529,6 @@ export class Clavier {
 		// Touche pressée = R
 		if (touchePressee === 'r' && coucheActuelle === 'ShiftAltGr') {
 			nouvelleCouche = 'R';
-		}
-
-		// Touche pressée = Space (devient Layer en Ergodox+)
-		if (
-			touchePressee === 'Space' &&
-			this.infos_clavier.type === 'ergodox' &&
-			this.infos_clavier.plus === 'oui' &&
-			coucheActuelle !== 'Layer'
-		) {
-			nouvelleCouche = 'Layer';
-		} else if (
-			touchePressee === 'Space' &&
-			this.infos_clavier.type === 'ergodox' &&
-			this.infos_clavier.plus === 'oui'
-		) {
-			nouvelleCouche = 'Visuel';
 		}
 
 		// Touche pressée = ,
