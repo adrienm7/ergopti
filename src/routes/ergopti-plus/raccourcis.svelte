@@ -27,10 +27,18 @@
 </p>
 <ul>
 	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-sortie>Tab</kbd-sortie> sur le tap ;</li>
-
 	<li>
-		Tap hold en <kbd>Alt</kbd> ➜ <kbd-sortie>Layer</kbd-sortie> en hold et
-		<kbd-sortie>Enter</kbd-sortie> en tap ;
+		Tap hold en <kbd>Alt</kbd> ➜ <kbd-sortie>Shift</kbd-sortie> en hold et
+		<kbd-sortie>OneShotShift</kbd-sortie> en tap ;
+	</li>
+	<p>
+		Il est beaucoup plus judicieux de mettre <kbd>Shift</kbd> sous un pouce, afin d’éviter
+		d’utiliser un auriculaire qui est le doigt le plus faible. Cela évite également beaucoup de <SFB
+		></SFB>s.
+	</p>
+	<li>
+		Tap hold en <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> sur le hold et
+		<kbd-sortie>Enter</kbd-sortie> sur le tap ;
 	</li>
 	<p>
 		La touche <kbd>Entrée</kbd> est très utilisée sur un clavier, elle l’est même plus que certaines
@@ -40,6 +48,20 @@
 		aussi beaucoup de <SFB />s. À noter que les raccourcis comme <kbd>Ctrl</kbd> + <kbd>Entrée</kbd>
 		par exemple sont également fonctionnels avec cette nouvelle touche <kbd>Entrée</kbd>.
 	</p>
+	<li>
+		Tap hold en <kbd>"Tab"</kbd> ➜ <kbd-sortie>Alt</kbd-sortie> sur le hold et
+		<kbd-sortie>Alt+Tab</kbd-sortie> sur le tap ;
+	</li>
+	<p>
+		Ce raccourci est extrêmement pratique. Avec lui, il n’y a plus besoin de faire la combinaison <kbd
+			>Alt</kbd
+		>
+		+ <kbd>Tab</kbd>. Seul un appui sur <kbd>Alt</kbd> suffit, ce qui transforme cette touche en sorte
+		de toggle entre les fenêtres.
+	</p>
+
+	<petit-espace></petit-espace>
+
 	<BlocClavier nom="layer" />
 	<p>
 		Le <kbd>Layer</kbd> de navigation contient quant à lui les flèches directionnelles pour naviguer
@@ -55,17 +77,9 @@
 		de navigation évite donc des positions inconfortables nécessitant de presser plusieurs modificateurs
 		en même temps ainsi que les touches de flèches qui sont peu accessibles.
 	</p>
-	<li>
-		Tap hold en <kbd>"Tab"</kbd> ➜ <kbd-sortie>Alt</kbd-sortie> sur le hold et
-		<kbd-sortie>Alt+Tab</kbd-sortie> sur le tap ;
-	</li>
-	<p>
-		Ce raccourci est extrêmement pratique. Avec lui, il n’y a plus besoin de faire la combinaison <kbd
-			>Alt</kbd
-		>
-		+ <kbd>Tab</kbd>. Seul un appui sur <kbd>Alt</kbd> suffit, ce qui transforme cette touche en sorte
-		de toggle entre les fenêtres.
-	</p>
+
+	<petit-espace></petit-espace>
+
 	<li>
 		Tap hold en <kbd>LShift</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>C</kbd-sortie> sur le
 		tap ;
@@ -79,53 +93,24 @@
 		est très utile, particulièrement lorsque la souris est utilisée en même temps par la main droite.
 		Cela permet de remplacer à la volée des parties de texte.
 	</p>
-	<li>
-		Tap hold en <kbd>RControl</kbd> ➜ envoi <kbd-sortie>OneShot Shift</kbd-sortie> en tap,
-		<kbd-sortie>Shift</kbd-sortie> en hold.
-	</li>
-	<p>
-		Il est beaucoup plus judicieux de mettre <kbd>Shift</kbd> sous un pouce, afin d’éviter
-		d’utiliser un auriculaire qui est le doigt le plus faible. Cela évite également beaucoup de <SFB
-		></SFB>s. Dans de précédentes versions de <Nom></Nom>, <kbd>Shift</kbd> était même à la place de
-		<kbd>Alt</kbd>, remplacé actuellement par le <kbd>Layer</kbd> de navigation. Cependant cela
-		génère beaucoup de <SFB></SFB>s avec la barre d’espace et gâche un excellent emplacement sur la
-		main gauche, permettant de démultiplier les possibilités à une main.
-	</p>
 </ul>
 
 <h3>Raccourcis avec AltGr</h3>
 <ul>
-	<li><kbd>AltGr</kbd> + <kbd>"Alt"</kbd> ➜ <kbd-sortie>Capsword</kbd-sortie> ;</li>
-	<p>
-		<kbd>Capsword</kbd> est une sorte de
-		<span class="important">CapsLock qui se désactive automatiquement</span>
-		à la fin d’un "mot". Ainsi, CapsLock se désactive lors de la pression de
-		<kbd>Espace</kbd>,
-		<kbd>,</kbd> ou encore <kbd>Entrée</kbd>. Cette fonctionnalité peut être très utile pour écrire
-		des abréviations telles que <kbd-sortie>QMK</kbd-sortie>,
-		<kbd-sortie>ASCII</kbd-sortie>,
-		<kbd-sortie>FAQ</kbd-sortie>, etc. De plus, elle permet également d’écrire plus aisément les
-		noms des variables et constantes en programmation comme
-		<kbd-sortie>KC_SPC</kbd-sortie>,
-		<kbd-sortie>SERVER_NAME</kbd-sortie>, etc.
-	</p>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> (BackSpace) ➜ <kbd-sortie>Ctrl</kbd-sortie> +
+		<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
 		<kbd-sortie>BackSpace</kbd-sortie> ;
 	</li>
 	<p>
 		La combinaison <kbd>Ctrl</kbd> + <kbd>BackSpace</kbd> permet de supprimer d’un coup le mot vers
-		la gauche. <kbd>AltGr</kbd> est un modificateur très accessible sur n’importe quel clavier, étant
-		sous le pouce droit. Par conséquent, ce raccourci permet de très rapidement corriger des erreurs
-		de frappe.
+		la gauche. <kbd>AltGr</kbd> est un modificateur très accessible, étant sous le pouce droit. Par conséquent,
+		ce raccourci permet de très rapidement corriger des erreurs de frappe.
 	</p>
-	<p>
-		De plus, ajouter cette fonctionnalité sur la touche <kbd>"CapsLock"</kbd> (qui a été remappée en
-		BackSpace) est un choix plutôt logique. Ainsi, tous les raccourcis de suppression sont à cet
-		emplacement, car la touche <kbd-sortie>Delete</kbd-sortie> est quant à elle disponible en
-		<kbd>Shift</kbd>
-		+ <kbd>"CapsLock"</kbd>.
-	</p>
+	<li>
+		<kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
+		<kbd-sortie>Delete</kbd-sortie>.
+	</li>
+	<p>Le principe est le même, sauf qu’ici on supprime le mot à droite.</p>
 	<!-- <li>
 				<kbd>AltGr</kbd> + <kbd>LShift</kbd> ➜ <kbd-sortie>Dot-Space-Shift</kbd-sortie> =
 				<kbd-sortie>.</kbd-sortie>
@@ -146,17 +131,23 @@
 			</p> -->
 </ul>
 
-<h3>Raccourcis sur <kbd>"CapsLock"</kbd> (transformé en <kbd>BackSpace</kbd>)</h3>
+<h3>Raccourcis avec <kbd>"CapsLock"</kbd> (transformé en <kbd>Enter</kbd>)</h3>
 <ul>
+	<li><kbd>"LAlt"</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>CapsWord</kbd-sortie> ;</li>
+	<p>
+		<kbd>CapsWord</kbd> est une sorte de
+		<span class="important">CapsLock qui se désactive automatiquement</span>
+		à la fin d’un "mot". Ainsi, CapsLock se désactive lors de la pression de
+		<kbd>Espace</kbd>, <kbd>,</kbd> ou encore <kbd>Entrée</kbd>. Cette fonctionnalité peut être très
+		utile pour écrire des abréviations telles que <kbd-sortie>QMK</kbd-sortie>,
+		<kbd-sortie>ASCII</kbd-sortie>,
+		<kbd-sortie>FAQ</kbd-sortie>, etc. De plus, elle permet également d’écrire plus aisément les
+		noms des variables et constantes en programmation comme
+		<kbd-sortie>KC_SPC</kbd-sortie>,
+		<kbd-sortie>SERVER_NAME</kbd-sortie>, etc.
+	</p>
 	<li>
-		<kbd>Shift</kbd> + <kbd>"CapsLock"</kbd> (BackSpace) ➜ <kbd-sortie>Delete</kbd-sortie> ;
-	</li>
-	<li>
-		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> (BackSpace) ➜
-		<kbd-sortie>Ctrl</kbd-sortie>
-		+ <kbd-sortie>Delete</kbd-sortie> ;
-	</li>
-	<li>
-		<kbd>Windows</kbd> + <kbd>"CapsLock"</kbd> (BackSpace) ➜ <kbd-sortie>CapsLock</kbd-sortie>.
+		<kbd>Windows</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>CapsLock</kbd-sortie>, pour ne pas
+		perdre la fonctionnalité.
 	</li>
 </ul>

@@ -7,7 +7,7 @@
 <h2>Confort</h2>
 
 <h3>
-	Touche <kbd>BackSpace</kbd> à la place de CapsLock
+	Touche <kbd>BackSpace</kbd> à la place de RCtrl
 </h3>
 <p>
 	La touche <kbd>BackSpace</kbd> est l’une des touches les plus utilisées sur un clavier. En effet,
@@ -15,19 +15,23 @@
 	Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée en haut à droite du
 	clavier. Par conséquent, il est logique de vouloir la placer sur un emplacement très accessible.
 	C’est pour cela que la touche <kbd>BackSpace</kbd> a été dupliquée sur la touche
-	<kbd>"CapsLock"</kbd>
-	avec <NomPlus />.
-</p>
-<p>
-	Idéalement, il serait même mieux de la mettre sur une touche activée par un pouce. Toutefois, sur
-	les claviers non Ergodox c’est difficilement réalisable.
+	<kbd>"RCtrl"</kbd> avec <NomPlus />.
 </p>
 <p>
 	La touche <kbd-sortie>Delete</kbd-sortie> se trouve quant à elle sur la combinaison
-	<kbd>Shift</kbd>
-	+
-	<kbd>"CapsLock"</kbd>.
+	<kbd>Shift</kbd> + <kbd>"RCtrl"</kbd>.
 </p>
+<p>Pour être encore plus rapide, deux raccourcis optionnels ont aussi été implémentés :</p>
+<ul>
+	<li>
+		<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
+		<kbd-sortie>BackSpace</kbd-sortie>
+	</li>
+	<li>
+		<kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
+		<kbd-sortie>Delete</kbd-sortie>
+	</li>
+</ul>
 
 <h3>[QU] automatiques avant les voyelles</h3>
 <p>
@@ -87,16 +91,16 @@
 </p>
 
 <h3>
-	Remplacement automatique des <kbd>'</kbd> par <kbd>’</kbd> en français
+	Remplacement automatique des <kbd>'</kbd> par <kbd>’</kbd>
 </h3>
 
 <p>
-	Lorsque l’on écrit en français, il faudrait idéalement utiliser l’apostrophe typographique plutôt
-	que l’apostrophe droite. C’est pour cela que <NomPlus /> va automatiquement l’utiliser à la place de
-	l’apostrophe droite lors de l’écriture en français. Cette apostrophe est d’ailleurs plus jolie et présente
-	l’avantage de ne pas avoir à être échappée en programmation si une chaîne de caractères est écrite
-	avec ce caractère à l’intérieur. Il n’y a pas à réfléchir, il suffit d’écrire normalement et l’apostrophe
-	typographique apparaîtra. Les faux positifs devraient en outre être extrêmement rares.
+	Lorsque l’on écrit en français ou anglais, il faudrait idéalement utiliser l’apostrophe
+	typographique plutôt que l’apostrophe droite. C’est pour cela que <NomPlus /> va automatiquement l’utiliser
+	à la place de l’apostrophe droite lors de l’écriture de texte. Cette apostrophe est d’ailleurs plus
+	jolie et présente l’avantage de ne pas avoir à être échappée en programmation si une chaîne de caractères
+	est écrite avec ce caractère à l’intérieur. Il n’y a pas à réfléchir, il suffit d’écrire normalement
+	et l’apostrophe typographique apparaîtra. Les faux positifs devraient être extrêmement rares.
 </p>
 <p>
 	Un autre raccourci a aussi été ajouté pour avoir la possibilité d’écrire <kbd-sortie

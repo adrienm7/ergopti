@@ -11,11 +11,7 @@
 	<h1 data-aos="zoom-in" class="ergopti-title">
 		Disposition clavier<br /><span style="line-height: 0.75!important;"><NomPlus></NomPlus></span>
 	</h1>
-	<!-- <div class="container">
-		<div class="block"> -->
 	<BlocClavier nom="presentation_plus" />
-	<!-- </div>
-	</div> -->
 	<mini-espace />
 	<BlocControlesClavier nom="presentation_plus" />
 </div>
@@ -100,7 +96,7 @@
 		de navigation, la touche <kbd>Échap</kbd>, en cliquant quelque part, etc. Ces manipulations ne
 		devraient arriver que très rarement, mais tout dépend de votre utilisation. Par exemple,
 		l’enchaînement <kbd>XG</kbd>
-		est très peu commun, mais les data scientists l’utiliseront régulièrement pour écrire
+		est très peu commun, mais les Data Scientists l’utiliseront régulièrement pour écrire
 		<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
 		/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
 		macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant

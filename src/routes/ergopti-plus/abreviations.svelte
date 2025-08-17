@@ -24,7 +24,6 @@
 	<li><kbd>AVV★</kbd> ➜ <kbd-sortie>AVEZ-VOUS</kbd-sortie> ;</li>
 	<li><kbd>C★</kbd> ➜ <kbd-sortie>C’EST</kbd-sortie> ;</li>
 	<li><kbd>CT★</kbd> ➜ <kbd-sortie>C’ÉTAIT</kbd-sortie> ;</li>
-	<li><kbd>D★</kbd> ➜ <kbd-sortie>DONC</kbd-sortie> ;</li>
 	<li><kbd>DÉ★</kbd> ➜ <kbd-sortie>DÉJÀ</kbd-sortie> ;</li>
 	<li><kbd>Ê★</kbd> ➜ <kbd-sortie>ÊTRE</kbd-sortie> ;</li>
 	<li><kbd>EEF★</kbd> ➜ <kbd-sortie>EN EFFET</kbd-sortie> ;</li>
@@ -58,9 +57,11 @@
 	sont
 	<kbd-sortie>À</kbd-sortie>, <kbd-sortie>LÀ</kbd-sortie> et <kbd-sortie>DÉJÀ</kbd-sortie>. Par
 	conséquent, toute combinaison de type <kbd>ÀS</kbd> ou
-	<kbd>ÀC</kbd> n’est jamais tapée. Cela donne une opportunité extraordinaire de raccourcis pour
-	augmenter sa vitesse et son confort de frappe. Par exemple, au lieu de taper 5 lettres pour écrire
-	le suffixe
+	<kbd>ÀC</kbd> n’est jamais tapée. Cela donne une opportunité extraordinaire de raccourcis pour augmenter
+	sa vitesse et son confort de frappe.
+</p>
+<p>
+	Par exemple, au lieu de taper 5 lettres pour écrire le suffixe
 	<kbd-sortie>EMENT</kbd-sortie>, très souvent utilisé en français, deux frappes suffisent :
 	<kbd>ÀS</kbd>. Ces raccourcis vont diviser par deux le nombre de touches nécessaires pour écrire
 	les suffixes les plus communs,
