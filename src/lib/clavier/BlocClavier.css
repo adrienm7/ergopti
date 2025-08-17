@@ -280,17 +280,6 @@ bloc-clavier[data-couche='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche=
 	font-size: 0.85em;
 }
 
-bloc-clavier[data-couche='Shift'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
-bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
-bloc-clavier[data-couche='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div,
-bloc-clavier[data-couche='Ctrl'][data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
-	font-size: 0.7em;
-}
-
-bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='LAlt'] div {
-	font-size: 0.5em;
-}
-
 /* Taille plus petite pour la légende Win+V */
 bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Coller'] div {
 	font-size: 0.85em;
@@ -301,6 +290,10 @@ bloc-clavier[data-couche='Layer']
 	bloc-touche:not([data-doigt='pouce']):not([data-type='special'])
 	div {
 	font-size: 0.8em;
+}
+
+bloc-clavier[data-couche='AltGr'] bloc-touche[data-touche='CapsLock'] div {
+	font-size: calc(var(--taille-texte-touche) * 0.8);
 }
 
 bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Copier'] div,
