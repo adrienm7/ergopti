@@ -144,6 +144,18 @@
 			<br />
 			<div id="page-toc-mobile" onclick={fermerMenu}></div>
 			<div style="height:70px"></div>
+			<div style="text-align:center;">
+				<a href="https://github.com/adrienm7/ergopti" style="font-size:1em!important"
+					>Repo GitHub <i class="fa-brands fa-github"></i></a
+				>
+				—
+				<a
+					href="https://discord.gg/ptxRzBqcQP"
+					style="position:relative; bottom:-0.1em; font-size:1em!important"
+					>Serveur Discord <i class="fa-brands fa-discord"></i></a
+				>
+			</div>
+			<div style="height:70px"></div>
 		</div>
 	</nav>
 </header>
@@ -196,6 +208,7 @@
 		padding-top: 1px;
 		padding-bottom: 2px;
 		border-radius: 5px;
+		border: 1px solid rgb(14, 83, 117);
 		/* width: 2.3em; */
 	}
 

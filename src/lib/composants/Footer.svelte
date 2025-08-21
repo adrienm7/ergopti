@@ -6,10 +6,13 @@
 
 <footer>
 	<p>
-		<a href="https://github.com/adrienm7/ergopti"><i class="fa-brands fa-github"></i></a>
-		Disposition <Nom></Nom>
-		<a href="https://discord.gg/ptxRzBqcQP" style="position:relative; bottom:-0.1em"
-			><i class="fa-brands fa-discord"></i></a
+		Disposition <Nom></Nom> —
+		<a href="https://github.com/adrienm7/ergopti" style="color:white"
+			>GitHub <i class="fa-brands fa-github"></i></a
+		>
+		|
+		<a href="https://discord.gg/ptxRzBqcQP" style="position:relative; bottom:-0.1em; color:white"
+			>Discord <i class="fa-brands fa-discord"></i></a
 		>
 	</p>
 </footer>
@@ -34,15 +37,5 @@
 	footer p {
 		font-size: 0.9rem;
 		text-align: center;
-	}
-
-	footer i::before {
-		-webkit-background-clip: text;
-		background-clip: text;
-		-webkit-text-fill-color: transparent;
-		color: transparent;
-		-webkit-box-decoration-break: clone;
-		box-decoration-break: clone;
-		background-image: linear-gradient(to right, white, white);
 	}
 </style>

@@ -108,7 +108,22 @@
 					<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
 						Contenu de la page
 					</p>
-					<div id="page-toc-pc"><div id="page-toc"></div></div>
+					<div id="page-toc-pc">
+						<div id="page-toc"></div>
+					</div>
+					<p style="text-align:center; margin: 0; margin-top: 1em; margin-bottom: 0.5em;">
+						<a
+							href="https://github.com/adrienm7/ergopti"
+							style="font-size:0.9em!important; color:white"
+							>Repo GitHub <i class="fa-brands fa-github"></i></a
+						>
+						—
+						<a
+							href="https://discord.gg/ptxRzBqcQP"
+							style="position:relative; bottom:-0.1em; font-size:0.9em!important; color:white"
+							>Serveur Discord <i class="fa-brands fa-discord"></i></a
+						>
+					</p>
 				</div>
 			</aside>
 			<div id="main-content">
