@@ -9,10 +9,11 @@
 <h3>Version 2.2 (Septembre 2025)</h3>
 <p>
 	Le changement le plus visible d’<Nom></Nom> v2.2 est l’interversion de la touche <kbd>€</kbd> avec
-	la touche <kbd>%</kbd>. Celle-ci a été réalisée car le <kbd>%</kbd> est beaucoup plus fréquemment
-	utilisé que le <kbd>€</kbd>, que ce soit dans la vie quotidienne ou en programmation. Ainsi, il
-	fallait que la touche la plus facile d’accès des deux (celle située le plus vers l’intérieur du
-	clavier) soit aussi la plus utile. En outre, le touche <kbd>€</kbd> a été modifiée pour mettre le
+	la touche <kbd>%</kbd> sur la rangée des chiffres. Celle-ci a été réalisée car le <kbd>%</kbd> est
+	beaucoup plus fréquemment utilisé que le <kbd>€</kbd>, que ce soit dans la vie quotidienne ou en
+	programmation. Ainsi, il fallait que la touche la plus facile d’accès des deux (celle située le
+	plus vers l’intérieur du clavier) soit aussi la plus utile. En outre, le touche <kbd>€</kbd> a été
+	modifiée pour mettre le
 	<kbd-sortie>€</kbd-sortie> en AltGr et placer le <kbd-sortie>$</kbd-sortie> en accès direct. Ici encore,
 	c’est parce que ce caractère est beaucoup plus utilisé, que ce soit en tant que monnaie, mais aussi
 	en programmation ou sur Excel par exemple.
@@ -35,11 +36,10 @@
 	ces nombreuses features.
 </p>
 <p>
-	Sur cette nouvelle version d’<NomPlus></NomPlus>, certains raccourcis et touches ont été
-	inversées. En particulier, le layer de navigation ne pouvait auparavant pas se trouver sur la
-	barre d’espace, car cela rendait celle-ci inutilisable. Cette contrainte technique ayant été
-	résolue, cela a libéré de la place en "LAlt", ce qui a permis d’y mettre une touche
-	Shift/OneShotShift.
+	Sur cette nouvelle version d’<NomPlus></NomPlus>, certains raccourcis et touches ont été inversés.
+	En particulier, le layer de navigation ne pouvait auparavant pas se trouver sur la barre d’espace,
+	car cela rendait celle-ci inutilisable. Cette contrainte technique ayant été résolue, cela a
+	libéré de la place en "LAlt", ce qui a permis d’y mettre une touche OneShotShift/Shift.
 </p>
 
 <h3>Version 2.1 (Janvier 2025)</h3>
@@ -55,6 +55,11 @@
 	roulement vers l’intérieur. Une autre amélioration est que le <kbd>C</kbd> n’est plus sur le même
 	doigt que le <kbd>D</kbd>, ce qui permet de taper la commande <kbd-sortie>cd</kbd-sortie> (change
 	directory) sans <SFB></SFB>.
+</p>
+<p>
+	Cette interversion est pénalisée par les analyseurs de disposition, qui comptent un peu plus de <SFB
+	></SFB>s. Pourtant, à l’usage, le <SFB></SFB> sur <kbd>CT</kbd> se révèle moins gênant que
+	l’ancien sur <kbd>SC</kbd>.
 </p>
 
 <h3>Version 2.0 (Janvier 2025)</h3>

@@ -99,6 +99,18 @@
 	</p>
 
 	<h3>Analyse KLAnext</h3>
+	<p>
+		À noter que la version 2.2 d’<Nom></Nom> n’est pas présente sur ces benchmarks, car les changements
+		sont si minimes que cela n’impacte pas les résultats. La version 2.1 a donc les mêmes métriques que
+		la version 2.2.
+	</p>
+	<p>
+		De plus, on peut se demander pourquoi les scores diminuent légèrement plus la version de la
+		disposition évolue. C’est tout simplement car KLAnext ne mesure pas toutes les métriques d’une
+		disposition clavier et que certaines de celles qu’il mesure sont pénalisées par des changements
+		qui au contraire améliorent beaucoup des métriques non mesurées.
+	</p>
+
 	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
 		<button on:click={toggleClavier} style="height:2.5rem;">
 			{#if clavier === 'ergodox'}
@@ -149,13 +161,12 @@
 			<option value="">Standard</option>
 		</select>
 	</div>
-	<a
-		href="/benchmarks/ergol/v{versionValue}/analyse_ergol_ergopti{version_1dfh}_v{versionValue}_{ergol}.pdf"
+	<a href="/benchmarks/ergol/v2.1/analyse_ergol_ergopti{version_1dfh}_v2.1_{ergol}.pdf"
 		><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo-L</button></a
 	>
 	<mini-espace />
 	<embed
-		src="/benchmarks/ergol/v{versionValue}/analyse_ergol_ergopti{version_1dfh}_v{versionValue}_{ergol}.pdf"
+		src="/benchmarks/ergol/v2.1/analyse_ergol_ergopti{version_1dfh}_v2.1_{ergol}.pdf"
 		type="application/pdf"
 		width="100%"
 		height="600px"

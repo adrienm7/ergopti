@@ -84,6 +84,9 @@ kbd-non:hover {
 	box-shadow: rgba(204, 204, 204, 0.7) 0 0.766667px 0 0;
 }
 
-kbd.morte {
+kbd.morte,
+kbd-sortie.morte {
+	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
+	font-family: sans-serif;
 	font-weight: normal;
 }

@@ -249,7 +249,8 @@ bloc-touche[data-touche='LCtrl'] div,
 bloc-touche[data-touche='RCtrl'] div,
 bloc-touche[data-touche='Space'] div,
 bloc-touche[data-touche='Win'] div,
-bloc-touche[data-touche='Option'] div {
+bloc-touche[data-touche='Option'] div,
+bloc-touche[data-touche='Escape'] div {
 	font-size: calc(var(--taille-texte-touche) * 0.7);
 	font-weight: normal;
 }

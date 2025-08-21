@@ -6,6 +6,14 @@ def main():
     directory_path = Path(__file__).parent
 
     for file_path in directory_path.glob("*_v0.keylayout"):
+        target_file = file_path.with_name(
+            file_path.stem.replace("_v0", "") + file_path.suffix
+        )
+
+        # Skip if the file already exists
+        if target_file.exists():
+            continue
+
         with file_path.open("r", encoding="utf-8") as f:
             content = f.read()
 

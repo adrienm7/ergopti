@@ -66,8 +66,8 @@
 		<div style="margin:0; margin-left: 0.5em; padding:0; text-align: left; width:max-content">
 			<p style="margin:0; font-weight:bold">
 				<a href="/">Disposition <span class="morespace">clavier </span></a>
-				<span class="hyper" style="display:inline-block"
-					><a href="/">Ergopti</a>
+				<span style="display:inline-block;"
+					><a href="/"><Nom></Nom></a>
 					<span class="myselect">
 						<select
 							id="selection-version"
@@ -78,6 +78,9 @@
 							{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
 						</select>
 					</span></span
+				>
+				<a href="/informations/#changelog" style="position:relative; top:-0.65em; font-size:0.8em"
+					><i class="fa-duotone fa-solid fa-circle-info"></i></a
 				>
 			</p>
 			<p style="margin:0; padding-top: 0; padding-left: 0; font-size: 0.8em">
@@ -180,16 +183,16 @@
 		margin: 0;
 		padding: 0;
 		background-clip: text;
-		-webkit-text-fill-color: transparent;
+		/* -webkit-text-fill-color: transparent;
 		color: transparent;
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
-		background-image: inherit;
-		border: none;
-		font-weight: bold;
-		width: 2.3em;
+		background-image: inherit; */
 		-webkit-appearance: none;
 		-moz-appearance: none;
+		border: none;
+		color: white;
+		width: 2.3em;
 	}
 
 	.myselect {
@@ -197,14 +200,15 @@
 		display: inline-block;
 		margin: 0;
 		padding: 0;
-		padding-right: 0.25em;
-		background-clip: text;
+		padding-right: 0.2em;
+		color: white;
+		/* background-clip: text;
 		-webkit-text-fill-color: transparent;
 		color: transparent;
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
-		background-image: inherit;
-		font-weight: bold;
+		background-image: inherit; */
+		font-weight: normal !important;
 	}
 
 	.myselect::after {
@@ -221,8 +225,8 @@
 	}
 
 	#selection-version option {
-		background-color: white;
-		color: black;
+		background-color: black;
+		color: white;
 		font-style: normal;
 		font-weight: normal;
 	}
