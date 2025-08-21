@@ -190,9 +190,13 @@
 		background-image: inherit; */
 		-webkit-appearance: none;
 		-moz-appearance: none;
-		border: none;
 		color: white;
-		width: 2.3em;
+		padding: 4px;
+		margin-bottom: -4px;
+		padding-top: 1px;
+		padding-bottom: 2px;
+		border-radius: 5px;
+		/* width: 2.3em; */
 	}
 
 	.myselect {
@@ -200,7 +204,7 @@
 		display: inline-block;
 		margin: 0;
 		padding: 0;
-		padding-right: 0.2em;
+		/* padding-right: 0.2em; */
 		color: white;
 		/* background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -211,7 +215,7 @@
 		font-weight: normal !important;
 	}
 
-	.myselect::after {
+	/* .myselect::after {
 		content: '';
 		position: absolute;
 		right: 0px;
@@ -222,7 +226,7 @@
 		border-right: 0.45em solid transparent;
 		border-top: 0.7em solid rgb(255, 255, 255);
 		pointer-events: none;
-	}
+	} */
 
 	#selection-version option {
 		background-color: black;
