@@ -6,7 +6,9 @@
 
 <footer>
 	<p>
-		Disposition <Nom></Nom> — <a href="https://github.com/adrienm7/ergopti">Repo GitHub</a>
+		Disposition <Nom></Nom> —
+		<a href="https://github.com/adrienm7/ergopti"><i class="fa-brands fa-github"></i></a>
+		<a href="https://discord.gg/ptxRzBqcQP"><i class="fa-brands fa-discord"></i></a>
 	</p>
 </footer>
 

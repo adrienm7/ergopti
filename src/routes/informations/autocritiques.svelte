@@ -9,28 +9,29 @@
 <h3>L’importance des compromis</h3>
 <p>
 	Il est évident qu’il n’est pas possible de maximiser plusieurs paramètres simultanément. Bien que
-	largement supérieure à de nombreuses dispositions telles que l’AZERTY et même le BÉPO, <Nom /> est
-	donc malheureusement loin d’être parfaite. En effet, la création d’une disposition est une affaire
-	de compromis. Des choix ont dû être effectués pour maximiser chacun des critères d’évaluation sans
-	trop compromettre les autres.
+	largement supérieure à de nombreuses dispositions telles qu’AZERTY et même BÉPO, <Nom /> est donc malheureusement
+	loin d’être parfaite. En effet, la création d’une disposition est une affaire de compromis. Des choix
+	ont dû être effectués pour maximiser chacun des critères d’évaluation sans trop compromettre les autres.
 </p>
 <p>
 	Par exemple, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Cela peut sembler
 	étrange, tant son apparition est incontournable dans les textes (sauf dans le livre
-	<i>La Disparition</i>
-	qui arrive l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est la lettre la plus fréquente et
-	de loin. Elle est si fréquente que sur le
+	<i>La Disparition</i> qui arrive l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est la lettre
+	la plus fréquente, et de loin. Elle est si fréquente que sur le
 	<a href="/#clavier_frequences">clavier affichant les touches les plus utilisées</a>
 	de la page d’accueil, une transformation mathématique a été nécessaire pour que les fréquences relatives
-	aux autres touches soient visibles et comparables.
+	aux autres touches soient visibles et comparables (passage au logarithme). En effet, si l’on affichait
+	les fréquences relatives telles quelles, le <kbd>E</kbd> serait tellement plus fréquent qu’il écraserait
+	complètement les autres fréquences, rendant impossible de les comparer par un code couleur.
 </p>
 <p>
-	Pourtant, cette lettre n’a pas été placée sur l’index, notamment afin de réduire les <SFB />s. En
-	effet, si le <kbd>E</kbd> avait été sur l’index, alors les 6 touches tapées par ce doigt auraient
+	Pourtant, cette lettre n’a pas été placée sur l’index, comme le fait pourtant BÉPO. La raison
+	principale est que la mettre ailleurs permet de sensiblement de réduire les <SFB />s. En effet, si
+	le <kbd>E</kbd> avait été sur l’index, alors les 6 touches tapées par ce doigt auraient
 	possiblement générées des <SFB />s avec le <kbd>E</kbd>. <kbd>E</kbd> s’associe avec quasiment
 	toutes les lettres, donc ce serait une très mauvaise idée. Au contraire, la voyelle <kbd>U</kbd>
-	ne s’associe pas avec beaucoup de lettres, elle est donc beaucoup plus pertinente à cet emplacement.
-	D’autant que cet arrangement des voyelles permet alors de très bons roulements.
+	ne s’associe pas avec beaucoup de lettres, ce qui la rend beaucoup plus pertinente à cet emplacement.
+	D’autant que ce nouvel arrangement des voyelles permet alors de très bons roulements.
 </p>
 <p>
 	En outre, parfois tous les emplacements sont mauvais pour une touche, et il faut choisir le moins
@@ -41,8 +42,10 @@
 <ul>
 	<li>
 		<kbd>E</kbd> est sur le majeur et non sur l’index. Théoriquement, l’index est plus fort et
-		devrait donc être l’endroit idéal pour la lettre <kbd>E</kbd> qui est de loin la lettre la plus fréquente,
-		loin devant la deuxième lettre la plus fréquente de l’alphabet.
+		devrait donc être l’endroit idéal pour la lettre <kbd>E</kbd> qui est de loin la lettre la plus
+		fréquente, loin devant la deuxième lettre la plus fréquente de l’alphabet. Cependant, comme
+		l’index se charge de 6 touches, il faut aussi veiller à ne pas le surcharger. Par conséquent, ce
+		n’est en réalité pas si grave que cela que le <kbd>E</kbd> soit sur le majeur et non sur l’index.
 	</li>
 	<li>
 		Le <kbd>K</kbd>, bien que très rare en français et peu fréquent en anglais, est à une position
@@ -54,6 +57,21 @@
 	<li>
 		Les touches <kbd>Q</kbd> et <kbd>Z</kbd> pourraient aussi être critiquées, car elles nécessitent
 		des extensions de l’auriculaire droit, étant sur une autre colonne que celle de repos.
+		<kbd>Z</kbd> étant très rare et le raccourci <kbd>Ctrl</kbd> + <kbd>Z</kbd> pouvant être réalisé
+		avec la main gauche, cela ne pose pas vraiment de problème.
+	</li>
+	<li>
+		Certains pourront aussi critiquer le fait que la touche <kbd>J</kbd> soit trop bien située,
+		étant sur un excellent emplacement sur l’index gauche. En effet, cette lettre a l’une des
+		fréquences les plus faibles de toutes les lettres, que ce soit en français et en anglais. Si
+		cette lettre à été placée ici en <Nom></Nom>, c’est en vue de l’utilisation d’<NomPlus
+		></NomPlus>, qui a été pensée dès le début comme une extension de la disposition. Ainsi, ce
+		choix de placement de la touche <kbd>J</kbd> est justifié par le fait que cela permet de
+		facilement ajouter de nouvelles fonctionnalités à la disposition sans avoir à créer une toute
+		nouvelle disposition pour tirer parti de ces nouvelles fonctionnalités sans que cela n’ait
+		d’impact négatif. Si la touche magique <kbd>★</kbd> est à cet emplacement, c’est aussi parce que
+		c’est sur la colonne du <kbd>U</kbd>, pour éviter le maximum de <SFB></SFB>s lors de la
+		conversion de cette touche en touche de répétition.
 	</li>
 </ul>
 
@@ -62,33 +80,29 @@
 	Certains claviers ont moins de touches, par exemple en n’ayant que 6 colonnes, voire seulement 5,
 	par main. <Nom></Nom> a été conçue pour exploiter toutes les touches d’un clavier standard, donc 6
 	colonnes à gauche et 7 à droite. Sur la dernière colonne de droite, il n’y a cependant que les touches
-	mortes
-	<kbd class="morte">◌̂</kbd>
-	et <kbd class="morte">◌̈</kbd> qui seront beaucoup plus rarement utilisées. Avec <NomPlus
-	></NomPlus>, ces touches deviennent même inutiles, car elles sont réalisables autrement.
+	mortes <kbd class="morte">◌̂</kbd> et <kbd class="morte">◌̈</kbd> qui seront beaucoup plus rarement
+	utilisées. Ces touches mortes sont en accès direct sur la septième colonne, mais peuvent également
+	être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec <kbd>Shift</kbd> +
+	<kbd>AltGr</kbd> + <kbd>Ê</kbd> pour <kbd-sortie class="morte">◌̂</kbd-sortie> et <kbd>Shift</kbd>
+	+ <kbd>AltGr</kbd> + <kbd>T</kbd> pour le Tréma <kbd-sortie class="morte">◌̈</kbd-sortie>.
 </p>
 <p>
-	Il n’en demeure pas moins que <Nom></Nom> n’est pas 1DFH (1u distance from home). Les lettres accentuées
+	Il n’en demeure pas moins qu’<Nom></Nom> n’est pas 1DFH (1u Distance From Home). Les lettres accentuées
 	du français étant en accès direct avec <Nom></Nom>, il est impossible de réaliser une disposition
-	1DFH, car il y a trop de touches à placer. La disposition <a href="https://ergol.org">Ergo-L</a> est
-	quant à elle une disposition 1DFH, mais au prix d’une touche morte permettant de réaliser les accents.
-</p>
-<p>
-	Une solution simple pour adapter <Nom></Nom> à un clavier plus compact serait de supprimer la touche
-	<kbd class="morte">◌̈</kbd>
-	qui peut déjà être réalisée en <kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> (T pour Tréma).
-	De même, la touche <kbd>Ê</kbd> pourrait être remplacée par la touche morte
-	<kbd class="morte">◌̂</kbd>. En Fait, la touche morte de tréma pourrait même être en
-	<kbd>Shift</kbd> de cette touche morte circonflexe. Mais tout ceci n’est pas idéal, et les espaces
-	insécables et fines insécables respectivement disponibles en <kbd>AltGr</kbd> +
-	<kbd class="morte">◌̈</kbd>
-	et <kbd>Shift</kbd> + <kbd class="morte">◌̈</kbd> ne seront plus disponibles.
+	1DFH, car il y a trop de touches à placer par rapport à l’espace disponible. La disposition
+	<a href="https://ergol.org">Ergo-L</a> est quant à elle une disposition 1DFH, mais au prix d’une touche
+	morte permettant de réaliser les accents. Cela signifie que dans ce genre de dispositions, il y a plus
+	de frappes pour écrire un mot, car pour écrire une lettre accentuée, il faut d’abord appuyer sur la
+	touche morte, puis sur la lettre.
 </p>
 <p class="encadre">
-	<b>Note :</b> Une version 1DFH de <Nom></Nom> a été développée. Elle est disponible sur la
+	<b>Note :</b> Une version 1DFH d’<Nom></Nom> a été développée. Elle est disponible sur la
 	<a href="/benchmarks">page de benchmarks</a>
 	ainsi que sur la <a href="/telechargements">page de téléchargements</a>, par installation via
-	Kalamine.
+	Kalamine. Elle utilise le fait qu’<Nom></Nom> ait été conçue de base pour utiliser de nouvelles fonctionnalités
+	grâce à l’emplacement réservé à la touche magique <kbd>★</kbd>. Cependant, les gains apportés par
+	cette version 1DFH sont faibles et il est donc recommandé de ne pas l’utiliser, sauf si vous avez
+	un clavier compact et n’avez pas d’autre choix.
 </p>
 
 <h3>Quelques <SFB />s restants</h3>
@@ -112,7 +126,7 @@
 	</li>
 </ul>
 <p class="encadre">
-	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation de <NomPlus
+	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation d’<NomPlus
 	></NomPlus>, y compris pour les <SFB></SFB>s encore plus rares qui ne sont pas listés ici.
 	<i class="fa-duotone fa-face-smile"></i>
 </p>

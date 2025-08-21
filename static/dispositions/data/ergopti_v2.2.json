@@ -740,7 +740,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "z",
+			"touche": "Circonflexe",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "2",
@@ -836,7 +836,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "q",
+			"touche": "z",
 			"main": "droite",
 			"doigt": "auriculaire",
 			"ligne": "3",
@@ -996,7 +996,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "Circonflexe",
+			"touche": "q",
 			"main": "droite",
 			"doigt": "index",
 			"ligne": "5",
@@ -1004,7 +1004,7 @@
 			"taille": "1"
 		},
 		{
-			"touche": "vide",
+			"touche": "ç",
 			"main": "droite",
 			"doigt": "majeur",
 			"ligne": "5",
@@ -1305,7 +1305,7 @@
 			"Greek": "φ",
 			"GreekShift": "Φ",
 			"R": "𝔽",
-			"Layer": "+<span style='font-weight: light;'>↩</span>",
+			"Layer": "+⇤",
 			"À": "iste",
 			",": "fl",
 			"type": "lettre"
@@ -1733,7 +1733,7 @@
 			"Greek": "ζ",
 			"GreekShift": "Ζ",
 			"R": "ℤ",
-			"Layer": "",
+			"Layer": "+⇥",
 			"À": "ez-vous",
 			",": "bj",
 			"type": "lettre"
@@ -1980,6 +1980,27 @@
 			"Layer": "!+⇧",
 			"À": "able",
 			",": "ju",
+			"type": "français"
+		},
+		{
+			"touche": "ç",
+			"Primary": "ç",
+			"Shift": "Ç",
+			"AltGr": "",
+			"ShiftAltGr": "",
+			"Ctrl": "",
+			"Circonflexe": "",
+			"CirconflexeShift": "",
+			"Trema": "",
+			"TremaShift": "",
+			"Exposant": "",
+			"Indice": "",
+			"Greek": "",
+			"GreekShift": "",
+			"R": "",
+			"Layer": "",
+			"À": "",
+			",": "",
 			"type": "français"
 		},
 		{
@@ -2591,23 +2612,23 @@
 		},
 		{
 			"touche": "Escape",
-			"Primary": "␛",
-			"Shift": "␛",
-			"AltGr": "␛",
-			"ShiftAltGr": "␛",
-			"Ctrl": "␛",
-			"Circonflexe": "␛",
-			"CirconflexeShift": "␛",
-			"Trema": "␛",
-			"TremaShift": "␛",
-			"Exposant": "␛",
-			"Indice": "␛",
-			"Greek": "␛",
-			"GreekShift": "␛",
-			"R": "␛",
-			"Layer": "␛",
-			"À": "␛",
-			",": "␛",
+			"Primary": "Esc",
+			"Shift": "Esc",
+			"AltGr": "Esc",
+			"ShiftAltGr": "Esc",
+			"Ctrl": "Esc",
+			"Circonflexe": "Esc",
+			"CirconflexeShift": "Esc",
+			"Trema": "Esc",
+			"TremaShift": "Esc",
+			"Exposant": "Esc",
+			"Indice": "Esc",
+			"Greek": "Esc",
+			"GreekShift": "Esc",
+			"R": "Esc",
+			"Layer": "Esc",
+			"À": "Esc",
+			",": "Esc",
 			"type": "special"
 		},
 		{

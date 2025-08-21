@@ -40,7 +40,7 @@
 	Cette analyse met en lumière la quasi-suppression des <SFB></SFB>s, avec une valeur d’environ 3.
 	Pour rappel, la valeur de cette métrique avec un corpus non modifié est de 25 pour la même
 	disposition. Ainsi, l’utilisation d’<NomPlus></NomPlus> divise par environ 8 le nombre de <SFB
-	></SFB>s de <Nom></Nom>.
+	></SFB>s d’<Nom></Nom>.
 </p>
 <p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
 <h4><Nom></Nom></h4>

@@ -1,7 +1,7 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-08-06 at 20:55 (GMT+0)-->
-<keyboard group="126" id="-20043" name="Ergopti v2.2.0" maxout="3">
+<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-08-21 at 19:54 (GMT+0)-->
+<keyboard group="126" id="-20043" name="Ergopti v2.2.1" maxout="3">
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
@@ -149,7 +149,7 @@
 			<key code="7" action="À"/>
 			<key code="8" action="J"/>
 			<key code="9" action=","/>
-			<key code="10" action="+"/>
+			<key code="10" action="="/>
 			<key code="11" action="K"/>
 			<key code="12" action="È"/>
 			<key code="13" action="Y"/>
@@ -163,7 +163,7 @@
 			<key code="21" action="4"/>
 			<key code="22" action="6"/>
 			<key code="23" action="5"/>
-			<key code="24" action="$"/>
+			<key code="24" output="€"/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
 			<key code="27" output="%"/>
@@ -262,7 +262,6 @@
 			<key code="21" action="4"/>
 			<key code="22" action="6"/>
 			<key code="23" action="5"/>
-			<key code="24" output=" €"/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
 			<key code="27" output=" %"/>
@@ -337,7 +336,7 @@
 			<key code="7" action="à"/>
 			<key code="8" action="j"/>
 			<key code="9" output=" ;"/>
-			<key code="10" action="="/>
+			<key code="10" action="+"/>
 			<key code="11" action="k"/>
 			<key code="12" action="è"/>
 			<key code="13" action="y"/>
@@ -351,7 +350,6 @@
 			<key code="21" action="4"/>
 			<key code="22" action="6"/>
 			<key code="23" action="5"/>
-			<key code="24" output=" €"/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
 			<key code="27" output=" %"/>
@@ -623,7 +621,7 @@
 			<key code="24" action="¤"/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
-			<key code="27" output="‱"/>
+			<key code="27" output="‰"/>
 			<key code="28" action="8"/>
 			<key code="29" output="°"/>
 			<key code="30" action=" "/>
@@ -783,7 +781,7 @@
 			<key code="24" output="€"/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
-			<key code="27" output="‰"/>
+			<key code="27" output="‱"/>
 			<key code="28" action="8"/>
 			<key code="29" output="ª"/>
 			<key code="31" output="ç"/>
