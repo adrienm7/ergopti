@@ -12,6 +12,7 @@
 
 <div class="main">
 	<h1 data-aos="zoom-in">Utiliser <Nom></Nom></h1>
+	<hr class="margin-h1" />
 
 	<h2>Tester la disposition en ligne</h2>
 	<EmulationClavier />

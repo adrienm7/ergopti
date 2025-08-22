@@ -269,6 +269,7 @@ export class Clavier {
 			let lCtrl = emplacementClavier.querySelector("[data-touche='LCtrl']");
 			let rCtrl = emplacementClavier.querySelector("[data-touche='RCtrl']");
 			let altGr = emplacementClavier.querySelector("[data-touche='RAlt']");
+			let CapsLock = emplacementClavier.querySelector("[data-touche='CapsLock']");
 			let aGrave = emplacementClavier.querySelector("[data-touche='à']");
 			let virgule = emplacementClavier.querySelector("[data-touche=',']");
 			let circonflexe = emplacementClavier.querySelector("[data-touche='Circonflexe']");
@@ -291,6 +292,13 @@ export class Clavier {
 			}
 			if (this.infos_clavier.couche === 'Ctrl' && lCtrl !== null) {
 				lCtrl.classList.add('touche-active');
+			}
+			if (
+				this.infos_clavier.couche === 'Ctrl' &&
+				CapsLock !== null &&
+				this.infos_clavier.plus === 'oui'
+			) {
+				CapsLock.classList.add('touche-active');
 			}
 			if (
 				this.infos_clavier.couche === 'Ctrl' &&
@@ -473,16 +481,22 @@ export class Clavier {
 		// Touche pressée = RCtrl
 		if (
 			touchePressee === 'RCtrl' &&
-			((this.infos_clavier.type === 'iso' && this.infos_clavier.plus === 'non') ||
-				this.infos_clavier.type === 'ergodox') &&
+			this.infos_clavier.plus === 'non' &&
 			coucheActuelle !== 'Ctrl'
 		) {
 			nouvelleCouche = 'Ctrl';
-		} else if (
-			touchePressee === 'RCtrl' &&
-			((this.infos_clavier.type === 'iso' && this.infos_clavier.plus === 'non') ||
-				this.infos_clavier.type === 'ergodox')
+		} else if (touchePressee === 'RCtrl' && this.infos_clavier.plus === 'non') {
+			nouvelleCouche = 'Visuel';
+		}
+
+		// Touche pressée = CapsLock
+		if (
+			touchePressee === 'CapsLock' &&
+			this.infos_clavier.plus === 'oui' &&
+			coucheActuelle !== 'Ctrl'
 		) {
+			nouvelleCouche = 'Ctrl';
+		} else if (touchePressee === 'CapsLock' && this.infos_clavier.plus === 'oui') {
 			nouvelleCouche = 'Visuel';
 		}
 
@@ -566,6 +580,7 @@ export class Clavier {
 			let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
 			let toucheLCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='LCtrl']");
 			let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
+			let toucheCapsLock = emplacementClavier.querySelector("bloc-touche[data-touche='CapsLock']");
 			let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
 			let toucheE = emplacementClavier.querySelector("bloc-touche[data-touche='e']");
 			let toucheECirc = emplacementClavier.querySelector("bloc-touche[data-touche='ê']");
@@ -586,6 +601,8 @@ export class Clavier {
 				toucheLShift,
 				toucheRShift,
 				toucheLCtrl,
+				toucheRCtrl,
+				toucheCapsLock,
 				toucheA,
 				toucheE,
 				toucheECirc,

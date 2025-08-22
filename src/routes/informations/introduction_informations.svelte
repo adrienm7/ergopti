@@ -6,4 +6,5 @@
 
 <div class="main">
 	<h1 data-aos="zoom-in">Informations sur la disposition <Nom></Nom></h1>
+	<hr class="margin-h1" />
 </div>

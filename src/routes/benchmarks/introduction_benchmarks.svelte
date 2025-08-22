@@ -6,6 +6,8 @@
 
 <div class="main">
 	<h1 data-aos="zoom-in">Benchmarks</h1>
+	<hr class="margin-h1" />
+
 	<p>
 		Il existe de nombreux comparateurs de dispositions, certains ayant même une interface en ligne.
 		Le site <span class="important">KLAnext</span> est l’un d’entre eux et est gratuitement
