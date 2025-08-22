@@ -193,4 +193,5 @@ def sort_keys(content):
 
 
 if __name__ == "__main__":
-    main("Ergopti_v2.2.1_v0.keylayout")
+    main()
+    # main("Ergopti_v2.2.1_v0.keylayout")
