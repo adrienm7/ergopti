@@ -2,22 +2,33 @@ import re
 from pathlib import Path
 
 
-def main():
-    directory_path = Path(__file__).parent
+def main(input_path: str = None, directory_path: str = None):
+    overwrite = False
 
-    for file_path in directory_path.glob("*_v0.keylayout"):
+    if directory_path:
+        base_dir = Path(directory_path)
+    else:
+        base_dir = Path(__file__).parent
+
+    if input_path:
+        file_paths = [base_dir / input_path]
+        overwrite = True
+    else:
+        file_paths = list(base_dir.glob("*_v0.keylayout"))
+
+    for file_path in file_paths:
         target_file = file_path.with_name(
             file_path.stem.replace("_v0", "") + file_path.suffix
         )
 
-        # Skip if the file already exists
-        if target_file.exists():
+        if not overwrite and target_file.exists():
             continue
 
         with file_path.open("r", encoding="utf-8") as f:
             content = f.read()
 
         content = fix_invalid_symbols(content)
+        content = ensure_keymap2_has_euro(content)
         content = swap_keys_10_and_50(content)
 
         # Add keymaps index 4 and 9
@@ -53,6 +64,23 @@ def fix_invalid_symbols(content):
             """\t\t<action id="&amp;">\n\t\t\t<when state="none" output="&#x0026;"/>""",
         )
     )
+
+
+def ensure_keymap2_has_euro(content):
+    pattern = r'(<keyMap index="2">.*?</keyMap>)'
+    match = re.search(pattern, content, flags=re.DOTALL)
+    if not match:
+        return content
+
+    block = match.group(1)
+    if re.search(r'<key code="24".*€', block):
+        return content
+
+    new_block = re.sub(
+        r"(</keyMap>)", '\t<key code="24" output=" €"/>\n\t\t\\1', block
+    )
+
+    return content.replace(block, new_block, 1)
 
 
 def swap_keys_10_and_50(content):
@@ -165,4 +193,4 @@ def sort_keys(content):
 
 
 if __name__ == "__main__":
-    main()
+    main("Ergopti_v2.2.1_v0.keylayout")

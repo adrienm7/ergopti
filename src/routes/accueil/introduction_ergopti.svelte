@@ -26,11 +26,11 @@
 	<hr />
 	<p class="encart-introduction">
 		<strong><Nom></Nom></strong> est une
-		<strong class="gradient1">disposition clavier ergonomique et optimisée</strong>
+		<strong class="hyper">disposition clavier ergonomique et optimisée</strong>
 		pour le
 		<strong>français</strong>, l’<strong>anglais</strong> et la <strong>programmation</strong>.
 		Fruit de nombreuses réflexions et expérimentations, elle permet une frappe rapide, fluide et
-		<strong class="gradient1">un&nbsp;confort&nbsp;d’exception</strong>.
+		<strong class="hyper">un&nbsp;confort&nbsp;d’exception</strong>.
 	</p>
 	<hr />
 </div>

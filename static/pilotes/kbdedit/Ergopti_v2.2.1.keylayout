@@ -262,6 +262,7 @@
 			<key code="21" action="4"/>
 			<key code="22" action="6"/>
 			<key code="23" action="5"/>
+			<key code="24" output=" €"/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
 			<key code="27" output=" %"/>
