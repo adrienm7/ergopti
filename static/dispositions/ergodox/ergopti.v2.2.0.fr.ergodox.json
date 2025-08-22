@@ -16,9 +16,9 @@
 	},
 	"keyboardType": "ergodox",
 	"author": "Adrien MOYAUX",
-	"authorUrl": "https://ergopti.fr",
-	"moreInfoUrl": "",
-	"moreInfoText": "",
+	"authorUrl": "",
+	"moreInfoUrl": "https://ergopti.fr",
+	"moreInfoText": "https://ergopti.fr",
 	"keys": [
 		{
 			"primary": -1,
