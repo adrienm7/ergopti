@@ -1262,7 +1262,7 @@
 			"Greek": "δ",
 			"GreekShift": "Δ",
 			"R": "",
-			"Layer": "⊞+⇦",
+			"Layer": "⇤",
 			"À": "ould",
 			",": "ds",
 			"type": "lettre"
@@ -1540,7 +1540,7 @@
 			"Greek": "χ",
 			"GreekShift": "Χ",
 			"R": "ℚ",
-			"Layer": "⇥",
+			"Layer": "⊞+⇨",
 			"À": "ique",
 			",": "qu’",
 			"type": "lettre"
@@ -1648,7 +1648,7 @@
 			"Greek": "ν",
 			"GreekShift": "Ν",
 			"R": "",
-			"Layer": "⇤",
+			"Layer": "⊞+⇦",
 			"À": "ment",
 			",": "dv",
 			"type": "lettre"
@@ -1843,7 +1843,7 @@
 			"Greek": "ς",
 			"GreekShift": "",
 			"R": "",
-			"Layer": "⊞+⇨",
+			"Layer": "⇥",
 			"À": "ance",
 			",": "j’",
 			"type": "ponctuation"
