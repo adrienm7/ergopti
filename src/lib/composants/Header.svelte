@@ -79,7 +79,9 @@
 						</select>
 					</span></span
 				>
-				<a href="/informations/#changelog" style="position:relative; top:-0.65em; font-size:0.8em"
+				<a
+					href="/informations/#changelog"
+					style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
 					><i class="fa-duotone fa-solid fa-circle-info"></i></a
 				>
 			</p>

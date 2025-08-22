@@ -55,7 +55,7 @@ giga-espace {
 
 hr {
 	border: 0;
-	height: 1px;
+	height: 1.5px;
 	background-image: linear-gradient(
 		to right,
 		rgba(255, 255, 255, 0),
