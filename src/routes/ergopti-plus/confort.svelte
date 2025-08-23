@@ -42,21 +42,20 @@
 	+ <kbd-sortie>Voyelle</kbd-sortie>.
 </p>
 <p>
-	Ainsi, pour écrire <kbd-sortie>QUE</kbd-sortie>, il suffira d’écrire <kbd>QE</kbd>. De même, pour
-	écrire <kbd-sortie>POURQUOI</kbd-sortie>, il suffira d’écrire
-	<kbd>POURQOI</kbd>.
+	Ainsi, pour écrire <kbd-sortie>que</kbd-sortie>, il suffira d’écrire <kbd>qe</kbd>. De même, pour
+	écrire <kbd-sortie>pourquoi</kbd-sortie>, il suffira d’écrire
+	<kbd>pourqoi</kbd>.
 </p>
 
 <h3>Touche [OÙ]</h3>
 <p>
-	La touche <kbd>Ù</kbd> n’est utilisée que pour écrire <kbd-sortie>OÙ</kbd-sortie>. Ainsi, autant
-	transformer cette touche en raccourci pour écrire <kbd-sortie>OÙ</kbd-sortie> afin d’économiser
+	La touche <kbd>Ù</kbd> n’est utilisée que pour écrire <kbd-sortie>où</kbd-sortie>. Ainsi, autant
+	transformer cette touche en raccourci pour écrire <kbd-sortie>où</kbd-sortie> afin d’économiser
 	une frappe certaine sur la touche <kbd>O</kbd> et améliorer l’alternance des mains.
 </p>
 <p>
-	Ainsi, le <kbd-sortie>Ù</kbd-sortie> en <kbd>AltGr</kbd> + <kbd>W</kbd> se transforme en
-	<kbd-sortie>OÙ</kbd-sortie>
-	si <NomPlus></NomPlus> est activé.
+	Ainsi, le <kbd-sortie>ù</kbd-sortie> en <kbd>AltGr</kbd> + <kbd>W</kbd> se transforme en
+	<kbd-sortie>où</kbd-sortie> si <NomPlus></NomPlus> est activé.
 </p>
 
 <h3>
@@ -81,9 +80,9 @@
 	Les plus attentifs d’entre vous remarqueront que l’écriture de <kbd-sortie>Â</kbd-sortie> et de
 	<kbd-sortie>AÎ</kbd-sortie>
 	(par exemple pour écrire « paraît ») engendre des <SFB></SFB>s avec cette nouvelle méthode. C’est
-	pour cela qu’il est aussi possible de réaliser <kbd>ÉÊ</kbd> pour obtenir
-	<kbd-sortie>Â</kbd-sortie>
-	et <kbd>ÊÉ</kbd> pour <kbd-sortie>AÎ</kbd-sortie>. Ces options offrent en outre des roulements
+	pour cela qu’il est aussi possible de réaliser <kbd>éê</kbd> pour obtenir
+	<kbd-sortie>â</kbd-sortie>
+	et <kbd>êé</kbd> pour <kbd-sortie>aî</kbd-sortie>. Ces options offrent en outre des roulements
 	extrêmement confortables sur des bigrammes qui n’existent pas et donc ne posent aucun problème.
 </p>
 <p>
@@ -107,8 +106,8 @@
 	Un autre raccourci a aussi été ajouté pour avoir la possibilité d’écrire <kbd-sortie
 		>N'T</kbd-sortie
 	>
-	par un roulement. Effectivement, <kbd>NT'</kbd> se transforme en
-	<kbd-sortie>N'T</kbd-sortie> pour pouvoir faire [majeur, annulaire, auriculaire] plutôt que
+	par un roulement. Effectivement, <kbd>nt'</kbd> se transforme en
+	<kbd-sortie>n't</kbd-sortie> pour pouvoir faire [majeur, annulaire, auriculaire] plutôt que
 	[majeur, auriculaire, annulaire]. Ce raccourci est utile pour réaliser les négations en anglais
 	telles que <kbd-sortie>don't</kbd-sortie>, <kbd-sortie>won't</kbd-sortie> ou
 	<kbd-sortie>can't</kbd-sortie>.
@@ -171,3 +170,32 @@
 	<kbd>voyelle</kbd>. Il suffit de faire <kbd>,</kbd> + <kbd>voyelle</kbd>. Ainsi, la frappe n’est
 	absolument pas ralentie, car on ne rajoute pas de touches supplémentaires à taper.
 </p>
+
+<h3>
+	Utilisation de la touche <kbd>,</kbd> + <kbd>consonne</kbd> pour avoir une disposition 1DFH
+</h3>
+<p>
+	La disposition <Nom></Nom> n’est pas 1DFH de base. En effet, il y a trop de lettres à placer, notamment
+	les voyelles accentuées du français, pour que toutes les touches soient à une distance maximale d’une
+	touche de la position de repos de chaque doigt (« 1u Distance From Home »). C’est pourquoi il y a les
+	lettres <kbd>Q</kbd> et <kbd>Z</kbd> sur l’auriculaire droit, non sur la colonne de repos de ce
+	doigt, mais à droite de celle-ci. De même pour la touche <kbd>K</kbd> qui est pile au milieu du clavier,
+	mais trop loin de chacun des deux index pour être considérée 1DFH.
+</p>
+<p>
+	En outre, réaliser un <kbd-sortie>ç</kbd-sortie> ou un <kbd-sortie>où</kbd-sortie> est un peu
+	inconfortable, car il faut utiliser <kbd>AltGr</kbd> pour les obtenir. La frappe serait encore plus
+	fluide en utilisant une touche morte au lieu d’un modificateur. En effet, celui-ci qui peut dans certains
+	cas demeurer activé pour la lettre d’après, et donc entraîner des erreurs de frappe.
+</p>
+<p>
+	C’est pour toutes ces raisons qu’il est possible d’utiliser la touche <kbd>,</kbd> comme une super
+	touche morte avec <NomPlus></NomPlus> :
+</p>
+<ul>
+	<li><kbd>,</kbd> + <kbd>è</kbd> = <kbd-sortie>z</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>y</kbd> = <kbd-sortie>k</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>s</kbd> = <kbd-sortie>q</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>c</kbd> = <kbd-sortie>ç</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>x</kbd> = <kbd-sortie>où</kbd-sortie>.</li>
+</ul>

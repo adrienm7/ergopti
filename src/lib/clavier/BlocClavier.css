@@ -569,6 +569,10 @@ bloc-clavier,
 	margin-right: 0;
 }
 
+#clavier_symboles_plus bloc-ligne:nth-child(n + 5) {
+	display: none;
+}
+
 #clavier_magique bloc-touche[data-plus='oui']:not([data-touche='magique']) {
 	background: unset !important;
 	--couleur-touche-saturation: 100% !important;

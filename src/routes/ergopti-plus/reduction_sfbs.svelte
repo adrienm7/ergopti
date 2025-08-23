@@ -10,13 +10,11 @@
 <p>L’un des avantages majeurs de <NomPlus /> est qu’il réduit presque totalement les <SFB />s.</p>
 <p>
 	Les <SFB />s les plus fréquents de la disposition sont : <kbd>CT</kbd>,
-	<kbd>PT</kbd>, <kbd>EO</kbd>, <kbd>OE</kbd>,
-	<kbd>UB</kbd>, <kbd>BU</kbd> et <kbd>DS</kbd>. <kbd>CT</kbd> est de loin le plus fréquent.
-	<kbd>EO</kbd>
-	et
-	<kbd>OE</kbd> sont aussi relativement fréquents en anglais (pour écrire
-	<kbd-sortie>DOES</kbd-sortie>,
-	<kbd-sortie>PEOPLE</kbd-sortie>, etc.) Tous ces <SFB />s sont supprimés avec <NomPlus />, plus de
+	<kbd>pt</kbd>, <kbd>eo</kbd>, <kbd>oe</kbd>,
+	<kbd>ub</kbd>, <kbd>bu</kbd> et <kbd>ds</kbd>. <kbd>ct</kbd> est de loin le plus fréquent.
+	<kbd>eo</kbd> et <kbd>oe</kbd> sont aussi relativement fréquents en anglais (pour écrire
+	<kbd-sortie>does</kbd-sortie>,
+	<kbd-sortie>people</kbd-sortie>, etc.) Tous ces <SFB />s sont supprimés avec <NomPlus />, plus de
 	nombreux autres encore plus rares.
 </p>
 
@@ -28,8 +26,7 @@
 	plupart des <SFB />s restants sont supprimés. De plus, certaines combinaisons ont aussi été
 	ajoutées pour plus de confort, afin d’éviter de devoir sauter de 2 rangées avec des doigts
 	consécutifs pour écrire un bigramme (donc éviter les <i>ciseaux</i>). C’est le cas de
-	<kbd>CL</kbd>
-	ou encore de <kbd>PH</kbd>.
+	<kbd>cl</kbd> ou encore de <kbd>ph</kbd>.
 </p>
 <BlocClavier nom="virgule" />
 <p>
@@ -41,50 +38,49 @@
 <p>
 	Les touches <kbd>È</kbd> et <kbd>Ê</kbd> permettent de se débarrasser des quelques <SFB />s se
 	trouvant sur la main gauche. Plus particulièrement, ce sont les <SFB />s sur les touches
-	<kbd>I</kbd>,
-	<kbd>E</kbd>
-	ainsi qu’en
-	<kbd>U</kbd> :
+	<kbd>I</kbd>, <kbd>E</kbd> ainsi qu’en <kbd>U</kbd> :
 </p>
 <ul class="margin-top-2">
 	<li>
-		<kbd>ÊE</kbd> ➜ <kbd-sortie>OE</kbd-sortie> ;
+		<kbd>êe</kbd> ➜ <kbd-sortie>oe</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>EÊ</kbd> ➜ <kbd-sortie>EO</kbd-sortie> ;
+		<kbd>eê</kbd> ➜ <kbd-sortie>eo</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>Ê,</kbd> ➜ <kbd-sortie>U,</kbd-sortie> ;
+		<kbd>ê,</kbd> ➜ <kbd-sortie>u,</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>Ê.</kbd> ➜ <kbd-sortie>U.</kbd-sortie> ;
+		<kbd>ê.</kbd> ➜ <kbd-sortie>u.</kbd-sortie> ;
 	</li>
 	<mini-espace></mini-espace>
 	<li>
-		<kbd>ÈY</kbd> ➜ <kbd-sortie>IÉ</kbd-sortie> ;
+		<kbd>èy</kbd> ➜ <kbd-sortie>ié</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>YÈ</kbd> ➜ <kbd-sortie>ÉI</kbd-sortie>
+		<kbd>yè</kbd> ➜ <kbd-sortie>éi</kbd-sortie>.
 	</li>
 	<p>
 		Idéalement, cela devrait plutôt être l’inverse afin d’être plus logique (le son YÈ donnant IÉ).
-		Toutefois, <kbd-sortie>IÉ</kbd-sortie> étant beaucoup plus fréquent, il mérite d’avoir le roulement
+		Toutefois, <kbd-sortie>ié</kbd-sortie> étant beaucoup plus fréquent, il mérite d’avoir le roulement
 		vers l’intérieur qui est plus confortable.
 	</p>
 </ul>
+
 <h3>Utilisation de roulements</h3>
 <ul class="margin-top-2">
-	<li><kbd>ÊÉ</kbd> ➜ <kbd-sortie>AÎ</kbd-sortie> ;</li>
-	<li><kbd>ÉÊ</kbd> ➜ <kbd-sortie>Â</kbd-sortie> ;</li>
-	<li><kbd>P'</kbd> ➜ <kbd-sortie>CT</kbd-sortie>.</li>
+	<li><kbd>êé</kbd> ➜ <kbd-sortie>aî</kbd-sortie> ;</li>
+	<li><kbd>éê</kbd> ➜ <kbd-sortie>â</kbd-sortie> ;</li>
+	<li><kbd>p'</kbd> ➜ <kbd-sortie>ct</kbd-sortie> ;</li>
+	<li><kbd>à★</kbd> ➜ <kbd-sortie>bu</kbd-sortie> ;</li>
+	<li><kbd>àu</kbd> ➜ <kbd-sortie>ub</kbd-sortie>.</li>
 </ul>
 
 <h3>Touche <kbd>★</kbd> de répétition</h3>
 <p>
 	De nombreux <SFB />s se produisent non pas à cause de deux touches devant être tapées par le même
 	doigt, mais lors de la répétition de la même touche. C’est par exemple le cas avec
-	<kbd>LL</kbd>
-	(elle, pelle, telle, etc.) ou encore <kbd>RR</kbd> (terre, erreur, etc.).
+	<kbd>ll</kbd> (elle, pelle, telle, etc.) ou encore <kbd>rr</kbd> (terre, erreur, etc.).
 </p>
 <p>
 	Sur le logiciel Excel, la touche <kbd>F4</kbd> permet de répéter la dernière action. Ne pourrait-on
@@ -94,21 +90,21 @@
 <BlocClavier nom="magique" />
 <mini-espace />
 <p>
-	La touche <kbd>★</kbd> est <span class="important">l’ajout principal de</span>
-	<NomPlus /> et mérite son excellent emplacement sous l’index gauche. Elle vient en remplacement de
+	La touche <kbd>★</kbd> est <span class="important">l’ajout principal</span>
+	d’<NomPlus /> et mérite son excellent emplacement sous l’index gauche. Elle vient en remplacement de
 	la touche <kbd>J</kbd>
 	(mais pas le contenu des autres couches de la touche <kbd>J</kbd> tel qu’en
-	<kbd>AltGr</kbd>
-	ou <kbd>Ctrl</kbd>). Le <kbd>J</kbd> se retrouve quant à lui en <kbd>,</kbd> + <kbd>Voyelle</kbd>.
+	<kbd>AltGr</kbd> ou en <kbd>Ctrl</kbd>). Le <kbd>J</kbd> se retrouve quant à lui en <kbd>,</kbd> +
+	<kbd>Voyelle</kbd>.
 </p>
 <p>
 	La nouvelle touche <kbd>★</kbd>
-	<span class="important">va répéter la dernière touche tapée</span>. Ainsi, <kbd>L★</kbd>
-	va envoyer
-	<kbd-sortie>LL</kbd-sortie>, tandis que <kbd>R★</kbd> va envoyer <kbd-sortie>RR</kbd-sortie>. Cela
-	engendrera cependant un petit <SFB></SFB> pour les lettres doublées suivies d’un <kbd>U</kbd>, tel
-	que « connu » ou « battu ». La combinaison <kbd>★Ê</kbd> permet d’éviter ce problème. Ainsi, «
-	connu » pourra s’écrire <kbd>CON★Ê</kbd> et « battu » pourra s’écrire <kbd>BAT★Ê</kbd>.
+	<span class="important">va répéter la dernière touche tapée</span>. Ainsi, <kbd>l★</kbd>
+	va envoyer <kbd-sortie>ll</kbd-sortie>, tandis que <kbd>r★</kbd> va envoyer
+	<kbd-sortie>rr</kbd-sortie>. Cela engendrera cependant un petit <SFB></SFB> pour les lettres doublées
+	suivies d’un <kbd>U</kbd>, tel que « connu » ou « battu ». La combinaison <kbd>★ê</kbd> permet
+	d’éviter ce problème. Ainsi, « connu » pourra s’écrire <kbd>con★ê</kbd> et « battu » pourra
+	s’écrire <kbd>bat★ê</kbd>.
 </p>
 <p>
 	L’utilisation de la touche <kbd>★</kbd> va instantanément fluidifier la fra<kbd>p★</kbd>e et
