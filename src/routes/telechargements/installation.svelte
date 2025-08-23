@@ -52,17 +52,18 @@
 		>KbdEdit</a
 	>. C’est un logiciel très complet qui permet de modifier des dispositions de clavier sur Windows.
 	Il est en mesure de créer des pilotes pour Windows, et depuis peu pour Mac. Seul Linux n’est pas
-	supporté. Dans le cas de Linux, il est possible d’utiliser la
-	<a href="#kalamine">génération par Kalamine</a>.
+	supporté.
 </p>
-<p>
+<!-- <p>
+    Dans le cas de Linux, il est possible d’utiliser la
+	<a href="#kalamine">génération par Kalamine</a>.
 	<strong
 		>Si vous êtes sur Windows ou Mac, il est fortement conseillé d’utiliser cette installation
 		plutôt que celle de Kalamine</strong
 	>. En effet, vous serez alors certain d’avoir toutes les fonctionnalités (touches mortes,
 	raccourcis clavier, etc.). La version Kalamine est une version allégée, car Kalamine n’a pas
 	encore toutes les fonctionnalités de KbdEdit.
-</p>
+</p> -->
 
 <h4>Windows</h4>
 <mini-espace />
@@ -192,7 +193,7 @@
 		</p>
 	{/if}
 </div>
-
+<!-- 
 <h3 id="kalamine">Installation Kalamine</h3>
 <select bind:value={variante_kalamine} style="height: 2rem">
 	<option value="standard" selected>Standard</option>
@@ -287,4 +288,4 @@
 			></a
 		>
 	</div>
-{/if}
+{/if} -->
