@@ -5,6 +5,28 @@
 </script>
 
 <h2>Ajout d’excellents roulements</h2>
+
+<p>
+	Dans de très rares cas, ces raccourcis vous empêcheront d’écrire ce que vous voulez réellement
+	écrire. En effet, avec <NomPlus />, les combinaisons de touches extrêmement rares comme
+	<kbd>HC</kbd>
+	sont transformées en d’autres bien plus utiles comme <kbd-sortie>WH</kbd-sortie>. Cela signifie
+	que dans les cas où vous voulez vraiment écrire
+	<kbd>HC</kbd>, il faudra remettre à zéro le remplacement de texte.
+</p>
+<p>
+	➜ La remise à zéro du remplacement de texte peut notamment se réaliser en utilisant les flèches de
+	navigation, la touche <kbd>Échap</kbd>, en cliquant quelque part, etc. Ces manipulations ne
+	devraient arriver que très rarement, mais tout dépend de votre utilisation. Par exemple,
+	l’enchaînement <kbd>XG</kbd>
+	est très peu commun, mais les Data Scientists l’utiliseront régulièrement pour écrire
+	<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
+	/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
+	macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant XG
+	en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était qu’un
+	exemple illustratif.
+</p>
+
 <p>Des roulements pour plus de confort ont été ajoutés :</p>
 <ul class="margin-top-2">
 	<li><kbd>HC</kbd> ➜ <kbd-sortie>WH</kbd-sortie> ;</li>

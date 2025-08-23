@@ -40,7 +40,8 @@
 <div class="cards">
 	<div class="card">
 		<i class="fa-duotone fa-circle-1"></i>
-		<span class="text-bold">Diminution de la distance parcourue</span> par les doigts pour moins de fatigue.
+		<span class="text-bold">Diminution de la distance parcourue</span> par les doigts pour moins de fatigue
+		et plus de vitesse.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i> <span class="important">Frappe extrêmement fluide</span>
@@ -48,7 +49,7 @@
 		<span class="nowrap"><SFB />s.</span>
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-3"></i> <span class="text-bold">Alternance des mains</span> favorisée
+		<i class="fa-duotone fa-circle-3"></i> <span class="text-bold">Alternance des mains</span> maximisée
 		pour paralléliser la frappe et ainsi écrire plus vite.
 	</div>
 	<div class="card">
