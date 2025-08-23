@@ -8,7 +8,7 @@
 
 <h2>Raccourcis</h2>
 
-<h3>Tap-hold</h3>
+<h3>Tap-holds</h3>
 <p>
 	Le tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et une
 	lors de son maintien. C’est particulièrement adapté pour les touches modificatrices (<kbd
@@ -140,11 +140,9 @@
 		à la fin d’un "mot". Ainsi, CapsLock se désactive lors de la pression de
 		<kbd>Espace</kbd>, <kbd>,</kbd> ou encore <kbd>Entrée</kbd>. Cette fonctionnalité peut être très
 		utile pour écrire des abréviations telles que <kbd-sortie>QMK</kbd-sortie>,
-		<kbd-sortie>ASCII</kbd-sortie>,
-		<kbd-sortie>FAQ</kbd-sortie>, etc. De plus, elle permet également d’écrire plus aisément les
-		noms des variables et constantes en programmation comme
-		<kbd-sortie>KC_SPC</kbd-sortie>,
-		<kbd-sortie>SERVER_NAME</kbd-sortie>, etc.
+		<kbd-sortie>ASCII</kbd-sortie>, <kbd-sortie>FAQ</kbd-sortie>, etc. De plus, elle permet d’écrire
+		plus aisément les noms des variables et constantes en programmation comme
+		<kbd-sortie>KC_SPC</kbd-sortie>, <kbd-sortie>SERVER_NAME</kbd-sortie>, etc.
 	</p>
 	<li>
 		<kbd>Windows</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>CapsLock</kbd-sortie>, pour ne pas

@@ -86,6 +86,15 @@ export const symboles = writable({
 	controles: 'oui'
 });
 
+export const symboles_plus = writable({
+	emplacement: 'clavier_symboles_plus',
+	type: 'ergodox',
+	couche: 'AltGr',
+	plus: 'oui',
+	couleur: 'non',
+	controles: 'non'
+});
+
 export const magique = writable({
 	emplacement: 'clavier_magique',
 	type: 'iso',
