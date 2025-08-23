@@ -138,9 +138,12 @@
 		</div>
 	</div>
 	<mini-espace />
-	<bloc-image>
-		<img src="/benchmarks/{clavier}/{corpus}.jpg" />
-	</bloc-image>
+	<!-- <bloc-image>
+		<enhanced:img
+			src="$lib/benchmarks/{clavier}/{corpus}.jpg"
+			alt="Screenshot de benchmark sur le clavier {clavier} et le corpus {corpus}"
+		/>
+	</bloc-image> -->
 
 	<h3>Analyse Ergo-L</h3>
 	<p>

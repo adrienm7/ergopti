@@ -16,6 +16,13 @@ bloc-image p {
 	font-weight: bold;
 }
 
+/* Correction du problème d’images étirées */
+enhanced\:img,
+.fullwidth {
+	width: 100% !important;
+	height: auto !important;
+}
+
 /* Icônes */
 i {
 	color: #3088ed !important;
