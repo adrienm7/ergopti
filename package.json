@@ -18,6 +18,7 @@
 		"@samkirkland/ftp-deploy": "^1.2.4",
 		"@sveltejs/adapter-auto": "^6.1.0",
 		"@sveltejs/adapter-static": "^3.0.9",
+		"@sveltejs/enhanced-img": "^0.8.1",
 		"@sveltejs/kit": "^2.36.2",
 		"@types/aos": "^3.0.7",
 		"prettier": "^3.6.2",

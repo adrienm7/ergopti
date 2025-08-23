@@ -2,13 +2,15 @@
 	import Nom from '$lib/composants/Nom.svelte';
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
-
-	import img from '$lib/images/menu_ergopti_plus.jpg';
 </script>
 
 <h2>Menu de gestion des fonctionnalités</h2>
 
-<img src={img} style="width:100%" />
+<enhanced:img
+	src="$lib/images/menu_ergopti_plus.jpg"
+	class="fullwidth"
+	alt="Screenshot du menu du script Ergopti+"
+/>
 
 <p>
 	Un clic droit sur l’icône du script dans la barre des tâches permet d’ouvrir le menu du script.
