@@ -76,21 +76,26 @@
 			</li>
 			<li>
 				Sur macOS,
-				<a href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a> permet d’également
-				réaliser une partie de ces fonctionnalités, à savoir les remappages de touches, tap-holds et
-				layer de navigation. Cependant, il ne gère pas les hotstrings (remplacements de texte), ce
-				qui ne permet pas d’utiliser la moitié des possibilités d’<NomPlus></NomPlus> sur macOS.
+				<a href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a> permettrait de
+				réaliser une partie des fonctionnalités d’<NomPlus></NomPlus>. Celles pouvant être
+				implémentées sont les remappages de touches, les tap-holds et la création d’un layer de
+				navigation. Cependant, ce logiciel ne gère pas les hotstrings (remplacements de texte), ce
+				qui ne permet pas d’utiliser la moitié des possibilités d’<NomPlus></NomPlus> sur macOS : création
+				de nouveaux roulements, touche <kbd>,</kbd> de correction de <SFB></SFB>s, touche
+				<kbd>★</kbd> de répétition et d’expansion de texte, etc. Peut-être un programme complémentaire
+				pourrait se charger de cette partie, mais il n’y a pas de solution aussi simple et puissante
+				qu’AutoHotkey sur macOS.
 			</li>
 			<li>
-				Enfin, il est aussi possible de programmer le firmware de son clavier (avec <a
+				Il est aussi possible de programmer le firmware de son clavier (avec <a
 					href="https://qmk.fm/">QMK</a
 				>
-				ou <a href="https://zmk.dev/">ZMK</a>) pour bénéficier de ce genre de fonctionnalités
-				quelque soit la plateforme. Cependant, cela nécessite beaucoup plus de travail et là encore
-				toutes les possibilités d’AutoHotkey ne seront pas disponibles.
+				ou <a href="https://zmk.dev/">ZMK</a>) pour bénéficier de ce genre de fonctionnalités quelle
+				que soit la plateforme (Windows, Mac, Linux, etc.). Cependant, cela nécessite beaucoup de
+				travail et là encore toutes les possibilités d’AutoHotkey ne seront pas disponibles.
 			</li>
 		</ul>
 	</div>
 	<mini-espace></mini-espace>
-	<p class="important">Voici maintenant toutes les fonctionnalités d’<NomPlus /> :</p>
+	<p>Voici maintenant les nombreuses fonctionnalités d’<NomPlus /> :</p>
 </div>

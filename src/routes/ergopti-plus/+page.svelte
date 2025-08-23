@@ -3,6 +3,7 @@
 	import NomPlus from '$lib/composants/NomPlus.svelte';
 	import SFB from '$lib/composants/SFB.svelte';
 
+	import Menu from './menu.svelte';
 	import Abreviations from './abreviations.svelte';
 	import Confort from './confort.svelte';
 	import Raccourcis from './raccourcis.svelte';
@@ -16,6 +17,7 @@
 	<meta name="description" content="Découvrez Ergopti +" />
 </svelte:head>
 
+<Menu />
 <Confort />
 <Roulements />
 <Reduction_SFBs />
