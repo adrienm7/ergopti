@@ -19,15 +19,16 @@
 <petit-espace />
 
 <hr />
-<p class="main">
-	<NomPlus /> est une version améliorée de la disposition <Nom />. Elle se rapproche de très près de
-	la <span class="important">disposition clavier idéale</span>. Effectivement, elle :
+<p class="main text-center">
+	<NomPlus /> est une variante améliorée de la disposition <Nom /> qui tire parti des meilleures fonctionnalités
+	des claviers programmables et outils d’automatisation. Elle se rapproche de très près de la
+	<span class="important">disposition clavier idéale</span>. En effet, elle :
 </p>
 <div class="cards">
 	<div class="card">
 		<i class="fa-duotone fa-circle-1"></i>
 		Ajoute de
-		<span class="text-bold">nouveaux roulements</span>.
+		<span class="text-bold">nouveaux roulements</span> extrêmement confortables.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-2"></i>
@@ -41,19 +42,21 @@
 		l’auriculaire droit.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-4"></i> Ajoute <span class="important">divers raccourcis</span>
-		tels que des touches
-		<kbd-sortie>OneShotShift</kbd-sortie>, <kbd-sortie>Alt + Tab</kbd-sortie>
-		et
-		<kbd-sortie>Capsword</kbd-sortie>.
+		<i class="fa-duotone fa-circle-4"></i> Ajoute de
+		<span class="important">nombreux raccourcis</span>
+		tels qu’un layer de navigation, des tap-holds et des touches <kbd-sortie>Alt + Tab</kbd-sortie>,
+		<kbd-sortie>OneShotShift</kbd-sortie> et <kbd-sortie>CapsWord</kbd-sortie>.
 	</div>
 	<div class="card">
 		<i class="fa-duotone fa-circle-5"></i>
-		<span class="text-bold">Divise par 2 le nombre de touches frappées</span> pour écrire certains mots.
+		Fonctionnalités d’<span class="text-bold">autocorrection et de snippets</span>. Permet également
+		d’écrire des
+		<span class="text-bold">symboles complexes et des emojis</span>.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-6"></i> Les fonctionnalités sont optionnelles et
-		<span class="important">peuvent être intégrées au fil du temps</span>.
+		<i class="fa-duotone fa-circle-6"></i> Chaque fonctionnalité est optionnelle, désactivable et
+		<span class="important">peut être intégrée au fil du temps</span>. Nul besoin de chercher à tout
+		utiliser dès le départ.
 	</div>
 </div>
 <mini-espace></mini-espace>
@@ -63,46 +66,31 @@
 
 <div class="main">
 	<div class="encadre">
-		Toutefois, l’utilisation de cette version nécessite des <span class="important"
-			>outils de programmation de clavier spécifiques.
-		</span>
-		<span>
-			Sur Windows, le programme <span class="important">AutoHotkey</span>
-			est utilisé afin de réaliser ces changements. Il est également possible de programmer le firmware
-			de son clavier (avec QMK ou ZMK) pour ce faire.
-		</span>
+		Cependant, l’utilisation d’<NomPlus></NomPlus> nécessite des
+		<span class="important">outils de programmation de clavier :</span>
+		<ul>
+			<li>
+				Sur Windows, le programme <a href="https://www.autohotkey.com/">AutoHotkey</a>
+				est utilisé afin de réaliser ces changements. Il donne une immense liberté et est l’implémentation
+				actuelle d’<NomPlus></NomPlus>.
+			</li>
+			<li>
+				Sur macOS,
+				<a href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a> permet d’également
+				réaliser une partie de ces fonctionnalités, à savoir les remappages de touches, tap-holds et
+				layer de navigation. Cependant, il ne gère pas les hotstrings (remplacements de texte), ce
+				qui ne permet pas d’utiliser la moitié des possibilités d’<NomPlus></NomPlus> sur macOS.
+			</li>
+			<li>
+				Enfin, il est aussi possible de programmer le firmware de son clavier (avec <a
+					href="https://qmk.fm/">QMK</a
+				>
+				ou <a href="https://zmk.dev/">ZMK</a>) pour bénéficier de ce genre de fonctionnalités
+				quelque soit la plateforme. Cependant, cela nécessite beaucoup plus de travail et là encore
+				toutes les possibilités d’AutoHotkey ne seront pas disponibles.
+			</li>
+		</ul>
 	</div>
-
-	<petit-espace />
-
-	<p class="lettrine">
-		⚠ Attention, ces nombreux avantages viennent à un prix. D’abord, il y a un effort
-		d’apprentissage supplémentaire à effectuer. C’est d’autant plus difficile que ces raccourcis ne
-		sont pas marqués sur le clavier, il faut donc les apprendre par cœur car regarder ses touches ne
-		fournira aucune information. Le bon côté est que vous n’êtes pas obligé de tous les utiliser
-		d’un coup, ce ne sont que des possibilités supplémentaires. Ainsi, le passage de <Nom /> vers <NomPlus
-		/> se fait en douceur.
-	</p>
-	<p>
-		☒ Ensuite, et c’est le plus grand inconvénient, dans de très rares cas ces raccourcis vous
-		empêcheront d’écrire ce que vous voulez réellement écrire. En effet, avec <NomPlus />, les
-		combinaisons de touches extrêmement rares comme <kbd>HC</kbd> sont transformées en d’autres bien
-		plus utiles comme <kbd-sortie>WH</kbd-sortie>. Cela signifie que dans les cas où vous voulez
-		vraiment écrire
-		<kbd>HC</kbd>, il faudra remettre à zéro le remplacement de texte.
-	</p>
-	<p>
-		➜ La remise à zéro du remplacement de texte peut notamment se réaliser en utilisant les flèches
-		de navigation, la touche <kbd>Échap</kbd>, en cliquant quelque part, etc. Ces manipulations ne
-		devraient arriver que très rarement, mais tout dépend de votre utilisation. Par exemple,
-		l’enchaînement <kbd>XG</kbd>
-		est très peu commun, mais les Data Scientists l’utiliseront régulièrement pour écrire
-		<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
-		/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
-		macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
-		XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était qu’un
-		exemple illustratif.
-	</p>
-
-	<p class="important">Voici maintenant toutes les améliorations de <NomPlus /> :</p>
+	<mini-espace></mini-espace>
+	<p class="important">Voici maintenant toutes les fonctionnalités d’<NomPlus /> :</p>
 </div>
