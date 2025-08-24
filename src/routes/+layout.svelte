@@ -12,7 +12,7 @@
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
-	import 'normalize.css';
+	import 'modern-normalize';
 
 	import { afterUpdate, onMount } from 'svelte';
 	import { page } from '$app/stores';

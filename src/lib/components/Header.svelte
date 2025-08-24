@@ -129,11 +129,7 @@
 				onclick={fermerMenu}
 			>
 				<a href="/telechargements"
-					><i
-						><span class="icon-download"
-							><span class="path1"></span><span class="path2"></span></span
-						></i
-					>
+					><i class="icon-download"><span class="path1"></span><span class="path2"></span></i>
 					<span class="titre">Téléchargements</span></a
 				>
 			</p>
@@ -142,11 +138,7 @@
 				onclick={fermerMenu}
 			>
 				<a href="/informations"
-					><i
-						><span class="icon-circle-info"
-							><span class="path1"></span><span class="path2"></span></span
-						></i
-					>
+					><i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
 					<span class="titre">Informations</span></a
 				>
 			</p>
@@ -207,9 +199,6 @@
 	}
 
 	#selection-version {
-		margin: 0;
-		padding: 0;
-		background-clip: text;
 		/* -webkit-text-fill-color: transparent;
 		color: transparent;
 		-webkit-box-decoration-break: clone;
@@ -217,19 +206,22 @@
 		background-image: inherit; */
 		-webkit-appearance: none;
 		-moz-appearance: none;
-		color: white;
-		padding: 4px;
+		margin: 0;
 		margin-bottom: -4px;
+		border: 1px solid rgb(14, 83, 117);
+		border-radius: 5px;
+		background-clip: text;
+		padding: 0;
+		padding: 4px;
 		padding-top: 1px;
 		padding-bottom: 2px;
-		border-radius: 5px;
-		border: 1px solid rgb(14, 83, 117);
+		color: white;
 		/* width: 2.3em; */
 	}
 
 	.myselect {
-		position: relative;
 		display: inline-block;
+		position: relative;
 		margin: 0;
 		padding: 0;
 		/* padding-right: 0.2em; */
@@ -265,19 +257,19 @@
 
 	header {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
 		position: fixed;
 		top: 0;
 		left: 0;
+		justify-content: space-between;
+		align-items: center;
 		z-index: 100;
-		height: var(--hauteur-header);
-		width: 100vw;
-		margin: 0;
-		padding: 0;
 		backdrop-filter: blur(30px);
-		background-color: var(--couleur-header);
+		margin: 0;
 		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
+		background-color: var(--couleur-header);
+		padding: 0;
+		width: 100vw;
+		height: var(--hauteur-header);
 	}
 	header a {
 		color: var(--couleur-liens-header);
@@ -294,18 +286,18 @@
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		color: transparent;
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
+		color: transparent;
 	}
 
 	header .header-logo {
 		display: inline-flex;
-		align-items: center;
 		justify-content: center;
-		height: 100%;
+		align-items: center;
 		margin-left: clamp(3px, 1vw, 10px);
+		height: 100%;
 		/* margin-left: var(--marge-bords-menu); */
 	}
 	header .menu-btn {
@@ -313,8 +305,8 @@
 	}
 
 	.logo {
-		height: calc(0.85 * var(--hauteur-header));
 		margin-top: 3px;
+		height: calc(0.85 * var(--hauteur-header));
 		/*  
 		margin-right: 10px;
 		padding: 3px;
@@ -330,30 +322,30 @@
 			position: fixed;
 			top: var(--hauteur-header);
 			left: 0;
-			width: 100%;
-			margin: 0;
-			padding: 0;
-			background-color: var(--couleur-header-mobile);
-			backdrop-filter: blur(30px);
-			border-top: 1px solid rgba(255, 255, 255, 0.2);
-			transition: height 0.15s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
-			overflow: hidden;
 			z-index: 98;
+			backdrop-filter: blur(30px);
+			transition: height 0.15s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
+			margin: 0;
+			border-top: 1px solid rgba(255, 255, 255, 0.2);
+			background-color: var(--couleur-header-mobile);
+			padding: 0;
+			width: 100%;
+			overflow: hidden;
 		}
 
 		header #menu p a {
 			display: block;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 			padding: var(--hauteur-element-menu-mobile) 0;
 			padding-left: var(--marge-fenetre);
-			text-decoration: none;
-			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 			line-height: 1em;
+			text-decoration: none;
 		}
 		header #menu p,
 		header #menu p a p {
-			width: 100%;
 			margin: 0;
 			padding: 0;
+			width: 100%;
 			font-size: 1.1rem;
 			line-height: 1em !important;
 		}
@@ -362,29 +354,29 @@
 
 		header .menu-icon {
 			display: inline-block;
-			padding: var(--marge-bords-menu);
 			cursor: pointer;
+			padding: var(--marge-bords-menu);
 			user-select: none;
 		}
 
 		header .menu-icon .navicon {
 			display: block;
 			position: relative;
-			width: var(--longueur-traits-hamburger);
-			height: 2px;
 			transition: background 0.1s ease-out;
 			background: var(--couleur-icone-hamburger);
+			width: var(--longueur-traits-hamburger);
+			height: 2px;
 		}
 
 		header .menu-icon .navicon:before,
 		header .menu-icon .navicon:after {
-			background: var(--couleur-icone-hamburger);
-			content: '';
 			display: block;
-			height: 100%;
 			position: absolute;
 			transition: all 0.1s ease-out;
+			background: var(--couleur-icone-hamburger);
 			width: 100%;
+			height: 100%;
+			content: '';
 		}
 
 		header .menu-icon .navicon:before {
@@ -430,10 +422,10 @@
 		header #menu #menu-pages {
 			display: flex !important;
 			flex-direction: row;
-			background-color: transparent;
 			z-index: 1;
-			border: none;
 			margin: 0;
+			border: none;
+			background-color: transparent;
 			padding: 0;
 			padding-right: var(--marge-bords-menu);
 		}
@@ -442,23 +434,23 @@
 			display: flex;
 			justify-content: center;
 			align-items: center;
-			height: var(--hauteur-header);
 			margin: 0;
+			border-bottom: 0;
+			background-color: transparent;
 			padding: 0;
 			padding-left: calc(2 * var(--espacement-items-menu) + 5px);
-			background-color: transparent;
-			border-bottom: 0;
+			height: var(--hauteur-header);
 			font-size: 1rem;
 		}
 
 		header #menu #menu-pages p:not(:last-child)::after {
-			content: '';
-			background-color: transparent;
-			height: 100%;
-			width: 5px;
 			position: relative;
 			right: calc((-1) * var(--espacement-items-menu));
 			box-shadow: 2px 0 2px 0px var(--couleur-ombre);
+			background-color: transparent;
+			width: 5px;
+			height: 100%;
+			content: '';
 		}
 
 		header #menu #menu-pages p a {
@@ -472,14 +464,14 @@
 		}
 
 		header #menu #menu-pages p[aria-current='page'] a::after {
-			content: '';
 			display: block;
 			position: relative;
 			bottom: -5px;
-			width: 100%;
-			height: 3px;
 			border-radius: 5px;
 			background-image: linear-gradient(to right, var(--gradient-blue));
+			width: 100%;
+			height: 3px;
+			content: '';
 		}
 
 		/* header #menu #menu-pages p:not([aria-current='page']) .titre:hover::after {

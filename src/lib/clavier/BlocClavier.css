@@ -23,13 +23,13 @@ bloc-clavier {
 	--couleur-touche-pressee-luminosite: 60%;
 
 	display: block;
-	width: max-content;
 	margin: 0 auto;
-	padding: var(--marge-clavier);
-	background-color: hsla(216, 100%, 10%, 0.85);
+	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
 	border: 1px solid hsla(227, 100%, 8%, 0.8);
 	border-radius: 7px; /* Arrondi des coins du clavier */
-	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
+	background-color: hsla(216, 100%, 10%, 0.85);
+	padding: var(--marge-clavier);
+	width: max-content;
 	font-weight: 300; /* La graisse est trop "grosse" pour les labels de touches sinon */
 }
 
@@ -84,22 +84,29 @@ bloc-touche {
 	display: inline-flex;
 	justify-content: center;
 	align-items: center;
-	text-align: center;
-	height: var(--hauteur-touche);
-	width: var(--longueur-touche);
+	cursor: pointer;
 	margin: var(--marge-touche);
+	box-shadow: var(--ombres-touche);
 	border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
 	border-radius: var(--arrondi-touche);
 	background-color: var(--couleur-fond-touche);
-
-	box-shadow: var(--ombres-touche);
+	width: var(--longueur-touche);
+	height: var(--hauteur-touche);
+	color: var(--couleur-texte-touche);
+	font-weight: 300;
+	font-size: var(--taille-texte-touche);
+	text-align: center;
 	text-shadow:
 		rgb(0, 0, 0) 0px 0 1px,
 		rgb(0, 0, 0) 0px 0 6px,
 		rgba(0, 0, 0, 0.5) 0px 0 12px;
-	color: var(--couleur-texte-touche);
-	cursor: pointer;
-	font-size: var(--taille-texte-touche);
+}
+
+bloc-touche {
+	font-style: normal;
+	font-weight: 300;
+	font-family: 'Noto Sans', 'Noto Sans Symbols', sans-serif;
+	font-optical-sizing: auto;
 }
 
 bloc-touche:active,
@@ -107,12 +114,12 @@ bloc-touche:hover,
 .touche-active {
 	position: relative;
 	top: var(--descente-touche);
-	text-shadow: none;
 	box-shadow:
 		0 var(--profondeur-touche-pressee) 0 var(--effet-3d),
 		inset 0 0 1px #00000077;
-	color: #333 !important;
 	background-color: rgba(255, 255, 255, 0.85) !important;
+	color: #333 !important;
+	text-shadow: none;
 }
 
 bloc-touche[data-touche=''] {
@@ -122,10 +129,10 @@ bloc-touche[data-touche=''] {
 bloc-touche[data-touche='aucune'],
 bloc-touche[data-touche='aucune']:hover,
 bloc-touche[data-touche='aucune'].active {
-	background-color: transparent !important;
-	border-color: transparent;
-	box-shadow: none;
 	cursor: auto;
+	box-shadow: none;
+	border-color: transparent;
+	background-color: transparent !important;
 }
 
 /*
@@ -156,8 +163,8 @@ bloc-clavier[data-couche='Visuel'] bloc-touche[data-type='français'] div {
 }
 
 bloc-clavier[data-couche='Visuel'] bloc-touche[data-type='ponctuation'] div {
-	font-size: calc(var(--taille-texte-touche) * 0.7);
 	font-weight: bolder;
+	font-size: calc(var(--taille-texte-touche) * 0.7);
 	line-height: 1;
 }
 
@@ -211,14 +218,14 @@ bloc-clavier[data-plus='oui'][data-type='iso'][data-couche='Visuel']
 bloc-clavier[data-plus='oui'][data-type='iso'][data-couche='Primary']
 	bloc-touche[data-touche='Tab']
 	div {
-	line-height: 1.2;
 	font-size: calc(var(--taille-texte-touche) * 0.7);
+	line-height: 1.2;
 }
 
 bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='LShift'] div,
 bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='LShift'] div {
-	line-height: 1.05;
 	font-size: calc(var(--taille-texte-touche) * 0.8);
+	line-height: 1.05;
 }
 
 .tap {
@@ -237,9 +244,9 @@ bloc-touche[data-style='different'] {
 	--couleur-touche-saturation: 0% !important;
 	--couleur-touche-luminosite: 100% !important;
 	--opacite-touche: 5% !important;
+	font-weight: normal;
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 	font-family: sans-serif;
-	font-weight: normal;
 }
 
 /* Touches spéciales */
@@ -252,8 +259,8 @@ bloc-touche[data-touche='Space'] div,
 bloc-touche[data-touche='Win'] div,
 bloc-touche[data-touche='Option'] div,
 bloc-touche[data-touche='Escape'] div {
-	font-size: calc(var(--taille-texte-touche) * 0.7);
 	font-weight: normal;
+	font-size: calc(var(--taille-texte-touche) * 0.7);
 }
 
 bloc-touche[data-touche='RShift'] div,
@@ -315,15 +322,15 @@ bloc-clavier[data-couche='À'] bloc-touche:not([data-type='special']) div {
 */
 
 bloc-clavier[data-type='iso'] bloc-touche[data-type='enter'] {
-	top: 0;
 	position: relative;
+	top: 0;
 	z-index: 1;
 	border-right: none;
 }
 
 bloc-clavier[data-type='iso'] bloc-touche[data-type='enter'] div {
-	font-weight: normal;
 	z-index: 3;
+	font-weight: normal;
 }
 
 /* On cache la jonction entre la touche et le bas de la touche créé par ::after, avec un rectangle par-dessus */
@@ -332,12 +339,12 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::before {
 	top: 0;
 	right: 0;
 	z-index: 2;
-	content: '';
-	height: var(--taille-touche);
-	width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 1px);
-	background-color: var(--couleur-fond-touche);
-	border-radius: 0 calc(var(--arrondi-touche) - 1px) 0 0;
 	border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+	border-radius: 0 calc(var(--arrondi-touche) - 1px) 0 0;
+	background-color: var(--couleur-fond-touche);
+	width: calc(var(--taille-touche) - 2 * var(--marge-touche) - 1px);
+	height: var(--taille-touche);
+	content: '';
 }
 
 /* On crée la partie en bas de la touche Entrée */
@@ -346,17 +353,17 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::after {
 	top: 100%;
 	right: 0;
 	z-index: 0;
-	content: '';
-	height: calc(var(--taille-touche) + var(--marge-touche) / 2);
-	width: calc(var(--taille-touche) - 2 * var(--marge-touche));
-	background-color: var(--couleur-fond-touche);
-	border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
-	border-top: none;
-	border-radius: 0 0 var(--arrondi-touche) var(--arrondi-touche);
 	box-shadow:
 		var(--ombre-touche),
 		0 var(--profondeur-touche) 0 var(--effet-3d),
 		-0.5px var(--profondeur-touche) 0 var(--effet-3d);
+	border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+	border-top: none;
+	border-radius: 0 0 var(--arrondi-touche) var(--arrondi-touche);
+	background-color: var(--couleur-fond-touche);
+	width: calc(var(--taille-touche) - 2 * var(--marge-touche));
+	height: calc(var(--taille-touche) + var(--marge-touche) / 2);
+	content: '';
 }
 
 /* Ce qui se passe quand on presse la touche Entrée */
@@ -393,9 +400,9 @@ bloc-touche[data-type='enter']:hover::after,
 bloc-touche[data-type='enter'].touche-active,
 bloc-touche[data-type='enter'].touche-active::before,
 bloc-touche[data-type='enter'].touche-active::after {
-	color: #333;
-	background-color: rgb(210, 210, 210) !important;
 	box-shadow: none;
+	background-color: rgb(210, 210, 210) !important;
+	color: #333;
 }
 
 /*
@@ -598,10 +605,10 @@ bloc-clavier,
 bloc-clavier espace-insecable {
 	display: inline-block;
 	margin-right: 2px;
-	height: 0.75em;
-	width: 0.25em;
-	background-color: white;
 	border-radius: 1px;
+	background-color: white;
+	width: 0.25em;
+	height: 0.75em;
 }
 
 .one-shot-shift {

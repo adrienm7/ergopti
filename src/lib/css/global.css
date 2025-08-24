@@ -6,23 +6,12 @@
 	--largeur-main: 72.5vw;
 }
 
-*,
-*:before,
-*:after {
-	-webkit-box-sizing: border-box;
-	-moz-box-sizing: border-box;
-	box-sizing: border-box; /* La width d’une div sera constante, même avec l’ajout de padding */
-}
-
 html,
 body {
 	scroll-behavior: smooth;
 	color: white;
 	font-size: 100%;
 	font-size: clamp(14px, 0.3vw + 14px, 24px);
-	font-family:
-		-apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-		'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Helvetica', Arial, sans-serif;
 }
 
 html,
