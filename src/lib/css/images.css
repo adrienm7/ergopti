@@ -17,8 +17,7 @@ image-block p {
 }
 
 /* Correction du problème d’images étirées */
-enhanced\:img,
-.fullwidth {
+picture img {
 	width: 100% !important;
 	height: auto !important;
 }
