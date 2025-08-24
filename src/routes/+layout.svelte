@@ -16,6 +16,8 @@
 
 	import { afterUpdate, onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { discord_link } from '$lib/stores_infos.js';
+
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
 
@@ -112,7 +114,7 @@
 						>
 						—
 						<a
-							href="https://discord.gg/ptxRzBqcQP"
+							href={discord_link}
 							style="position:relative; bottom:-0.1em; font-size:0.9em!important; color:white"
 							>Serveur Discord <i class="icon-discord"></i></a
 						>

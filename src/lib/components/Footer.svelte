@@ -1,19 +1,18 @@
 <script>
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import { page } from '$app/stores';
+	import { discord_link } from '$lib/stores_infos.js';
 	const date = new Date().getFullYear();
 </script>
 
 <footer>
 	<p>
 		Disposition <Ergopti></Ergopti> —
-		<a href="https://github.com/adrienm7/ergopti" style="color:white"
+		<a href="https://github.com/adrienm7/ergopti" class="text-white"
 			>GitHub <i class="icon-github"></i></a
 		>
 		|
-		<a href="https://discord.gg/ptxRzBqcQP" style="position:relative; bottom:-0.1em; color:white"
-			>Discord <i class="icon-discord"></i></a
-		>
+		<a href={discord_link} class="text-white">Discord <i class="icon-discord"></i></a>
 	</p>
 </footer>
 

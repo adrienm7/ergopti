@@ -96,6 +96,8 @@ i .path1::before {
 }
 
 .no-gradient,
+.text-white,
+.text-black,
 nav a,
 a button,
 a:has(button) {
@@ -113,10 +115,6 @@ a:has(button) {
 
 .text-center {
 	text-align: center;
-}
-
-.text-gray {
-	color: hsla(190, 100%, 80%, 0.8);
 }
 
 .text-white {
