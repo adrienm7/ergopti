@@ -8,7 +8,7 @@
 
 <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);"></div>
 <div
-	style="background:black; padding-top: 10px; padding-bottom: 100px; margin-bottom:-10vh;
+	style="background:black; padding-top: 10px; padding-bottom: 100px;
 	overflow-x: hidden; /* Très important pour que les animations AOS horizontales n’agrandissent pas l’écran */"
 >
 	<div id="orb">
@@ -53,10 +53,10 @@
 			-webkit-background-clip: text;
 			background-clip: text;
 			-webkit-text-fill-color: transparent;
-			color: transparent;
 			-webkit-box-decoration-break: clone;
 			box-decoration-break: clone;
 			background-image: linear-gradient(90deg, #fcaa00 30%, #ff6300 50%, #ff0063 100%);
+			color: transparent;
 		}
 	}
 </style>

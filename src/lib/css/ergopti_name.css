@@ -1,0 +1,64 @@
+nom-disposition {
+	/* font-style: italic; */
+	display: inline-block;
+	white-space: nowrap;
+}
+
+nom-disposition-plus {
+	white-space: nowrap;
+}
+
+.namecolor {
+	margin: -0.5em;
+	background-clip: text;
+	-webkit-background-clip: text;
+	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
+	-webkit-text-fill-color: transparent;
+	-moz-background-clip: text;
+	-moz-text-fill-color: transparent;
+	background-image: linear-gradient(
+		to right,
+		#0084ff 0%,
+		#4af0ff 30%,
+		#c1d6ff 50%,
+		#ff40fc 70%,
+		#ff2a2a 100%
+	);
+}
+
+.nowrap {
+	white-space: nowrap;
+}
+
+.glow {
+	position: relative;
+	top: 0.05em;
+	left: 0.03em;
+	animation: glow 2s ease-in-out infinite alternate;
+	color: #fff;
+	font-weight: bold;
+	font-size: 1.2em;
+	text-align: center;
+}
+
+@-webkit-keyframes glow {
+	from {
+		text-shadow:
+			0 0 0 rgba(255, 255, 255, 0),
+			0 0 0 rgba(255, 255, 255, 0),
+			0 0 5px #fff,
+			0 0 10px #fff,
+			0 0 5px #009de6,
+			0 0 10px #004de6,
+			0 0 15px #000ce6,
+			0 0 20px #0049e6,
+			0 0 25px #9200e6;
+	}
+
+	to {
+		text-shadow:
+			0 0 1px #fff,
+			0 0 5px #ff4da6,
+			0 0 10px #ff4da6;
+	}
+}
