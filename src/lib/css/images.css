@@ -25,7 +25,7 @@ enhanced\:img,
 
 /* Icons */
 i {
-	display: inline;
+	display: inline-flex;
 }
 
 i,
