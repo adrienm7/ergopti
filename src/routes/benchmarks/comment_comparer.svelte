@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
@@ -38,24 +38,24 @@
 </p>
 
 <p>
-	En outre, la philosophie derrière la construction du clavier doit être prise en compte. Certaines
-	dispositions comme Optimot préfèrent mettre l’apostrophe droite en accès direct plutôt que celle
-	typographique, partant du principe que la plupart des éditeurs de texte la remplaceront de toute
-	manière par l’apostrophe typographique. Dans ce cas précis, le caractère faisant office
+	En outre, la philosophie derrière la construction de la disposition doit être prise en compte.
+	Certaines dispositions comme Optimot préfèrent mettre l’apostrophe droite en accès direct plutôt
+	que celle typographique, partant du principe que la plupart des éditeurs de texte la remplaceront
+	de toute manière par l’apostrophe typographique. Dans ce cas précis, le caractère faisant office
 	d’"apostrophe" est l’apostrophe droite, alors que d’autres dispositions (comme une version
-	précédente d’<Nom />) font la distinction entre les deux. Pour comparer avec le plus d’exactitude
-	les dispositions, il faudrait alors les modifier pour soit remplacer l’apostrophe typographique
-	par une apostrophe droite, soit en ajoutant une apostrophe typographique dans la disposition n’en
-	ayant pas.
+	précédente d’<Ergopti />) font la distinction entre les deux. Pour comparer avec le plus
+	d’exactitude les dispositions, il faudrait alors les modifier pour soit remplacer l’apostrophe
+	typographique par une apostrophe droite, soit en ajoutant une apostrophe typographique dans la
+	disposition n’en ayant pas.
 </p>
 <p>
 	De même, si une disposition part du principe que l’appui sur la touche <kbd>Q</kbd> donne
 	<kbd-sortie>QU</kbd-sortie>
-	comme le proposent Optimot ou <NomPlus></NomPlus>, alors il faut s’assurer que le corpus reflète
-	aussi cette modification. Pour cela, il convient de remplacer tous les "qu" par des "q" dans le
-	corpus. Cela permet alors de placer le <kbd>Q</kbd> sur la colonne du <kbd>U</kbd> sans que cela
-	ne génère de <SFB></SFB>s. Oublier de modifier le corpus va entraîner une énorme augmentation des <SFB
-	></SFB>s alors que ce n’est pas "mérité".
+	comme le proposent Optimot ou <ErgoptiPlus></ErgoptiPlus>, alors il faut s’assurer que le corpus
+	reflète aussi cette modification. Pour cela, il convient de remplacer tous les "qu" par des "q"
+	dans le corpus. Cela permet alors de placer le <kbd>Q</kbd> sur la colonne du <kbd>U</kbd> sans
+	que cela ne génère de <SFB></SFB>s. Oublier de modifier le corpus va entraîner une énorme
+	augmentation des <SFB></SFB>s alors que ce n’est pas "mérité".
 </p>
 <p class="important">
 	➜ Comparer ce qui est comparable. Si le symbole n’existe pas dans la disposition, la touche ne

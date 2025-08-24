@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
@@ -9,9 +9,10 @@
 <h3>L’importance des compromis</h3>
 <p>
 	Il est évident qu’il n’est pas possible de maximiser plusieurs paramètres simultanément. Bien que
-	largement supérieure à de nombreuses dispositions telles qu’AZERTY et même BÉPO, <Nom /> est donc malheureusement
-	loin d’être parfaite. En effet, la création d’une disposition est une affaire de compromis. Des choix
-	ont dû être effectués pour maximiser chacun des critères d’évaluation sans trop compromettre les autres.
+	largement supérieure à de nombreuses dispositions telles qu’AZERTY et même BÉPO, <Ergopti /> est donc
+	malheureusement loin d’être parfaite. En effet, la création d’une disposition est une affaire de compromis.
+	Des choix ont dû être effectués pour maximiser chacun des critères d’évaluation sans trop compromettre
+	les autres.
 </p>
 <p>
 	Par exemple, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Cela peut sembler
@@ -35,7 +36,7 @@
 </p>
 <p>
 	En outre, parfois tous les emplacements sont mauvais pour une touche, et il faut choisir le moins
-	pire. Par conséquent, <Nom /> a évidemment des défauts, dont les principaux sont recensés ici.
+	pire. Par conséquent, <Ergopti /> a évidemment des défauts, dont les principaux sont recensés ici.
 </p>
 
 <h3>Distances non optimales</h3>
@@ -64,8 +65,8 @@
 		Certains pourront aussi critiquer le fait que la touche <kbd>J</kbd> soit trop bien située,
 		étant sur un excellent emplacement sur l’index gauche. En effet, cette lettre a l’une des
 		fréquences les plus faibles de toutes les lettres, que ce soit en français et en anglais. Si
-		cette lettre à été placée ici en <Nom></Nom>, c’est en vue de l’utilisation d’<NomPlus
-		></NomPlus>, qui a été pensée dès le début comme une extension de la disposition. Ainsi, ce
+		cette lettre à été placée ici en <Ergopti></Ergopti>, c’est en vue de l’utilisation d’<ErgoptiPlus
+		></ErgoptiPlus>, qui a été pensée dès le début comme une extension de la disposition. Ainsi, ce
 		choix de placement de la touche <kbd>J</kbd> est justifié par le fait que cela permet de
 		facilement ajouter de nouvelles fonctionnalités à la disposition sans avoir à créer une toute
 		nouvelle disposition pour tirer parti de ces nouvelles fonctionnalités sans que cela n’ait
@@ -78,31 +79,32 @@
 <h3>Non compatible avec les claviers compacts</h3>
 <p>
 	Certains claviers ont moins de touches, par exemple en n’ayant que 6 colonnes, voire seulement 5,
-	par main. <Nom></Nom> a été conçue pour exploiter toutes les touches d’un clavier standard, donc 6
-	colonnes à gauche et 7 à droite. Sur la dernière colonne de droite, il n’y a cependant que les touches
-	mortes <kbd class="morte">◌̂</kbd> et <kbd class="morte">◌̈</kbd> qui seront beaucoup plus rarement
-	utilisées. Ces touches mortes sont en accès direct sur la septième colonne, mais peuvent également
-	être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec <kbd>Shift</kbd> +
+	par main. <Ergopti></Ergopti> a été conçue pour exploiter toutes les touches d’un clavier standard,
+	donc 6 colonnes à gauche et 7 à droite. Sur la dernière colonne de droite, il n’y a cependant que les
+	touches mortes <kbd class="morte">◌̂</kbd> et <kbd class="morte">◌̈</kbd> qui seront beaucoup plus
+	rarement utilisées. Ces touches mortes sont en accès direct sur la septième colonne, mais peuvent
+	également être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec <kbd>Shift</kbd> +
 	<kbd>AltGr</kbd> + <kbd>Ê</kbd> pour <kbd-sortie class="morte">◌̂</kbd-sortie> et <kbd>Shift</kbd>
 	+ <kbd>AltGr</kbd> + <kbd>T</kbd> pour le Tréma <kbd-sortie class="morte">◌̈</kbd-sortie>.
 </p>
 <p>
-	Il n’en demeure pas moins qu’<Nom></Nom> n’est pas 1DFH (1u Distance From Home). Les lettres accentuées
-	du français étant en accès direct avec <Nom></Nom>, il est impossible de réaliser une disposition
-	1DFH, car il y a trop de touches à placer par rapport à l’espace disponible. La disposition
+	Il n’en demeure pas moins qu’<Ergopti></Ergopti> n’est pas 1DFH (1u Distance From Home). Les lettres
+	accentuées du français étant en accès direct avec <Ergopti></Ergopti>, il est impossible de
+	réaliser une disposition 1DFH, car il y a trop de touches à placer par rapport à l’espace
+	disponible. La disposition
 	<a href="https://ergol.org">Ergo-L</a> est quant à elle une disposition 1DFH, mais au prix d’une touche
 	morte permettant de réaliser les accents. Cela signifie que dans ce genre de dispositions, il y a plus
 	de frappes pour écrire un mot, car pour écrire une lettre accentuée, il faut d’abord appuyer sur la
 	touche morte, puis sur la lettre.
 </p>
 <p class="encadre">
-	<b>Note :</b> Une version 1DFH d’<Nom></Nom> a été développée. Elle est disponible sur la
+	<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
 	<a href="/benchmarks">page de benchmarks</a>
 	ainsi que sur la <a href="/telechargements">page de téléchargements</a>, par installation via
-	Kalamine. Elle utilise le fait qu’<Nom></Nom> ait été conçue de base pour utiliser de nouvelles fonctionnalités
-	grâce à l’emplacement réservé à la touche magique <kbd>★</kbd>. Cependant, les gains apportés par
-	cette version 1DFH sont faibles et il est donc recommandé de ne pas l’utiliser, sauf si vous avez
-	un clavier compact et n’avez pas d’autre choix.
+	Kalamine. Elle utilise le fait qu’<Ergopti></Ergopti> ait été conçue de base pour utiliser de nouvelles
+	fonctionnalités grâce à l’emplacement réservé à la touche magique <kbd>★</kbd>. Cependant, les
+	gains apportés par cette version 1DFH sont faibles et il est donc recommandé de ne pas l’utiliser,
+	sauf si vous avez un clavier compact et n’avez pas d’autre choix.
 </p>
 
 <h3>Quelques <SFB />s restants</h3>
@@ -126,8 +128,8 @@
 	</li>
 </ul>
 <p class="encadre">
-	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation d’<NomPlus
-	></NomPlus>, y compris pour les <SFB></SFB>s encore plus rares qui ne sont pas listés ici.
+	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation d’<ErgoptiPlus
+	></ErgoptiPlus>, y compris pour les <SFB></SFB>s encore plus rares qui ne sont pas listés ici.
 	<i class="icon-face-smile"><span class="path1"></span><span class="path2"></span></i>
 </p>
 
@@ -154,8 +156,8 @@
 	<kbd-sortie>`</kbd-sortie>.
 </p>
 <p>
-	Cependant, les touches <kbd>À</kbd> et <kbd>È</kbd> ont depuis été interverties. En effet, <NomPlus
-	></NomPlus> utilisant beaucoup la touche <kbd>À</kbd>, il convenait de la mettre sous un doigt
+	Cependant, les touches <kbd>À</kbd> et <kbd>È</kbd> ont depuis été interverties. En effet, <ErgoptiPlus
+	></ErgoptiPlus> utilisant beaucoup la touche <kbd>À</kbd>, il convenait de la mettre sous un doigt
 	fort et non plus sur l’auriculaire. Les symboles en <kbd>AltGr</kbd> ont en revanche été
 	conservés, car le <kbd>\</kbd> est plus fréquemment utilisé que le <kbd>`</kbd>, en particulier en
 	LaTeX. En résulte un placement moins logique des caractères en <kbd>AltGr</kbd> pour ces deux touches.
@@ -163,14 +165,14 @@
 
 <h3>Manque de caractères et non optimisation pour les autres langues</h3>
 <p>
-	<Nom></Nom> possède peu de touches mortes et de couches de symboles. En effet, la disposition ne se
-	prétend pas être exhaustive en incorporant tous les alphabets des langues européennes comme le BÉPO,
-	ou encore le cyrillique, l’écriture phonétique, les pièces d’échec, etc. comme Optimot. Ces couches
+	<Ergopti></Ergopti> possède peu de touches mortes et de couches de symboles. En effet, la disposition
+	ne se prétend pas être exhaustive en incorporant tous les alphabets des langues européennes comme le
+	BÉPO, ou encore le cyrillique, l’écriture phonétique, les pièces d’échec, etc. comme Optimot. Ces couches
 	n’intéressent que peu d’utilisateurs et occupent des emplacements du clavier très accessibles pour
 	une utilisation très rare.
 </p>
 <p>
-	En outre, <Nom></Nom> a été optimisée pour le français et l’anglais ; elle n’a pas été pensée pour
-	être utilisée dans d’autres langues. Par conséquent, <Nom></Nom> n’est probablement pas la disposition
-	la plus adaptée si vous écrivez dans une langue différente du français et de l’anglais.
+	En outre, <Ergopti></Ergopti> a été optimisée pour le français et l’anglais ; elle n’a pas été pensée
+	pour être utilisée dans d’autres langues. Par conséquent, <Ergopti></Ergopti> n’est probablement pas
+	la disposition la plus adaptée si vous écrivez dans une langue différente du français et de l’anglais.
 </p>

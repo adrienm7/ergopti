@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
@@ -59,14 +59,14 @@
 	let ergol = 'en_fr';
 	let version_1dfh = '_1dk';
 
-	const images = import.meta.glob('$lib/benchmarks/**/*.jpg', {
+	const images = import.meta.glob('$lib/images/benchmarks/**/*.jpg', {
 		eager: true,
 		query: {
 			enhanced: true
 		}
 	});
 	function getImagePath(clavier, corpus) {
-		return images[`/src/lib/benchmarks/${clavier}/${corpus}.jpg`].default;
+		return images[`/src/lib/images/benchmarks/${clavier}/${corpus}.jpg`].default;
 	}
 </script>
 
@@ -81,12 +81,12 @@
 
 	<h2>Résultats de benchmarks</h2>
 	<p>
-		Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Nom
+		Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Ergopti
 		/>
 		fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
 	</p>
 	<!-- <p>
-			À noter qu’en version ISO, la version Thumbshift d’Optimot fait systématiquement mieux qu’<Nom
+			À noter qu’en version ISO, la version Thumbshift d’Optimot fait systématiquement mieux qu’<Ergopti
 			/>, avec notamment une grande différence en distance parcourue. C’était un résultat attendu,
 			car dans cette disposition <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> tandis que
 			<kbd>AltGr</kbd>
@@ -94,7 +94,7 @@
 			Engram, qui a le même placement des touches <kbd>Shift</kbd> et <kbd>AltGr</kbd>.
 		</p> -->
 	<p>
-		En version Ergodox, <Nom /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
+		En version Ergodox, <Ergopti /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
 		la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
 		est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
 		de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
@@ -110,7 +110,7 @@
 
 	<h3>Analyse KLAnext</h3>
 	<p>
-		À noter que la version 2.2 d’<Nom></Nom> n’est pas présente sur ces benchmarks, car les changements
+		À noter que la version 2.2 d’<Ergopti></Ergopti> n’est pas présente sur ces benchmarks, car les changements
 		sont si minimes que cela n’impacte pas les résultats. La version 2.1 a donc les mêmes métriques que
 		la version 2.2.
 	</p>

@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -111,7 +111,7 @@
 	En français et en anglais, le <kbd>E</kbd>
 	est de loin la lettre la plus fréquente. Viennent ensuite les voyelles <kbd>A</kbd>,
 	<kbd>I</kbd>, <kbd>O</kbd> et <kbd>U</kbd>, ainsi que les consonnes
-	<kbd>S</kbd>, <kbd>N</kbd>, <kbd>T</kbd> et <kbd>R</kbd>. <Nom /> place ainsi les lettres les plus
+	<kbd>S</kbd>, <kbd>N</kbd>, <kbd>T</kbd> et <kbd>R</kbd>. <Ergopti /> place ainsi les lettres les plus
 	utilisées sur la rangée du milieu. En résulte immédiatement un déplacement des doigts largement diminué
 	et un meilleur confort.
 </p>
@@ -146,9 +146,9 @@
 	: la touche de repos de l’index.
 </p>
 <p>
-	Enfin, contrairement au BÉPO ou à l’Optimot, <Nom /> ne place pas de symboles de programmation ou de
-	ponctuation sur la rangée des chiffres. Ces symboles sont ramenés au plus près des doigts grâce à l’utilisation
-	de la couche <kbd>AltGr</kbd>.
+	Enfin, contrairement au BÉPO ou à l’Optimot, <Ergopti /> ne place pas de symboles de programmation
+	ou de ponctuation sur la rangée des chiffres. Ces symboles sont ramenés au plus près des doigts grâce
+	à l’utilisation de la couche <kbd>AltGr</kbd>.
 </p>
 
 <mini-espace />
@@ -157,7 +157,7 @@
 
 <p>
 	Comme vous pouvez le constater sur le clavier ci-dessus, les lettres les plus fréquentes sont bien
-	sur la rangée du milieu en <Nom />. Effectivement, la lettre la plus fréquente, le
+	sur la rangée du milieu en <Ergopti />. Effectivement, la lettre la plus fréquente, le
 	<kbd>E</kbd>, est en rouge. Viennent ensuite en orange les voyelles et consonnes les plus
 	fréquentes. Enfin, les lettres en vert, voire bleu, sont les moins fréquentes de toutes.
 </p>

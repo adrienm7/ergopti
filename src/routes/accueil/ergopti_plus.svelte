@@ -1,8 +1,8 @@
 <script>
 	import '$lib/css/orb.css';
 
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
@@ -27,15 +27,15 @@
 		<div class="texte-orb" style="max-width: 850px; margin:0 auto; margin-top:-50px">
 			<hr />
 			<p class="encart-introduction">
-				<NomPlus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont éradiqués,
-				les roulements sont améliorés et les doigts ont encore moins de distance à parcourir.
-				Découvrez cette amélioration (optionnelle) de la disposition en consultant la page associée
-				:
+				<ErgoptiPlus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont
+				éradiqués, les roulements sont améliorés et les doigts ont encore moins de distance à
+				parcourir. Découvrez cette amélioration (optionnelle) de la disposition en consultant la
+				page associée :
 			</p>
 			<a href="/ergopti-plus" style="text-decoration: none;"
 				><button
 					style="display:block; margin: 0 auto; margin-bottom: 25px; background: rgba(0, 0, 0, 0.2); padding: 10px; padding-top: 6px; border-radius: 3px; border: 1px solid white;"
-					><NomPlus /></button
+					><ErgoptiPlus /></button
 				></a
 			>
 			<hr />

@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
@@ -27,7 +27,7 @@
 	meilleure de 2,48% en général. En outre, passé une certaine performance, les gains sont marginaux.
 </p>
 <p>
-	Par exemple, il serait probablement possible d’améliorer encore les résultats de <Nom /> sur KLAnext,
+	Par exemple, il serait probablement possible d’améliorer encore les résultats de <Ergopti /> sur KLAnext,
 	mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le confort général
 	ou la disparition de certains roulements. Autre exemple, certaines dispositions optimisent tellement
 	que les chiffres ne sont pas dans l’ordre mais plutôt du genre <kbd>3210987654</kbd>. Cela rend la

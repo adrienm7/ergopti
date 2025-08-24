@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -11,8 +11,8 @@
 <div class="encadre">
 	<p class="margin0">
 		<b>Note :</b> Dans de très rares cas, ces raccourcis vous empêcheront d’écrire ce que vous
-		voulez réellement écrire. En effet, avec <NomPlus />, les combinaisons de touches extrêmement
-		rares comme
+		voulez réellement écrire. En effet, avec <ErgoptiPlus />, les combinaisons de touches
+		extrêmement rares comme
 		<kbd>HC</kbd>
 		sont transformées en d’autres bien plus utiles comme <kbd-sortie>WH</kbd-sortie>. Cela signifie
 		que dans les cas où vous voulez vraiment écrire
@@ -25,7 +25,7 @@
 		devraient arriver que très rarement, mais tout dépend de votre utilisation. Par exemple,
 		l’enchaînement <kbd>XG</kbd>
 		est très peu commun, mais les Data Scientists l’utiliseront régulièrement pour écrire
-		<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
+		<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <ErgoptiPlus
 		/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
 		macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
 		XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était qu’un
@@ -41,7 +41,7 @@
 <ul class="margin-top-2">
 	<li><kbd>hc</kbd> ➜ <kbd-sortie>wh</kbd-sortie> ;</li>
 	<p>
-		Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Nom />, car
+		Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Ergopti />, car
 		cette combinaison est très fréquente et se produit en roulement, ce qui la rend extrêmement
 		confortable. L’ajout du roulement donnant <kbd-sortie>WH</kbd-sortie> permet d’avoir une frappe en
 		anglais encore plus fluide.

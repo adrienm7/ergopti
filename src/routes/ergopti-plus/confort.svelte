@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
@@ -15,7 +15,7 @@
 	Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée en haut à droite du
 	clavier. Par conséquent, il est logique de vouloir la placer sur un emplacement très accessible.
 	C’est pour cela que la touche <kbd>BackSpace</kbd> a été dupliquée sur la touche
-	<kbd>"RCtrl"</kbd> avec <NomPlus />.
+	<kbd>"RCtrl"</kbd> avec <ErgoptiPlus />.
 </p>
 <p>
 	La touche <kbd-sortie>Delete</kbd-sortie> se trouve quant à elle sur la combinaison
@@ -55,7 +55,7 @@
 </p>
 <p>
 	Ainsi, le <kbd-sortie>ù</kbd-sortie> en <kbd>AltGr</kbd> + <kbd>W</kbd> se transforme en
-	<kbd-sortie>où</kbd-sortie> si <NomPlus></NomPlus> est activé.
+	<kbd-sortie>où</kbd-sortie> si <ErgoptiPlus></ErgoptiPlus> est activé.
 </p>
 
 <h3>
@@ -86,7 +86,7 @@
 	extrêmement confortables sur des bigrammes qui n’existent pas et donc ne posent aucun problème.
 </p>
 <p>
-	En outre, le mécanisme de correction automatique de <NomPlus /> permet de donner
+	En outre, le mécanisme de correction automatique de <ErgoptiPlus /> permet de donner
 	<kbd-sortie>paraît</kbd-sortie>
 	lors de l’écriture de <kbd>parait</kbd>, rendant ce <SFB /> encore plus inoffensif.
 </p>
@@ -96,8 +96,8 @@
 </h3>
 <p>
 	Lorsqu’on écrit en français ou anglais, il faudrait idéalement utiliser l’apostrophe typographique
-	plutôt que l’apostrophe droite. C’est pour cela que <NomPlus /> va automatiquement l’utiliser à la
-	place de l’apostrophe droite lors de l’écriture de texte. Cette apostrophe est d’ailleurs plus jolie
+	plutôt que l’apostrophe droite. C’est pour cela que <ErgoptiPlus /> va automatiquement l’utiliser à
+	la place de l’apostrophe droite lors de l’écriture de texte. Cette apostrophe est d’ailleurs plus jolie
 	et présente l’avantage de ne pas avoir à être échappée en programmation si une chaîne de caractères
 	est écrite avec ce caractère à l’intérieur. Il n’y a pas à réfléchir, il suffit d’écrire normalement
 	et l’apostrophe typographique apparaîtra. Les faux positifs devraient être extrêmement rares.
@@ -117,12 +117,13 @@
 	Utilisation de la touche <kbd>,</kbd> + <kbd>voyelle</kbd> en tant que <kbd>j</kbd>
 </h3>
 <p>
-	La touche <kbd>j</kbd> minuscule se fait remplacer par <kbd>★</kbd> avec <NomPlus></NomPlus>.
-	Cette nouvelle touche possède plusieurs fonctionnalités extrêmement utiles qui seront détaillées
-	par la suite. Toutefois, elle prend la place du <kbd>j</kbd> et il convient donc de replacer ce
-	caractère autre part. Il convient de noter que seul le caractère <kbd-sortie>j</kbd-sortie> change
-	de place, la touche <kbd>J/★</kbd> reste une touche <kbd>J</kbd> dans tous les autres cas, que ce
-	soit pour les raccourcis avec <kbd>Ctrl</kbd> (<kbd-sortie>Ctrl</kbd-sortie> +
+	La touche <kbd>j</kbd> minuscule se fait remplacer par <kbd>★</kbd> avec <ErgoptiPlus
+	></ErgoptiPlus>. Cette nouvelle touche possède plusieurs fonctionnalités extrêmement utiles qui
+	seront détaillées par la suite. Toutefois, elle prend la place du <kbd>j</kbd> et il convient donc
+	de replacer ce caractère autre part. Il convient de noter que seul le caractère
+	<kbd-sortie>j</kbd-sortie>
+	change de place, la touche <kbd>J/★</kbd> reste une touche <kbd>J</kbd> dans tous les autres cas,
+	que ce soit pour les raccourcis avec <kbd>Ctrl</kbd> (<kbd-sortie>Ctrl</kbd-sortie> +
 	<kbd-sortie>J</kbd-sortie>), avec <kbd>Alt</kbd> (<kbd-sortie>Alt</kbd-sortie> +
 	<kbd-sortie>J</kbd-sortie>), ou simplement les caractères en <kbd>AltGr</kbd> (<kbd-sortie
 		>"</kbd-sortie
@@ -175,12 +176,12 @@
 	Utilisation de la touche <kbd>,</kbd> + <kbd>consonne</kbd> pour avoir une disposition 1DFH
 </h3>
 <p>
-	La disposition <Nom></Nom> n’est pas 1DFH de base. En effet, il y a trop de lettres à placer, notamment
-	les voyelles accentuées du français, pour que toutes les touches soient à une distance maximale d’une
-	touche de la position de repos de chaque doigt (« 1u Distance From Home »). C’est pourquoi il y a les
-	lettres <kbd>Q</kbd> et <kbd>Z</kbd> sur l’auriculaire droit, non sur la colonne de repos de ce
-	doigt, mais à droite de celle-ci. De même pour la touche <kbd>K</kbd> qui est pile au milieu du clavier,
-	mais trop loin de chacun des deux index pour être considérée 1DFH.
+	La disposition <Ergopti></Ergopti> n’est pas 1DFH de base. En effet, il y a trop de lettres à placer,
+	notamment les voyelles accentuées du français, pour que toutes les touches soient à une distance maximale
+	d’une touche de la position de repos de chaque doigt (« 1u Distance From Home »). C’est pourquoi il
+	y a les lettres <kbd>Q</kbd> et <kbd>Z</kbd> sur l’auriculaire droit, non sur la colonne de repos
+	de ce doigt, mais à droite de celle-ci. De même pour la touche <kbd>K</kbd> qui est pile au milieu
+	du clavier, mais trop loin de chacun des deux index pour être considérée 1DFH.
 </p>
 <p>
 	En outre, réaliser un <kbd-sortie>ç</kbd-sortie> ou un <kbd-sortie>où</kbd-sortie> est un peu
@@ -190,7 +191,7 @@
 </p>
 <p>
 	C’est pour toutes ces raisons qu’il est possible d’utiliser la touche <kbd>,</kbd> comme une super
-	touche morte avec <NomPlus></NomPlus> :
+	touche morte avec <ErgoptiPlus></ErgoptiPlus> :
 </p>
 <ul>
 	<li><kbd>,</kbd> + <kbd>è</kbd> = <kbd-sortie>z</kbd-sortie> ;</li>

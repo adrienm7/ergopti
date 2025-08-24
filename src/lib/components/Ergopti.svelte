@@ -1,3 +1,3 @@
-<nom-disposition>
+<name-ergopti>
 	<span class="namecolor">Ergopti</span>
-</nom-disposition>
+</name-ergopti>

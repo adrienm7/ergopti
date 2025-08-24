@@ -1,13 +1,13 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
 <h2>Contact</h2>
 <div class="encadre">
 	<p class="text-center margin0">
-		Le créateur de la disposition <Nom /> et de ce site est <strong>Adrien MOYAUX</strong>.
+		Le créateur de la disposition <Ergopti /> et de ce site est <strong>Adrien MOYAUX</strong>.
 	</p>
 	<p>
 		Vous pouvez créer une nouvelle <i>Issue</i> sur
@@ -18,6 +18,6 @@
 		Il est aussi possible de rejoindre le <a href="https://discord.gg/ptxRzBqcQP"
 			>serveur Discord BÉPO | Ergodis</a
 		>
-		où <Nom></Nom> dispose d’un canal dédié, simplifiant les échanges.
+		où <Ergopti></Ergopti> dispose d’un canal dédié, simplifiant les échanges.
 	</p>
 </div>

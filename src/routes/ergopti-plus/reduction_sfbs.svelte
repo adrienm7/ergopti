@@ -1,29 +1,31 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 </script>
 
 <h2>Diminution des SFBs</h2>
-<p>L’un des avantages majeurs de <NomPlus /> est qu’il réduit presque totalement les <SFB />s.</p>
+<p>
+	L’un des avantages majeurs de <ErgoptiPlus /> est qu’il réduit presque totalement les <SFB />s.
+</p>
 <p>
 	Les <SFB />s les plus fréquents de la disposition sont : <kbd>CT</kbd>,
 	<kbd>pt</kbd>, <kbd>eo</kbd>, <kbd>oe</kbd>,
 	<kbd>ub</kbd>, <kbd>bu</kbd> et <kbd>ds</kbd>. <kbd>ct</kbd> est de loin le plus fréquent.
 	<kbd>eo</kbd> et <kbd>oe</kbd> sont aussi relativement fréquents en anglais (pour écrire
 	<kbd-sortie>does</kbd-sortie>,
-	<kbd-sortie>people</kbd-sortie>, etc.) Tous ces <SFB />s sont supprimés avec <NomPlus />, plus de
-	nombreux autres encore plus rares.
+	<kbd-sortie>people</kbd-sortie>, etc.) Tous ces <SFB />s sont supprimés avec <ErgoptiPlus />, plus
+	de nombreux autres encore plus rares.
 </p>
 
 <h3>
 	Utilisation de la touche <kbd>,</kbd> + <kbd>Consonne</kbd>
 </h3>
 <p>
-	La touche <kbd>,</kbd> est l’une des plus importantes dans <NomPlus />. C’est grâce à elle que la
-	plupart des <SFB />s restants sont supprimés. De plus, certaines combinaisons ont aussi été
+	La touche <kbd>,</kbd> est l’une des plus importantes dans <ErgoptiPlus />. C’est grâce à elle que
+	la plupart des <SFB />s restants sont supprimés. De plus, certaines combinaisons ont aussi été
 	ajoutées pour plus de confort, afin d’éviter de devoir sauter de 2 rangées avec des doigts
 	consécutifs pour écrire un bigramme (donc éviter les <i>ciseaux</i>). C’est le cas de
 	<kbd>cl</kbd> ou encore de <kbd>ph</kbd>.
@@ -31,7 +33,7 @@
 <BlocClavier nom="virgule" />
 <p>
 	Comme vous pouvez le constater, la touche <kbd>,</kbd> est vraiment pour supprimer les derniers
-	petits <SFB />s restants. La disposition <Nom /> éliminait déjà la majorité d’entre eux.
+	petits <SFB />s restants. La disposition <Ergopti /> éliminait déjà la majorité d’entre eux.
 </p>
 
 <h3>Utilisation des touches <kbd>È</kbd> et <kbd>Ê</kbd></h3>
@@ -91,8 +93,8 @@
 <mini-espace />
 <p>
 	La touche <kbd>★</kbd> est <span class="important">l’ajout principal</span>
-	d’<NomPlus /> et mérite son excellent emplacement sous l’index gauche. Elle vient en remplacement de
-	la touche <kbd>J</kbd>
+	d’<ErgoptiPlus /> et mérite son excellent emplacement sous l’index gauche. Elle vient en remplacement
+	de la touche <kbd>J</kbd>
 	(mais pas le contenu des autres couches de la touche <kbd>J</kbd> tel qu’en
 	<kbd>AltGr</kbd> ou en <kbd>Ctrl</kbd>). Le <kbd>J</kbd> se retrouve quant à lui en <kbd>,</kbd> +
 	<kbd>Voyelle</kbd>.

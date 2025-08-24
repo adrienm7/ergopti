@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import ComparateursDispositions from './comparateurs_dispositions.svelte';
@@ -45,7 +45,7 @@
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
 		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition. Vous aurez
-		alors automatiquement la meilleure version de la disposition : <NomPlus />
+		alors automatiquement la meilleure version de la disposition : <ErgoptiPlus />
 	</p>
 	<petit-espace />
 	<h3>Comment installer la disposition sur Windows</h3>

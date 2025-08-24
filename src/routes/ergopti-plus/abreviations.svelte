@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -37,7 +37,7 @@
 	<li>etc.</li>
 </ul>
 <p>
-	Avec cette fonction d’abréviations, <NomPlus></NomPlus>
+	Avec cette fonction d’abréviations, <ErgoptiPlus></ErgoptiPlus>
 	<span class="important">devient plus qu’une disposition clavier</span>. Elle devient un outil de
 	productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes les plus
 	fréquents.

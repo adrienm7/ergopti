@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -24,8 +24,8 @@
 	<kbd>Ctrl</kbd> sont du côté gauche.
 </p>
 <p>
-	Avec <Nom />, le <kbd>=</kbd> a ainsi été dupliqué à gauche pour être mis en accès direct. Cela
-	permet de faire facilement des raccourcis, notamment sur Excel, tels que <kbd>=</kbd> et
+	Avec <Ergopti />, le <kbd>=</kbd> a ainsi été dupliqué à gauche pour être mis en accès direct.
+	Cela permet de faire facilement des raccourcis, notamment sur Excel, tels que <kbd>=</kbd> et
 	<kbd>Alt</kbd>
 	+
 	<kbd>=</kbd>. En effet, normalement le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
@@ -56,7 +56,7 @@
 <BlocClavier nom="raccourcis_ergodox" />
 <mini-espace></mini-espace>
 <p>
-	La version d’<Nom /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
+	La version d’<Ergopti /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
 	à une main, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
 	<kbd>Alt+Tab</kbd> ont été directement incluses à gauche du clavier. À noter que ces touches ne sont
 	pas définies dans le pilote et que ce sont uniquement des idées d’implémentation. Les claviers de type
@@ -72,7 +72,7 @@
 	ces 3 touches sous les pouces.
 </p>
 <p>
-	<NomPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
+	<ErgoptiPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
 	<span class="important">mécanisme de tap-hold</span>. L’idée du tap-hold est qu’il est possible
 	d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir
 	pressé). Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une touche
@@ -84,5 +84,6 @@
 	<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>. En outre, un layer de navigation ainsi que
 	les touches
 	<kbd>Backspace</kbd>
-	et <kbd>Entrée</kbd> sont également disponibles à gauche du clavier avec <NomPlus></NomPlus>.
+	et <kbd>Entrée</kbd> sont également disponibles à gauche du clavier avec <ErgoptiPlus
+	></ErgoptiPlus>.
 </p>

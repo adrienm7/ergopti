@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -9,7 +9,9 @@
 
 <div>
 	<h1 data-aos="zoom-in" class="ergopti-title">
-		Disposition clavier<br /><span style="line-height: 0.75!important;"><NomPlus></NomPlus></span>
+		Disposition clavier<br /><span style="line-height: 0.75!important;"
+			><ErgoptiPlus></ErgoptiPlus></span
+		>
 	</h1>
 	<BlocClavier nom="presentation_plus" />
 	<mini-espace />
@@ -20,8 +22,9 @@
 
 <hr />
 <p class="main text-center">
-	<NomPlus /> est une variante améliorée de la disposition <Nom /> qui tire parti des meilleures fonctionnalités
-	des claviers programmables et outils d’automatisation. Elle se rapproche de très près de la
+	<ErgoptiPlus /> est une variante améliorée de la disposition <Ergopti /> qui tire parti des meilleures
+	fonctionnalités des claviers programmables et outils d’automatisation. Elle se rapproche de très près
+	de la
 	<span class="important">disposition clavier idéale</span>. En effet, elle :
 </p>
 <div class="cards">
@@ -67,22 +70,22 @@
 
 <div class="main">
 	<div class="encadre">
-		Cependant, l’utilisation d’<NomPlus></NomPlus> nécessite des
+		Cependant, l’utilisation d’<ErgoptiPlus></ErgoptiPlus> nécessite des
 		<span class="important">outils de programmation de clavier :</span>
 		<ul>
 			<li>
 				Sur Windows, le programme <a href="https://www.autohotkey.com/">AutoHotkey</a>
 				est utilisé afin de réaliser ces changements. Il donne une immense liberté et est l’implémentation
-				actuelle d’<NomPlus></NomPlus>.
+				actuelle d’<ErgoptiPlus></ErgoptiPlus>.
 			</li>
 			<li>
 				Sur macOS,
 				<a href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a> permettrait de
-				réaliser une partie des fonctionnalités d’<NomPlus></NomPlus>. Celles pouvant être
+				réaliser une partie des fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>. Celles pouvant être
 				implémentées sont les remappages de touches, les tap-holds et la création d’un layer de
 				navigation. Cependant, ce logiciel ne gère pas les hotstrings (remplacements de texte), ce
-				qui ne permet pas d’utiliser la moitié des possibilités d’<NomPlus></NomPlus> sur macOS : création
-				de nouveaux roulements, touche <kbd>,</kbd> de correction de <SFB></SFB>s, touche
+				qui ne permet pas d’utiliser la moitié des possibilités d’<ErgoptiPlus></ErgoptiPlus> sur macOS :
+				création de nouveaux roulements, touche <kbd>,</kbd> de correction de <SFB></SFB>s, touche
 				<kbd>★</kbd> de répétition et d’expansion de texte, etc. Peut-être un programme complémentaire
 				pourrait se charger de cette partie, mais il n’y a pas de solution aussi simple et puissante
 				qu’AutoHotkey sur macOS.
@@ -98,5 +101,5 @@
 		</ul>
 	</div>
 	<mini-espace></mini-espace>
-	<p>Voici maintenant les nombreuses fonctionnalités d’<NomPlus /> :</p>
+	<p>Voici maintenant les nombreuses fonctionnalités d’<ErgoptiPlus /> :</p>
 </div>

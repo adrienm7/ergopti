@@ -22,26 +22,6 @@ picture img {
 	height: auto !important;
 }
 
-/* Icons */
-i {
-	display: inline-flex;
-}
-
-i,
-i .path1::before {
-	color: #3088ed !important;
-}
-
-i .path2::before {
-	-webkit-background-clip: text;
-	background-clip: text;
-	-webkit-text-fill-color: transparent;
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
-	background-image: linear-gradient(to right, var(--gradient-blue));
-	color: transparent;
-}
-
 /* Deactivate AOS for people who get animation sick */
 @media (prefers-reduced-motion: reduce) {
 	[data-aos] {

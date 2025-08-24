@@ -1,12 +1,12 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
 <h2>Genèse et inspirations</h2>
 <p>
-	La genèse de la disposition <Nom></Nom> remonte à début 2022, suite à la découverte de la disposition
+	La genèse de la disposition <Ergopti></Ergopti> remonte à début 2022, suite à la découverte de la disposition
 	<a href="https://optimot.fr/">Optimot</a>. À ce moment-là, j’étais un utilisateur du
 	<a href="https://bepo.fr/">BÉPO</a>
 	depuis déjà de nombreuses années. Les améliorations d’Optimot par rapport au BÉPO sont significatives,
@@ -36,11 +36,11 @@
 	mettre les symboles.
 </p>
 <p>
-	Rapidement, <Nom></Nom> s'éloigna d'Optimot sur plusieurs aspects fondamentaux. L'un des points clés
-	était ma volonté d'optimiser les <i>roulements</i>, entraînant de nombreux tests de disposition
-	des touches pour la homerow, notamment sur la partie droite avec les consonnes. Un des choix
-	majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le <kbd>TSRN</kbd> du BÉPO et
-	d’Optimot. En effet, le bigramme <kbd>NT</kbd> est le plus fréquent des bigrammes
+	Rapidement, <Ergopti></Ergopti> s'éloigna d'Optimot sur plusieurs aspects fondamentaux. L'un des points
+	clés était ma volonté d'optimiser les <i>roulements</i>, entraînant de nombreux tests de
+	disposition des touches pour la homerow, notamment sur la partie droite avec les consonnes. Un des
+	choix majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le <kbd>TSRN</kbd> du
+	BÉPO et d’Optimot. En effet, le bigramme <kbd>NT</kbd> est le plus fréquent des bigrammes
 	consonne-consonne, et il est pertinent de l'optimiser pour qu'il se réalise sur des doigts
 	consécutifs. D’autant que <kbd>NTR</kbd> se réalise également en roulement.
 </p>
@@ -49,7 +49,7 @@
 	conçu pour maximiser les bigrammes consonantiques, avec une disposition harmonieuse. Seuls les
 	bigrammes <kbd>ST</kbd>
 	et <kbd>TS</kbd> (comme dans « <kbd>ST</kbd>A<kbd>TS</kbd> ») ne profitent malheureusement pas de
-	cette optimisation de roulements. En résumé, <Nom></Nom> a été pensée dès le départ pour maximiser
+	cette optimisation de roulements. En résumé, <Ergopti></Ergopti> a été pensée dès le départ pour maximiser
 	les roulements, mais sans sacrifier l’alternance des mains. La disposition a la même alternance des
 	mains que BÉPO ou Optimot, tout en ayant des roulements beaucoup plus fréquents pour les lettres ne
 	bénéficiant pas de cette alternance.
@@ -65,12 +65,12 @@
 	et le déplacement de <kbd>É</kbd> sur l’annulaire gauche.
 </p>
 <p>
-	Bien que la création d’<Nom></Nom> ait été un processus étalé sur plusieurs années, près de 90% de
-	la disposition est restée constante. Les ajustements concernaient principalement le déplacement de
-	certaines lettres, nécessitant ainsi de petites phases de réapprentissage régulières. Néanmoins, la
-	plupart des changements se sont avérés non pertinents, ce qui explique l'absence de modifications majeures
-	entre les premières versions d’<span class="important">Optim7</span> et la version finale d’<Nom
-	></Nom>.
+	Bien que la création d’<Ergopti></Ergopti> ait été un processus étalé sur plusieurs années, près de
+	90% de la disposition est restée constante. Les ajustements concernaient principalement le déplacement
+	de certaines lettres, nécessitant ainsi de petites phases de réapprentissage régulières. Néanmoins,
+	la plupart des changements se sont avérés non pertinents, ce qui explique l'absence de modifications
+	majeures entre les premières versions d’<span class="important">Optim7</span> et la version finale
+	d’<Ergopti></Ergopti>.
 </p>
 
 <mini-espace />
@@ -89,8 +89,9 @@
 </p>
 <p>
 	Environ un mois après la sortie publique de la disposition,
-	<span class="important">HyperTexte</span> fut renommée <Nom></Nom>, son nom définitif. Ce nouveau
-	nom reflète à la fois l’ergonomie de la disposition et l’optimisation de celle-ci, la lettre
+	<span class="important">HyperTexte</span> fut renommée <Ergopti></Ergopti>, son nom définitif. Ce
+	nouveau nom reflète à la fois l’ergonomie de la disposition et l’optimisation de celle-ci, la
+	lettre
 	<kbd>O</kbd> faisant le lien entre les deux (ergo[nomie] & opti[misation]). En outre, il est
 	court, d’une longueur idéale de 7 lettres, et peu présent en ligne. Une fois la nouvelle
 	appellation trouvée, le nom de domaine
@@ -100,9 +101,9 @@
 <h3>Comment la disposition a été développée</h3>
 <p>
 	<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i> La première
-	étape dans la création d’<Nom /> a été de partager les touches du clavier en deux groupes : main gauche
-	et main droite. L’objectif est de maximiser l’alternance des mains, c’est-à-dire de faire en sorte
-	que les touches qui sont le plus souvent tapées l’une après l’autre le soient par des mains différentes.
+	étape dans la création d’<Ergopti /> a été de partager les touches du clavier en deux groupes : main
+	gauche et main droite. L’objectif est de maximiser l’alternance des mains, c’est-à-dire de faire en
+	sorte que les touches qui sont le plus souvent tapées l’une après l’autre le soient par des mains différentes.
 </p>
 <p>
 	Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
@@ -111,8 +112,8 @@
 	dans presque toutes les dispositions alternatives : Dvorak, BÉPO, Optimot, etc.
 </p>
 <p>
-	Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que sur la
-	plupart des claviers standards, il y a moins de touches sur ce côté. Le côté droit a en effet
+	Dans le cas d’<Ergopti />, les voyelles ont été placées sur le côté gauche. La raison est que sur
+	la plupart des claviers standards, il y a moins de touches sur ce côté. Le côté droit a en effet
 	trois colonnes de touches pour l’auriculaire alors que l’auriculaire gauche n’en a qu’une. Ces
 	nombreux emplacements sont précieux, surtout pour les langues ayant besoin de caractères
 	supplémentaires, comme les accents en français. Le nombre de consonnes étant largement supérieur
@@ -122,8 +123,8 @@
 <p>
 	Le seul problème avec cette approche est que l’on perd des raccourcis utiles sur la main gauche
 	qui se font avec des consonnes, comme <kbd>Ctrl</kbd> + <kbd>C</kbd> pour copier ou
-	<kbd>Ctrl</kbd> + <kbd>V</kbd> pour coller. Cependant, <Nom></Nom> a trouvé une solution pour que ce
-	ne soit pas un problème en dupliquant ces raccourcis sur les voyelles accentuées.
+	<kbd>Ctrl</kbd> + <kbd>V</kbd> pour coller. Cependant, <Ergopti></Ergopti> a trouvé une solution pour
+	que ce ne soit pas un problème en dupliquant ces raccourcis sur les voyelles accentuées.
 </p>
 
 <mini-espace />
@@ -163,14 +164,14 @@
 	Simplification et utilisation de la couche <kbd>AltGr</kbd>
 </h3>
 <p>
-	<Nom /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire drastiquement
-	les distances parcourues pour atteindre de nombreuses touches. N’ayant nullement besoin de tous
-	les caractères exotiques et touches mortes de BÉPO ou d’Optimot, la majeure partie fut supprimée
-	pour ne conserver que l’essentiel. Cette simplification permit de libérer de nombreux excellents
-	emplacements sur la couche <kbd>AltGr</kbd> et me laissa assez de place pour y loger tous les symboles.
-	Ainsi, plus besoin d’étendre les doigts pour atteindre la rangée des chiffres pour taper des parenthèses,
-	guillemets ou opérateurs mathématiques. Au contraire, tous ces symboles sont désormais sous les doigts,
-	sur les trois rangées principales du clavier.
+	<Ergopti /> utilise intensivement la couche <kbd>AltGr</kbd>. Celle-ci permet de réduire
+	drastiquement les distances parcourues pour atteindre de nombreuses touches. N’ayant nullement
+	besoin de tous les caractères exotiques et touches mortes de BÉPO ou d’Optimot, la majeure partie
+	fut supprimée pour ne conserver que l’essentiel. Cette simplification permit de libérer de
+	nombreux excellents emplacements sur la couche <kbd>AltGr</kbd> et me laissa assez de place pour y
+	loger tous les symboles. Ainsi, plus besoin d’étendre les doigts pour atteindre la rangée des chiffres
+	pour taper des parenthèses, guillemets ou opérateurs mathématiques. Au contraire, tous ces symboles
+	sont désormais sous les doigts, sur les trois rangées principales du clavier.
 </p>
 <p>
 	En outre, les chiffres sont quant à eux passés en accès direct, un changement très appréciable
@@ -184,16 +185,17 @@
 </p>
 
 <h3>
-	Atouts d’<NomPlus></NomPlus>
+	Atouts d’<ErgoptiPlus></ErgoptiPlus>
 </h3>
 <p>
-	La singularité d’<Nom></Nom> ne réside pas seulement dans ses excellents scores en français, anglais
-	et en programmation, où elle rivalise avec les meilleures dispositions actuelles. Sa version étendue,
-	<NomPlus></NomPlus>, pousse encore plus loin l’efficacité de cette disposition déjà très
+	La singularité d’<Ergopti></Ergopti> ne réside pas seulement dans ses excellents scores en français,
+	anglais et en programmation, où elle rivalise avec les meilleures dispositions actuelles. Sa version
+	étendue,
+	<ErgoptiPlus></ErgoptiPlus>, pousse encore plus loin l’efficacité de cette disposition déjà très
 	performante, en la rendant véritablement exceptionnelle.
 </p>
 <p>
-	Le qualificatif d’exceptionnel n’est pas exagéré : <NomPlus></NomPlus> permet, une fois maîtrisée,
+	Le qualificatif d’exceptionnel n’est pas exagéré : <ErgoptiPlus></ErgoptiPlus> permet, une fois maîtrisée,
 	de supprimer presque totalement les <SFB></SFB>s, y compris ceux liés à la répétition d'une même
 	touche. Cela est rendu possible grâce à la touche spéciale <kbd>★</kbd>, permettant de réitérer la
 	frappe de la touche précédente avec une fluidité inédite, ainsi qu’à la touche <kbd>,</kbd> de

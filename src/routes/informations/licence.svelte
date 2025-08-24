@@ -1,14 +1,14 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
 <h2 id="licence">Licence</h2>
 
 <p>
-	La disposition de clavier <Nom />, ses pilotes ainsi que son site de présentation
-	<a href="https://ergopti.fr">https://ergopti.fr</a>
+	La disposition de clavier <Ergopti />, ses pilotes ainsi que son site de présentation
+	<a class="link" href="https://ergopti.fr">https://ergopti.fr</a>
 	sont distribués sous la <strong class="important">licence MIT</strong>. Le code source est
 	librement disponible sur
 	<a href="https://github.com/adrienm7/ergopti">https://github.com/adrienm7/ergopti</a>.
