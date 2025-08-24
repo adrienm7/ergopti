@@ -58,6 +58,19 @@
 	let corpus = 'fr/panache';
 	let ergol = 'en_fr';
 	let version_1dfh = '_1dk';
+
+	// 👇 import toutes les images disponibles
+	const images = import.meta.glob('$lib/benchmarks/**/*.{jpg,png}', {
+		eager: true,
+		import: 'default'
+	});
+
+	// fonction qui résout le bon chemin
+	function getImagePath(clavier, corpus, ergol, version_1dfh) {
+		// ajuste le chemin selon ta hiérarchie réelle
+		const key = `/src/lib/benchmarks/${clavier}/${corpus}.jpg`;
+		return images[key];
+	}
 </script>
 
 <svelte:head>
@@ -138,12 +151,12 @@
 		</div>
 	</div>
 	<mini-espace />
-	<!-- <image-block>
-		<enhanced:img
-			src="$lib/benchmarks/{clavier}/{corpus}.jpg"
+	<image-block>
+		<img
+			src={getImagePath(clavier, corpus)}
 			alt="Screenshot de benchmark sur le clavier {clavier} et le corpus {corpus}"
 		/>
-	</image-block> -->
+	</image-block>
 
 	<h3>Analyse Ergo-L</h3>
 	<p>
