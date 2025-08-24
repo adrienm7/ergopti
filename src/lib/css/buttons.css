@@ -99,3 +99,7 @@ kbd-sortie.morte {
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 	font-family: sans-serif;
 }
+
+kbd-sortie.morte {
+	--opacite-touche: 100% !important;
+}

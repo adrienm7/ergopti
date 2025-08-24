@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -20,7 +20,7 @@
 		>écrire très rapidement des nombres</span
 	>. C’est un réel gain en confort. La rangée des nombres n’est de toute façon pas très accessible.
 	Par conséquent, il vaut mieux placer les symboles qu’elle contenait sur la couche <kbd>AltGr</kbd>
-	qui est plus proche des doigts. C’est exactement ce que fait <Nom /> avec sa couche AltGr de symboles
+	qui est plus proche des doigts. C’est exactement ce que fait <Ergopti /> avec sa couche AltGr de symboles
 	qui amène les symboles directement sous les doigts.
 </p>
 <mini-espace></mini-espace>

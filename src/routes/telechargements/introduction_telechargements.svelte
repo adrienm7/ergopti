@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
@@ -11,7 +11,7 @@
 </script>
 
 <div class="main">
-	<h1 data-aos="zoom-in">Utiliser <Nom></Nom></h1>
+	<h1 data-aos="zoom-in">Utiliser <Ergopti></Ergopti></h1>
 	<hr class="margin-h1" />
 
 	<h2>Tester la disposition en ligne</h2>
@@ -48,14 +48,14 @@
 
 <style>
 	table {
-		width: 100%;
 		border-collapse: collapse;
+		width: 100%;
 	}
 
 	th,
 	td {
-		padding: 8px;
 		border: 1px solid #ddd;
+		padding: 8px;
 		text-align: left;
 	}
 

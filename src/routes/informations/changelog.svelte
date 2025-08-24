@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
@@ -8,10 +8,12 @@
 
 <h3>Version 2.2 (Septembre 2025)</h3>
 <p>
-	Le changement le plus visible d’<Nom></Nom> v2.2 est l’interversion de la touche <kbd>€</kbd> avec
-	la touche <kbd>%</kbd> sur la rangée des chiffres. Celle-ci a été réalisée car le <kbd>%</kbd> est
-	beaucoup plus fréquemment utilisé que le <kbd>€</kbd>, que ce soit dans la vie quotidienne ou en
-	programmation. Ainsi, il fallait que la touche la plus facile d’accès des deux (celle située le
+	Le changement le plus visible d’<Ergopti></Ergopti> v2.2 est l’interversion de la touche
+	<kbd>€</kbd>
+	avec la touche <kbd>%</kbd> sur la rangée des chiffres. Celle-ci a été réalisée car le
+	<kbd>%</kbd>
+	est beaucoup plus fréquemment utilisé que le <kbd>€</kbd>, que ce soit dans la vie quotidienne ou
+	en programmation. Ainsi, il fallait que la touche la plus facile d’accès des deux (celle située le
 	plus vers l’intérieur du clavier) soit aussi la plus utile. En outre, le touche <kbd>€</kbd> a été
 	modifiée pour mettre le
 	<kbd-sortie>€</kbd-sortie> en AltGr et placer le <kbd-sortie>$</kbd-sortie> en accès direct. Ici encore,
@@ -24,29 +26,29 @@
 </p>
 <mini-espace></mini-espace>
 <p>
-	Enfin, un gros changement concerne <NomPlus></NomPlus> où le code AutoHotKey a été complètement réécrit.
-	Celui-ci est désormais beaucoup plus simple et robuste. En outre, chaque feature peut désormais s’activer
-	ou se désactiver grâce à un menu de configuration apparaissant lors du clic sur l’icône du script dans
-	la barre des taches.
+	Enfin, un gros changement concerne <ErgoptiPlus></ErgoptiPlus> où le code AutoHotKey a été complètement
+	réécrit. Celui-ci est désormais beaucoup plus simple et robuste. En outre, chaque feature peut désormais
+	s’activer ou se désactiver grâce à un menu de configuration apparaissant lors du clic sur l’icône du
+	script dans la barre des taches.
 </p>
 <p>
 	Cette nouvelle version permet à tout le monde d’utiliser des raccourcis, la couche de symboles,
 	les chiffres en accès direct, etc. à la carte, quelle que soit sa disposition actuelle. Ainsi,
-	même une personne utilisant AZERTY et ne souhaitant pas apprendre <Nom></Nom> peut avoir à sa disposition
-	ces nombreuses features.
+	même une personne utilisant AZERTY et ne souhaitant pas apprendre <Ergopti></Ergopti> peut avoir à
+	sa disposition ces nombreuses features.
 </p>
 <p>
-	Sur cette nouvelle version d’<NomPlus></NomPlus>, certains raccourcis et touches ont été inversés.
-	En particulier, le layer de navigation ne pouvait auparavant pas se trouver sur la barre d’espace,
-	car cela rendait celle-ci inutilisable. Cette contrainte technique ayant été résolue, cela a
-	libéré de la place en "LAlt", ce qui a permis d’y mettre une touche OneShotShift/Shift.
+	Sur cette nouvelle version d’<ErgoptiPlus></ErgoptiPlus>, certains raccourcis et touches ont été
+	inversés. En particulier, le layer de navigation ne pouvait auparavant pas se trouver sur la barre
+	d’espace, car cela rendait celle-ci inutilisable. Cette contrainte technique ayant été résolue,
+	cela a libéré de la place en "LAlt", ce qui a permis d’y mettre une touche OneShotShift/Shift.
 </p>
 
 <h3>Version 2.1 (Janvier 2025)</h3>
 <p>
-	<Nom></Nom> v2.1 intervertit le <kbd>C</kbd> et le <kbd>G</kbd>. Les résultats sur les analyseurs
-	sont tous un peu moins bons avec ce changement, car le <SFB></SFB> <kbd>CT</kbd> est plus fréquent
-	que l'ancien qui était <kbd>SC</kbd> et intervient sur l’annulaire au lieu de l’index.
+	<Ergopti></Ergopti> v2.1 intervertit le <kbd>C</kbd> et le <kbd>G</kbd>. Les résultats sur les
+	analyseurs sont tous un peu moins bons avec ce changement, car le <SFB></SFB> <kbd>CT</kbd> est
+	plus fréquent que l'ancien qui était <kbd>SC</kbd> et intervient sur l’annulaire au lieu de l’index.
 </p>
 <p>
 	Cependant, cette modification était importante à réaliser, car le <kbd>C</kbd> est désormais plus
@@ -64,8 +66,8 @@
 
 <h3>Version 2.0 (Janvier 2025)</h3>
 <p>
-	<Nom></Nom> v2.0 est une évolution majeure de la disposition, d’où le changement de numérotation. La
-	modification est en réalité très simple :
+	<Ergopti></Ergopti> v2.0 est une évolution majeure de la disposition, d’où le changement de numérotation.
+	La modification est en réalité très simple :
 	<strong>interversion de la rangée inférieure de la main droite avec la rangée supérieure</strong>.
 </p>
 <p>Ce changement n’est pas anodin et apporte les bénéfices suivants :</p>
@@ -103,14 +105,14 @@
 </p>
 <br />
 <p>
-	En résumé, la version 2.0 d’<Nom></Nom> conserve ses excellents scores en alternance des mains, distance
-	parcourue, minimisation des <SFB></SFB>s, etc. Toutefois, elle
+	En résumé, la version 2.0 d’<Ergopti></Ergopti> conserve ses excellents scores en alternance des mains,
+	distance parcourue, minimisation des <SFB></SFB>s, etc. Toutefois, elle
 	<strong>est désormais beaucoup plus confortable pour l’écriture de l’anglais</strong>.
 </p>
 
 <h3>Version 1.1 (Octobre 2024)</h3>
 <p>
-	<Nom></Nom> v1.1 est la première version de la disposition à être dévoilée au public. Elle fige enfin
-	les quelques lettres qui changeaient au fil des versions de test v1.0.x pour une disposition stable
-	suite à tous ces essais.
+	<Ergopti></Ergopti> v1.1 est la première version de la disposition à être dévoilée au public. Elle
+	fige enfin les quelques lettres qui changeaient au fil des versions de test v1.0.x pour une disposition
+	stable suite à tous ces essais.
 </p>

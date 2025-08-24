@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
@@ -14,7 +14,8 @@
 	Qu’est-ce qu’un <SFB /> ? C’est le fait de
 	<span class="important">devoir taper deux touches d’affilée avec exactement le même doigt</span>.
 	Par exemple, c’est taper <kbd>DE</kbd> en AZERTY : il faut d’abord utiliser le majeur gauche pour
-	taper <kbd>D</kbd>, puis le remonter d’une rangée pour atteindre le <kbd>E</kbd>. Avec <Nom />, le
+	taper <kbd>D</kbd>, puis le remonter d’une rangée pour atteindre le <kbd>E</kbd>. Avec <Ergopti
+	/>, le
 	<kbd>D</kbd>
 	est sur l’annulaire droit sur la rangée du bas et le <kbd>E</kbd> est directement sur la rangée du
 	milieu, sur le majeur gauche. Ici, c’est une alternance des mains qui permet d’éviter un <SFB
@@ -43,5 +44,5 @@
 	ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
 	regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la
 	suppression totale des <SFB />s est impossible. Toutefois, il est quand même possible de les
-	réduire drastiquement. C’est ce que fait <Nom />.
+	réduire drastiquement. C’est ce que fait <Ergopti />.
 </p>

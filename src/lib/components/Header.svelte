@@ -1,6 +1,6 @@
 <script>
-	import Nom from '../components/Nom.svelte';
-	import NomPlus from '../components/NomPlus.svelte';
+	import Ergopti from '../components/Ergopti.svelte';
+	import ErgoptiPlus from '../components/ErgoptiPlus.svelte';
 
 	import { page } from '$app/stores';
 
@@ -64,10 +64,12 @@
 	<div class="header-logo">
 		<a href="/"><img src="img/logo/logo.svg" class="logo" /></a>
 		<div style="margin:0; margin-left: 0.5em; padding:0; text-align: left; width:max-content">
-			<p style="margin:0; font-weight:bold">
-				<a href="/">Disposition <span class="morespace">clavier </span></a>
+			<strong style="margin:0;">
+				<a class="no-gradient text-white" href="/"
+					>Disposition <span class="morespace">clavier </span></a
+				>
 				<span style="display:inline-block;"
-					><a href="/"><Nom></Nom></a>
+					><a href="/"><Ergopti></Ergopti></a>
 					<span class="myselect">
 						<select
 							id="selection-version"
@@ -84,7 +86,7 @@
 					style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
 					><i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i></a
 				>
-			</p>
+			</strong>
 			<p style="margin:0; padding-top: 0; padding-left: 0; font-size: 0.8em">
 				<strong class="hyper" style="font-size:1.1em">Ergonomie optimisée</strong>
 				<span class="morespace2" style="color:white;"> pour le français, l’anglais et le code</span>

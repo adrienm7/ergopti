@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
@@ -59,8 +59,9 @@
 		download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
 	>
 	<p>
-		➜ Il n’y a de loin pas toutes les fonctionnalités de <NomPlus></NomPlus> dans ce fichier ISO+, car
-		c’est impossible de les ajouter. Pour pouvoir les prendre en compte, comme l’utilisation de la touche
+		➜ Il n’y a de loin pas toutes les fonctionnalités de <ErgoptiPlus></ErgoptiPlus> dans ce fichier
+		ISO+, car c’est impossible de les ajouter. Pour pouvoir les prendre en compte, comme l’utilisation
+		de la touche
 		<kbd>★</kbd>, il faudrait nécessairement modifier le corpus utilisé en entrée. Cependant, dans
 		le même temps, cela va fausser toutes les comparaisons avec les autres dispositions. Par
 		conséquent, la version ISO+ contient uniquement le déplacement des touches <kbd>Entrée</kbd>

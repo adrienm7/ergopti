@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -65,8 +65,8 @@
 	<kbd>GL</kbd> du BÉPO.
 </p>
 <p>
-	La disposition <Nom /> a été construite avec pour contrainte principale de permettre de réaliser les
-	bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des roulements, de préférence
+	La disposition <Ergopti /> a été construite avec pour contrainte principale de permettre de réaliser
+	les bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des roulements, de préférence
 	sur des doigts consécutifs dans un mouvement horizontal.
 </p>
 

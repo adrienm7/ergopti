@@ -12,11 +12,6 @@ ul,
 	}
 }
 
-a {
-	color: var(--couleur-bleue);
-	text-decoration: none;
-}
-
 .ergopti-title {
 	z-index: 2;
 	margin: 7vh 0;
@@ -55,10 +50,13 @@ strong,
 	font-weight: bold;
 }
 
+a,
+i,
+i .path2::before,
+.hyper,
 .important {
 	-webkit-background-clip: text;
 	background-clip: text;
-	font-weight: bold;
 	-webkit-text-fill-color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
@@ -66,18 +64,52 @@ strong,
 	color: transparent;
 }
 
-.text-center {
-	text-align: center;
+/* a.link::after {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	background-image: linear-gradient(to right, var(--gradient-blue));
+	width: 100%;
+	height: 2px;
+	content: '';
+} */
+
+/* Icons */
+i {
+	display: inline-flex;
 }
 
-.text-white {
-	color: white;
+i .path1::before {
+	color: #3088ed !important;
+}
+
+.no-gradient,
+nav a,
+a button,
+a:has(button) {
+	background: none;
+	-webkit-background-clip: border-box;
+	background-clip: border-box;
+	-webkit-text-fill-color: initial;
+	color: inherit;
+	text-decoration: none;
+}
+
+.important {
+	font-weight: bold;
+}
+
+.text-center {
+	text-align: center;
 }
 
 .text-gray {
 	color: hsla(190, 100%, 80%, 0.8);
 }
 
+.text-white {
+	color: white;
+}
 .text-black {
 	color: black;
 }
@@ -87,10 +119,6 @@ strong,
 	background-color: white;
 	padding: 0 0.3em;
 	color: black;
-}
-
-.italic {
-	font-style: italic;
 }
 
 .font-size-big {
@@ -107,32 +135,7 @@ strong,
 	}
 }
 
-/* Lettrines */
-
-.lettrine::first-letter {
-	float: left;
-	margin-top: 6px;
-	margin-right: 10px;
-	border-radius: 2px;
-	background-color: white;
-	padding: 13px;
-	color: black;
-	font-size: 3em;
-}
-
 /* Correction d’un bug d’affichage entre SFB et s dans l’introduction de la page d’accueil */
 .nowrap .texte-sfb {
 	display: inline-block !important;
-}
-
-.hyper {
-	margin: -0.5em;
-	-webkit-background-clip: text;
-	background-clip: text;
-	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
-	-webkit-text-fill-color: transparent;
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
-	background-image: linear-gradient(to right, var(--gradient-blue));
-	color: transparent;
 }

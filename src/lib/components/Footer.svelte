@@ -1,12 +1,12 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
 	import { page } from '$app/stores';
 	const date = new Date().getFullYear();
 </script>
 
 <footer>
 	<p>
-		Disposition <Nom></Nom> —
+		Disposition <Ergopti></Ergopti> —
 		<a href="https://github.com/adrienm7/ergopti" style="color:white"
 			>GitHub <i class="icon-github"></i></a
 		>
@@ -24,14 +24,14 @@
 
 	footer {
 		display: flex;
-		align-items: center;
 		justify-content: center;
-		height: var(--hauteur-footer);
+		align-items: center;
 		margin: 0;
-		padding: 2px;
-		background-color: rgba(0, 0, 0, 0.8);
-		color: white;
 		box-shadow: 0 0 3px 2px var(--couleur-ombre);
+		background-color: rgba(0, 0, 0, 0.8);
+		padding: 2px;
+		height: var(--hauteur-footer);
+		color: white;
 	}
 
 	footer p {

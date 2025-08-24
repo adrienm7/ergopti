@@ -1,6 +1,6 @@
 <script>
-	import Nom from '$lib/components/Nom.svelte';
-	import NomPlus from '$lib/components/NomPlus.svelte';
+	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
@@ -10,7 +10,7 @@
 <div>
 	<h1 data-aos="zoom-in" class="ergopti-title">
 		Disposition clavier<br /><span>—&nbsp;</span><span style="line-height: 0.75!important;"
-			><Nom></Nom><span>&nbsp;—</span>
+			><Ergopti></Ergopti><span>&nbsp;—</span>
 		</span>
 	</h1>
 	<BlocClavier nom="presentation" />
@@ -25,7 +25,7 @@
 	<petit-espace />
 	<hr />
 	<p class="encart-introduction">
-		<strong><Nom></Nom></strong> est une
+		<strong><Ergopti></Ergopti></strong> est une
 		<strong class="hyper">disposition clavier ergonomique et optimisée</strong>
 		pour le
 		<strong>français</strong>, l’<strong>anglais</strong> et la <strong>programmation</strong>.
@@ -86,12 +86,12 @@
 <style>
 	.scrollez {
 		display: block;
-		text-align: center;
-		font-size: 4rem;
-		font-size: clamp(20px, 4rem, 100px);
-		color: white;
 		-webkit-animation: bounce7 2.5s infinite;
 		animation: bounce7 2.5s infinite;
+		color: white;
+		font-size: 4rem;
+		font-size: clamp(20px, 4rem, 100px);
+		text-align: center;
 	}
 
 	@keyframes bounce7 {
