@@ -24,6 +24,10 @@ enhanced\:img,
 }
 
 /* Icônes */
+i {
+	display: inline;
+}
+
 i,
 i .path1::before {
 	color: #3088ed !important;

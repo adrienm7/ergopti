@@ -85,24 +85,25 @@
 
 <style>
 	.scrollez {
+		display: block;
 		text-align: center;
 		font-size: 4rem;
 		font-size: clamp(20px, 4rem, 100px);
 		color: white;
-		-webkit-animation: bounce7 2s infinite;
-		animation: bounce7 2s infinite;
+		-webkit-animation: bounce7 2.5s infinite;
+		animation: bounce7 2.5s infinite;
 	}
 
 	@keyframes bounce7 {
 		0% {
-			-webkit-transform: translate(0, -200px);
+			-webkit-transform: translate(0, -20px);
 			opacity: 0;
 		}
 		50% {
 			opacity: 1;
 		}
 		100% {
-			-webkit-transform: translate(0, 20px);
+			-webkit-transform: translate(0, 40px);
 			opacity: 0;
 		}
 	}
