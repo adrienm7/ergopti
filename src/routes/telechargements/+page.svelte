@@ -45,7 +45,7 @@
 	<p>
 		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
 		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition. Vous aurez
-		alors automatiquement la meilleure version de la disposition : <NomPlus />
+		alors automatiquement la meilleure version de la disposition : <NomPlus />
 	</p>
 	<petit-espace />
 	<h3>Comment installer la disposition sur Windows</h3>

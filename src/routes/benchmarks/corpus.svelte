@@ -38,7 +38,7 @@
 	Il serait aussi possible de faire cela pour les majuscules. Cela nous paraît évident que la
 	majuscule d’une lettre soit en <kbd>Shift</kbd> + <kbd>Lettre</kbd>. Pourtant, il serait tout à
 	fait possible que cela ne soit pas le cas, notamment pour optimiser les <SFB></SFB>s. Toutefois,
-	cela impliquerait dans ce cas d’apprendre deux fois plus de choses : où sont les lettres, et où
+	cela impliquerait dans ce cas d’apprendre deux fois plus de choses : où sont les lettres, et où
 	sont les majuscules. Tout cela pour peu de gains si ce n’est d’avoir un score légèrement supérieur
 	sur les comparateurs de dispositions.
 </p>

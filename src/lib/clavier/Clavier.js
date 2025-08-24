@@ -128,7 +128,7 @@ export class Clavier {
 							if (this.infos_clavier.couche === 'Visuel') {
 								if (contenuTouche['type'] === 'ponctuation') {
 									if (res['touche'] === '"') {
-										// Cas particulier de la touche « " »
+										// Cas particulier de la touche « " »
 										toucheClavier.innerHTML =
 											'<div>' +
 											contenuTouche['Shift'] +

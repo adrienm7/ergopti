@@ -1,9 +1,9 @@
 /* Le code ci-dessous permet (notamment) de toujours placer le footer en bas de la page */
 
-/* « Je vous conseille fortement d’utiliser un conteneur global, comme ici avec #page, pour réaliser ce genre de mise en page.
+/* « Je vous conseille fortement d’utiliser un conteneur global, comme ici avec #page, pour réaliser ce genre de mise en page.
  * En effet, définir un contexte flex directement sur <body> comme on peut le voir sur d’autres d’articles peut causer des problèmes avec les plugins
  * qui créent des éléments en bas de page avant </body> (popup, autocomplete, etc.).
- * Ces éléments risquent de ne pas s’afficher correctement, à cause du contexte flex hérité. Just saying. »
+ * Ces éléments risquent de ne pas s’afficher correctement, à cause du contexte flex hérité. Just saying. »
  */
 
 #page {

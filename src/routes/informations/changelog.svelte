@@ -70,8 +70,8 @@
 </p>
 <p>Ce changement n’est pas anodin et apporte les bénéfices suivants :</p>
 <ul>
-	<li>bigrammes <kbd>TH</kbd> et <kbd>SH</kbd> beaucoup plus confortables sur clavier ISO ;</li>
-	<li>bigramme <kbd>ND</kbd> beaucoup plus confortable ;</li>
+	<li>bigrammes <kbd>TH</kbd> et <kbd>SH</kbd> beaucoup plus confortables sur clavier ISO ;</li>
+	<li>bigramme <kbd>ND</kbd> beaucoup plus confortable ;</li>
 	<li>
 		positionnement du <kbd>M</kbd> plus près du <kbd>P</kbd>, car désormais sur la même rangée et
 		non plus à 2 rangées d’écart.
@@ -93,7 +93,7 @@
 	le majeur et l’annulaire étant des doigts longs, ils ont plus de facilité à atteindre la rangée
 	supérieure que celle inférieure. Au contraire, l’index étant un peu plus court, c’est la rangée
 	inférieure qui est plus accessible pour ce doigt. C’est d’ailleurs aussi pour cela que la touche
-	<kbd>★</kbd> a été placée sur l’index gauche en rangée du bas et non du haut : car cette position est
+	<kbd>★</kbd> a été placée sur l’index gauche en rangée du bas et non du haut : car cette position est
 	la plus confortable.
 </p>
 <p>

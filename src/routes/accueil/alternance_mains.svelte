@@ -9,7 +9,7 @@
 	L’alternance des mains est très importante pour garantir une bonne <span class="important"
 		>fluidité de frappe</span
 	>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus possible d’alternance des
-	mains lors de la frappe du texte : main droite, puis main gauche, main droite, main gauche, etc.
+	mains lors de la frappe du texte : main droite, puis main gauche, main droite, main gauche, etc.
 </p>
 <p>
 	Cette alternance des mains permet de <span class="important"

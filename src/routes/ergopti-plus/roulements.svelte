@@ -28,7 +28,7 @@
 		<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <NomPlus
 		/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
 		macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
-		XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était qu’un
+		XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était qu’un
 		exemple illustratif.
 	</p>
 </div>
@@ -39,20 +39,20 @@
 
 <h3>Roulements avec des lettres</h3>
 <ul class="margin-top-2">
-	<li><kbd>hc</kbd> ➜ <kbd-sortie>wh</kbd-sortie> ;</li>
+	<li><kbd>hc</kbd> ➜ <kbd-sortie>wh</kbd-sortie> ;</li>
 	<p>
 		Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Nom />, car
 		cette combinaison est très fréquente et se produit en roulement, ce qui la rend extrêmement
 		confortable. L’ajout du roulement donnant <kbd-sortie>WH</kbd-sortie> permet d’avoir une frappe en
 		anglais encore plus fluide.
 	</p>
-	<li><kbd>p'</kbd> ➜ <kbd-sortie>ct</kbd-sortie> ;</li>
+	<li><kbd>p'</kbd> ➜ <kbd-sortie>ct</kbd-sortie> ;</li>
 	<p>
 		Ce roulement donnant <kbd-sortie>ct</kbd-sortie> permet d’éviter le pire <SFB></SFB> de la disposition
 		pour le transformer en roulement très confortable.
 	</p>
 	<li>
-		<kbd>sx</kbd> ➜ <kbd-sortie>sk</kbd-sortie> et <kbd>cx</kbd> ➜ <kbd-sortie>ck</kbd-sortie> ;
+		<kbd>sx</kbd> ➜ <kbd-sortie>sk</kbd-sortie> et <kbd>cx</kbd> ➜ <kbd-sortie>ck</kbd-sortie> ;
 	</li>
 	<p>
 		La lettre <kbd>K</kbd> est rarement utilisée. Lorsqu’elle l’est, c’est souvent pour réaliser les
@@ -75,11 +75,11 @@
 
 <ul class="margin-top-2">
 	<li>
-		<kbd>#!</kbd> ➜ <kbd-sortie>:=</kbd-sortie> et <kbd>!#</kbd> ➜ <kbd-sortie>!=</kbd-sortie> ;
+		<kbd>#!</kbd> ➜ <kbd-sortie>:=</kbd-sortie> et <kbd>!#</kbd> ➜ <kbd-sortie>!=</kbd-sortie> ;
 	</li>
 	<li>
 		<kbd>{'(#'}</kbd> ➜ <kbd-sortie>{'("'}</kbd-sortie> et <kbd>{'[#'}</kbd> ➜
-		<kbd-sortie>{'["'}</kbd-sortie> ;
+		<kbd-sortie>{'["'}</kbd-sortie> ;
 	</li>
 	<p>
 		Une fois qu’on a l’habitude de ce roulement, on ne peut plus s’en passer. Le <kbd>#</kbd>
@@ -87,7 +87,7 @@
 		ultra-confortables.
 	</p>
 	<li>
-		<kbd>{'[)'}</kbd> ➜ <kbd-sortie>{'=""'}</kbd-sortie> ;
+		<kbd>{'[)'}</kbd> ➜ <kbd-sortie>{'=""'}</kbd-sortie> ;
 	</li>
 	<p>
 		Cette suite de symboles est extrêmement utilisée en programmation, où elle permet généralement
@@ -95,7 +95,7 @@
 		plus, est un véritable luxe.
 	</p>
 	<li>
-		<kbd>\"</kbd> ➜ <kbd-sortie>/*</kbd-sortie> et <kbd>"\</kbd> ➜ <kbd-sortie>*/</kbd-sortie> ;
+		<kbd>\"</kbd> ➜ <kbd-sortie>/*</kbd-sortie> et <kbd>"\</kbd> ➜ <kbd-sortie>*/</kbd-sortie> ;
 	</li>
 	<p>
 		Ce roulement permet de réaliser un commentaire en programmation, et ce extrêmement
@@ -103,10 +103,10 @@
 	</p>
 	<li>
 		<kbd>$=</kbd> ➜ <kbd-sortie>{'=>'}</kbd-sortie> et <kbd>=$</kbd> ➜
-		<kbd-sortie>{'<='}</kbd-sortie> ;
+		<kbd-sortie>{'<='}</kbd-sortie> ;
 	</li>
 	<li>
 		<kbd>+?</kbd> ➜ <kbd-sortie>{'->'}</kbd-sortie> et <kbd>?+</kbd> ➜
-		<kbd-sortie>{'<-'}</kbd-sortie> ;
+		<kbd-sortie>{'<-'}</kbd-sortie> ;
 	</li>
 </ul>

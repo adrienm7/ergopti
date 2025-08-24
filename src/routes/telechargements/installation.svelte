@@ -122,9 +122,9 @@
 <ol>
 	<li>
 		Presser simultanément la touche Windows et la touche R. Ce raccourci <kbd>Win</kbd> +
-		<kbd>R</kbd> permet d'ouvrir la fenêtre « Exécuter » de Windows ;
+		<kbd>R</kbd> permet d'ouvrir la fenêtre « Exécuter » de Windows ;
 	</li>
-	<li>Saisir <kbd>shell:startup</kbd> et valider en cliquant sur le bouton « OK » ;</li>
+	<li>Saisir <kbd>shell:startup</kbd> et valider en cliquant sur le bouton « OK » ;</li>
 	<li>
 		Le dossier qui vient de s'ouvrir correspond au dossier de démarrage. Tout élément dedans est
 		exécuté au démarrage de Windows. Créer un raccourci dans ce dossier pointant vers l'emplacement
@@ -138,8 +138,8 @@
 <p>Certains problèmes ont été rapportés avec le pilote d’Ergopti dans quelques logiciels :</p>
 <ul>
 	<li>
-		Microsoft Excel : Taper un <kbd>+</kbd> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause des problèmes
-		d’édition de la cellule : tout ce qui est tapé avant disparaît et le <kbd-sortie>+</kbd-sortie>
+		Microsoft Excel : Taper un <kbd>+</kbd> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause des problèmes
+		d’édition de la cellule : tout ce qui est tapé avant disparaît et le <kbd-sortie>+</kbd-sortie>
 		apparaît. Une solution est de faire <kbd>Shift</kbd> + <kbd>=</kbd> (touche tout en haut à
 		gauche, sur la rangée des chiffres), car le <kbd>+</kbd> est aussi à cet emplacement.
 	</li>
@@ -218,7 +218,7 @@
 	leurs limites.
 </p>
 <p>
-	Les instructions d’installation se trouvent ici : <a
+	Les instructions d’installation se trouvent ici : <a
 		href="https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts"
 		>https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts</a
 	>

@@ -18,7 +18,6 @@
 	import { page } from '$app/stores';
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
-	import { typography } from '$lib/js/typography.js';
 	import { makeIds } from '$lib/js/make-ids.js';
 	import tocbot from 'tocbot';
 

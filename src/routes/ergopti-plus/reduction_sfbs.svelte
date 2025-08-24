@@ -9,7 +9,7 @@
 <h2>Diminution des SFBs</h2>
 <p>L’un des avantages majeurs de <NomPlus /> est qu’il réduit presque totalement les <SFB />s.</p>
 <p>
-	Les <SFB />s les plus fréquents de la disposition sont : <kbd>CT</kbd>,
+	Les <SFB />s les plus fréquents de la disposition sont : <kbd>CT</kbd>,
 	<kbd>pt</kbd>, <kbd>eo</kbd>, <kbd>oe</kbd>,
 	<kbd>ub</kbd>, <kbd>bu</kbd> et <kbd>ds</kbd>. <kbd>ct</kbd> est de loin le plus fréquent.
 	<kbd>eo</kbd> et <kbd>oe</kbd> sont aussi relativement fréquents en anglais (pour écrire
@@ -42,20 +42,20 @@
 </p>
 <ul class="margin-top-2">
 	<li>
-		<kbd>êe</kbd> ➜ <kbd-sortie>oe</kbd-sortie> ;
+		<kbd>êe</kbd> ➜ <kbd-sortie>oe</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>eê</kbd> ➜ <kbd-sortie>eo</kbd-sortie> ;
+		<kbd>eê</kbd> ➜ <kbd-sortie>eo</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>ê,</kbd> ➜ <kbd-sortie>u,</kbd-sortie> ;
+		<kbd>ê,</kbd> ➜ <kbd-sortie>u,</kbd-sortie> ;
 	</li>
 	<li>
-		<kbd>ê.</kbd> ➜ <kbd-sortie>u.</kbd-sortie> ;
+		<kbd>ê.</kbd> ➜ <kbd-sortie>u.</kbd-sortie> ;
 	</li>
 	<mini-espace></mini-espace>
 	<li>
-		<kbd>èy</kbd> ➜ <kbd-sortie>ié</kbd-sortie> ;
+		<kbd>èy</kbd> ➜ <kbd-sortie>ié</kbd-sortie> ;
 	</li>
 	<li>
 		<kbd>yè</kbd> ➜ <kbd-sortie>éi</kbd-sortie>.
@@ -69,10 +69,10 @@
 
 <h3>Utilisation de roulements</h3>
 <ul class="margin-top-2">
-	<li><kbd>êé</kbd> ➜ <kbd-sortie>aî</kbd-sortie> ;</li>
-	<li><kbd>éê</kbd> ➜ <kbd-sortie>â</kbd-sortie> ;</li>
-	<li><kbd>p'</kbd> ➜ <kbd-sortie>ct</kbd-sortie> ;</li>
-	<li><kbd>à★</kbd> ➜ <kbd-sortie>bu</kbd-sortie> ;</li>
+	<li><kbd>êé</kbd> ➜ <kbd-sortie>aî</kbd-sortie> ;</li>
+	<li><kbd>éê</kbd> ➜ <kbd-sortie>â</kbd-sortie> ;</li>
+	<li><kbd>p'</kbd> ➜ <kbd-sortie>ct</kbd-sortie> ;</li>
+	<li><kbd>à★</kbd> ➜ <kbd-sortie>bu</kbd-sortie> ;</li>
 	<li><kbd>àu</kbd> ➜ <kbd-sortie>ub</kbd-sortie>.</li>
 </ul>
 
@@ -102,8 +102,8 @@
 	<span class="important">va répéter la dernière touche tapée</span>. Ainsi, <kbd>l★</kbd>
 	va envoyer <kbd-sortie>ll</kbd-sortie>, tandis que <kbd>r★</kbd> va envoyer
 	<kbd-sortie>rr</kbd-sortie>. Cela engendrera cependant un petit <SFB></SFB> pour les lettres doublées
-	suivies d’un <kbd>U</kbd>, tel que « connu » ou « battu ». La combinaison <kbd>★ê</kbd> permet
-	d’éviter ce problème. Ainsi, « connu » pourra s’écrire <kbd>con★ê</kbd> et « battu » pourra
+	suivies d’un <kbd>U</kbd>, tel que « connu » ou « battu ». La combinaison <kbd>★ê</kbd> permet
+	d’éviter ce problème. Ainsi, « connu » pourra s’écrire <kbd>con★ê</kbd> et « battu » pourra
 	s’écrire <kbd>bat★ê</kbd>.
 </p>
 <p>

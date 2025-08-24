@@ -23,15 +23,15 @@
 
 <h3>Permissions</h3>
 <ul>
-	<li>Utilisation commerciale ;</li>
-	<li>Modification ;</li>
-	<li>Distribution ;</li>
+	<li>Utilisation commerciale ;</li>
+	<li>Modification ;</li>
+	<li>Distribution ;</li>
 	<li>Usage privé.</li>
 </ul>
 
 <h3>Limitations</h3>
 <ul>
-	<li>Absence de garantie ;</li>
+	<li>Absence de garantie ;</li>
 	<li>Aucune responsabilité.</li>
 </ul>
 

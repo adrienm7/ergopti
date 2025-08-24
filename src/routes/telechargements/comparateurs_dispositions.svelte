@@ -47,14 +47,14 @@
 </p>
 <mini-espace />
 <div>
-	<span>Version ISO : </span><a
+	<span>Version ISO : </span><a
 		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso}.fr.iso.json"
 		download><button>ergopti.v{version_mineure_kla_iso}.fr.iso.json</button></a
 	>
 </div>
 <mini-espace />
 <div>
-	<span>Version ISO+ : </span><a
+	<span>Version ISO+ : </span><a
 		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json"
 		download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
 	>
@@ -70,7 +70,7 @@
 </div>
 <mini-espace />
 <div>
-	<span>Version Ergodox : </span><a
+	<span>Version Ergodox : </span><a
 		href="/dispositions/ergodox/ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json"
 		download><button>ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
 	>
@@ -85,7 +85,7 @@
 		</select>
 	</div>
 	<mini-espace />
-	<span>Version pour l’analyseur Ergo-L : </span><a
+	<span>Version pour l’analyseur Ergo-L : </span><a
 		href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
 		download
 		><button

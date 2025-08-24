@@ -110,7 +110,7 @@
 	<li>
 		<kbd>CT</kbd> engendre beaucoup de <SFB />s, mais un <SFB /> avec le <kbd>C</kbd> est de toute
 		manière inévitable avec l’une des 4 touches de la homerow droite. Cette combinaison est l’une
-		des moins pires : en fréquence d’apparition,
+		des moins pires : en fréquence d’apparition,
 		<kbd-sortie>NC</kbd-sortie>
 		> <kbd-sortie>CR</kbd-sortie> >
 		<kbd-sortie>CT</kbd-sortie> > <kbd-sortie>SC</kbd-sortie>.
@@ -121,8 +121,8 @@
 		>imisée, l’écriture même de ce mot ne l’est pas…
 	</li>
 	<li>
-		<kbd>EO</kbd> et <kbd>OE</kbd> : bien qu’inexistants en français, ces bigrammes sont relativement
-		fréquents en anglais (people, does, etc.)
+		<kbd>EO</kbd> et <kbd>OE</kbd> : bien qu’inexistants en français, ces bigrammes sont
+		relativement fréquents en anglais (people, does, etc.)
 	</li>
 </ul>
 <p class="encadre">
@@ -170,7 +170,7 @@
 	une utilisation très rare.
 </p>
 <p>
-	En outre, <Nom></Nom> a été optimisée pour le français et l’anglais ; elle n’a pas été pensée pour
+	En outre, <Nom></Nom> a été optimisée pour le français et l’anglais ; elle n’a pas été pensée pour
 	être utilisée dans d’autres langues. Par conséquent, <Nom></Nom> n’est probablement pas la disposition
 	la plus adaptée si vous écrivez dans une langue différente du français et de l’anglais.
 </p>

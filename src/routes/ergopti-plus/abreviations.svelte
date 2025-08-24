@@ -19,21 +19,21 @@
 <mini-espace />
 <p class="text-bold">Liste de quelques-unes des abréviations (liste modifiable par vos soins) :</p>
 <ul>
-	<li><kbd>a★</kbd> ➜ <kbd-sortie>ainsi</kbd-sortie> ;</li>
-	<li><kbd>avv★</kbd> ➜ <kbd-sortie>avez-vous</kbd-sortie> ;</li>
-	<li><kbd>c★</kbd> ➜ <kbd-sortie>c’est</kbd-sortie> ;</li>
-	<li><kbd>ct★</kbd> ➜ <kbd-sortie>c’était</kbd-sortie> ;</li>
-	<li><kbd>dé★</kbd> ➜ <kbd-sortie>déjà</kbd-sortie> ;</li>
-	<li><kbd>ê★</kbd> ➜ <kbd-sortie>être</kbd-sortie> ;</li>
-	<li><kbd>eef★</kbd> ➜ <kbd-sortie>en effet</kbd-sortie> ;</li>
-	<li><kbd>f★</kbd> ➜ <kbd-sortie>faire</kbd-sortie> ;</li>
-	<li><kbd>g★</kbd> ➜ <kbd-sortie>j’ai</kbd-sortie> ;</li>
-	<li><kbd>gt★</kbd> ➜ <kbd-sortie>j’étais</kbd-sortie> ;</li>
-	<li><kbd>m★</kbd> ➜ <kbd-sortie>mais</kbd-sortie> ;</li>
-	<li><kbd>pcq★</kbd> ➜ <kbd-sortie>parce que</kbd-sortie> ;</li>
-	<li><kbd>pê★</kbd> ➜ <kbd-sortie>peut-être</kbd-sortie> ;</li>
-	<li><kbd>pex★</kbd> ➜ <kbd-sortie>par exemple</kbd-sortie> ;</li>
-	<li><kbd>r★</kbd> ➜ <kbd-sortie>rien</kbd-sortie> ;</li>
+	<li><kbd>a★</kbd> ➜ <kbd-sortie>ainsi</kbd-sortie> ;</li>
+	<li><kbd>avv★</kbd> ➜ <kbd-sortie>avez-vous</kbd-sortie> ;</li>
+	<li><kbd>c★</kbd> ➜ <kbd-sortie>c’est</kbd-sortie> ;</li>
+	<li><kbd>ct★</kbd> ➜ <kbd-sortie>c’était</kbd-sortie> ;</li>
+	<li><kbd>dé★</kbd> ➜ <kbd-sortie>déjà</kbd-sortie> ;</li>
+	<li><kbd>ê★</kbd> ➜ <kbd-sortie>être</kbd-sortie> ;</li>
+	<li><kbd>eef★</kbd> ➜ <kbd-sortie>en effet</kbd-sortie> ;</li>
+	<li><kbd>f★</kbd> ➜ <kbd-sortie>faire</kbd-sortie> ;</li>
+	<li><kbd>g★</kbd> ➜ <kbd-sortie>j’ai</kbd-sortie> ;</li>
+	<li><kbd>gt★</kbd> ➜ <kbd-sortie>j’étais</kbd-sortie> ;</li>
+	<li><kbd>m★</kbd> ➜ <kbd-sortie>mais</kbd-sortie> ;</li>
+	<li><kbd>pcq★</kbd> ➜ <kbd-sortie>parce que</kbd-sortie> ;</li>
+	<li><kbd>pê★</kbd> ➜ <kbd-sortie>peut-être</kbd-sortie> ;</li>
+	<li><kbd>pex★</kbd> ➜ <kbd-sortie>par exemple</kbd-sortie> ;</li>
+	<li><kbd>r★</kbd> ➜ <kbd-sortie>rien</kbd-sortie> ;</li>
 	<li>etc.</li>
 </ul>
 <p>

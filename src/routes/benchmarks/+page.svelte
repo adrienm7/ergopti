@@ -92,7 +92,7 @@
 		entraver la fluidité lors de l’écriture de texte ainsi que le confort général.
 	</p>
 	<p>
-		Enfin, gardez en tête que les dispositions dont le nom est suffixé par « en » plutôt que « fr »
+		Enfin, gardez en tête que les dispositions dont le nom est suffixé par « en » plutôt que « fr »
 		ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles vont donc
 		forcément surperformer sur les corpus français. Et même sur les corpus anglais, elles feront un
 		peu mieux car il y aura moins de touches à disposer et donc davantage de bons emplacements.
@@ -147,7 +147,7 @@
 
 	<h3>Analyse Ergo-L</h3>
 	<p>
-		Réalisée à l’aide de l’analyseur disponible ici : <a
+		Réalisée à l’aide de l’analyseur disponible ici : <a
 			href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
 		>.
 	</p>
