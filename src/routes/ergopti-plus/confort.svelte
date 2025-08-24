@@ -25,7 +25,7 @@
 <ul>
 	<li>
 		<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
-		<kbd-sortie>BackSpace</kbd-sortie> ;
+		<kbd-sortie>BackSpace</kbd-sortie> ;
 	</li>
 	<li>
 		<kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
@@ -79,7 +79,7 @@
 <p>
 	Les plus attentifs d’entre vous remarqueront que l’écriture de <kbd-sortie>Â</kbd-sortie> et de
 	<kbd-sortie>AÎ</kbd-sortie>
-	(par exemple pour écrire « paraît ») engendre des <SFB></SFB>s avec cette nouvelle méthode. C’est
+	(par exemple pour écrire « paraît ») engendre des <SFB></SFB>s avec cette nouvelle méthode. C’est
 	pour cela qu’il est aussi possible de réaliser <kbd>éê</kbd> pour obtenir
 	<kbd-sortie>â</kbd-sortie>
 	et <kbd>êé</kbd> pour <kbd-sortie>aî</kbd-sortie>. Ces options offrent en outre des roulements
@@ -150,16 +150,16 @@
 
 <p class="text-bold">En résumé :</p>
 <ul class="margin-top-2">
-	<li><kbd>,a</kbd> ➜ <kbd-sortie>ja</kbd-sortie> ;</li>
-	<li><kbd>,i</kbd> ➜ <kbd-sortie>ji</kbd-sortie> ;</li>
-	<li><kbd>,e</kbd> ➜ <kbd-sortie>je</kbd-sortie> ;</li>
-	<li><kbd>,é</kbd> ➜ <kbd-sortie>jé</kbd-sortie> ;</li>
-	<li><kbd>,o</kbd> ➜ <kbd-sortie>jo</kbd-sortie> ;</li>
-	<li><kbd>,u</kbd> ➜ <kbd-sortie>ju</kbd-sortie> ;</li>
-	<li><kbd>,ê</kbd> ➜ <kbd-sortie>ju</kbd-sortie> pour éviter un <SFB /> ;</li>
-	<li><kbd>,'</kbd> ➜ <kbd-sortie>j’</kbd-sortie> ;</li>
-	<li><kbd>,à</kbd> ➜ <kbd-sortie>j</kbd-sortie> ;</li>
-	<li><kbd>Shift</kbd> + <kbd>J/★</kbd> ➜ <kbd-sortie>J</kbd-sortie> ;</li>
+	<li><kbd>,a</kbd> ➜ <kbd-sortie>ja</kbd-sortie> ;</li>
+	<li><kbd>,i</kbd> ➜ <kbd-sortie>ji</kbd-sortie> ;</li>
+	<li><kbd>,e</kbd> ➜ <kbd-sortie>je</kbd-sortie> ;</li>
+	<li><kbd>,é</kbd> ➜ <kbd-sortie>jé</kbd-sortie> ;</li>
+	<li><kbd>,o</kbd> ➜ <kbd-sortie>jo</kbd-sortie> ;</li>
+	<li><kbd>,u</kbd> ➜ <kbd-sortie>ju</kbd-sortie> ;</li>
+	<li><kbd>,ê</kbd> ➜ <kbd-sortie>ju</kbd-sortie> pour éviter un <SFB /> ;</li>
+	<li><kbd>,'</kbd> ➜ <kbd-sortie>j’</kbd-sortie> ;</li>
+	<li><kbd>,à</kbd> ➜ <kbd-sortie>j</kbd-sortie> ;</li>
+	<li><kbd>Shift</kbd> + <kbd>J/★</kbd> ➜ <kbd-sortie>J</kbd-sortie> ;</li>
 	<li><kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>J/★</kbd> ➜ <kbd-sortie>j</kbd-sortie>.</li>
 </ul>
 
@@ -177,7 +177,7 @@
 <p>
 	La disposition <Nom></Nom> n’est pas 1DFH de base. En effet, il y a trop de lettres à placer, notamment
 	les voyelles accentuées du français, pour que toutes les touches soient à une distance maximale d’une
-	touche de la position de repos de chaque doigt (« 1u Distance From Home »). C’est pourquoi il y a les
+	touche de la position de repos de chaque doigt (« 1u Distance From Home »). C’est pourquoi il y a les
 	lettres <kbd>Q</kbd> et <kbd>Z</kbd> sur l’auriculaire droit, non sur la colonne de repos de ce
 	doigt, mais à droite de celle-ci. De même pour la touche <kbd>K</kbd> qui est pile au milieu du clavier,
 	mais trop loin de chacun des deux index pour être considérée 1DFH.
@@ -193,9 +193,9 @@
 	touche morte avec <NomPlus></NomPlus> :
 </p>
 <ul>
-	<li><kbd>,</kbd> + <kbd>è</kbd> = <kbd-sortie>z</kbd-sortie> ;</li>
-	<li><kbd>,</kbd> + <kbd>y</kbd> = <kbd-sortie>k</kbd-sortie> ;</li>
-	<li><kbd>,</kbd> + <kbd>s</kbd> = <kbd-sortie>q</kbd-sortie> ;</li>
-	<li><kbd>,</kbd> + <kbd>c</kbd> = <kbd-sortie>ç</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>è</kbd> = <kbd-sortie>z</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>y</kbd> = <kbd-sortie>k</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>s</kbd> = <kbd-sortie>q</kbd-sortie> ;</li>
+	<li><kbd>,</kbd> + <kbd>c</kbd> = <kbd-sortie>ç</kbd-sortie> ;</li>
 	<li><kbd>,</kbd> + <kbd>x</kbd> = <kbd-sortie>où</kbd-sortie>.</li>
 </ul>

@@ -81,7 +81,7 @@
 				réaliser une partie des fonctionnalités d’<NomPlus></NomPlus>. Celles pouvant être
 				implémentées sont les remappages de touches, les tap-holds et la création d’un layer de
 				navigation. Cependant, ce logiciel ne gère pas les hotstrings (remplacements de texte), ce
-				qui ne permet pas d’utiliser la moitié des possibilités d’<NomPlus></NomPlus> sur macOS : création
+				qui ne permet pas d’utiliser la moitié des possibilités d’<NomPlus></NomPlus> sur macOS : création
 				de nouveaux roulements, touche <kbd>,</kbd> de correction de <SFB></SFB>s, touche
 				<kbd>★</kbd> de répétition et d’expansion de texte, etc. Peut-être un programme complémentaire
 				pourrait se charger de cette partie, mais il n’y a pas de solution aussi simple et puissante

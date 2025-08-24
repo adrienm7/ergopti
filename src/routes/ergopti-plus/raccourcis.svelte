@@ -10,7 +10,7 @@
 
 <h3>Tap-holds</h3>
 <p>
-	Le tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et une
+	Le tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et une
 	lors de son maintien. C’est particulièrement adapté pour les touches modificatrices (<kbd
 		>Shift</kbd
 	>,
@@ -26,10 +26,10 @@
 	le plus faible de notre main.
 </p>
 <ul>
-	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-sortie>Tab</kbd-sortie> sur le tap ;</li>
+	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-sortie>Tab</kbd-sortie> sur le tap ;</li>
 	<li>
 		Tap hold en <kbd>Alt</kbd> ➜ <kbd-sortie>Shift</kbd-sortie> en hold et
-		<kbd-sortie>OneShotShift</kbd-sortie> en tap ;
+		<kbd-sortie>OneShotShift</kbd-sortie> en tap ;
 	</li>
 	<p>
 		Il est beaucoup plus judicieux de mettre <kbd>Shift</kbd> sous un pouce, afin d’éviter
@@ -38,7 +38,7 @@
 	</p>
 	<li>
 		Tap hold en <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> sur le hold et
-		<kbd-sortie>Enter</kbd-sortie> sur le tap ;
+		<kbd-sortie>Enter</kbd-sortie> sur le tap ;
 	</li>
 	<p>
 		La touche <kbd>Entrée</kbd> est très utilisée sur un clavier, elle l’est même plus que certaines
@@ -50,7 +50,7 @@
 	</p>
 	<li>
 		Tap hold en <kbd>"Tab"</kbd> ➜ <kbd-sortie>Alt</kbd-sortie> sur le hold et
-		<kbd-sortie>Alt+Tab</kbd-sortie> sur le tap ;
+		<kbd-sortie>Alt+Tab</kbd-sortie> sur le tap ;
 	</li>
 	<p>
 		Ce raccourci est extrêmement pratique. Avec lui, il n’y a plus besoin de faire la combinaison <kbd
@@ -82,11 +82,11 @@
 
 	<li>
 		Tap hold en <kbd>LShift</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>C</kbd-sortie> sur le
-		tap ;
+		tap ;
 	</li>
 	<li>
 		Tap hold en <kbd>LCtrl</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>V</kbd-sortie> sur le
-		tap ;
+		tap ;
 	</li>
 	<p>
 		Avoir la possibilité de <kbd-sortie>Coller</kbd-sortie> par appui de la main gauche sur une touche
@@ -99,7 +99,7 @@
 <ul>
 	<li>
 		<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
-		<kbd-sortie>BackSpace</kbd-sortie> ;
+		<kbd-sortie>BackSpace</kbd-sortie> ;
 	</li>
 	<p>
 		La combinaison <kbd>Ctrl</kbd> + <kbd>BackSpace</kbd> permet de supprimer d’un coup le mot vers
@@ -133,7 +133,7 @@
 
 <h3>Raccourcis avec <kbd>"CapsLock"</kbd> (transformé en <kbd>Enter</kbd>)</h3>
 <ul>
-	<li><kbd>"LAlt"</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>CapsWord</kbd-sortie> ;</li>
+	<li><kbd>"LAlt"</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>CapsWord</kbd-sortie> ;</li>
 	<p>
 		<kbd>CapsWord</kbd> est une sorte de
 		<span class="important">CapsLock qui se désactive automatiquement</span>

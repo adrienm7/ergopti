@@ -74,8 +74,8 @@
 <p>
 	<NomPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
 	<span class="important">mécanisme de tap-hold</span>. L’idée du tap-hold est qu’il est possible
-	d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir
-	pressé). Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une touche
+	d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir
+	pressé). Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une touche
 	envoie un raccourci, mais la presser la fait se comporter normalement. Cela permet d’intégrer des
 	touches
 	<kbd-sortie>Copier</kbd-sortie>, <kbd-sortie>Coller</kbd-sortie> et

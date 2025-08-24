@@ -16,7 +16,7 @@
 </p>
 <p>
 	Pour m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions, toutes
-	meilleures les unes que les autres, la solution a été radicale : développer la mienne, optimisée
+	meilleures les unes que les autres, la solution a été radicale : développer la mienne, optimisée
 	pour mes besoins. Évidemment, une telle tâche nécessite un investissement en temps considérable.
 	Il faut déjà comprendre ce qui fait une bonne disposition, puis réarranger les touches pour en
 	créer une au moins aussi bonne, si ce n’est meilleure, que les autres dispositions déjà
@@ -83,7 +83,7 @@
 	remarquablement bien trouvé que celui d’Optimot, le nom
 	<span class="important">HyperTexte</span> fut d’abord retenu. Cependant, il s’avéra par la suite que
 	ce nom était mal choisi, car déjà utilisé sur de nombreux sites ailleurs (ce qui n’est pas étonnant,
-	avec toutes les mentions de « lien hypertexte »). La découverte de la disposition, notamment grâce
+	avec toutes les mentions de « lien hypertexte »). La découverte de la disposition, notamment grâce
 	à un moteur de recherche, s'en trouvait compromise. Le site de présentation n’apparaissait même pas
 	en première page des résultats.
 </p>
@@ -100,7 +100,7 @@
 <h3>Comment la disposition a été développée</h3>
 <p>
 	<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i> La première
-	étape dans la création d’<Nom /> a été de partager les touches du clavier en deux groupes : main gauche
+	étape dans la création d’<Nom /> a été de partager les touches du clavier en deux groupes : main gauche
 	et main droite. L’objectif est de maximiser l’alternance des mains, c’est-à-dire de faire en sorte
 	que les touches qui sont le plus souvent tapées l’une après l’autre le soient par des mains différentes.
 </p>
@@ -108,7 +108,7 @@
 	Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
 	étant majoritairement précédées et suivies de consonnes, cela amène immédiatement une grande
 	alternance des mains. À noter que cette idée est loin d’être nouvelle, car elle est déjà appliquée
-	dans presque toutes les dispositions alternatives : Dvorak, BÉPO, Optimot, etc.
+	dans presque toutes les dispositions alternatives : Dvorak, BÉPO, Optimot, etc.
 </p>
 <p>
 	Dans le cas d’<Nom />, les voyelles ont été placées sur le côté gauche. La raison est que sur la
@@ -193,7 +193,7 @@
 	performante, en la rendant véritablement exceptionnelle.
 </p>
 <p>
-	Le qualificatif d’exceptionnel n’est pas exagéré : <NomPlus></NomPlus> permet, une fois maîtrisée,
+	Le qualificatif d’exceptionnel n’est pas exagéré : <NomPlus></NomPlus> permet, une fois maîtrisée,
 	de supprimer presque totalement les <SFB></SFB>s, y compris ceux liés à la répétition d'une même
 	touche. Cela est rendu possible grâce à la touche spéciale <kbd>★</kbd>, permettant de réitérer la
 	frappe de la touche précédente avec une fluidité inédite, ainsi qu’à la touche <kbd>,</kbd> de
