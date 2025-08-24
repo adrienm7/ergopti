@@ -41,8 +41,9 @@
 
 <h3>KLAnext</h3>
 <p>
-	Pour notamment les utiliser sur le site <a href="https://klanext.keyboard-design.com/"
-		>https://klanext.keyboard-design.com/</a
+	Pour notamment les utiliser sur le site <a
+		class="link"
+		href="https://klanext.keyboard-design.com/">https://klanext.keyboard-design.com/</a
 	> et ses dérivés.
 </p>
 <mini-espace />
@@ -94,8 +95,9 @@
 		></a
 	>
 	<p>
-		À noter que sur <a href="https://github.com/Nuclear-Squid/ergol">l’analyseur Ergo-L</a>, les
-		touches assignées à chaque doigt diffèrent. Par exemple, la touche <kbd>À</kbd>
+		À noter que sur <a class="link" href="https://github.com/Nuclear-Squid/ergol"
+			>l’analyseur Ergo-L</a
+		>, les touches assignées à chaque doigt diffèrent. Par exemple, la touche <kbd>À</kbd>
 		est assignée à l’annulaire et non au majeur. Cela entraîne un <SFB />, car la touche
 		<kbd>J</kbd>
 		se retrouve sur le même doigt que la touche <kbd>E</kbd>. Le <kbd>J</kbd> doit normalement être

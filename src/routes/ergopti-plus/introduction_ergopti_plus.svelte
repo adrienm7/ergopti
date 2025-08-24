@@ -74,29 +74,32 @@
 		<span class="important">outils de programmation de clavier :</span>
 		<ul>
 			<li>
-				Sur Windows, le programme <a href="https://www.autohotkey.com/">AutoHotkey</a>
+				Sur Windows, le programme <a class="link" href="https://www.autohotkey.com/">AutoHotkey</a>
 				est utilisé afin de réaliser ces changements. Il donne une immense liberté et est l’implémentation
 				actuelle d’<ErgoptiPlus></ErgoptiPlus>.
 			</li>
 			<li>
 				Sur macOS,
-				<a href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a> permettrait de
-				réaliser une partie des fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>. Celles pouvant être
-				implémentées sont les remappages de touches, les tap-holds et la création d’un layer de
-				navigation. Cependant, ce logiciel ne gère pas les hotstrings (remplacements de texte), ce
-				qui ne permet pas d’utiliser la moitié des possibilités d’<ErgoptiPlus></ErgoptiPlus> sur macOS :
-				création de nouveaux roulements, touche <kbd>,</kbd> de correction de <SFB></SFB>s, touche
+				<a class="link" href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a>
+				permettrait de réaliser une partie des fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>. Celles
+				pouvant être implémentées sont les remappages de touches, les tap-holds et la création d’un
+				layer de navigation. Cependant, ce logiciel ne gère pas les hotstrings (remplacements de
+				texte), ce qui ne permet pas d’utiliser la moitié des possibilités d’<ErgoptiPlus
+				></ErgoptiPlus> sur macOS : création de nouveaux roulements, touche <kbd>,</kbd> de
+				correction de <SFB></SFB>s, touche
 				<kbd>★</kbd> de répétition et d’expansion de texte, etc. Peut-être un programme complémentaire
 				pourrait se charger de cette partie, mais il n’y a pas de solution aussi simple et puissante
 				qu’AutoHotkey sur macOS.
 			</li>
 			<li>
 				Il est aussi possible de programmer le firmware de son clavier (avec <a
+					class="link"
 					href="https://qmk.fm/">QMK</a
 				>
-				ou <a href="https://zmk.dev/">ZMK</a>) pour bénéficier de ce genre de fonctionnalités quelle
-				que soit la plateforme (Windows, Mac, Linux, etc.). Cependant, cela nécessite beaucoup de
-				travail et là encore toutes les possibilités d’AutoHotkey ne seront pas disponibles.
+				ou <a class="link" href="https://zmk.dev/">ZMK</a>) pour bénéficier de ce genre de
+				fonctionnalités quelle que soit la plateforme (Windows, Mac, Linux, etc.). Cependant, cela
+				nécessite beaucoup de travail et là encore toutes les possibilités d’AutoHotkey ne seront
+				pas disponibles.
 			</li>
 		</ul>
 	</div>

@@ -11,11 +11,11 @@
 	</p>
 	<p>
 		Vous pouvez créer une nouvelle <i>Issue</i> sur
-		<a href="https://github.com/adrienm7/ergopti">la page GitHub du projet</a> si vous avez une question
-		ou un problème, notamment pour l’installation.
+		<a class="link" href="https://github.com/adrienm7/ergopti">la page GitHub du projet</a> si vous avez
+		une question ou un problème, notamment pour l’installation.
 	</p>
 	<p class="margin0">
-		Il est aussi possible de rejoindre le <a href="https://discord.gg/ptxRzBqcQP"
+		Il est aussi possible de rejoindre le <a class="link" href="https://discord.gg/ptxRzBqcQP"
 			>serveur Discord BÉPO | Ergodis</a
 		>
 		où <Ergopti></Ergopti> dispose d’un canal dédié, simplifiant les échanges.

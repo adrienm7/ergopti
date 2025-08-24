@@ -62,17 +62,29 @@ i .path2::before,
 	box-decoration-break: clone;
 	background-image: linear-gradient(to right, var(--gradient-blue));
 	color: transparent;
+	text-decoration: none;
 }
 
-/* a.link::after {
+.link {
+	display: inline-block; /* nécessaire pour positionner les pseudo-éléments */
+	background: linear-gradient(to right, var(--gradient-blue));
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	position: relative;
+	color: transparent;
+}
+
+.link:after {
 	position: absolute;
 	bottom: 0;
 	left: 0;
+	border-radius: 1px; /* optionnel, arrondi léger */
 	background-image: linear-gradient(to right, var(--gradient-blue));
 	width: 100%;
-	height: 2px;
+	height: 2px; /* épaisseur du soulignement */
 	content: '';
-} */
+}
 
 /* Icons */
 i {

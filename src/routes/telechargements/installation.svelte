@@ -48,8 +48,9 @@
 
 <h3 id="kbdedit">Installation KbdEdit (méthode préférée)</h3>
 <p>
-	Les fichiers de cette section ont été réalisées à l’aide de <a href="https://www.kbdedit.com/"
-		>KbdEdit</a
+	Les fichiers de cette section ont été réalisées à l’aide de <a
+		class="link"
+		href="https://www.kbdedit.com/">KbdEdit</a
 	>. C’est un logiciel très complet qui permet de modifier des dispositions de clavier sur Windows.
 	Il est en mesure de créer des pilotes pour Windows, et depuis peu pour Mac. Seul Linux n’est pas
 	supporté.
@@ -93,8 +94,8 @@
 </div>
 <p>
 	Afin que le code source ErgoptiPlus.ahk fonctionne, il faut auparavant installer
-	<a href="https://www.autohotkey.com/">AutoHotkey v2</a>. Une fois cela fait, il suffit de
-	double-cliquer sur le fichier ErgoptiPlus.ahk pour l’exécuter avec AutoHotkey.
+	<a class="link" href="https://www.autohotkey.com/">AutoHotkey v2</a>. Une fois cela fait, il
+	suffit de double-cliquer sur le fichier ErgoptiPlus.ahk pour l’exécuter avec AutoHotkey.
 </p>
 <p>
 	Ce fichier se modifie avec un éditeur de texte afin que vous puissiez l’adapter selon vos envies,
@@ -200,7 +201,7 @@
 	<option value="1dk">1DFH avec la 1DK</option>
 </select>
 <p>
-	<a href="https://github.com/OneDeadKey/kalamine">Kalamine</a> permet de générer des fichiers
+	<a class="link" href="https://github.com/OneDeadKey/kalamine">Kalamine</a> permet de générer des fichiers
 	d’installation pour plusieurs systèmes d’exploitation. Cependant, les fichiers plus bas n’ont pas
 	encore été testés. De plus, certaines fonctionnalités vont manquer, comme la modification de la
 	couche <kbd>Ctrl</kbd> pour avoir les raccourcis
@@ -219,7 +220,7 @@
 </p>
 <p>
 	Les instructions d’installation se trouvent ici : <a
-		href="https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts"
+		class="link" href="https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts"
 		>https://github.com/OneDeadKey/kalamine?tab=readme-ov-file#using-distributable-layouts</a
 	>
 </p>

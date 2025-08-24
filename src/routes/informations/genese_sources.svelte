@@ -7,8 +7,8 @@
 <h2>Genèse et inspirations</h2>
 <p>
 	La genèse de la disposition <Ergopti></Ergopti> remonte à début 2022, suite à la découverte de la disposition
-	<a href="https://optimot.fr/">Optimot</a>. À ce moment-là, j’étais un utilisateur du
-	<a href="https://bepo.fr/">BÉPO</a>
+	<a class="link" href="https://optimot.fr/">Optimot</a>. À ce moment-là, j’étais un utilisateur du
+	<a class="link" href="https://bepo.fr/">BÉPO</a>
 	depuis déjà de nombreuses années. Les améliorations d’Optimot par rapport au BÉPO sont significatives,
 	avec notamment une forte diminution des bigrammes à un doigt (<SFB />s) et un meilleur placement
 	des lettres pour l’anglais. Cependant, l'idée d'apprendre Optimot, pour peut-être découvrir par la
@@ -29,7 +29,7 @@
 
 <p>
 	Les premières versions de ce projet, baptisées <span class="important"
-		><a href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux">Optim7</a></span
+		><a class="link" href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux">Optim7</a></span
 	>, étaient des dérivés directs d'Optimot. L'objectif initial était d’améliorer les scores sur les
 	analyseurs de disposition et de corriger des choix qui ne me convenaient pas. Par exemple, je
 	voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot, l’auteur préférant y
@@ -95,7 +95,7 @@
 	<kbd>O</kbd> faisant le lien entre les deux (ergo[nomie] & opti[misation]). En outre, il est
 	court, d’une longueur idéale de 7 lettres, et peu présent en ligne. Une fois la nouvelle
 	appellation trouvée, le nom de domaine
-	<a href="https://ergopti.fr">https://ergopti.fr</a> fut également acquéri à ce moment-là.
+	<a class="link" href="https://ergopti.fr">https://ergopti.fr</a> fut également acquéri à ce moment-là.
 </p>
 
 <h3>Comment la disposition a été développée</h3>
@@ -205,6 +205,7 @@
 	Il convient de préciser que l’idée de cette touche de répétition n’est pas de mon invention. Elle
 	provient d'une (voire plus) disposition anglophone dont je ne retrouve plus le nom. D'autres
 	concepts ont également été empruntés, comme l'utilisation d'AHK (AutoHotKey) dans la disposition <a
+		class="link"
 		href="https://ballerboo.github.io/boolayout/">Boo</a
 	>, pour modifier le comportement des combinaisons de touches. Ce système permet d'optimiser encore
 	davantage les roulements sur les touches adjacentes qui n'engendrent pas de bigrammes habituels.
