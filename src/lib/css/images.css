@@ -4,16 +4,16 @@ image-block {
 }
 
 image-block img {
-	width: 100%;
 	margin: 0 auto;
 	border: 10px solid rgba(0, 0, 0, 0.5);
 	border-radius: 10px;
+	width: 100%;
 	/* box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px; */
 }
 
 image-block p {
-	font-size: 1.3rem;
 	font-weight: bold;
+	font-size: 1.3rem;
 }
 
 /* Correction du problème d’images étirées */
@@ -37,17 +37,17 @@ i .path2::before {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
-	color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	background-image: linear-gradient(to right, var(--gradient-blue));
+	color: transparent;
 }
 
 /* Deactivate AOS for people who get animation sick */
 @media (prefers-reduced-motion: reduce) {
 	[data-aos] {
-		opacity: 1 !important;
 		transform: none !important;
+		opacity: 1 !important;
 		transition: none !important;
 	}
 }

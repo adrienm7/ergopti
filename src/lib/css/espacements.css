@@ -1,12 +1,12 @@
 main,
 .main {
-	max-width: 850px;
 	margin: 0 auto; /* Centrer le bloc main horizontalement */
-	line-height: 1.35;
 	padding: min(
 		3.5vw,
 		35px
 	); /* Espaces entre le texte et les bords de l'écran, notamment sur mobile */
+	max-width: 850px;
+	line-height: 1.35;
 }
 
 main p,
@@ -55,11 +55,11 @@ giga-espace {
 
 hr {
 	border: 0;
-	height: 1.5px;
 	background-image: linear-gradient(
 		to right,
 		rgba(255, 255, 255, 0),
 		rgba(255, 255, 255, 0.75),
 		rgba(255, 255, 255, 0)
 	);
+	height: 1.5px;
 }

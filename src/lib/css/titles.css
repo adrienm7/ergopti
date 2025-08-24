@@ -1,17 +1,16 @@
 h1 {
 	margin: 0;
-	line-height: auto;
-	font-size: 2.5rem;
-	font-weight: normal;
-	text-align: center;
-
 	-webkit-background-clip: text;
 	background-clip: text;
+	font-weight: normal;
+	font-size: 2.5rem;
+	line-height: auto;
+	text-align: center;
 	-webkit-text-fill-color: transparent;
-	color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	background-image: linear-gradient(to left, rgb(255, 255, 255) 0%, rgb(180, 180, 180) 100%);
+	color: transparent;
 }
 
 .margin-h1 {
@@ -23,32 +22,31 @@ h2 {
 	margin: 0;
 	margin-top: 33vh;
 	margin-bottom: 10vh;
-	color: white;
-	text-align: center;
-	font-size: 2.5rem;
-	font-weight: 400;
-
 	background: linear-gradient(#f2dfff, #db4bff);
 	background-clip: text;
 	-webkit-background-clip: text;
+	color: white;
+	font-weight: 400;
+	font-size: 2.5rem;
+	text-align: center;
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
 	-moz-text-fill-color: transparent;
 }
 
 h3 {
-	width: fit-content;
 	margin-top: 25vh;
 	margin-bottom: 10vh;
-	padding: 10px 15px 15px 15px;
-	background-color: rgba(0, 0, 0, 0.4);
+	box-shadow: rgba(0, 0, 0, 0.4) 0px 0px 6px;
 	border: 1px solid rgb(0, 55, 92);
 	border-radius: 7px;
-	box-shadow: rgba(0, 0, 0, 0.4) 0px 0px 6px;
+	background-color: rgba(0, 0, 0, 0.4);
+	padding: 10px 15px 15px 15px;
+	width: fit-content;
 	color: rgb(106, 218, 255);
+	font-weight: normal;
 	font-size: 1.5rem;
 	line-height: 1.2;
-	font-weight: normal;
 }
 
 h2:first-of-type {

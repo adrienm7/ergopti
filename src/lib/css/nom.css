@@ -9,15 +9,15 @@ nom-disposition-plus {
 }
 
 .hyper {
-	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	margin: -0.5em;
 	-webkit-background-clip: text;
 	background-clip: text;
+	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	-webkit-text-fill-color: transparent;
-	color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	background-image: linear-gradient(to right, var(--gradient-blue));
+	color: transparent;
 }
 
 .gradient1 {
@@ -30,10 +30,10 @@ nom-disposition-plus {
 }
 
 .htexte {
-	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	margin: -0.5em;
 	background-clip: text;
 	-webkit-background-clip: text;
+	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
 	-moz-text-fill-color: transparent;
@@ -41,10 +41,10 @@ nom-disposition-plus {
 }
 
 .namecolor {
-	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	margin: -0.5em;
 	background-clip: text;
 	-webkit-background-clip: text;
+	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
 	-moz-text-fill-color: transparent;
@@ -66,11 +66,11 @@ nom-disposition-plus {
 	position: relative;
 	top: 0.05em;
 	left: 0.03em;
-	color: #fff;
-	text-align: center;
-	font-size: 1.2em;
-	font-weight: bold;
 	animation: glow 2s ease-in-out infinite alternate;
+	color: #fff;
+	font-weight: bold;
+	font-size: 1.2em;
+	text-align: center;
 }
 
 @-webkit-keyframes glow {
