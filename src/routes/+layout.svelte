@@ -18,8 +18,10 @@
 	import { page } from '$app/stores';
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
+
 	import { makeIds } from '$lib/js/make-ids.js';
 	import tocbot from 'tocbot';
+	import '$lib/css/tocbot.css';
 
 	import '$lib/css/global.css';
 	import '$lib/css/layout.css';
@@ -27,10 +29,9 @@
 	import '$lib/css/espacements.css';
 	import '$lib/css/titles.css';
 	import '$lib/css/typographie.css';
-	import '$lib/css/nom.css';
+	import '$lib/css/ergopti_name.css';
 	import '$lib/css/images.css';
 	import '$lib/css/buttons.css';
-	import '$lib/css/tocbot.css';
 
 	import '$lib/icons/icomoon/style.css';
 

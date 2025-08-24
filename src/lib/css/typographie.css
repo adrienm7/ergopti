@@ -124,3 +124,15 @@ strong,
 .nowrap .texte-sfb {
 	display: inline-block !important;
 }
+
+.hyper {
+	margin: -0.5em;
+	-webkit-background-clip: text;
+	background-clip: text;
+	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
+	-webkit-text-fill-color: transparent;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	background-image: linear-gradient(to right, var(--gradient-blue));
+	color: transparent;
+}
