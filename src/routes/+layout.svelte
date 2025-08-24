@@ -63,7 +63,6 @@
 		});
 
 		AOS.init({ mirror: true, offset: 0, anchorPlacement: 'top-bottom' });
-		typography(document.getElementsByTagName('main')[0]);
 		tocbot.refresh();
 	});
 

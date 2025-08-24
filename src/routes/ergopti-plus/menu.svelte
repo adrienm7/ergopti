@@ -6,11 +6,7 @@
 
 <h2>Menu de gestion des fonctionnalités</h2>
 
-<enhanced:img
-	src="$lib/images/menu_ergopti_plus.jpg"
-	class="fullwidth"
-	alt="Screenshot du menu du script Ergopti+"
-/>
+<enhanced:img src="$lib/images/menu_ergopti_plus.jpg" alt="Screenshot du menu du script Ergopti+" />
 
 <p>
 	Un clic droit sur l’icône du script dans la barre des tâches permet d’ouvrir le menu du script.
