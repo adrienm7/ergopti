@@ -16,13 +16,13 @@
 
 html,
 body {
-	font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', 'Roboto', 'Oxygen',
-		'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Helvetica', Arial,
-		sans-serif;
-	font-size: 100%;
-	font-size: clamp(14px, 0.3vw + 14px, 24px);
 	scroll-behavior: smooth;
 	color: white;
+	font-size: 100%;
+	font-size: clamp(14px, 0.3vw + 14px, 24px);
+	font-family:
+		-apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+		'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Helvetica', Arial, sans-serif;
 }
 
 html,
@@ -36,4 +36,22 @@ body,
 		hsl(205, 100%, 25%) 100%
 	);
 	background-attachment: fixed;
+}
+
+/* New scrollbar design */
+
+::-webkit-scrollbar {
+	width: 16px;
+}
+
+::-webkit-scrollbar-track {
+	border-left: 1px solid rgba(255, 255, 255, 0.2);
+	background-color: black;
+}
+
+::-webkit-scrollbar-thumb {
+	border: 3px solid transparent;
+	border-radius: 8px;
+	background: rgba(180, 180, 180, 0.5);
+	background-clip: content-box;
 }

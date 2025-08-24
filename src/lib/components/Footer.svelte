@@ -1,5 +1,5 @@
 <script>
-	import Nom from '$lib/composants/Nom.svelte';
+	import Nom from '$lib/components/Nom.svelte';
 	import { page } from '$app/stores';
 	const date = new Date().getFullYear();
 </script>

@@ -1,0 +1,31 @@
+/* Quand la bannière "En construction" était encore utilisée */
+
+.banner {
+	display: flex;
+	position: fixed;
+	right: -41vw;
+	bottom: 6vw;
+	justify-content: center;
+	align-items: center;
+	transform: rotate(315deg);
+	z-index: 90;
+	margin: 0 auto;
+	box-shadow:
+		rgba(0, 0, 0, 0.6) 0px -2px 4px,
+		rgba(0, 0, 0, 0.7) 0px 3px 8px;
+	border: 2px solid white;
+	background-image: linear-gradient(0, #c80000 0%, #ff6f00 100%);
+	background-color: #a40606;
+	width: 100vw;
+	height: 3.5rem;
+	text-align: center;
+}
+
+.banner p {
+	color: white;
+	font-weight: bold;
+	font-size: clamp(10px, 1.7vw, 18px);
+	line-height: 1;
+	text-align: center;
+	text-transform: uppercase;
+}

@@ -1,6 +1,6 @@
 <script>
-	import Nom from '../composants/Nom.svelte';
-	import NomPlus from '../composants/NomPlus.svelte';
+	import Nom from '../components/Nom.svelte';
+	import NomPlus from '../components/NomPlus.svelte';
 
 	import { page } from '$app/stores';
 

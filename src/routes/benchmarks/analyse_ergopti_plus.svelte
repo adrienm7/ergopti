@@ -1,7 +1,7 @@
 <script>
-	import Nom from '$lib/composants/Nom.svelte';
-	import NomPlus from '$lib/composants/NomPlus.svelte';
-	import SFB from '$lib/composants/SFB.svelte';
+	import Nom from '$lib/components/Nom.svelte';
+	import NomPlus from '$lib/components/NomPlus.svelte';
+	import SFB from '$lib/components/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
 	let versionValue;
@@ -32,12 +32,12 @@
 <p>
 	Voici les résultats de <NomPlus></NomPlus> obtenus sur le corpus français-anglais Essais :
 </p>
-<bloc-image>
+<image-block>
 	<enhanced:img
 		src="$lib/benchmarks/plus/ergopti+_reduction_SFBs.jpg"
 		alt="Screenshot de benchmark Ergopti+"
 	/>
-</bloc-image>
+</image-block>
 <h3>Analyse des <SFB></SFB>s</h3>
 <p>
 	Cette analyse met en lumière la quasi-suppression des <SFB></SFB>s, avec une valeur d’environ 3.
@@ -47,16 +47,16 @@
 </p>
 <p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
 <h4><Nom></Nom></h4>
-<bloc-image>
+<image-block>
 	<enhanced:img src="$lib/benchmarks/plus/SFBs_ergopti.jpg" alt="SFBs de la disposition Ergopti" />
-</bloc-image>
+</image-block>
 <h4><NomPlus></NomPlus></h4>
-<bloc-image>
+<image-block>
 	<enhanced:img
 		src="$lib/benchmarks/plus/SFBs_ergopti+.jpg"
 		alt="SFBs de la disposition Ergopti+"
 	/>
-</bloc-image>
+</image-block>
 <p>
 	Plusieurs <SFB></SFB>s se produisent maintenant sur l’index gauche en <kbd>★,</kbd> et
 	<kbd>★.</kbd>, même s’ils sont déjà deux fois moins nombreux qu’avec <NomPlus></NomPlus>. Il y a
@@ -88,12 +88,12 @@
 	en <kbd>f★</kbd>.
 </p>
 <h3>Analyse de la fréquence d’utilisation des doigts</h3>
-<bloc-image>
+<image-block>
 	<enhanced:img
 		src="$lib/benchmarks/plus/finger_usage_comparison.jpg"
 		alt="Comparaison de la fréquence d’utilisation des doigts"
 	/>
-</bloc-image>
+</image-block>
 <p>
 	Comme vous pouvez le constater sur l’image ci-dessous, l’index gauche est plus utilisé (6% vs 8%)
 	avec <NomPlus></NomPlus>. Cela vient des nombreuses utilisations de la touche

@@ -1,7 +1,7 @@
 <script>
-	import Nom from '$lib/composants/Nom.svelte';
-	import NomPlus from '$lib/composants/NomPlus.svelte';
-	import SFB from '$lib/composants/SFB.svelte';
+	import Nom from '$lib/components/Nom.svelte';
+	import NomPlus from '$lib/components/NomPlus.svelte';
+	import SFB from '$lib/components/SFB.svelte';
 
 	import Autocritiques from './autocritiques.svelte';
 	import Changelog from './changelog.svelte';
