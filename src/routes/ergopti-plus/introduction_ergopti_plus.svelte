@@ -26,35 +26,36 @@
 </p>
 <div class="cards">
 	<div class="card">
-		<i class="fa-duotone fa-circle-1"></i>
+		<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i>
 		Ajoute de
 		<span class="text-bold">nouveaux roulements</span> extrêmement confortables.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-2"></i>
+		<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i>
 		<span class="important"
 			>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span></span
 		> pour une frappe ultra-fluide et sans inconfort.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-3"></i>
+		<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
 		<span class="text-bold">Réduit les distances parcourues par les doigts</span>, en particulier
 		l’auriculaire droit.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-4"></i> Ajoute de
+		<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajoute de
 		<span class="important">nombreux raccourcis</span>
 		tels qu’un layer de navigation, des tap-holds et des touches <kbd-sortie>Alt + Tab</kbd-sortie>,
 		<kbd-sortie>OneShotShift</kbd-sortie> et <kbd-sortie>CapsWord</kbd-sortie>.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-5"></i>
+		<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>
 		Fonctionnalités d’<span class="text-bold">autocorrection et de snippets</span>. Permet également
 		d’écrire des
 		<span class="text-bold">symboles complexes et des emojis</span>.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-6"></i> Chaque fonctionnalité est optionnelle, désactivable et
+		<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i> Chaque
+		fonctionnalité est optionnelle, désactivable et
 		<span class="important">peut être intégrée au fil du temps</span>. Nul besoin de chercher à tout
 		utiliser dès le départ.
 	</div>

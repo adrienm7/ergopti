@@ -82,7 +82,7 @@
 				<a
 					href="/informations/#changelog"
 					style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
-					><i class="fa-duotone fa-solid fa-circle-info"></i></a
+					><i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i></a
 				>
 			</p>
 			<p style="margin:0; padding-top: 0; padding-left: 0; font-size: 0.8em">
@@ -97,7 +97,9 @@
 		<div id="menu-pages">
 			<p aria-current={$page.url.pathname === '/' ? 'page' : undefined} onclick={fermerMenu}>
 				<a href="/"
-					><i class="fa-duotone fa-keyboard"></i>
+					><i class="icon-keyboard-duotone"
+						><span class="path1"></span><span class="path2"></span></i
+					>
 					<span class="titre">Ergopti</span></a
 				>
 			</p>
@@ -106,7 +108,7 @@
 				onclick={fermerMenu}
 			>
 				<a href="/ergopti-plus"
-					><i class="fa-duotone fa-circle-star"></i>
+					><i class="icon-circle-star"><span class="path1"></span><span class="path2"></span></i>
 					<span class="titre">Ergopti<span class="glow">+</span></span></a
 				>
 			</p>
@@ -115,7 +117,10 @@
 				onclick={fermerMenu}
 			>
 				<a href="/benchmarks"
-					><span class="couleur"><i class="fa-duotone fa-chart-mixed"></i></span>
+					><span class="couleur"
+						><i class="icon-chart-mixed"><span class="path1"></span><span class="path2"></span></i
+						></span
+					>
 					<span class="titre">Benchmarks</span></a
 				>
 			</p>
@@ -124,7 +129,11 @@
 				onclick={fermerMenu}
 			>
 				<a href="/telechargements"
-					><i class="fa-duotone fa-download"></i>
+					><i
+						><span class="icon-download"
+							><span class="path1"></span><span class="path2"></span></span
+						></i
+					>
 					<span class="titre">Téléchargements</span></a
 				>
 			</p>
@@ -133,7 +142,11 @@
 				onclick={fermerMenu}
 			>
 				<a href="/informations"
-					><i class="fa-duotone fa-circle-info"></i>
+					><i
+						><span class="icon-circle-info"
+							><span class="path1"></span><span class="path2"></span></span
+						></i
+					>
 					<span class="titre">Informations</span></a
 				>
 			</p>
@@ -148,13 +161,13 @@
 			<div style="height:70px"></div>
 			<div style="text-align:center;">
 				<a href="https://github.com/adrienm7/ergopti" style="font-size:1em!important"
-					>Repo GitHub <i class="fa-brands fa-github"></i></a
+					>Repo GitHub <i class="icon-github"></i></a
 				>
 				—
 				<a
 					href="https://discord.gg/ptxRzBqcQP"
 					style="position:relative; bottom:-0.1em; font-size:1em!important"
-					>Serveur Discord <i class="fa-brands fa-discord"></i></a
+					>Serveur Discord <i class="icon-discord"></i></a
 				>
 			</div>
 			<div style="height:70px"></div>

@@ -8,11 +8,11 @@
 	<p>
 		Disposition <Nom></Nom> —
 		<a href="https://github.com/adrienm7/ergopti" style="color:white"
-			>GitHub <i class="fa-brands fa-github"></i></a
+			>GitHub <i class="icon-github"></i></a
 		>
 		|
 		<a href="https://discord.gg/ptxRzBqcQP" style="position:relative; bottom:-0.1em; color:white"
-			>Discord <i class="fa-brands fa-discord"></i></a
+			>Discord <i class="icon-discord"></i></a
 		>
 	</p>
 </footer>
