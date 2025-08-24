@@ -92,10 +92,10 @@
 	accentuées du français étant en accès direct avec <Ergopti></Ergopti>, il est impossible de
 	réaliser une disposition 1DFH, car il y a trop de touches à placer par rapport à l’espace
 	disponible. La disposition
-	<a href="https://ergol.org">Ergo-L</a> est quant à elle une disposition 1DFH, mais au prix d’une touche
-	morte permettant de réaliser les accents. Cela signifie que dans ce genre de dispositions, il y a plus
-	de frappes pour écrire un mot, car pour écrire une lettre accentuée, il faut d’abord appuyer sur la
-	touche morte, puis sur la lettre.
+	<a class="link" href="https://ergol.org">Ergo-L</a> est quant à elle une disposition 1DFH, mais au
+	prix d’une touche morte permettant de réaliser les accents. Cela signifie que dans ce genre de dispositions,
+	il y a plus de frappes pour écrire un mot, car pour écrire une lettre accentuée, il faut d’abord appuyer
+	sur la touche morte, puis sur la lettre.
 </p>
 <p class="encadre">
 	<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la

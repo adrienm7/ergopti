@@ -146,9 +146,9 @@
 	: la touche de repos de l’index.
 </p>
 <p>
-	Enfin, contrairement au BÉPO ou à l’Optimot, <Ergopti /> ne place pas de symboles de programmation
-	ou de ponctuation sur la rangée des chiffres. Ces symboles sont ramenés au plus près des doigts grâce
-	à l’utilisation de la couche <kbd>AltGr</kbd>.
+	Enfin, contrairement à BÉPO ou Optimot, <Ergopti /> ne place pas de symboles de programmation ou de
+	ponctuation sur la rangée des chiffres. Ces symboles sont ramenés au plus près des doigts grâce à l’utilisation
+	de la couche <kbd>AltGr</kbd>.
 </p>
 
 <mini-espace />

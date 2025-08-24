@@ -158,6 +158,7 @@
 	<h3>Analyse Ergo-L</h3>
 	<p>
 		Réalisée à l’aide de l’analyseur disponible ici : <a
+			class="link"
 			href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
 		>.
 	</p>
