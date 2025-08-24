@@ -1,9 +1,9 @@
-bloc-image {
+image-block {
 	margin: 0 auto;
 	text-align: center;
 }
 
-bloc-image img {
+image-block img {
 	width: 100%;
 	margin: 0 auto;
 	border: 10px solid rgba(0, 0, 0, 0.5);
@@ -11,7 +11,7 @@ bloc-image img {
 	/* box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px; */
 }
 
-bloc-image p {
+image-block p {
 	font-size: 1.3rem;
 	font-weight: bold;
 }
@@ -23,7 +23,7 @@ enhanced\:img,
 	height: auto !important;
 }
 
-/* Icônes */
+/* Icons */
 i {
 	display: inline;
 }
@@ -43,29 +43,11 @@ i .path2::before {
 	background-image: linear-gradient(to right, var(--gradient-blue));
 }
 
-/* Clavier en 3D */
-.container {
-	perspective: 1000px;
-}
-.block {
-	position: relative;
-	margin: 0 auto;
-	width: fit-content;
-	transform: rotateX(25deg) translateZ(5px);
-	transform-style: preserve-3d;
-}
-.block::before {
-	border-radius: var(--arrondi-clavier);
-	content: '';
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate3d(
-		-50%,
-		-50%,
-		-20px
-	); /* mettre la même valeur en négatif que la valeur de l'épaisseur */
-	width: calc(100% + 4px);
-	height: 100%;
-	background-color: black;
+/* Deactivate AOS for people who get animation sick */
+@media (prefers-reduced-motion: reduce) {
+	[data-aos] {
+		opacity: 1 !important;
+		transform: none !important;
+		transition: none !important;
+	}
 }

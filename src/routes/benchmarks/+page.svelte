@@ -1,7 +1,7 @@
 <script>
-	import Nom from '$lib/composants/Nom.svelte';
-	import NomPlus from '$lib/composants/NomPlus.svelte';
-	import SFB from '$lib/composants/SFB.svelte';
+	import Nom from '$lib/components/Nom.svelte';
+	import NomPlus from '$lib/components/NomPlus.svelte';
+	import SFB from '$lib/components/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
 	import AnalyseErgoptiPlus from './analyse_ergopti_plus.svelte';
@@ -138,12 +138,12 @@
 		</div>
 	</div>
 	<mini-espace />
-	<!-- <bloc-image>
+	<!-- <image-block>
 		<enhanced:img
 			src="$lib/benchmarks/{clavier}/{corpus}.jpg"
 			alt="Screenshot de benchmark sur le clavier {clavier} et le corpus {corpus}"
 		/>
-	</bloc-image> -->
+	</image-block> -->
 
 	<h3>Analyse Ergo-L</h3>
 	<p>

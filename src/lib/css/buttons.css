@@ -1,9 +1,9 @@
 button {
 	cursor: pointer;
-	padding: 10px;
-	background-color: white;
 	border: 1px solid rgba(0, 0, 0, 0.6);
 	border-radius: 3px;
+	background-color: white;
+	padding: 10px;
 	color: black;
 }
 
@@ -13,9 +13,9 @@ button p {
 
 .bouton-telechargement,
 select {
-	background-color: rgba(0, 0, 0, 0.8);
 	border: 1px solid rgba(255, 255, 255, 0.6);
 	border-radius: 3px;
+	background-color: rgba(0, 0, 0, 0.8);
 	color: white;
 }
 
@@ -29,33 +29,33 @@ kbd,
 kbd-sortie,
 kbd-non {
 	--taille: 1;
+	display: inline-flex;
+	justify-content: center;
 	align-items: center;
-	background-color: hsla(100deg, 0%, 60%, 10%);
-	border: 0.666667px solid rgba(255, 255, 255, 0.3);
-	border-image: none 100% 1 0 stretch;
-	border-radius: 0.15em;
+	cursor: pointer;
+	box-sizing: border-box;
+	margin: 1px 0;
 	box-shadow:
 		rgba(0, 0, 0, 0.3) 5px 3px 5px,
 		0 calc(0.6 * 0.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%);
 	box-shadow:
 		rgba(0, 0, 0, 0.4) 1px 1px 1px,
 		0 calc(0.6 * 0.25vw) 0 hsla(100deg, 0%, calc(100% - 20%), 70%);
-	box-sizing: border-box;
-	color: hsla(0, 100%, 100%, 90%);
-	cursor: pointer;
-	display: inline-flex;
-	font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', 'Roboto', 'Oxygen',
-		'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Helvetica', Arial,
-		sans-serif;
-	font-size: 1em;
-	font-weight: 300;
-	/* height: calc(calc(.6*100vw/15) - 2*calc(.6*.35vw));  */
-	justify-content: center;
-	line-height: 1.35em;
-	text-align: center;
+	border: 0.666667px solid rgba(255, 255, 255, 0.3);
+	border-radius: 0.15em;
+	border-image: none 100% 1 0 stretch;
+	background-color: hsla(100deg, 0%, 60%, 10%);
 	padding: 1px 5px 2px 5px;
-	margin: 1px 0;
-	/* width: calc(calc(.6*100vw/15)*1 - 2*calc(.6*.35vw)); */
+	/* width: calc(calc(0.6 * 100vw / 15) * 1 - 2 * calc(0.6 * 0.35vw));
+	height: calc(calc(0.6 * 100vw / 15) - 2 * calc(0.6 * 0.35vw)); */
+	color: hsla(0, 100%, 100%, 90%);
+	font-weight: 300;
+	font-size: 1em;
+	line-height: 1.35em;
+	font-family:
+		-apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+		'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Helvetica', Arial, sans-serif;
+	text-align: center;
 }
 
 kbd {
@@ -63,8 +63,8 @@ kbd {
 }
 
 kbd-sortie {
-	background-color: hsla(0, 0%, 100%, 0.9);
 	border: 1px solid rgba(0, 0, 0, 0.3);
+	background-color: hsla(0, 0%, 100%, 0.9);
 	color: black;
 }
 
@@ -95,7 +95,7 @@ kbd-sortie.morte {
 		var(--couleur-touche-luminosite),
 		var(--opacite-touche)
 	) !important;
+	font-weight: normal;
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 	font-family: sans-serif;
-	font-weight: normal;
 }
