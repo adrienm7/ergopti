@@ -19,7 +19,7 @@
 </div>
 
 <div style="margin: 0 auto; text-align:center; padding-top: 5px;">
-	<a href="#debut"><i class="far fa-chevron-down icon-chevron-down scrollez"></i></a>
+	<a href="#debut" class="scrollez"><i class="icon-chevron-down"></i></a>
 </div>
 <div id="debut">
 	<petit-espace />
@@ -39,30 +39,33 @@
 
 <div class="cards">
 	<div class="card">
-		<i class="fa-duotone fa-circle-1"></i>
+		<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i>
 		<span class="text-bold">Diminution de la distance parcourue</span> par les doigts pour moins de fatigue
 		et plus de vitesse.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-2"></i> <span class="important">Frappe extrêmement fluide</span>
+		<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i>
+		<span class="important">Frappe extrêmement fluide</span>
 		par élimination de la quasi-totalité des
 		<span class="nowrap"><SFB />s.</span>
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-3"></i> <span class="text-bold">Alternance des mains</span> maximisée
-		pour paralléliser la frappe et ainsi écrire plus vite.
+		<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
+		<span class="text-bold">Alternance des mains</span> maximisée pour paralléliser la frappe et ainsi
+		écrire plus vite.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-4"></i> <span class="important">Frappe ultra-confortable</span> grâce
-		à une optimisation des roulements.
+		<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i>
+		<span class="important">Frappe ultra-confortable</span> grâce à une optimisation des roulements.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-5"></i> <span class="text-bold">Placement logique</span> des symboles,
-		permettant de s’en souvenir aisément.
+		<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>
+		<span class="text-bold">Placement logique</span> des symboles, permettant de s’en souvenir aisément.
 	</div>
 	<div class="card">
-		<i class="fa-duotone fa-circle-6"></i> <span class="important">Chiffres en accès direct</span>,
-		raccourcis sur la main gauche, ponctuations insécables, et plus…
+		<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i>
+		<span class="important">Chiffres en accès direct</span>, raccourcis sur la main gauche,
+		ponctuations insécables, et plus…
 	</div>
 </div>
 <p class="encart-introduction">
@@ -92,7 +95,7 @@
 
 	@keyframes bounce7 {
 		0% {
-			-webkit-transform: translate(0, -20px);
+			-webkit-transform: translate(0, -200px);
 			opacity: 0;
 		}
 		50% {

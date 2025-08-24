@@ -99,10 +99,10 @@
 
 <h3>Comment la disposition a été développée</h3>
 <p>
-	<i class="fa-duotone fa-circle-1"></i> La première étape dans la création d’<Nom /> a été de partager
-	les touches du clavier en deux groupes : main gauche et main droite. L’objectif est de maximiser l’alternance
-	des mains, c’est-à-dire de faire en sorte que les touches qui sont le plus souvent tapées l’une après
-	l’autre le soient par des mains différentes.
+	<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i> La première
+	étape dans la création d’<Nom /> a été de partager les touches du clavier en deux groupes : main gauche
+	et main droite. L’objectif est de maximiser l’alternance des mains, c’est-à-dire de faire en sorte
+	que les touches qui sont le plus souvent tapées l’une après l’autre le soient par des mains différentes.
 </p>
 <p>
 	Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
@@ -129,11 +129,11 @@
 <mini-espace />
 
 <p>
-	<i class="fa-duotone fa-circle-2"></i> La deuxième étape dans la création de la disposition a été de
-	placer les touches les plus souvent utilisées le plus proche possible des doigts. Les doigts sont effectivement
-	toujours censés reposer sur la rangée de repos du clavier (la ligne du milieu). Il est donc logique
-	de chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les déplacements
-	des doigts aux touches.
+	<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i> La deuxième étape
+	dans la création de la disposition a été de placer les touches les plus souvent utilisées le plus proche
+	possible des doigts. Les doigts sont effectivement toujours censés reposer sur la rangée de repos du
+	clavier (la ligne du milieu). Il est donc logique de chercher à placer sur cette rangée les lettres
+	les plus utilisées pour réduire les déplacements des doigts aux touches.
 </p>
 <p>
 	De même, certaines touches sont plus facilement accessibles que d’autres sur les claviers
@@ -147,9 +147,10 @@
 <mini-espace />
 
 <p>
-	<i class="fa-duotone fa-circle-3"></i> La troisième étape a été de déplacer des lettres pour
-	réduire au maximum le nombre de <SFB />s, tout en maximisant les roulements. Encore une fois, la
-	maximisation des roulements était une des priorités dès le début du projet.
+	<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i> La troisième
+	étape a été de déplacer des lettres pour réduire au maximum le nombre de <SFB />s, tout en
+	maximisant les roulements. Encore une fois, la maximisation des roulements était une des priorités
+	dès le début du projet.
 </p>
 <p>
 	Cette étape est la plus difficile, car intervertir seulement deux touches peut faire passer d’une

@@ -35,11 +35,7 @@
 	import '$lib/css/scrollbar.css';
 	import '$lib/css/old.css';
 
-	/* Icônes */
-	import '$lib/icons/fontawesome/css/fontawesome.min.css';
-	import '$lib/icons/fontawesome/css/regular.min.css';
-	import '$lib/icons/fontawesome/css/duotone.min.css';
-	import '$lib/icons/fontawesome/css/brands.min.css';
+	import '$lib/icons/icomoon/style.css';
 
 	onMount(() => {
 		tocbot.init({
@@ -115,13 +111,13 @@
 						<a
 							href="https://github.com/adrienm7/ergopti"
 							style="font-size:0.9em!important; color:white"
-							>Repo GitHub <i class="fa-brands fa-github"></i></a
+							>Repo GitHub <i class="icon-github"></i></a
 						>
 						—
 						<a
 							href="https://discord.gg/ptxRzBqcQP"
 							style="position:relative; bottom:-0.1em; font-size:0.9em!important; color:white"
-							>Serveur Discord <i class="fa-brands fa-discord"></i></a
+							>Serveur Discord <i class="icon-discord"></i></a
 						>
 					</p>
 				</div>
@@ -143,8 +139,12 @@
 
 <bloc-clavier-reference>
 	<button id="afficher-clavier-reference" on:click={toggleZIndex}>
-		<i class="fa-duotone fa-keyboard" style="display:{affiche === 'none' ? 'block' : 'none'}"></i>
-		<i class="fa-duotone fa-square-xmark" style="display:{affiche}"></i>
+		<i class="icon-keyboard-duotone" style="display:{affiche === 'none' ? 'block' : 'none'}"
+			><span class="path1"></span><span class="path2"></span></i
+		>
+		<i class="icon-square-xmark" style="display:{affiche}"
+			><span class="path1"></span><span class="path2"></span></i
+		>
 	</button>
 
 	<clavier-reference id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">

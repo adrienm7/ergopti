@@ -128,7 +128,7 @@
 <p class="encadre">
 	<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation d’<NomPlus
 	></NomPlus>, y compris pour les <SFB></SFB>s encore plus rares qui ne sont pas listés ici.
-	<i class="fa-duotone fa-face-smile"></i>
+	<i class="icon-face-smile"><span class="path1"></span><span class="path2"></span></i>
 </p>
 
 <h3>Alternance des mains non maximale</h3>

@@ -24,10 +24,12 @@ enhanced\:img,
 }
 
 /* Icônes */
-i {
+i,
+i .path1::before {
 	color: #3088ed !important;
 }
-i::before {
+
+i .path2::before {
 	-webkit-background-clip: text;
 	background-clip: text;
 	-webkit-text-fill-color: transparent;
