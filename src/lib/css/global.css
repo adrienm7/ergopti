@@ -8,10 +8,10 @@
 
 html,
 body {
-	scroll-behavior: smooth;
 	color: white;
 	font-size: 100%;
 	font-size: clamp(14px, 0.3vw + 14px, 24px);
+	scroll-behavior: smooth;
 }
 
 html,
@@ -22,25 +22,25 @@ body,
 		hsl(205, 100%, 5%) 0%,
 		hsl(220, 100%, 10%) 30%,
 		hsl(220, 100%, 20%) 60%,
-		hsl(205, 100%, 25%) 100%
+		hsl(207, 100%, 32%) 100%
 	);
 	background-attachment: fixed;
 }
 
-/* New scrollbar design */
+/* New scrollbar design on Webkit browsers */
 
 ::-webkit-scrollbar {
 	width: 16px;
 }
 
 ::-webkit-scrollbar-track {
-	border-left: 1px solid rgba(255, 255, 255, 0.2);
 	background-color: black;
+	border-left: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 ::-webkit-scrollbar-thumb {
-	border: 3px solid transparent;
-	border-radius: 8px;
 	background: rgba(180, 180, 180, 0.5);
 	background-clip: content-box;
+	border: 3px solid transparent;
+	border-radius: 8px;
 }
