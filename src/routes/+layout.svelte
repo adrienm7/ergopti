@@ -12,6 +12,8 @@
 	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
 	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
 
+	import 'normalize.css';
+
 	import { afterUpdate, onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import AOS from 'aos';
@@ -20,7 +22,6 @@
 	import { makeIds } from '$lib/js/make-ids.js';
 	import tocbot from 'tocbot';
 
-	import '$lib/css/normalize.css';
 	import '$lib/css/global.css';
 	import '$lib/css/layout.css';
 	import '$lib/css/cards.css';
@@ -160,20 +161,20 @@
 <style>
 	#afficher-clavier-reference {
 		position: fixed;
-		z-index: 99;
-		bottom: 1rem;
 		right: 1rem;
-		padding: 0.5rem;
-		margin: 0 auto;
-		height: 3rem;
-		width: 3rem;
-		background-color: rgba(0, 1, 14, 0.9);
+		bottom: 1rem;
+		z-index: 99;
+		animation: glowing 3s infinite alternate ease-in-out;
 		cursor: pointer;
+		margin: 0 auto;
+		box-shadow: 0px 0px 7px 3px #0087b4b1;
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
+		background-color: rgba(0, 1, 14, 0.9);
+		padding: 0.5rem;
+		width: 3rem;
+		height: 3rem;
 		font-size: 1.5rem;
-		box-shadow: 0px 0px 7px 3px #0087b4b1;
-		animation: glowing 3s infinite alternate ease-in-out;
 	}
 
 	@keyframes glowing {
@@ -195,10 +196,10 @@
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		color: transparent;
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: linear-gradient(to right, var(--gradient-blue));
+		color: transparent;
 	}
 
 	clavier-reference {
@@ -206,11 +207,11 @@
 		position: fixed;
 		bottom: 0;
 		left: 0;
+		transition: all 0.2s ease-in-out;
+		padding-top: var(--hauteur-header);
 		width: 100vw;
 		height: 100vh;
-		padding-top: var(--hauteur-header);
 		overflow: scroll;
-		transition: all 0.2s ease-in-out;
 		overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
 	}
 
@@ -218,10 +219,10 @@
 		/* Permet d’avoir une div qui ne scrolle pas ce qui est dessous */
 		--marge: 10vh;
 		display: flex;
-		align-items: center;
-		justify-content: center;
 		flex-direction: column;
-		min-height: calc(100vh - var(--hauteur-header) - 2 * var(--marge) + 1px);
+		justify-content: center;
+		align-items: center;
 		margin: var(--marge) 0;
+		min-height: calc(100vh - var(--hauteur-header) - 2 * var(--marge) + 1px);
 	}
 </style>
