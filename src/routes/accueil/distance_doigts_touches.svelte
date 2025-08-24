@@ -15,7 +15,7 @@
 	et <kbd>JKLM</kbd> en AZERTY). En particulier, il y a souvent une petite bosse sur les touches de
 	repos pour les index, qui sont donc <kbd>F</kbd> et <kbd>J</kbd> en AZERTY.
 </p>
-<p class="text-gray">
+<p>
 	➜ L’idée est de taper sur une touche, puis de tout de suite replacer le doigt sur la rangée du
 	milieu. Cela permet de toujours être capable de bouger rapidement dans n’importe quelle direction,
 	un peu comme un sportif se replace toujours au milieu du terrain au cours d’un match.
@@ -58,13 +58,12 @@
 </bloc-clavier>
 
 <p>
-	Pourtant, le QWERTY est pire qu’une disposition aléatoire sur ce point. <span class="text-gray"
-		>La légende raconte que sa première rangée remonte à l’époque de l’invention de la machine à
-		écrire. Le choix de la disposition QWERTY aurait, entre autres raisons, été influencé par un
-		aspect purement marketing. En effet, à des fins de démonstrations, auraient été placées sur la
-		rangée supérieure de la machine à écrire toutes les lettres nécessaires pour pouvoir écrire
-		<kbd-sortie>TYPEWRITER</kbd-sortie>.</span
-	>
+	Pourtant, le QWERTY est pire qu’une disposition aléatoire sur ce point. La légende raconte que sa
+	première rangée remonte à l’époque de l’invention de la machine à écrire. Le choix de la
+	disposition QWERTY aurait, entre autres raisons, été influencé par un aspect purement marketing.
+	En effet, à des fins de démonstrations, auraient été placées sur la rangée supérieure de la
+	machine à écrire toutes les lettres nécessaires pour pouvoir écrire
+	<kbd-sortie>TYPEWRITER</kbd-sortie>.
 </p>
 <p>
 	Certaines des touches ayant les fréquences d’apparition les plus rares (en français et en anglais)
@@ -120,13 +119,10 @@
 	Une fois que les lettres les plus fréquentes ont été placées sur la rangée du milieu, il reste
 	encore beaucoup à faire. En effet, <span class="important"
 		>chaque doigt a une force différente</span
-	>.
-	<span class="text-gray"
-		>Ainsi, un pouce a plus de force qu’un index, qui a plus de force qu’un majeur, qui a plus de
-		force qu’un annulaire, qui a plus de force qu’un auriculaire. Vous pouvez facilement vous en
-		rendre compte en pressant fort de l’index sur une table, puis en essayant de faire de même avec
-		votre auriculaire.</span
-	>
+	>. Ainsi, un pouce a plus de force qu’un index, qui a plus de force qu’un majeur, qui a plus de
+	force qu’un annulaire, qui a plus de force qu’un auriculaire. Vous pouvez facilement vous en
+	rendre compte en pressant fort de l’index sur une table, puis en essayant de faire de même avec
+	votre auriculaire.
 </p>
 <p>
 	Par conséquent, ce constat de la force des doigts pris en compte, les meilleurs emplacements sont

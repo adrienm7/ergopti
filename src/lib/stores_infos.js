@@ -4,6 +4,7 @@ export const derniere_version = liste_versions[liste_versions.length - 1];
 export let version = writable(derniere_version); // Par défaut c’est la dernière version
 
 export const data_disposition = writable();
+export const discord_link = 'https://discord.gg/ptxRzBqcQP';
 
 export const presentation = writable({
 	emplacement: 'clavier_presentation',

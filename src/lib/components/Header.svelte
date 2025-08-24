@@ -5,7 +5,7 @@
 	import { page } from '$app/stores';
 
 	import { loadData } from '$lib/clavier/getData.js';
-	import { version, data_disposition, liste_versions } from '$lib/stores_infos.js';
+	import { version, data_disposition, liste_versions, discord_link } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
@@ -158,9 +158,7 @@
 					>Repo GitHub <i class="icon-github"></i></a
 				>
 				—
-				<a
-					href="https://discord.gg/ptxRzBqcQP"
-					style="position:relative; bottom:-0.1em; font-size:1em!important"
+				<a href={discord_link} style="position:relative; bottom:-0.1em; font-size:1em!important"
 					>Serveur Discord <i class="icon-discord"></i></a
 				>
 			</div>
