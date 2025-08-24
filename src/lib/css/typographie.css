@@ -19,33 +19,33 @@ a {
 
 .ergopti-title {
 	z-index: 2;
-	line-height: 1;
 	margin: 7vh 0;
-	font-size: 2.5rem;
 	-webkit-background-clip: text;
 	background-clip: text;
+	font-size: 2.5rem;
+	line-height: 1;
 	-webkit-text-fill-color: transparent;
-	color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	background-image: linear-gradient(to bottom, white, rgb(155, 155, 155));
+	color: transparent;
 }
 
 .encart-introduction {
-	/* background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%); */
-	max-width: 820px;
 	margin: 0 auto;
 	padding: 20px;
+	/* background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%); */
+	max-width: 820px;
 	line-height: 1.35rem;
 	text-align: center;
 }
 
 .encadre {
 	margin: 0;
-	padding: 25px;
-	background-color: rgba(0, 0, 0, 0.3);
 	border: 1px solid rgba(255, 255, 255, 0.7);
 	border-radius: 7px;
+	background-color: rgba(0, 0, 0, 0.3);
+	padding: 25px;
 }
 
 /* Mise en forme du texte */
@@ -56,14 +56,14 @@ strong,
 }
 
 .important {
-	font-weight: bold;
 	-webkit-background-clip: text;
 	background-clip: text;
+	font-weight: bold;
 	-webkit-text-fill-color: transparent;
-	color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	background-image: linear-gradient(to right, var(--gradient-blue));
+	color: transparent;
 }
 
 .text-center {
@@ -83,10 +83,10 @@ strong,
 }
 
 .surlignage-blanc {
-	background-color: white;
-	color: black;
 	border-radius: 0.2em;
+	background-color: white;
 	padding: 0 0.3em;
+	color: black;
 }
 
 .italic {
@@ -110,14 +110,14 @@ strong,
 /* Lettrines */
 
 .lettrine::first-letter {
-	font-size: 3em;
 	float: left;
-	color: black;
-	background-color: white;
-	padding: 13px;
 	margin-top: 6px;
 	margin-right: 10px;
 	border-radius: 2px;
+	background-color: white;
+	padding: 13px;
+	color: black;
+	font-size: 3em;
 }
 
 /* Correction d’un bug d’affichage entre SFB et s dans l’introduction de la page d’accueil */

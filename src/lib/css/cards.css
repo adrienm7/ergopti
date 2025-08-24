@@ -1,15 +1,15 @@
 .cards {
-	max-width: min(1000px, 95vw);
-	margin: 0 auto;
 	display: grid;
 	gap: 1rem;
+	margin: 0 auto;
+	max-width: min(1000px, 95vw);
 }
 
 .card {
 	display: block;
 	align-items: center;
-	padding: 1rem;
 	border-radius: 7px;
+	padding: 1rem;
 }
 
 .cards .card:nth-child(even) {
