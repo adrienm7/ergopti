@@ -9,8 +9,8 @@
 	import IntroductionInformations from './informations/introduction_informations.svelte';
 	import DispositionPlus from './accueil/ergopti_plus.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControlButtons from '$lib/keyboard/KeyboardControlButtons.svelte';
 
 	import 'modern-normalize';
 
@@ -148,9 +148,9 @@
 
 	<clavier-reference id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 		<div class="conteneur">
-			<BlocClavier nom="reference" />
+			<KeyboardBasis nom="reference" />
 			<mini-espace />
-			<BlocControlesClavier nom="reference" />
+			<KeyboardControlButtons nom="reference" />
 		</div>
 	</clavier-reference>
 </bloc-clavier-reference>
@@ -161,21 +161,21 @@
 
 <style>
 	#afficher-clavier-reference {
-		position: fixed;
-		right: 1rem;
-		bottom: 1rem;
-		z-index: 99;
 		animation: glowing 3s infinite alternate ease-in-out;
-		cursor: pointer;
-		margin: 0 auto;
-		box-shadow: 0px 0px 7px 3px #0087b4b1;
+		background-color: rgba(0, 1, 14, 0.9);
 		border: 1px solid rgba(0, 0, 0, 0.5);
 		border-radius: 5px;
-		background-color: rgba(0, 1, 14, 0.9);
-		padding: 0.5rem;
-		width: 3rem;
-		height: 3rem;
+		bottom: 1rem;
+		box-shadow: 0px 0px 7px 3px #0087b4b1;
+		cursor: pointer;
 		font-size: 1.5rem;
+		height: 3rem;
+		margin: 0 auto;
+		padding: 0.5rem;
+		position: fixed;
+		right: 1rem;
+		width: 3rem;
+		z-index: 99;
 	}
 
 	@keyframes glowing {
@@ -197,32 +197,32 @@
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
+		background-image: linear-gradient(to right, var(--gradient-blue));
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
-		background-image: linear-gradient(to right, var(--gradient-blue));
 		color: transparent;
 	}
 
 	clavier-reference {
 		--couleur: 60;
-		position: fixed;
 		bottom: 0;
-		left: 0;
-		transition: all 0.2s ease-in-out;
-		padding-top: var(--hauteur-header);
-		width: 100vw;
 		height: 100vh;
+		left: 0;
 		overflow: scroll;
 		overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
+		padding-top: var(--hauteur-header);
+		position: fixed;
+		transition: all 0.2s ease-in-out;
+		width: 100vw;
 	}
 
 	clavier-reference .conteneur {
 		/* Permet d’avoir une div qui ne scrolle pas ce qui est dessous */
 		--marge: 10vh;
+		align-items: center;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
-		align-items: center;
 		margin: var(--marge) 0;
 		min-height: calc(100vh - var(--hauteur-header) - 2 * var(--marge) + 1px);
 	}

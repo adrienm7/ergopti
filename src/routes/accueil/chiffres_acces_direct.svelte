@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 </script>
 
 <h2>Chiffres en accès direct et couche AltGr de symboles</h2>
@@ -24,4 +24,4 @@
 	qui amène les symboles directement sous les doigts.
 </p>
 <mini-espace></mini-espace>
-<BlocClavier nom="symboles" />
+<KeyboardBasis nom="symboles" />

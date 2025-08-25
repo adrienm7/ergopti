@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 </script>
 
 <h2>Distance des doigts aux touches</h2>
@@ -148,7 +148,7 @@
 </p>
 
 <mini-espace />
-<BlocClavier nom="frequences" />
+<KeyboardBasis nom="frequences" />
 <mini-espace />
 
 <p>

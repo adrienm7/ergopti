@@ -3,8 +3,8 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControlButtons from '$lib/keyboard/KeyboardControlButtons.svelte';
 	import Layout from './+layout.svelte';
 
 	import AlternanceMains from './accueil/alternance_mains.svelte';

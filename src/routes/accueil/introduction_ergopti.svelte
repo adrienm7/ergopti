@@ -3,8 +3,8 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControlButtons from '$lib/keyboard/KeyboardControlButtons.svelte';
 </script>
 
 <div>
@@ -13,9 +13,9 @@
 			><Ergopti></Ergopti><span>&nbsp;—</span>
 		</span>
 	</h1>
-	<BlocClavier nom="presentation" />
+	<KeyboardBasis nom="presentation" />
 	<mini-espace />
-	<BlocControlesClavier nom="presentation" />
+	<KeyboardControlButtons nom="presentation" />
 </div>
 
 <div style="margin: 0 auto; text-align:center; padding-top: 5px;">
@@ -85,10 +85,10 @@
 
 <style>
 	.scrollez {
-		display: block;
 		-webkit-animation: bounce7 2.5s infinite;
 		animation: bounce7 2.5s infinite;
 		color: white;
+		display: block;
 		font-size: 4rem;
 		font-size: clamp(20px, 4rem, 100px);
 		text-align: center;
@@ -96,15 +96,15 @@
 
 	@keyframes bounce7 {
 		0% {
-			-webkit-transform: translate(0, -20px);
 			opacity: 0;
+			-webkit-transform: translate(0, -20px);
 		}
 		50% {
 			opacity: 1;
 		}
 		100% {
-			-webkit-transform: translate(0, 40px);
 			opacity: 0;
+			-webkit-transform: translate(0, 40px);
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 </script>
 
 <h2>Abréviations</h2>
@@ -64,4 +64,4 @@
 	les suffixes les plus communs,
 	<span class="important">entraînant une augmentation de vitesse</span>.
 </p>
-<BlocClavier nom="a" />
+<KeyboardBasis nom="a" />

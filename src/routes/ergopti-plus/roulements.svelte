@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 </script>
 
 <h2>Ajout d’excellents roulements</h2>
@@ -70,7 +70,7 @@
 
 <h3>Roulements avec des symboles</h3>
 
-<BlocClavier nom="symboles_plus" />
+<KeyboardBasis nom="symboles_plus" />
 <mini-espace></mini-espace>
 
 <ul class="margin-top-2">

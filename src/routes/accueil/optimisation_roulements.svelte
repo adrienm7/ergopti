@@ -3,9 +3,9 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import { Clavier } from '$lib/clavier/Clavier.js';
-	let clavier = new Clavier('roulements');
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import { Keyboard } from '$lib/keyboard/Keyboard.js';
+	let clavier = new Keyboard('roulements');
 
 	let texte;
 	let roulements_voyelles = [
@@ -136,7 +136,7 @@
 
 <h3>Visualisation des roulements</h3>
 <p>Vous pouvez visualiser les roulements présentés précédemment ci-dessous :</p>
-<BlocClavier nom="roulements" />
+<KeyboardBasis nom="roulements" />
 <div style="height: 20px" />
 <controles-roulements
 	class="btn-group"

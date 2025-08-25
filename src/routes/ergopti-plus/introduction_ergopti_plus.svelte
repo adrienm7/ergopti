@@ -3,8 +3,8 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import BlocControlesClavier from '$lib/clavier/BlocControlesClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControlButtons from '$lib/keyboard/KeyboardControlButtons.svelte';
 </script>
 
 <div>
@@ -13,9 +13,9 @@
 			><ErgoptiPlus></ErgoptiPlus></span
 		>
 	</h1>
-	<BlocClavier nom="presentation_plus" />
+	<KeyboardBasis nom="presentation_plus" />
 	<mini-espace />
-	<BlocControlesClavier nom="presentation_plus" />
+	<KeyboardControlButtons nom="presentation_plus" />
 </div>
 
 <petit-espace />
