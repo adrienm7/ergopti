@@ -1,7 +1,7 @@
-import { Clavier } from '$lib/clavier/Clavier.js';
-import remplacements from '$lib/clavier/remplacementsMagique.json';
+import { Keyboard } from '$lib/keyboard/Keyboard.js';
+import remplacements from '$lib/keyboard/remplacementsMagique.json';
 
-export class EmulationClavier extends Clavier {
+export class KeyboardEmulation extends Keyboard {
 	constructor(id) {
 		super(id);
 		this.shift = false;
@@ -17,7 +17,7 @@ export class EmulationClavier extends Clavier {
 		this.virgule = false;
 		this.couche = 'Primary'; // Couche par défaut
 		// La portée de this est modifiée dans le textinput sinon et this.data_disposition est undefined
-		this.emulationClavier = this.emulationClavier.bind(this);
+		this.KeyboardEmulation = this.KeyboardEmulation.bind(this);
 		this.relacherModificateurs = this.relacherModificateurs.bind(this);
 	}
 
@@ -102,7 +102,7 @@ export class EmulationClavier extends Clavier {
 		this.majClavier();
 	}
 
-	emulationClavier(event) {
+	KeyboardEmulation(event) {
 		let modificateurActive = this.activationModificateur(event); // Activation des éventuelles touches modificatrices
 		this.setCouche();
 		if (this.alt && this.infos_clavier['plus'] === 'oui') {
@@ -325,7 +325,7 @@ export class EmulationClavier extends Clavier {
 
 			if (mot.toLowerCase() in remplacements) {
 				let remplacement = remplacements[mot.toLowerCase()];
-			
+
 				if (mot === mot.toUpperCase() && mot.length > 1) {
 					remplacement = remplacement.toUpperCase();
 				} else if (mot === mot.charAt(0).toUpperCase() + mot.slice(1).toLowerCase()) {
@@ -333,19 +333,18 @@ export class EmulationClavier extends Clavier {
 				} else {
 					remplacement = remplacement.toLowerCase();
 				}
-			
+
 				let regex = /(\s*)(\S+)$/;
 				let match = texteAvantCurseur.match(regex);
 				let prefix = match ? match[1] : '';
-			
+
 				this.textarea.value =
-					texteAvantCurseur.replace(regex, prefix + remplacement) +
-					texteApresCurseur;
+					texteAvantCurseur.replace(regex, prefix + remplacement) + texteApresCurseur;
 				nouvellePositionCurseur = positionCurseur + remplacement.length;
 			} else {
 				this.textarea.value = texteAvantCurseur + texteAvantCurseur.slice(-1) + texteApresCurseur;
 				nouvellePositionCurseur = positionCurseur + 1;
-			}			
+			}
 		} else {
 			this.textarea.value = texteAvantCurseur + touche + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur + touche.length;

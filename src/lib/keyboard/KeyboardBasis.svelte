@@ -1,10 +1,10 @@
 <script>
-	import '$lib/clavier/BlocClavier.css';
-	import { Clavier } from '$lib/clavier/Clavier.js';
+	import '$lib/keyboard/Keyboard.css';
+	import { Keyboard } from '$lib/keyboard/Keyboard.js';
 	import { onMount, afterUpdate } from 'svelte';
 
 	export let nom;
-	let clavier = new Clavier(nom);
+	let clavier = new Keyboard(nom);
 	onMount(() => {
 		clavier.majClavier();
 	});

@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 </script>
 
 <h2>Diminution des SFBs</h2>
@@ -30,7 +30,7 @@
 	consécutifs pour écrire un bigramme (donc éviter les <i>ciseaux</i>). C’est le cas de
 	<kbd>cl</kbd> ou encore de <kbd>ph</kbd>.
 </p>
-<BlocClavier nom="virgule" />
+<KeyboardBasis nom="virgule" />
 <p>
 	Comme vous pouvez le constater, la touche <kbd>,</kbd> est vraiment pour supprimer les derniers
 	petits <SFB />s restants. La disposition <Ergopti /> éliminait déjà la majorité d’entre eux.
@@ -89,7 +89,7 @@
 	pas avoir la même chose sur sa disposition clavier ?
 </p>
 <mini-espace />
-<BlocClavier nom="magique" />
+<KeyboardBasis nom="magique" />
 <mini-espace />
 <p>
 	La touche <kbd>★</kbd> est <span class="important">l’ajout principal</span>

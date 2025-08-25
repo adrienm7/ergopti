@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 </script>
 
 <h2>Optimisation pour l’utilisation à&nbsp;une&nbsp;main</h2>
@@ -37,7 +37,7 @@
 	<kbd>Z</kbd>
 </h3>
 
-<BlocClavier nom="controle" />
+<KeyboardBasis nom="controle" />
 <mini-espace />
 <p>
 	Les raccourcis <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>X</kbd-sortie>,
@@ -53,7 +53,7 @@
 </p>
 
 <h3>Touches de raccourci sur la version Ergodox</h3>
-<BlocClavier nom="raccourcis_ergodox" />
+<KeyboardBasis nom="raccourcis_ergodox" />
 <mini-espace></mini-espace>
 <p>
 	La version d’<Ergopti /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation

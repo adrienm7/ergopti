@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 export const liste_versions = ['1.1', '2.0', '2.1', '2.2'];
-export const derniere_version = liste_versions[liste_versions.length - 1];
-export let version = writable(derniere_version); // Par défaut c’est la dernière version
+export const latestVersion = liste_versions[liste_versions.length - 1];
+export let version = writable(latestVersion); // Default value
 
 export const data_disposition = writable();
 export const discord_link = 'https://discord.gg/ptxRzBqcQP';

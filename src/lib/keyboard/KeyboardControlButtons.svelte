@@ -1,16 +1,16 @@
 <script>
-	import '$lib/clavier/BlocControlesClavier.css';
-	import { Clavier } from '$lib/clavier/Clavier.js';
+	import '$lib/keyboard/KeyboardControlButtons.css';
+	import { Keyboard } from '$lib/keyboard/Keyboard.js';
 	import { onMount } from 'svelte';
 
-	import ChangementType from '$lib/clavier/controles/ChangementType.svelte';
-	import ChangementCouleur from '$lib/clavier/controles/ChangementCouleur.svelte';
-	import ChangementPlus from '$lib/clavier/controles/ChangementPlus.svelte';
-	import ChangementCouche from '$lib/clavier/controles/ChangementCouche.svelte';
+	import ChangementType from '$lib/keyboard/controles/ChangementType.svelte';
+	import ChangementCouleur from '$lib/keyboard/controles/ChangementCouleur.svelte';
+	import ChangementPlus from '$lib/keyboard/controles/ChangementPlus.svelte';
+	import ChangementCouche from '$lib/keyboard/controles/ChangementCouche.svelte';
 
 	export let nom;
 	let infos_clavier;
-	let clavier = new Clavier(nom);
+	let clavier = new Keyboard(nom);
 	clavier.data_clavier.subscribe((value) => {
 		infos_clavier = value;
 	});

@@ -1,7 +1,7 @@
 import * as stores_infos from '$lib/stores_infos.js';
-import { getData } from '$lib/clavier/getData.js';
+import { getKeyboardData } from '$lib/keyboard/getKeyboardData.js';
 
-import characterFrequencies from '$lib/clavier/characterFrequencies.json';
+import characterFrequencies from '$lib/keyboard/characterFrequencies.json';
 // Créer la clé "max" contenant la valeur maximale parmi les fréquences (souvent la fréquence en E)
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
 characterFrequencies.min = Math.min(...Object.values(characterFrequencies));
@@ -10,7 +10,7 @@ function transformLogarithmique(x, k) {
 	return Math.log(1 + k * x) / Math.log(1 + k);
 }
 
-export class Clavier {
+export class Keyboard {
 	constructor(id) {
 		this.id = id;
 
@@ -49,7 +49,7 @@ export class Clavier {
 	majClavier() {
 		// On n’en a pas besoin, et si c’est activé cela multiplie les requêtes inutiles (1 par clavier)
 		// if (this.data_disposition === undefined) {
-		// 	this.data_disposition = getData(this.version);
+		// 	this.data_disposition = getKeyboardData(this.version);
 		// }
 		this.majTouches();
 		this.activerModificateurs();

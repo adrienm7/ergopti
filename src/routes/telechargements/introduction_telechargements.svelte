@@ -3,8 +3,8 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import EmulationClavier from '$lib/clavier/EmulationClavier.svelte';
-	import remplacements from '$lib/clavier/remplacementsMagique.json';
+	import KeyboardEmulation from '$lib/keyboard/KeyboardEmulation.svelte';
+	import remplacements from '$lib/keyboard/remplacementsMagique.json';
 
 	// Variable pour contrôler l'affichage du tableau d’abréviations
 	let isCollapsed = true;
@@ -15,7 +15,7 @@
 	<hr class="margin-h1" />
 
 	<h2>Tester la disposition en ligne</h2>
-	<EmulationClavier />
+	<KeyboardEmulation />
 	<mini-espace />
 	{#if isCollapsed}
 		<button on:click={() => (isCollapsed = !isCollapsed)}>

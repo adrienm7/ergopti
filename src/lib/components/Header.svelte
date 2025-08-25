@@ -4,7 +4,7 @@
 
 	import { page } from '$app/stores';
 
-	import { loadData } from '$lib/clavier/getData.js';
+	import { loadData } from '$lib/keyboard/getKeyboardData.js';
 	import { version, data_disposition, liste_versions, discord_link } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
@@ -206,26 +206,23 @@
 		background-image: inherit; */
 		-webkit-appearance: none;
 		-moz-appearance: none;
-		margin: 0;
-		margin-bottom: -4px;
+		background-clip: text;
 		border: 1px solid rgb(14, 83, 117);
 		border-radius: 5px;
-		background-clip: text;
+		color: white;
+		margin: 0;
+		margin-bottom: -4px;
 		padding: 0;
 		padding: 4px;
-		padding-top: 1px;
 		padding-bottom: 2px;
-		color: white;
+		padding-top: 1px;
 		/* width: 2.3em; */
 	}
 
 	.myselect {
-		display: inline-block;
-		position: relative;
-		margin: 0;
-		padding: 0;
 		/* padding-right: 0.2em; */
 		color: white;
+		display: inline-block;
 		/* background-clip: text;
 		-webkit-text-fill-color: transparent;
 		color: transparent;
@@ -233,6 +230,9 @@
 		box-decoration-break: clone;
 		background-image: inherit; */
 		font-weight: normal !important;
+		margin: 0;
+		padding: 0;
+		position: relative;
 	}
 
 	/* .myselect::after {
@@ -256,20 +256,20 @@
 	}
 
 	header {
+		align-items: center;
+		backdrop-filter: blur(30px);
+		background-color: var(--couleur-header);
+		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
 		display: flex;
+		height: var(--hauteur-header);
+		justify-content: space-between;
+		left: 0;
+		margin: 0;
+		padding: 0;
 		position: fixed;
 		top: 0;
-		left: 0;
-		justify-content: space-between;
-		align-items: center;
-		z-index: 100;
-		backdrop-filter: blur(30px);
-		margin: 0;
-		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
-		background-color: var(--couleur-header);
-		padding: 0;
 		width: 100vw;
-		height: var(--hauteur-header);
+		z-index: 100;
 	}
 	header a {
 		color: var(--couleur-liens-header);
@@ -286,18 +286,18 @@
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
+		background-image: linear-gradient(to right, var(--gradient-blue));
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
-		background-image: linear-gradient(to right, var(--gradient-blue));
 		color: transparent;
 	}
 
 	header .header-logo {
-		display: inline-flex;
-		justify-content: center;
 		align-items: center;
-		margin-left: clamp(3px, 1vw, 10px);
+		display: inline-flex;
 		height: 100%;
+		justify-content: center;
+		margin-left: clamp(3px, 1vw, 10px);
 		/* margin-left: var(--marge-bords-menu); */
 	}
 	header .menu-btn {
@@ -305,8 +305,8 @@
 	}
 
 	.logo {
-		margin-top: 3px;
 		height: calc(0.85 * var(--hauteur-header));
+		margin-top: 3px;
 		/*  
 		margin-right: 10px;
 		padding: 3px;
@@ -319,64 +319,64 @@
 	/* Menu mobile */
 	@media (max-width: 1400px) {
 		header #menu {
+			backdrop-filter: blur(30px);
+			background-color: var(--couleur-header-mobile);
+			border-top: 1px solid rgba(255, 255, 255, 0.2);
+			left: 0;
+			margin: 0;
+			overflow: hidden;
+			padding: 0;
 			position: fixed;
 			top: var(--hauteur-header);
-			left: 0;
-			z-index: 98;
-			backdrop-filter: blur(30px);
 			transition: height 0.15s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
-			margin: 0;
-			border-top: 1px solid rgba(255, 255, 255, 0.2);
-			background-color: var(--couleur-header-mobile);
-			padding: 0;
 			width: 100%;
-			overflow: hidden;
+			z-index: 98;
 		}
 
 		header #menu p a {
-			display: block;
 			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+			display: block;
+			line-height: 1em;
 			padding: var(--hauteur-element-menu-mobile) 0;
 			padding-left: var(--marge-fenetre);
-			line-height: 1em;
 			text-decoration: none;
 		}
 		header #menu p,
 		header #menu p a p {
+			font-size: 1.1rem;
+			line-height: 1em !important;
 			margin: 0;
 			padding: 0;
 			width: 100%;
-			font-size: 1.1rem;
-			line-height: 1em !important;
 		}
 
 		/* menu icon */
 
 		header .menu-icon {
-			display: inline-block;
 			cursor: pointer;
+			display: inline-block;
 			padding: var(--marge-bords-menu);
 			user-select: none;
 		}
 
 		header .menu-icon .navicon {
+			background: var(--couleur-icone-hamburger);
 			display: block;
+			height: 2px;
 			position: relative;
 			transition: background 0.1s ease-out;
-			background: var(--couleur-icone-hamburger);
 			width: var(--longueur-traits-hamburger);
-			height: 2px;
 		}
 
 		header .menu-icon .navicon:before,
 		header .menu-icon .navicon:after {
+			background: var(--couleur-icone-hamburger);
+			content: '';
 			display: block;
+			height: 100%;
 			position: absolute;
 			transition: all 0.1s ease-out;
-			background: var(--couleur-icone-hamburger);
 			width: 100%;
-			height: 100%;
-			content: '';
 		}
 
 		header .menu-icon .navicon:before {
@@ -420,37 +420,37 @@
 	/* Menu ordinateur */
 	@media (min-width: 1400px) {
 		header #menu #menu-pages {
+			background-color: transparent;
+			border: none;
 			display: flex !important;
 			flex-direction: row;
-			z-index: 1;
 			margin: 0;
-			border: none;
-			background-color: transparent;
 			padding: 0;
 			padding-right: var(--marge-bords-menu);
+			z-index: 1;
 		}
 
 		header #menu #menu-pages p {
-			display: flex;
-			justify-content: center;
 			align-items: center;
-			margin: 0;
-			border-bottom: 0;
 			background-color: transparent;
+			border-bottom: 0;
+			display: flex;
+			font-size: 1rem;
+			height: var(--hauteur-header);
+			justify-content: center;
+			margin: 0;
 			padding: 0;
 			padding-left: calc(2 * var(--espacement-items-menu) + 5px);
-			height: var(--hauteur-header);
-			font-size: 1rem;
 		}
 
 		header #menu #menu-pages p:not(:last-child)::after {
+			background-color: transparent;
+			box-shadow: 2px 0 2px 0px var(--couleur-ombre);
+			content: '';
+			height: 100%;
 			position: relative;
 			right: calc((-1) * var(--espacement-items-menu));
-			box-shadow: 2px 0 2px 0px var(--couleur-ombre);
-			background-color: transparent;
 			width: 5px;
-			height: 100%;
-			content: '';
 		}
 
 		header #menu #menu-pages p a {
@@ -464,14 +464,14 @@
 		}
 
 		header #menu #menu-pages p[aria-current='page'] a::after {
-			display: block;
-			position: relative;
-			bottom: -5px;
-			border-radius: 5px;
 			background-image: linear-gradient(to right, var(--gradient-blue));
-			width: 100%;
-			height: 3px;
+			border-radius: 5px;
+			bottom: -5px;
 			content: '';
+			display: block;
+			height: 3px;
+			position: relative;
+			width: 100%;
 		}
 
 		/* header #menu #menu-pages p:not([aria-current='page']) .titre:hover::after {

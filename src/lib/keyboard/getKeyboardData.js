@@ -13,7 +13,7 @@ export async function loadData(version) {
 	}
 }
 
-export function getData(versionValue) {
+export function getKeyboardData(versionValue) {
 	loadData(versionValue)
 		.then((data) => {
 			return data;

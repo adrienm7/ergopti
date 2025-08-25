@@ -1,17 +1,17 @@
 <script>
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
-	import { EmulationClavier } from '$lib/clavier/EmulationClavier.js';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import { KeyboardEmulation } from '$lib/keyboard/KeyboardEmulation.js';
 	import { onMount, afterUpdate } from 'svelte';
 
 	let champTexte = '';
-	let clavier = new EmulationClavier('emulation');
+	let clavier = new KeyboardEmulation('emulation');
 	onMount(() => {
 		clavier.textarea = document.getElementById('input-text');
 		clavier.majClavier();
 	});
 </script>
 
-<BlocClavier nom="emulation" />
+<KeyboardBasis nom="emulation" />
 
 <mini-espace />
 
@@ -20,23 +20,23 @@
 		id="input-text"
 		placeholder="Écrivez ici"
 		bind:value={champTexte}
-		on:keydown={clavier.emulationClavier}
+		on:keydown={clavier.KeyboardEmulation}
 		on:keyup={clavier.relacherModificateurs}
 	/>
 </div>
 
 <style>
 	#input-text {
-		display: block;
-		margin: 0 auto;
-		width: 100%;
-		height: 200px;
-		padding: 15px;
-		border-radius: 5px;
-		border: none;
-		resize: none;
 		background-color: rgba(0, 0, 0, 0.4);
+		border: none;
+		border-radius: 5px;
 		color: rgba(255, 255, 255, 0.9);
+		display: block;
+		height: 200px;
+		margin: 0 auto;
+		padding: 15px;
+		resize: none;
+		width: 100%;
 	}
 
 	#input-text:focus-visible {

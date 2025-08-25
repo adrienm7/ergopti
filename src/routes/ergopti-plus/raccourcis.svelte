@@ -3,7 +3,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import BlocClavier from '$lib/clavier/BlocClavier.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 </script>
 
 <h2>Raccourcis</h2>
@@ -62,7 +62,7 @@
 
 	<petit-espace></petit-espace>
 
-	<BlocClavier nom="layer" />
+	<KeyboardBasis nom="layer" />
 	<p>
 		Le <kbd>Layer</kbd> de navigation contient quant à lui les flèches directionnelles pour naviguer
 		rapidement dans un texte, mais aussi toutes les combinaisons de ces flèches avec des
