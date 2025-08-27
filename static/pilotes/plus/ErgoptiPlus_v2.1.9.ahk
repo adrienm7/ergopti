@@ -1401,7 +1401,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 ; =====================================================================
 
 ; ======= Rangée du haut =======
-f
+
 ; Z
 :*?C:,è::
 {
