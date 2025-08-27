@@ -16,20 +16,31 @@ SetKeyDelay(0) ; No delay between key presses
 SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
 ; Otherwise, we can’t have a hotstring triggering another hotstring, triggering another hotstring, etc.
 
-SendNewResult(Text, OnlyText := True) {
+SendNewResult(Text, options := Map()) {
+    ; Default values if not provided
+    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : True
+
     ; Hotstrings will be triggered, so SendNewResult("a") can give a ➜ b ➜ c (final result)
-    if OnlyText {
+    if OptionOnlyText {
         SendEvent("{Text}" Text)
         ; We use Send("{Text}") because otherwise sending certain special characters like symbols will trigger modifiers, like Alt or AltGr, and may even stay locked in that state
         ; An example is writing "c’est" with the windows Ergopti layout
     } else {
         SendEvent(Text)
     }
+    UpdateLastSentCharacter(SubStr(Text, -1))
 }
 
-SendFinalResult(Text) {
+SendFinalResult(Text, options := Map()) {
+    ; Default values if not provided
+    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : False
+
     ; SendInput prevents other hotstrings/hotkeys from activating, so this is the "final" result
-    SendInput(Text)
+    if OptionOnlyText {
+        SendInput("{Text}" Text)
+    } else {
+        SendInput(Text)
+    }
 }
 
 SendInstant(Text) {
@@ -37,7 +48,7 @@ SendInstant(Text) {
     OldClipboard := ClipboardAll()  ; Save the current clipboard
 
     A_Clipboard := Text             ; Put the text into the clipboard
-    SendFinalResult("^v")           ; Paste into the active window
+    SendInput("^v")                 ; Paste into the active window
     Sleep(200)                      ; Give time for the paste to finish
 
     A_Clipboard := OldClipboard     ; Restore the original clipboard
@@ -49,7 +60,7 @@ HotstringsTriggerDelay := 30 ; in ms
 ActivateHotstrings() {
     SendNewResult(" ")
     Sleep(HotstringsTriggerDelay)
-    SendFinalResult("{Backspace}")
+    SendFinalResult("{BackSpace}")
 }
 
 GetSelection() {
@@ -78,38 +89,93 @@ MicrosoftApps() {
     or WinActive("ahk_exe POWERPNT.EXE")
 }
 
-CreateHotstring(Flags, Abbreviation, Replacement, OnlyText := True, FinalResult := FALSE) {
-    FlagsPortion := ":" Flags ":"
-    Hotstring(FlagsPortion Abbreviation, (*) => HotstringHandler(Replacement, A_EndChar, OnlyText, FinalResult))
+CreateHotstring(Flags, Abbreviation, Replacement, options := Map()) {
+    ; Default values if not provided
+    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : True
+    OptionFinalResult := options.Has("FinalResult") ? options["FinalResult"] : False
+    OptionTimeActivationSeconds := options.Has("TimeActivationSeconds") ? options[
+        "TimeActivationSeconds"] : 0
+
+    HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
+        "TimeActivationSeconds", OptionTimeActivationSeconds)
+
+    FlagsPortion := ":" Flags "B0:"
+    Hotstring(
+        FlagsPortion Abbreviation,
+        (*) => HotstringHandler(
+            Abbreviation,
+            Replacement,
+            A_EndChar,
+            HotstringOptions
+        )
+    )
 }
 
-HotstringHandler(Replacement, EndChar := "", OnlyText := True, FinalResult := FALSE) {
+HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) {
+    ; Default values if not provided
+    OnlyText := HotstringOptions.Has("OnlyText") ? HotstringOptions["OnlyText"] : True
+    FinalResult := HotstringOptions.Has("FinalResult") ? HotstringOptions["FinalResult"] : False
+    OptionTimeActivationSeconds := HotstringOptions.Has("TimeActivationSeconds") ? HotstringOptions[
+        "TimeActivationSeconds"] : 0
+
+    if IsTimeActivationExpired(Abbreviation, OptionTimeActivationSeconds) {
+        return
+    }
+
+    ; We pass the abbreviation as argument to delete it manually, as we use the B0 flag
+    ; This is to make it work everywhere, like in URL bar or in the code inspector inside navigators
+    ; Otherwise, typing hc to get wh gives hwh for example when trying to type "white"
+    NumberOfCharactersToDelete := StrLen(Abbreviation)
+    if (EndChar != "" and EndChar != "`t") {
+        ; Delete ending character too if present, to then add it again
+        ; Doesn’t work with Tab, as it can add multiple Spaces
+        NumberOfCharactersToDelete := NumberOfCharactersToDelete + 1
+    }
+
     if FinalResult {
-        SendFinalResult(Replacement)
-        if (EndChar != "") {
-            if (EndChar = "`t") {
-                SendFinalResult("{Tab}")
-            } else {
-                SendFinalResult(EndChar)
-            }
+        if (EndChar == "`t") {
+            SendFinalResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
+        SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        SendFinalResult(Replacement, Map("OnlyText", OnlyText))
+        SendFinalResult(EndChar)
     } else {
-        SendNewResult(Replacement, OnlyText)
-        ActivateHotstrings()
-        if (EndChar != "") {
-            if (EndChar = "`t") {
-                SendNewResult("{Tab}", FALSE)
-            } else {
-                SendNewResult(EndChar, FALSE)
-            }
+        if (EndChar == "`t") {
+            SendNewResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
+        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        SendNewResult(Replacement, Map("OnlyText", OnlyText))
+        SendNewResult(EndChar, Map("OnlyText", False))
     }
 }
 
-CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement,
-    PreferTitleCase := TRUE, OnlyText := True, FinalResult := FALSE) {
+IsTimeActivationExpired(Abbreviation, OptionTimeActivationSeconds) {
+    ; Don’t activate the hotstring if taped too slowly
+    Now := A_TickCount
+    PreviousCharacter := SubStr(Abbreviation, -2, 1)
+    CharacterSentTime := LastSentCharacterKeyTime.Has(PreviousCharacter) ? LastSentCharacterKeyTime[PreviousCharacter] :
+        Now
+    if OptionTimeActivationSeconds > 0 {
+        ; We need to convert into milliseconds, hence the multiplication by 1000
+        if (Now - CharacterSentTime > OptionTimeActivationSeconds * 1000) {
+            return true
+        }
+    }
+    return false
+}
 
-    FlagsPortion := ":" Flags "C:"
+CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()) {
+    ; Default values if not provided
+    OptionPreferTitleCase := options.Has("PreferTitleCase") ? options["PreferTitleCase"] : True
+    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : True
+    OptionFinalResult := options.Has("FinalResult") ? options["FinalResult"] : False
+    OptionTimeActivationSeconds := options.Has("TimeActivationSeconds") ? options[
+        "TimeActivationSeconds"] : 0
+
+    HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
+        "TimeActivationSeconds", OptionTimeActivationSeconds)
+
+    FlagsPortion := ":" Flags "CB0:"
     AbbreviationLowercase := StrLower(Abbreviation)
     ReplacementLowercase := StrLower(Replacement)
     AbbreviationTitleCase := StrTitle(Abbreviation)
@@ -120,15 +186,15 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement,
     ; Abbreviation lowercase
     Hotstring(
         FlagsPortion AbbreviationLowercase,
-        (*) => HotstringHandler(ReplacementLowercase, A_EndChar, OnlyText, FinalResult)
+        (*) => HotstringHandler(AbbreviationLowercase, ReplacementLowercase, A_EndChar, HotstringOptions)
     )
 
     ; First letter of abbreviation uppercase and rest lowercase
-    if not PreferTitleCase {
+    if not OptionPreferTitleCase {
         ; Special case of repeat key ("A★" must give AA)
         Hotstring(
             FlagsPortion AbbreviationTitleCase,
-            (*) => HotstringHandler(ReplacementUppercase, A_EndChar, OnlyText, FinalResult)
+            (*) => HotstringHandler(AbbreviationTitleCase, ReplacementUppercase, A_EndChar, HotstringOptions)
         )
         return
     } else if (SubStr(AbbreviationTitleCase, 1, 1) == ",") {
@@ -136,17 +202,17 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement,
         AbbreviationTitleCaseV1 := " :" SubStr(AbbreviationLowercase, 2)
         Hotstring(
             FlagsPortion AbbreviationTitleCaseV1,
-            (*) => HotstringHandler(ReplacementTitleCase, A_EndChar, OnlyText, FinalResult)
+            (*) => HotstringHandler(AbbreviationTitleCaseV1, ReplacementTitleCase, A_EndChar, HotstringOptions)
         )
         AbbreviationTitleCaseV2 := " ;" SubStr(AbbreviationLowercase, 2)
         Hotstring(
             FlagsPortion AbbreviationTitleCaseV2,
-            (*) => HotstringHandler(ReplacementTitleCase, A_EndChar, OnlyText, FinalResult)
+            (*) => HotstringHandler(AbbreviationTitleCaseV2, ReplacementTitleCase, A_EndChar, HotstringOptions)
         )
     } else {
         Hotstring(
             FlagsPortion AbbreviationTitleCase,
-            (*) => HotstringHandler(ReplacementTitleCase, A_EndChar, OnlyText, FinalResult)
+            (*) => HotstringHandler(AbbreviationTitleCase, ReplacementTitleCase, A_EndChar, HotstringOptions)
         )
     }
 
@@ -160,24 +226,26 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement,
             AbbreviationUppercaseV1 := " :" SubStr(AbbreviationUppercase, 2)
             Hotstring(
                 FlagsPortion AbbreviationUppercaseV1,
-                (*) => HotstringHandler(ReplacementUppercase, A_EndChar, OnlyText, FinalResult)
+                (*) => HotstringHandler(AbbreviationUppercaseV1, ReplacementUppercase, A_EndChar, HotstringOptions
+                )
             )
             AbbreviationUppercaseV2 := " ;" SubStr(AbbreviationUppercase, 2)
             Hotstring(
                 FlagsPortion AbbreviationUppercaseV2,
-                (*) => HotstringHandler(ReplacementUppercase, A_EndChar, OnlyText, FinalResult)
+                (*) => HotstringHandler(AbbreviationUppercaseV2, ReplacementUppercase, A_EndChar, HotstringOptions
+                )
             )
         } else if (SubStr(AbbreviationUppercase, -1, 1) == "'") {
             AbbreviationUppercase := SubStr(AbbreviationUppercase, 1, StrLen(AbbreviationUppercase) - 1) " ?"
             Hotstring(
                 FlagsPortion AbbreviationUppercase,
-                (*) => HotstringHandler(ReplacementUppercase, A_EndChar, OnlyText, FinalResult)
+                (*) => HotstringHandler(AbbreviationUppercase, ReplacementUppercase, A_EndChar, HotstringOptions)
             )
         }
         else {
             Hotstring(
                 FlagsPortion AbbreviationUppercase,
-                (*) => HotstringHandler(ReplacementUppercase, A_EndChar, OnlyText, FinalResult)
+                (*) => HotstringHandler(AbbreviationUppercase, ReplacementUppercase, A_EndChar, HotstringOptions)
             )
         }
     }
@@ -206,15 +274,15 @@ StrTitle(Text) {
 ; ======= 1.1) Variables initialization =======
 ; =============================================
 
-global TapHoldTime := "T.2" ; The first 200ms a key is pressed will give a tap, above will be a hold
-
 ; NOT TO MODIFY
 global RemappedList := Map()
-global CapsWordEnabled := FALSE ; If the keyboard layer is currently in CapsWord state
-global LayerEnabled := FALSE ; If the keyboard layer is currently in navigation state
+global LastSentCharacterKeyTime := Map() ; Tracks the time since a key was pressed
+global CapsWordEnabled := False ; If the keyboard layer is currently in CapsWord state
+global LayerEnabled := False ; If the keyboard layer is currently in navigation state
 global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times, we can do the same in the navigation layer
 global LastSentCharacter := "" ; Useful for modifying the output of a key depending on the previous character sent
-global ActivitySimulation := FALSE
+global ActivitySimulation := False
+global OneShotShiftEnabled := False
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -228,318 +296,435 @@ global ActivitySimulation := FALSE
 global Features := Map(
     "Layout", Map(
         "ErgoptiBase", {
-            Enabled: TRUE,
-            Description: "Émuler la couche de base de la disposition Ergopti"
+            Enabled: True,
+            Description: "Émuler la couche de base de la disposition Ergopti",
         },
         "DirectAccessDigits", {
-            Enabled: TRUE,
-            Description: "Chiffres en accès direct sur la rangée du haut"
+            Enabled: True,
+            Description: "Chiffres en accès direct sur la rangée du haut",
         },
         "ErgoptiAltGr", {
-            Enabled: TRUE,
-            Description: "Émuler la couche AltGr de la disposition Ergopti"
+            Enabled: True,
+            Description: "Émuler la couche AltGr de la disposition Ergopti",
         },
         "ErgoptiPlus", {
-            Enabled: TRUE,
-            Description: "Appliquer les légers changements en AltGr d’Ergopti➕"
+            Enabled: True,
+            Description: "Appliquer les légers changements en AltGr d’Ergopti➕",
         }
     ),
     "DistancesReduction", Map(
         "QU", {
-            Enabled: TRUE,
-            Description: "Q devient QU quand elle est suivie d’une voyelle : q + a = qua, q + o = quo, …"
+            Enabled: True,
+            Description: "Q devient QU quand elle est suivie d’une voyelle : q + a = qua, q + o = quo, …",
+            TimeActivationSeconds: 1,
         },
         "SuffixesA", {
-            Enabled: TRUE,
-            Description: "À + lettre donne un suffixe : às = ement, àn = ation, àé = ying, …"
+            Enabled: True,
+            Description: "À + lettre donne un suffixe : às = ement, àn = ation, àé = ying, …",
+            TimeActivationSeconds: 1,
         },
         "DeadKeyECircumflex", {
-            Enabled: TRUE,
-            Description: "Ê suivi d’une voyelle agit comme une touche morte : ê + o = ô, ê + u = û, …"
+            Enabled: True,
+            Description: "Ê suivi d’une voyelle agit comme une touche morte : ê + o = ô, ê + u = û, …",
+            TimeActivationSeconds: 1,
         },
         "CommaJ", {
-            Enabled: TRUE,
-            Description: "Virgule + Voyelle donne J : ,a = ja, ,' = j’, …"
+            Enabled: True,
+            Description: "Virgule + Voyelle donne J : ,a = ja, ,' = j’, …",
+            TimeActivationSeconds: 1,
         },
         "CommaFarLetters", {
-            Enabled: TRUE,
-            Description: "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,s=q et ,c=ç et ,x=Ç"
+            Enabled: True,
+            Description: "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,s=q et ,c=ç et ,x=où",
+            TimeActivationSeconds: 1,
         },
         "SpaceAroundSymbols", {
-            Enabled: TRUE,
-            Description: "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]"
+            Enabled: True,
+            Description: "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]",
+            TimeActivationSeconds: 1,
         },
     ),
     "SFBsReduction", Map(
         "Comma", {
-            Enabled: TRUE,
-            Description: "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"
+            Enabled: True,
+            Description: "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …",
+            TimeActivationSeconds: 1,
         },
         "ECirc", {
-            Enabled: TRUE,
-            Description: "Ê + touche sur la main gauche corrige des SFBs : êe = oe, eê = eo, ê. = u., êé = aî, …"
+            Enabled: True,
+            Description: "Ê + touche sur la main gauche corrige des SFBs : êe = oe, eê = eo, ê. = u., êé = aî, …",
+            TimeActivationSeconds: 1,
         },
         "EGrave", {
-            Enabled: TRUE,
-            Description: "È + touche Y corrige 2 SFBs : èy = ié et yè = éi"
+            Enabled: True,
+            Description: "È + touche Y corrige 2 SFBs : èy = ié et yè = éi",
+            TimeActivationSeconds: 1,
+        },
+        "BU", {
+            Enabled: True,
+            Description: "À corrige 2 SFBs : à★ = bu et àu = ub",
+            TimeActivationSeconds: 1,
         },
     ),
     "Rolls", Map(
-        "CloseChevronTag", {
-            Enabled: TRUE,
-            Description: "<@ ➜ </"
-        },
-        "ChevronEqual", {
-            Enabled: TRUE,
-            Description: "<% ➜ <= et >% ➜ >="
-        },
-        "Assign", {
-            Enabled: TRUE,
-            Description: "#! ➜ :="
-        },
-        "NotEqual", {
-            Enabled: TRUE,
-            Description: "!# ➜ !="
-        },
         "HC", {
-            Enabled: TRUE,
-            Description: "HC ➜ WH"
+            Enabled: True,
+            Description: "hc ➜ wh",
+            TimeActivationSeconds: 0.5,
         },
         "SX", {
-            Enabled: TRUE,
-            Description: "SX ➜ SK"
+            Enabled: True,
+            Description: "sx ➜ sk",
+            TimeActivationSeconds: 0.5,
         },
         "CX", {
-            Enabled: TRUE,
-            Description: "CX ➜ CK"
-        },
-        "HashtagQuote", {
-            Enabled: TRUE,
-            Description: "(# ➜ (`" et [# ➜ [`""
-        },
-        "HashtagParenthesis", {
-            Enabled: TRUE,
-            Description: "#( ➜ `")"
-        },
-        "HashtagBracket", {
-            Enabled: TRUE,
-            Description: "#[ ➜ `"]"
-        },
-        "EqualString", {
-            Enabled: TRUE,
-            Description: "[ ) ➜ = `" `""
+            Enabled: True,
+            Description: "cx ➜ ck",
+            TimeActivationSeconds: 0.5,
         },
         "EnglishNegation", {
-            Enabled: TRUE,
-            Description: "nt' ➜ = n’t"
+            Enabled: True,
+            Description: "nt' ➜ = n’t",
+            TimeActivationSeconds: 0.5,
         },
         "EZ", {
-            Enabled: TRUE,
-            Description: "EÉ ➜ EZ"
-        },
-        "Comment", {
-            Enabled: TRUE,
-            Description: "\`" = /*"
-        },
-        "AssignArrowEqualRight", {
-            Enabled: TRUE,
-            Description: "$= ➜ =>"
-        },
-        "AssignArrowEqualLeft", {
-            Enabled: TRUE,
-            Description: "=$ ➜ <="
-        },
-        "AssignArrowMinusRight", {
-            Enabled: TRUE,
-            Description: "+? ➜ ->"
-        },
-        "AssignArrowMinusLeft", {
-            Enabled: TRUE,
-            Description: "?+ ➜ <-"
+            Enabled: True,
+            Description: "eé ➜ ez",
+            TimeActivationSeconds: 0.5,
         },
         "CT", {
-            Enabled: TRUE,
-            Description: "P' ➜ CT"
+            Enabled: True,
+            Description: "p' ➜ ct",
+            TimeActivationSeconds: 0.5,
+        },
+        "CloseChevronTag", {
+            Enabled: True,
+            Description: "<@ ➜ </",
+            TimeActivationSeconds: 0.5,
+        },
+        "ChevronEqual", {
+            Enabled: True,
+            Description: "<% ➜ <= et >% ➜ >=",
+            TimeActivationSeconds: 0.5,
+        },
+        "Assign", {
+            Enabled: True,
+            Description: "#! ➜ :=",
+            TimeActivationSeconds: 0.5,
+        },
+        "NotEqual", {
+            Enabled: True,
+            Description: "!# ➜ !=",
+            TimeActivationSeconds: 0.5,
+        },
+        "HashtagQuote", {
+            Enabled: True,
+            Description: "(# ➜ (`" et [# ➜ [`"",
+            TimeActivationSeconds: 0.5,
+        },
+        "HashtagParenthesis", {
+            Enabled: True,
+            Description: "#( ➜ `")",
+            TimeActivationSeconds: 0.5,
+        },
+        "HashtagBracket", {
+            Enabled: True,
+            Description: "#[ ➜ `"] et #] ➜ `"]",
+            TimeActivationSeconds: 0.5,
+        },
+        "EqualString", {
+            Enabled: True,
+            Description: "[ ) ➜ = `" `"",
+            TimeActivationSeconds: 0.5,
+        },
+        "Comment", {
+            Enabled: True,
+            Description: "\`" = /*",
+            TimeActivationSeconds: 0.5,
+        },
+        "AssignArrowEqualRight", {
+            Enabled: True,
+            Description: "$= ➜ =>",
+            TimeActivationSeconds: 0.5,
+        },
+        "AssignArrowEqualLeft", {
+            Enabled: True,
+            Description: "=$ ➜ <=",
+            TimeActivationSeconds: 0.5,
+        },
+        "AssignArrowMinusRight", {
+            Enabled: True,
+            Description: "+? ➜ ->",
+            TimeActivationSeconds: 0.5,
+        },
+        "AssignArrowMinusLeft", {
+            Enabled: True,
+            Description: "?+ ➜ <-",
+            TimeActivationSeconds: 0.5,
         },
     ),
     "Autocorrection", Map(
         "TypographicApostrophe", {
-            Enabled: TRUE,
-            Description: "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
+            Enabled: True,
+            Description: "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …",
+            TimeActivationSeconds: 1,
         },
         "Errors", {
-            Enabled: TRUE,
-            Description: "Corrige certaines fautes de frappe : OUi = Oui, aeu = eau, …"
+            Enabled: True,
+            Description: "Corrige certaines fautes de frappe : OUi = Oui, aeu = eau, …",
+            TimeActivationSeconds: 1,
         },
         "SuffixesAChaining", {
-            Enabled: TRUE,
-            Description: "Permet d’enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement"
+            Enabled: True,
+            Description: "Permet d’enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement",
+            TimeActivationSeconds: 1,
         },
         "Accents", {
-            Enabled: TRUE,
-            Description: "Autocorrection des accents de nombreux mots"
+            Enabled: True,
+            Description: "Autocorrection des accents de nombreux mots",
         },
         "Brands", {
-            Enabled: TRUE,
-            Description: "Met les majuscules au noms de marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
+            Enabled: True,
+            Description: "Met les majuscules au noms de marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …",
         },
         "Names", {
-            Enabled: TRUE,
-            Description: "Corrige les accents sur les prénoms et sur les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
+            Enabled: True,
+            Description: "Corrige les accents sur les prénoms et sur les noms de pays : alexei = Alexeï, taiwan = Taïwan, …",
         },
         "Minus", {
-            Enabled: TRUE,
-            Description: "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
+            Enabled: True,
+            Description: "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … ",
         },
         "OU", {
-            Enabled: TRUE,
-            Description: "Permet de taper [où ] puis un point ou une virgule et de supprimer automatiquement l’espace ajouté avant"
+            Enabled: True,
+            Description: "Permet de taper [où ] puis un point ou une virgule et de supprimer automatiquement l’espace ajouté avant",
+            TimeActivationSeconds: 1,
         },
     ),
     "MagicKey", Map(
         "Replace", {
-            Enabled: TRUE,
-            Description: "Transformer la touche J en ★"
+            Enabled: True,
+            Description: "Transformer la touche J en ★",
         },
         "Repeat", {
-            Enabled: TRUE,
-            Description: "La touche ★ permet la répétition"
+            Enabled: True,
+            Description: "La touche ★ permet la répétition",
         },
         "TextExpansion", {
-            Enabled: TRUE,
-            Description: "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …"
+            Enabled: True,
+            Description: "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …",
         },
         "TextExpansionPersonalInformation", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Remplissage de formulaires avec le suffixe @ : @np★ = Nom Prénom, etc.",
-            PatternMaxLength: 3
+            PatternMaxLength: 3,
         },
         "TextExpansionEmojis", {
-            Enabled: TRUE,
-            Description: "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …"
+            Enabled: True,
+            Description: "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …",
         },
         "TextExpansionSymbols", {
-            Enabled: TRUE,
-            Description: "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
+            Enabled: True,
+            Description: "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …",
         },
         "TextExpansionSymbolsTypst", {
-            Enabled: TRUE,
-            Description: "Expansion de texte Symboles Typst : $eq.not$ = ≠, $AA$ = 𝔸, …"
+            Enabled: True,
+            Description: "Expansion de texte Symboles Typst : $eq.not$ = ≠, $AA$ = 𝔸, …",
         },
     ),
     "Shortcuts", Map(
         "EGrave", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Tous les raccourcis sur la touche È correspondent à ceux de ",
-            Letter: "z"
+            Letter: "z",
         },
         "ECirc", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Tous les raccourcis sur la touche Ê correspondent à ceux de ",
-            Letter: "x"
+            Letter: "x",
         },
         "EAcute", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Tous les raccourcis sur la touche É correspondent à ceux de ",
-            Letter: "c"
+            Letter: "c",
         },
         "AGrave", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Tous les raccourcis sur la touche À correspondent à ceux de ",
-            Letter: "v"
+            Letter: "v",
         },
         "WrapTextIfSelected", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Taper un symbole quand du texte est sélectionné encadre le texte par celui-ci. Ne fonctionne que si UIA/Lib/UIA.ahk est dans le dossier du script",
         },
         "MicrosoftBold", {
-            Enabled: TRUE,
-            Description: "Ctrl + B met en gras dans les applications Microsoft au lieu de Ctrl + G"
+            Enabled: True,
+            Description: "Ctrl + B met en gras dans les applications Microsoft au lieu de Ctrl + G",
         },
         "Save", {
-            Enabled: FALSE,
-            Description: "Ctrl + J/★ = Ctrl + S. Attention, Ctrl + J est perdu"
+            Enabled: False,
+            Description: "Ctrl + J/★ = Ctrl + S. Attention, Ctrl + J est perdu",
         },
-        "CapsWord", {
-            Enabled: TRUE,
-            Description: "AltGr + 'CapsLock' = CapsWord"
+        "LAltCapsLockGivesCapsWord", {
+            Enabled: True,
+            Description: "`"LAlt`" + `"CapsLock`" = CapsWord",
+        },
+        "AltGrLAltGivesCtrlBackSpace", {
+            Enabled: True,
+            Description: "`"AltGr`" + `"LAlt`" = Ctrl + BackSpace",
+        },
+        "AltGrLAltGivesCtrlDelete", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"LAlt`" = Ctrl + Delete",
+        },
+        "AltGrLAltGivesOneShotShift", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"LAlt`" = OneShotShift",
+        },
+        "AltGrLAltGivesCapsWord", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"LAlt`" = CapsWord",
+        },
+        "AltGrCapsLockGivesCtrlDelete", {
+            Enabled: True,
+            Description: "`"AltGr`" + `"CapsLock`" = Ctrl + Delete",
+        },
+        "AltGrCapsLockGivesCtrlBackSpace", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"CapsLock`" = Ctrl + BackSpace",
+        },
+        "AltGrCapsLockGivesCapsWord", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"CapsLock`" = CapsWord",
         },
         "SelectLine", {
-            Enabled: TRUE,
-            Description: "Win + A(ll) = Sélectionne toute la ligne"
+            Enabled: True,
+            Description: "Win + A(ll) = Sélectionne toute la ligne",
         },
         "Screen", {
-            Enabled: TRUE,
-            Description: "Win + C(apture) = Prend une capture d’écran (Win + Shift + S)"
+            Enabled: True,
+            Description: "Win + C(apture) = Prend une capture d’écran (Win + Shift + S)",
         },
         "GPT", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Win + G(PT) = Ouvre ChatGPT",
-            Link: "https://chatgpt.com/"
+            Link: "https://chatgpt.com/",
         },
         "GetHexValue", {
-            Enabled: TRUE,
-            Description: "Win + H(ex) = Copie dans le presse-papiers la couleur HEX du pixel situé sous le curseur"
+            Enabled: True,
+            Description: "Win + H(ex) = Copie dans le presse-papiers la couleur HEX du pixel situé sous le curseur",
         },
         "TakeNote", {
-            Enabled: TRUE,
+            Enabled: True,
             Description: "Win + N(ote) = Ouvre un fichier pour prendre des notes",
-            DatedNotes: FALSE,
-            DestinationFolder: A_Desktop
+            DatedNotes: False,
+            DestinationFolder: A_Desktop,
         },
         "SurroundWithParentheses", {
-            Enabled: TRUE,
-            Description: "Win + O = Entoure de parenthèses la ligne"
+            Enabled: True,
+            Description: "Win + O = Entoure de parenthèses la ligne",
         },
         "Move", {
-            Enabled: TRUE,
-            Description: "Win + M(ove) = Simule de l’activité en bougeant la souris aléatoirement. Réitérer le raccourci pour désactiver, ou recharger le script"
+            Enabled: True,
+            Description: "Win + M(ove) = Simule de l’activité en bougeant la souris aléatoirement. Réitérer le raccourci pour désactiver, ou recharger le script",
         },
         "Search", {
-            Enabled: TRUE,
-            Description: "Win + S(earch) = Cherche la sélection sur google, ou récupère le chemin du fichier sélectionné"
+            Enabled: True,
+            Description: "Win + S(earch) = Cherche la sélection sur google, ou récupère le chemin du fichier sélectionné",
         },
         "TitleCase", {
-            Enabled: TRUE,
-            Description: "Win + T(itlecase) = Convertit en titlecase"
+            Enabled: True,
+            Description: "Win + T(itleCase) = Convertit en casse de titre (majuscule à chaque première lettre de mot)",
         },
         "Uppercase", {
-            Enabled: TRUE,
-            Description: "Win + U(ppercase) = Convertit en majuscules/minuscules la sélection"
+            Enabled: True,
+            Description: "Win + U(ppercase) = Convertit en majuscules/minuscules la sélection",
         },
         "SelectWord", {
-            Enabled: TRUE,
-            Description: "Win + W(ord) = Sélectionne le mot là où se trouve le curseur"
+            Enabled: True,
+            Description: "Win + W(ord) = Sélectionne le mot là où se trouve le curseur",
         },
     ),
     "TapHolds", Map(
-        "CapsLock", {
-            Enabled: TRUE,
-            Description: "'CapsLock' : Enter en tap, Ctrl en hold. CapsLock en Win + 'CapsLock'"
+        "CapsLockEnterCtrl", {
+            Enabled: True,
+            Description: "`"CapsLock`" : Enter en tap, Ctrl en hold. CapsLock en Win + `"CapsLock`"",
+            TimeActivationSeconds: 0.2,
         },
-        "Copy", {
-            Enabled: TRUE,
-            Description: "LShift : Ctrl + C en tap, Shift en hold"
+        "CapsLockBackSpace", {
+            Enabled: False,
+            Description: "`"CapsLock`" : BackSpace. CapsLock en Win + `"CapsLock`"",
         },
-        "Paste", {
-            Enabled: TRUE,
-            Description: "LCtrl : Ctrl + V en tap, Ctrl en hold"
+        "LShiftCopy", {
+            Enabled: True,
+            Description: "`"LShift`" : Ctrl + C en tap, Shift en hold",
+            TimeActivationSeconds: 0.35,
         },
-        "AltGr", {
-            Enabled: TRUE,
-            Description: "AltGr : Tab en tap, AltGr en hold"
+        "LCtrlPaste", {
+            Enabled: True,
+            Description: "`"LCtrl`" : Ctrl + V en tap, Ctrl en hold",
+            TimeActivationSeconds: 0.35,
         },
-        "OneShotShift", {
-            Enabled: TRUE,
-            Description: "RCtrl : OneShotShift en tap, Shift en hold"
+        "LAltOneShotShift", {
+            Enabled: True,
+            Description: "`"LAlt`" : OneShotShift en tap, Shift en hold",
         },
-        "Layer", {
-            Enabled: TRUE,
-            Description: "Alt : ⌫ en tap, layer de navigation en hold. AltGr + 'Alt' = Ctrl + ⌫"
+        "LAltAltTabMonitor", {
+            Enabled: False,
+            Description: "`"LAlt`" : Alt+Tab sur le moniteur en tap, Alt en hold",
+            TimeActivationSeconds: 0.2,
         },
-        "Tab", {
-            Enabled: TRUE,
-            Description: "'Tab' : Alt-Tab sur le moniteur en tap, Alt en hold. À activer si le layer est activé pour ne pas perdre Alt"
+        "LAltTabLayer", {
+            Enabled: False,
+            Description: "`"LAlt`" : Tab en tap, layer de navigation en hold",
+            TimeActivationSeconds: 0.2,
+        },
+        "LAltBackSpace", {
+            Enabled: False,
+            Description: "`"LAlt`" : BackSpace. Shift + `"LAlt`" = Delete",
+        },
+        "LAltBackSpaceLayer", {
+            Enabled: False,
+            Description: "`"LAlt`" : BackSpace en tap, layer de navigation en hold. Shift + `"LAlt`" = Delete",
+            TimeActivationSeconds: 0.2,
+        },
+        "SpaceLayer", {
+            Enabled: True,
+            Description: "`"Espace`" : Espace en tap, layer de navigation en hold",
+            TimeActivationSeconds: 0.15,
+        },
+        "SpaceCtrl", {
+            Enabled: False,
+            Description: "`"Espace`" : Espace en tap, Ctrl en hold",
+            TimeActivationSeconds: 0.15,
+        },
+        "AltGrTab", {
+            Enabled: True,
+            Description: "`"AltGr`" : Tab en tap, AltGr en hold",
+            TimeActivationSeconds: 0.2,
+        },
+        "AltGrOneShotShift", {
+            Enabled: False,
+            Description: "`"AltGr`" : OneShotShift en tap, AltGr en hold",
+            TimeActivationSeconds: 0.2,
+        },
+        "RCtrlBackSpace", {
+            Enabled: True,
+            Description: "`"RCtrl`" : BackSpace. Shift + `"RCtrl`" = Delete"
+        },
+        "RCtrlTab", {
+            Enabled: False,
+            Description: "`"RCtrl`" : Tab en tap, Ctrl en hold",
+            TimeActivationSeconds: 0.2,
+        },
+        "RCtrlOneShotShift", {
+            Enabled: False,
+            Description: "`"RCtrl`" : OneShotShift en tap, Shift en hold",
+        },
+        "TabAlt", {
+            Enabled: True,
+            Description: "`"Tab`" : Alt-Tab sur le moniteur en tap, Alt en hold. À activer si `"LAlt`" est remplacé par un autre raccourci pour ne pas perdre Alt",
+            TimeActivationSeconds: 0.2,
         },
     ),
 )
@@ -564,9 +749,9 @@ global PersonalInformation := Map(
 )
 
 global ScriptInformation := Map(
-    "ShortcutSuspend", TRUE,
-    "ShortcutSaveReload", TRUE,
-    "ShortcutEdit", TRUE,
+    "ShortcutSuspend", True,
+    "ShortcutSaveReload", True,
+    "ShortcutEdit", True,
     ; The icon of the script when active or disabled
     "IconPath", "ErgoptiPlus_Icon.ico",
     "IconPathDisabled", "ErgoptiPlus_Icon_Disabled.ico",
@@ -588,9 +773,15 @@ ReadConfiguration() {
     ; "_" = value if the key is not found in the ini file
     for Category in Features {
         for Feature in Features[Category] {
-            RawValue := IniRead(ConfigurationFile, Category, Feature, "_")
-            if RawValue != "_" {
-                Features[Category][Feature].Enabled := (RawValue != "0")
+            RawValueEnabled := IniRead(ConfigurationFile, Category, Feature, "_")
+            if RawValueEnabled != "_" {
+                Features[Category][Feature].Enabled := (RawValueEnabled != "0")
+            }
+
+            RawValueTimeActivationSeconds := IniRead(ConfigurationFile, Category, Feature . "TimeActivationSeconds",
+                "_")
+            if RawValueTimeActivationSeconds != "_" {
+                Features[Category][Feature].TimeActivationSeconds := RawValueTimeActivationSeconds
             }
         }
     }
@@ -650,6 +841,8 @@ ReadConfiguration() {
     }
 }
 
+global SpaceAroundSymbols := Features["DistancesReduction"]["SpaceAroundSymbols"].Enabled ? " " : ""
+
 ; =============================================================
 ; ======= 1.3) Tray menu of the script — Menus creation =======
 ; =============================================================
@@ -688,18 +881,18 @@ MenuItemCheckmarkUpdate(Menu, FeatureCategory, FeatureName, FeatureValue) {
 }
 
 SubmenuUpdate(FeatureCategory) {
-    if FeatureCategory = "Layout" {
+    if FeatureCategory == "Layout" {
         ; No submenu for the layout category
         return
     }
 
     MenuTitle := %"Menu" FeatureCategory%
-    AreEveryFeaturesEnabled := TRUE
+    AreEveryFeaturesEnabled := True
     global Features
     for FeatureName in Features[FeatureCategory] {
         FeatureEnabled := Features[FeatureCategory][FeatureName].Enabled
         if not FeatureEnabled {
-            AreEveryFeaturesEnabled := FALSE
+            AreEveryFeaturesEnabled := False
             break
         }
     }
@@ -741,6 +934,7 @@ MenuStructure := Map(
         "HC",
         "SX",
         "CX",
+        "EnglishNegation",
         "EZ",
         "CT",
         "-",
@@ -792,7 +986,16 @@ MenuStructure := Map(
         "MicrosoftBold",
         "Save",
         "-",
-        "CapsWord",
+        "LAltCapsLockGivesCapsWord",
+        "-",
+        "AltGrLAltGivesCtrlBackSpace",
+        "AltGrLAltGivesCtrlDelete",
+        "AltGrLAltGivesOneShotShift",
+        "AltGrLAltGivesCapsWord",
+        "-",
+        "AltGrCapsLockGivesCtrlDelete",
+        "AltGrCapsLockGivesCtrlBackSpace",
+        "AltGrCapsLockGivesCapsWord",
         "-",
         "SelectLine",
         "Screen",
@@ -807,21 +1010,36 @@ MenuStructure := Map(
         "SelectWord",
     ],
     "TapHolds", [
-        "CapsLock",
-        "Copy",
-        "Paste",
-        "AltGr",
-        "OneShotShift",
+        "CapsLockEnterCtrl",
+        "CapsLockBackSpace",
         "-",
-        "Layer",
-        "Tab",
+        "LShiftCopy",
+        "LCtrlPaste",
+        "-",
+        "LAltOneShotShift",
+        "LAltTabLayer",
+        "LAltAltTabMonitor",
+        "LAltBackSpace",
+        "LAltBackSpaceLayer",
+        "-",
+        "SpaceLayer",
+        "SpaceCtrl",
+        "-",
+        "AltGrTab",
+        "AltGrOneShotShift",
+        "-",
+        "RCtrlBackSpace",
+        "RCtrlTab",
+        "RCtrlOneShotShift",
+        "-",
+        "TabAlt",
     ]
 )
 
 CreateSubMenus(MenuStructure) {
     Menus := Map()
     for Category, Items in MenuStructure {
-        if (Category = "Layout") {
+        if (Category == "Layout") {
             continue
         }
         SubMenu := Menu()
@@ -905,7 +1123,7 @@ MenuItemUpdateAll() {
     global MenuStructure, SubMenus, A_TrayMenu
     for Category, Items in MenuStructure {
         SubmenuUpdate(Category)
-        CurrentMenu := (Category = "Layout") ? A_TrayMenu : SubMenus[Category]
+        CurrentMenu := (Category == "Layout") ? A_TrayMenu : SubMenus[Category]
         for Item in Items {
             if (Item != "-") {
                 MenuItemUpdate(CurrentMenu, Category, Item)
@@ -992,16 +1210,16 @@ ShortcutsEditor(*) {
 }
 ModifyValues(gui, NewEGraveValue, NewECircValue, NewEAcuteValue, NewAGraveValue) {
     Features["Shortcuts"]["EGrave"].Letter := NewEGraveValue
-    IniWrite(NewEGraveValue, ConfigurationFile, "Shortcuts", "EGrave")
+    IniWrite(NewEGraveValue, ConfigurationFile, "Shortcuts", "EGraveLetter")
 
     Features["Shortcuts"]["ECirc"].Letter := NewECircValue
-    IniWrite(NewECircValue, ConfigurationFile, "Shortcuts", "ECirc")
+    IniWrite(NewECircValue, ConfigurationFile, "Shortcuts", "ECircLetter")
 
     Features["Shortcuts"]["EAcute"].Letter := NewEAcuteValue
-    IniWrite(NewEAcuteValue, ConfigurationFile, "Shortcuts", "EAcute")
+    IniWrite(NewEAcuteValue, ConfigurationFile, "Shortcuts", "EAcuteLetter")
 
     Features["Shortcuts"]["AGrave"].Letter := NewAGraveValue
-    IniWrite(NewAGraveValue, ConfigurationFile, "Shortcuts", "AGrave")
+    IniWrite(NewAGraveValue, ConfigurationFile, "Shortcuts", "AGraveLetter")
 
     gui.Destroy()
 }
@@ -1023,6 +1241,9 @@ NoAction(*) {
 }
 
 ToggleAllFeaturesOn(*) {
+    MsgBox(
+        "⚠ ATTENTION : Toutes les fonctionnalités ont été activées. Cela inclut les différents raccourcis que l’on peut choisir d’avoir sur la même combinaison de touches. Par défaut, le premier raccourci actif d’une combinaison de touches sera celui utilisé, les autres raccourcis actifs sur cette même combinaison n’auront pas d’effet. Après cette opération, il est cependant très fortement recommandé de DÉSACTIVER MANUELLEMENT LES RACCOURCIS EN CONFLIT pour éviter de futurs potentiels problèmes."
+    )
     ToggleAllFeatures(1)
 }
 ToggleAllFeaturesOff(*) {
@@ -1121,7 +1342,7 @@ SC138 & SC01C::
     if GetKeyState("SC138", "P") {
         ToggleSuspend()
     } else {
-        SendFinalResult("{Enter}")
+        SendInput("{Enter}")
     }
 }
 #HotIf
@@ -1132,11 +1353,11 @@ RAlt & BackSpace::
 SC138 & SC00E::
 {
     if GetKeyState("SC138", "P") {
-        SendFinalResult("{LControl Down}s{LControl Up}") ; Save the script by sending Ctrl + S
+        SendInput("{LControl Down}s{LControl Up}") ; Save the script by sending Ctrl + S
         Sleep(200) ; Leave time for the file to be saved
         Reload
     } else {
-        SendFinalResult("{BackSpace}")
+        SendInput("{BackSpace}")
     }
 }
 #HotIf
@@ -1149,7 +1370,7 @@ SC138 & SC153::
     if GetKeyState("SC138", "P") {
         Edit
     } else {
-        SendFinalResult("{Delete}")
+        SendInput("{Delete}")
     }
 }
 #HotIf
@@ -1164,7 +1385,10 @@ SC138 & SC153::
 ; =======================================================
 ; =======================================================
 
-; Here you can modify the script to add/change features
+; Here you can add your own hotkeys and hotstrings.
+; As they are defined before everything else, they will override any existing definitions if there are duplicates
+; Putting everything in this part makes is easy to update your ErgoptiPlus version, as you will only need
+; to paste this part into the « 2/ PERSONAL SHORTCUTS » part of the new version.
 
 ; ========================================================
 ; ========================================================
@@ -1177,6 +1401,9 @@ SC138 & SC153::
 #InputLevel 2 ; Very important, we need to be at an higher InputLevel to remap the keys into something else.
 ; It is because we will then remap keys we just remapped, so the InputLevel of those other shortcuts must be lower
 ; This is especially important for the "★" key, otherwise the hotstrings involving this key won’t trigger.
+
+; It is better to use #HotIf everywhere in this part instead of simple ifs.
+; Otherwise we can run into issues like double defined hotkeys, or hotkeys that can’t be overriden
 
 /*
     ======= Scancodes map of the keyboard keys =======
@@ -1203,20 +1430,22 @@ SC138 & SC153::
 
 UpdateLastSentCharacter(Character) {
     global LastSentCharacter := Character
+    global LastSentCharacterKeyTime
+    LastSentCharacterKeyTime[Character] := A_TickCount
 }
 
-RemapKey(ScanCode, Letter, AlternativeCharacter := "") {
+RemapKey(ScanCode, Character, AlternativeCharacter := "") {
     global RemappedList
     InputLevel := "I2"
 
     Hotkey(
         "*" ScanCode,
-        (*) => SendEvent("{Blind}" Letter) UpdateLastSentCharacter(Letter),
+        (*) => SendEvent("{Blind}" Character) UpdateLastSentCharacter(Character),
         InputLevel
     )
 
     if AlternativeCharacter == "" {
-        RemappedList[Letter] := ScanCode
+        RemappedList[Character] := ScanCode
     } else {
         Hotkey(
             ScanCode,
@@ -1230,25 +1459,25 @@ RemapKey(ScanCode, Letter, AlternativeCharacter := "") {
     ; The same happens for Win shortcuts, where we can get the shortcut on the QWERTY layer and not emulated Ergopti layer
     Hotkey(
         "^" ScanCode,
-        (*) => SendEvent("^" Letter) UpdateLastSentCharacter(Letter),
+        (*) => SendEvent("^" Character) UpdateLastSentCharacter(Character),
         InputLevel
     )
     Hotkey(
         "!" ScanCode,
-        (*) => SendEvent("!" Letter) UpdateLastSentCharacter(Letter),
-        InputLevel
+        (*) => SendEvent("!" Character) UpdateLastSentCharacter(Character),
+        "I3" ; Needs to be higher to keep the Alt shortcuts
     )
-    if Letter == "l" {
+    if Character == "l" {
         ; Solves a bug of # + remapped letter L not triggering the Lock shortcup
         Hotkey(
             "#" ScanCode,
-            (*) => DllCall("LockWorkStation") UpdateLastSentCharacter(Letter),
+            (*) => DllCall("LockWorkStation") UpdateLastSentCharacter(Character),
             InputLevel
         )
     } else {
         Hotkey(
             "#" ScanCode,
-            (*) => SendEvent("#" Letter) UpdateLastSentCharacter(Letter),
+            (*) => SendEvent("#" Character) UpdateLastSentCharacter(Character),
             InputLevel
         )
     }
@@ -1287,7 +1516,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 DeadKey(Mapping) {
     ih := InputHook(
         "L1",
-        "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{Backspace}{Delete}"
+        "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
     )
     ih.Start()
     ih.Wait()
@@ -1535,15 +1764,9 @@ global DeadkeyMappingR := Map(
 ; ======= 3.1) Base =======
 ; =========================
 
-; In the navigation layer or in CapsLock mode, we want the keys to be different than what is defined below
-; Hence this condition that modifies the layer when we are in base mode
-IsBaseCondition() {
-    return not GetKeyState("CapsLock", "T") and not LayerEnabled
-}
-
-#HotIf IsBaseCondition() and Features["Layout"]["DirectAccessDigits"].Enabled
+#HotIf Features["Layout"]["DirectAccessDigits"].Enabled
 ; === Number row ===
-RemapKey("SC029", "=")
+SC029:: SendInput("=")
 RemapKey("SC002", "1")
 RemapKey("SC003", "2")
 RemapKey("SC004", "3")
@@ -1554,54 +1777,54 @@ RemapKey("SC008", "7")
 RemapKey("SC009", "8")
 RemapKey("SC00A", "9")
 RemapKey("SC00B", "0")
-RemapKey("SC00C", "%")
-RemapKey("SC00D", "$")
+SC00C:: SendInput("%") ; Non letter characters don’t use RemapKey. Otherwise when tapping % for example, it will trigger and lock AltGr
+SC00D:: SendInput("$")
 #HotIf
 
-if IsBaseCondition() and Features["Layout"]["ErgoptiBase"].Enabled {
-    ; === Top row ===
-    RemapKey("SC010", Features["Shortcuts"]["EGrave"].Letter, "è")
-    RemapKey("SC011", "y")
-    RemapKey("SC012", "o")
-    RemapKey("SC013", "w")
-    RemapKey("SC014", "b")
-    RemapKey("SC015", "f")
-    RemapKey("SC016", "g")
-    RemapKey("SC017", "h")
-    RemapKey("SC018", "c")
-    RemapKey("SC019", "x")
-    RemapKey("SC01A", "z")
-    SC01B:: DeadKey(DeadkeyMappingDiaresis)
+#HotIf Features["Layout"]["ErgoptiBase"].Enabled
+; === Top row ===
+RemapKey("SC010", Features["Shortcuts"]["EGrave"].Letter, "è")
+RemapKey("SC011", "y")
+RemapKey("SC012", "o")
+RemapKey("SC013", "w")
+RemapKey("SC014", "b")
+RemapKey("SC015", "f")
+RemapKey("SC016", "g")
+RemapKey("SC017", "h")
+RemapKey("SC018", "c")
+RemapKey("SC019", "x")
+RemapKey("SC01A", "z")
+SC01B:: DeadKey(DeadkeyMappingDiaresis)
 
-    ; === Middle row ===
-    RemapKey("SC01E", "a")
-    RemapKey("SC01F", "i")
-    RemapKey("SC020", "e")
-    RemapKey("SC021", "u")
-    RemapKey("SC022", ".")
-    RemapKey("SC023", "v")
-    RemapKey("SC024", "s")
-    RemapKey("SC025", "n")
-    RemapKey("SC026", "t")
-    RemapKey("SC027", "r")
-    RemapKey("SC028", "q")
-    SC02B:: DeadKey(DeadkeyMappingCircumflex)
+; === Middle row ===
+RemapKey("SC01E", "a")
+RemapKey("SC01F", "i")
+RemapKey("SC020", "e")
+RemapKey("SC021", "u")
+RemapKey("SC022", ".")
+RemapKey("SC023", "v")
+RemapKey("SC024", "s")
+RemapKey("SC025", "n")
+RemapKey("SC026", "t")
+RemapKey("SC027", "r")
+RemapKey("SC028", "q")
+SC02B:: DeadKey(DeadkeyMappingCircumflex)
 
-    ; === Bottom row ===
-    RemapKey("SC056", Features["Shortcuts"]["ECirc"].Letter, "ê")
-    RemapKey("SC02C", Features["Shortcuts"]["EAcute"].Letter, "é")
-    RemapKey("SC02D", Features["Shortcuts"]["AGrave"].Letter, "à")
-    RemapKey("SC02E", "j")
-    RemapKey("SC02F", ",")
-    RemapKey("SC030", "k")
-    RemapKey("SC031", "m")
-    RemapKey("SC032", "d")
-    RemapKey("SC033", "l")
-    RemapKey("SC034", "p")
-    RemapKey("SC035", "'")
-}
+; === Bottom row ===
+RemapKey("SC056", Features["Shortcuts"]["ECirc"].Letter, "ê")
+RemapKey("SC02C", Features["Shortcuts"]["EAcute"].Letter, "é")
+RemapKey("SC02D", Features["Shortcuts"]["AGrave"].Letter, "à")
+RemapKey("SC02E", "j")
+RemapKey("SC02F", ",")
+RemapKey("SC030", "k")
+RemapKey("SC031", "m")
+RemapKey("SC032", "d")
+RemapKey("SC033", "l")
+RemapKey("SC034", "p")
+RemapKey("SC035", "'")
+#HotIf
 
-if IsBaseCondition() and Features["MagicKey"]["Replace"].Enabled {
+if Features["MagicKey"]["Replace"].Enabled {
     RemapKey("SC02E", "j", "★")
 }
 
@@ -1610,7 +1833,6 @@ if IsBaseCondition() and Features["MagicKey"]["Replace"].Enabled {
 ; ==========================
 
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled
-
 ; === Space bar ===
 +SC039:: WrapTextIfSelected("-", "-", "-")
 
@@ -1708,7 +1930,6 @@ SC02E:: SendNewResult("★")
 #HotIf
 
 #HotIf GetCapsLockCondition() and Features["Layout"]["ErgoptiBase"].Enabled
-
 ; === Number row ===
 SC029:: SendNewResult("=")
 SC002:: SendNewResult("1")
@@ -1778,7 +1999,10 @@ SC138 & SC012:: RemapAltGr(
 )
 AddRollEqual() {
     global LastSentCharacter
-    if (LastSentCharacter == "<" or LastSentCharacter == ">") {
+    if (
+        LastSentCharacter == "<" or LastSentCharacter == ">")
+    and A_TimeSincePriorHotkey < (Features["Rolls"]["ChevronEqual"].TimeActivationSeconds * 1000
+    ) {
         SendNewResult("=")
         global LastSentCharacter := "="
     } else if Features["Layout"]["ErgoptiPlus"].Enabled {
@@ -1788,6 +2012,7 @@ AddRollEqual() {
     }
 }
 #HotIf
+
 #HotIf Features["Rolls"]["HashtagQuote"].Enabled
 SC138 & SC017:: RemapAltGr(
     (*) => HashtagOrQuote(),
@@ -1795,7 +2020,10 @@ SC138 & SC017:: RemapAltGr(
 )
 HashtagOrQuote() {
     global LastSentCharacter
-    if (LastSentCharacter == "(" or LastSentCharacter == "[") {
+    if (
+        LastSentCharacter == "(" or LastSentCharacter == "[")
+    and A_TimeSincePriorHotkey < (Features["Rolls"]["HashtagQuote"].TimeActivationSeconds * 1000
+    ) {
         SendNewResult("`"")
         global LastSentCharacter := "`""
     } else {
@@ -1815,7 +2043,7 @@ SC138 & SC013:: RemapAltGr(
     (*) => SendNewResult("Où" . SpaceAroundSymbols)
 )
 SC138 & SC018:: RemapAltGr(
-    (*) => SendNewResult("!"),
+    (*) => WrapTextIfSelected("!", "!", "!"),
     (*) => SendNewResult(" !")
 )
 #HotIf
@@ -2005,16 +2233,16 @@ SC138 & SC035:: RemapAltGr(
 ; ======= 3.5) Control =======
 ; ============================
 
-; In Microsoft apps like Word or Excel, we can’t use Numpad + to zoom
-#HotIf Features["Layout"]["ErgoptiBase"].Enabled and MicrosoftApps()
-^SC00C:: SendFinalResult("{LControl Down}{WheelDown}{LControl Up}") ; Zoom out with Ctrl + %
-^SC00D:: SendFinalResult("{LControl Down}{WheelUp}{LControl Up}") ; Zoom in with Ctrl + $
+#HotIf Features["Layout"]["ErgoptiBase"].Enabled
+^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste does't work
+^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
+^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
-#HotIf Features["Layout"]["ErgoptiBase"].Enabled
-^SC02F:: SendFinalResult("{LControl Down}v{LControl Up}") ; Correct issue where Win + V paste does't work
-^SC00C:: SendFinalResult("{LControl Down}{NumpadSub}{LControl Up}") ; Zoom out with Ctrl + %
-^SC00D:: SendFinalResult("{LControl Down}{NumpadAdd}{LControl Up}") ; Zoom in with Ctrl + $
+; In Microsoft apps like Word or Excel, we can’t use Numpad + to zoom
+#HotIf Features["Layout"]["ErgoptiBase"].Enabled and MicrosoftApps()
+^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with Ctrl + %
+^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; ==============================================
@@ -2044,11 +2272,51 @@ RetrieveScancode(Letter) {
 }
 
 ; ==========================
-; ======= 4.1) Shift =======
+; ======= 4.1) Base =======
+; ==========================
+
+#HotIf (
+    Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
+    ; We need to handle the shortcut differently when LAlt has been remapped:
+    and not Features["TapHolds"]["LAltOneShotShift"].Enabled
+    and not Features["TapHolds"]["LAltBackSpace"].Enabled ; No need to add the shortcut here, as it is impossible with a BackSpace key that fires immediately
+    and not Features["TapHolds"]["LAltBackSpaceLayer"].Enabled ; Here we directly change the result on the layer
+    and not Features["TapHolds"]["LAltTabLayer"].Enabled ; Here we directly change the result on the layer
+)
+SC038 & SC03A:: ToggleCapsWordState()
+#HotIf
+
+; This function fixes Features["Shortcuts"]["LAltCapsLockGivesCapsWord"] when used with Features["TapHolds"]["LAltOneShotShift"]
+; It needs to be used in every remapping of the "CapsLock" key, or the "CapsLock" key itself if no remapping is done
+CapsWordShortcutFix() {
+    if (
+        Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
+        and Features["TapHolds"]["LAltOneShotShift"].Enabled
+        and GetKeyState("SC038", "P")
+    ) {
+        ToggleCapsWordState()
+        return
+    }
+}
+
+; When no remapping of the "CapsLock" key is done, add the fix
+#HotIf (
+    Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
+    and Features["TapHolds"]["LAltOneShotShift"].Enabled
+    and not Features["TapHolds"]["CapsLockEnterCtrl"].Enabled and not LayerEnabled
+)
+~SC03A::
+{
+    CapsWordShortcutFix()
+}
+#HotIf
+
+; ==========================
+; ======= 4.2) Shift =======
 ; ==========================
 
 ; ============================
-; ======= 4.2) Control =======
+; ======= 4.3) Control =======
 ; ============================
 
 if Features["Shortcuts"]["Save"].Enabled {
@@ -2064,22 +2332,68 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
 }
 
 ; ========================
-; ======= 4.3) Alt =======
+; ======= 4.4) Alt =======
 ; ========================
 
 ; Attention to the Windows shortcut Alt + LShift that changes the keyboard layout
 
 ; ==========================
-; ======= 4.4) AltGr =======
+; ======= 4.5) AltGr =======
 ; ==========================
 
-if Features["Shortcuts"]["CapsWord"].Enabled {
-    ; On AltGr + "CapsLock"
-    SC138 & SC03A:: ToggleCapsWordState()
+#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled
+; "AltGr" + "LAlt" = Ctrl + BackSpace
+SC138 & SC038:: {
+    OneShotShiftFix()
+    SendInput("^{BackSpace}")
 }
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlDelete"].Enabled
+; "AltGr" + "LAlt" = Ctrl + Delete
+SC138 & SC038:: {
+    OneShotShiftFix()
+    SendInput("^{Delete}")
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrLAltGivesOneShotShift"].Enabled
+; "AltGr" + "LAlt" = OneShotShift
+SC138 & SC038:: {
+    global OneShotShiftEnabled := True
+    OneShotShift()
+}
+#HotIf
+#HotIf Features["Shortcuts"]["AltGrLAltGivesCapsWord"].Enabled
+; "AltGr" + "LAlt" = CapsWord
+SC138 & SC038:: {
+    ToggleCapsWordState()
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCtrlDelete"].Enabled
+; "AltGr" + "CapsLock" = Ctrl + Delete
+SC138 & SC03A:: {
+    SendInput("^{Delete}")
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCtrlBackSpace"].Enabled
+; "AltGr" + "CapsLock" = Ctrl + BackSpace
+SC138 & SC03A:: {
+    SendInput("^{BackSpace}")
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCapsWord"].Enabled
+; "AltGr" + "CapsLock" = CapsWord
+SC138 & SC03A:: {
+    ToggleCapsWordState()
+}
+#HotIf
 
 ; ============================
-; ======= 4.5) Windows =======
+; ======= 4.6) Windows =======
 ; ============================
 
 if Features["Shortcuts"]["SelectLine"].Enabled {
@@ -2140,13 +2454,13 @@ if Features["Shortcuts"]["TakeNote"].Enabled {
         SetTitleMatchMode(2) ; Partial match
         WinPattern := FileName
 
-        WindowAlreadyOpen := FALSE
+        WindowAlreadyOpen := False
         if WinExist(WinPattern) {
-            WindowAlreadyOpen := TRUE
+            WindowAlreadyOpen := True
             WinActivate(WinPattern)
             WinWaitActive(WinPattern, , 3)
         } else {
-            Run("notepad " FilePath)
+            Run("notepad " . FilePath)
             WinWait(FileName, , 7)
             WinActivate(FileName)
             WinWaitActive(FileName, , 3)
@@ -2199,11 +2513,35 @@ if Features["Shortcuts"]["Search"].Enabled {
     }
 
     SearchPath(SelectedText) {
-        ; The result of those regexes are booleans
-        FilePath := RegExMatch(SelectedText, "^[a-zA-Z]:[\/]") ; Paths starting with C:/, D:/, etc.
-        RegeditPath := RegExMatch(SelectedText, "^(Computer\\|Ordinateur\\)?(HKEY)|(HKU)|(HKCC)|(HKCU)|(HKLM)")
-        URLPath := RegExMatch(SelectedText, "^\w{3,8}://") ; Works with http(s), ftp etc.
-        WebsitePath := RegExMatch(SelectedText, "([\w\.-]{1,20}\.){0,4}[\w\.-]{2,20}\.[\w\.-]{2,6}.*")
+        ; The result of each of those regexes is a boolean
+
+        ; Detects Windows file paths like C:/ or D:\ (supports forward and backward slashes)
+        ; Invalid Windows path characters are excluded: <>:"|?*
+        FilePath := RegExMatch(
+            SelectedText,
+            "^[A-Za-z]:[\\/](?:[^<>:`"|?*\r\n]+[\\/]?)*$"
+        )
+
+        ; Detects Windows Registry paths (optional Computer\ or Ordinateur\ prefix)
+        ; Matches both full names (HKEY_CLASSES_ROOT...) and abbreviations (HKCR, HKCU, etc.)
+        RegeditPath := RegExMatch(
+            SelectedText,
+            "i)^(?:Computer\\|Ordinateur\\)?(?:HKEY_(?:CLASSES_ROOT|CURRENT_USER|LOCAL_MACHINE|USERS|CURRENT_CONFIG)|HK(?:CR|CU|LM|U|CC))(?:\\[^\r\n]*)?$"
+        )
+
+        ; Detects full URLs with protocol (http, https, ftp, file, etc.)
+        ; Protocol must start with a letter and be 2–9 characters long
+        URLPath := RegExMatch(
+            SelectedText,
+            "i)^[a-z][a-z0-9+\-.]{1,8}://[^\s]+$"
+        )
+
+        ; Detects domain names (supports up to 4 subdomain levels, TLD up to 63 chars)
+        ; Optionally followed by a path (no spaces allowed)
+        WebsitePath := RegExMatch(
+            SelectedText,
+            "i)^(?:[\w-]{1,63}\.){1,4}[a-z]{2,63}(?:/[^\s]*)?$"
+        )
 
         if FilePath {
             Run(SelectedText, , "Max")
@@ -2229,94 +2567,66 @@ if Features["Shortcuts"]["Search"].Enabled {
         }
     }
 
-    ;Open Regedit and navigate to RegPath.
-    ;RegPath accepts both HKEY_LOCAL_MACHINE and HKLM formats.
+    ; Open Regedit and navigate to RegPath.
+    ; RegPath accepts both HKEY_LOCAL_MACHINE and HKLM formats.
     RegJump(RegPath) {
-        ;Must close Regedit so that next time it opens the target key is selected
+        ; Close existing Registry Editor to ensure target key is selected next time
         if WinExist("Registry Editor") {
             WinKill("Registry Editor")
         }
 
-        ; remove leading Computer and replace with "Ordinateur"
-        if (SubStr(RegPath, 1, 9) = "Computer\") {
+        ; Normalize leading Computer\ prefix to French "Ordinateur\"
+        if StrLeft(RegPath, 9) == "Computer\" {
             RegPath := "Ordinateur\" . SubStr(RegPath, 10)
         }
-        ;remove trailing "\" if present
-        if (SubStr(RegPath, -1) = "\") {
-            RegPath := SubStr(RegPath, 1, -1)
-        }
-        ; Msgbox(RegPath)
 
-        ;Extract RootKey part of supplied registry path
-        loop parse, RegPath, "\" {
-            RootKey := A_LoopField
-            break
-        }
+        ; Remove trailing backslash if present
+        RegPath := Trim(RegPath, "\")
 
-        ;Now convert RootKey to standard long format
-        if !InStr(RootKey, "HKEY_") ;if short form, convert to long form
-        {
-            if (RootKey = "HKCR")
-                RegPath := StrReplace(RegPath, RootKey, "HKEY_CLASSES_ROOT", , , 1)
-            else if (RootKey = "HKCU")
-                RegPath := StrReplace(RegPath, RootKey, "HKEY_CURRENT_USER", , , 1)
-            else if (RootKey = "HKLM")
-                RegPath := StrReplace(RegPath, RootKey, "HKEY_LOCAL_MACHINE", , , 1)
-            else if (RootKey = "HKU")
-                RegPath := StrReplace(RegPath, RootKey, "HKEY_USERS", , , 1)
-            else if (RootKey = "HKCC")
-                RegPath := StrReplace(RegPath, RootKey, "HKEY_CURRENT_CONFIG", , , 1)
+        ; Extract root key (first component of path)
+        RootKey := StrSplit(RegPath, "\")[1]
+
+        ; Convert short root key forms to long forms if necessary
+        if !InStr(RootKey, "HKEY_") {
+            KeyMap := Map(
+                "HKCR", "HKEY_CLASSES_ROOT",
+                "HKCU", "HKEY_CURRENT_USER",
+                "HKLM", "HKEY_LOCAL_MACHINE",
+                "HKU", "HKEY_USERS",
+                "HKCC", "HKEY_CURRENT_CONFIG"
+            )
+            if KeyMap.HasKey(RootKey) {
+                RegPath := StrReplace(RegPath, RootKey, KeyMap[RootKey], , , 1)
+            }
         }
 
-        ;Make target key the last selected key, which is the selected key next time Regedit runs
+        ; Set the last selected key in Regedit. When we will run Regedit, it will open directly to the target
         RegWrite(RegPath, "REG_SZ", "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit", "LastKey")
         Run("Regedit.exe")
     }
 
-    GetPath(Text) {
-        chemin := ""
-        temp := Text
-        paths := StrSplit(temp, "`r`n")
-        num_paths := paths.Length
-        if (num_paths == 1) {
-            chemin := temp
-            ; chemin:= '"' . temp . '"' ; Version avec des guillemets
-        } else {
-            output_string := "["
-            for key, path in paths {
-                path := '"' . path . '"'
-                output_string := output_string . path . ", "
-            }
-            output_string := SubStr(output_string, 1, -1 * (2))
-            output_string := output_string . "]"
-            chemin := output_string
-        }
-        chemin_avec_backslash := chemin
-        chemin_avec_slash := StrReplace(chemin, "\", "/")
-
-        OldClipboard := ClipboardAll()
-        A_Clipboard := chemin_avec_slash
+    GetPath(Path) {
+        PathWithBackslash := Path
+        PathWithSlash := StrReplace(Path, "\", "/")
+        A_Clipboard := PathWithSlash
 
         #SingleInstance
         SetTimer ChangeButtonNames, 50
         Result := MsgBox("Le chemin`n" A_Clipboard "`na été copié dans le presse-papier. `n`nVoulez-vous la version avec des \ à la place des / ?",
             "Copie du chemin d’accès", "YesNo")
-        if (Result = "Yes") {
-            A_Clipboard := chemin_avec_backslash
+        if (Result == "No") {
+            A_Clipboard := PathWithBackslash
             Sleep(200)
             MsgBox("Le chemin`n" A_Clipboard "`na été copié dans le presse-papier.")
         }
-
-        A_Clipboard := OldClipboard ; Restore the clipboard
     }
-
     ChangeButtonNames() {
         if not WinExist("Copie du chemin d’accès")
-            return  ; Keep waiting.
+            return ; Keep waiting
         SetTimer ChangeButtonNames, 0
         WinActivate()
-        ControlSetText("&Backslash (\)", "Button1")
-        ControlSetText("&Quitter", "Button2")
+        ControlSetText("&Quitter", "Button1")
+        ControlSetText("&Backslash (\)", "Button2")
     }
 }
 
@@ -2373,59 +2683,64 @@ if Features["Shortcuts"]["SelectWord"].Enabled {
         SendFinalResult("{LShift Down}^{Right}{LShift Up}")
 
         SelectedWord := GetSelection()
-        if (SubStr(SelectedWord, -1, 1) = " ") {
+        if (SubStr(SelectedWord, -1, 1) == " ") {
             ; If the selected word finishes with a space, we remove it from the selection
             SendFinalResult("{LShift Down}{Left}{LShift Up}")
         }
     }
 }
 
-; =============================
-; ======= 4.6) CapsWord =======
-; =============================
+; ===========================
+; ======= 4.7) Others =======
+; ===========================
+
+; ========================
+; ======= CapsWord =======
+; ========================
 
 ; (cf. https://github.com/qmk/qmk_firmware/blob/master/users/drashna/keyrecords/capwords.md)
 
 ToggleCapsWordState() {
     global CapsWordEnabled := not CapsWordEnabled
-    if CapsWordEnabled {
-        SetCapsLockState("AlwaysOn")
-    } else {
-        SetCapsLockState("AlwaysOff")
-    }
+    UpdateCapsLockLED()
 }
 
 DisableCapsWordState() {
-    global CapsWordEnabled := FALSE
-    SetCapsLockState("AlwaysOff")
+    global CapsWordEnabled := False
+    UpdateCapsLockLED()
 }
-DisableCapsWordState() ; Make sure that it is the default
+
+UpdateCapsLockLED() {
+    if CapsWordEnabled or LayerEnabled {
+        SetCapsLockState("On")
+    } else {
+        SetCapsLockState("Off")
+    }
+}
 
 ; Defines what deactivates the CapsLock triggered by CapsWord
-#HotIf Features["Shortcuts"]["CapsWord"].Enabled and CapsWordEnabled
+#HotIf Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled and CapsWordEnabled
 SC039::
 {
-    SendFinalResult("{Space}")
+    SendEvent("{Space}")
+    Keywait("SC039") ; Solves bug of 2 sent Spaces when exiting CapsWord with a Space
     DisableCapsWordState()
 }
 
+; Big Enter key
 SC01C::
 {
-    SendFinalResult("{Enter}")
+    SendEvent("{Enter}")
     DisableCapsWordState()
 }
 
 ; Mouse click
-LButton::
-RButton::
+~LButton::
+~RButton::
 {
     DisableCapsWordState()
 }
 #HotIf
-
-; ===========================
-; ======= 4.7) Others =======
-; ===========================
 
 ; ===================================================================================
 ; ===================================================================================
@@ -2435,18 +2750,19 @@ RButton::
 ; ===================================================================================
 ; ===================================================================================
 
-; ==============================
-; ======= 5.1) Tap-holds =======
-; ==============================
+; =============================
+; ======= 5.1) CapsLock =======
+; =============================
 
-#HotIf Features["TapHolds"]["CapsLock"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["CapsLockEnterCtrl"].Enabled and not LayerEnabled
 *SC03A::Enter
-; Tap-hold on "CapsLock" : Enter on tap, Ctrl en hold
+; Tap-hold on "CapsLock" : Enter on tap, Ctrl on hold
 $SC03A::
 {
-    SendEvent("{LControl Down}") ; Necessary to send an event to then get it in A_PriorKey
-    tap := KeyWait("CapsLock", "T0.2")
-    if (tap and (A_PriorKey == "LControl")) { ; If released before. A_PriorKey is to be able to fire shortcuts very quickly
+    CapsWordShortcutFix()
+    SendEvent("{LControl Down}") ; It is necessary to send an event to then get it in A_PriorKey
+    tap := KeyWait("CapsLock", "T" . Features["TapHolds"]["CapsLockEnterCtrl"].TimeActivationSeconds)
+    if (tap and (A_PriorKey == "LControl")) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
         SendEvent("{LControl Up}")
         SendEvent("{Enter}")
         DisableCapsWordState()
@@ -2454,146 +2770,396 @@ $SC03A::
 }
 SC03A Up:: SendEvent("{LControl Up}")
 
+; It is necessary to do this, otherwise keeping the finger pressed on CapsLock will trigger an infinite number of spaces instead of keeping Ctrl down
 ^SC03A:: {
     if GetKeyState("SC01D", 'P') {
-        SendFinalResult("{LControl Down}{Enter}{LControl Up}")
-    }
-} ; It is necessary to do this, otherwise keeping the finger presse on CapsLock will trigger an infinite number of spaces instead of keeping Ctrl down
-
-#SC03A:: ; Win + "CapsLock" to toggle CapsLock
-{
-    if GetKeyState("CapsLock", "T") {
-        SetCapsLockState("AlwaysOff")
-        DisableCapsWordState()
-    }
-    else {
-        SetCapsLockState("AlwaysOn")
+        SendInput("{LControl Down}{Enter}{LControl Up}")
     }
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["Copy"].Enabled
+#HotIf Features["TapHolds"]["CapsLockBackSpace"].Enabled
+SC03A::BackSpace
+#HotIf
+
+#HotIf Features["TapHolds"]["CapsLockEnterCtrl"].Enabled or Features["TapHolds"]["CapsLockBackSpace"].Enabled
+; Win + "CapsLock" to toggle CapsLock
+#SC03A::
+{
+    global CapsWordEnabled := False
+    if GetKeyState("CapsLock", "T") {
+        SetCapsLockState("Off")
+    }
+    else {
+        SetCapsLockState("On")
+    }
+}
+#HotIf
+
+; =====================================
+; ======= 5.2) LShift and LCtrl =======
+; =====================================
+
+#HotIf Features["TapHolds"]["LShiftCopy"].Enabled and not LayerEnabled
 ; Tap-hold on "LShift" : Ctrl + C on tap, Shift on hold
 ~$SC02A::
 {
-    if (KeyWait("LShift", "T0.35") and (A_PriorKey == "LShift")) { ;  If released before, A_PriorKey is to be able to fire shortcuts very quickly
-        SendEvent("{LShift Up}")
-        SendEvent("{LCtrl Down}c{LCtrl Up}")
+    tap := KeyWait("LShift", "T" . Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds)
+    if (tap and (A_PriorKey == "LShift")) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
+        SendInput("{LCtrl Down}c{LCtrl Up}")
     }
 }
-SC02A Up:: SendEvent("{LShift Up}")
 #HotIf
 
-#HotIf Features["TapHolds"]["Paste"].Enabled
+#HotIf Features["TapHolds"]["LCtrlPaste"].Enabled and not LayerEnabled
+; This bug seems resolved now:
+; « ~ must not be used here, otherwise [AltGr] [AltGr] … [AltGr], which is supposed to give Tab multiple times, will suddenly block and keep LCtrl activated »
+
 ; Tap-hold on "LControl" : Ctrl + V on tap, Ctrl on hold
-$SC01D:: ; ~ must not be used here, otherwise [AltGr] [AltGr] … [AltGr], which is suposed to give Tab multiple times, will suddenly block and keep LCtrl activated
+~$SC01D::
 {
-    SendEvent("{LControl Down}")
-    tap := KeyWait("LControl", "T0.25")
+    UpdateLastSentCharacter("LControl")
+}
+
+~SC01D Up:: {
+    Now := A_TickCount
+    CharacterSentTime := LastSentCharacterKeyTime.Has("LControl") ? LastSentCharacterKeyTime["LControl"] : Now
     if (
-        tap and (A_PriorKey == "LControl")
-        and not InStr(A_ThisHotkey, "<^>!") ; Solves bug of triggered paste when AltGr + key is quickly pressed
+        Now - CharacterSentTime <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000
+        and A_PriorKey == "LControl"
     ) {
-        SendEvent("{LCtrl Down}v{LCtrl Up}")
+        SendInput("^v")
     }
 }
-SC01D Up:: SendEvent("{LControl Up}")
 #HotIf
 
-#HotIf Features["TapHolds"]["AltGr"].Enabled and not LayerEnabled
-RAlt::Tab
-; Tap-hold on "AltGr" : Tab on tap, AltGr on hold
-; LControl & RAlt is the only way to make it fire on tap directly
-SC01D & ~SC138::
-RAlt:: ; Necessary to work on layouts like QWERTY
+; =========================
+; ======= 5.3) LAlt =======
+; =========================
+
+#HotIf Features["TapHolds"]["LAltOneShotShift"].Enabled and not LayerEnabled
+; Tap-hold on "LAlt" : OneShotShift on tap, Shift on hold
+SC038:: {
+    if (
+        GetKeyState("SC11D", "P")
+        or GetKeyState("SC03A", "P")
+        or GetKeyState("LShift", "P")
+        or GetKeyState("LCtrl", "P")
+    ) {
+        ; Solves a problem where shorcuts consisting of another key (pressed first) + SC038 (pressed second) triggers the shortcut, but also OneShotShift()
+        return
+    }
+
+    global OneShotShiftEnabled := True
+    SendEvent("{LAlt Up}")
+    OneShotShift()
+    SendInput("{LShift Down}")
+    KeyWait("SC038")
+    SendInput("{LShift Up}")
+}
+#HotIf
+
+#HotIf Features["TapHolds"]["LAltTabLayer"].Enabled and not LayerEnabled
+; Tap-hold on "LAlt" : Tab on tap, Layer on hold
+SC038::
 {
-    tap := KeyWait("RAlt", "T.25")
-    if (tap and A_PriorKey == "RAlt") {
-        DisableCapsWordState()
-        if (GetKeyState("LControl") and GetKeyState("Shift")) {
-            SendInput("^+{Tab}")
-        } else if GetKeyState("LControl") {
-            SendInput("^{Tab}")
-        } else if GetKeyState("Shift") {
-            SendInput("+{Tab}")
-        } else if GetKeyState("LWin") {
-            SendEvent("#{Tab}") ; SendInput doesn’t work in that case
-        } else {
-            SendInput("{Tab}")
+    UpdateLastSentCharacter("LAlt")
+
+    global LayerEnabled := True
+    ResetNumberOfRepetitions()
+    UpdateCapsLockLED()
+
+    KeyWait("SC038")
+
+    LayerEnabled := False
+    UpdateCapsLockLED()
+
+    Now := A_TickCount
+    CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
+    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAltTabLayer"].TimeActivationSeconds * 1000)
+    if tap {
+        SendEvent("{Tab}")
+    }
+}
+
+SC02A & SC038:: SendInput("+{Tab}") ; On "LShift"
+if Features["TapHolds"]["RCtrlOneShotShift"].Enabled {
+    SC11D & SC038:: {
+        OneShotShiftFix()
+        SendInput("+{Tab}")
+    }
+}
+#SC038:: SendEvent("#{Tab}") ; Doesn’t fire when SendInput is used
+!SC038:: SendInput("!{Tab}")
+#HotIf
+
+#HotIf Features["TapHolds"]["LAltAltTabMonitor"].Enabled and not LayerEnabled
+; Tap-hold on "LAlt" : AltTabMonitor on tap, Alt on hold
+SC038::
+{
+    Send("{LAlt Down}")
+    tap := KeyWait("SC038", "T" . Features["TapHolds"]["LAltAltTabMonitor"].TimeActivationSeconds)
+    if tap {
+        Send("{LAlt Up}")
+        AltTabMonitor()
+    } else {
+        KeyWait("SC038")
+        Send("{LAlt Up}")
+    }
+}
+#HotIf
+
+#HotIf Features["TapHolds"]["LAltBackSpace"].Enabled and not LayerEnabled
+; RCtrl becomes BackSpace, and Delete on Shift
+SC038::
+{
+    if GetKeyState("SC02A", "P") { ; LShift
+        SendInput("{Delete}")
+    } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
+        OneShotShiftFix()
+        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+    } else {
+        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        Sleep(300) ; Delay before repeating the key
+        while GetKeyState("SC038", "P") {
+            SendEvent("{BackSpace}")
+            Sleep(70)
         }
     }
 }
-SC01D & ~SC138 Up::
-RAlt Up::
+#HotIf
+
+#HotIf Features["TapHolds"]["LAltBackSpaceLayer"].Enabled and not LayerEnabled
+; Tap-hold on "LAlt" : BackSpace on tap, Layer on hold
+SC038::
 {
-    SendFinalResult("{RAlt Up}{SC138 Up}{LControl Up}")
+    UpdateLastSentCharacter("LAlt")
+
+    global LayerEnabled := True
+    ResetNumberOfRepetitions()
+    UpdateCapsLockLED()
+
+    KeyWait("SC038")
+
+    LayerEnabled := False
+    UpdateCapsLockLED()
+
+    Now := A_TickCount
+    CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
+    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAltBackSpaceLayer"].TimeActivationSeconds * 1000)
+
+    if (
+        tap
+        and not GetKeyState("SC03A", "P") ; Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
+    ) {
+        if GetKeyState("SC02A", "P") { ; LShift
+            SendInput("{Delete}")
+        } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
+            OneShotShiftFix()
+            SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        } else {
+            SendEvent("{BackSpace}")
+        }
+    }
 }
 #HotIf
 
-; ===================================
-; ======= 5.2) One-Shot Shift =======
-; ===================================
+; ==========================
+; ======= 5.4) Space =======
+; ==========================
 
-OneShotShift() {
-    ihvText := InputHook("L1 T2 E", "%€.★', ", "")
-    ihvText.Start()
-    ihvText.Wait()
-    Text := ""
-
-    if (ihvText.EndKey = "%") {
-        Text := " %"
-    } else if (ihvText.EndKey = "€") {
-        Text := " €"
-    } else if (ihvText.EndKey = ".") {
-        Text := " :"
-    } else if (ihvText.EndKey = "★") {
-        Text := "J" ; OneShotShift + ★ will give J directly
-    } else if (ihvText.EndKey = ",") {
-        Text := " ;"
-    } else if (ihvText.EndKey = "'") {
-        Text := " ?"
-    } else if (ihvText.EndKey = " ") {
-        Text := "-"
-    }
-
-    if Text != "" {
-        ActivateHotstrings()
-        SendNewResult(Text)
-    } else if (ihvText = "Timeout") {
+#HotIf Features["TapHolds"]["SpaceLayer"].Enabled and not LayerEnabled
+; Tap-hold on "Space" : Space on tap, Layer on hold
+SC039::
+{
+    ih := InputHook("L1 T" . Features["TapHolds"]["SpaceLayer"].TimeActivationSeconds)
+    ih.Start()
+    ih.Wait()
+    if ih.EndReason != "Timeout" {
+        Text := ih.Input
+        if ih.Input == " " {
+            Text := "" ; To not send a double space
+        }
+        SendEvent("{Space}" Text)
+        ; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
+        ; Otherwise, SendInput resets the hotstrings search
         return
-    } else {
-        Text := Format("{:T}", ihvText.Input) ; Titelcase
-        SendNewResult(Text)
+    }
+
+    global LayerEnabled := True
+    ResetNumberOfRepetitions()
+    UpdateCapsLockLED()
+    KeyWait("SC039")
+    LayerEnabled := False
+    UpdateCapsLockLED()
+}
+SC039 Up:: {
+    if (
+        A_PriorHotkey == "SC039"
+        and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["SpaceLayer"].TimeActivationSeconds
+    ) {
+        SendEvent("{Space}")
+    }
+}
+#HotIf
+
+#HotIf Features["TapHolds"]["SpaceCtrl"].Enabled and not LayerEnabled
+; Tap-hold on "Space" : Space on tap, Ctrl on hold
+SC039::
+{
+    ih := InputHook("L1 T" . Features["TapHolds"]["SpaceCtrl"].TimeActivationSeconds)
+    ih.Start()
+    ih.Wait()
+    if ih.EndReason != "Timeout" {
+        Text := ih.Input
+        if ih.Input == " " {
+            Text := "" ; To not send a double space
+        }
+        SendEvent("{Space}" Text)
+        ; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
+        ; Otherwise, SendInput resets the hotstrings search
+        return
+    }
+
+    SendEvent("{LCtrl Down}")
+    KeyWait("SC039")
+    SendEvent("{LCtrl Up}")
+}
+SC039 Up:: {
+    if (
+        A_PriorHotkey == "SC039"
+        and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["SpaceCtrl"].TimeActivationSeconds
+    ) {
+        SendEvent("{Space}")
+    }
+}
+#HotIf
+
+; ==========================
+; ======= 5.5) AltGr =======
+; ==========================
+
+#HotIf Features["TapHolds"]["AltGrTab"].Enabled and not LayerEnabled
+RAlt::Tab
+; Tap-hold on "AltGr" : Tab on tap, AltGr on hold
+SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
+RAlt:: ; Necessary to work on layouts like QWERTY
+{
+    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGrTab"].TimeActivationSeconds)
+    if (tap and A_PriorKey == "RAlt") {
+        DisableCapsWordState()
+        if (GetKeyState("LControl", "P") and GetKeyState("LShift", "P")) {
+            SendInput("^+{Tab}")
+        } else if GetKeyState("LControl", "P") {
+            SendInput("^{Tab}")
+        } else if GetKeyState("LShift", "P") {
+            SendInput("+{Tab}")
+        } else if GetKeyState("LWin", "P") {
+            SendEvent("#{Tab}") ; SendInput doesn’t work in that case
+        } else {
+            SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
+        }
     }
 }
 
-#HotIf Features["TapHolds"]["OneShotShift"].Enabled
-; Tap-hold on "RControl" : OneShotShift on tap, Shift on hold
-$SC11D:: {
-    OneShotShift()
-    SendFinalResult("{LShift Down}")
-    KeyWait("SC11D")
-    SendFinalResult("{LShift Up}")
+SC01D & ~SC138 Up::
+RAlt Up:: {
+    global LastSentCharacter := ""
 }
-SC11D Up:: SendFinalResult("{LShift Up}")
 #HotIf
 
-; =====================================
-; ======= 5.3) Navigation layer =======
-; =====================================
+#HotIf Features["TapHolds"]["AltGrOneShotShift"].Enabled and not LayerEnabled
+; Tap-hold on "AltGr" : OneShotShift on tap, AltGr on hold
+SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
+RAlt:: ; Necessary to work on layouts like QWERTY
+{
+    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGrOneShotShift"].TimeActivationSeconds)
+    if (tap and A_PriorKey == "RAlt") {
+        DisableCapsWordState()
+        global OneShotShiftEnabled := True
+        OneShotShift()
+    }
+}
+#HotIf
 
-#HotIf Features["TapHolds"]["Tab"].Enabled
+; ==========================
+; ======= 5.6) RCtrl =======
+; ==========================
+
+#HotIf Features["TapHolds"]["RCtrlBackSpace"].Enabled and not LayerEnabled
+; RCtrl becomes BackSpace, and Delete on Shift
+SC11D::
+{
+    if GetKeyState("LShift", "P") {
+        SendInput("{Delete}")
+    } else if Features["TapHolds"]["LAltOneShotShift"].Enabled and GetKeyState("SC038", "P") {
+        OneShotShiftFix()
+        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+    } else {
+        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
+        if not tap {
+            while GetKeyState("SC11D", "P") {
+                SendEvent("{BackSpace}")
+                Sleep(100)
+            }
+        }
+    }
+}
+#HotIf
+
+#HotIf Features["TapHolds"]["RCtrlTab"].Enabled and not LayerEnabled
+; Tap-hold on "RCtrl" : Tab on tap, Ctrl on hold
+~SC11D:: {
+    tap := KeyWait("RControl", "T" . Features["TapHolds"]["RCtrlTab"].TimeActivationSeconds)
+    if (tap and A_PriorKey == "RControl") {
+        SendEvent("{RCtrl Up}")
+        SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
+    }
+}
+
++SC11D:: SendInput("+{Tab}")
+^SC11D:: SendInput("^{Tab}")
+^+SC11D:: SendInput("^+{Tab}")
+#SC11D:: SendEvent("#{Tab}") ; SendInput doesn’t work in that case
+#HotIf
+
+#HotIf Features["TapHolds"]["RCtrlOneShotShift"].Enabled and not LayerEnabled
+; Tap-hold on "RCtrl" : OneShotShift on tap, Shift on hold
+SC11D:: {
+    global OneShotShiftEnabled := True
+    OneShotShift()
+    SendEvent("{LShift Down}")
+    KeyWait("SC11D")
+    SendEvent("{LShift Up}")
+}
+#HotIf
+
+; ========================
+; ======= 5.7) Tab =======
+; ========================
+
+#HotIf Features["TapHolds"]["TabAlt"].Enabled and not LayerEnabled
+; Tap-hold on "Tab": Alt + Tab on tap, Alt on hold
 SC00F::LAlt
 SC00F::
 {
-    SendFinalResult("{LAlt Down}")
-    tap := KeyWait("SC00F", TapHoldTime)
+    SendInput("{LAlt Down}")
+    tap := KeyWait("SC00F", "T" . Features["TapHolds"]["TabAlt"].TimeActivationSeconds)
     if tap {
-        SendFinalResult("{LAlt Up}")
-        AltTabMonitor()
+        if Features["TapHolds"]["LAltTabLayer"].Enabled and GetKeyState("SC038", "P") {
+            SendInput("!{Tab}")
+        } else {
+            SendInput("{LAlt Up}")
+            AltTabMonitor()
+        }
+
     }
 }
-SC00F Up:: SendFinalResult("{LAlt Up}")
+SC00F Up:: SendInput("{LAlt Up}")
+#HotIf
 
 AltTabMonitor() {
     CoordMode("Mouse", "Screen")
@@ -2627,8 +3193,8 @@ AltTabMonitor() {
             continue ; Window is not on the target monitor
         }
 
-        ; Skip windows with no title — often tooltips, overlays, or hidden UI elements
-        if WinGetTitle(WindowId) = "" {
+        ; Skip windows with no title — often tooltips, overlays, or hidden UI elements, and when dragging files
+        if WinGetTitle(WindowId) == "" or WinGetTitle(WindowId) == "Drag" {
             continue
         }
 
@@ -2666,60 +3232,108 @@ GetMonitorFromPoint(X, Y) {
 
     return 0 ; No monitor found
 }
-#HotIf
 
-#HotIf Features["TapHolds"]["Layer"].Enabled and not LayerEnabled
-; Tap-hold on "Alt" : BackSpace on tap, Layer on hold
-$SC038::
-{
-    SendFinalResult("{LAlt Up}")
-    global LayerEnabled := TRUE
-    ResetNumberOfRepetitions()
-    tap := KeyWait("SC038", TapHoldTime)
-    if tap and A_PriorKey == "LAlt" {
-        LayerEnabled := FALSE
-        SendEvent("{BackSpace}") ; SendEvent to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring. Otherwise, SendInput resets the hotstrings search
+; ==============================
+; ======= One-Shot Shift =======
+; ==============================
+
+OneShotShift() {
+    ihvText := InputHook("L1 T2 E", "%€.★', ")
+    ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
+    ihvText.Start()
+    ihvText.Wait()
+    SpecialCharacter := ""
+
+    if (ihvText.EndKey == "%") {
+        SpecialCharacter := " %"
+    } else if (ihvText.EndKey == "€") {
+        SpecialCharacter := " €"
+    } else if (ihvText.EndKey == ".") {
+        SpecialCharacter := " :"
+    } else if (ihvText.EndKey == "★") {
+        SpecialCharacter := "J" ; OneShotShift + ★ will give J directly
+    } else if (ihvText.EndKey == ",") {
+        SpecialCharacter := " ;"
+    } else if (ihvText.EndKey == "'") {
+        SpecialCharacter := " ?"
+    } else if (ihvText.EndKey == " ") {
+        SpecialCharacter := "-"
+    }
+
+    if (ihvText == "Timeout") {
+        return
+    } else if SpecialCharacter != "" {
+        if OneShotShiftEnabled {
+            ActivateHotstrings()
+            SendNewResult(SpecialCharacter)
+        } else {
+            SendNewResult(ihvText.EndKey)
+        }
     } else {
-        SetCapsLockState("AlwaysOn")
-        KeyWait("SC038")
-        LayerEnabled := FALSE
-        SetCapsLockState("AlwaysOff")
+        if OneShotShiftEnabled {
+            TitleCaseText := Format("{:T}", ihvText.Input)
+            SendNewResult(TitleCaseText)
+        } else {
+            SendNewResult(ihvText.Input)
+        }
     }
 }
-SC038 Up:: {
-    global LayerEnabled := FALSE
+
+OneShotShiftFix() {
+    ; This function and global variable solves a problem when we use the OneShotShift key as a modifier.
+    ; In that case, we first press this key, thus firing the OneShotShift() function that will uppercase the next character in the next 2 seconds.
+    ; The only way to disable it after it has fired is to modify this global variable by setting global OneShotShiftEnabled := False.
+    ; That way, calling this function OneShotShiftFix() won’t uppercase the next character in our shortcuts involving the OneShotShift key.
+    global OneShotShiftEnabled := False
 }
 
-+SC038::Delete ; Shift + LAlt = Delete
-SC138 & SC038:: SendFinalResult("^{BackSpace}") ; AltGr + LAlt = Ctrl + BackSpace
-+^!SC038::^Delete ; Shift +  Ctrl + Delete
-#HotIf
+; ================================
+; ======= Navigation layer =======
+; ================================
 
 ResetNumberOfRepetitions() {
-    global NumberOfRepetitions := 1
+    SetNumberOfRepetitions(1)
 }
 SetNumberOfRepetitions(NewNumber) {
     global NumberOfRepetitions := NewNumber
 }
 ActionLayer(action) {
-    SendFinalResult(action)
+    SendInput(action)
     ResetNumberOfRepetitions()
 }
 
-#HotIf Features["TapHolds"]["Layer"].Enabled and LayerEnabled
-; The base layer will become this one when the navigation layer variable is set to TRUE
+; Fix to get the CapsWord shortcut working when "LAlt" is activating the layer
+#HotIf (
+    Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
+    and LayerEnabled
+    and (
+        Features["TapHolds"]["LAltBackSpaceLayer"].Enabled
+        or Features["TapHolds"]["LAltTabLayer"].Enabled
+    )
+)
+SC03A:: ToggleCapsWordState() ; Overrides the "BackSpace" shortcut on the layer
+#HotIf
 
-SC039:: ActionLayer("{Escape " . NumberOfRepetitions . "}") ; On Space
+; Fix when Space triggers the layer
+#HotIf (
+    Features["TapHolds"]["SpaceLayer"].Enabled
+    and LayerEnabled
+)
+SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it is held to get the layer
+#HotIf
+
+#HotIf LayerEnabled
+; The base layer will become this one when the navigation layer variable is set to True
+
+SC039:: ActionLayer("{Escape}")
+WheelUp:: ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
+WheelDown:: ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
 
 SC01D & ~SC138:: ; RAlt
 RAlt:: ; RAlt on QWERTY
-SC11D:: ; RControl
 {
-    SendFinalResult("{LCtrl Down}{Delete}{LCtrl Up}")
+    ActionLayer("{Escape " . NumberOfRepetitions . "}")
 }
-
-WheelUp:: ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
-WheelDown:: ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
 
 ; === Number row ===
 SC002:: SetNumberOfRepetitions(1) ; On key 1
@@ -2736,52 +3350,52 @@ SC00B:: SetNumberOfRepetitions(10) ; On key 0
 ; ======= Left hand =======
 
 ; === Top row ===
-SC010:: ActionLayer("{Shift Down}^{Home}{Shift Up}") ; Select to the beginning of the document
+SC010:: ActionLayer("^+{Home}") ; Select to the beginning of the document
 SC011:: ActionLayer("^{Home}") ; Go to the beginning of the document
 SC012:: ActionLayer("^{End}") ; Go to the end of the document
-SC013:: ActionLayer("{Shift Down}^{End}{Shift Up}") ; Select to the end of the document
-SC014:: ActionLayer("{Tab" . NumberOfRepetitions . "}")
+SC013:: ActionLayer("^+{End}") ; Select to the end of the document
+SC014:: ActionLayer("{F2}")
 
 ; === Middle row ===
-SC03A:: ActionLayer("{Delete " . NumberOfRepetitions . "}") ; "CapsLock" becomes Delete
-SC01E:: ActionLayer("^+{Up " . NumberOfRepetitions . "}")
-SC01F:: ActionLayer("{Up " . NumberOfRepetitions . "}") ; ⇧
-SC020:: ActionLayer("{Down " . NumberOfRepetitions . "}") ; ⇩
-SC021:: ActionLayer("^+{Down " . NumberOfRepetitions . "}")
-SC022:: ActionLayer("{End} {Enter " . NumberOfRepetitions . "}") ; Start a new line below the cursor
+SC03A:: ActionLayer(Format("{BackSpace {1}}", NumberOfRepetitions)) ; "CapsLock" becomes BackSpace
+SC01E:: ActionLayer(Format("^+{Up {1}}", NumberOfRepetitions))
+SC01F:: ActionLayer(Format("{Up {1}}", NumberOfRepetitions)) ; ⇧
+SC020:: ActionLayer(Format("{Down {1}}", NumberOfRepetitions)) ; ⇩
+SC021:: ActionLayer(Format("^+{Down {1}}", NumberOfRepetitions))
+SC022:: ActionLayer("{F12}")
 
 ; === Bottom row ===
-SC056:: ActionLayer("{LAlt Down}{LShift Down}{Up " . NumberOfRepetitions . "}{LShift Up}{LAlt Up}")  ; Duplicate the line up
-SC02C:: ActionLayer("!{Up " . NumberOfRepetitions . "}") ; Move the line up
-SC02D:: ActionLayer("!{Down " . NumberOfRepetitions . "}") ; Move the line down
-SC02E:: ActionLayer("{LAlt Down}{LShift Down}{Down " . NumberOfRepetitions . "}{LShift Up}{LAlt Up}") ; Duplicate the line down
-SC02F:: ActionLayer("+!{Right " . NumberOfRepetitions . "}") ; Start a new line below the cursor
-SC030:: ActionLayer("{LAlt Down}{LShift Down}{Down " . NumberOfRepetitions . "}{LShift Up}{LAlt Up}") ; Duplicate the line down
+SC056:: ActionLayer(Format("!+{Up {1}}", NumberOfRepetitions))  ; Duplicate the line up
+SC02C:: ActionLayer(Format("!{Up {1}}", NumberOfRepetitions)) ; Move the line up
+SC02D:: ActionLayer(Format("!{Down {1}}", NumberOfRepetitions)) ; Move the line down
+SC02E:: ActionLayer(Format("!+{Down {1}}", NumberOfRepetitions)) ; Duplicate the line down
+SC02F:: ActionLayer(Format("{End}{Enter {1}}", NumberOfRepetitions)) ; Start a new line below the cursor
+; SC030:: ; On K
 
 ; ======= Right hand =======
 
 ; === Top row ===
 SC015:: ActionLayer("+{Home}") ; Select everything to the beginning of the line
-SC016:: ActionLayer("^+{Left " . NumberOfRepetitions . "}") ; Select the previous word
-SC017:: ActionLayer("+{Left " . NumberOfRepetitions . "}") ; Select the previous character
-SC018:: ActionLayer("+{Right " . NumberOfRepetitions . "}") ; Select the next character
-SC019:: ActionLayer("^+{Right " . NumberOfRepetitions . "}") ; Select the next word
+SC016:: ActionLayer(Format("^+{Left {1}}", NumberOfRepetitions)) ; Select the previous word
+SC017:: ActionLayer(Format("+{Left {1}}", NumberOfRepetitions)) ; Select the previous character
+SC018:: ActionLayer(Format("+{Right {1}}", NumberOfRepetitions)) ; Select the next character
+SC019:: ActionLayer(Format("^+{Right {1}}", NumberOfRepetitions)) ; Select the next word
 SC01A:: ActionLayer("+{End}") ; Select everything to the end of the line
 
 ; === Middle row ===
-SC023:: ActionLayer("{Home}") ; Go to the beginning of the line
-SC024:: ActionLayer("^{Left " . NumberOfRepetitions . "}") ; Move to the previous word
-SC025:: ActionLayer("{Left " . NumberOfRepetitions . "}") ; ⇦
-SC026:: ActionLayer("{Right " . NumberOfRepetitions . "}") ; ⇨
-SC027:: ActionLayer("^{Right " . NumberOfRepetitions . "}") ; Move to the next word
-SC028:: ActionLayer("{End}") ; Go to the end of the line
+SC023:: ActionLayer("#+{Left}") ; Move the window to the left screen
+SC024:: ActionLayer(Format("^{Left {1}}", NumberOfRepetitions)) ; Move to the previous word
+SC025:: ActionLayer(Format("{Left {1}}", NumberOfRepetitions)) ; ⇦
+SC026:: ActionLayer(Format("{Right {1}}", NumberOfRepetitions)) ; ⇨
+SC027:: ActionLayer(Format("^{Right {1}}", NumberOfRepetitions)) ; Move to the next word
+SC028:: ActionLayer("#+{Right}") ; Move the window to the right screen
 
 ; === Bottom row ===
 SC031:: WinMaximize("A") ; Make the window fullscreen
-SC032:: SendFinalResult("#+{Left}") ; Move the window to the left screen
-SC033:: SendFinalResult("#{Left}") ; Move the window to the left of the current screen
-SC034:: SendFinalResult("#{Right}") ; Move the window to the right of the current screen
-SC035:: SendFinalResult("#+{Right}") ; Move the window to the right screen
+SC032:: ActionLayer("{Home}") ; Go to the beginning of the line
+SC033:: ActionLayer("#{Left}") ; Move the window to the left of the current screen
+SC034:: ActionLayer("#{Right}") ; Move the window to the right of the current screen
+SC035:: ActionLayer("{End}") ; Go to the end of the line
 #HotIf
 
 ; ====================================================================
@@ -2797,15 +3411,42 @@ SC035:: SendFinalResult("#+{Right}") ; Move the window to the right screen
 ; =====================================================
 
 if Features["DistancesReduction"]["QU"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "qa", "qua")
-    CreateCaseSensitiveHotstrings("*?", "qà", "quà")
-    CreateCaseSensitiveHotstrings("*?", "qe", "que")
-    CreateCaseSensitiveHotstrings("*?", "qé", "qué")
-    CreateCaseSensitiveHotstrings("*?", "qè", "què")
-    CreateCaseSensitiveHotstrings("*?", "qê", "quê")
-    CreateCaseSensitiveHotstrings("*?", "qi", "qui")
-    CreateCaseSensitiveHotstrings("*?", "qo", "quo")
-    CreateCaseSensitiveHotstrings("*?", "q'", "qu’")
+    CreateCaseSensitiveHotstrings(
+        "*?", "qa", "qua",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "qà", "quà",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "qe", "que",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "qé", "qué",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "qè", "què",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "qê", "quê",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "qi", "qui",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "qo", "quo",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "q'", "qu’",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================
@@ -2813,10 +3454,26 @@ if Features["DistancesReduction"]["QU"].Enabled {
 ; ==========================================
 
 if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "êa", "â")
-    CreateCaseSensitiveHotstrings("*?", "êi", "î")
-    CreateCaseSensitiveHotstrings("*?", "êo", "ô")
-    CreateCaseSensitiveHotstrings("*?", "êu", "û")
+    CreateCaseSensitiveHotstrings(
+        "*?", "êa", "â",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+        )
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "êi", "î",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+        )
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "êo", "ô",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+        )
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "êu", "û",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+        )
+    )
 }
 
 ; ======================================================
@@ -2824,29 +3481,67 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
 ; ======================================================
 
 if Features["DistancesReduction"]["CommaJ"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", ",à", "j")
-    CreateCaseSensitiveHotstrings("*?", ",a", "ja")
-    CreateCaseSensitiveHotstrings("*?", ",e", "je")
-    CreateCaseSensitiveHotstrings("*?", ",é", "jé")
-    CreateCaseSensitiveHotstrings("*?", ",i", "ji")
-    CreateCaseSensitiveHotstrings("*?", ",o", "jo")
-    CreateCaseSensitiveHotstrings("*?", ",u", "ju")
-    CreateCaseSensitiveHotstrings("*?", ",ê", "ju")
-    CreateCaseSensitiveHotstrings("*?", ",'", "j’")
+    CreateCaseSensitiveHotstrings(
+        "*?", ",à", "j",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",a", "ja",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",e", "je",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",é", "jé",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",i", "ji",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",o", "jo",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",u", "ju",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",ê", "ju",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", ",'", "j’",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
 }
+
 ; ===================================================================================
 ; ======= 6.4) Comma makes it possible to type letters that are hard to reach =======
 ; ===================================================================================
 
 if Features["DistancesReduction"]["CommaFarLetters"].Enabled {
     ; === Top row ===
-    CreateCaseSensitiveHotstrings("*?", ",è", "z")
-    CreateCaseSensitiveHotstrings("*?", ",y", "k")
-    CreateCaseSensitiveHotstrings("*?", ",c", "ç")
-    CreateHotstring("*?", ",x", "Ç")
+    CreateCaseSensitiveHotstrings("*?", ",è", "z",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaFarLetters"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",y", "k",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaFarLetters"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",c", "ç",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaFarLetters"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",x", "où" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaFarLetters"].TimeActivationSeconds)
+    )
 
     ; === Middle row ===
-    CreateCaseSensitiveHotstrings("*?", ",s", "q")
+    CreateCaseSensitiveHotstrings("*?", ",s", "q",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaFarLetters"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================================
@@ -2855,23 +3550,49 @@ if Features["DistancesReduction"]["CommaFarLetters"].Enabled {
 
 if Features["SFBsReduction"]["Comma"].Enabled {
     ; === Top row ===
-    CreateCaseSensitiveHotstrings("*?", ",f", "fl")
-    CreateCaseSensitiveHotstrings("*?", ",g", "gl")
-    CreateCaseSensitiveHotstrings("*?", ",h", "ph")
-    CreateCaseSensitiveHotstrings("*?", ",z", "bj")
+    CreateCaseSensitiveHotstrings("*?", ",f", "fl",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",g", "gl",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",h", "ph",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",z", "bj",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
 
     ; === Middle row ===
-    CreateCaseSensitiveHotstrings("*?", ",v", "dv")
-    CreateCaseSensitiveHotstrings("*?", ",n", "nl")
-    CreateCaseSensitiveHotstrings("*?", ",t", "pt")
-    CreateCaseSensitiveHotstrings("*?", ",r", "rq")
-    CreateCaseSensitiveHotstrings("*?", ",q", "qu’")
+    CreateCaseSensitiveHotstrings("*?", ",v", "dv",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",n", "nl",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",t", "pt",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",r", "rq",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",q", "qu’",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
 
     ; === Bottom row ===
-    CreateCaseSensitiveHotstrings("*?", ",m", "ms")
-    CreateCaseSensitiveHotstrings("*?", ",d", "ds")
-    CreateCaseSensitiveHotstrings("*?", ",l", "cl")
-    CreateCaseSensitiveHotstrings("*?", ",p", "xp")
+    CreateCaseSensitiveHotstrings("*?", ",m", "ms",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",d", "ds",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",l", "cl",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings("*?", ",p", "xp",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================
@@ -2879,12 +3600,30 @@ if Features["SFBsReduction"]["Comma"].Enabled {
 ; ==========================================
 
 if Features["SFBsReduction"]["ECirc"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "êé", "aî")
-    CreateCaseSensitiveHotstrings("*?", "éê", "â")
-    CreateCaseSensitiveHotstrings("*?", "êe", "oe")
-    CreateCaseSensitiveHotstrings("*?", "eê", "eo")
-    CreateCaseSensitiveHotstrings("*?", "ê.", "u.")
-    CreateCaseSensitiveHotstrings("*?", "ê,", "u,")
+    CreateCaseSensitiveHotstrings(
+        "*?", "êé", "aî",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "éê", "â",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "êe", "oe",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eê", "eo",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "ê.", "u.",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "ê,", "u,",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================
@@ -2892,8 +3631,42 @@ if Features["SFBsReduction"]["ECirc"].Enabled {
 ; ==========================================
 
 if Features["SFBsReduction"]["EGrave"] {
-    CreateCaseSensitiveHotstrings("*?", "yè", "éi")
-    CreateCaseSensitiveHotstrings("*?", "èy", "ié")
+    CreateCaseSensitiveHotstrings(
+        "*?", "yè", "éi",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["EGrave"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "èy", "ié",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["EGrave"].TimeActivationSeconds)
+    )
+}
+
+; ==========================================
+; ======= 6.8) SFBs reduction with À =======
+; ==========================================
+
+if Features["SFBsReduction"]["BU"].Enabled and Features["MagicKey"]["TextExpansion"].Enabled {
+    ; Those hotstrings must be defined before bu, otherwise they won’t get activated
+    CreateCaseSensitiveHotstrings("*", "il a mà★", "il a mis à jour")
+    CreateCaseSensitiveHotstrings("*", "la mà★", "la mise à jour")
+    CreateCaseSensitiveHotstrings("*", "ta mà★", "ta mise à jour")
+    CreateCaseSensitiveHotstrings("*", "ma mà★", "ma mise à jour")
+    CreateCaseSensitiveHotstrings("*?", "e mà★", "e mise à jour")
+    CreateCaseSensitiveHotstrings("*?", "es mà★", "es mises à jour")
+    CreateCaseSensitiveHotstrings("*", "mà★", "mettre à jour")
+    CreateCaseSensitiveHotstrings("*", "mià★", "mise à jour")
+    CreateCaseSensitiveHotstrings("*", "pià★", "pièce jointe")
+    CreateCaseSensitiveHotstrings("*", "tà★", "toujours")
+}
+if Features["SFBsReduction"]["BU"].Enabled {
+    CreateCaseSensitiveHotstrings(
+        "*?", "à★", "bu",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["BU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àu", "ub",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["BU"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================
@@ -2904,26 +3677,36 @@ if Features["SFBsReduction"]["EGrave"] {
 ; ==========================================
 ; ==========================================
 
-global SpaceAroundSymbols := Features["DistancesReduction"]["SpaceAroundSymbols"].Enabled ? " " : ""
-
 ; =======================================
 ; ======= 7.1) Rolls on left hand =======
 ; =======================================
 
 ; === Top row ===
 if Features["Rolls"]["CloseChevronTag"].Enabled {
-    CreateHotstring("*?P", "<@", "</")
+    CreateHotstring(
+        "*?P", "<@", "</",
+        Map("TimeActivationSeconds", Features["Rolls"]["CloseChevronTag"].TimeActivationSeconds)
+    )
 }
 
 ; === Middle row ===
 if Features["Rolls"]["EZ"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "eé", "ez")
+    CreateCaseSensitiveHotstrings(
+        "*?", "eé", "ez",
+        Map("TimeActivationSeconds", Features["Rolls"]["EZ"].TimeActivationSeconds)
+    )
 }
 
 ; === Bottom row ===
 if Features["Rolls"]["Comment"].Enabled {
-    CreateHotstring("*?", "\`"", "/*")
-    CreateHotstring("*?", "`"\", "*/")
+    CreateHotstring(
+        "*?", "\`"", "/*",
+        Map("TimeActivationSeconds", Features["Rolls"]["Comment"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "`"\", "*/",
+        Map("TimeActivationSeconds", Features["Rolls"]["Comment"].TimeActivationSeconds)
+    )
 }
 
 ; =======================================
@@ -2932,55 +3715,148 @@ if Features["Rolls"]["Comment"].Enabled {
 
 ; === Top row ===
 if Features["Rolls"]["HashtagParenthesis"].Enabled {
-    CreateHotstring("*?", "#(", "`")")
+    CreateHotstring(
+        "*?", "#(", "`")",
+        Map("TimeActivationSeconds", Features["Rolls"]["HashtagParenthesis"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["HashtagBracket"].Enabled {
-    CreateHotstring("*?", "#[", "`"]")
+    CreateHotstring(
+        "*?", "#[", "`"]",
+        Map("TimeActivationSeconds", Features["Rolls"]["HashtagBracket"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "#]", "`"]",
+        Map("TimeActivationSeconds", Features["Rolls"]["HashtagBracket"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["HC"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "hc", "wh")
+    CreateCaseSensitiveHotstrings(
+        "*?", "hc", "wh",
+        Map("TimeActivationSeconds", Features["Rolls"]["HC"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["Assign"].Enabled {
-    CreateHotstring("*?", "#ç", SpaceAroundSymbols ":=" SpaceAroundSymbols)
-    CreateHotstring("*?", "#!", " := ")
+    CreateHotstring(
+        "*?", " #ç", SpaceAroundSymbols . ":=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["Assign"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", " #!", SpaceAroundSymbols . ":=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["Assign"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "#ç", SpaceAroundSymbols . ":=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["Assign"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "#!", SpaceAroundSymbols . ":=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["Assign"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["NotEqual"].Enabled {
-    CreateHotstring("*?", "ç#", SpaceAroundSymbols . "!=" . SpaceAroundSymbols)
-    CreateHotstring("*?", "!#", SpaceAroundSymbols . "!=" . SpaceAroundSymbols)
+    CreateHotstring(
+        "*?", " ç#", SpaceAroundSymbols . "!=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["NotEqual"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", " !#", SpaceAroundSymbols . "!=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["NotEqual"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "ç#", SpaceAroundSymbols . "!=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["NotEqual"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "!#", SpaceAroundSymbols . "!=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["NotEqual"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["SX"].Enabled {
     CreateCaseSensitiveHotstrings("*?", "xlsx", "xlsx") ; To not trigger the replacement in this particular case
-    CreateCaseSensitiveHotstrings("*?", "sx", "sk")
+    CreateCaseSensitiveHotstrings(
+        "*?", "sx", "sk",
+        Map("TimeActivationSeconds", Features["Rolls"]["SX"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["CX"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "cx", "ck")
+    CreateCaseSensitiveHotstrings(
+        "*?", "cx", "ck",
+        Map("TimeActivationSeconds", Features["Rolls"]["CX"].TimeActivationSeconds)
+    )
 }
 
 ; === Middle row ===
 if Features["Rolls"]["EqualString"].Enabled {
-    CreateHotstring("*?", "[)", " = `"`"{Left}", OnlyText := FALSE)
+    CreateHotstring(
+        "*?", " [)", SpaceAroundSymbols . "=" . SpaceAroundSymbols . "`"`"{Left}",
+        Map("OnlyText", False).Set("TimeActivationSeconds", Features["Rolls"]["EqualString"].TimeActivationSeconds
+        )
+    )
+    CreateHotstring(
+        "*?", "[)", SpaceAroundSymbols . "=" . SpaceAroundSymbols . "`"`"{Left}",
+        Map("OnlyText", False).Set("TimeActivationSeconds", Features["Rolls"]["EqualString"].TimeActivationSeconds
+        )
+    )
 }
 if Features["Rolls"]["EnglishNegation"].Enabled and Features["Autocorrection"]["TypographicApostrophe"].Enabled {
-    CreateHotstring("*?", "nt'", "n’t")
+    CreateHotstring(
+        "*?", "nt'", "n’t",
+        Map("TimeActivationSeconds", Features["Rolls"]["EnglishNegation"].TimeActivationSeconds)
+    )
 } else if Features["Rolls"]["EnglishNegation"].Enabled {
-    CreateHotstring("*?", "nt'", "n't")
+    CreateHotstring(
+        "*?", "nt'", "n't",
+        Map("TimeActivationSeconds", Features["Rolls"]["EnglishNegation"].TimeActivationSeconds)
+    )
 }
 
 ; === Bottom row ===
 if Features["Rolls"]["AssignArrowEqualRight"].Enabled {
-    CreateHotstring("*?", "$=", SpaceAroundSymbols . "=>" . SpaceAroundSymbols)
+    CreateHotstring(
+        "*?", " $=", SpaceAroundSymbols . "=>" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowEqualRight"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "$=", SpaceAroundSymbols . "=>" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowEqualRight"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["AssignArrowEqualLeft"].Enabled {
-    CreateHotstring("*?", "=$", SpaceAroundSymbols . "<=" . SpaceAroundSymbols)
+    CreateHotstring(
+        "*?", " =$", SpaceAroundSymbols . "<=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowEqualLeft"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "=$", SpaceAroundSymbols . "<=" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowEqualLeft"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["AssignArrowMinusRight"].Enabled {
-    CreateHotstring("*?", "+?", SpaceAroundSymbols . "->" . SpaceAroundSymbols)
+    CreateHotstring(
+        "*?", " +?", SpaceAroundSymbols . "->" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowMinusRight"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "+?", SpaceAroundSymbols . "->" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowMinusRight"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["AssignArrowMinusLeft"].Enabled {
-    CreateHotstring("*?", "?+", SpaceAroundSymbols . "<-" . SpaceAroundSymbols)
+    CreateHotstring(
+        "*?", " ?+", SpaceAroundSymbols . "<-" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowMinusLeft"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "?+", SpaceAroundSymbols . "<-" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowMinusLeft"].TimeActivationSeconds)
+    )
 }
 if Features["Rolls"]["CT"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "p'", "ct")
+    CreateCaseSensitiveHotstrings(
+        "*?", "p'", "ct",
+        Map("TimeActivationSeconds", Features["Rolls"]["CT"].TimeActivationSeconds)
+    )
 }
 
 ; ===================================================
@@ -2996,15 +3872,46 @@ if Features["Rolls"]["CT"].Enabled {
 ; ==============================================================================
 
 if Features["Autocorrection"]["TypographicApostrophe"].Enabled {
-    CreateCaseSensitiveHotstrings("*", "c'", "c’")
-    CreateCaseSensitiveHotstrings("*", "d'", "d’")
-    CreateCaseSensitiveHotstrings("*", "j'", "j’")
-    CreateCaseSensitiveHotstrings("*", "l'", "l’")
-    CreateCaseSensitiveHotstrings("*", "m'", "m’")
-    CreateCaseSensitiveHotstrings("*", "n'", "n’")
-    CreateCaseSensitiveHotstrings("*", "s'", "s’")
-    CreateCaseSensitiveHotstrings("*", "t'", "t’")
-    CreateCaseSensitiveHotstrings("*?", "n't", "n’t") ; words negated with -n’t in English
+    CreateCaseSensitiveHotstrings(
+        "*", "c'", "c’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "d'", "d’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "j'", "j’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "l'", "l’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "m'", "m’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "n'", "n’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "s'", "s’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "t'", "t’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "y'", "y’",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "n't", "n’t",  ; words negated with -n’t in English
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================
@@ -3013,46 +3920,140 @@ if Features["Autocorrection"]["TypographicApostrophe"].Enabled {
 
 if Features["Autocorrection"]["Errors"].Enabled {
     ; === Prevents getting an underscore instead of space when typing quickly in AltGr
-    CreateHotstring("*", "(_", "( ")
-    CreateHotstring("*", ")_", ") ")
-    CreateHotstring("*", "+_", "+ ")
-    CreateHotstring("*", "#_", "# ")
-    CreateHotstring("*", "$_", "$ ")
-    CreateHotstring("*", "=_", "= ")
-    CreateHotstring("*", "[_", "[ ")
-    CreateHotstring("*", "]_", "] ")
-    CreateHotstring("*", "~_", "~ ")
-    CreateHotstring("*", "*_", "* ")
-    CreateHotstring("*", "=_", "= ")
+    CreateHotstring(
+        "*", "(_", "( ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", ")_", ") ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "+_", "+ ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "#_", "# ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "$_", "$ ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "=_", "= ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "[_", "[ ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "]_", "] ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "~_", "~ ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "*_", "* ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "=_", "= ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
 
     ; === Caps correction ===
-    CreateHotstring("?:C", "OUi", "Oui")
+    CreateHotstring(
+        "?:C", "OUi", "Oui",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
 
     ; === Letters chaining correction ===
-    CreateHotstring("*?", "eua", "eau")
-    CreateHotstring("*?", "aeu", "eau")
-    CreateCaseSensitiveHotstrings("*?", "oiu", "oui")
-    CreateCaseSensitiveHotstrings("*", "poru", "pour")
+    CreateHotstring(
+        "*?", "eua", "eau",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "aeu", "eau",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "oiu", "oui",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "poru", "pour",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
 }
 
 if Features["Autocorrection"]["OU"].Enabled {
-    CreateCaseSensitiveHotstrings("*", "où .", "où.")
-    CreateCaseSensitiveHotstrings("*", "où ,", "où, ")
+    CreateCaseSensitiveHotstrings(
+        "*", "où .", "où.",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["OU"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "où ,", "où, ",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["OU"].TimeActivationSeconds)
+    )
 }
 
 if Features["Autocorrection"]["SuffixesAChaining"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "eàa", "aire")
-    CreateCaseSensitiveHotstrings("*?", "eàf", "iste")
-    CreateCaseSensitiveHotstrings("*?", "eàl", "elle")
-    CreateCaseSensitiveHotstrings("*?", "eàm", "isme")
-    CreateCaseSensitiveHotstrings("*?", "eàn", "ation")
-    CreateCaseSensitiveHotstrings("*?", "eàp", "ence")
-    CreateCaseSensitiveHotstrings("*?", "eàq", "ique")
-    CreateCaseSensitiveHotstrings("*?", "eàr", "erre")
-    CreateCaseSensitiveHotstrings("*?", "eàs", "ement")
-    CreateCaseSensitiveHotstrings("*?", "eàt", "ettre")
-    CreateCaseSensitiveHotstrings("*?", "eàt", "ettre")
-    CreateCaseSensitiveHotstrings("*?", "eàz", "ez-vous")
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàa", "aire",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàf", "iste",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàl", "elle",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàm", "isme",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàn", "ation",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàp", "ence",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "ieàq", "ique", ; For example "psychologie" + ique
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàq", "ique",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàr", "erre",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàs", "ement",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàt", "ettre",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàt", "ettre",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eàz", "ez-vous",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["SuffixesAChaining"].TimeActivationSeconds)
+    )
 }
 
 ; =================================================
@@ -3133,7 +4134,7 @@ if Features["Autocorrection"]["Brands"].Enabled {
         "fichiers",
         "le",
         "mon",
-        "sur"
+        "sur",
         "son",
         "ton",
     ]
@@ -3245,6 +4246,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "calin", "câlin")
     CreateCaseSensitiveHotstrings("*", "canoe", "canoë")
     CreateCaseSensitiveHotstrings("*?", "chaine", "chaîne")
+    CreateCaseSensitiveHotstrings("*?", "chaîned", "chained")
     CreateCaseSensitiveHotstrings("*?", "chainé", "chaîné")
     CreateCaseSensitiveHotstrings("", "chassis", "châssis")
     CreateCaseSensitiveHotstrings("*", "chateau", "château")
@@ -3323,6 +4325,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "flanes", "flânes")
     CreateCaseSensitiveHotstrings("*", "flaneu", "flâneu")
     CreateCaseSensitiveHotstrings("", "flanez", "flânez")
+    CreateCaseSensitiveHotstrings("", "flanons", "flânons")
     CreateCaseSensitiveHotstrings("", "flute", "flûte")
     CreateCaseSensitiveHotstrings("", "flutes", "flûtes")
     CreateCaseSensitiveHotstrings("*", "foetus", "fœtus")
@@ -3341,7 +4344,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "génant", "gênant")
     CreateCaseSensitiveHotstrings("", "génants", "gênants")
     CreateCaseSensitiveHotstrings("*", "geole", "geôle")
-    CreateCaseSensitiveHotstrings("*", "geolier", "geôlier")
+    CreateCaseSensitiveHotstrings("*?", "geolier", "geôlier")
+    CreateCaseSensitiveHotstrings("*?", "geoliè", "geôliè")
     CreateCaseSensitiveHotstrings("", "gout", "goût")
     CreateCaseSensitiveHotstrings("", "gouta", "goûta")
     CreateCaseSensitiveHotstrings("", "goute", "goûte")
@@ -3440,8 +4444,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     ; === P ===
     CreateCaseSensitiveHotstrings("*", "paella", "paëlla")
     CreateCaseSensitiveHotstrings("*", "palir", "pâlir")
-    CreateCaseSensitiveHotstrings("*", "parait", "paraît")
-    CreateCaseSensitiveHotstrings("*?", "paraitre", "paraître")
+    CreateCaseSensitiveHotstrings("*?", "parait", "paraît")
     CreateCaseSensitiveHotstrings("*?", "paranoia", "paranoïa")
     CreateCaseSensitiveHotstrings("", "paté", "pâté")
     CreateCaseSensitiveHotstrings("", "patés", "pâtés")
@@ -3541,50 +4544,106 @@ if Features["Autocorrection"]["Accents"].Enabled {
 ; ======= 9.1) Suffixes with À =======
 ; ====================================
 
-if Features["DistancesReduction"]["SuffixesA"].Enabled and Features["MagicKey"]["TextExpansion"].Enabled {
-    ; Those hotstrings must be defined before bu, otherwise they won’t get activated
-    CreateCaseSensitiveHotstrings("*", "il a mà★", "il a mis à jour")
-    CreateCaseSensitiveHotstrings("*", "la mà★", "la mise à jour")
-    CreateCaseSensitiveHotstrings("*", "ta mà★", "ta mise à jour")
-    CreateCaseSensitiveHotstrings("*", "ma mà★", "ma mise à jour")
-    CreateCaseSensitiveHotstrings("*?", "e mà★", "e mise à jour")
-    CreateCaseSensitiveHotstrings("*?", "es mà★", "es mises à jour")
-    CreateCaseSensitiveHotstrings("*", "mà★", "mettre à jour")
-    CreateCaseSensitiveHotstrings("*", "mià★", "mise à jour")
-    CreateCaseSensitiveHotstrings("*", "pià★", "pièce jointe")
-    CreateCaseSensitiveHotstrings("*", "tà★", "toujours")
-}
-
 if Features["DistancesReduction"]["SuffixesA"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "à★", "bu")
-    CreateCaseSensitiveHotstrings("*?", "àa", "aire")
-    CreateCaseSensitiveHotstrings("*?", "àc", "ction")
+    CreateCaseSensitiveHotstrings(
+        "*?", "àa", "aire",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àc", "ction",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
 
     ; À + d = "could", "should" or "would" depending on the prefix
-    CreateCaseSensitiveHotstrings("*?", "càd", "could")
-    CreateCaseSensitiveHotstrings("*?", "shàd", "should")
-    CreateCaseSensitiveHotstrings("*?", "àd", "would")
+    CreateCaseSensitiveHotstrings(
+        "*?", "càd", "could",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "shàd", "should",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àd", "would",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
 
-    CreateCaseSensitiveHotstrings("*?", "àé", "ying")
-    CreateCaseSensitiveHotstrings("*?", "àê", "able")
-    CreateCaseSensitiveHotstrings("*?", "àf", "iste")
-    CreateCaseSensitiveHotstrings("*?", "àg", "ought")
-    CreateCaseSensitiveHotstrings("*?", "àh", "techn")
-    CreateCaseSensitiveHotstrings("*?", "ài", "ight")
-    CreateCaseSensitiveHotstrings("*?", "àk", "ique")
-    CreateCaseSensitiveHotstrings("*?", "àl", "elle")
-    CreateCaseSensitiveHotstrings("*?", "àp", "ence")
-    CreateCaseSensitiveHotstrings("*?", "à'", "ance")
-    CreateCaseSensitiveHotstrings("*?", "àm", "isme")
-    CreateCaseSensitiveHotstrings("*?", "àn", "ation")
-    CreateCaseSensitiveHotstrings("*?", "àq", "ique")
-    CreateCaseSensitiveHotstrings("*?", "àr", "erre")
-    CreateCaseSensitiveHotstrings("*?", "às", "ement")
-    CreateCaseSensitiveHotstrings("*?", "àt", "ettre")
-    CreateCaseSensitiveHotstrings("*?", "àu", "ub")
-    CreateCaseSensitiveHotstrings("*?", "àv", "ment")
-    CreateCaseSensitiveHotstrings("*?", "àx", "ieux")
-    CreateCaseSensitiveHotstrings("*?", "àz", "ez-vous")
+    CreateCaseSensitiveHotstrings(
+        "*?", "àé", "ying",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àê", "able",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àf", "iste",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àg", "ought",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àh", "techn",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "ài", "ight",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àk", "ique",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àl", "elle",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àp", "ence",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àm", "isme",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àn", "ation",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àq", "ique",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àr", "erre",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "às", "ement",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àt", "ettre",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àv", "ment",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àx", "ieux",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "àz", "ez-vous",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "à'", "ance",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================================
@@ -3611,7 +4670,7 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
     }
 
     Generate(keys, hotstrings, combo, len) {
-        if (len = 0) {
+        if (len == 0) {
             value := ""
             loop parse, combo {
                 if (hotstrings.Has(A_LoopField)) {
@@ -3621,7 +4680,7 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
                 }
             }
             if (value != "")
-                CreateHotstring("*", "@" combo "★", value, FALSE, TRUE)
+                CreateHotstring("*", "@" combo "★", value, Map("OnlyText", False).Set("FinalResult", True))
             return
         }
         for key in keys
@@ -3633,18 +4692,18 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
         Features["MagicKey"]["TextExpansionPersonalInformation"].PatternMaxLength
     )
 
-    CreateHotstring("*", "@b★", PersonalInformation["BIC"], , TRUE)
-    CreateHotstring("*", "@bic★", PersonalInformation["BIC"], , TRUE)
-    CreateHotstring("*", "@c★", PersonalInformation["PhoneNumberClean"], , TRUE)
-    CreateHotstring("*", "@cb★", PersonalInformation["CreditCard"], , TRUE)
-    CreateHotstring("*", "@cc★", PersonalInformation["CreditCard"], , TRUE)
-    CreateHotstring("*", "@i★", PersonalInformation["IBAN"], , TRUE)
-    CreateHotstring("*", "@iban★", PersonalInformation["IBAN"], , TRUE)
-    CreateHotstring("*", "@rib★", PersonalInformation["IBAN"], , TRUE)
-    CreateHotstring("*", "@s★", PersonalInformation["SocialSecurityNumber"], , TRUE)
-    CreateHotstring("*", "@ss★", PersonalInformation["SocialSecurityNumber"], , TRUE)
-    CreateHotstring("*", "@tel★", PersonalInformation["PhoneNumber"], , TRUE)
-    CreateHotstring("*", "@tél★", PersonalInformation["PhoneNumber"], , TRUE)
+    CreateHotstring("*", "@b★", PersonalInformation["BIC"], Map("FinalResult", True))
+    CreateHotstring("*", "@bic★", PersonalInformation["BIC"], Map("FinalResult", True))
+    CreateHotstring("*", "@c★", PersonalInformation["PhoneNumberClean"], Map("FinalResult", True))
+    CreateHotstring("*", "@cb★", PersonalInformation["CreditCard"], Map("FinalResult", True))
+    CreateHotstring("*", "@cc★", PersonalInformation["CreditCard"], Map("FinalResult", True))
+    CreateHotstring("*", "@i★", PersonalInformation["IBAN"], Map("FinalResult", True))
+    CreateHotstring("*", "@iban★", PersonalInformation["IBAN"], Map("FinalResult", True))
+    CreateHotstring("*", "@rib★", PersonalInformation["IBAN"], Map("FinalResult", True))
+    CreateHotstring("*", "@s★", PersonalInformation["SocialSecurityNumber"], Map("FinalResult", True))
+    CreateHotstring("*", "@ss★", PersonalInformation["SocialSecurityNumber"], Map("FinalResult", True))
+    CreateHotstring("*", "@tel★", PersonalInformation["PhoneNumber"], Map("FinalResult", True))
+    CreateHotstring("*", "@tél★", PersonalInformation["PhoneNumber"], Map("FinalResult", True))
 }
 
 ; ===========================================
@@ -3685,7 +4744,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "admin★", "administrateur")
     CreateCaseSensitiveHotstrings("*", "afr★", "à faire")
     CreateCaseSensitiveHotstrings("*", "ah★", "aujourd’hui")
-    CreateCaseSensitiveHotstrings("*", "ahk★", "AutoHotkey")
+    CreateHotstring("*", "ahk★", "AutoHotkey")
     CreateCaseSensitiveHotstrings("*", "ajd★", "aujourd’hui")
     CreateCaseSensitiveHotstrings("*", "algo★", "algorithme")
     CreateCaseSensitiveHotstrings("*", "alpha★", "alphabétique")
@@ -3709,8 +4768,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "aug★", "augmentation")
     CreateCaseSensitiveHotstrings("*", "auj★", "aujourd’hui")
     CreateCaseSensitiveHotstrings("*", "auto★", "automatique")
-    CreateCaseSensitiveHotstrings("*", "autos★", "automatiques")
-    CreateCaseSensitiveHotstrings("*", "autot★", "automatiquement")
     CreateCaseSensitiveHotstrings("*", "av★", "avant")
     CreateCaseSensitiveHotstrings("*", "avv★", "avez-vous")
     CreateCaseSensitiveHotstrings("*", "avvd★", "avez-vous déjà")
@@ -3736,19 +4793,14 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
 
     ; === C ===
     CreateCaseSensitiveHotstrings("*", "c★", "c’est")
-    CreateCaseSensitiveHotstrings("*", "càd★", "c’est-à-dire")
     CreateCaseSensitiveHotstrings("*", "cad★", "c’est-à-dire")
     CreateCaseSensitiveHotstrings("*", "camp★", "campagne")
-    CreateCaseSensitiveHotstrings("*", "camps★", "campagnes")
     CreateCaseSensitiveHotstrings("*", "carac★", "caractère")
-    CreateCaseSensitiveHotstrings("*", "caracs★", "caractères")
-    CreateCaseSensitiveHotstrings("*", "caracq★", "caractéristique")
-    CreateCaseSensitiveHotstrings("*", "caracqs★", "caractéristiques")
+    CreateCaseSensitiveHotstrings("*", "caract★", "caractéristique")
     CreateCaseSensitiveHotstrings("*", "cb★", "combien")
     CreateCaseSensitiveHotstrings("*", "cc★", "copier-coller")
     CreateCaseSensitiveHotstrings("*", "ccé★", "copié-collé")
     CreateCaseSensitiveHotstrings("*", "ccl★", "conclusion")
-    CreateCaseSensitiveHotstrings("*", "ccls★", "conclusions")
     CreateCaseSensitiveHotstrings("*", "cdg★", "Charles de Gaulle")
     CreateCaseSensitiveHotstrings("*", "cdt★", "cordialement")
     CreateCaseSensitiveHotstrings("*", "certif★", "certification")
@@ -3774,34 +4826,27 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "ctb★", "c’est très bien")
     CreateCaseSensitiveHotstrings("*", "cv★", "ça va ?")
     CreateCaseSensitiveHotstrings("*", "cvt★", "ça va toi ?")
-    CreateCaseSensitiveHotstrings("*", "ctc★", "est-ce que cela te convient ?")
-    CreateCaseSensitiveHotstrings("*", "cvc★", "est-ce que cela vous convient ?")
+    CreateHotstring("*", "ctc★", "Est-ce que cela te convient ?")
+    CreateHotstring("*", "cvc★", "Est-ce que cela vous convient ?")
 
     ; === D ===
-    CreateCaseSensitiveHotstrings("*", "d★", "donc")
-    CreateCaseSensitiveHotstrings("*", "d'ac★", "d’accord")
-    CreateCaseSensitiveHotstrings("*", "d’ac★", "d’accord")
     CreateCaseSensitiveHotstrings("*", "dac★", "d’accord")
     CreateCaseSensitiveHotstrings("*", "ddl★", "download")
-    CreateCaseSensitiveHotstrings("*", "dê★", "d’être")
     CreateCaseSensitiveHotstrings("*", "dé★", "déjà")
+    CreateCaseSensitiveHotstrings("*", "dê★", "d’être")
     CreateCaseSensitiveHotstrings("*", "déc★", "décembre")
     CreateCaseSensitiveHotstrings("*", "dec★", "décembre")
     CreateCaseSensitiveHotstrings("*", "dedt★", "d’emploi du temps")
     CreateCaseSensitiveHotstrings("*", "déf★", "définition")
     CreateCaseSensitiveHotstrings("*", "def★", "définition")
     CreateCaseSensitiveHotstrings("*", "défs★", "définitions")
-    CreateCaseSensitiveHotstrings("*", "defs★", "définitions")
     CreateCaseSensitiveHotstrings("*", "démo★", "démonstration")
     CreateCaseSensitiveHotstrings("*", "demo★", "démonstration")
     CreateCaseSensitiveHotstrings("*", "dep★", "département")
     CreateCaseSensitiveHotstrings("*", "deux★", "deuxième")
-    CreateCaseSensitiveHotstrings("*", "deuxt★", "deuxièmement")
     CreateCaseSensitiveHotstrings("*", "desc★", "description")
-    CreateCaseSensitiveHotstrings("*", "descs★", "descriptions")
-    CreateCaseSensitiveHotstrings("*", "dév★", "développeur")
     CreateCaseSensitiveHotstrings("*", "dev★", "développeur")
-    CreateCaseSensitiveHotstrings("*", "devr★", "développer")
+    CreateCaseSensitiveHotstrings("*", "dév★", "développeur")
     CreateCaseSensitiveHotstrings("*", "devt★", "développement")
     CreateCaseSensitiveHotstrings("*", "dico★", "dictionnaire")
     CreateCaseSensitiveHotstrings("*", "diff★", "différence")
@@ -3822,22 +4867,14 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "docs★", "documents")
     CreateCaseSensitiveHotstrings("*", "dp★", "de plus")
     CreateCaseSensitiveHotstrings("*", "dsl★", "désolé")
-    CreateCaseSensitiveHotstrings("*", "dsls★", "désolés")
     CreateCaseSensitiveHotstrings("*", "dtm★", "détermine")
     CreateCaseSensitiveHotstrings("*", "dvlp★", "développe")
-    CreateCaseSensitiveHotstrings("*", "dvlpr★", "développer")
-    CreateCaseSensitiveHotstrings("*", "dvlpt★", "développent")
 
     ; === E ===
-    CreateCaseSensitiveHotstrings("*", "ém★", "écris-moi")
-    CreateCaseSensitiveHotstrings("*", "é★", "écart")
     CreateCaseSensitiveHotstrings("*", "e★", "est")
     CreateCaseSensitiveHotstrings("*", "echant★", "échantillon")
     CreateCaseSensitiveHotstrings("*", "echants★", "échantillons")
     CreateCaseSensitiveHotstrings("*", "eco★", "économie")
-    CreateCaseSensitiveHotstrings("*", "ecos★", "économies")
-    CreateCaseSensitiveHotstrings("*", "ecoq★", "économique")
-    CreateCaseSensitiveHotstrings("*", "ecoqs★", "économiques")
     CreateCaseSensitiveHotstrings("*", "ecq★", "est-ce que")
     CreateCaseSensitiveHotstrings("*", "edt★", "emploi du temps")
     CreateCaseSensitiveHotstrings("*", "eef★", "en effet")
@@ -3848,20 +4885,13 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "eng★", "english")
     CreateCaseSensitiveHotstrings("*", "enft★", "en fait")
     CreateCaseSensitiveHotstrings("*", "ens★", "ensemble")
-    CreateCaseSensitiveHotstrings("*", "enss★", "ensembles")
     CreateCaseSensitiveHotstrings("*", "ent★", "entreprise")
-    CreateCaseSensitiveHotstrings("*", "ents★", "entreprises")
     CreateCaseSensitiveHotstrings("*", "env★", "environ")
     CreateCaseSensitiveHotstrings("*", "ep★", "épisode")
     CreateCaseSensitiveHotstrings("*", "eps★", "épisodes")
     CreateCaseSensitiveHotstrings("*", "eq★", "équation")
-    CreateCaseSensitiveHotstrings("*", "eqs★", "équations")
-    CreateCaseSensitiveHotstrings("*", "este★", "est-elle")
-    CreateCaseSensitiveHotstrings("*", "esti★", "est-il")
-    CreateCaseSensitiveHotstrings("*", "estil★", "est-il")
     CreateCaseSensitiveHotstrings("*", "ety★", "étymologie")
     CreateCaseSensitiveHotstrings("*", "eve★", "événement")
-    CreateCaseSensitiveHotstrings("*", "eves★", "événements")
     CreateCaseSensitiveHotstrings("*", "evtl★", "éventuel")
     CreateCaseSensitiveHotstrings("*", "evtle★", "éventuelle")
     CreateCaseSensitiveHotstrings("*", "evtlt★", "éventuellement")
@@ -3869,9 +4899,12 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "exo★", "exercice")
     CreateCaseSensitiveHotstrings("*", "exp★", "expérience")
     CreateCaseSensitiveHotstrings("*", "expo★", "exposition")
-    CreateCaseSensitiveHotstrings("*", "êe★", "est-ce")
+    CreateCaseSensitiveHotstrings("*", "é★", "écart")
+    CreateCaseSensitiveHotstrings("*", "éco★", "économie")
+    CreateCaseSensitiveHotstrings("*", "ém★", "écris-moi")
     CreateCaseSensitiveHotstrings("*", "éq★", "équation")
     CreateCaseSensitiveHotstrings("*", "ê★", "être")
+    CreateCaseSensitiveHotstrings("*", "êe★", "est-ce")
     CreateCaseSensitiveHotstrings("*", "êt★", "es-tu")
 
     ; === F ===
@@ -3888,14 +4921,9 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "ff★", "Firefox")
     CreateCaseSensitiveHotstrings("*", "fig★", "figure")
     CreateCaseSensitiveHotstrings("*", "fl★", "falloir")
-    CreateCaseSensitiveHotstrings("*", "fp★", "fonds propres")
-    CreateCaseSensitiveHotstrings("*", "fpdf★", "filetype:pdf")
-    CreateCaseSensitiveHotstrings("*", "fps★", "fonds propres")
     CreateCaseSensitiveHotstrings("*", "freq★", "fréquence")
-    CreateCaseSensitiveHotstrings("*", "fr★", "France")
+    CreateHotstring("*", "fr★", "France")
     CreateCaseSensitiveHotstrings("*", "frs★", "français")
-    CreateCaseSensitiveHotstrings("*", "fs★", "fais")
-    CreateCaseSensitiveHotstrings("*", "ft★", "fait")
 
     ; === G ===
     CreateCaseSensitiveHotstrings("*", "g★", "j’ai")
@@ -3906,14 +4934,9 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "gg★", "Google")
     CreateCaseSensitiveHotstrings("*", "ges★", "gestion")
     CreateCaseSensitiveHotstrings("*", "gf★", "J’ai fait")
-    CreateCaseSensitiveHotstrings("*", "ggl★", "Google")
-    CreateCaseSensitiveHotstrings("*", "gh★", "GitHub")
-    CreateCaseSensitiveHotstrings("*", "gm★", "git merge")
     CreateCaseSensitiveHotstrings("*", "gmag★", "J’ai mis à jour")
-    CreateCaseSensitiveHotstrings("*", "goo★", "Google")
     CreateCaseSensitiveHotstrings("*", "gov★", "government")
     CreateCaseSensitiveHotstrings("*", "gouv★", "gouvernement")
-    CreateCaseSensitiveHotstrings("*", "gp★", "Graduate Program")
     CreateCaseSensitiveHotstrings("*", "indiv★", "individuel")
     CreateCaseSensitiveHotstrings("*", "gpa★", "je n’ai pas")
     CreateCaseSensitiveHotstrings("*", "gt★", "j’étais")
@@ -3923,11 +4946,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "h★", "heure")
     CreateCaseSensitiveHotstrings("*", "his★", "historique")
     CreateCaseSensitiveHotstrings("*", "histo★", "historique")
-    CreateCaseSensitiveHotstrings("*", "ht★", "how to")
     CreateCaseSensitiveHotstrings("*", "hyp★", "hypothèse")
-    CreateCaseSensitiveHotstrings("*", "hyper★", "hyperparamètre")
-    CreateCaseSensitiveHotstrings("*", "hyperparam★", "hyperparamètre")
-    CreateCaseSensitiveHotstrings("*", "hyps★", "hypothèses")
 
     ; === I ===
     CreateCaseSensitiveHotstrings("*", "ia★", "intelligence artificielle")
@@ -3942,7 +4961,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "imp★", "impossible")
     CreateCaseSensitiveHotstrings("*", "inf★", "inférieur")
     CreateCaseSensitiveHotstrings("*", "info★", "information")
-    CreateCaseSensitiveHotstrings("*", "insta★", "Instagram")
+    CreateHotstring("*", "insta★", "Instagram")
     CreateCaseSensitiveHotstrings("*", "intart★", "intelligence artificielle")
     CreateCaseSensitiveHotstrings("*", "inter★", "international")
     CreateCaseSensitiveHotstrings("*", "intro★", "introduction")
@@ -3992,29 +5011,22 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "mdps★", "mots de passe")
     CreateCaseSensitiveHotstrings("*", "méthodo★", "méthodologie")
     CreateCaseSensitiveHotstrings("*", "min★", "minimum")
-    CreateCaseSensitiveHotstrings("*", "mins★", "minimums")
     CreateCaseSensitiveHotstrings("*", "mio★", "million")
     CreateCaseSensitiveHotstrings("*", "mios★", "millions")
     CreateCaseSensitiveHotstrings("*", "mjo★", "mettre à jour")
     CreateCaseSensitiveHotstrings("*", "ml★", "machine learning")
     CreateCaseSensitiveHotstrings("*", "mm★", "même")
     CreateCaseSensitiveHotstrings("*", "mme★", "madame")
-    CreateCaseSensitiveHotstrings("*", "mms★", "mêmes")
     CreateCaseSensitiveHotstrings("*", "modif★", "modification")
-    CreateCaseSensitiveHotstrings("*", "modifs★", "modifications")
     CreateCaseSensitiveHotstrings("*", "mom★", "moi-même")
-    CreateCaseSensitiveHotstrings("*", "morta★", "mortalité")
-    CreateCaseSensitiveHotstrings("*", "mortas★", "mortalités")
     CreateCaseSensitiveHotstrings("*", "mrc★", "merci")
     CreateCaseSensitiveHotstrings("*", "msg★", "message")
-    CreateCaseSensitiveHotstrings("*", "msgs★", "messages")
     CreateCaseSensitiveHotstrings("*", "mt★", "montant")
     CreateCaseSensitiveHotstrings("*", "mtn★", "maintenant")
     CreateCaseSensitiveHotstrings("*", "moy★", "moyenne")
     CreateCaseSensitiveHotstrings("*", "mq★", "montre que")
     CreateCaseSensitiveHotstrings("*", "mr★", "monsieur")
     CreateCaseSensitiveHotstrings("*", "mtn★", "maintenant")
-    CreateCaseSensitiveHotstrings("*", "mtq★", "montrent que")
     CreateCaseSensitiveHotstrings("*", "mutu★", "mutualiser")
     CreateCaseSensitiveHotstrings("*", "mvt★", "mouvement")
 
@@ -4031,7 +5043,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "nota★", "notamment")
     CreateCaseSensitiveHotstrings("*", "notm★", "notamment")
     CreateCaseSensitiveHotstrings("*", "nouv★", "nouvelle")
-    CreateCaseSensitiveHotstrings("*", "nouvs★", "nouvelles")
     CreateCaseSensitiveHotstrings("*", "nov★", "novembre")
     CreateCaseSensitiveHotstrings("*", "now★", "maintenant")
     CreateCaseSensitiveHotstrings("*", "np★", "ne pas")
@@ -4048,47 +5059,35 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "odj★", "ordre du jour")
     CreateCaseSensitiveHotstrings("*", "opé★", "opération")
     CreateCaseSensitiveHotstrings("*", "oqp★", "occupé")
-    CreateCaseSensitiveHotstrings("*", "oqpe★", "occupe")
     CreateCaseSensitiveHotstrings("*", "ordi★", "ordinateur")
     CreateCaseSensitiveHotstrings("*", "org★", "organisation")
     CreateCaseSensitiveHotstrings("*", "orga★", "organisation")
     CreateCaseSensitiveHotstrings("*", "ortho★", "orthographe")
-    CreateCaseSensitiveHotstrings("*", "out★", "Où es-tu ?")
-    CreateCaseSensitiveHotstrings("*", "outv★", "Où êtes-vous ?")
+    CreateHotstring("*", "out★", "Où es-tu ?")
+    CreateHotstring("*", "outv★", "Où êtes-vous ?")
     CreateCaseSensitiveHotstrings("*", "ouv★", "ouverture")
 
     ; === P ===
     CreateCaseSensitiveHotstrings("*", "p//★", "par rapport")
     CreateCaseSensitiveHotstrings("*", "par★", "paragraphe")
-    CreateCaseSensitiveHotstrings("*", "pars★", "paragraphes")
     CreateCaseSensitiveHotstrings("*", "param★", "paramètre")
-    CreateCaseSensitiveHotstrings("*", "params★", "paramètres")
     CreateCaseSensitiveHotstrings("*", "pb★", "problème")
-    CreateCaseSensitiveHotstrings("*", "pbi★", "Power BI")
-    CreateCaseSensitiveHotstrings("*", "pbs★", "problèmes")
-    CreateCaseSensitiveHotstrings("*", "pcd★", "précède")
-    CreateCaseSensitiveHotstrings("*", "pcdt★", "précédent")
-    CreateCaseSensitiveHotstrings("*", "pcdmt★", "précédemment")
     CreateCaseSensitiveHotstrings("*", "pcq★", "parce que")
     CreateCaseSensitiveHotstrings("*", "pck★", "parce que")
-    CreateCaseSensitiveHotstrings("*", "pcqil★", "parce qu’il")
     CreateCaseSensitiveHotstrings("*", "pckil★", "parce qu’il")
-    CreateCaseSensitiveHotstrings("*", "pcqon★", "parce qu’on")
+    CreateCaseSensitiveHotstrings("*", "pcquil★", "parce qu’il")
+    CreateCaseSensitiveHotstrings("*", "pcquon★", "parce qu’on")
     CreateCaseSensitiveHotstrings("*", "pckon★", "parce qu’on")
     CreateCaseSensitiveHotstrings("*", "pd★", "pendant")
     CreateCaseSensitiveHotstrings("*", "pdt★", "pendant")
     CreateCaseSensitiveHotstrings("*", "pdv★", "point de vue")
     CreateCaseSensitiveHotstrings("*", "pdvs★", "points de vue")
     CreateCaseSensitiveHotstrings("*", "perf★", "performance")
-    CreateCaseSensitiveHotstrings("*", "perfs★", "performances")
     CreateCaseSensitiveHotstrings("*", "perso★", "personne")
-    CreateCaseSensitiveHotstrings("*", "persos★", "personnes")
     CreateCaseSensitiveHotstrings("*", "pê★", "peut-être")
-    CreateCaseSensitiveHotstrings("*", "pé★", "prime émise")
     CreateCaseSensitiveHotstrings("*", "péri★", "périmètre")
     CreateCaseSensitiveHotstrings("*", "périm★", "périmètre")
     CreateCaseSensitiveHotstrings("*", "peut-ê★", "peut-être")
-    CreateCaseSensitiveHotstrings("*", "peuton★", "peut-on")
     CreateCaseSensitiveHotstrings("*", "pex★", "par exemple")
     CreateCaseSensitiveHotstrings("*", "pf★", "portefeuille")
     CreateCaseSensitiveHotstrings("*", "pg★", "pas grave")
@@ -4100,45 +5099,33 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "pj★", "pièce jointe")
     CreateCaseSensitiveHotstrings("*", "pjs★", "pièces jointes")
     CreateCaseSensitiveHotstrings("*", "pk★", "pourquoi")
-    CreateCaseSensitiveHotstrings("*", "pks★", "pourquois")
-    CreateCaseSensitiveHotstrings("*", "pl★", "pipeline")
     CreateCaseSensitiveHotstrings("*", "pls★", "please")
     CreateCaseSensitiveHotstrings("*", "poum★", "plus ou moins")
     CreateCaseSensitiveHotstrings("*", "poss★", "possible")
-    CreateCaseSensitiveHotstrings("*", "possb★", "possibilité")
-    CreateCaseSensitiveHotstrings("*", "possbs★", "possibilités")
     CreateCaseSensitiveHotstrings("*", "pourcent★", "pourcentage")
     CreateCaseSensitiveHotstrings("*", "ppt★", "PowerPoint")
     CreateCaseSensitiveHotstrings("*", "pq★", "pourquoi")
-    CreateCaseSensitiveHotstrings("*", "pqs★", "pourquois")
     CreateCaseSensitiveHotstrings("*", "prd★", "produit")
-    CreateCaseSensitiveHotstrings("*", "prdt★", "produit")
     CreateCaseSensitiveHotstrings("*", "prem★", "premier")
-    CreateCaseSensitiveHotstrings("*", "preme★", "première")
     CreateCaseSensitiveHotstrings("*", "prez★", "présentation")
     CreateCaseSensitiveHotstrings("*", "prg★", "programme")
     CreateCaseSensitiveHotstrings("*", "pro★", "professionnel")
     CreateCaseSensitiveHotstrings("*", "prob★", "problème")
     CreateCaseSensitiveHotstrings("*", "proba★", "probabilité")
     CreateCaseSensitiveHotstrings("*", "prod★", "production")
+    CreateCaseSensitiveHotstrings("*", "prof★", "professeur")
     CreateCaseSensitiveHotstrings("*", "prog★", "programme")
     CreateCaseSensitiveHotstrings("*", "prop★", "propriété")
     CreateCaseSensitiveHotstrings("*", "propo★", "proposition")
-    CreateCaseSensitiveHotstrings("*", "propos★", "propositions")
     CreateCaseSensitiveHotstrings("*", "props★", "propriétés")
     CreateCaseSensitiveHotstrings("*", "pros★", "professionnels")
     CreateCaseSensitiveHotstrings("*", "prot★", "professionnellement")
     CreateCaseSensitiveHotstrings("*", "prov★", "provision")
-    CreateCaseSensitiveHotstrings("*", "provs★", "provisions")
     CreateCaseSensitiveHotstrings("*", "psycha★", "psychanalyse")
     CreateCaseSensitiveHotstrings("*", "psycho★", "psychologie")
-    CreateCaseSensitiveHotstrings("*", "psychoq★", "psychologique")
-    CreateCaseSensitiveHotstrings("*", "prof★", "professeur")
-    CreateCaseSensitiveHotstrings("*", "prog★", "programme")
     CreateCaseSensitiveHotstrings("*", "psb★", "possible")
-    CreateCaseSensitiveHotstrings("*", "psbs★", "possibles")
     CreateCaseSensitiveHotstrings("*", "psy★", "psychologie")
-    CreateCaseSensitiveHotstrings("*", "psyq★", "psychologique")
+    CreateCaseSensitiveHotstrings("*", "psycho★", "psychologie")
     CreateCaseSensitiveHotstrings("*", "pt★", "point")
     CreateCaseSensitiveHotstrings("*", "ptf★", "portefeuille")
     CreateCaseSensitiveHotstrings("*", "pts★", "points")
@@ -4155,7 +5142,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "qqch★", "quelque chose")
     CreateCaseSensitiveHotstrings("*", "qqs★", "quelques")
     CreateCaseSensitiveHotstrings("*", "qqn★", "quelqu’un")
-    CreateCaseSensitiveHotstrings("*", "qs★", "questions")
     CreateCaseSensitiveHotstrings("*", "quasi★", "quasiment")
     CreateCaseSensitiveHotstrings("*", "ques★", "question")
     CreateCaseSensitiveHotstrings("*", "quid★", "qu’en est-il de")
@@ -4183,7 +5169,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "sept★", "septembre")
     CreateCaseSensitiveHotstrings("*", "simpl★", "simplement")
     CreateCaseSensitiveHotstrings("*", "situ★", "situation")
-    CreateCaseSensitiveHotstrings("*", "situs★", "situations")
     CreateCaseSensitiveHotstrings("*", "smth★", "something")
     ; CreateCaseSensitiveHotstrings("*", "sol★", "solution") ; Conflict with "sollicitation"
     CreateCaseSensitiveHotstrings("*", "srx★", "sérieux")
@@ -4196,7 +5181,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "stream★", "streaming")
     CreateCaseSensitiveHotstrings("*", "suff★", "suffisant")
     CreateCaseSensitiveHotstrings("*", "sufft★", "suffisament")
-    CreateCaseSensitiveHotstrings("*", "sup★", "supérieur")
     CreateCaseSensitiveHotstrings("*", "supé★", "supérieur")
     CreateCaseSensitiveHotstrings("*", "surv★", "survenance")
     CreateCaseSensitiveHotstrings("*", "svp★", "s’il vous plaît")
@@ -4242,8 +5226,8 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "v★", "version")
     CreateCaseSensitiveHotstrings("*", "var★", "variable")
     CreateCaseSensitiveHotstrings("*", "vav★", "vis-à-vis")
-    CreateCaseSensitiveHotstrings("*", "vérif★", "vérification")
     CreateCaseSensitiveHotstrings("*", "verif★", "vérification")
+    CreateCaseSensitiveHotstrings("*", "vérif★", "vérification")
     CreateCaseSensitiveHotstrings("*", "vocab★", "vocabulaire")
     CreateCaseSensitiveHotstrings("*", "volat★", "volatilité")
     CreateCaseSensitiveHotstrings("*", "vrm★", "vraiment")
@@ -4255,8 +5239,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "wd★", "Windows")
     CreateCaseSensitiveHotstrings("*", "wk★", "week-end")
     CreateCaseSensitiveHotstrings("*", "wknd★", "week-end")
-    CreateCaseSensitiveHotstrings("*", "wiki★", "Wikipédia")
-    CreateCaseSensitiveHotstrings("*", "wk★", "week-end")
+    CreateHotstring("*", "wiki★", "Wikipédia")
 
     ; === X ===
     CreateCaseSensitiveHotstrings("*", "x★", "exemple")
@@ -4265,7 +5248,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "ya★", "il y a")
     CreateCaseSensitiveHotstrings("*", "yapa★", "il n’y a pas")
     CreateCaseSensitiveHotstrings("*", "yc★", "y compris")
-    CreateCaseSensitiveHotstrings("*", "yt★", "YouTube")
+    CreateHotstring("*", "yt★", "YouTube")
 
     ; === Z ===
 }
@@ -4718,30 +5701,31 @@ if Features["MagicKey"]["TextExpansionSymbols"].Enabled {
 }
 
 if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
-    ; https://typst.app/docs/reference/symbols/sym/ to search for a symbol. List scrapped here: https://github.com/typst/codex/tree/main/src/modules/sym.txt
+    ; https://typst.app/docs/reference/symbols/sym/ to search for a symbol.
+    ; List scrapped here: https://github.com/typst/codex/tree/main/src/modules/sym.txt
 
     ; === Control ===
-    CreateHotstring("*", "$wj$", "{U+2060}", OnlyText := FALSE)
-    CreateHotstring("*", "$zwj$", "{U+200D}", OnlyText := FALSE)
-    CreateHotstring("*", "$zwnj$", "{U+200C}", OnlyText := FALSE)
-    CreateHotstring("*", "$zws$", "{U+200B}", OnlyText := FALSE)
-    CreateHotstring("*", "$lrm$", "{U+200E}", OnlyText := FALSE)
-    CreateHotstring("*", "$rlm$", "{U+200F}", OnlyText := FALSE)
+    CreateHotstring("*", "$wj$", "{U+2060}", Map("OnlyText", False))
+    CreateHotstring("*", "$zwj$", "{U+200D}", Map("OnlyText", False))
+    CreateHotstring("*", "$zwnj$", "{U+200C}", Map("OnlyText", False))
+    CreateHotstring("*", "$zws$", "{U+200B}", Map("OnlyText", False))
+    CreateHotstring("*", "$lrm$", "{U+200E}", Map("OnlyText", False))
+    CreateHotstring("*", "$rlm$", "{U+200F}", Map("OnlyText", False))
 
     ; === Spaces ===
-    CreateHotstring("*", "$space$", "{U+0020}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.nobreak$", "{U+00A0}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.nobreak.narrow$", "{U+202F}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.en$", "{U+2002}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.quad$", "{U+2003}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.third$", "{U+2004}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.quarter$", "{U+2005}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.sixth$", "{U+2006}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.med$", "{U+205F}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.fig$", "{U+2007}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.punct$", "{U+2008}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.thin$", "{U+2009}", OnlyText := FALSE)
-    CreateHotstring("*", "$space.hair$", "{U+200A}", OnlyText := FALSE)
+    CreateHotstring("*", "$space$", "{U+0020}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.nobreak$", "{U+00A0}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.nobreak.narrow$", "{U+202F}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.en$", "{U+2002}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.quad$", "{U+2003}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.third$", "{U+2004}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.quarter$", "{U+2005}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.sixth$", "{U+2006}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.med$", "{U+205F}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.fig$", "{U+2007}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.punct$", "{U+2008}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.thin$", "{U+2009}", Map("OnlyText", False))
+    CreateHotstring("*", "$space.hair$", "{U+200A}", Map("OnlyText", False))
 
     ; === Delimiters ===
     ; Paren
@@ -4759,8 +5743,8 @@ if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
     CreateHotstring("*", "$paren.b$", "⏝")
     ; Brace
     CreateHotstring("*", "$brace.l$", "{")
-    CreateHotstring("*", "$brace.l.stroked$", "{U+27C3}", OnlyText := FALSE)
-    CreateHotstring("*", "$brace.l.double$", "{U+27C3}", OnlyText := FALSE)
+    CreateHotstring("*", "$brace.l.stroked$", "{U+27C3}", Map("OnlyText", False))
+    CreateHotstring("*", "$brace.l.double$", "{U+27C3}", Map("OnlyText", False))
     CreateHotstring("*", "$brace.r$", "}")
     CreateHotstring("*", "$brace.r.stroked$", "⦄")
     CreateHotstring("*", "$brace.r.double$", "⦄")
@@ -4889,8 +5873,8 @@ if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
     CreateHotstring("*", "$dot.circle.big$", "⨀")
     CreateHotstring("*", "$dot.square$", "⊡")
     CreateHotstring("*", "$dot.double$", "¨")
-    CreateHotstring("*", "$dot.triple$", "{U+20DB}", OnlyText := FALSE)
-    CreateHotstring("*", "$dot.quad$", "{U+20DC}", OnlyText := FALSE)
+    CreateHotstring("*", "$dot.triple$", "{U+20DB}", Map("OnlyText", False))
+    CreateHotstring("*", "$dot.quad$", "{U+20DC}", Map("OnlyText", False))
     CreateHotstring("*", "$excl$", "!")
     CreateHotstring("*", "$excl.double$", "‼")
     CreateHotstring("*", "$excl.inv$", "¡")
@@ -4904,9 +5888,9 @@ if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
     CreateHotstring("*", "$hash$", "#")
     CreateHotstring("*", "$hyph$", "‐")
     CreateHotstring("*", "$hyph.minus$", "-")
-    CreateHotstring("*", "$hyph.nobreak$", "{U+2011}", OnlyText := FALSE)
+    CreateHotstring("*", "$hyph.nobreak$", "{U+2011}", Map("OnlyText", False))
     CreateHotstring("*", "$hyph.point$", "‧")
-    CreateHotstring("*", "$hyph.soft$", "{U+00AD}", OnlyText := FALSE)
+    CreateHotstring("*", "$hyph.soft$", "{U+00AD}", Map("OnlyText", False))
     CreateHotstring("*", "$numero$", "№")
     CreateHotstring("*", "$percent$", "%")
     CreateHotstring("*", "$permille$", "‰")
@@ -6024,35 +7008,35 @@ if Features["MagicKey"]["Repeat"].Enabled {
     ; ======= PRIORITY 3/3: Repeat last sent character =======
 
     ; === Letters ===
-    CreateCaseSensitiveHotstrings("*?", "a★", "aa", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "b★", "bb", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "c★", "cc", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "d★", "dd", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "e★", "ee", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "é★", "éé", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "è★", "èè", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "ê★", "êê", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "f★", "ff", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "g★", "gg", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "h★", "hh", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "i★", "ii", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "j★", "jj", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "k★", "kk", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "l★", "ll", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "m★", "mm", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "n★", "nn", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "o★", "oo", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "p★", "pp", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "q★", "qq", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "r★", "rr", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "s★", "ss", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "t★", "tt", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "u★", "uu", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "v★", "vv", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "w★", "ww", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "x★", "xx", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "y★", "yy", PreferTitleCase := FALSE)
-    CreateCaseSensitiveHotstrings("*?", "z★", "zz", PreferTitleCase := FALSE)
+    CreateCaseSensitiveHotstrings("*?", "a★", "aa", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "b★", "bb", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "c★", "cc", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "d★", "dd", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "e★", "ee", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "é★", "éé", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "è★", "èè", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "ê★", "êê", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "f★", "ff", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "g★", "gg", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "h★", "hh", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "i★", "ii", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "j★", "jj", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "k★", "kk", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "l★", "ll", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "m★", "mm", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "n★", "nn", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "o★", "oo", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "p★", "pp", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "q★", "qq", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "r★", "rr", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "s★", "ss", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "t★", "tt", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "u★", "uu", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "v★", "vv", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "w★", "ww", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "x★", "xx", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "y★", "yy", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "z★", "zz", Map("PreferTitleCase", False))
 
     ; === Numbers ===
     CreateHotstring("*?", "0★", "00")
