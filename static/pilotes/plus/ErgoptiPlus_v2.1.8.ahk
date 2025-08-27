@@ -29,17 +29,17 @@ global deadkey_grec_min := { a: "α", b: "β", c: "ε", d: "δ", e: "η", f: "ξ
 global deadkey_grec_maj := { A: "", B: "", C: "", D: "Δ", E: "", F: "Ξ", G: "Γ", H: "Φ", I: "", J: "", K: "", L: "Λ", M: "",
     N: "", O: "Θ", P: "Π", Q: "", R: "", S: "Σ", T: "", U: "", V: "", W: "Ω", X: "", Y: "Ψ", Z: "Ψ"
 }
-global deadkey_exposant_min := { a: "ᵃ", b: "ᵇ", c: "ᶜ", d: "ᵈ", e: "ᵉ", f: "ᶠ", g: "ᶢ", h: "ᵸ", i: "ᶤ", j: "ᶨ", k: "ᵏ",
-    l: "ᶪ", m: "ᵐ", n: "ⁿ", o: "ᵒ", p: "ᵖ", q: "", r: "", s: "ᶳ", t: "ᵗ", u: "ᵘ", v: "ᵛ", w: "", x: "ᵡ", y: "", z: "ᶻ"
+global deadkey_exposant_min := { a: "ᵃ", b: "ᵇ", c: "ᶜ", d: "ᵈ", e: "ᵉ", f: "ᶠ", g: "ᶢ", h: "ʰ", i: "ᶤ", j: "ᶨ", k: "ᵏ",
+    l: "ˡ", m: "ᵐ", n: "ⁿ", o: "ᵒ", p: "ᵖ", q: "", r: "ʳ", s: "ˢ", t: "ᵗ", u: "ᵘ", v: "ᵛ", w: "ʷ", x: "ˣ", y: "ʸ", z: "ᶻ"
 }
-global deadkey_exposant_maj := { a: "ᴬ", b: "ᴮ", c: "", d: "ᴰ", e: "ᴱ", f: "", g: "", h: "ᴴ", i: "ᴵ", j: "ᴶ", k: "ᴷ", l: "ᴸ",
+global deadkey_exposant_maj := { a: "ᴬ", b: "ᴮ", c: "", d: "ᴰ", e: "ᴱ", f: "", g: "ᴳ", h: "ᴴ", i: "ᴵ", j: "ᴶ", k: "ᴷ", l: "ᴸ",
     m: "ᴹ", n: "ᴺ", o: "ᴼ", p: "ᴾ", q: "", r: "ᴿ", s: "", t: "ᵀ", u: "ᵁ", v: "", w: "ᵂ", x: "", y: "", z: ""
 }
 global deadkey_exposant_nb := { touche1: "¹", touche2: "²", touche3: "³", touche4: "⁴", touche5: "⁵", touche6: "⁶",
     touche7: "⁷", touche8: "⁸", touche9: "⁹", touche0: "⁰"
 }
-global deadkey_indice_min := { a: "ₐ", b: "ᵦ", c: "", d: "", e: "ₑ", f: "", g: "ᵧ", h: "", i: "ᵢ", j: "", k: "", l: "",
-    m: "", n: "", o: "ₒ", p: "ᵨ", q: "", r: "ᵣ", s: "", t: "", u: "ᵤ", v: "ᵥ", w: "", x: "ₓ", y: "", z: ""
+global deadkey_indice_min := { a: "ₐ", b: "ᵦ", c: "", d: "", e: "ₑ", f: "", g: "ᵧ", h: "ₕ", i: "ᵢ", j: "ⱼ", k: "ₖ", l: "ₗ",
+    m: "ₘ", n: "ₙ", o: "ₒ", p: "ₚ", q: "", r: "ᵣ", s: "ₛ", t: "ₜ", u: "ᵤ", v: "ᵥ", w: "", x: "ₓ", y: "", z: ""
 }
 global deadkey_indice_nb := { touche1: "₁", touche2: "₂", touche3: "₃", touche4: "₄", touche5: "₅", touche6: "₆",
     touche7: "₇", touche8: "₈", touche9: "₉", touche0: "₀"
@@ -1401,7 +1401,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 ; =====================================================================
 
 ; ======= Rangée du haut =======
-
+f
 ; Z
 :*?C:,è::
 {
@@ -1481,7 +1481,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 }
 
 ; ç
-:*?:,c::
+:*?C:,c::
 {
     Send("ç")
 }
