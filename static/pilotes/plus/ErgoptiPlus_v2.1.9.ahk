@@ -2303,7 +2303,7 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 }
 
 ; ====================================================================
-; ======= 5.3) Ê fait office de touche morte ^ sur clavier ISO =======
+; ======= 5.3) Ê/^ fait office de touche morte ^ sur clavier ISO =====
 ; ====================================================================
 
 :*?C:êa::â
@@ -2316,15 +2316,128 @@ SendMode("Event") ; Tout ce qui concerne les hotstrings DOIT être en Event et n
 :*?C:Êi::Î
 :*?C:ÊI::Î
 
-:*?C:êo::ô
-:*?C:êO::Ô
-:*?C:Êo::Ô
-:*?C:ÊO::Ô
+:*?C:êe::ê
+:*?C:êE::Ê
+:*?C:Êe::Ê
+:*?C:ÊE::Ê
 
 :*?C:êu::û
 :*?C:êU::Û
 :*?C:Êu::Û
 :*?C:ÊU::Û
+
+:*?C:êo::ô
+:*?C:êO::Ô
+:*?C:Êo::Ô
+:*?C:ÊO::Ô
+
+:*?C:êè::æ
+:*?C:êÈ::Æ
+:*?C:Êè::Æ
+:*?C:ÊÈ::Æ
+:*?CB0:^è::
+{
+    Send("{BackSpace 2}æ")
+}
+:*?CB0:^È::
+{
+    Send("{BackSpace 2}Æ")
+}
+:*?C: !è::Æ
+:*?C:!è::Æ
+:*?C: !È::Æ
+:*?C:!È::Æ
+:*?C:êà::æ
+:*?C:êÀ::Æ
+:*?C:Êà::Æ
+:*?C:ÊÀ::Æ
+:*?CB0:^à::
+{
+    Send("{BackSpace 2}æ")
+}
+:*?CB0:^À::
+{
+    Send("{BackSpace 2}Æ")
+}
+:*?: !à::Æ
+:*?:!à::Æ
+
+:*?CB0:^s::
+{
+    Send("{BackSpace}ß")
+}
+:*?CB0:^S::
+{
+    Send("{BackSpace 2}ẞ")
+}
+:*?: !s::ẞ
+:*?:!s::ẞ
+
+:*?CB0:^n::
+{
+    Send("{BackSpace}ñ")
+}
+:*?CB0:^N::
+{
+    Send("{BackSpace 2}Ñ")
+}
+:*?: !n::Ñ
+:*?:!n::Ñ
+
+:*?CB0:^t::
+{
+    Send("{BackSpace}™")
+}
+:*?CB0:^T::
+{
+    Send("{BackSpace 2}™")
+}
+:*?: !t::™
+:*?:!t::™
+
+:*?CB0:^r::
+{
+    Send("{BackSpace}®")
+}
+:*?CB0:^R::
+{
+    Send("{BackSpace 2}®")
+}
+:*?: !r::®
+:*?:!r::®
+
+:*?CB0:^c::
+{
+    Send("{BackSpace}©")
+}
+:*?CB0:^C::
+{
+    Send("{BackSpace 2}©")
+}
+:*?: !c::©
+:*?:!c::©
+
+; Il faut double-cliquer pour les utiliser avec ^
+:*?:ê1::➊
+:*?:^1::{BackSpace}➊
+:*?:ê2::➋
+:*?:^2::{BackSpace}➋
+:*?:ê3::➌
+:*?:^3::{BackSpace}➌
+:*?:ê4::➍
+:*?:^4::{BackSpace}➍
+:*?:ê5::➎
+:*?:^5::{BackSpace}➎
+:*?:ê6::➏
+:*?:^6::{BackSpace}➏
+:*?:ê7::➐
+:*?:^7::{BackSpace}➐
+:*?:ê8::➑
+:*?:^8::{BackSpace}➑
+:*?:ê9::➒
+:*?:^9::{BackSpace}➒
+:*?:ê0::➓
+:*?:^0::{BackSpace}➓
 
 ; ====================================
 ; ======= 5.4) Suffixes avec À =======
