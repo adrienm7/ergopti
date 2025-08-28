@@ -259,6 +259,15 @@ StrTitle(Text) {
     }
 }
 
+GetLastSentCharacterAt(Offset) {
+    if !IsSet(LastSentCharacters)
+        return ""
+    Len := LastSentCharacters.Length
+    if Len < Abs(Offset)
+        return ""
+    return LastSentCharacters[Offset]
+}
+
 ; ======================================================
 ; ======================================================
 ; ======================================================
@@ -277,10 +286,10 @@ StrTitle(Text) {
 ; NOT TO MODIFY
 global RemappedList := Map()
 global LastSentCharacterKeyTime := Map() ; Tracks the time since a key was pressed
+global LastSentCharacters := [] ; Enables to modify the output of a key depending on the previous character sent
 global CapsWordEnabled := False ; If the keyboard layer is currently in CapsWord state
 global LayerEnabled := False ; If the keyboard layer is currently in navigation state
 global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times, we can do the same in the navigation layer
-global LastSentCharacter := "" ; Useful for modifying the output of a key depending on the previous character sent
 global ActivitySimulation := False
 global OneShotShiftEnabled := False
 
@@ -600,6 +609,10 @@ global Features := Map(
         "AltGrCapsLockGivesCapsWord", {
             Enabled: False,
             Description: "`"AltGr`" + `"CapsLock`" = CapsWord",
+        },
+        "AltGrCapsLockGivesCapsLock", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"CapsLock`" = CapsLock",
         },
         "SelectLine", {
             Enabled: True,
@@ -1001,6 +1014,7 @@ MenuStructure := Map(
         "AltGrCapsLockGivesCtrlDelete",
         "AltGrCapsLockGivesCtrlBackSpace",
         "AltGrCapsLockGivesCapsWord",
+        "AltGrCapsLockGivesCapsLock",
         "-",
         "SelectLine",
         "Screen",
@@ -1359,7 +1373,7 @@ SC138 & SC00E::
 {
     if GetKeyState("SC138", "P") {
         SendInput("{LControl Down}s{LControl Up}") ; Save the script by sending Ctrl + S
-        Sleep(200) ; Leave time for the file to be saved
+        Sleep(300) ; Leave time for the file to be saved
         Reload
     } else {
         SendInput("{BackSpace}")
@@ -1394,6 +1408,8 @@ SC138 & SC153::
 ; As they are defined before everything else, they will override any existing definitions if there are duplicates
 ; Putting everything in this part makes is easy to update your ErgoptiPlus version, as you will only need
 ; to paste this part into the « 2/ PERSONAL SHORTCUTS » part of the new version.
+
+#InputLevel 2 ; Mandatory for this section to work, it needs to be below the InputLevel of the key remappings
 
 ; ========================================================
 ; ========================================================
@@ -1434,7 +1450,12 @@ SC138 & SC153::
 */
 
 UpdateLastSentCharacter(Character) {
-    global LastSentCharacter := Character
+    global LastSentCharacters
+    LastSentCharacters.Push(Character)
+    ; Keep only the last 5 keys to save memory
+    if (LastSentCharacters.Length > 5)
+        LastSentCharacters.RemoveAt(1)
+
     global LastSentCharacterKeyTime
     LastSentCharacterKeyTime[Character] := A_TickCount
 }
@@ -1513,12 +1534,12 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
     } else {
         SendNewResult(Symbol)
     }
-    global LastSentCharacter := Symbol
+    UpdateLastSentCharacter(Symbol)
 }
 
 ; === Dead Keys ===
 
-DeadKey(Mapping, DeleteTrigger := False) {
+DeadKey(Mapping) {
     ih := InputHook(
         "L1",
         "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
@@ -1527,10 +1548,6 @@ DeadKey(Mapping, DeleteTrigger := False) {
     ih.Wait()
     PressedKey := ih.Input
     if Mapping.Has(PressedKey) {
-        if DeleteTrigger {
-            ; Makes it possible to send immediately a key, but that can transform into a deadkey if a mapping is found
-            SendNewResult("{BackSpace}", Map("OnlyText", False))
-        }
         SendNewResult(Mapping[PressedKey])
     } else {
         SendNewResult(PressedKey)
@@ -1794,6 +1811,10 @@ SC00D:: SendInput("$")
 #HotIf
 
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled
+~SC039:: {
+    UpdateLastSentCharacter(" ")
+}
+
 ; === Top row ===
 RemapKey("SC010", Features["Shortcuts"]["EGrave"].Letter, "è")
 RemapKey("SC011", "y")
@@ -2010,13 +2031,13 @@ SC138 & SC012:: RemapAltGr(
     () => SendNewResult("Œ")
 )
 AddRollEqual() {
-    global LastSentCharacter
+    LastSentCharacter := GetLastSentCharacterAt(-1)
     if (
         LastSentCharacter == "<" or LastSentCharacter == ">")
     and A_TimeSincePriorHotkey < (Features["Rolls"]["ChevronEqual"].TimeActivationSeconds * 1000
     ) {
         SendNewResult("=")
-        global LastSentCharacter := "="
+        UpdateLastSentCharacter("=")
     } else if Features["Layout"]["ErgoptiPlus"].Enabled {
         WrapTextIfSelected("%", "%", "%")
     } else {
@@ -2031,13 +2052,13 @@ SC138 & SC017:: RemapAltGr(
     (*) => SendNewResult("%")
 )
 HashtagOrQuote() {
-    global LastSentCharacter
+    LastSentCharacter := GetLastSentCharacterAt(-1)
     if (
         LastSentCharacter == "(" or LastSentCharacter == "[")
     and A_TimeSincePriorHotkey < (Features["Rolls"]["HashtagQuote"].TimeActivationSeconds * 1000
     ) {
         SendNewResult("`"")
-        global LastSentCharacter := "`""
+        UpdateLastSentCharacter("`"")
     } else {
         WrapTextIfSelected("#", "#", "#")
     }
@@ -2404,6 +2425,13 @@ SC138 & SC03A:: {
 ; "AltGr" + "CapsLock" = CapsWord
 SC138 & SC03A:: {
     ToggleCapsWordState()
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCapsLock"].Enabled
+; "AltGr" + "CapsLock" = CapsLock
+SC138 & SC03A:: {
+    SetCapsLockState( not GetCapsLockCondition())
 }
 #HotIf
 
@@ -2999,6 +3027,7 @@ SC039::
         SendEvent("{Space}" Text)
         ; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
         ; Otherwise, SendInput resets the hotstrings search
+        UpdateLastSentCharacter(" ")
         return
     }
 
@@ -3016,6 +3045,7 @@ SC039 Up:: {
         and A_TimeSinceThisHotkey <= Features["TapHolds"]["SpaceLayer"].TimeActivationSeconds
     ) {
         SendEvent("{Space}")
+        UpdateLastSentCharacter(" ")
     }
 }
 #HotIf
@@ -3035,6 +3065,7 @@ SC039::
         SendEvent("{Space}" Text)
         ; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
         ; Otherwise, SendInput resets the hotstrings search
+        UpdateLastSentCharacter(" ")
         return
     }
 
@@ -3082,7 +3113,7 @@ RAlt:: ; Necessary to work on layouts like QWERTY
 
 SC01D & ~SC138 Up::
 RAlt Up:: {
-    global LastSentCharacter := ""
+    UpdateLastSentCharacter("")
 }
 #HotIf
 
@@ -3470,24 +3501,7 @@ if Features["DistancesReduction"]["QU"].Enabled {
 ; ==========================================
 
 #HotIf Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled
-; This code doesn’t work, because même for example will give "m⁂e"
-; DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
-; DeadkeyMappingCircumflexModified.Delete(" ")
-
-; if Features["SFBsReduction"]["ECirc"].Enabled {
-;     DeadkeyMappingCircumflexModified.Delete("é")
-;     DeadkeyMappingCircumflexModified.Delete("e")
-;     DeadkeyMappingCircumflexModified.Delete(",")
-;     DeadkeyMappingCircumflexModified.Delete(".")
-; }
-
-; ~SC056:: {
-;     DeadKey(DeadkeyMappingCircumflexModified, True)
-; }
-; ~+SC056:: {
-;     DeadKey(DeadkeyMappingCircumflexModified, True)
-; }
-
+; We specify the result with the vowels first to be sure it will override any problems
 CreateCaseSensitiveHotstrings(
     "*?", "êa", "â",
     Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
@@ -3508,6 +3522,46 @@ CreateCaseSensitiveHotstrings(
     Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
     )
 )
+
+; The "Ê" key will enable to use the other symbols on the layer if we aren’t inside a word
+DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
+DeadkeyMappingCircumflexModified.Delete(" ")
+
+if Features["SFBsReduction"]["ECirc"].Enabled {
+    DeadkeyMappingCircumflexModified.Delete("é")
+    DeadkeyMappingCircumflexModified.Delete("e")
+    DeadkeyMappingCircumflexModified.Delete(",")
+    DeadkeyMappingCircumflexModified.Delete(".")
+}
+
+; Fix the only word starting with "ê": "être"
+CreateCaseSensitiveHotstrings(
+    "*?", "êt", "êt",
+    Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+    )
+)
+
+for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
+    doHotstring(MapKey, MappedValue)
+}
+
+doHotstring(MapKey, MappedValue) {
+    Combination := "ê" . MapKey
+    Hotstring(
+        ":*CB0:" . Combination,
+        (*) => deadfunction(Combination, MappedValue)
+    )
+}
+
+deadfunction(Combination, MappedValue) {
+    ; We only activate the deadkey if it is the start of a new word, as symbols aren’t put in words
+    ; This condition corrects problems such as writing "même" that give "mê⁂e"
+    if (GetLastSentCharacterAt(-3) = " ") {
+        ; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
+        SendNewResult("{BackSpace 2}", Map("OnlyText", False))
+        SendNewResult(MappedValue)
+    }
+}
 #HotIf
 
 ; ======================================================
