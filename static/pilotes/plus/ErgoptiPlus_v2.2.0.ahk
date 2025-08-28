@@ -326,7 +326,6 @@ global Features := Map(
         "DeadKeyECircumflex", {
             Enabled: True,
             Description: "Ê suivi d’une voyelle agit comme une touche morte : ê + o = ô, ê + u = û, …",
-            TimeActivationSeconds: 1,
         },
         "CommaJ", {
             Enabled: True,
@@ -1513,7 +1512,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 
 ; === Dead Keys ===
 
-DeadKey(Mapping) {
+DeadKey(Mapping, DeleteTrigger := False) {
     ih := InputHook(
         "L1",
         "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
@@ -1521,8 +1520,15 @@ DeadKey(Mapping) {
     ih.Start()
     ih.Wait()
     PressedKey := ih.Input
-    if Mapping.Has(PressedKey)
+    if Mapping.Has(PressedKey) {
+        if DeleteTrigger {
+            ; Makes it possible to send immediately a key, but that can transform into a deadkey if a mapping is found
+            SendNewResult("{BackSpace}", Map("OnlyText", False))
+        }
         SendNewResult(Mapping[PressedKey])
+    } else {
+        SendNewResult(PressedKey)
+    }
 }
 
 global DeadkeyMappingCircumflex := Map(
@@ -2910,7 +2916,7 @@ SC038::
 #HotIf
 
 #HotIf Features["TapHolds"]["LAltBackSpace"].Enabled and not LayerEnabled
-; RCtrl becomes BackSpace, and Delete on Shift
+; "LAlt" becomes BackSpace, and Delete on Shift
 SC038::
 {
     if GetKeyState("SC02A", "P") { ; LShift
@@ -2950,6 +2956,7 @@ SC038::
 
     if (
         tap
+        and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
         and not GetKeyState("SC03A", "P") ; Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
     ) {
         if GetKeyState("SC02A", "P") { ; LShift
@@ -3453,28 +3460,24 @@ if Features["DistancesReduction"]["QU"].Enabled {
 ; ======= 6.2) Ê acts like a deadkey =======
 ; ==========================================
 
-if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "êa", "â",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êi", "î",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êo", "ô",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êu", "û",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
+#HotIf Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled
+DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
+DeadkeyMappingCircumflexModified.Delete(" ")
+
+if Features["SFBsReduction"]["ECirc"].Enabled {
+    DeadkeyMappingCircumflexModified.Delete("é")
+    DeadkeyMappingCircumflexModified.Delete("e")
+    DeadkeyMappingCircumflexModified.Delete(",")
+    DeadkeyMappingCircumflexModified.Delete(".")
 }
+
+~SC056:: {
+    DeadKey(DeadkeyMappingCircumflexModified, True)
+}
+~+SC056:: {
+    DeadKey(DeadkeyMappingCircumflexModified, True)
+}
+#HotIf
 
 ; ======================================================
 ; ======= 6.3) Comma becomes a J with the vowels =======
@@ -4159,6 +4162,7 @@ if Features["Autocorrection"]["Names"].Enabled {
     CreateHotstring("", "anais", "Anaïs")
     CreateHotstring("", "azerbaidjan", "Azerbaïdjan")
     CreateHotstring("", "benoit", "Benoît")
+    CreateHotstring("", "caraibes", "Caraïbes")
     CreateHotstring("", "cleopatre", "Cléopâtre")
     CreateHotstring("", "cléopatre", "Cléopâtre")
     CreateHotstring("", "dubai", "Dubaï")
@@ -4174,6 +4178,7 @@ if Features["Autocorrection"]["Names"].Enabled {
     CreateHotstring("*", "Quatar", "Qatar") ; We can use it with the QU feature that way
     CreateHotstring("", "raphael", "Raphaël")
     CreateHotstring("", "serguei", "Sergueï")
+    CreateHotstring("", "shanghai", "Shanghaï")
     CreateHotstring("", "taiwan", "Taïwan")
     CreateHotstring("", "thais", "Thaïs")
     CreateHotstring("", "thailande", "Thaïlande")
