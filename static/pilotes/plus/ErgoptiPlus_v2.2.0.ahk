@@ -326,6 +326,7 @@ global Features := Map(
         "DeadKeyECircumflex", {
             Enabled: True,
             Description: "Ê suivi d’une voyelle agit comme une touche morte : ê + o = ô, ê + u = û, …",
+            TimeActivationSeconds: 1,
         },
         "CommaJ", {
             Enabled: True,
@@ -563,6 +564,10 @@ global Features := Map(
         "Save", {
             Enabled: False,
             Description: "Ctrl + J/★ = Ctrl + S. Attention, Ctrl + J est perdu",
+        },
+        "CtrlJ", {
+            Enabled: False,
+            Description: "Ctrl + S = Ctrl + J",
         },
         "LAltCapsLockGivesCapsWord", {
             Enabled: True,
@@ -984,6 +989,7 @@ MenuStructure := Map(
         "-",
         "MicrosoftBold",
         "Save",
+        "CtrlJ",
         "-",
         "LAltCapsLockGivesCapsWord",
         "-",
@@ -2328,6 +2334,9 @@ CapsWordShortcutFix() {
 if Features["Shortcuts"]["Save"].Enabled {
     AddShortcut("^", "j", (*) => (*) => SendFinalResult("^s"))
 }
+if Features["Shortcuts"]["CtrlJ"].Enabled {
+    AddShortcut("^", "s", (*) => (*) => SendFinalResult("^j"))
+}
 
 if Features["Shortcuts"]["MicrosoftBold"].Enabled {
     ; Makes it possible to use the standard shortcuts instead of their translation in Microsoft apps
@@ -2917,7 +2926,7 @@ SC038::
 
 #HotIf Features["TapHolds"]["LAltBackSpace"].Enabled and not LayerEnabled
 ; "LAlt" becomes BackSpace, and Delete on Shift
-SC038::
+*SC038::
 {
     if GetKeyState("SC02A", "P") { ; LShift
         SendInput("{Delete}")
@@ -2937,7 +2946,7 @@ SC038::
 
 #HotIf Features["TapHolds"]["LAltBackSpaceLayer"].Enabled and not LayerEnabled
 ; Tap-hold on "LAlt" : BackSpace on tap, Layer on hold
-SC038::
+*SC038::
 {
     UpdateLastSentCharacter("LAlt")
 
@@ -3461,22 +3470,44 @@ if Features["DistancesReduction"]["QU"].Enabled {
 ; ==========================================
 
 #HotIf Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled
-DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
-DeadkeyMappingCircumflexModified.Delete(" ")
+; This code doesn’t work, because même for example will give "m⁂e"
+; DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
+; DeadkeyMappingCircumflexModified.Delete(" ")
 
-if Features["SFBsReduction"]["ECirc"].Enabled {
-    DeadkeyMappingCircumflexModified.Delete("é")
-    DeadkeyMappingCircumflexModified.Delete("e")
-    DeadkeyMappingCircumflexModified.Delete(",")
-    DeadkeyMappingCircumflexModified.Delete(".")
-}
+; if Features["SFBsReduction"]["ECirc"].Enabled {
+;     DeadkeyMappingCircumflexModified.Delete("é")
+;     DeadkeyMappingCircumflexModified.Delete("e")
+;     DeadkeyMappingCircumflexModified.Delete(",")
+;     DeadkeyMappingCircumflexModified.Delete(".")
+; }
 
-~SC056:: {
-    DeadKey(DeadkeyMappingCircumflexModified, True)
-}
-~+SC056:: {
-    DeadKey(DeadkeyMappingCircumflexModified, True)
-}
+; ~SC056:: {
+;     DeadKey(DeadkeyMappingCircumflexModified, True)
+; }
+; ~+SC056:: {
+;     DeadKey(DeadkeyMappingCircumflexModified, True)
+; }
+
+CreateCaseSensitiveHotstrings(
+    "*?", "êa", "â",
+    Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+    )
+)
+CreateCaseSensitiveHotstrings(
+    "*?", "êi", "î",
+    Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+    )
+)
+CreateCaseSensitiveHotstrings(
+    "*?", "êo", "ô",
+    Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+    )
+)
+CreateCaseSensitiveHotstrings(
+    "*?", "êu", "û",
+    Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+    )
+)
 #HotIf
 
 ; ======================================================
@@ -4250,6 +4281,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     ; === C ===
     CreateCaseSensitiveHotstrings("*", "calin", "câlin")
     CreateCaseSensitiveHotstrings("*", "canoe", "canoë")
+    CreateCaseSensitiveHotstrings("*", "prochaine", "prochaine")
     CreateCaseSensitiveHotstrings("*?", "chaine", "chaîne")
     CreateCaseSensitiveHotstrings("*?", "chaîned", "chained")
     CreateCaseSensitiveHotstrings("*?", "chainé", "chaîné")
