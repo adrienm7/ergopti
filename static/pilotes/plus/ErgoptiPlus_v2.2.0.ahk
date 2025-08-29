@@ -582,6 +582,10 @@ global Features := Map(
             Enabled: True,
             Description: "`"LAlt`" + `"CapsLock`" = CapsWord",
         },
+        "AltGrLAltGivesDelete", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"LAlt`" = Delete",
+        },
         "AltGrLAltGivesCtrlBackSpace", {
             Enabled: True,
             Description: "`"AltGr`" + `"LAlt`" = Ctrl + BackSpace",
@@ -1006,6 +1010,7 @@ MenuStructure := Map(
         "-",
         "LAltCapsLockGivesCapsWord",
         "-",
+        "AltGrLAltGivesDelete",
         "AltGrLAltGivesCtrlBackSpace",
         "AltGrLAltGivesCtrlDelete",
         "AltGrLAltGivesOneShotShift",
@@ -2381,19 +2386,42 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
 ; ======= 4.5) AltGr =======
 ; ==========================
 
-#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled
-; "AltGr" + "LAlt" = Ctrl + BackSpace
+#HotIf Features["Shortcuts"]["AltGrLAltGivesDelete"].Enabled
+; "AltGr" + "LAlt" = Delete
+; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
     OneShotShiftFix()
-    SendInput("^{BackSpace}")
+    if GetKeyState("Shift", "P") {
+        SendInput("^{Delete}")
+    } else {
+        SendInput("{Delete}")
+    }
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled
+; "AltGr" + "LAlt" = Ctrl + BackSpace
+; "Shift" + "AltGr" + "LAlt" = BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
+SC138 & SC038:: {
+    OneShotShiftFix()
+    if GetKeyState("Shift", "P") {
+        SendInput("{BackSpace}")
+    } else {
+        SendInput("^{BackSpace}")
+    }
 }
 #HotIf
 
 #HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlDelete"].Enabled
 ; "AltGr" + "LAlt" = Ctrl + Delete
+; "Shift" + "AltGr" + "LAlt" = Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
     OneShotShiftFix()
-    SendInput("^{Delete}")
+    if GetKeyState("Shift", "P") {
+        SendInput("{Delete}")
+    } else {
+        SendInput("^{Delete}")
+    }
 }
 #HotIf
 
@@ -2962,7 +2990,13 @@ SC038::
 {
     if GetKeyState("Ctrl", "P") {
         if GetKeyState("Shift", "P") {
-            SendInput("^{Delete}")
+            if Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled {
+                SendInput("{Delete}")
+            } else if Features["Shortcuts"]["AltGrLAltGivesCtrlDelete"].Enabled {
+                SendInput("{BackSpace}")
+            } else {
+                SendInput("^{Delete}")
+            }
         } else {
             SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
             Sleep(300) ; Delay before repeating the key
@@ -3016,7 +3050,13 @@ SC038::
     ) {
         if GetKeyState("Ctrl", "P") {
             if GetKeyState("Shift", "P") {
-                SendInput("^{Delete}")
+                if Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled {
+                    SendInput("{Delete}")
+                } else if Features["Shortcuts"]["AltGrLAltGivesCtrlDelete"].Enabled {
+                    SendInput("{BackSpace}")
+                } else {
+                    SendInput("^{Delete}")
+                }
             } else {
                 SendEvent("^{BackSpace}")
             }
@@ -3167,7 +3207,13 @@ SC11D::
 {
     if GetKeyState("Ctrl", "P") {
         if GetKeyState("Shift", "P") { 
-            SendInput("^{Delete}")
+            if Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled {
+                SendInput("{Delete}")
+            } else if Features["Shortcuts"]["AltGrLAltGivesCtrlDelete"].Enabled {
+                SendInput("{BackSpace}")
+            } else {
+                SendInput("^{Delete}")
+            }
         } else {
             SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
             tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
