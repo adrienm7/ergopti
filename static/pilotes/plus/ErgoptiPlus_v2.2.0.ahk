@@ -3527,13 +3527,6 @@ CreateCaseSensitiveHotstrings(
 DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
 DeadkeyMappingCircumflexModified.Delete(" ")
 
-if Features["SFBsReduction"]["ECirc"].Enabled {
-    DeadkeyMappingCircumflexModified.Delete("é")
-    DeadkeyMappingCircumflexModified.Delete("e")
-    DeadkeyMappingCircumflexModified.Delete(",")
-    DeadkeyMappingCircumflexModified.Delete(".")
-}
-
 ; Fix the only word starting with "ê": "être"
 CreateCaseSensitiveHotstrings(
     "*?", "êt", "êt",
@@ -3542,25 +3535,17 @@ CreateCaseSensitiveHotstrings(
 )
 
 for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
-    doHotstring(MapKey, MappedValue)
+    CreateDeadkeyHotstring(MapKey, MappedValue)
 }
 
-doHotstring(MapKey, MappedValue) {
+CreateDeadkeyHotstring(MapKey, MappedValue) {
+    ; We only activate the deadkey if it is the start of a new word, as symbols aren’t put in words
+    ; This condition corrects problems such as writing "même" that give "mê⁂e"
     Combination := "ê" . MapKey
     Hotstring(
         ":*CB0:" . Combination,
-        (*) => deadfunction(Combination, MappedValue)
+        (*) => SendNewResult("{BackSpace 2}" . MappedValue, Map("OnlyText", False))
     )
-}
-
-deadfunction(Combination, MappedValue) {
-    ; We only activate the deadkey if it is the start of a new word, as symbols aren’t put in words
-    ; This condition corrects problems such as writing "même" that give "mê⁂e"
-    if (GetLastSentCharacterAt(-3) = " ") {
-        ; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
-        SendNewResult("{BackSpace 2}", Map("OnlyText", False))
-        SendNewResult(MappedValue)
-    }
 }
 #HotIf
 
