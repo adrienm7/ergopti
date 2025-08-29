@@ -2282,7 +2282,6 @@ SC138 & SC035:: RemapAltGr(
 +^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf
 
-
 ; ==============================================
 ; ==============================================
 ; ==============================================
@@ -2961,24 +2960,31 @@ SC038::
 ; "LAlt" becomes BackSpace, and Delete on Shift
 *SC038::
 {
-    if GetKeyState("SC02A", "P") { ; LShift
-        SendInput("{Delete}")
-    } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
-        OneShotShiftFix()
-        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-    } else if GetKeyState("SC01D", "P") { ; LCtrl
-        SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-        Sleep(300) ; Delay before repeating the key
-        while GetKeyState("SC038", "P") {
-            SendEvent("^{BackSpace}")
-            Sleep(70)
+    if GetKeyState("Ctrl", "P") {
+        if GetKeyState("Shift", "P") {
+            SendInput("^{Delete}")
+        } else {
+            SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+            Sleep(300) ; Delay before repeating the key
+            while GetKeyState("SC038", "P") {
+                SendEvent("^{BackSpace}")
+                Sleep(70)
+            }
         }
     } else {
-        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-        Sleep(300) ; Delay before repeating the key
-        while GetKeyState("SC038", "P") {
-            SendEvent("{BackSpace}")
-            Sleep(70)
+        if GetKeyState("Shift", "P") {
+            SendInput("{Delete}")
+        } else
+            if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
+            OneShotShiftFix()
+            SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        } else {
+            SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+            Sleep(300) ; Delay before repeating the key
+            while GetKeyState("SC038", "P") {
+                SendEvent("{BackSpace}")
+                Sleep(70)
+            }
         }
     }
 }
@@ -3008,15 +3014,21 @@ SC038::
         and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
         and not GetKeyState("SC03A", "P") ; Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
     ) {
-        if GetKeyState("SC02A", "P") { ; LShift
-            SendInput("{Delete}")
-        } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
-            OneShotShiftFix()
-            SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-        } else if GetKeyState("SC01D", "P") { ; LCtrl
-            SendEvent("^{BackSpace}")
+        if GetKeyState("Ctrl", "P") {
+            if GetKeyState("Shift", "P") {
+                SendInput("^{Delete}")
+            } else {
+                SendEvent("^{BackSpace}")
+            }
         } else {
-            SendEvent("{BackSpace}")
+            if GetKeyState("Shift", "P") {
+                SendInput("{Delete}")
+            } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
+                OneShotShiftFix()
+                SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+            } else {
+                SendEvent("{BackSpace}")
+            }
         }
     }
 }
@@ -3153,27 +3165,33 @@ RAlt:: ; Necessary to work on layouts like QWERTY
 ; RCtrl becomes BackSpace, and Delete on Shift
 SC11D::
 {
-    if GetKeyState("LShift", "P") {
-        SendInput("{Delete}")
-    } else if Features["TapHolds"]["LAltOneShotShift"].Enabled and GetKeyState("SC038", "P") {
-        OneShotShiftFix()
-        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-    } else if GetKeyState("SC01D", "P") { ; LCtrl
-        SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-        tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
-        if not tap {
-            while GetKeyState("SC11D", "P") {
-                SendEvent("^{BackSpace}")
-                Sleep(100)
+    if GetKeyState("Ctrl", "P") {
+        if GetKeyState("Shift", "P") { 
+            SendInput("^{Delete}")
+        } else {
+            SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+            tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
+            if not tap {
+                while GetKeyState("SC11D", "P") {
+                    SendEvent("^{BackSpace}")
+                    Sleep(100)
+                }
             }
         }
     } else {
-        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-        tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
-        if not tap {
-            while GetKeyState("SC11D", "P") {
-                SendEvent("{BackSpace}")
-                Sleep(100)
+        if GetKeyState("Shift", "P") {
+            SendInput("{Delete}")
+        } else if Features["TapHolds"]["LAltOneShotShift"].Enabled and GetKeyState("SC038", "P") {
+            OneShotShiftFix()
+            SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        } else {
+            SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+            tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
+            if not tap {
+                while GetKeyState("SC11D", "P") {
+                    SendEvent("{BackSpace}")
+                    Sleep(100)
+                }
             }
         }
     }
