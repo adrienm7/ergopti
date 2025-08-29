@@ -2268,15 +2268,20 @@ SC138 & SC035:: RemapAltGr(
 
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled
 ^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste does't work
-^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
-^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
+^SC00C::
++^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with (Shift +) Ctrl + %
+^SC00D::
++^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can’t use Numpad + to zoom
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled and MicrosoftApps()
-^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with Ctrl + %
-^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with Ctrl + $
+^SC00C::
++^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
+^SC00D::
++^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf
+
 
 ; ==============================================
 ; ==============================================
@@ -2961,6 +2966,13 @@ SC038::
     } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
         OneShotShiftFix()
         SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+    } else if GetKeyState("SC01D", "P") { ; LCtrl
+        SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        Sleep(300) ; Delay before repeating the key
+        while GetKeyState("SC038", "P") {
+            SendEvent("^{BackSpace}")
+            Sleep(70)
+        }
     } else {
         SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
         Sleep(300) ; Delay before repeating the key
@@ -3001,6 +3013,8 @@ SC038::
         } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
             OneShotShiftFix()
             SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        } else if GetKeyState("SC01D", "P") { ; LCtrl
+            SendEvent("^{BackSpace}")
         } else {
             SendEvent("{BackSpace}")
         }
@@ -3144,6 +3158,15 @@ SC11D::
     } else if Features["TapHolds"]["LAltOneShotShift"].Enabled and GetKeyState("SC038", "P") {
         OneShotShiftFix()
         SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+    } else if GetKeyState("SC01D", "P") { ; LCtrl
+        SendEvent("^{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
+        if not tap {
+            while GetKeyState("SC11D", "P") {
+                SendEvent("^{BackSpace}")
+                Sleep(100)
+            }
+        }
     } else {
         SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
         tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
