@@ -1870,7 +1870,7 @@ if Features["MagicKey"]["Replace"].Enabled {
 +SC039:: WrapTextIfSelected("-", "-", "-")
 
 ; === Number row ===
-+SC029:: SendNewResult("+")
++SC029:: SendNewResult("º")
 +SC002:: SendNewResult("1")
 +SC003:: SendNewResult("2")
 +SC004:: SendNewResult("3")
@@ -1880,7 +1880,7 @@ if Features["MagicKey"]["Replace"].Enabled {
 +SC008:: SendNewResult("7")
 +SC009:: SendNewResult("8")
 +SC00A:: SendNewResult("9")
-+SC00B:: SendNewResult("º")
++SC00B:: SendNewResult("0")
 +SC00C:: {
     SendNewResult(" ") ; Thin non-breaking space
     Sleep(HotstringsTriggerDelay)
@@ -2088,7 +2088,7 @@ SC138 & SC018:: RemapAltGr(
 SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
 
 ; === Number row ===
-SC138 & SC029:: RemapAltGr((*) => SendNewResult("}"), (*) => SendNewResult("⁰"))
+SC138 & SC029:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"))
 SC138 & SC002:: RemapAltGr((*) => SendNewResult("1"), (*) => SendNewResult("¹"))
 SC138 & SC003:: RemapAltGr((*) => SendNewResult("2"), (*) => SendNewResult("²"))
 SC138 & SC004:: RemapAltGr((*) => SendNewResult("3"), (*) => SendNewResult("³"))
@@ -2098,7 +2098,7 @@ SC138 & SC007:: RemapAltGr((*) => SendNewResult("6"), (*) => SendNewResult("⁶"
 SC138 & SC008:: RemapAltGr((*) => SendNewResult("7"), (*) => SendNewResult("⁷"))
 SC138 & SC009:: RemapAltGr((*) => SendNewResult("8"), (*) => SendNewResult("⁸"))
 SC138 & SC00A:: RemapAltGr((*) => SendNewResult("9"), (*) => SendNewResult("⁹"))
-SC138 & SC00B:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"))
+SC138 & SC00B:: RemapAltGr((*) => SendNewResult("0"), (*) => SendNewResult("0"))
 SC138 & SC00C:: RemapAltGr((*) => SendNewResult("‰"), (*) => SendNewResult("‱"))
 SC138 & SC00D:: RemapAltGr((*) => SendNewResult("€"), (*) => SendNewResult("£"))
 
@@ -2966,7 +2966,7 @@ SC038::
         Sleep(300) ; Delay before repeating the key
         while GetKeyState("SC038", "P") {
             SendEvent("{BackSpace}")
-            Sleep(70)
+            Sleep(100)
         }
     }
 }
@@ -3146,12 +3146,10 @@ SC11D::
         SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
     } else {
         SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-        tap := KeyWait("SC11D", "T" . Features["TapHolds"]["RCtrlBackSpace"].TimeActivationSeconds)
-        if not tap {
-            while GetKeyState("SC11D", "P") {
-                SendEvent("{BackSpace}")
-                Sleep(100)
-            }
+        Sleep(300) ; Delay before repeating the key
+        while GetKeyState("SC11D", "P") {
+            SendEvent("{BackSpace}")
+            Sleep(100)
         }
     }
 }
