@@ -31,8 +31,11 @@ def main(input_path: str = None, directory_path: str = None):
         content = ensure_keymap2_has_euro(content)
         content = swap_keys_10_and_50(content)
 
-        # Add keymaps index 4 and 9
+        # Add keymap 4
         content = replace_keymap_index(content, from_index=0, to_index=4)
+        content = fix_keymap4_symbols(content)
+
+        # Add keymap 9
         content = add_keymap_select_9(content)
         content = add_keymap_9(content)
 
@@ -128,10 +131,32 @@ def replace_keymap_index(content, from_index, to_index):
     )
 
 
+def fix_keymap4_symbols(content):
+    def replace_in_keymap(match):
+        # Replace only in this keymap (index 4)
+        header, body, footer = match.groups()
+        # code 24: "+" instead of "$"
+        body = re.sub(
+            r'(<key code="24"[^>]*(output|action)=")[^"]*(")', r"\1+\3", body
+        )
+        # code 27: "-" instead of "%"
+        body = re.sub(
+            r'(<key code="27"[^>]*(output|action)=")[^"]*(")', r"\1-\3", body
+        )
+        return f"{header}{body}{footer}"
+
+    return re.sub(
+        r'(<keyMap index="4">)(.*?)(</keyMap>)',
+        replace_in_keymap,
+        content,
+        flags=re.DOTALL,
+    )
+
+
 def add_keymap_9(content):
     if '<keyMap index="9">' in content:
         return content
-    _, base_body, _ = extract_keymap(content, 0)
+    _, base_body, _ = extract_keymap(content, 4)
     keymap_9 = build_custom_keymap(9, base_body)
     return re.sub(
         r'(<keyMap index="8">.*?</keyMap>)',
@@ -194,4 +219,4 @@ def sort_keys(content):
 
 if __name__ == "__main__":
     main()
-    # main("Ergopti_v2.2.1_v0.keylayout")
+    # main("Ergopti_v2.2.2_v0.keylayout")
