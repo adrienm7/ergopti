@@ -1,6 +1,10 @@
 import re
 from pathlib import Path
 
+# For the moment, keylayout files are created with KbdEdit 24.7.0
+# Some issues corrected here won’t be needed to be corrected anymore if KbdEdit is upgraded
+# See http://www.kbdedit.com/release_notes.html
+
 
 def main(input_path: str = None, directory_path: str = None):
     overwrite = False
