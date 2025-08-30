@@ -509,6 +509,11 @@ global Features := Map(
             Description: "Permet de taper [où ] puis un point ou une virgule et de supprimer automatiquement l’espace ajouté avant",
             TimeActivationSeconds: 1,
         },
+        "MultiplePonctuationMarks", {
+            Enabled: True,
+            Description: "Permet de taper `"!`" ou `"?`" plusieurs fois d’affilée sans espace insécable entre chaque caractère",
+            TimeActivationSeconds: 1,
+        },
     ),
     "MagicKey", Map(
         "Replace", {
@@ -974,6 +979,7 @@ MenuStructure := Map(
         "-",
         "Errors",
         "OU",
+        "MultiplePonctuationMarks",
         "SuffixesAChaining",
         "-",
         "Minus",
@@ -4073,6 +4079,25 @@ if Features["Autocorrection"]["OU"].Enabled {
     CreateCaseSensitiveHotstrings(
         "*", "où ,", "où, ",
         Map("TimeActivationSeconds", Features["Autocorrection"]["OU"].TimeActivationSeconds)
+    )
+}
+
+if Features["Autocorrection"]["MultiplePonctuationMarks"].Enabled {
+    CreateHotstring(
+        "*", " ! !", " !!",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "! !", "!!",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", " ? ?", " ??",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "? ?", "??",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
     )
 }
 
