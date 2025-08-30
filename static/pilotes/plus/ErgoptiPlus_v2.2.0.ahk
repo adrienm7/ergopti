@@ -587,6 +587,14 @@ global Features := Map(
             Enabled: True,
             Description: "`"LAlt`" + `"CapsLock`" = CapsWord",
         },
+        "AltGrLAltGivesBackSpace", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"LAlt`" = BackSpace",
+        },
+        "AltGrLAltGivesDelete", {
+            Enabled: False,
+            Description: "`"AltGr`" + `"LAlt`" = Delete",
+        },
         "AltGrLAltGivesCtrlBackSpace", {
             Enabled: True,
             Description: "`"AltGr`" + `"LAlt`" = Ctrl + BackSpace",
@@ -1012,6 +1020,8 @@ MenuStructure := Map(
         "-",
         "LAltCapsLockGivesCapsWord",
         "-",
+        "AltGrLAltGivesBackSpace",
+        "AltGrLAltGivesDelete",
         "AltGrLAltGivesCtrlBackSpace",
         "AltGrLAltGivesCtrlDelete",
         "AltGrLAltGivesOneShotShift",
@@ -2312,15 +2322,20 @@ SC138 & SC035:: RemapAltGr(
 ; ============================
 
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled
-^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste does't work
+^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste doesn't work
 ^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 ^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
+; Doesn’t seem necessary anymore:
+; if GetCapsLockCondition() {
+;     +^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with (Shift +) Ctrl + %
+;     +^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with (Shift +) Ctrl + $
+; }
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can’t use Numpad + to zoom
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled and MicrosoftApps()
-^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with Ctrl + %
-^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with Ctrl + $
+^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
+^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf
 
 ; ==============================================
@@ -2422,19 +2437,55 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
 ; ======= 4.5) AltGr =======
 ; ==========================
 
-#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled
-; "AltGr" + "LAlt" = Ctrl + BackSpace
+#HotIf Features["Shortcuts"]["AltGrLAltGivesBackSpace"].Enabled
+; "AltGr" + "LAlt" = BackSpace
+; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
     OneShotShiftFix()
-    SendInput("^{BackSpace}")
+    if GetKeyState("Shift", "P") {
+        SendInput("^{BackSpace}")
+    } else {
+        SendInput("{BackSpace}")
+    }
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrLAltGivesDelete"].Enabled
+; "AltGr" + "LAlt" = Delete
+; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
+SC138 & SC038:: {
+    OneShotShiftFix()
+    if GetKeyState("Shift", "P") {
+        SendInput("^{Delete}")
+    } else {
+        SendInput("{Delete}")
+    }
+}
+#HotIf
+
+#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled
+; "AltGr" + "LAlt" = Ctrl + BackSpace
+; "Shift" + "AltGr" + "LAlt" = BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
+SC138 & SC038:: {
+    OneShotShiftFix()
+    if GetKeyState("Shift", "P") {
+        SendInput("{BackSpace}")
+    } else {
+        SendInput("^{BackSpace}")
+    }
 }
 #HotIf
 
 #HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlDelete"].Enabled
 ; "AltGr" + "LAlt" = Ctrl + Delete
+; "Shift" + "AltGr" + "LAlt" = Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
     OneShotShiftFix()
-    SendInput("^{Delete}")
+    if GetKeyState("Shift", "P") {
+        SendInput("{Delete}")
+    } else {
+        SendInput("^{Delete}")
+    }
 }
 #HotIf
 
@@ -3001,12 +3052,9 @@ SC038::
 ; "LAlt" becomes BackSpace, and Delete on Shift
 *SC038::
 {
-    if GetKeyState("SC02A", "P") { ; LShift
-        SendInput("{Delete}")
-    } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
-        OneShotShiftFix()
-        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-    } else {
+    BackSpaceActionWithModifiers := BackSpaceLogic()
+    if not BackSpaceActionWithModifiers {
+        ; If no modifier was pressed
         SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
         Sleep(300) ; Delay before repeating the key
         while GetKeyState("SC038", "P") {
@@ -3041,17 +3089,66 @@ SC038::
         and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
         and not GetKeyState("SC03A", "P") ; Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
     ) {
-        if GetKeyState("SC02A", "P") { ; LShift
-            SendInput("{Delete}")
-        } else if Features["TapHolds"]["RCtrlOneShotShift"].Enabled and GetKeyState("SC11D", "P") {
-            OneShotShiftFix()
-            SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-        } else {
+        BackSpaceActionWithModifiers := BackSpaceLogic()
+        if not BackSpaceActionWithModifiers {
+            ; If no modifier was pressed
             SendEvent("{BackSpace}")
         }
     }
 }
 #HotIf
+
+BackSpaceLogic() {
+    if (
+        GetKeyState("SC01D", "P")
+        and GetKeyState("Shift", "P")
+    ) {
+        ; "LCtrl" and Shift
+        SendInput("^{Delete}")
+        return True
+    } else if (
+        GetKeyState("SC11D", "P")
+        and not Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        and GetKeyState("Shift", "P")
+    ) {
+        ; "RCtrl" when it stays RCtrl and Shift
+        SendInput("^{Delete}")
+        return True
+    } else if (
+        GetKeyState("SC01D", "P")
+        and Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        and GetKeyState("SC11D", "P")
+    ) {
+        ; "LCtrl" and Shift on "RCtrl"
+        OneShotShiftFix()
+        SendInput("^{Right}^{BackSpace}") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        return True
+    } else if (
+        Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        and GetKeyState("SC11D", "P")
+    ) {
+        ; Shift on "RCtrl"
+        OneShotShiftFix()
+        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        return True
+    } else if GetKeyState("Shift", "P") {
+        ; Shift
+        SendInput("{Delete}")
+        return True
+    } else if GetKeyState("SC01D", "P") {
+        ; "LCtrl"
+        SendInput("^{BackSpace}")
+        return True
+    } else if (
+        not Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        and GetKeyState("SC11D", "P")
+    ) {
+        ; "RCtrl" when it stays RCtrl
+        SendInput("^{BackSpace}")
+        return True
+    }
+    return False
+}
 
 ; ==========================
 ; ======= 5.4) Space =======
