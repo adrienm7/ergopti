@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run AHk cleanup
+npm run clean-ahk
+
+# Stage any changes made by the cleanup
+git add static/pilotes/plus/*.ahk
