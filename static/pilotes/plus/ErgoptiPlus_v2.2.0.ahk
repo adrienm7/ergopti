@@ -1568,7 +1568,7 @@ global DeadkeyMappingCircumflex := Map(
     "a", "â", "A", "Â",
     "à", "œ", "À", "Œ",
     "b", "⚐", "B", "⚑",
-    "c", "©", "C", "©",
+    "c", "º", "C", "°",
     "d", "★", "D", "☆",
     "e", "ê", "E", "Ê",
     "é", "æ", "É", "Æ",
@@ -1586,9 +1586,9 @@ global DeadkeyMappingCircumflex := Map(
     "o", "ô", "O", "Ô",
     "p", "¶", "P", "¶",
     "q", "☒", "Q", "☐",
-    "r", "®", "R", "®",
+    "r", "/", "R", "/",
     "s", "ß", "S", "ẞ",
-    "t", "™", "T", "™",
+    "t", "!", "T", "¡",
     "u", "û", "U", "Û",
     "v", "✓", "V", "✔",
     "w", "ŵ", "W", "Ŵ",
@@ -1616,10 +1616,15 @@ global DeadkeyMappingCircumflex := Map(
 
 global DeadkeyMappingDiaresis := Map(
     "a", "ä", "A", "Ä",
+    "c", "©", "C", "©",
     "e", "ë", "E", "Ë",
     "h", "ḧ", "H", "Ḧ",
     "i", "ï", "I", "Ï",
+    "n", " ", "N", " ",
     "o", "ö", "O", "Ö",
+    "r", "®", "R", "®",
+    "s", " ", "S", " ",
+    "t", "™", "T", "™",
     "u", "ü", "U", "Ü",
     "w", "ẅ", "W", "Ẅ",
     "x", "ẍ", "X", "Ẍ",
@@ -1797,6 +1802,36 @@ global DeadkeyMappingR := Map(
     "[", "⟦", "]", "⟧",
     "<", "⟪", ">", "⟫",
     "«", "⟪", "»", "⟫",
+)
+
+global DeadkeyMappingCurrency := Map(
+    "a", "؋", "A", "₳",
+    "b", "₿", "B", "฿",
+    "c", "¢", "C", "₵",
+    "d", "₫", "D", "₯",
+    "e", "€", "E", "₠",
+    "f", "ƒ", "F", "₣",
+    "g", "₲", "G", "₲",
+    "h", "₴", "H", "₴",
+    "i", "﷼", "I", "៛",
+    "k", "₭", "K", "₭",
+    "l", "₺", "L", "₤",
+    "m", "₥", "M", "ℳ",
+    "n", "₦", "N", "₦",
+    "o", "௹", "O", "૱",
+    "p", "₱", "P", "₧",
+    "r", "₽", "R", "₹",
+    "s", "₪", "S", "₷",
+    "t", "₸", "T", "₮",
+    "u", "元", "U", "圓",
+    "w", "₩", "W", "₩",
+    "y", "¥", "Y", "円",
+    "$", "£",
+    "&", "৳",
+    "'", "£",
+    "-", "£",
+    "_", "¤",
+    " ", "€"
 )
 
 ; =========================
@@ -2099,18 +2134,18 @@ SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
 
 ; === Number row ===
 SC138 & SC029:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"))
-SC138 & SC002:: RemapAltGr((*) => SendNewResult("1"), (*) => SendNewResult("¹"))
-SC138 & SC003:: RemapAltGr((*) => SendNewResult("2"), (*) => SendNewResult("²"))
-SC138 & SC004:: RemapAltGr((*) => SendNewResult("3"), (*) => SendNewResult("³"))
-SC138 & SC005:: RemapAltGr((*) => SendNewResult("4"), (*) => SendNewResult("⁴"))
-SC138 & SC006:: RemapAltGr((*) => SendNewResult("5"), (*) => SendNewResult("⁵"))
-SC138 & SC007:: RemapAltGr((*) => SendNewResult("6"), (*) => SendNewResult("⁶"))
-SC138 & SC008:: RemapAltGr((*) => SendNewResult("7"), (*) => SendNewResult("⁷"))
-SC138 & SC009:: RemapAltGr((*) => SendNewResult("8"), (*) => SendNewResult("⁸"))
-SC138 & SC00A:: RemapAltGr((*) => SendNewResult("9"), (*) => SendNewResult("⁹"))
-SC138 & SC00B:: RemapAltGr((*) => SendNewResult("0"), (*) => SendNewResult("0"))
+SC138 & SC002:: RemapAltGr((*) => SendNewResult("¹"), (*) => SendNewResult("₁"))
+SC138 & SC003:: RemapAltGr((*) => SendNewResult("²"), (*) => SendNewResult("₂"))
+SC138 & SC004:: RemapAltGr((*) => SendNewResult("³"), (*) => SendNewResult("₃"))
+SC138 & SC005:: RemapAltGr((*) => SendNewResult("⁴"), (*) => SendNewResult("₄"))
+SC138 & SC006:: RemapAltGr((*) => SendNewResult("⁵"), (*) => SendNewResult("₅"))
+SC138 & SC007:: RemapAltGr((*) => SendNewResult("⁶"), (*) => SendNewResult("₆"))
+SC138 & SC008:: RemapAltGr((*) => SendNewResult("⁷"), (*) => SendNewResult("₇"))
+SC138 & SC009:: RemapAltGr((*) => SendNewResult("⁸"), (*) => SendNewResult("₈"))
+SC138 & SC00A:: RemapAltGr((*) => SendNewResult("⁹"), (*) => SendNewResult("₉"))
+SC138 & SC00B:: RemapAltGr((*) => SendNewResult("⁰"), (*) => SendNewResult("₀"))
 SC138 & SC00C:: RemapAltGr((*) => SendNewResult("‰"), (*) => SendNewResult("‱"))
-SC138 & SC00D:: RemapAltGr((*) => SendNewResult("€"), (*) => SendNewResult("£"))
+SC138 & SC00D:: RemapAltGr((*) => SendNewResult("€"), (*) => DeadKey(DeadkeyMappingCurrency))
 
 ; ======= Ctrl + Alt is different from AltGr on the Number row =======
 ; Some programs use these shortcuts, like in Google Docs where it changes the heading
@@ -2218,7 +2253,7 @@ SC138 & SC027:: RemapAltGr(
 )
 SC138 & SC028:: RemapAltGr(
     (*) => SendNewResult("’"),
-    (*) => SendNewResult("€")
+    (*) => DeadKey(DeadkeyMappingCurrency)
 )
 SC138 & SC02B:: RemapAltGr(
     (*) => WrapTextIfSelected("!", "!", "!"),
@@ -3533,14 +3568,7 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
 
     ; The "Ê" key will enable to use the other symbols on the layer if we aren’t inside a word
     DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
-    DeadkeyMappingCircumflexModified.Delete(" ")
-
-    ; Fix the only word starting with "ê": "être"
-    CreateCaseSensitiveHotstrings(
-        "*?", "êt", "êt",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
+    DeadkeyMappingCircumflexModified.Delete("t") ; To be able to type "être"
 
     for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
         CreateDeadkeyHotstring(MapKey, MappedValue)
@@ -3551,9 +3579,24 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
         ; This condition corrects problems such as writing "même" that give "mê⁂e"
         Combination := "ê" . MapKey
         Hotstring(
-            ":*CB0:" . Combination,
-            (*) => SendNewResult("{BackSpace 2}" . MappedValue, Map("OnlyText", False))
+            ":*?CB0:" . Combination,
+            (*) => ShouldActivateDeadkey(Combination, MappedValue)
         )
+    }
+
+    ShouldActivateDeadkey(Combination, MappedValue) {
+        ; We only activate the deadkey if it is the start of a new word, as symbols aren’t put in words
+        ; This condition corrects problems such as writing "même" that give "mê⁂e"
+        ; We could simply have removed the "?" flag in the Hotstring definition, but we want to get the symbols also if we are typing numbers.
+        ; For example to write 01/02 by using the / on the deadkey.
+        if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z★]$") { ; Everything except a letter
+            ; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
+            SendNewResult("{BackSpace 2}", Map("OnlyText", False))
+            SendNewResult(MappedValue)
+        } else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
+            SendNewResult("{BackSpace 2}", Map("OnlyText", False))
+            SendNewResult(MappedValue)
+        }
     }
 }
 
