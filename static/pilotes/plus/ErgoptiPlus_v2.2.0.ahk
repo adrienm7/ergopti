@@ -222,6 +222,10 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
         ; If this length is 1, that means Titlecase and Uppercase abbreviation will trigger the same result.
         ; Thus, we need to make sure this result is in titlecase instead of uppercase because it is the most useful.
         if (SubStr(AbbreviationUppercase, 1, 1) == ",") {
+            Hotstring(
+                FlagsPortion AbbreviationUppercase,
+                (*) => HotstringHandler(AbbreviationUppercase, ReplacementUppercase, A_EndChar, HotstringOptions)
+            )
             ; In case we are creating the abbreviations for the , key, we need to consider its shift version
             AbbreviationUppercaseV1 := " :" SubStr(AbbreviationUppercase, 2)
             Hotstring(
@@ -640,7 +644,7 @@ global Features := Map(
         },
         "WrapTextIfSelected", {
             Enabled: True,
-            Description: "Taper un symbole quand du texte est sélectionné encadre le texte par celui-ci. Ne fonctionne que si UIA/Lib/UIA.ahk est dans le dossier du script",
+            Description: "Taper un symbole quand du texte est sélectionné encadre le texte par celui-ci. Fonctionne si UIA/Lib/UIA.ahk est dans le dossier du script",
         },
         "MicrosoftBold", {
             Enabled: True,
@@ -848,7 +852,7 @@ global Features := Map(
         ),
         "TabAlt", {
             Enabled: True,
-            Description: "`"Tab`" : Alt-Tab sur le moniteur en tap, Alt en hold. À activer si `"LAlt`" est remplacé par un autre raccourci pour ne pas perdre Alt",
+            Description: "`"Tab`" : Alt-Tab sur le moniteur en tap, Alt en hold. À activer pour ne pas perdre Alt",
             TimeActivationSeconds: 0.2,
         },
     ),
@@ -1253,9 +1257,9 @@ NoAction(*) {
 }
 
 ToggleAllFeaturesOn(*) {
-    MsgBox(
-        "⚠ ATTENTION : Toutes les fonctionnalités ont été activées. Cela inclut les différents raccourcis que l’on peut choisir d’avoir sur la même combinaison de touches. Par défaut, le premier raccourci actif d’une combinaison de touches sera celui utilisé, les autres raccourcis actifs sur cette même combinaison n’auront pas d’effet. Après cette opération, il est cependant très fortement recommandé de DÉSACTIVER MANUELLEMENT LES RACCOURCIS EN CONFLIT pour éviter de futurs potentiels problèmes."
-    )
+    ; MsgBox(
+    ;     "⚠ ATTENTION : Toutes les fonctionnalités ont été activées. Cela inclut les différents raccourcis que l’on peut choisir d’avoir sur la même combinaison de touches. Par défaut, le premier raccourci actif d’une combinaison de touches sera celui utilisé, les autres raccourcis actifs sur cette même combinaison n’auront pas d’effet. Après cette opération, il est cependant très fortement recommandé de DÉSACTIVER MANUELLEMENT LES RACCOURCIS EN CONFLIT pour éviter de futurs potentiels problèmes."
+    ; )
     ToggleAllFeatures(1)
 }
 ToggleAllFeaturesOff(*) {
@@ -1269,7 +1273,7 @@ ToggleAllFeatures(Value) {
             continue
         }
         for FeatureName in Features[FeatureCategory] {
-            if FeatureCategory == "__Order" {
+            if FeatureName == "__Order" {
                 continue
             }
             Features[FeatureCategory][FeatureName].Enabled := Value
@@ -3645,8 +3649,23 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
         )
     )
 
+    CreateCaseSensitiveHotstrings(
+        "*?", "êé", "æ",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+        )
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "êà", "œ",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+        )
+    )
+
     ; The "Ê" key will enable to use the other symbols on the layer if we aren’t inside a word
     DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
+    for Vowel in ["a", "i", "o", "u", "é", "à"] {
+        ; Necessary for things to work, as we define them above alraedy
+        DeadkeyMappingCircumflexModified.Delete(Vowel)
+    }
     DeadkeyMappingCircumflexModified.Delete("t") ; To be able to type "être"
 
     for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
