@@ -158,10 +158,10 @@ IsTimeActivationExpired(Abbreviation, OptionTimeActivationSeconds) {
     if OptionTimeActivationSeconds > 0 {
         ; We need to convert into milliseconds, hence the multiplication by 1000
         if (Now - CharacterSentTime > OptionTimeActivationSeconds * 1000) {
-            return true
+            return True
         }
     }
-    return false
+    return False
 }
 
 CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()) {
@@ -298,12 +298,15 @@ global OneShotShiftEnabled := False
 ; This configuration file will automatically be created or updated as soon as one element of the tray menu is toggled on/off.
 ; It can also be created manually. The content will look like this, with the different categories in brackets:
 ; [Layout]
-; ErgoptiBase=0
+; ErgoptiBase.Enabled=0
 ; [TapHolds]
-; AltGr=1
+; AltGr.Enabled=1
 
 global Features := Map(
+    "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey", "Shortcuts",
+        "TapHolds"],
     "Layout", Map(
+        "__Order", ["ErgoptiBase", "DirectAccessDigits", "ErgoptiAltGr", "ErgoptiPlus"],
         "ErgoptiBase", {
             Enabled: True,
             Description: "Émuler la couche de base de la disposition Ergopti",
@@ -322,6 +325,14 @@ global Features := Map(
         }
     ),
     "DistancesReduction", Map(
+        "__Order", [
+            "SuffixesA",
+            "QU",
+            "DeadKeyECircumflex",
+            "CommaJ",
+            "CommaFarLetters",
+            "SpaceAroundSymbols"
+        ],
         "QU", {
             Enabled: True,
             Description: "Q devient QU quand elle est suivie d’une voyelle : q + a = qua, q + o = quo, …",
@@ -354,6 +365,11 @@ global Features := Map(
         },
     ),
     "SFBsReduction", Map(
+        "__Order", [
+            "Comma",
+            "ECirc",
+            "EGrave"
+        ],
         "Comma", {
             Enabled: True,
             Description: "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …",
@@ -376,6 +392,9 @@ global Features := Map(
         },
     ),
     "Rolls", Map(
+        "__Order", ["HC", "SX", "CX", "EnglishNegation", "EZ", "CT", "-", "CloseChevronTag", "ChevronEqual", "Assign",
+            "NotEqual", "HashtagQuote", "HashtagParenthesis", "HashtagBracket", "EqualString", "Comment",
+            "AssignArrowEqualRight", "AssignArrowEqualLeft", "AssignArrowMinusRight", "AssignArrowMinusLeft"],
         "HC", {
             Enabled: True,
             Description: "hc ➜ wh",
@@ -473,6 +492,20 @@ global Features := Map(
         },
     ),
     "Autocorrection", Map(
+        "__Order", [
+            "TypographicApostrophe",
+            "-",
+            "Errors",
+            "OU",
+            "MultiplePonctuationMarks",
+            "SuffixesAChaining",
+            "-",
+            "Minus",
+            "-",
+            "Brands",
+            "Names",
+            "Accents"
+        ],
         "TypographicApostrophe", {
             Enabled: True,
             Description: "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …",
@@ -516,6 +549,16 @@ global Features := Map(
         },
     ),
     "MagicKey", Map(
+        "__Order", [
+            "Replace",
+            "Repeat",
+            "-",
+            "TextExpansionPersonalInformation",
+            "TextExpansion",
+            "TextExpansionEmojis",
+            "TextExpansionSymbols",
+            "TextExpansionSymbolsTypst"
+        ],
         "Replace", {
             Enabled: True,
             Description: "Transformer la touche J en ★",
@@ -547,6 +590,34 @@ global Features := Map(
         },
     ),
     "Shortcuts", Map(
+        "__Order", [
+            "EGrave",
+            "ECirc",
+            "EAcute",
+            "AGrave",
+            "-",
+            "WrapTextIfSelected",
+            "-",
+            "MicrosoftBold",
+            "Save",
+            "CtrlJ",
+            "-",
+            "LAltCapsLockGivesCapsWord",
+            "AltGrLAlt",
+            "AltGrCapsLock",
+            "-",
+            "SelectLine",
+            "Screen",
+            "GPT",
+            "GetHexValue",
+            "TakeNote",
+            "SurroundWithParentheses",
+            "Move",
+            "Search",
+            "TitleCase",
+            "Uppercase",
+            "SelectWord"
+        ],
         "EGrave", {
             Enabled: True,
             Description: "Tous les raccourcis sur la touche È correspondent à ceux de ",
@@ -587,46 +658,50 @@ global Features := Map(
             Enabled: True,
             Description: "`"LAlt`" + `"CapsLock`" = CapsWord",
         },
-        "AltGrLAltGivesBackSpace", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"LAlt`" = BackSpace",
-        },
-        "AltGrLAltGivesDelete", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"LAlt`" = Delete",
-        },
-        "AltGrLAltGivesCtrlBackSpace", {
-            Enabled: True,
-            Description: "`"AltGr`" + `"LAlt`" = Ctrl + BackSpace",
-        },
-        "AltGrLAltGivesCtrlDelete", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"LAlt`" = Ctrl + Delete",
-        },
-        "AltGrLAltGivesOneShotShift", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"LAlt`" = OneShotShift",
-        },
-        "AltGrLAltGivesCapsWord", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"LAlt`" = CapsWord",
-        },
-        "AltGrCapsLockGivesCtrlDelete", {
-            Enabled: True,
-            Description: "`"AltGr`" + `"CapsLock`" = Ctrl + Delete",
-        },
-        "AltGrCapsLockGivesCtrlBackSpace", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"CapsLock`" = Ctrl + BackSpace",
-        },
-        "AltGrCapsLockGivesCapsWord", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"CapsLock`" = CapsWord",
-        },
-        "AltGrCapsLockGivesCapsLock", {
-            Enabled: False,
-            Description: "`"AltGr`" + `"CapsLock`" = CapsLock",
-        },
+        "AltGrLAlt", Map(
+            "BackSpace", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = BackSpace",
+            },
+            "Delete", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = Delete",
+            },
+            "CtrlBackSpace", {
+                Enabled: True,
+                Description: "`"AltGr`" + `"LAlt`" = Ctrl + BackSpace",
+            },
+            "CtrlDelete", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = Ctrl + Delete",
+            },
+            "OneShotShift", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = OneShotShift",
+            },
+            "CapsWord", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = CapsWord",
+            },
+        ),
+        "AltGrCapsLock", Map(
+            "CtrlDelete", {
+                Enabled: True,
+                Description: "`"AltGr`" + `"CapsLock`" = Ctrl + Delete",
+            },
+            "CtrlBackSpace", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = Ctrl + BackSpace",
+            },
+            "CapsWord", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = CapsWord",
+            },
+            "CapsLock", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = CapsLock",
+            },
+        ),
         "SelectLine", {
             Enabled: True,
             Description: "Win + A(ll) = Sélectionne toute la ligne",
@@ -676,15 +751,27 @@ global Features := Map(
         },
     ),
     "TapHolds", Map(
-        "CapsLockEnterCtrl", {
-            Enabled: True,
-            Description: "`"CapsLock`" : Enter en tap, Ctrl en hold. CapsLock en Win + `"CapsLock`"",
-            TimeActivationSeconds: 0.2,
-        },
-        "CapsLockBackSpace", {
-            Enabled: False,
-            Description: "`"CapsLock`" : BackSpace. CapsLock en Win + `"CapsLock`"",
-        },
+        "__Order", [
+            "CapsLock",
+            "LShiftCopy",
+            "LCtrlPaste",
+            "LAlt",
+            "Space",
+            "AltGr",
+            "RCtrl",
+            "TabAlt"
+        ],
+        "CapsLock", Map(
+            "EnterCtrl", {
+                Enabled: True,
+                Description: "`"CapsLock`" : Enter en tap, Ctrl en hold. CapsLock en Win + `"CapsLock`"",
+                TimeActivationSeconds: 0.2,
+            },
+            "BackSpace", {
+                Enabled: False,
+                Description: "`"CapsLock`" : BackSpace. CapsLock en Win + `"CapsLock`"",
+            },
+        ),
         "LShiftCopy", {
             Enabled: True,
             Description: "`"LShift`" : Ctrl + C en tap, Shift en hold",
@@ -695,62 +782,70 @@ global Features := Map(
             Description: "`"LCtrl`" : Ctrl + V en tap, Ctrl en hold",
             TimeActivationSeconds: 0.35,
         },
-        "LAltOneShotShift", {
-            Enabled: True,
-            Description: "`"LAlt`" : OneShotShift en tap, Shift en hold",
-        },
-        "LAltAltTabMonitor", {
-            Enabled: False,
-            Description: "`"LAlt`" : Alt+Tab sur le moniteur en tap, Alt en hold",
-            TimeActivationSeconds: 0.2,
-        },
-        "LAltTabLayer", {
-            Enabled: False,
-            Description: "`"LAlt`" : Tab en tap, layer de navigation en hold",
-            TimeActivationSeconds: 0.2,
-        },
-        "LAltBackSpace", {
-            Enabled: False,
-            Description: "`"LAlt`" : BackSpace. Shift + `"LAlt`" = Delete",
-        },
-        "LAltBackSpaceLayer", {
-            Enabled: False,
-            Description: "`"LAlt`" : BackSpace en tap, layer de navigation en hold. Shift + `"LAlt`" = Delete",
-            TimeActivationSeconds: 0.2,
-        },
-        "SpaceLayer", {
-            Enabled: True,
-            Description: "`"Espace`" : Espace en tap, layer de navigation en hold",
-            TimeActivationSeconds: 0.15,
-        },
-        "SpaceCtrl", {
-            Enabled: False,
-            Description: "`"Espace`" : Espace en tap, Ctrl en hold",
-            TimeActivationSeconds: 0.15,
-        },
-        "AltGrTab", {
-            Enabled: True,
-            Description: "`"AltGr`" : Tab en tap, AltGr en hold",
-            TimeActivationSeconds: 0.2,
-        },
-        "AltGrOneShotShift", {
-            Enabled: False,
-            Description: "`"AltGr`" : OneShotShift en tap, AltGr en hold",
-            TimeActivationSeconds: 0.2,
-        },
-        "RCtrlBackSpace", {
-            Enabled: True,
-            Description: "`"RCtrl`" : BackSpace. Shift + `"RCtrl`" = Delete"
-        },
-        "RCtrlTab", {
-            Enabled: False,
-            Description: "`"RCtrl`" : Tab en tap, Ctrl en hold",
-            TimeActivationSeconds: 0.2,
-        },
-        "RCtrlOneShotShift", {
-            Enabled: False,
-            Description: "`"RCtrl`" : OneShotShift en tap, Shift en hold",
-        },
+        "LAlt", Map(
+            "OneShotShift", {
+                Enabled: False,
+                Description: "`"LAlt`" : OneShotShift en tap, Shift en hold",
+            },
+            "AltTabMonitor", {
+                Enabled: False,
+                Description: "`"LAlt`" : Alt+Tab sur le moniteur en tap, Alt en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "TabLayer", {
+                Enabled: False,
+                Description: "`"LAlt`" : Tab en tap, layer de navigation en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "BackSpace", {
+                Enabled: False,
+                Description: "`"LAlt`" : BackSpace. Shift + `"LAlt`" = Delete",
+            },
+            "BackSpaceLayer", {
+                Enabled: True,
+                Description: "`"LAlt`" : BackSpace en tap, layer de navigation en hold. Shift + `"LAlt`" = Delete",
+                TimeActivationSeconds: 0.2,
+            },
+        ),
+        "Space", Map(
+            "Layer", {
+                Enabled: False,
+                Description: "`"Espace`" : Espace en tap, layer de navigation en hold",
+                TimeActivationSeconds: 0.15,
+            },
+            "Ctrl", {
+                Enabled: False,
+                Description: "`"Espace`" : Espace en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.15,
+            },
+        ),
+        "AltGr", Map(
+            "Tab", {
+                Enabled: True,
+                Description: "`"AltGr`" : Tab en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "OneShotShift", {
+                Enabled: False,
+                Description: "`"AltGr`" : OneShotShift en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+        ),
+        "RCtrl", Map(
+            "BackSpace", {
+                Enabled: False,
+                Description: "`"RCtrl`" : BackSpace. Shift + `"RCtrl`" = Delete"
+            },
+            "Tab", {
+                Enabled: False,
+                Description: "`"RCtrl`" : Tab en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "OneShotShift", {
+                Enabled: True,
+                Description: "`"RCtrl`" : OneShotShift en tap, Shift en hold",
+            },
+        ),
         "TabAlt", {
             Enabled: True,
             Description: "`"Tab`" : Alt-Tab sur le moniteur en tap, Alt en hold. À activer si `"LAlt`" est remplacé par un autre raccourci pour ne pas perdre Alt",
@@ -800,60 +895,31 @@ if FileExist(ConfigurationFile) {
 
 ReadConfiguration() {
     global Features, PersonalInformation, ScriptInformation
-    ; "_" = value if the key is not found in the ini file
-    for Category in Features {
-        for Feature in Features[Category] {
-            RawValueEnabled := IniRead(ConfigurationFile, Category, Feature, "_")
-            if RawValueEnabled != "_" {
-                Features[Category][Feature].Enabled := (RawValueEnabled != "0")
-            }
+    Props := ["Enabled", "TimeActivationSeconds", "Letter", "Link", "DestinationFolder", "DatedNotes"]
 
-            RawValueTimeActivationSeconds := IniRead(ConfigurationFile, Category, Feature . "TimeActivationSeconds",
-                "_")
-            if RawValueTimeActivationSeconds != "_" {
-                Features[Category][Feature].TimeActivationSeconds := RawValueTimeActivationSeconds
+    for Category, FeaturesMap in Features {
+        for Feature, Value in FeaturesMap {
+            if (Type(Value) = "Map") {
+                ; Sub-map => iterate sub-features under [Category.Feature]
+                for SubFeature, SubValue in Value {
+                    for Prop in Props {
+                        Name := SubFeature . "." . Prop
+                        RawValue := IniRead(ConfigurationFile, Category "." Feature, Name, "_")
+                        if RawValue != "_" {
+                            Features[Category][Feature][SubValue].%Prop% := RawValue
+                        }
+                    }
+                }
+            } else {
+                for Prop in Props {
+                    Name := Feature . "." . Prop
+                    RawValue := IniRead(ConfigurationFile, Category, Name, "_")
+                    if RawValue != "_" {
+                        Features[Category][Feature].%Prop% := RawValue
+                    }
+                }
             }
         }
-    }
-
-    Value := IniRead(ConfigurationFile, "MagicKey", "TextExpansionPersonalInformationPatternMaxLength", "_")
-    if Value != "_" {
-        Features["MagicKey"]["TextExpansionPersonalInformationPatternMaxLength"].PatternMaxLength := Value
-    }
-
-    Value := IniRead(ConfigurationFile, "Shortcuts", "EGraveLetter", "_")
-    if Value != "_" {
-        Features["Shortcuts"]["EGrave"].Letter := Value
-    }
-
-    Value := IniRead(ConfigurationFile, "Shortcuts", "ECircLetter", "_")
-    if Value != "_" {
-        Features["Shortcuts"]["ECirc"].Letter := Value
-    }
-
-    Value := IniRead(ConfigurationFile, "Shortcuts", "EAcuteLetter", "_")
-    if Value != "_" {
-        Features["Shortcuts"]["EAcute"].Letter := Value
-    }
-
-    Value := IniRead(ConfigurationFile, "Shortcuts", "AGraveLetter", "_")
-    if Value != "_" {
-        Features["Shortcuts"]["AGrave"].Letter := Value
-    }
-
-    Value := IniRead(ConfigurationFile, "Shortcuts", "GPTLink", "_")
-    if Value != "_" {
-        Features["Shortcuts"]["GPT"].Link := Value
-    }
-
-    Value := IniRead(ConfigurationFile, "Shortcuts", "TakeNoteDatedNotes", "_")
-    if Value != "_" {
-        Features["Shortcuts"]["TakeNote"].DatedNotes := Value
-    }
-
-    Value := IniRead(ConfigurationFile, "Shortcuts", "TakeNoteDestinationFolder", "_")
-    if Value != "_" {
-        Features["Shortcuts"]["TakeNote"].DestinationFolder := Value
     }
 
     for Information in PersonalInformation {
@@ -877,257 +943,171 @@ global SpaceAroundSymbols := Features["DistancesReduction"]["SpaceAroundSymbols"
 ; ======= 1.3) Tray menu of the script — Menus creation =======
 ; =============================================================
 
-MenuAddItem(Menu, FeatureCategory, FeatureName) {
-    MenuTitle := GetMenuTitle(FeatureCategory, FeatureName)
-    Menu.Add(MenuTitle, (*) => ToggleMenuVariable(Menu, FeatureCategory, FeatureName))
-}
+global SubMenus := Map()
 
-GetMenuTitle(FeatureCategory, FeatureName) {
-    MenuTitle := Features[FeatureCategory][FeatureName].Description
-    if FeatureCategory == "Shortcuts" and Features[FeatureCategory][FeatureName].HasOwnProp("Letter") {
-        MenuTitle := MenuTitle StrUpper(Features[FeatureCategory][FeatureName].Letter)
+CreateSubMenusRecursive(MenuParent, Items, CategoryPath) {
+    global SubMenus
+
+    if GetFeatureByPath(CategoryPath).Has("__Order") {
+        for Feature in GetFeatureByPath(CategoryPath)["__Order"] {
+            if Feature == "-" {
+                MenuParent.Add() ; Empty line
+                continue
+            }
+
+            Key := Feature
+            Val := GetFeatureByPath(CategoryPath)[Feature]
+            CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath)
+        }
+    } else {
+        for Key, Val in Items {
+            CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath)
+        }
     }
-    return MenuTitle
 }
 
-ToggleMenuVariable(Menu, FeatureCategory, FeatureName) {
-    global Features, ConfigurationFile
-    Features[FeatureCategory][FeatureName].Enabled := not Features[FeatureCategory][FeatureName].Enabled ; Toggle the global variable value
-    FeatureValue := Features[FeatureCategory][FeatureName].Enabled
+CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
+    FullPath := CategoryPath "." Key
 
-    ; Update the configuration file with the new value
-    IniWrite(FeatureValue, ConfigurationFile, FeatureCategory, FeatureName)
+    if (Type(Val) == "Map") {
+        ; Create submenu and store in SubMenus
+        SubMenu := Menu()
+        MenuParent.Add(Key, SubMenu)
+        SubMenus[FullPath] := SubMenu
+        ; Recursively create nested submenus
+        CreateSubMenusRecursive(SubMenu, Val, FullPath)
+    } else if IsObject(Val) and Val.HasOwnProp("Enabled") {
+        MenuAddItem(MenuParent, CategoryPath, Key)
+    }
+}
+
+MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
+    FullPath := FeatureCategoryPath "." FeatureName
+    MenuTitle := GetMenuTitleByPath(FullPath)
+    MenuParent.Add(MenuTitle, (*) => ToggleMenuVariableByPath(FullPath))
+
+    Feature := GetFeatureByPath(FullPath)
+    if Feature.Enabled {
+        MenuParent.Check(MenuTitle)
+    } else {
+        MenuParent.Uncheck(MenuTitle)
+    }
+}
+
+; Retrieve a feature title by its path
+GetMenuTitleByPath(FullPath) {
+    Feature := GetFeatureByPath(FullPath)
+    if !IsObject(Feature)
+        return FullPath
+
+    if Feature.HasOwnProp("Description") {
+        MenuTitle := Feature.Description
+        if Feature.HasOwnProp("Letter")
+            MenuTitle := MenuTitle StrUpper(Feature.Letter)
+        return MenuTitle
+    }
+    return FullPath
+}
+
+; Retrieve a feature object by its path
+GetFeatureByPath(FullPath) {
+    global Features
+    Keys := StrSplit(FullPath, ".")
+    Feature := Features
+    for K in Keys {
+        Feature := Feature[K]
+    }
+    return Feature
+}
+
+; Toggle a feature Enabled state
+ToggleMenuVariableByPath(FullPath) {
+    Feature := GetFeatureByPath(FullPath)
+
+    ; Chercher position du dernier point
+    pos := InStr(FullPath, ".", , -1)
+    if (pos) {
+        FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)   ; tout à gauche du point
+        FeatureName := SubStr(FullPath, pos + 1)      ; tout à droite du point
+    } else {
+        FeatureCategoryPath := FullPath
+        FeatureName := ""
+    }
+
+    ; MsgBox(Feature.Description " " Feature.Enabled)
+    Feature.Enabled := !Feature.Enabled
+    ; MsgBox(Feature.Description " " Feature.Enabled)
+    Value := Feature.Enabled ? 1 : 0
+    IniWrite(Feature.Enabled, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
     Reload
 }
 
-MenuItemCheckmarkUpdate(Menu, FeatureCategory, FeatureName, FeatureValue) {
-    global Features
-    MenuTitle := GetMenuTitle(FeatureCategory, FeatureName)
-    if FeatureValue {
-        Menu.Check(MenuTitle)
-    } else {
-        Menu.Uncheck(MenuTitle)
+GetCategoryTitle(Category) {
+    switch Category {
+        case "DistancesReduction":
+            return "➀ Réduction des distances"
+        case "SFBsReduction":
+            return "➁ Réduction des SFBs"
+        case "Rolls":
+            return "➂ Roulements"
+        case "Autocorrection":
+            return "➃ Autocorrection"
+        case "MagicKey":
+            return "➄ Touche ★"
+        case "Shortcuts":
+            return "➅ Raccourcis"
+        case "TapHolds":
+            return "➆ Tap-Holds"
+        default:
+            return ""
     }
 }
 
-SubmenuUpdate(FeatureCategory) {
-    if FeatureCategory == "Layout" {
-        ; No submenu for the layout category
-        return
-    }
+; =========================
+; Main menu initialization
+; =========================
 
-    MenuTitle := %"Menu" FeatureCategory%
-    AreEveryFeaturesEnabled := True
-    global Features
-    for FeatureName in Features[FeatureCategory] {
-        FeatureEnabled := Features[FeatureCategory][FeatureName].Enabled
-        if not FeatureEnabled {
-            AreEveryFeaturesEnabled := False
-            break
-        }
-    }
+global MenuLayout := "Modification de la disposition clavier"
+global MenuAllFeatures := "Features Ergopti➕"
+global MenuScriptManagement := "Gestion du script"
+global MenuSuspend := "⏸︎ Suspendre (Raccourci : AltGr + ↩)"
+global MenuDebugging := "⚠ Débogage"
 
-    if AreEveryFeaturesEnabled {
-        A_TrayMenu.Check(MenuTitle)
-    } else {
-        A_TrayMenu.Uncheck(MenuTitle)
-    }
-}
-
-MenuItemUpdate(Menu, FeatureCategory, FeatureName) {
-    global Features
-    FeatureValue := Features[FeatureCategory][FeatureName].Enabled
-    MenuItemCheckmarkUpdate(Menu, FeatureCategory, FeatureName, FeatureValue)
-}
-
-MenuStructure := Map(
-    "Layout", [
-        "ErgoptiBase",
-        "DirectAccessDigits",
-        "ErgoptiAltGr",
-        "ErgoptiPlus",
-    ],
-    "DistancesReduction", [
-        "SuffixesA",
-        "QU",
-        "DeadKeyECircumflex",
-        "CommaJ",
-        "CommaFarLetters",
-        "SpaceAroundSymbols",
-    ],
-    "SFBsReduction", [
-        "Comma",
-        "ECirc",
-        "EGrave",
-    ],
-    "Rolls", [
-        "HC",
-        "SX",
-        "CX",
-        "EnglishNegation",
-        "EZ",
-        "CT",
-        "-",
-        "CloseChevronTag",
-        "ChevronEqual",
-        "Assign",
-        "NotEqual",
-        "HashtagQuote",
-        "HashtagParenthesis",
-        "HashtagBracket",
-        "EqualString",
-        "Comment",
-        "AssignArrowEqualRight",
-        "AssignArrowEqualLeft",
-        "AssignArrowMinusRight",
-        "AssignArrowMinusLeft",
-    ],
-    "Autocorrection", [
-        "TypographicApostrophe",
-        "-",
-        "Errors",
-        "OU",
-        "MultiplePonctuationMarks",
-        "SuffixesAChaining",
-        "-",
-        "Minus",
-        "-",
-        "Brands",
-        "Names",
-        "Accents",
-    ],
-    "MagicKey", [
-        "Replace",
-        "Repeat",
-        "-",
-        "TextExpansionPersonalInformation",
-        "TextExpansion",
-        "TextExpansionEmojis",
-        "TextExpansionSymbols",
-        "TextExpansionSymbolsTypst",
-    ],
-    "Shortcuts", [
-        "EGrave",
-        "ECirc",
-        "EAcute",
-        "AGrave",
-        "-",
-        "WrapTextIfSelected",
-        "-",
-        "MicrosoftBold",
-        "Save",
-        "CtrlJ",
-        "-",
-        "LAltCapsLockGivesCapsWord",
-        "-",
-        "AltGrLAltGivesBackSpace",
-        "AltGrLAltGivesDelete",
-        "AltGrLAltGivesCtrlBackSpace",
-        "AltGrLAltGivesCtrlDelete",
-        "AltGrLAltGivesOneShotShift",
-        "AltGrLAltGivesCapsWord",
-        "-",
-        "AltGrCapsLockGivesCtrlDelete",
-        "AltGrCapsLockGivesCtrlBackSpace",
-        "AltGrCapsLockGivesCapsWord",
-        "AltGrCapsLockGivesCapsLock",
-        "-",
-        "SelectLine",
-        "Screen",
-        "GPT",
-        "GetHexValue",
-        "TakeNote",
-        "SurroundWithParentheses",
-        "Move",
-        "Search",
-        "TitleCase",
-        "Uppercase",
-        "SelectWord",
-    ],
-    "TapHolds", [
-        "CapsLockEnterCtrl",
-        "CapsLockBackSpace",
-        "-",
-        "LShiftCopy",
-        "LCtrlPaste",
-        "-",
-        "LAltOneShotShift",
-        "LAltTabLayer",
-        "LAltAltTabMonitor",
-        "LAltBackSpace",
-        "LAltBackSpaceLayer",
-        "-",
-        "SpaceLayer",
-        "SpaceCtrl",
-        "-",
-        "AltGrTab",
-        "AltGrOneShotShift",
-        "-",
-        "RCtrlBackSpace",
-        "RCtrlTab",
-        "RCtrlOneShotShift",
-        "-",
-        "TabAlt",
-    ]
-)
-
-CreateSubMenus(MenuStructure) {
-    Menus := Map()
-    for Category, Items in MenuStructure {
-        if (Category == "Layout") {
+InitSubMenus() {
+    global Features, SubMenus
+    SubMenus := Map()
+    for Category, Items in Features {
+        if Category = "Layout" {
             continue
         }
         SubMenu := Menu()
-        for Item in Items {
-            if (Item == "-") {
-                SubMenu.Add() ; Separating line
-            }
-            else {
-                MenuAddItem(SubMenu, Category, Item)
-            }
-        }
-        Menus[Category] := SubMenu
+        SubMenus[Category] := SubMenu ; Only top-level category stored
+        CreateSubMenusRecursive(SubMenu, Items, Category)
     }
-    return Menus
 }
-global SubMenus := CreateSubMenus(MenuStructure)
 
-; We use variables for repeating text
-; Indeed, an element of the menu is referenced by the text it contains
-MenuLayout := "Modification de la disposition clavier"
-MenuAllFeatures := "Features Ergopti➕"
-MenuDistancesReduction := "➀ Réduction des distances"
-MenuSFBsReduction := "➁ Réduction des SFBs"
-MenuRolls := "➂ Roulements"
-MenuAutocorrection := "➃ Autocorrection"
-MenuMagicKey := "➄ Touche ★"
-MenuShortcuts := "➅ Raccourcis"
-MenuTapHolds := "➆ Tap-Holds"
-MenuScriptManagement := "Gestion du script"
-MenuSuspend := "⏸︎ Suspendre (Raccourci : AltGr + ↩)"
-MenuDebugging := "⚠ Débogage"
-
-; Menu that will be shown and contain all tho other menus
 initMenu() {
-    global MenuStructure, SubMenus, A_TrayMenu
-    A_TrayMenu.Delete() ; Remove all items of the default menu
+    global Features, SubMenus, A_TrayMenu
+    A_TrayMenu.Delete()
 
+    ; Layout section (top-level)
     A_TrayMenu.Add(MenuLayout, NoAction)
     A_TrayMenu.Disable(MenuLayout)
-    for Item in MenuStructure["Layout"] {
-        MenuAddItem(A_TrayMenu, "Layout", Item)
+    for FeatureName in Features["Layout"]["__Order"] {
+        MenuAddItem(A_TrayMenu, "Layout", FeatureName)
     }
-
-    A_TrayMenu.Add() ; Separating line
+    A_TrayMenu.Add()
     A_TrayMenu.Add(MenuAllFeatures, NoAction)
     A_TrayMenu.Disable(MenuAllFeatures)
-    A_TrayMenu.Add(MenuDistancesReduction, SubMenus["DistancesReduction"])
-    A_TrayMenu.Add(MenuSFBsReduction, SubMenus["SFBsReduction"])
-    A_TrayMenu.Add(MenuRolls, SubMenus["Rolls"])
-    A_TrayMenu.Add(MenuAutocorrection, SubMenus["Autocorrection"])
-    A_TrayMenu.Add(MenuMagicKey, SubMenus["MagicKey"])
-    A_TrayMenu.Add(MenuShortcuts, SubMenus["Shortcuts"])
-    A_TrayMenu.Add(MenuTapHolds, SubMenus["TapHolds"])
+
+    ; Add only top-level submenus to global tray menu
+    for Category in Features["__Order"] {
+        if Category = "Layout"
+            continue ; Don’t add this submenu as we already added it above
+        SubMenu := SubMenus[Category]
+        CategoryTitle := GetCategoryTitle(Category)
+        A_TrayMenu.Add(CategoryTitle, SubMenu)
+    }
 
     A_TrayMenu.Add() ; Separating line
     A_TrayMenu.Add("✔️ TOUT activer", ToggleAllFeaturesOn)
@@ -1136,6 +1116,7 @@ initMenu() {
     A_TrayMenu.Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
     A_TrayMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
 
+    ; Script management section
     A_TrayMenu.Add() ; Separating line
     A_TrayMenu.Add(MenuScriptManagement, NoAction)
     A_TrayMenu.Disable(MenuScriptManagement)
@@ -1144,6 +1125,7 @@ initMenu() {
     A_TrayMenu.Add("🔄 Recharger (Raccourci : AltGr + ⌫)", ActivateReload)
     A_TrayMenu.Add("⏹ Quitter", ActivateExitApp)
 
+    ; Debugging section
     A_TrayMenu.Add() ; Separating line
     A_TrayMenu.Add(MenuDebugging, NoAction)
     A_TrayMenu.Disable(MenuDebugging)
@@ -1151,22 +1133,10 @@ initMenu() {
     A_TrayMenu.Add("État des variables", ActivateListVars)
     A_TrayMenu.Add("Historique des touches", ActivateKeyHistory)
 }
+
+InitSubMenus()
 initMenu()
 UpdateTrayIcon()
-
-MenuItemUpdateAll() {
-    global MenuStructure, SubMenus, A_TrayMenu
-    for Category, Items in MenuStructure {
-        SubmenuUpdate(Category)
-        CurrentMenu := (Category == "Layout") ? A_TrayMenu : SubMenus[Category]
-        for Item in Items {
-            if (Item != "-") {
-                MenuItemUpdate(CurrentMenu, Category, Item)
-            }
-        }
-    }
-}
-MenuItemUpdateAll()
 
 ; ========================================================
 ; ======= 1.4) Tray menu of the script — Functions =======
@@ -1198,7 +1168,7 @@ ProcessUserInput(gui, edits) {
         NewValue := editControl.Text
         OldValue := PersonalInformation.Has(key) ? PersonalInformation[key] : ""
         if (NewValue != OldValue)
-            changed[key] := true
+            changed[key] := True
         PersonalInformation[key] := NewValue
         IniWrite(NewValue, ConfigurationFile, "PersonalInformation", key)
     }
@@ -1214,6 +1184,7 @@ ProcessUserInput(gui, edits) {
     }
 
     MsgBox("Nouvelles coordonnées :`n`n" PersonalInformationSummary)
+    Reload
 }
 
 ShortcutsEditor(*) {
@@ -1239,24 +1210,28 @@ ShortcutsEditor(*) {
     GuiToShow.SetFont("norm")
     NewAGraveValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["AGrave"].Letter)
 
-    GuiToShow.Add("Button", "w100 Center", "OK").OnEvent("Click", (*) => ModifyValues(GuiToShow, NewEGraveValue.Text,
-        NewECircValue.Text, NewEAcuteValue.Text, NewAGraveValue.Text))
+    GuiToShow.Add("Button", "w100 Center", "OK").OnEvent(
+        "Click",
+        (*) => ModifyValues(GuiToShow, NewEGraveValue.Text, NewECircValue.Text, NewEAcuteValue.Text, NewAGraveValue.Text
+        )
+    )
     GuiToShow.Show("Center")
 }
 ModifyValues(gui, NewEGraveValue, NewECircValue, NewEAcuteValue, NewAGraveValue) {
     Features["Shortcuts"]["EGrave"].Letter := NewEGraveValue
-    IniWrite(NewEGraveValue, ConfigurationFile, "Shortcuts", "EGraveLetter")
+    IniWrite(NewEGraveValue, ConfigurationFile, "Shortcuts", "EGrave" . "." . "Letter")
 
     Features["Shortcuts"]["ECirc"].Letter := NewECircValue
-    IniWrite(NewECircValue, ConfigurationFile, "Shortcuts", "ECircLetter")
+    IniWrite(NewECircValue, ConfigurationFile, "Shortcuts", "ECirc" . "." . "Letter")
 
     Features["Shortcuts"]["EAcute"].Letter := NewEAcuteValue
-    IniWrite(NewEAcuteValue, ConfigurationFile, "Shortcuts", "EAcuteLetter")
+    IniWrite(NewEAcuteValue, ConfigurationFile, "Shortcuts", "EAcute" . "." . "Letter")
 
     Features["Shortcuts"]["AGrave"].Letter := NewAGraveValue
-    IniWrite(NewAGraveValue, ConfigurationFile, "Shortcuts", "AGraveLetter")
+    IniWrite(NewAGraveValue, ConfigurationFile, "Shortcuts", "AGrave" . "." . "Letter")
 
     gui.Destroy()
+    Reload
 }
 
 GPTLinkEditor(*) {
@@ -1268,8 +1243,10 @@ GPTLinkEditor(*) {
 }
 ModifyLink(gui, NewValue) {
     Features["Shortcuts"]["GPT"].Link := NewValue
-    IniWrite(NewValue, ConfigurationFile, "Shortcuts", "GPTLink")
+    IniWrite(NewValue, ConfigurationFile, "Shortcuts", "GPT" . "." . "Link")
+
     gui.Destroy()
+    Reload
 }
 
 NoAction(*) {
@@ -1285,11 +1262,18 @@ ToggleAllFeaturesOff(*) {
     ToggleAllFeatures(0)
 }
 ToggleAllFeatures(Value) {
+    ; TO UPDATE because it isn’t easy like that anymore with one more level
     global Features
     for FeatureCategory in Features {
+        if FeatureCategory == "__Order" {
+            continue
+        }
         for FeatureName in Features[FeatureCategory] {
+            if FeatureCategory == "__Order" {
+                continue
+            }
             Features[FeatureCategory][FeatureName].Enabled := Value
-            IniWrite(Value, ConfigurationFile, FeatureCategory, FeatureName)
+            IniWrite(Value, ConfigurationFile, FeatureCategory, FeatureName . ".Enabled")
         }
     }
     Reload
@@ -1315,7 +1299,7 @@ UpdateTrayIcon() {
     if A_IsSuspended {
         A_TrayMenu.Check(MenuSuspend)
         if FileExist(ScriptInformation["IconPathDisabled"]) {
-            TraySetIcon(ScriptInformation["IconPathDisabled"], , true)
+            TraySetIcon(ScriptInformation["IconPathDisabled"], , True)
         }
     } else {
         A_TrayMenu.Uncheck(MenuSuspend)
@@ -1866,9 +1850,7 @@ if Features["Layout"]["DirectAccessDigits"].Enabled {
 }
 
 if Features["Layout"]["ErgoptiBase"].Enabled {
-    ~SC039:: {
-        UpdateLastSentCharacter(" ")
-    }
+    RemapKey("SC039", " ")
 
     ; === Top row ===
     RemapKey("SC010", Features["Shortcuts"]["EGrave"].Letter, "è")
@@ -2371,20 +2353,20 @@ RetrieveScancode(Letter) {
 #HotIf (
     Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
     ; We need to handle the shortcut differently when LAlt has been remapped:
-    and not Features["TapHolds"]["LAltOneShotShift"].Enabled
-    and not Features["TapHolds"]["LAltBackSpace"].Enabled ; No need to add the shortcut here, as it is impossible with a BackSpace key that fires immediately
-    and not Features["TapHolds"]["LAltBackSpaceLayer"].Enabled ; Here we directly change the result on the layer
-    and not Features["TapHolds"]["LAltTabLayer"].Enabled ; Here we directly change the result on the layer
+    and not Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
+    and not Features["TapHolds"]["LAlt"]["BackSpace"].Enabled ; No need to add the shortcut here, as it is impossible with a BackSpace key that fires immediately
+    and not Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled ; Here we directly change the result on the layer
+    and not Features["TapHolds"]["LAlt"]["TabLayer"].Enabled ; Here we directly change the result on the layer
 )
 SC038 & SC03A:: ToggleCapsWordState()
 #HotIf
 
-; This function fixes Features["Shortcuts"]["LAltCapsLockGivesCapsWord"] when used with Features["TapHolds"]["LAltOneShotShift"]
+; This function fixes Features["Shortcuts"]["LAltCapsLockGivesCapsWord"] when used with Features["TapHolds"]["LAlt"]["OneShotShift"]
 ; It needs to be used in every remapping of the "CapsLock" key, or the "CapsLock" key itself if no remapping is done
 CapsWordShortcutFix() {
     if (
         Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
-        and Features["TapHolds"]["LAltOneShotShift"].Enabled
+        and Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
         and GetKeyState("SC038", "P")
     ) {
         ToggleCapsWordState()
@@ -2395,8 +2377,8 @@ CapsWordShortcutFix() {
 ; When no remapping of the "CapsLock" key is done, add the fix
 #HotIf (
     Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
-    and Features["TapHolds"]["LAltOneShotShift"].Enabled
-    and not Features["TapHolds"]["CapsLockEnterCtrl"].Enabled and not LayerEnabled
+    and Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
+    and not Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled and not LayerEnabled
 )
 ~SC03A::
 {
@@ -2437,7 +2419,7 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
 ; ======= 4.5) AltGr =======
 ; ==========================
 
-#HotIf Features["Shortcuts"]["AltGrLAltGivesBackSpace"].Enabled
+#HotIf Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled
 ; "AltGr" + "LAlt" = BackSpace
 ; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
@@ -2450,7 +2432,7 @@ SC138 & SC038:: {
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrLAltGivesDelete"].Enabled
+#HotIf Features["Shortcuts"]["AltGrLAlt"]["Delete"].Enabled
 ; "AltGr" + "LAlt" = Delete
 ; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
@@ -2463,7 +2445,7 @@ SC138 & SC038:: {
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlBackSpace"].Enabled
+#HotIf Features["Shortcuts"]["AltGrLAlt"]["CtrlBackSpace"].Enabled
 ; "AltGr" + "LAlt" = Ctrl + BackSpace
 ; "Shift" + "AltGr" + "LAlt" = BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
@@ -2476,7 +2458,7 @@ SC138 & SC038:: {
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrLAltGivesCtrlDelete"].Enabled
+#HotIf Features["Shortcuts"]["AltGrLAlt"]["CtrlDelete"].Enabled
 ; "AltGr" + "LAlt" = Ctrl + Delete
 ; "Shift" + "AltGr" + "LAlt" = Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
 SC138 & SC038:: {
@@ -2489,42 +2471,42 @@ SC138 & SC038:: {
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrLAltGivesOneShotShift"].Enabled
+#HotIf Features["Shortcuts"]["AltGrLAlt"]["OneShotShift"].Enabled
 ; "AltGr" + "LAlt" = OneShotShift
 SC138 & SC038:: {
     global OneShotShiftEnabled := True
     OneShotShift()
 }
 #HotIf
-#HotIf Features["Shortcuts"]["AltGrLAltGivesCapsWord"].Enabled
+#HotIf Features["Shortcuts"]["AltGrLAlt"]["CapsWord"].Enabled
 ; "AltGr" + "LAlt" = CapsWord
 SC138 & SC038:: {
     ToggleCapsWordState()
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCtrlDelete"].Enabled
+#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CtrlDelete"].Enabled
 ; "AltGr" + "CapsLock" = Ctrl + Delete
 SC138 & SC03A:: {
     SendInput("^{Delete}")
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCtrlBackSpace"].Enabled
+#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CtrlBackSpace"].Enabled
 ; "AltGr" + "CapsLock" = Ctrl + BackSpace
 SC138 & SC03A:: {
     SendInput("^{BackSpace}")
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCapsWord"].Enabled
+#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CapsWord"].Enabled
 ; "AltGr" + "CapsLock" = CapsWord
 SC138 & SC03A:: {
     ToggleCapsWordState()
 }
 #HotIf
 
-#HotIf Features["Shortcuts"]["AltGrCapsLockGivesCapsLock"].Enabled
+#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CapsLock"].Enabled
 ; "AltGr" + "CapsLock" = CapsLock
 SC138 & SC03A:: {
     SetCapsLockState( not GetCapsLockCondition())
@@ -2893,14 +2875,14 @@ SC01C::
 ; ======= 5.1) CapsLock =======
 ; =============================
 
-#HotIf Features["TapHolds"]["CapsLockEnterCtrl"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled and not LayerEnabled
 *SC03A::Enter
 ; Tap-hold on "CapsLock" : Enter on tap, Ctrl on hold
 $SC03A::
 {
     CapsWordShortcutFix()
     SendEvent("{LControl Down}") ; It is necessary to send an event to then get it in A_PriorKey
-    tap := KeyWait("CapsLock", "T" . Features["TapHolds"]["CapsLockEnterCtrl"].TimeActivationSeconds)
+    tap := KeyWait("CapsLock", "T" . Features["TapHolds"]["CapsLock"]["EnterCtrl"].TimeActivationSeconds)
     if (tap and (A_PriorKey == "LControl")) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
         SendEvent("{LControl Up}")
         SendEvent("{Enter}")
@@ -2917,11 +2899,11 @@ SC03A Up:: SendEvent("{LControl Up}")
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["CapsLockBackSpace"].Enabled
+#HotIf Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
 SC03A::BackSpace
 #HotIf
 
-#HotIf Features["TapHolds"]["CapsLockEnterCtrl"].Enabled or Features["TapHolds"]["CapsLockBackSpace"].Enabled
+#HotIf Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled or Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
 ; Win + "CapsLock" to toggle CapsLock
 #SC03A::
 {
@@ -2976,7 +2958,7 @@ SC03A::BackSpace
 ; ======= 5.3) LAlt =======
 ; =========================
 
-#HotIf Features["TapHolds"]["LAltOneShotShift"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled and not LayerEnabled
 ; Tap-hold on "LAlt" : OneShotShift on tap, Shift on hold
 SC038:: {
     if (
@@ -2998,7 +2980,7 @@ SC038:: {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["LAltTabLayer"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["LAlt"]["TabLayer"].Enabled and not LayerEnabled
 ; Tap-hold on "LAlt" : Tab on tap, Layer on hold
 SC038::
 {
@@ -3015,14 +2997,14 @@ SC038::
 
     Now := A_TickCount
     CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAltTabLayer"].TimeActivationSeconds * 1000)
+    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["TabLayer"].TimeActivationSeconds * 1000)
     if tap {
         SendEvent("{Tab}")
     }
 }
 
 SC02A & SC038:: SendInput("+{Tab}") ; On "LShift"
-if Features["TapHolds"]["RCtrlOneShotShift"].Enabled {
+if Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled {
     SC11D & SC038:: {
         OneShotShiftFix()
         SendInput("+{Tab}")
@@ -3032,12 +3014,12 @@ if Features["TapHolds"]["RCtrlOneShotShift"].Enabled {
 !SC038:: SendInput("!{Tab}")
 #HotIf
 
-#HotIf Features["TapHolds"]["LAltAltTabMonitor"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["LAlt"]["AltTabMonitor"].Enabled and not LayerEnabled
 ; Tap-hold on "LAlt" : AltTabMonitor on tap, Alt on hold
 SC038::
 {
     Send("{LAlt Down}")
-    tap := KeyWait("SC038", "T" . Features["TapHolds"]["LAltAltTabMonitor"].TimeActivationSeconds)
+    tap := KeyWait("SC038", "T" . Features["TapHolds"]["LAlt"]["AltTabMonitor"].TimeActivationSeconds)
     if tap {
         Send("{LAlt Up}")
         AltTabMonitor()
@@ -3048,7 +3030,7 @@ SC038::
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["LAltBackSpace"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["LAlt"]["BackSpace"].Enabled and not LayerEnabled
 ; "LAlt" becomes BackSpace, and Delete on Shift
 *SC038::
 {
@@ -3065,7 +3047,7 @@ SC038::
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["LAltBackSpaceLayer"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled and not LayerEnabled
 ; Tap-hold on "LAlt" : BackSpace on tap, Layer on hold
 *SC038::
 {
@@ -3082,7 +3064,7 @@ SC038::
 
     Now := A_TickCount
     CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAltBackSpaceLayer"].TimeActivationSeconds * 1000)
+    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["BackSpaceLayer"].TimeActivationSeconds * 1000)
 
     if (
         tap
@@ -3108,7 +3090,7 @@ BackSpaceLogic() {
         return True
     } else if (
         GetKeyState("SC11D", "P")
-        and not Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        and not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
         and GetKeyState("Shift", "P")
     ) {
         ; "RCtrl" when it stays RCtrl and Shift
@@ -3116,7 +3098,7 @@ BackSpaceLogic() {
         return True
     } else if (
         GetKeyState("SC01D", "P")
-        and Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        and Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
         and GetKeyState("SC11D", "P")
     ) {
         ; "LCtrl" and Shift on "RCtrl"
@@ -3124,7 +3106,7 @@ BackSpaceLogic() {
         SendInput("^{Right}^{BackSpace}") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
         return True
     } else if (
-        Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
         and GetKeyState("SC11D", "P")
     ) {
         ; Shift on "RCtrl"
@@ -3140,7 +3122,7 @@ BackSpaceLogic() {
         SendInput("^{BackSpace}")
         return True
     } else if (
-        not Features["TapHolds"]["RCtrlOneShotShift"].Enabled
+        not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
         and GetKeyState("SC11D", "P")
     ) {
         ; "RCtrl" when it stays RCtrl
@@ -3154,11 +3136,11 @@ BackSpaceLogic() {
 ; ======= 5.4) Space =======
 ; ==========================
 
-#HotIf Features["TapHolds"]["SpaceLayer"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["Space"]["Layer"].Enabled and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Layer on hold
 SC039::
 {
-    ih := InputHook("L1 T" . Features["TapHolds"]["SpaceLayer"].TimeActivationSeconds)
+    ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Layer"].TimeActivationSeconds)
     ih.Start()
     ih.Wait()
     if ih.EndReason != "Timeout" {
@@ -3184,7 +3166,7 @@ SC039 Up:: {
     if (
         A_PriorHotkey == "SC039"
         and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
-        and A_TimeSinceThisHotkey <= Features["TapHolds"]["SpaceLayer"].TimeActivationSeconds
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Layer"].TimeActivationSeconds
     ) {
         SendEvent("{Space}")
         UpdateLastSentCharacter(" ")
@@ -3192,11 +3174,11 @@ SC039 Up:: {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["SpaceCtrl"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["Space"]["Ctrl"].Enabled and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Ctrl on hold
 SC039::
 {
-    ih := InputHook("L1 T" . Features["TapHolds"]["SpaceCtrl"].TimeActivationSeconds)
+    ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds)
     ih.Start()
     ih.Wait()
     if ih.EndReason != "Timeout" {
@@ -3219,7 +3201,7 @@ SC039 Up:: {
     if (
         A_PriorHotkey == "SC039"
         and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
-        and A_TimeSinceThisHotkey <= Features["TapHolds"]["SpaceCtrl"].TimeActivationSeconds
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds
     ) {
         SendEvent("{Space}")
     }
@@ -3230,13 +3212,13 @@ SC039 Up:: {
 ; ======= 5.5) AltGr =======
 ; ==========================
 
-#HotIf Features["TapHolds"]["AltGrTab"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["AltGr"]["Tab"].Enabled and not LayerEnabled
 RAlt::Tab
 ; Tap-hold on "AltGr" : Tab on tap, AltGr on hold
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
-    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGrTab"].TimeActivationSeconds)
+    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["Tab"].TimeActivationSeconds)
     if (tap and A_PriorKey == "RAlt") {
         DisableCapsWordState()
         if (GetKeyState("LControl", "P") and GetKeyState("LShift", "P")) {
@@ -3259,12 +3241,12 @@ RAlt Up:: {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["AltGrOneShotShift"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["AltGr"]["OneShotShift"].Enabled and not LayerEnabled
 ; Tap-hold on "AltGr" : OneShotShift on tap, AltGr on hold
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
-    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGrOneShotShift"].TimeActivationSeconds)
+    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["OneShotShift"].TimeActivationSeconds)
     if (tap and A_PriorKey == "RAlt") {
         DisableCapsWordState()
         global OneShotShiftEnabled := True
@@ -3277,13 +3259,13 @@ RAlt:: ; Necessary to work on layouts like QWERTY
 ; ======= 5.6) RCtrl =======
 ; ==========================
 
-#HotIf Features["TapHolds"]["RCtrlBackSpace"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["RCtrl"]["BackSpace"].Enabled and not LayerEnabled
 ; RCtrl becomes BackSpace, and Delete on Shift
 SC11D::
 {
     if GetKeyState("LShift", "P") {
         SendInput("{Delete}")
-    } else if Features["TapHolds"]["LAltOneShotShift"].Enabled and GetKeyState("SC038", "P") {
+    } else if Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled and GetKeyState("SC038", "P") {
         OneShotShiftFix()
         SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
     } else {
@@ -3297,10 +3279,10 @@ SC11D::
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["RCtrlTab"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["RCtrl"]["Tab"].Enabled and not LayerEnabled
 ; Tap-hold on "RCtrl" : Tab on tap, Ctrl on hold
 ~SC11D:: {
-    tap := KeyWait("RControl", "T" . Features["TapHolds"]["RCtrlTab"].TimeActivationSeconds)
+    tap := KeyWait("RControl", "T" . Features["TapHolds"]["RCtrl"]["Tab"].TimeActivationSeconds)
     if (tap and A_PriorKey == "RControl") {
         SendEvent("{RCtrl Up}")
         SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
@@ -3313,7 +3295,7 @@ SC11D::
 #SC11D:: SendEvent("#{Tab}") ; SendInput doesn’t work in that case
 #HotIf
 
-#HotIf Features["TapHolds"]["RCtrlOneShotShift"].Enabled and not LayerEnabled
+#HotIf Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled and not LayerEnabled
 ; Tap-hold on "RCtrl" : OneShotShift on tap, Shift on hold
 SC11D:: {
     global OneShotShiftEnabled := True
@@ -3336,7 +3318,7 @@ SC00F::
     SendInput("{LAlt Down}")
     tap := KeyWait("SC00F", "T" . Features["TapHolds"]["TabAlt"].TimeActivationSeconds)
     if tap {
-        if Features["TapHolds"]["LAltTabLayer"].Enabled and GetKeyState("SC038", "P") {
+        if Features["TapHolds"]["LAlt"]["TabLayer"].Enabled and GetKeyState("SC038", "P") {
             SendInput("!{Tab}")
         } else {
             SendInput("{LAlt Up}")
@@ -3494,8 +3476,8 @@ ActionLayer(action) {
     Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
     and LayerEnabled
     and (
-        Features["TapHolds"]["LAltBackSpaceLayer"].Enabled
-        or Features["TapHolds"]["LAltTabLayer"].Enabled
+        Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
+        or Features["TapHolds"]["LAlt"]["TabLayer"].Enabled
     )
 )
 SC03A:: ToggleCapsWordState() ; Overrides the "BackSpace" shortcut on the layer
@@ -3503,7 +3485,7 @@ SC03A:: ToggleCapsWordState() ; Overrides the "BackSpace" shortcut on the layer
 
 ; Fix when Space triggers the layer
 #HotIf (
-    Features["TapHolds"]["SpaceLayer"].Enabled
+    Features["TapHolds"]["Space"]["Layer"].Enabled
     and LayerEnabled
 )
 SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it is held to get the layer
