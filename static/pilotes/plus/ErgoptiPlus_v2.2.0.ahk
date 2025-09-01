@@ -2309,19 +2309,14 @@ SC138 & SC035:: RemapAltGr(
 
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled
 ^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste doesn't work
-^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
-^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
-; Doesn’t seem necessary anymore:
-; if GetCapsLockCondition() {
-;     +^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with (Shift +) Ctrl + %
-;     +^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with (Shift +) Ctrl + $
-; }
+*^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
+*^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can’t use Numpad + to zoom
 #HotIf Features["Layout"]["ErgoptiBase"].Enabled and MicrosoftApps()
-^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
-^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
+*^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
+*^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf
 
 ; ==============================================
@@ -4232,12 +4227,18 @@ if Features["Autocorrection"]["MultiplePonctuationMarks"].Enabled {
         "*", "! !", "!!",
         Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
     )
+
     CreateHotstring(
         "*", " ? ?", " ??",
         Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
     )
     CreateHotstring(
         "*", "? ?", "??",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+    )
+
+    CreateHotstring(
+        "*", "...", "…",
         Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
     )
 }
