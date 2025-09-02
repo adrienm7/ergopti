@@ -910,7 +910,7 @@ ReadConfiguration() {
                         Name := SubFeature . "." . Prop
                         RawValue := IniRead(ConfigurationFile, Category "." Feature, Name, "_")
                         if RawValue != "_" {
-                            Features[Category][Feature][SubValue].%Prop% := RawValue
+                            Features[Category][Feature][SubFeature].%Prop% := RawValue
                         }
                     }
                 }
