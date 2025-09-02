@@ -14,19 +14,26 @@
 	<kbd>%</kbd>
 	est beaucoup plus fréquemment utilisé que le <kbd>€</kbd>, que ce soit dans la vie quotidienne ou
 	en programmation. Ainsi, il fallait que la touche la plus facile d’accès des deux (celle située le
-	plus vers l’intérieur du clavier) soit aussi la plus utile. En outre, le touche <kbd>€</kbd> a été
-	modifiée pour mettre le
-	<kbd-sortie>€</kbd-sortie> en AltGr et placer le <kbd-sortie>$</kbd-sortie> en accès direct. Ici encore,
-	c’est parce que ce caractère est beaucoup plus utilisé, que ce soit en tant que monnaie, mais aussi
-	en programmation ou sur Excel par exemple.
+	plus vers l’intérieur du clavier) soit aussi la plus utile. En outre, la touche <kbd>€</kbd> a été
+	modifiée pour mettre le <kbd-sortie>€</kbd-sortie> en AltGr et placer le
+	<kbd-sortie>$</kbd-sortie> en accès direct. Ici encore, c’est parce que ce caractère est beaucoup plus
+	utilisé, que ce soit en tant que monnaie, mais aussi en programmation ou sur Excel par exemple.
 </p>
 <p>
-	Le deuxième changement, moins visible, est une amélioration des touches mortes. Celles-ci sont
-	désormais beaucoup plus complètes et plus logiquement agencées.
+	En outre, les symboles <kbd-sortie>º</kbd-sortie>, <kbd-sortie>°</kbd-sortie> et
+	<kbd-sortie>ª</kbd-sortie> étaient auparavant sur la touche <kbd>0</kbd>. Ils ont été déplacés sur
+	la touche <kbd>=</kbd> afin de libérer les emplacements sur la touche <kbd>0</kbd>. Cette
+	modification a permis d’ajouter, sur les touches de chiffres, les chiffres en exposant en
+	<kbd>AltGr</kbd> ainsi que les chiffres en indice en <kbd>Shift</kbd> + <kbd>AltGr</kbd>.
 </p>
 <mini-espace></mini-espace>
 <p>
-	Enfin, un gros changement concerne <ErgoptiPlus></ErgoptiPlus> où le code AutoHotKey a été complètement
+	Le deuxième changement, moins visible, est une nette amélioration des touches mortes. Celles-ci
+	sont désormais beaucoup plus complètes et plus logiquement agencées.
+</p>
+<mini-espace></mini-espace>
+<p>
+	Enfin, un gros changement concerne <ErgoptiPlus></ErgoptiPlus> dont le code AutoHotkey a été complètement
 	réécrit. Celui-ci est désormais beaucoup plus simple et robuste. En outre, chaque feature peut désormais
 	s’activer ou se désactiver grâce à un menu de configuration apparaissant lors du clic sur l’icône du
 	script dans la barre des taches.
@@ -34,14 +41,9 @@
 <p>
 	Cette nouvelle version permet à tout le monde d’utiliser des raccourcis, la couche de symboles,
 	les chiffres en accès direct, etc. à la carte, quelle que soit sa disposition actuelle. Ainsi,
-	même une personne utilisant AZERTY et ne souhaitant pas apprendre <Ergopti></Ergopti> peut avoir à
-	sa disposition ces nombreuses features.
-</p>
-<p>
-	Sur cette nouvelle version d’<ErgoptiPlus></ErgoptiPlus>, certains raccourcis et touches ont été
-	inversés. En particulier, le layer de navigation ne pouvait auparavant pas se trouver sur la barre
-	d’espace, car cela rendait celle-ci inutilisable. Cette contrainte technique ayant été résolue,
-	cela a libéré de la place en "LAlt", ce qui a permis d’y mettre une touche OneShotShift/Shift.
+	même une personne utilisant AZERTY, BÉPO, Optimot, etc. et ne souhaitant pas apprendre <Ergopti
+	></Ergopti> peut avoir à sa disposition ces nombreuses features. Certains raccourcis de cette nouvelle
+	version ont été inversés afin d’être encore plus confortables à utiliser et de nombreux ont été ajoutés.
 </p>
 
 <h3>Version 2.1 (Janvier 2025)</h3>

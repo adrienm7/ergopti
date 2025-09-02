@@ -32,15 +32,15 @@ export class Keyboard {
 		});
 	}
 
-	getEmplacementClavier() {
+	getKeyboardLocation() {
 		// Vérifie si le document est défini
 		if (typeof document !== 'undefined') {
-			let emplacementClavier = document.getElementById(`clavier_${this.id}`);
-			if (emplacementClavier === null) {
+			let keyboardLocation = document.getElementById(`clavier_${this.id}`);
+			if (keyboardLocation === null) {
 				// Lève une exception si l'emplacement n'est pas défini
 				throw new Error('Emplacement clavier introuvable');
 			}
-			return emplacementClavier;
+			return keyboardLocation;
 		}
 		// Lève une exception si le document n'est pas défini
 		throw new Error('Document non défini');
@@ -52,20 +52,20 @@ export class Keyboard {
 		// 	this.data_disposition = getKeyboardData(this.version);
 		// }
 		this.majTouches();
-		this.activerModificateurs();
+		this.modifiersActivationOfCurrentLayer();
 
 		try {
-			const emplacementClavier = this.getEmplacementClavier();
-			emplacementClavier.dataset['type'] = this.infos_clavier.type;
-			emplacementClavier.dataset['couche'] = this.infos_clavier.couche;
-			emplacementClavier.dataset['plus'] = this.infos_clavier.plus;
-			emplacementClavier.dataset['couleur'] = this.infos_clavier.couleur;
+			const keyboardLocation = this.getKeyboardLocation();
+			keyboardLocation.dataset['type'] = this.infos_clavier.type;
+			keyboardLocation.dataset['couche'] = this.infos_clavier.couche;
+			keyboardLocation.dataset['plus'] = this.infos_clavier.plus;
+			keyboardLocation.dataset['couleur'] = this.infos_clavier.couleur;
 		} catch (error) {
 			return;
 		}
 
 		if (this.infos_clavier.controles === 'oui') {
-			this.ajouterBoutonsChangerCouche(this.id, this.infos_clavier);
+			this.layerSwitchAddButtons(this.id, this.infos_clavier);
 		}
 	}
 
@@ -74,7 +74,7 @@ export class Keyboard {
 			return;
 		}
 		try {
-			const emplacementClavier = this.getEmplacementClavier();
+			const keyboardLocation = this.getKeyboardLocation();
 			for (let ligne = 1; ligne <= 7; ligne++) {
 				for (let j = 0; j <= 15; j++) {
 					// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
@@ -94,7 +94,7 @@ export class Keyboard {
 					// }
 
 					// Suppression des event listeners sur la touche
-					const toucheClavier0 = emplacementClavier.querySelector(
+					const toucheClavier0 = keyboardLocation.querySelector(
 						"bloc-touche[data-ligne='" + ligne + "'][data-colonne='" + colonne + "']"
 					);
 					const toucheClavier = toucheClavier0.cloneNode(true);
@@ -261,341 +261,288 @@ export class Keyboard {
 		}
 	}
 
-	activerModificateurs() {
+	modifiersActivationOfCurrentLayer() {
 		try {
-			const emplacementClavier = this.getEmplacementClavier();
-			let lShift = emplacementClavier.querySelector("[data-touche='LShift']");
-			let rShift = emplacementClavier.querySelector("[data-touche='RShift']");
-			let lCtrl = emplacementClavier.querySelector("[data-touche='LCtrl']");
-			let rCtrl = emplacementClavier.querySelector("[data-touche='RCtrl']");
-			let altGr = emplacementClavier.querySelector("[data-touche='RAlt']");
-			let CapsLock = emplacementClavier.querySelector("[data-touche='CapsLock']");
-			let aGrave = emplacementClavier.querySelector("[data-touche='à']");
-			let virgule = emplacementClavier.querySelector("[data-touche=',']");
-			let circonflexe = emplacementClavier.querySelector("[data-touche='Circonflexe']");
-			let Trema = emplacementClavier.querySelector("[data-touche='Trema']");
-			let lalt = emplacementClavier.querySelector("[data-touche='LAlt']");
-			let space = emplacementClavier.querySelector("[data-touche='Space']");
+			const keyboardLocation = this.getKeyboardLocation();
+			let keyLeftShift = keyboardLocation.querySelector("[data-touche='LShift']");
+			let keyRightShift = keyboardLocation.querySelector("[data-touche='RShift']");
+			let keyLeftControl = keyboardLocation.querySelector("[data-touche='LCtrl']");
+			let keyRightControl = keyboardLocation.querySelector("[data-touche='RCtrl']");
+			let keyRightAlt = keyboardLocation.querySelector("[data-touche='RAlt']");
+			let keyLeftAlt = keyboardLocation.querySelector("[data-touche='LAlt']");
+			let keyCapsLock = keyboardLocation.querySelector("[data-touche='CapsLock']");
+			let keySpace = keyboardLocation.querySelector("[data-touche='Space']");
+			let keyAGrave = keyboardLocation.querySelector("[data-touche='à']");
+			let keyComma = keyboardLocation.querySelector("[data-touche=',']");
 
-			if (this.infos_clavier.couche === 'Shift' && lShift !== null) {
-				lShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'Shift' && keyLeftShift !== null) {
+				keyLeftShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'Shift' && rShift !== null) {
-				rShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'Shift' && keyRightShift !== null) {
+				keyRightShift.classList.add('touche-active');
 			}
 			if (
 				this.infos_clavier.couche === 'Shift' &&
 				this.infos_clavier.plus === 'oui' &&
 				this.infos_clavier.type === 'iso'
 			) {
-				lalt.classList.add('touche-active');
+				keyRightControl.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'Ctrl' && lCtrl !== null) {
-				lCtrl.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'Ctrl' && keyLeftControl !== null) {
+				keyLeftControl.classList.add('touche-active');
 			}
 			if (
 				this.infos_clavier.couche === 'Ctrl' &&
-				CapsLock !== null &&
+				keyCapsLock !== null &&
 				this.infos_clavier.plus === 'oui'
 			) {
-				CapsLock.classList.add('touche-active');
+				keyCapsLock.classList.add('touche-active');
 			}
 			if (
 				this.infos_clavier.couche === 'Ctrl' &&
-				rCtrl !== null &&
+				keyRightControl !== null &&
 				this.infos_clavier.plus === 'non'
 			) {
-				rCtrl.classList.add('touche-active');
+				keyRightControl.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'AltGr' && altGr !== null) {
-				altGr.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'AltGr' && keyRightAlt !== null) {
+				keyRightAlt.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'ShiftAltGr' && lShift !== null) {
-				lShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'ShiftAltGr' && keyLeftShift !== null) {
+				keyLeftShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'ShiftAltGr' && rShift !== null) {
-				rShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'ShiftAltGr' && keyRightShift !== null) {
+				keyRightShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'ShiftAltGr' && altGr !== null) {
-				altGr.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'ShiftAltGr' && keyRightAlt !== null) {
+				keyRightAlt.classList.add('touche-active');
 			}
-			// if (this.infos_clavier.couche === 'À' && aGrave !== null) {
-			// 	aGrave.classList.add('touche-active');
-			// }
-			// if (this.infos_clavier.couche === ',' && virgule !== null) {
-			// 	virgule.classList.add('touche-active');
-			// }
 			if (
 				this.infos_clavier.couche === 'Layer' &&
-				space !== null &&
+				keyLeftAlt !== null &&
 				this.infos_clavier.type === 'iso'
 			) {
-				space.classList.add('touche-active');
+				keySpace.classList.add('touche-active');
 			}
 			if (
 				this.infos_clavier.couche === 'Layer' &&
-				space !== null &&
+				keySpace !== null &&
 				this.infos_clavier.type === 'ergodox'
 			) {
-				space.classList.add('touche-active');
+				keySpace.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'CirconflexeShift' && lShift !== null) {
-				lShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'CirconflexeShift' && keyLeftShift !== null) {
+				keyLeftShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'CirconflexeShift' && rShift !== null) {
-				rShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'CirconflexeShift' && keyRightShift !== null) {
+				keyRightShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'TremaShift' && lShift !== null) {
-				lShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'TremaShift' && keyLeftShift !== null) {
+				keyLeftShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'TremaShift' && rShift !== null) {
-				rShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'TremaShift' && keyRightShift !== null) {
+				keyRightShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'GreekShift' && lShift !== null) {
-				lShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'GreekShift' && keyLeftShift !== null) {
+				keyLeftShift.classList.add('touche-active');
 			}
-			if (this.infos_clavier.couche === 'GreekShift' && rShift !== null) {
-				rShift.classList.add('touche-active');
+			if (this.infos_clavier.couche === 'GreekShift' && keyRightShift !== null) {
+				keyRightShift.classList.add('touche-active');
 			}
+			// if (this.infos_clavier.couche === 'À' && keyAGrave !== null) {
+			// 	keyAGrave.classList.add('touche-active');
+			// }
+			// if (this.infos_clavier.couche === ',' && keyComma !== null) {
+			// 	keyComma.classList.add('touche-active');
+			// }
 		} catch (error) {
 			return;
 		}
 	}
 
-	changerCouche(toucheModificatrice) {
-		let touchePressee = toucheModificatrice.dataset.touche;
-		let coucheActuelle = this.infos_clavier.couche;
-		let nouvelleCouche = coucheActuelle;
+	layerSwitch(modifierKey) {
+		let pressedKey = modifierKey.dataset.touche;
+		let currentLayer = this.infos_clavier.couche;
+		let newLayer = currentLayer;
 
-		// Touche pressée = AltGr
-		if (touchePressee === 'RAlt' && coucheActuelle === 'AltGr') {
-			nouvelleCouche = 'Visuel';
-		} else if (touchePressee === 'RAlt' && coucheActuelle === 'Shift') {
-			nouvelleCouche = 'ShiftAltGr';
-		} else if (touchePressee === 'RAlt' && coucheActuelle === 'ShiftAltGr') {
-			nouvelleCouche = 'Shift';
-		} else if (touchePressee === 'RAlt') {
-			nouvelleCouche = 'AltGr';
+		let shiftPressed =
+			pressedKey === 'LShift' ||
+			pressedKey === 'RShift' ||
+			(pressedKey === 'RCtrl' && this.infos_clavier.plus === 'oui');
+
+		if (shiftPressed) {
+			pressedKey = 'Shift';
 		}
 
-		// Touche pressée = Shift
-		if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'Shift'
-		) {
-			nouvelleCouche = 'Visuel';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'AltGr'
-		) {
-			nouvelleCouche = 'ShiftAltGr';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'ShiftAltGr'
-		) {
-			nouvelleCouche = 'AltGr';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			(coucheActuelle === 'À' || coucheActuelle === ',')
-		) {
-			nouvelleCouche = 'Shift';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'CirconflexeShift'
-		) {
-			nouvelleCouche = 'Circonflexe';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'Circonflexe'
-		) {
-			nouvelleCouche = 'CirconflexeShift';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'TremaShift'
-		) {
-			nouvelleCouche = 'Trema';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'Trema'
-		) {
-			nouvelleCouche = 'TremaShift';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'Exposant'
-		) {
-			nouvelleCouche = 'Shift';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'Indice'
-		) {
-			nouvelleCouche = 'Shift';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'GreekShift'
-		) {
-			nouvelleCouche = 'Greek';
-		} else if (
-			(touchePressee === 'LShift' ||
-				touchePressee === 'RShift' ||
-				(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')) &&
-			coucheActuelle === 'Greek'
-		) {
-			nouvelleCouche = 'GreekShift';
-		} else if (
-			touchePressee === 'LShift' ||
-			touchePressee === 'RShift' ||
-			(touchePressee === 'LAlt' && this.infos_clavier.plus === 'oui')
-		) {
-			nouvelleCouche = 'Shift';
+		// Ctrl becomes Shift in Ergopti+
+		if (pressedKey === 'RCtrl' && this.infos_clavier.plus === 'oui') {
+			pressedKey = 'Shift';
 		}
 
-		// Touche pressée = Ctrl
-		if (touchePressee === 'LCtrl' && coucheActuelle !== 'Ctrl') {
-			nouvelleCouche = 'Ctrl';
-		} else if (touchePressee === 'LCtrl') {
-			nouvelleCouche = 'Visuel';
-		}
+		const mappings = {
+			Shift: {
+				Shift: 'Visuel',
+				AltGr: 'ShiftAltGr',
+				ShiftAltGr: 'AltGr',
+				CirconflexeShift: 'Circonflexe',
+				Circonflexe: 'CirconflexeShift',
+				TremaShift: 'Trema',
+				Trema: 'TremaShift',
+				GreekShift: 'Greek',
+				Greek: 'GreekShift',
+				À: 'Shift',
+				',': 'Shift',
+				Exposant: 'Shift',
+				Indice: 'Shift',
+				default: 'Shift'
+			},
+			RAlt: {
+				AltGr: 'Visuel',
+				Shift: 'ShiftAltGr',
+				ShiftAltGr: 'Shift',
+				default: 'AltGr'
+			},
+			LCtrl: {
+				Ctrl: 'Visuel',
+				default: 'Ctrl'
+			},
+			RCtrl: {
+				Ctrl: 'Visuel',
+				default: 'Ctrl'
+			}
+		};
 
-		// Touche pressée = RCtrl
-		if (
-			touchePressee === 'RCtrl' &&
-			this.infos_clavier.plus === 'non' &&
-			coucheActuelle !== 'Ctrl'
-		) {
-			nouvelleCouche = 'Ctrl';
-		} else if (touchePressee === 'RCtrl' && this.infos_clavier.plus === 'non') {
-			nouvelleCouche = 'Visuel';
+		if (pressedKey in mappings) {
+			const rules = mappings[pressedKey];
+			if (rules) {
+				newLayer = rules[currentLayer] || rules.default;
+			}
 		}
 
 		// Touche pressée = CapsLock
-		if (
-			touchePressee === 'CapsLock' &&
-			this.infos_clavier.plus === 'oui' &&
-			coucheActuelle !== 'Ctrl'
-		) {
-			nouvelleCouche = 'Ctrl';
-		} else if (touchePressee === 'CapsLock' && this.infos_clavier.plus === 'oui') {
-			nouvelleCouche = 'Visuel';
+		if (pressedKey === 'CapsLock' && this.infos_clavier.plus === 'oui' && currentLayer !== 'Ctrl') {
+			newLayer = 'Ctrl';
+		} else if (pressedKey === 'CapsLock' && this.infos_clavier.plus === 'oui') {
+			newLayer = 'Visuel';
 		}
 
 		// Touche pressée = Space
 		if (
-			touchePressee === 'Space' &&
+			pressedKey === 'Space' &&
+			this.infos_clavier.type === 'ergodox' &&
 			this.infos_clavier.plus === 'oui' &&
-			['Visuel', 'Primary'].includes(coucheActuelle)
+			['Visuel', 'Primary'].includes(currentLayer)
 		) {
-			nouvelleCouche = 'Layer';
-		} else if (touchePressee === 'Space' && this.infos_clavier.plus === 'oui') {
-			nouvelleCouche = 'Visuel';
+			newLayer = 'Layer';
+		} else if (
+			pressedKey === 'Space' &&
+			this.infos_clavier.type === 'ergodox' &&
+			this.infos_clavier.plus === 'oui'
+		) {
+			newLayer = 'Visuel';
+		}
+
+		// LAlt
+		if (
+			pressedKey === 'LAlt' &&
+			this.infos_clavier.type === 'iso' &&
+			this.infos_clavier.plus === 'oui' &&
+			['Visuel', 'Primary'].includes(currentLayer)
+		) {
+			newLayer = 'Layer';
+		} else if (
+			pressedKey === 'LAlt' &&
+			this.infos_clavier.type === 'iso' &&
+			this.infos_clavier.plus === 'oui'
+		) {
+			newLayer = 'Visuel';
 		}
 
 		// Touche pressée = À
 		if (
-			touchePressee === 'à' &&
-			['Visuel', 'Primary', 'Shift'].includes(coucheActuelle) &&
+			pressedKey === 'à' &&
+			['Visuel', 'Primary', 'Shift'].includes(currentLayer) &&
 			this.infos_clavier.plus === 'oui'
 		) {
-			nouvelleCouche = 'À';
+			newLayer = 'À';
 		}
-		if (touchePressee === 'à' && coucheActuelle === 'ShiftAltGr') {
-			nouvelleCouche = 'Indice';
+		if (pressedKey === 'à' && currentLayer === 'ShiftAltGr') {
+			newLayer = 'Indice';
 		}
 
 		// Touche pressée = E
-		if (touchePressee === 'e' && coucheActuelle === 'ShiftAltGr') {
-			nouvelleCouche = 'Exposant';
+		if (pressedKey === 'e' && currentLayer === 'ShiftAltGr') {
+			newLayer = 'Exposant';
 		}
 
 		// Touche pressée = U
-		if (touchePressee === 'u' && coucheActuelle === 'ShiftAltGr') {
-			nouvelleCouche = 'Greek';
+		if (pressedKey === 'u' && currentLayer === 'ShiftAltGr') {
+			newLayer = 'Greek';
 		}
 
 		// Touche pressée = R
-		if (touchePressee === 'r' && coucheActuelle === 'ShiftAltGr') {
-			nouvelleCouche = 'R';
+		if (pressedKey === 'r' && currentLayer === 'ShiftAltGr') {
+			newLayer = 'R';
 		}
 
 		// Touche pressée = ,
 		if (
-			touchePressee === ',' &&
-			['Visuel', 'Primary', 'Shift'].includes(coucheActuelle) &&
+			pressedKey === ',' &&
+			['Visuel', 'Primary', 'Shift'].includes(currentLayer) &&
 			this.infos_clavier.plus === 'oui'
 		) {
-			nouvelleCouche = ',';
+			newLayer = ',';
 		}
 
 		// Touche pressée = Circonflexe
 		if (
-			(touchePressee === 'Circonflexe' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
-			(touchePressee === 'ê' && coucheActuelle === 'ShiftAltGr')
+			(pressedKey === 'Circonflexe' && ['Visuel', 'Primary'].includes(currentLayer)) ||
+			(pressedKey === 'ê' && currentLayer === 'ShiftAltGr')
 		) {
-			nouvelleCouche = 'Circonflexe';
+			newLayer = 'Circonflexe';
 		}
 
 		// Touche pressée = Trema
 		if (
-			(touchePressee === 'Trema' && ['Visuel', 'Primary'].includes(coucheActuelle)) ||
-			(touchePressee === 't' && coucheActuelle === 'ShiftAltGr')
+			(pressedKey === 'Trema' && ['Visuel', 'Primary'].includes(currentLayer)) ||
+			(pressedKey === 't' && currentLayer === 'ShiftAltGr')
 		) {
-			nouvelleCouche = 'Trema';
+			newLayer = 'Trema';
 		}
 
 		// Une fois que la nouvelle couche est déterminée, on actualise la valeur de la couche, puis le clavier
 		this.data_clavier.update((currentData) => {
-			currentData['couche'] = nouvelleCouche;
+			currentData['couche'] = newLayer;
 			return currentData;
 		});
 		this.majClavier();
 	}
 
-	ajouterBoutonsChangerCouche() {
+	layerSwitchAddButtons() {
 		try {
-			const emplacementClavier = this.getEmplacementClavier();
-			let toucheLAlt = emplacementClavier.querySelector("bloc-touche[data-touche='LAlt']");
-			let toucheRAlt = emplacementClavier.querySelector("bloc-touche[data-touche='RAlt']");
-			let toucheLShift = emplacementClavier.querySelector("bloc-touche[data-touche='LShift']");
-			let toucheRShift = emplacementClavier.querySelector("bloc-touche[data-touche='RShift']");
-			let toucheLCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='LCtrl']");
-			let toucheRCtrl = emplacementClavier.querySelector("bloc-touche[data-touche='RCtrl']");
-			let toucheCapsLock = emplacementClavier.querySelector("bloc-touche[data-touche='CapsLock']");
-			let toucheA = emplacementClavier.querySelector("bloc-touche[data-touche='à']");
-			let toucheE = emplacementClavier.querySelector("bloc-touche[data-touche='e']");
-			let toucheECirc = emplacementClavier.querySelector("bloc-touche[data-touche='ê']");
-			let toucheR = emplacementClavier.querySelector("bloc-touche[data-touche='r']");
-			let toucheT = emplacementClavier.querySelector("bloc-touche[data-touche='t']");
-			let toucheU = emplacementClavier.querySelector("bloc-touche[data-touche='u']");
-			let toucheEspace = emplacementClavier.querySelector("bloc-touche[data-touche='Space']");
-			let toucheVirgule = emplacementClavier.querySelector("bloc-touche[data-touche=',']");
-			let toucheCirconflexe = emplacementClavier.querySelector(
+			const keyboardLocation = this.getKeyboardLocation();
+			let toucheLAlt = keyboardLocation.querySelector("bloc-touche[data-touche='LAlt']");
+			let toucheRAlt = keyboardLocation.querySelector("bloc-touche[data-touche='RAlt']");
+			let toucheLShift = keyboardLocation.querySelector("bloc-touche[data-touche='LShift']");
+			let toucheRShift = keyboardLocation.querySelector("bloc-touche[data-touche='RShift']");
+			let toucheLCtrl = keyboardLocation.querySelector("bloc-touche[data-touche='LCtrl']");
+			let toucheRCtrl = keyboardLocation.querySelector("bloc-touche[data-touche='RCtrl']");
+			let toucheCapsLock = keyboardLocation.querySelector("bloc-touche[data-touche='CapsLock']");
+			let toucheA = keyboardLocation.querySelector("bloc-touche[data-touche='à']");
+			let toucheE = keyboardLocation.querySelector("bloc-touche[data-touche='e']");
+			let toucheECirc = keyboardLocation.querySelector("bloc-touche[data-touche='ê']");
+			let toucheR = keyboardLocation.querySelector("bloc-touche[data-touche='r']");
+			let toucheT = keyboardLocation.querySelector("bloc-touche[data-touche='t']");
+			let toucheU = keyboardLocation.querySelector("bloc-touche[data-touche='u']");
+			let toucheEspace = keyboardLocation.querySelector("bloc-touche[data-touche='Space']");
+			let toucheVirgule = keyboardLocation.querySelector("bloc-touche[data-touche=',']");
+			let toucheCirconflexe = keyboardLocation.querySelector(
 				"bloc-touche[data-touche='Circonflexe']"
 			);
-			let toucheTrema = emplacementClavier.querySelector("bloc-touche[data-touche='Trema']");
+			let toucheTrema = keyboardLocation.querySelector("bloc-touche[data-touche='Trema']");
 
 			// On ajoute une action au clic sur chacune des touches modificatrices
-			for (let toucheModificatrice of [
+			for (let modifierKey of [
 				toucheLAlt,
 				toucheRAlt,
 				toucheLShift,
@@ -614,11 +561,11 @@ export class Keyboard {
 				toucheCirconflexe,
 				toucheTrema
 			]) {
-				if (toucheModificatrice !== null) {
-					toucheModificatrice.addEventListener(
+				if (modifierKey !== null) {
+					modifierKey.addEventListener(
 						'click',
 						() => {
-							this.changerCouche(toucheModificatrice);
+							this.layerSwitch(modifierKey);
 						},
 						{ passive: true }
 					);
@@ -629,12 +576,12 @@ export class Keyboard {
 		}
 	}
 
-	taperTexte(texte, vitesse, disparition_anciennes_touches) {
+	typeText(texte, vitesse, disparition_anciennes_touches) {
 		try {
-			const emplacementClavier = this.getEmplacementClavier();
+			const keyboardLocation = this.getKeyboardLocation();
 
 			// Nettoyage des touches actives
-			const touchesActives = emplacementClavier.querySelectorAll('.touche-active');
+			const touchesActives = keyboardLocation.querySelectorAll('.touche-active');
 			[].forEach.call(touchesActives, function (el) {
 				el.classList.remove('touche-active');
 			});
@@ -642,13 +589,13 @@ export class Keyboard {
 			// let texte = 'test';
 			function writeNext(texte, i) {
 				let nouvelleLettre = texte.charAt(i);
-				emplacementClavier
+				keyboardLocation
 					.querySelector("bloc-touche[data-touche='" + nouvelleLettre + "']")
 					.classList.add('touche-active');
 
 				if (disparition_anciennes_touches) {
 					if (i === texte.length) {
-						emplacementClavier
+						keyboardLocation
 							.querySelector("bloc-touche[data-touche='" + texte.charAt(i - 1) + "']")
 							.classList.remove('touche-active');
 						return;
@@ -656,7 +603,7 @@ export class Keyboard {
 
 					if (i !== 0) {
 						let ancienneLettre = texte.charAt(i - 1);
-						emplacementClavier
+						keyboardLocation
 							.querySelector("bloc-touche[data-touche='" + ancienneLettre + "']")
 							.classList.remove('touche-active');
 					}
