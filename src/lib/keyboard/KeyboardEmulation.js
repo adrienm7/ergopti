@@ -15,7 +15,7 @@ export class KeyboardEmulation extends Keyboard {
 		this.R = false;
 		this.a_grave = false;
 		this.virgule = false;
-		this.couche = 'Primary'; // Couche par défaut
+		this.layer = 'Primary'; // Couche par défaut
 		// La portée de this est modifiée dans le textinput sinon et this.data_disposition est undefined
 		this.KeyboardEmulation = this.KeyboardEmulation.bind(this);
 		this.relacherModificateurs = this.relacherModificateurs.bind(this);
@@ -67,36 +67,36 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	setCouche() {
-		// Déterminer la valeur de `couche`
+		// Déterminer la valeur de `layer`
 		if (this.altgr && this.shift) {
-			this.couche = 'ShiftAltGr';
+			this.layer = 'ShiftAltGr';
 		} else if (this.altgr) {
-			this.couche = 'AltGr';
+			this.layer = 'AltGr';
 		} else if (this.shift) {
-			this.couche = 'Shift';
+			this.layer = 'Shift';
 		} else if (this.control) {
-			this.couche = 'Ctrl';
+			this.layer = 'Ctrl';
 		} else if (this.circonflexe) {
-			this.couche = '^';
+			this.layer = '^';
 		} else if (this.trema) {
-			this.couche = 'trema';
+			this.layer = 'trema';
 		} else if (this.e) {
-			this.couche = 'e';
+			this.layer = 'e';
 		} else if (this.i) {
-			this.couche = 'i';
+			this.layer = 'i';
 		} else if (this.R) {
-			this.couche = 'R';
+			this.layer = 'R';
 		} else if (this.a_grave) {
-			this.couche = 'À';
+			this.layer = 'À';
 		} else if (this.virgule) {
-			this.couche = ',';
+			this.layer = ',';
 		} else {
-			this.couche = 'Primary';
+			this.layer = 'Primary';
 		}
 
 		// Mettre à jour le store
 		this.data_clavier.update((currentData) => {
-			currentData['couche'] = this.couche;
+			currentData['layer'] = this.layer;
 			return currentData;
 		});
 		this.majClavier();
@@ -201,7 +201,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					// On supprime le à avant de taper le raccourci de la couche À
+					// On supprime le à avant de taper le raccourci de la layer À
 					this.textarea.value = this.textarea.value.slice(0, -1);
 					touche = toucheClavier['À'];
 				}
@@ -211,7 +211,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					// On supprime le , avant de taper le raccourci de la couche Virgule
+					// On supprime le , avant de taper le raccourci de la layer Virgule
 					this.textarea.value = this.textarea.value.slice(0, -1);
 					touche = toucheClavier[','];
 				}
@@ -243,13 +243,13 @@ export class KeyboardEmulation extends Keyboard {
 
 		let touche = '';
 		if (this.infos_clavier['plus'] === 'oui') {
-			if (toucheClavier[this.couche + '+'] !== undefined) {
-				touche = toucheClavier[this.couche + '+'];
+			if (toucheClavier[this.layer + '+'] !== undefined) {
+				touche = toucheClavier[this.layer + '+'];
 			} else {
-				touche = toucheClavier[this.couche];
+				touche = toucheClavier[this.layer];
 			}
 		} else {
-			touche = toucheClavier[this.couche];
+			touche = toucheClavier[this.layer];
 		}
 
 		touche = touche.replace(/<espace-insecable><\/espace-insecable>/g, ' ');

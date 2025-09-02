@@ -157,20 +157,20 @@ bloc-clavier[data-type='ergodox'] bloc-ligne[data-ligne='6'] {
 =============================
 */
 
-bloc-clavier[data-couche='Visuel'] bloc-touche[data-type='lettre'] div,
-bloc-clavier[data-couche='Visuel'] bloc-touche[data-type='français'] div {
+bloc-clavier[data-layer='Visuel'] bloc-touche[data-type='lettre'] div,
+bloc-clavier[data-layer='Visuel'] bloc-touche[data-type='français'] div {
 	text-transform: uppercase;
 }
 
-bloc-clavier[data-couche='Visuel'] bloc-touche[data-type='ponctuation'] div {
+bloc-clavier[data-layer='Visuel'] bloc-touche[data-type='ponctuation'] div {
 	font-size: calc(var(--key-text-size) * 0.7);
 	font-weight: bolder;
 	line-height: 1;
 }
 
 /* Cas particulier de la touche Q qui fait Qu */
-bloc-clavier[data-couche='Visuel'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-couche='Shift'][data-plus='oui'] bloc-touche[data-touche='q'] div {
+bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-touche='q'] div,
+bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-touche='q'] div {
 	text-transform: capitalize;
 }
 
@@ -180,12 +180,12 @@ bloc-clavier[data-couche='Shift'][data-plus='oui'] bloc-touche[data-touche='q'] 
 ===========================
 */
 
-bloc-clavier[data-couche='Ctrl'] bloc-touche div {
+bloc-clavier[data-layer='Ctrl'] bloc-touche div {
 	text-transform: uppercase;
 }
 
 /* Ne pas mettre en uppercase les noms des modificateurs */
-bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='special'] div {
+bloc-clavier[data-layer='Ctrl'] bloc-touche[data-type='special'] div {
 	text-transform: none;
 }
 
@@ -197,25 +197,25 @@ bloc-clavier[data-couche='Ctrl'] bloc-touche[data-type='special'] div {
 
 /* Style de toutes les touches qui changent avec Ergopti+ */
 bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui']:not([data-touche='Space']),
-bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='Space'],
-bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='Space'] {
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='Space'],
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='Space'] {
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
 }
 
 /* Hold-tap */
-bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='Space'] div,
-bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='LCtrl'] div,
-bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='LCtrl'] div,
-bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='LAlt'] div,
-bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='LAlt'] div,
-bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='RAlt'] div,
-bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='RAlt'] div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-couche='Visuel']
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='Space'] div,
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='LCtrl'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='LCtrl'] div,
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='LAlt'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='LAlt'] div,
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='RAlt'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='RAlt'] div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
 	bloc-touche[data-touche='Tab']
 	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-couche='Primary']
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
 	bloc-touche[data-touche='Tab']
 	div,
 bloc-clavier[data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
@@ -223,8 +223,8 @@ bloc-clavier[data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
 	line-height: 1.2;
 }
 
-bloc-clavier[data-plus='oui'][data-couche='Visuel'] bloc-touche[data-touche='LShift'] div,
-bloc-clavier[data-plus='oui'][data-couche='Primary'] bloc-touche[data-touche='LShift'] div {
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='LShift'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='LShift'] div {
 	font-size: calc(var(--key-text-size) * 0.8);
 	line-height: 1.05;
 }
@@ -280,23 +280,23 @@ bloc-touche[data-touche='Delete'] div {
 }
 
 /* Pas de taille trop grande pour la police des touches [qu] et [où] */
-bloc-clavier[data-couche='Primary'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-couche='AltGr'][data-plus='oui'] bloc-touche[data-touche='w'] div {
+bloc-clavier[data-layer='Primary'][data-plus='oui'] bloc-touche[data-touche='q'] div,
+bloc-clavier[data-layer='AltGr'][data-plus='oui'] bloc-touche[data-touche='w'] div {
 	font-size: 0.9em;
 }
-bloc-clavier[data-couche='Visuel'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-couche='Shift'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-couche='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche='w'] div {
+bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-touche='q'] div,
+bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-touche='q'] div,
+bloc-clavier[data-layer='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche='w'] div {
 	font-size: 0.85em;
 }
 
 /* Taille plus petite pour la légende Win+V */
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Coller'] div {
+bloc-clavier[data-layer='Layer'] bloc-touche[data-touche='Coller'] div {
 	font-size: 0.85em;
 }
 
 /* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */
-bloc-clavier[data-couche='Layer']
+bloc-clavier[data-layer='Layer']
 	bloc-touche:not([data-doigt='pouce']):not([data-type='special'])
 	div {
 	font-size: 0.8em;
@@ -306,13 +306,13 @@ bloc-clavier[data-plus='non'] bloc-touche[data-touche='CapsLock'] div {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
 
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Copier'] div,
-bloc-clavier[data-couche='Layer'] bloc-touche[data-touche='Couper'] div {
+bloc-clavier[data-layer='Layer'] bloc-touche[data-touche='Copier'] div,
+bloc-clavier[data-layer='Layer'] bloc-touche[data-touche='Couper'] div {
 	font-size: var(--key-text-size);
 }
 
 /* Layer À, pour éviter que les touches avec 4 symboles débordent */
-bloc-clavier[data-couche='À'] bloc-touche:not([data-type='special']) div {
+bloc-clavier[data-layer='À'] bloc-touche:not([data-type='special']) div {
 	font-size: 0.7em;
 }
 
