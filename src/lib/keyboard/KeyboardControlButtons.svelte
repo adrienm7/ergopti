@@ -26,7 +26,7 @@
 			currentData['type'] = event.detail.type;
 			currentData['couleur'] = event.detail.couleur;
 			currentData['plus'] = event.detail.plus;
-			currentData['couche'] = event.detail.couche;
+			currentData['layer'] = event.detail.layer;
 			return currentData;
 		});
 		clavier.majClavier();
@@ -36,28 +36,28 @@
 <controles-clavier id={'controles_' + nom}>
 	<ChangementType
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
+		coucheValue={infos_clavier.layer}
 		typeValue={infos_clavier.type}
 		couleurValue={infos_clavier.couleur}
 		plusValue={infos_clavier.plus}
 	/>
 	<ChangementPlus
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
+		coucheValue={infos_clavier.layer}
 		typeValue={infos_clavier.type}
 		couleurValue={infos_clavier.couleur}
 		plusValue={infos_clavier.plus}
 	/>
 	<ChangementCouleur
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
+		coucheValue={infos_clavier.layer}
 		typeValue={infos_clavier.type}
 		couleurValue={infos_clavier.couleur}
 		plusValue={infos_clavier.plus}
 	/>
 	<ChangementCouche
 		on:message={handleMessage}
-		coucheValue={infos_clavier.couche}
+		coucheValue={infos_clavier.layer}
 		typeValue={infos_clavier.type}
 		couleurValue={infos_clavier.couleur}
 		plusValue={infos_clavier.plus}

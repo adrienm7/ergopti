@@ -19,7 +19,7 @@
 		}
 		dispatch('message', {
 			type: typeValue,
-			couche: coucheValue,
+			layer: coucheValue,
 			couleur: couleurValue,
 			plus: plusValue
 		});
