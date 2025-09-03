@@ -197,8 +197,10 @@ bloc-clavier[data-layer='Ctrl'] bloc-touche[data-type='special'] div {
 
 /* Style de toutes les touches qui changent avec Ergopti+ */
 bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui']:not([data-touche='Space']),
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='Space'],
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='Space'] {
+bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Visuel']
+	bloc-touche[data-touche='Space'],
+bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Primary']
+	bloc-touche[data-touche='Space'] {
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
