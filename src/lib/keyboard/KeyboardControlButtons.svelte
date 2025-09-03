@@ -9,10 +9,10 @@
 	import ChangementCouche from '$lib/keyboard/controles/ChangementCouche.svelte';
 
 	export let nom;
-	let infos_clavier;
+	let keyboardInformation;
 	let clavier = new Keyboard(nom);
 	clavier.data_clavier.subscribe((value) => {
-		infos_clavier = value;
+		keyboardInformation = value;
 	});
 	onMount(() => {
 		clavier.majClavier();
@@ -36,30 +36,30 @@
 <controles-clavier id={'controles_' + nom}>
 	<ChangementType
 		on:message={handleMessage}
-		coucheValue={infos_clavier.layer}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={keyboardInformation.layer}
+		typeValue={keyboardInformation.type}
+		couleurValue={keyboardInformation.couleur}
+		plusValue={keyboardInformation.plus}
 	/>
 	<ChangementPlus
 		on:message={handleMessage}
-		coucheValue={infos_clavier.layer}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={keyboardInformation.layer}
+		typeValue={keyboardInformation.type}
+		couleurValue={keyboardInformation.couleur}
+		plusValue={keyboardInformation.plus}
 	/>
 	<ChangementCouleur
 		on:message={handleMessage}
-		coucheValue={infos_clavier.layer}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={keyboardInformation.layer}
+		typeValue={keyboardInformation.type}
+		couleurValue={keyboardInformation.couleur}
+		plusValue={keyboardInformation.plus}
 	/>
 	<ChangementCouche
 		on:message={handleMessage}
-		coucheValue={infos_clavier.layer}
-		typeValue={infos_clavier.type}
-		couleurValue={infos_clavier.couleur}
-		plusValue={infos_clavier.plus}
+		coucheValue={keyboardInformation.layer}
+		typeValue={keyboardInformation.type}
+		couleurValue={keyboardInformation.couleur}
+		plusValue={keyboardInformation.plus}
 	/>
 </controles-clavier>

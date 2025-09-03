@@ -138,10 +138,12 @@
 
 <bloc-clavier-reference>
 	<button id="afficher-clavier-reference" on:click={toggleZIndex}>
-		<i class="icon-keyboard-duotone" style="display:{affiche === 'none' ? 'block' : 'none'}"
+		<i
+			class="icon-keyboard-duotone"
+			style="width:100%; display:{affiche === 'none' ? 'block' : 'none'}"
 			><span class="path1"></span><span class="path2"></span></i
 		>
-		<i class="icon-square-xmark" style="display:{affiche}"
+		<i class="icon-square-xmark" style="width:100%; display:{affiche}"
 			><span class="path1"></span><span class="path2"></span></i
 		>
 	</button>
