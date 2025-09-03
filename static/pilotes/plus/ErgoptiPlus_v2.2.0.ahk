@@ -1532,7 +1532,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
         }
     }
 
-    if (Selection != "") {
+    if (Selection != "" and Selection != "`n`n") {
         ; Send all the text instantly and without triggering hotstrings while typing it
         SendInstant(LeftSymbol Selection RightSymbol)
     } else {
