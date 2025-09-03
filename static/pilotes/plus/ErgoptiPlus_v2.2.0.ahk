@@ -1532,6 +1532,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
         }
     }
 
+	; Selection != "`n`n" to fix a bug in Google Sheet
     if (Selection != "" and Selection != "`n`n") {
         ; Send all the text instantly and without triggering hotstrings while typing it
         SendInstant(LeftSymbol Selection RightSymbol)
