@@ -137,6 +137,7 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
             SendFinalResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
         SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        Sleep(30) ; Necessary for it to work in the Notepad
         SendFinalResult(Replacement, Map("OnlyText", OnlyText))
         SendFinalResult(EndChar)
     } else {
@@ -144,6 +145,7 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
             SendNewResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
         SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        Sleep(30) ; Necessary for it to work in the Notepad
         SendNewResult(Replacement, Map("OnlyText", OnlyText))
         SendNewResult(EndChar, Map("OnlyText", False))
     }
@@ -3494,8 +3496,8 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 ; The base layer will become this one when the navigation layer variable is set to True
 
 SC039:: ActionLayer("{Escape}")
-WheelUp:: ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
-WheelDown:: ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
+*WheelUp:: ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
+*WheelDown:: ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
 
 SC01D & ~SC138:: ; RAlt
 RAlt:: ; RAlt on QWERTY
@@ -3732,6 +3734,11 @@ if Features["DistancesReduction"]["CommaJ"].Enabled {
     )
     CreateCaseSensitiveHotstrings(
         "*?", ",'", "j’",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    ; To fix a problem of "J’" for ,'
+    CreateHotstring(
+        "*?C", ",'", "j’",
         Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
     )
 }
@@ -4317,6 +4324,9 @@ if Features["Autocorrection"]["Minus"].Enabled {
     CreateCaseSensitiveHotstrings("", "distu", "dis-tu")
     CreateCaseSensitiveHotstrings("", "diton", "dit-on")
     CreateCaseSensitiveHotstrings("", "doisje", "dois-je")
+    CreateCaseSensitiveHotstrings("", "doitelle", "doit-elle")
+    CreateCaseSensitiveHotstrings("", "doitil", "doit-il")
+    CreateCaseSensitiveHotstrings("", "doiton", "doit-on")
     CreateCaseSensitiveHotstrings("", "estu", "es-tu")
     ; CreateCaseSensitiveHotstrings("", "estelle", "est-elle") ; Conflict with the name Estelle
     CreateCaseSensitiveHotstrings("", "estil", "est-il")
@@ -4338,6 +4348,7 @@ if Features["Autocorrection"]["Minus"].Enabled {
     CreateCaseSensitiveHotstrings("", "veuxtu", "veux-tu")
     CreateCaseSensitiveHotstrings("", "yatil", "y a-t-il")
 
+    CreateCaseSensitiveHotstrings("*?", "vonsn", "vons-n")
     CreateCaseSensitiveHotstrings("*?", "vezv", "vez-v")
 }
 
