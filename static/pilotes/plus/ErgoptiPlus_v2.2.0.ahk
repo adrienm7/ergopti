@@ -1543,9 +1543,9 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
     }
     
     ; The regex is to not trigger the wrapping if there are only blank lines
-    ; Fix a bug in Google Sheet where we cannot type - in a selected cell
+    ; Fix a bug in Google Sheets where we cannot type - in a selected cell
     RegEx := "^(\r\n|\r|\n|" Symbol ")+$"
-    If RegExMatch(Symbol, "^(\.|\^|\$|\*|\+|\-|\?|\(|\)|\[|\]|\{|\}|\\)+$") {
+    If RegExMatch(Symbol, "^[\.\^\$\*\+\-\?\(\)\[\]\{\}\\]+$") {
         RegEx := "^(\r\n|\r|\n|\" Symbol ")+$"
     }
     
