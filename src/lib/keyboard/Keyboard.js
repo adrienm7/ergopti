@@ -51,7 +51,7 @@ export class Keyboard {
 		// if (this.data_disposition === undefined) {
 		// 	this.data_disposition = getKeyboardData(this.version);
 		// }
-		this.KeysUpdate();
+		this.keysUpdate();
 		this.currentLayerModifiersKeyPress();
 
 		try {
@@ -65,7 +65,7 @@ export class Keyboard {
 		}
 	}
 
-	KeysUpdate() {
+	keysUpdate() {
 		if (this.data_disposition === undefined) {
 			return;
 		}

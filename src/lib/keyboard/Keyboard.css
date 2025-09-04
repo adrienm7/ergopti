@@ -111,7 +111,7 @@ bloc-touche {
 
 bloc-touche:active,
 bloc-touche:hover,
-.touche-active {
+.pressed-key {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 	box-shadow:
 		0 var(--key-pressed-depth) 0 var(--effet-3d),
@@ -400,9 +400,9 @@ bloc-touche[data-type='enter']::after {
 bloc-touche[data-type='enter']:hover,
 bloc-touche[data-type='enter']:hover::before,
 bloc-touche[data-type='enter']:hover::after,
-bloc-touche[data-type='enter'].touche-active,
-bloc-touche[data-type='enter'].touche-active::before,
-bloc-touche[data-type='enter'].touche-active::after {
+bloc-touche[data-type='enter'].pressed-key,
+bloc-touche[data-type='enter'].pressed-key::before,
+bloc-touche[data-type='enter'].pressed-key::after {
 	background-color: rgb(210, 210, 210) !important;
 	box-shadow: none;
 	color: #333;
