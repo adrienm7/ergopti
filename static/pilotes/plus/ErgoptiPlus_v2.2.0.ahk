@@ -1541,7 +1541,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
             }
         }
     }
-
+    
     ; The regex is to not trigger the wrapping if there are only blank lines
     if (Selection != "" and RegExMatch(Selection, "^(\r\n|\r|\n)+$") = 0) {
         if RegExMatch(Selection, "^(" Symbol ")+$") {
