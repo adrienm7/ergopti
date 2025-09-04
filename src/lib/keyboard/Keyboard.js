@@ -28,7 +28,7 @@ export class Keyboard {
 
 		// S'abonner au store pour récupérer les données du clavier mises à jour en temps réel
 		this.data_clavier.subscribe((value) => {
-			this.infos_clavier = value;
+			this.keyboardInformation = value;
 		});
 	}
 
@@ -51,25 +51,21 @@ export class Keyboard {
 		// if (this.data_disposition === undefined) {
 		// 	this.data_disposition = getKeyboardData(this.version);
 		// }
-		this.majTouches();
-		this.modifiersActivationOfCurrentLayer();
+		this.keysUpdate();
+		this.currentLayerModifiersKeyPress();
 
 		try {
 			const keyboardLocation = this.getKeyboardLocation();
-			keyboardLocation.dataset['type'] = this.infos_clavier.type;
-			keyboardLocation.dataset['layer'] = this.infos_clavier.layer;
-			keyboardLocation.dataset['plus'] = this.infos_clavier.plus;
-			keyboardLocation.dataset['couleur'] = this.infos_clavier.couleur;
+			keyboardLocation.dataset['type'] = this.keyboardInformation.type;
+			keyboardLocation.dataset['layer'] = this.keyboardInformation.layer;
+			keyboardLocation.dataset['plus'] = this.keyboardInformation.plus;
+			keyboardLocation.dataset['couleur'] = this.keyboardInformation.couleur;
 		} catch (error) {
 			return;
 		}
-
-		if (this.infos_clavier.controles === 'oui') {
-			this.layerSwitchAddButtons(this.id, this.infos_clavier);
-		}
 	}
 
-	majTouches() {
+	keysUpdate() {
 		if (this.data_disposition === undefined) {
 			return;
 		}
@@ -78,7 +74,7 @@ export class Keyboard {
 			for (let ligne = 1; ligne <= 7; ligne++) {
 				for (let j = 0; j <= 15; j++) {
 					// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
-					const res = this.data_disposition[this.infos_clavier.type].find(
+					const res = this.data_disposition[this.keyboardInformation.type].find(
 						(el) => el['ligne'] == ligne && el['colonne'] == j
 					);
 
@@ -86,9 +82,9 @@ export class Keyboard {
 
 					// Interversion de É et de ★ sur les claviers ISO
 					// if (res !== undefined) {
-					// 	if ((this.infos_clavier.type === 'iso') && (this.infos_clavier.plus === 'oui') && (res.touche === 'é')) {
+					// 	if ((this.keyboardInformation.type === 'iso') && (this.keyboardInformation.plus === 'oui') && (res.touche === 'é')) {
 					// 		colonne = j + 1;
-					// 	} else if ((this.infos_clavier.type === 'iso') && (this.infos_clavier.plus === 'oui') && (res.touche === 'magique')) {
+					// 	} else if ((this.keyboardInformation.type === 'iso') && (this.keyboardInformation.plus === 'oui') && (res.touche === 'magique')) {
 					// 		colonne = j - 1;
 					// 	}
 					// }
@@ -111,7 +107,7 @@ export class Keyboard {
 					// Suppression du contenu de la touche
 					toucheClavier.dataset['touche'] = '';
 					toucheClavier.dataset['plus'] = 'non';
-					toucheClavier.classList.remove('touche-active'); // Suppression de la classe css pour les touches pressées
+					toucheClavier.classList.remove('pressed-key'); // Suppression de la classe css pour les touches pressées
 
 					if (res !== undefined) {
 						const contenuTouche = this.data_disposition.touches.find(
@@ -119,13 +115,13 @@ export class Keyboard {
 						);
 
 						if (
-							this.infos_clavier.layer !== 'Visuel' &&
-							(contenuTouche[this.infos_clavier.layer] === '' ||
-								contenuTouche[this.infos_clavier.layer] === undefined)
+							this.keyboardInformation.layer !== 'Visuel' &&
+							(contenuTouche[this.keyboardInformation.layer] === '' ||
+								contenuTouche[this.keyboardInformation.layer] === undefined)
 						) {
 							toucheClavier.innerHTML = '<div><div>'; /* Touche vide ou undefined dans le json */
 						} else {
-							if (this.infos_clavier.layer === 'Visuel') {
+							if (this.keyboardInformation.layer === 'Visuel') {
 								if (contenuTouche['type'] === 'ponctuation') {
 									if (res['touche'] === '"') {
 										// Cas particulier de la touche « " »
@@ -150,7 +146,7 @@ export class Keyboard {
 									}
 								} else {
 									// Cas où la touche n’est pas double
-									if (this.infos_clavier.plus === 'oui') {
+									if (this.keyboardInformation.plus === 'oui') {
 										// Cas où la touche n’est pas double et + est activé
 										if (contenuTouche['Primary' + '+'] !== undefined && ligne < 6) {
 											// Si la layer + existe ET n’est pas en thumb cluster
@@ -165,55 +161,55 @@ export class Keyboard {
 								}
 							} else {
 								// Toutes les couches autres que "Visuel"
-								if (this.infos_clavier.plus === 'oui') {
+								if (this.keyboardInformation.plus === 'oui') {
 									if (
-										contenuTouche[this.infos_clavier.layer + '+'] !== undefined &&
+										contenuTouche[this.keyboardInformation.layer + '+'] !== undefined &&
 										(ligne < 6 || res.touche === 'Space')
 									) {
 										// Si la layer + existe et n’est pas en thumb cluster. Sur le thumb cluster, on affiche seulement le tap hold en space et pas en Alt ou Ctrl
 										toucheClavier.innerHTML =
-											'<div>' + contenuTouche[this.infos_clavier.layer + '+'] + '</div>';
+											'<div>' + contenuTouche[this.keyboardInformation.layer + '+'] + '</div>';
 										toucheClavier.dataset.plus = 'oui';
 									} else {
 										toucheClavier.innerHTML =
-											'<div>' + contenuTouche[this.infos_clavier.layer] + '</div>';
+											'<div>' + contenuTouche[this.keyboardInformation.layer] + '</div>';
 									}
 								} else {
 									toucheClavier.innerHTML =
-										'<div>' + contenuTouche[this.infos_clavier.layer] + '</div>';
+										'<div>' + contenuTouche[this.keyboardInformation.layer] + '</div>';
 								}
 							}
 						}
 
+						if (this.keyboardInformation.controles === 'oui') {
+							// Functionality to switch layer by clicking on a key
+							toucheClavier.addEventListener(
+								'click',
+								() => {
+									this.layerSwitch(toucheClavier);
+								},
+								{ passive: true }
+							);
+						}
+
 						// Corrections localisées sur la barre d’espace
 						if (
-							this.infos_clavier.type === 'ergodox' &&
+							this.keyboardInformation.type === 'ergodox' &&
 							res.touche === 'Space' &&
-							['Visuel', 'Primary'].includes(this.infos_clavier.layer)
+							['Visuel', 'Primary'].includes(this.keyboardInformation.layer)
 						) {
 							toucheClavier.innerHTML = '<div>␣</div>';
 						}
 						if (
-							this.infos_clavier.type === 'iso' &&
+							this.keyboardInformation.type === 'iso' &&
 							res.touche === 'Space' &&
-							this.infos_clavier.layer === 'Visuel' &&
-							this.infos_clavier.plus === 'non'
+							this.keyboardInformation.layer === 'Visuel' &&
+							this.keyboardInformation.plus === 'non'
 						) {
 							toucheClavier.innerHTML = '<div>' + this.data_disposition.nom + '</div>';
 						}
-						if (
-							this.infos_clavier.type === 'iso' &&
-							res.touche === 'Space' &&
-							this.infos_clavier.layer === 'Visuel' &&
-							this.infos_clavier.plus === 'oui'
-						) {
-							toucheClavier.innerHTML =
-								"<div>Layer de navigation<br><span class='tap'>Ergopti v." +
-								this.version +
-								'</span></div>';
-						}
 
-						// On ajoute des this.infos_clavier dans les data attributes de la touche
+						// On ajoute des this.keyboardInformation dans les data attributes de la touche
 						toucheClavier.dataset['touche'] = res['touche'];
 						toucheClavier.dataset['colonne'] = colonne;
 						toucheClavier.dataset['doigt'] = res['doigt'];
@@ -221,31 +217,32 @@ export class Keyboard {
 						toucheClavier.dataset['type'] = contenuTouche['type'];
 						toucheClavier.dataset['style'] = '';
 						if (
-							this.infos_clavier.layer === 'Visuel' &&
+							this.keyboardInformation.layer === 'Visuel' &&
 							contenuTouche['Primary' + '-style'] !== undefined &&
 							contenuTouche['Primary' + '-style'] !== ''
 						) {
 							toucheClavier.dataset['style'] = contenuTouche['Primary' + '-style'];
 						} else {
 							if (
-								this.infos_clavier.plus === 'oui' &&
-								contenuTouche[this.infos_clavier.layer + '+' + '-style'] !== undefined &&
-								contenuTouche[this.infos_clavier.layer + '+' + '-style'] !== ''
+								this.keyboardInformation.plus === 'oui' &&
+								contenuTouche[this.keyboardInformation.layer + '+' + '-style'] !== undefined &&
+								contenuTouche[this.keyboardInformation.layer + '+' + '-style'] !== ''
 							) {
 								toucheClavier.dataset['style'] =
-									contenuTouche[this.infos_clavier.layer + '+' + '-style'];
+									contenuTouche[this.keyboardInformation.layer + '+' + '-style'];
 							} else if (
-								contenuTouche[this.infos_clavier.layer + '-style'] !== undefined &&
-								contenuTouche[this.infos_clavier.layer + '-style'] !== ''
+								contenuTouche[this.keyboardInformation.layer + '-style'] !== undefined &&
+								contenuTouche[this.keyboardInformation.layer + '-style'] !== ''
 							) {
-								toucheClavier.dataset['style'] = contenuTouche[this.infos_clavier.layer + '-style'];
+								toucheClavier.dataset['style'] =
+									contenuTouche[this.keyboardInformation.layer + '-style'];
 							}
 						}
 						toucheClavier.style.setProperty('--taille', res['taille']);
-						let frequence = characterFrequencies[contenuTouche[this.infos_clavier.layer]];
+						let frequence = characterFrequencies[contenuTouche[this.keyboardInformation.layer]];
 						toucheClavier.style.setProperty('--frequence', frequence);
 						let frequence_normalisee =
-							(characterFrequencies[contenuTouche[this.infos_clavier.layer]] -
+							(characterFrequencies[contenuTouche[this.keyboardInformation.layer]] -
 								characterFrequencies['min']) /
 							(characterFrequencies['max'] - characterFrequencies['min']); // Entre 0 et 1 avec 1 pour la lettre la plus fréquente
 						toucheClavier.style.setProperty(
@@ -260,101 +257,20 @@ export class Keyboard {
 		}
 	}
 
-	modifiersActivationOfCurrentLayer() {
-		try {
-			// Utility function to activate a key if it exists
-			function activate(key) {
-				if (keys[key] !== null) {
-					keys[key].classList.add('touche-active');
-				}
-			}
-
-			const keyboardLocation = this.getKeyboardLocation();
-			const { layer, plus, type } = this.infos_clavier;
-
-			const keys = {
-				LShift: keyboardLocation.querySelector("[data-touche='LShift']"),
-				RShift: keyboardLocation.querySelector("[data-touche='RShift']"),
-				LCtrl: keyboardLocation.querySelector("[data-touche='LCtrl']"),
-				RCtrl: keyboardLocation.querySelector("[data-touche='RCtrl']"),
-				LAlt: keyboardLocation.querySelector("[data-touche='LAlt']"),
-				RAlt: keyboardLocation.querySelector("[data-touche='RAlt']"),
-				CapsLock: keyboardLocation.querySelector("[data-touche='CapsLock']"),
-				Space: keyboardLocation.querySelector("[data-touche='Space']"),
-				AGrave: keyboardLocation.querySelector("[data-touche='à']"),
-				Comma: keyboardLocation.querySelector("[data-touche=',']")
-			};
-
-			// Mapping of keys to activate for each layer
-			const layerMap = {
-				Shift: ['LShift', 'RShift'],
-				Ctrl: ['LCtrl'], // RCtrl is a special case
-				AltGr: ['RAlt'],
-				ShiftAltGr: ['LShift', 'RShift', 'RAlt'],
-				CirconflexeShift: ['LShift', 'RShift'],
-				TremaShift: ['LShift', 'RShift'],
-				GreekShift: ['LShift', 'RShift']
-			};
-
-			// Activate keys for the current layer
-			const keysToActivate = layerMap[layer];
-			if (keysToActivate !== undefined) {
-				for (const key of keysToActivate) {
-					activate(key);
-				}
-			}
-
-			// Special cases
-			if (layer === 'Shift' && plus === 'oui' && type === 'iso') {
-				activate('RCtrl');
-			}
-
-			if (layer === 'Ctrl') {
-				if (plus === 'non') {
-					activate('RCtrl');
-				}
-				if (plus === 'oui') {
-					activate('CapsLock');
-				}
-			}
-
-			if (layer === 'Layer') {
-				if (type === 'iso') {
-					activate('LAlt');
-				}
-				if (type === 'ergodox') {
-					activate('Space');
-				}
-			}
-
-			if (
-				plus === 'oui' &&
-				['ShiftAltGr', 'CirconflexeShift', 'TremaShift', 'GreekShift'].includes(layer)
-			) {
-				activate('RCtrl');
-			}
-		} catch (error) {
-			return;
-		}
-	}
-
-	layerSwitch(modifierKey) {
-		let pressedKey = modifierKey.dataset.touche;
-		let currentLayer = this.infos_clavier.layer;
+	layerSwitch(pressedKey) {
+		let pressedKeyName = pressedKey.dataset.touche;
+		const currentLayer = this.keyboardInformation.layer;
+		const plus = this.keyboardInformation.plus === 'oui';
+		const type = this.keyboardInformation.type;
 		let newLayer = currentLayer;
 
-		let shiftPressed =
-			pressedKey === 'LShift' ||
-			pressedKey === 'RShift' ||
-			(pressedKey === 'RCtrl' && this.infos_clavier.plus === 'oui');
-
-		if (shiftPressed) {
-			pressedKey = 'Shift';
-		}
-
-		// Ctrl becomes Shift in Ergopti+
-		if (pressedKey === 'RCtrl' && this.infos_clavier.plus === 'oui') {
-			pressedKey = 'Shift';
+		if (
+			pressedKeyName === 'LShift' ||
+			pressedKeyName === 'RShift' ||
+			// RCtrl becomes Shift in Ergopti+
+			(pressedKeyName === 'RCtrl' && plus)
+		) {
+			pressedKeyName = 'Shift';
 		}
 
 		const mappings = {
@@ -390,163 +306,175 @@ export class Keyboard {
 			}
 		};
 
-		if (pressedKey in mappings) {
-			const rules = mappings[pressedKey];
+		if (pressedKeyName in mappings) {
+			const rules = mappings[pressedKeyName];
 			if (rules) {
 				newLayer = rules[currentLayer] || rules.default;
 			}
 		}
 
-		// Touche pressée = CapsLock
-		if (pressedKey === 'CapsLock' && this.infos_clavier.plus === 'oui' && currentLayer !== 'Ctrl') {
-			newLayer = 'Ctrl';
-		} else if (pressedKey === 'CapsLock' && this.infos_clavier.plus === 'oui') {
-			newLayer = 'Visuel';
+		// Dead Keys on direct access
+		if (['Visuel', 'Primary'].includes(currentLayer)) {
+			if (pressedKeyName === 'Circonflexe') {
+				newLayer = 'Circonflexe';
+			}
+
+			if (pressedKeyName === 'Trema') {
+				newLayer = 'Trema';
+			}
 		}
 
-		// Touche pressée = Space
-		if (
-			pressedKey === 'Space' &&
-			this.infos_clavier.type === 'ergodox' &&
-			this.infos_clavier.plus === 'oui' &&
-			['Visuel', 'Primary'].includes(currentLayer)
-		) {
-			newLayer = 'Layer';
-		} else if (
-			pressedKey === 'Space' &&
-			this.infos_clavier.type === 'ergodox' &&
-			this.infos_clavier.plus === 'oui'
-		) {
-			newLayer = 'Visuel';
+		// Dead Keys on Shift + AltGr
+		if (currentLayer === 'ShiftAltGr') {
+			if (pressedKeyName === 'e') {
+				newLayer = 'Exposant';
+			}
+
+			if (pressedKeyName === 'u') {
+				newLayer = 'Greek';
+			}
+
+			if (pressedKeyName === 't') {
+				newLayer = 'Trema';
+			}
+
+			if (pressedKeyName === 'r') {
+				newLayer = 'R';
+			}
+
+			if (pressedKeyName === 'ê') {
+				newLayer = 'Circonflexe';
+			}
+
+			if (pressedKeyName === 'à') {
+				newLayer = 'Indice';
+			}
 		}
 
-		// LAlt
-		if (
-			pressedKey === 'LAlt' &&
-			this.infos_clavier.type === 'iso' &&
-			this.infos_clavier.plus === 'oui' &&
-			['Visuel', 'Primary'].includes(currentLayer)
-		) {
-			newLayer = 'Layer';
-		} else if (
-			pressedKey === 'LAlt' &&
-			this.infos_clavier.type === 'iso' &&
-			this.infos_clavier.plus === 'oui'
-		) {
-			newLayer = 'Visuel';
+		if (plus) {
+			// Comma
+			if (pressedKeyName === ',') {
+				if (['Visuel', 'Primary', 'Shift'].includes(currentLayer)) {
+					newLayer = ',';
+				}
+			}
+
+			// À
+			if (pressedKeyName === 'à') {
+				if (['Visuel', 'Primary', 'Shift'].includes(currentLayer)) {
+					newLayer = 'À';
+				} else if (currentLayer === 'À') {
+					newLayer = 'Visuel';
+				}
+			}
+
+			// CapsLock
+			if (pressedKeyName === 'CapsLock') {
+				if (currentLayer !== 'Ctrl') {
+					newLayer = 'Ctrl';
+				} else {
+					newLayer = 'Visuel';
+				}
+			}
+
+			// Space
+			if (pressedKeyName === 'Space' && type === 'ergodox') {
+				if (['Visuel', 'Primary'].includes(currentLayer)) {
+					newLayer = 'Layer';
+				} else if (currentLayer === 'Layer') {
+					newLayer = 'Visuel';
+				}
+			}
+
+			// LAlt
+			if (pressedKeyName === 'LAlt' && type === 'iso') {
+				if (currentLayer === 'Layer') {
+					newLayer = 'Visuel';
+				} else {
+					newLayer = 'Layer';
+				}
+			}
 		}
 
-		// Touche pressée = À
-		if (
-			pressedKey === 'à' &&
-			['Visuel', 'Primary', 'Shift'].includes(currentLayer) &&
-			this.infos_clavier.plus === 'oui'
-		) {
-			newLayer = 'À';
+		// At this point, the new layer has been determined
+		// Most keys pressed won’t change the layer, as only some modifiers and deadkeys defined in this code do
+		// Then, the layer variable is updated, and finally the keyboard
+		if (newLayer !== currentLayer) {
+			this.data_clavier.update((currentData) => {
+				currentData['layer'] = newLayer;
+				return currentData;
+			});
+			this.majClavier();
 		}
-		if (pressedKey === 'à' && currentLayer === 'ShiftAltGr') {
-			newLayer = 'Indice';
-		}
-
-		// Touche pressée = E
-		if (pressedKey === 'e' && currentLayer === 'ShiftAltGr') {
-			newLayer = 'Exposant';
-		}
-
-		// Touche pressée = U
-		if (pressedKey === 'u' && currentLayer === 'ShiftAltGr') {
-			newLayer = 'Greek';
-		}
-
-		// Touche pressée = R
-		if (pressedKey === 'r' && currentLayer === 'ShiftAltGr') {
-			newLayer = 'R';
-		}
-
-		// Touche pressée = ,
-		if (
-			pressedKey === ',' &&
-			['Visuel', 'Primary', 'Shift'].includes(currentLayer) &&
-			this.infos_clavier.plus === 'oui'
-		) {
-			newLayer = ',';
-		}
-
-		// Touche pressée = Circonflexe
-		if (
-			(pressedKey === 'Circonflexe' && ['Visuel', 'Primary'].includes(currentLayer)) ||
-			(pressedKey === 'ê' && currentLayer === 'ShiftAltGr')
-		) {
-			newLayer = 'Circonflexe';
-		}
-
-		// Touche pressée = Trema
-		if (
-			(pressedKey === 'Trema' && ['Visuel', 'Primary'].includes(currentLayer)) ||
-			(pressedKey === 't' && currentLayer === 'ShiftAltGr')
-		) {
-			newLayer = 'Trema';
-		}
-
-		// Une fois que la nouvelle layer est déterminée, on actualise la valeur de la layer, puis le clavier
-		this.data_clavier.update((currentData) => {
-			currentData['layer'] = newLayer;
-			return currentData;
-		});
-		this.majClavier();
 	}
 
-	layerSwitchAddButtons() {
+	currentLayerModifiersKeyPress() {
 		try {
 			const keyboardLocation = this.getKeyboardLocation();
-			let toucheLAlt = keyboardLocation.querySelector("bloc-touche[data-touche='LAlt']");
-			let toucheRAlt = keyboardLocation.querySelector("bloc-touche[data-touche='RAlt']");
-			let toucheLShift = keyboardLocation.querySelector("bloc-touche[data-touche='LShift']");
-			let toucheRShift = keyboardLocation.querySelector("bloc-touche[data-touche='RShift']");
-			let toucheLCtrl = keyboardLocation.querySelector("bloc-touche[data-touche='LCtrl']");
-			let toucheRCtrl = keyboardLocation.querySelector("bloc-touche[data-touche='RCtrl']");
-			let toucheCapsLock = keyboardLocation.querySelector("bloc-touche[data-touche='CapsLock']");
-			let toucheA = keyboardLocation.querySelector("bloc-touche[data-touche='à']");
-			let toucheE = keyboardLocation.querySelector("bloc-touche[data-touche='e']");
-			let toucheECirc = keyboardLocation.querySelector("bloc-touche[data-touche='ê']");
-			let toucheR = keyboardLocation.querySelector("bloc-touche[data-touche='r']");
-			let toucheT = keyboardLocation.querySelector("bloc-touche[data-touche='t']");
-			let toucheU = keyboardLocation.querySelector("bloc-touche[data-touche='u']");
-			let toucheEspace = keyboardLocation.querySelector("bloc-touche[data-touche='Space']");
-			let toucheVirgule = keyboardLocation.querySelector("bloc-touche[data-touche=',']");
-			let toucheCirconflexe = keyboardLocation.querySelector(
-				"bloc-touche[data-touche='Circonflexe']"
-			);
-			let toucheTrema = keyboardLocation.querySelector("bloc-touche[data-touche='Trema']");
+			const layer = this.keyboardInformation.layer;
+			const plus = this.keyboardInformation.plus === 'oui';
+			const type = this.keyboardInformation.type;
 
-			// On ajoute une action au clic sur chacune des touches modificatrices
-			for (let modifierKey of [
-				toucheLAlt,
-				toucheRAlt,
-				toucheLShift,
-				toucheRShift,
-				toucheLCtrl,
-				toucheRCtrl,
-				toucheCapsLock,
-				toucheA,
-				toucheE,
-				toucheECirc,
-				toucheR,
-				toucheT,
-				toucheU,
-				toucheVirgule,
-				toucheEspace,
-				toucheCirconflexe,
-				toucheTrema
-			]) {
-				if (modifierKey !== null) {
-					modifierKey.addEventListener(
-						'click',
-						() => {
-							this.layerSwitch(modifierKey);
-						},
-						{ passive: true }
-					);
+			const keys = {
+				LShift: keyboardLocation.querySelector("[data-touche='LShift']"),
+				RShift: keyboardLocation.querySelector("[data-touche='RShift']"),
+				LCtrl: keyboardLocation.querySelector("[data-touche='LCtrl']"),
+				RCtrl: keyboardLocation.querySelector("[data-touche='RCtrl']"),
+				LAlt: keyboardLocation.querySelector("[data-touche='LAlt']"),
+				RAlt: keyboardLocation.querySelector("[data-touche='RAlt']"),
+				CapsLock: keyboardLocation.querySelector("[data-touche='CapsLock']"),
+				Space: keyboardLocation.querySelector("[data-touche='Space']")
+			};
+
+			// Utility function to activate a key if it exists
+			function activate(key) {
+				if (keys[key] !== null) {
+					keys[key].classList.add('pressed-key');
+				}
+			}
+
+			// Mapping of keys to activate for each layer
+			const layerMap = {
+				Shift: ['LShift', 'RShift'],
+				Ctrl: ['LCtrl'], // RCtrl is a special case
+				AltGr: ['RAlt'],
+				ShiftAltGr: ['LShift', 'RShift', 'RAlt'],
+				CirconflexeShift: ['LShift', 'RShift'],
+				TremaShift: ['LShift', 'RShift'],
+				GreekShift: ['LShift', 'RShift']
+			};
+
+			// Activate keys for the current layer
+			const keysToActivate = layerMap[layer];
+			if (keysToActivate !== undefined) {
+				for (const key of keysToActivate) {
+					activate(key);
+				}
+			}
+
+			// Special cases
+			if (
+				plus &&
+				type === 'iso' &&
+				['Shift', 'ShiftAltGr', 'CirconflexeShift', 'TremaShift', 'GreekShift'].includes(layer)
+			) {
+				activate('RCtrl');
+			}
+
+			if (layer === 'Ctrl') {
+				if (plus) {
+					activate('CapsLock');
+				} else {
+					activate('RCtrl');
+				}
+			}
+
+			if (layer === 'Layer') {
+				if (type === 'iso') {
+					activate('LAlt');
+				}
+				if (type === 'ergodox') {
+					activate('Space');
 				}
 			}
 		} catch (error) {
@@ -555,46 +483,41 @@ export class Keyboard {
 	}
 
 	typeText(text, speed, makePreviousKeysDisappear) {
-		try {
-			const keyboardLocation = this.getKeyboardLocation();
+		const keyboardLocation = this.getKeyboardLocation();
 
-			// Nettoyage des touches actives
-			const touchesActives = keyboardLocation.querySelectorAll('.touche-active');
-			[].forEach.call(touchesActives, function (el) {
-				el.classList.remove('touche-active');
-			});
+		// Clear previously pressed keys
+		const pressedKeys = keyboardLocation.querySelectorAll('.pressed-key');
+		pressedKeys.forEach(function (el) {
+			el.classList.remove('pressed-key');
+		});
 
-			// let text = 'test';
-			function writeNext(text, i) {
-				let nouvelleLettre = text.charAt(i);
-				keyboardLocation
-					.querySelector("bloc-touche[data-touche='" + nouvelleLettre + "']")
-					.classList.add('touche-active');
+		function writeNext(i) {
+			if (i >= text.length) return; // stop condition
 
-				if (makePreviousKeysDisappear) {
-					if (i === text.length) {
-						keyboardLocation
-							.querySelector("bloc-touche[data-touche='" + text.charAt(i - 1) + "']")
-							.classList.remove('touche-active');
-						return;
-					}
+			const nextLetter = text.charAt(i);
+			const nextKey = keyboardLocation.querySelector(
+				"bloc-touche[data-touche='" + nextLetter + "']"
+			);
 
-					if (i !== 0) {
-						let ancienneLettre = text.charAt(i - 1);
-						keyboardLocation
-							.querySelector("bloc-touche[data-touche='" + ancienneLettre + "']")
-							.classList.remove('touche-active');
-					}
-				}
-
-				setTimeout(function () {
-					writeNext(text, i + 1);
-				}, speed);
+			if (nextKey) {
+				nextKey.classList.add('pressed-key');
 			}
 
-			writeNext(text, 0);
-		} catch (error) {
-			return;
+			if (makePreviousKeysDisappear && i > 0) {
+				const previousLetter = text.charAt(i - 1);
+				const previousKey = keyboardLocation.querySelector(
+					"bloc-touche[data-touche='" + previousLetter + "']"
+				);
+				if (previousKey) {
+					previousKey.classList.remove('pressed-key');
+				}
+			}
+
+			setTimeout(function () {
+				writeNext(i + 1);
+			}, speed);
 		}
+
+		writeNext(0);
 	}
 }

@@ -122,6 +122,12 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
         return
     }
 
+    if WinActive("ahk_class Notepad") {
+        SleepDelay := 40
+    } else {
+        SleepDelay := 0
+    }
+
     ; We pass the abbreviation as argument to delete it manually, as we use the B0 flag
     ; This is to make it work everywhere, like in URL bar or in the code inspector inside navigators
     ; Otherwise, typing hc to get wh gives hwh for example when trying to type "white"
@@ -136,14 +142,18 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
         if (EndChar == "`t") {
             SendFinalResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
+        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
         SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
         SendFinalResult(Replacement, Map("OnlyText", OnlyText))
         SendFinalResult(EndChar)
     } else {
         if (EndChar == "`t") {
             SendNewResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
+        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
         SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
         SendNewResult(Replacement, Map("OnlyText", OnlyText))
         SendNewResult(EndChar, Map("OnlyText", False))
     }
@@ -1531,11 +1541,16 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
             }
         }
     }
-
-	; Selection != "`n`n" to fix a bug in Google Sheet
+    
+    ; The regex is to not trigger the wrapping if there are only blank lines
     if (Selection != "" and RegExMatch(Selection, "^(\r\n|\r|\n)+$") = 0) {
-        ; Send all the text instantly and without triggering hotstrings while typing it
-        SendInstant(LeftSymbol Selection RightSymbol)
+        if RegExMatch(Selection, "^(" Symbol ")+$") {
+            ; Fix a bug in Google Sheet where we cannot type - in a selected cell
+            SendInstant(Symbol)
+        } else {
+            ; Send all the text instantly and without triggering hotstrings while typing it
+            SendInstant(LeftSymbol Selection RightSymbol)
+        }
     } else {
         SendNewResult(Symbol)
     }
@@ -3495,8 +3510,8 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 ; The base layer will become this one when the navigation layer variable is set to True
 
 SC039:: ActionLayer("{Escape}")
-WheelUp:: ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
-WheelDown:: ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
+*WheelUp:: ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
+*WheelDown:: ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
 
 SC01D & ~SC138:: ; RAlt
 RAlt:: ; RAlt on QWERTY
@@ -3733,6 +3748,11 @@ if Features["DistancesReduction"]["CommaJ"].Enabled {
     )
     CreateCaseSensitiveHotstrings(
         "*?", ",'", "j’",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+    )
+    ; To fix a problem of "J’" for ,'
+    CreateHotstring(
+        "*?C", ",'", "j’",
         Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
     )
 }
@@ -4318,6 +4338,9 @@ if Features["Autocorrection"]["Minus"].Enabled {
     CreateCaseSensitiveHotstrings("", "distu", "dis-tu")
     CreateCaseSensitiveHotstrings("", "diton", "dit-on")
     CreateCaseSensitiveHotstrings("", "doisje", "dois-je")
+    CreateCaseSensitiveHotstrings("", "doitelle", "doit-elle")
+    CreateCaseSensitiveHotstrings("", "doitil", "doit-il")
+    CreateCaseSensitiveHotstrings("", "doiton", "doit-on")
     CreateCaseSensitiveHotstrings("", "estu", "es-tu")
     ; CreateCaseSensitiveHotstrings("", "estelle", "est-elle") ; Conflict with the name Estelle
     CreateCaseSensitiveHotstrings("", "estil", "est-il")
@@ -4339,6 +4362,7 @@ if Features["Autocorrection"]["Minus"].Enabled {
     CreateCaseSensitiveHotstrings("", "veuxtu", "veux-tu")
     CreateCaseSensitiveHotstrings("", "yatil", "y a-t-il")
 
+    CreateCaseSensitiveHotstrings("*?", "vonsn", "vons-n")
     CreateCaseSensitiveHotstrings("*?", "vezv", "vez-v")
 }
 

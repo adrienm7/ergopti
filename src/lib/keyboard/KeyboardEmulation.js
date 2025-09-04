@@ -28,7 +28,7 @@ export class KeyboardEmulation extends Keyboard {
 		} else if (
 			event.code === 'ShiftLeft' ||
 			event.code === 'ShiftRight' ||
-			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'oui')
+			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'oui')
 		) {
 			this.shift = true;
 			return true;
@@ -37,7 +37,7 @@ export class KeyboardEmulation extends Keyboard {
 			return true;
 		} else if (
 			event.code === 'ControlLeft' ||
-			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'non')
+			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'non')
 		) {
 			this.control = true;
 			return true;
@@ -51,14 +51,14 @@ export class KeyboardEmulation extends Keyboard {
 		} else if (
 			event.code === 'ShiftLeft' ||
 			event.code === 'ShiftRight' ||
-			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'oui')
+			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'oui')
 		) {
 			this.shift = false;
 		} else if (event.code === 'AltLeft') {
 			this.alt = false;
 		} else if (
 			event.code === 'ControlLeft' ||
-			(event.code === 'ControlRight' && this.infos_clavier['plus'] === 'non')
+			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'non')
 		) {
 			this.control = false;
 		}
@@ -105,7 +105,7 @@ export class KeyboardEmulation extends Keyboard {
 	KeyboardEmulation(event) {
 		let modificateurActive = this.activationModificateur(event); // Activation des éventuelles touches modificatrices
 		this.setCouche();
-		if (this.alt && this.infos_clavier['plus'] === 'oui') {
+		if (this.alt && this.keyboardInformation['plus'] === 'oui') {
 			this.envoiTouche_ReplacerCurseur('Enter');
 			this.alt = false;
 			return true;
@@ -122,7 +122,9 @@ export class KeyboardEmulation extends Keyboard {
 
 		// Si touche normale
 		let keyPressed = event.code;
-		let res = this.data_disposition[this.infos_clavier.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
+		let res = this.data_disposition[this.keyboardInformation.type].find(
+			(el) => el['code'] == keyPressed
+		); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
 			let toucheClavier = this.data_disposition.touches.find((el) => el['touche'] == res['touche']);
@@ -132,26 +134,26 @@ export class KeyboardEmulation extends Keyboard {
 				this.altgr &&
 				this.shift &&
 				keyPressed === 'CapsLock' &&
-				this.infos_clavier['plus'] === 'oui'
+				this.keyboardInformation['plus'] === 'oui'
 			) {
 				this.envoiTouche_ReplacerCurseur('Ctrl-Delete');
 				return true;
 			} else if (
 				this.control &&
 				(keyPressed === 'Backspace' ||
-					(keyPressed === 'CapsLock' && this.infos_clavier['plus'] === 'oui'))
+					(keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui'))
 			) {
 				this.envoiTouche_ReplacerCurseur('Ctrl-Backspace');
 				return true;
 			} else if (
 				keyPressed === 'Delete' ||
-				(this.shift && keyPressed === 'CapsLock' && this.infos_clavier['plus'] === 'oui')
+				(this.shift && keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui')
 			) {
 				this.envoiTouche_ReplacerCurseur('Delete');
 				return true;
 			} else if (
 				keyPressed === 'Backspace' ||
-				(keyPressed === 'CapsLock' && this.infos_clavier['plus'] === 'oui')
+				(keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui')
 			) {
 				this.envoiTouche_ReplacerCurseur('Backspace');
 				return true;
@@ -242,7 +244,7 @@ export class KeyboardEmulation extends Keyboard {
 		// }
 
 		let touche = '';
-		if (this.infos_clavier['plus'] === 'oui') {
+		if (this.keyboardInformation['plus'] === 'oui') {
 			if (toucheClavier[this.layer + '+'] !== undefined) {
 				touche = toucheClavier[this.layer + '+'];
 			} else {
@@ -390,15 +392,15 @@ export class KeyboardEmulation extends Keyboard {
 	presserToucheClavier(touche) {
 		// Nettoyage des touches actives
 		let emplacement = document.getElementById('clavier_' + this.id);
-		const touchesActives = emplacement.querySelectorAll('.touche-active');
+		const touchesActives = emplacement.querySelectorAll('.pressed-key');
 		[].forEach.call(touchesActives, function (el) {
 			if (el.dataset.type !== 'special') {
-				el.classList.remove('touche-active');
+				el.classList.remove('pressed-key');
 			}
 		});
 		emplacement
 			.querySelector("bloc-touche[data-touche='" + touche + "']")
-			.classList.add('touche-active');
+			.classList.add('pressed-key');
 	}
 }
 

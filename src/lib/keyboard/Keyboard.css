@@ -111,7 +111,7 @@ bloc-touche {
 
 bloc-touche:active,
 bloc-touche:hover,
-.touche-active {
+.pressed-key {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 	box-shadow:
 		0 var(--key-pressed-depth) 0 var(--effet-3d),
@@ -197,8 +197,10 @@ bloc-clavier[data-layer='Ctrl'] bloc-touche[data-type='special'] div {
 
 /* Style de toutes les touches qui changent avec Ergopti+ */
 bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui']:not([data-touche='Space']),
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='Space'],
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='Space'] {
+bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Visuel']
+	bloc-touche[data-touche='Space'],
+bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Primary']
+	bloc-touche[data-touche='Space'] {
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
@@ -398,9 +400,9 @@ bloc-touche[data-type='enter']::after {
 bloc-touche[data-type='enter']:hover,
 bloc-touche[data-type='enter']:hover::before,
 bloc-touche[data-type='enter']:hover::after,
-bloc-touche[data-type='enter'].touche-active,
-bloc-touche[data-type='enter'].touche-active::before,
-bloc-touche[data-type='enter'].touche-active::after {
+bloc-touche[data-type='enter'].pressed-key,
+bloc-touche[data-type='enter'].pressed-key::before,
+bloc-touche[data-type='enter'].pressed-key::after {
 	background-color: rgb(210, 210, 210) !important;
 	box-shadow: none;
 	color: #333;
