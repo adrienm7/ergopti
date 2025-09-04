@@ -1543,14 +1543,15 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
     }
     
     ; The regex is to not trigger the wrapping if there are only blank lines
-    if (Selection != "" and RegExMatch(Selection, "^(\r\n|\r|\n)+$") = 0) {
-        if RegExMatch(Selection, "^(" Symbol ")+$") {
-            ; Fix a bug in Google Sheet where we cannot type - in a selected cell
-            SendInstant(Symbol)
-        } else {
-            ; Send all the text instantly and without triggering hotstrings while typing it
-            SendInstant(LeftSymbol Selection RightSymbol)
-        }
+    ; Fix a bug in Google Sheet where we cannot type - in a selected cell
+    RegEx := "^(\r\n|\r|\n|" Symbol ")+$"
+    If RegExMatch(Symbol, "^(\.|\^|\$|\*|\+|\-|\?|\(|\)|\[|\]|\{|\}|\\)+$") {
+        RegEx := "^(\r\n|\r|\n|\" Symbol ")+$"
+    }
+    
+    if Selection != "" and RegExMatch(Selection, RegEx) = 0 {
+        ; Send all the text instantly and without triggering hotstrings while typing it
+        SendInstant(LeftSymbol Selection RightSymbol)
     } else {
         SendNewResult(Symbol)
     }
