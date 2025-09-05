@@ -63,7 +63,7 @@ export class KeyboardEmulation extends Keyboard {
 			this.control = false;
 		}
 		this.setCouche();
-		this.majClavier();
+		this.keyboardUpdate();
 	}
 
 	setCouche() {
@@ -99,7 +99,7 @@ export class KeyboardEmulation extends Keyboard {
 			currentData['layer'] = this.layer;
 			return currentData;
 		});
-		this.majClavier();
+		this.keyboardUpdate();
 	}
 
 	KeyboardEmulation(event) {

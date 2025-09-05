@@ -2,10 +2,10 @@ import * as stores_infos from '$lib/stores_infos.js';
 import { getKeyboardData } from '$lib/keyboard/getKeyboardData.js';
 
 import characterFrequencies from '$lib/keyboard/characterFrequencies.json';
-// Créer les clés "max" et "min" contenant la valeur maximale parmi les fréquences (souvent la fréquence en E) et valeur minimale
+// Create the "max" and "min" keys containing the maximum value among the frequencies (often the frequency of E) and the minimum value
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
 characterFrequencies.min = Math.min(...Object.values(characterFrequencies));
-// Permet de mieux étaler les valeurs des fréquences
+// Apply a logarithmic scale to smooth differences between very common and very rare characters
 function logarithmicTransformation(x, k) {
 	return Math.log(1 + k * x) / Math.log(1 + k);
 }
@@ -14,26 +14,24 @@ export class Keyboard {
 	constructor(id) {
 		this.id = id;
 
-		// S'abonner au store pour la version
+		// Subscribe to the store to always have the version currently selected
 		stores_infos['version'].subscribe((value) => {
 			this.version = value;
 		});
 		stores_infos['data_disposition'].subscribe((value) => {
 			this.data_disposition = value;
-			this.majClavier();
+			this.keyboardUpdate();
 		});
 
-		// Liaison avec le store spécifique au clavier (data_clavier)
-		this.data_clavier = stores_infos[this.id]; // Permet de modifier les données du clavier
+		this.data_clavier = stores_infos[this.id]; // Enables modification of the keyboard data in the store
 
-		// S'abonner au store pour récupérer les données du clavier mises à jour en temps réel
+		// Subscribe to the store to receive real-time updates of the keyboard data
 		this.data_clavier.subscribe((value) => {
 			this.keyboardInformation = value;
 		});
 	}
 
 	getKeyboardLocation() {
-		// Vérifie si le document est défini
 		if (typeof document !== 'undefined') {
 			let keyboardLocation = document.getElementById(`clavier_${this.id}`);
 			if (keyboardLocation === null) {
@@ -46,23 +44,14 @@ export class Keyboard {
 		throw new Error('Document non défini');
 	}
 
-	majClavier() {
-		// On n’en a pas besoin, et si c’est activé cela multiplie les requêtes inutiles (1 par clavier)
+	keyboardUpdate() {
+		// This code isn’t necessary anymore, and when activated it generates many useless requests, as all keyboards will request the same file:
 		// if (this.data_disposition === undefined) {
 		// 	this.data_disposition = getKeyboardData(this.version);
 		// }
 		this.keysUpdate();
+		this.keyboardInformationUpdate();
 		this.currentLayerModifiersKeyPress();
-
-		try {
-			const keyboardLocation = this.getKeyboardLocation();
-			keyboardLocation.dataset['type'] = this.keyboardInformation.type;
-			keyboardLocation.dataset['layer'] = this.keyboardInformation.layer;
-			keyboardLocation.dataset['plus'] = this.keyboardInformation.plus;
-			keyboardLocation.dataset['couleur'] = this.keyboardInformation.couleur;
-		} catch (error) {
-			return;
-		}
 	}
 
 	keysUpdate() {
@@ -404,7 +393,19 @@ export class Keyboard {
 				currentData['layer'] = newLayer;
 				return currentData;
 			});
-			this.majClavier();
+			this.keyboardUpdate();
+		}
+	}
+
+	keyboardInformationUpdate() {
+		try {
+			const keyboardLocation = this.getKeyboardLocation();
+			keyboardLocation.dataset['type'] = this.keyboardInformation.type;
+			keyboardLocation.dataset['layer'] = this.keyboardInformation.layer;
+			keyboardLocation.dataset['plus'] = this.keyboardInformation.plus;
+			keyboardLocation.dataset['couleur'] = this.keyboardInformation.couleur;
+		} catch (error) {
+			return;
 		}
 	}
 
