@@ -55,7 +55,7 @@ legende-clavier {
 */
 
 bloc-touche {
-	--longueur-touche: calc(var(--key-size) * var(--taille) - 2 * var(--key-margin));
+	--longueur-touche: calc(var(--key-size) * var(--size) - 2 * var(--key-margin));
 	--effet-3d: hsla(
 		var(--key-color),
 		var(--key-color-saturation),
@@ -75,11 +75,11 @@ bloc-touche {
 		var(--key-color-luminosity),
 		30%
 	);
-	--taille-bordure-touche: 1px; /* calc(var(--keyboard-width) * 0.1rem) */
+	--size-bordure-touche: 1px; /* calc(var(--keyboard-width) * 0.1rem) */
 	--key-text-size: calc(var(--key-size) / 2.5);
 	--couleur-texte-touche: hsla(0, 100%, 100%, 90%);
 	background-color: var(--couleur-fond-touche);
-	border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+	border: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
 	border-radius: var(--key-border-radius);
 	box-shadow: var(--ombres-touche);
 	color: var(--couleur-texte-touche);
@@ -122,13 +122,13 @@ bloc-touche:hover,
 	top: var(--key-depth-change);
 }
 
-bloc-touche[data-touche=''] {
+bloc-touche[data-key=''] {
 	display: none;
 }
 
-bloc-touche[data-touche='aucune'],
-bloc-touche[data-touche='aucune']:hover,
-bloc-touche[data-touche='aucune'].active {
+bloc-touche[data-key='aucune'],
+bloc-touche[data-key='aucune']:hover,
+bloc-touche[data-key='aucune'].active {
 	background-color: transparent !important;
 	border-color: transparent;
 	box-shadow: none;
@@ -142,12 +142,12 @@ bloc-touche[data-touche='aucune'].active {
 */
 
 /* Séparer en deux la clavier */
-bloc-clavier[data-type='ergodox'] bloc-touche[data-colonne='6'] {
+bloc-clavier[data-type='ergodox'] bloc-touche[data-column='6'] {
 	margin-right: 50px;
 }
 
 /* Séparer le thumb cluster du reste du clavier */
-bloc-clavier[data-type='ergodox'] bloc-ligne[data-ligne='6'] {
+bloc-clavier[data-type='ergodox'] bloc-ligne[data-row='6'] {
 	margin-top: 30px;
 }
 
@@ -169,8 +169,8 @@ bloc-clavier[data-layer='Visuel'] bloc-touche[data-type='ponctuation'] div {
 }
 
 /* Cas particulier de la touche Q qui fait Qu */
-bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-touche='q'] div {
+bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-key='q'] div,
+bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-key='q'] div {
 	text-transform: capitalize;
 }
 
@@ -196,37 +196,35 @@ bloc-clavier[data-layer='Ctrl'] bloc-touche[data-type='special'] div {
 */
 
 /* Style de toutes les touches qui changent avec Ergopti+ */
-bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui']:not([data-touche='Space']),
+bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui']:not([data-key='Space']),
 bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Visuel']
-	bloc-touche[data-touche='Space'],
+	bloc-touche[data-key='Space'],
 bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Primary']
-	bloc-touche[data-touche='Space'] {
+	bloc-touche[data-key='Space'] {
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
 }
 
 /* Hold-tap */
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='Space'] div,
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='LCtrl'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='LCtrl'] div,
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='LAlt'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='LAlt'] div,
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='RAlt'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='RAlt'] div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
-	bloc-touche[data-touche='Tab']
-	div,
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='Space'] div,
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='LCtrl'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='LCtrl'] div,
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='LAlt'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='LAlt'] div,
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='RAlt'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='RAlt'] div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel'] bloc-touche[data-key='Tab'] div,
 bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
-	bloc-touche[data-touche='Tab']
+	bloc-touche[data-key='Tab']
 	div,
-bloc-clavier[data-plus='oui'] bloc-touche[data-touche='CapsLock'] div {
+bloc-clavier[data-plus='oui'] bloc-touche[data-key='CapsLock'] div {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.2;
 }
 
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-touche='LShift'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-touche='LShift'] div {
+bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='LShift'] div,
+bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='LShift'] div {
 	font-size: calc(var(--key-text-size) * 0.8);
 	line-height: 1.05;
 }
@@ -253,63 +251,63 @@ bloc-touche[data-style='different'] {
 }
 
 /* Touches spéciales */
-bloc-touche[data-touche='LAlt'] div,
-bloc-touche[data-touche='RAlt'] div,
-bloc-touche[data-touche='LCtrl'] div,
-bloc-touche[data-touche='RCtrl'] div,
-bloc-touche[data-touche='CapsLock'] div,
-bloc-touche[data-touche='Space'] div,
-bloc-touche[data-touche='Win'] div,
-bloc-touche[data-touche='Option'] div,
-bloc-touche[data-touche='Escape'] div {
+bloc-touche[data-key='LAlt'] div,
+bloc-touche[data-key='RAlt'] div,
+bloc-touche[data-key='LCtrl'] div,
+bloc-touche[data-key='RCtrl'] div,
+bloc-touche[data-key='CapsLock'] div,
+bloc-touche[data-key='Space'] div,
+bloc-touche[data-key='Win'] div,
+bloc-touche[data-key='Option'] div,
+bloc-touche[data-key='Escape'] div {
 	font-size: calc(var(--key-text-size) * 0.7);
 	font-weight: normal;
 }
 
-bloc-touche[data-touche='RShift'] div,
-bloc-touche[data-touche='LShift'] div {
+bloc-touche[data-key='RShift'] div,
+bloc-touche[data-key='LShift'] div {
 	font-weight: bold;
 }
 
-bloc-touche[data-touche='AltTab'] div {
+bloc-touche[data-key='AltTab'] div {
 	font-size: 0.7em !important;
 	line-height: 1.15;
 }
 
-bloc-touche[data-touche='BackSpace'] div,
-bloc-touche[data-touche='Delete'] div {
+bloc-touche[data-key='BackSpace'] div,
+bloc-touche[data-key='Delete'] div {
 	font-size: 0.9em;
 }
 
 /* Pas de taille trop grande pour la police des touches [qu] et [où] */
-bloc-clavier[data-layer='Primary'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-layer='AltGr'][data-plus='oui'] bloc-touche[data-touche='w'] div {
+bloc-clavier[data-layer='Primary'][data-plus='oui'] bloc-touche[data-key='q'] div,
+bloc-clavier[data-layer='AltGr'][data-plus='oui'] bloc-touche[data-key='w'] div {
 	font-size: 0.9em;
 }
-bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-touche='q'] div,
-bloc-clavier[data-layer='ShiftAltGr'][data-plus='oui'] bloc-touche[data-touche='w'] div {
+bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-key='q'] div,
+bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-key='q'] div,
+bloc-clavier[data-layer='ShiftAltGr'][data-plus='oui'] bloc-touche[data-key='w'] div {
 	font-size: 0.85em;
 }
 
 /* Taille plus petite pour la légende Win+V */
-bloc-clavier[data-layer='Layer'] bloc-touche[data-touche='Coller'] div {
+bloc-clavier[data-layer='Layer'] bloc-touche[data-key='Coller'] div {
 	font-size: 0.85em;
 }
 
 /* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */
 bloc-clavier[data-layer='Layer']
-	bloc-touche:not([data-doigt='pouce']):not([data-type='special'])
+	bloc-touche:not([data-finger='pouce']):not([data-type='special'])
 	div {
 	font-size: 0.8em;
 }
 
-bloc-clavier[data-plus='non'] bloc-touche[data-touche='CapsLock'] div {
+bloc-clavier[data-plus='non'] bloc-touche[data-key='CapsLock'] div {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
 
-bloc-clavier[data-layer='Layer'] bloc-touche[data-touche='Copier'] div,
-bloc-clavier[data-layer='Layer'] bloc-touche[data-touche='Couper'] div {
+bloc-clavier[data-layer='Layer'] bloc-touche[data-key='Copier'] div,
+bloc-clavier[data-layer='Layer'] bloc-touche[data-key='Couper'] div {
 	font-size: var(--key-text-size);
 }
 
@@ -340,7 +338,7 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter'] div {
 bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::before {
 	background-color: var(--couleur-fond-touche);
 	border-radius: 0 calc(var(--key-border-radius) - 1px) 0 0;
-	border-right: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+	border-right: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
 	content: '';
 	height: var(--key-size);
 	position: absolute;
@@ -353,7 +351,7 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::before {
 /* On crée la partie en bas de la touche Entrée */
 bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::after {
 	background-color: var(--couleur-fond-touche);
-	border: var(--taille-bordure-touche) solid var(--couleur-bordure-touche);
+	border: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
 	border-radius: 0 0 var(--key-border-radius) var(--key-border-radius);
 	border-top: none;
 	box-shadow:
@@ -414,7 +412,7 @@ bloc-touche[data-type='enter'].pressed-key::after {
 ========================
 */
 
-/* Couleur des touches par doigt et main */
+/* Couleur des touches par doigt et hand */
 /* On ne les sépare pas de pile 45 degrés, c’est adapté pour un meilleur rendu */
 bloc-clavier {
 	--color-left-index-finger: 0deg;
@@ -427,35 +425,35 @@ bloc-clavier {
 	--color-right-index-finger: 315deg;
 }
 
-bloc-touche[data-main='gauche'][data-doigt='index'] {
+bloc-touche[data-hand='left'][data-finger='index'] {
 	--key-color: var(--color-left-index-finger);
 }
 
-bloc-touche[data-main='gauche'][data-doigt='majeur'] {
+bloc-touche[data-hand='left'][data-finger='majeur'] {
 	--key-color: var(--color-left-middle-finger);
 }
 
-bloc-touche[data-main='gauche'][data-doigt='annulaire'] {
+bloc-touche[data-hand='left'][data-finger='annulaire'] {
 	--key-color: var(--color-left-ring-finger);
 }
 
-bloc-touche[data-main='gauche'][data-doigt='auriculaire'] {
+bloc-touche[data-hand='left'][data-finger='auriculaire'] {
 	--key-color: var(--color-left-little-finger);
 }
 
-bloc-touche[data-main='droite'][data-doigt='index'] {
+bloc-touche[data-hand='right'][data-finger='index'] {
 	--key-color: var(--color-right-index-finger);
 }
 
-bloc-touche[data-main='droite'][data-doigt='majeur'] {
+bloc-touche[data-hand='right'][data-finger='majeur'] {
 	--key-color: var(--color-right-middle-finger);
 }
 
-bloc-touche[data-main='droite'][data-doigt='annulaire'] {
+bloc-touche[data-hand='right'][data-finger='annulaire'] {
 	--key-color: var(--color-right-ring-finger);
 }
 
-bloc-touche[data-main='droite'][data-doigt='auriculaire'] {
+bloc-touche[data-hand='right'][data-finger='auriculaire'] {
 	--key-color: var(--color-right-little-finger);
 }
 
@@ -464,7 +462,7 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='space'] {
 }
 
 /* Couleur spéciale pour les touches du pouce */
-bloc-clavier[data-type='ergodox'] bloc-touche[data-doigt='pouce'] {
+bloc-clavier[data-type='ergodox'] bloc-touche[data-finger='pouce'] {
 	/* background-color: var(--couleur-fond-touche); */
 	background-color: rgba(0, 46, 96, 0.3);
 }
@@ -473,7 +471,7 @@ bloc-clavier[data-type='ergodox'] bloc-touche[data-doigt='pouce'] {
 
 bloc-touche[data-type='space'],
 bloc-touche[data-type='special'],
-bloc-touche[data-touche='Enter'] {
+bloc-touche[data-key='Enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
 	/* Bordure des touches des touches spéciales en blanc pour mieux les mettre en relief */
@@ -534,7 +532,7 @@ bloc-clavier[data-couleur='freq'] bloc-touche[data-type='ponctuation'] {
 }
 
 /* Pour avoir exactement le même style d'effet 3D en couleur et noir et blanc */
-bloc-clavier[data-couleur='oui'] bloc-touche[data-doigt='pouce'] {
+bloc-clavier[data-couleur='oui'] bloc-touche[data-finger='pouce'] {
 	--effet-3d: hsla(var(--key-color), 0%, calc(100% - 20%), 70%);
 }
 
@@ -569,13 +567,13 @@ bloc-clavier,
 	--key-pressed-depth: 0.5px !important;
 }
 
-#clavier_controle bloc-touche[data-colonne]:nth-child(n + 8):nth-child(-n + 17),
-#clavier_controle bloc-touche[data-colonne='0'],
-#clavier_raccourcis_ergodox bloc-touche[data-colonne]:nth-child(n + 8):nth-child(-n + 17) {
+#clavier_controle bloc-touche[data-column]:nth-child(n + 8):nth-child(-n + 17),
+#clavier_controle bloc-touche[data-column='0'],
+#clavier_raccourcis_ergodox bloc-touche[data-column]:nth-child(n + 8):nth-child(-n + 17) {
 	display: none;
 }
-#clavier_controle bloc-touche[data-colonne='6'],
-#clavier_raccourcis_ergodox bloc-touche[data-colonne='6'] {
+#clavier_controle bloc-touche[data-column='6'],
+#clavier_raccourcis_ergodox bloc-touche[data-column='6'] {
 	margin-right: 0;
 }
 
@@ -583,19 +581,19 @@ bloc-clavier,
 	display: none;
 }
 
-#clavier_magique bloc-touche[data-plus='oui']:not([data-touche='magique']) {
+#clavier_magique bloc-touche[data-plus='oui']:not([data-key='magique']) {
 	background: unset !important;
 	--key-color-saturation: 100% !important;
 	--key-color-luminosity: 70% !important;
 	background-color: var(--couleur-fond-touche) !important;
 }
-#clavier_magique bloc-touche[data-plus='oui']:not([data-touche='magique']):hover {
+#clavier_magique bloc-touche[data-plus='oui']:not([data-key='magique']):hover {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 }
 #clavier_magique bloc-touche[data-plus='oui'][data-type='special'] {
 	background-color: rgb(10, 10, 10) !important;
 }
-#clavier_magique bloc-touche[data-touche='magique'] {
+#clavier_magique bloc-touche[data-key='magique'] {
 	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
 }
 

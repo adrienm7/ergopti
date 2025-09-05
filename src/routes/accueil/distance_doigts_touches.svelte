@@ -28,29 +28,22 @@
 </p>
 <bloc-clavier data-couleur="azerty">
 	<bloc-ligne class="center">
-		<bloc-touche data-doigt="auriculaire" data-main="gauche" style="--taille: 1;"
+		<bloc-touche data-finger="auriculaire" data-hand="left" style="--size: 1;"
 			><div>Q</div></bloc-touche
 		>
-		<bloc-touche data-doigt="annulaire" data-main="gauche" style="--taille: 1;"
+		<bloc-touche data-finger="annulaire" data-hand="left" style="--size: 1;"
 			><div>S</div></bloc-touche
 		>
-		<bloc-touche data-doigt="majeur" data-main="gauche" style="--taille: 1;"
-			><div>D</div></bloc-touche
-		>
-		<bloc-touche data-doigt="index" data-main="gauche" style="--taille: 1;"
-			><div>F</div></bloc-touche
-		>
+		<bloc-touche data-finger="majeur" data-hand="left" style="--size: 1;"><div>D</div></bloc-touche>
+		<bloc-touche data-finger="index" data-hand="left" style="--size: 1;"><div>F</div></bloc-touche>
 		<div style="display: inline-block; width: 50px;" />
-		<bloc-touche data-doigt="index" data-main="droite" style="--taille: 1;"
-			><div>J</div></bloc-touche
+		<bloc-touche data-finger="index" data-hand="right" style="--size: 1;"><div>J</div></bloc-touche>
+		<bloc-touche data-finger="majeur" data-hand="right" style="--size: 1;"><div>K</div></bloc-touche
 		>
-		<bloc-touche data-doigt="majeur" data-main="droite" style="--taille: 1;"
-			><div>K</div></bloc-touche
-		>
-		<bloc-touche data-doigt="annulaire" data-main="droite" style="--taille: 1;"
+		<bloc-touche data-finger="annulaire" data-hand="right" style="--size: 1;"
 			><div>L</div></bloc-touche
 		>
-		<bloc-touche data-doigt="auriculaire" data-main="droite" style="--taille: 1;"
+		<bloc-touche data-finger="auriculaire" data-hand="right" style="--size: 1;"
 			><div>M</div></bloc-touche
 		>
 	</bloc-ligne>
@@ -78,29 +71,22 @@
 
 <bloc-clavier data-couleur="ergopti">
 	<bloc-ligne class="center">
-		<bloc-touche data-doigt="auriculaire" data-main="gauche" style="--taille: 1;"
+		<bloc-touche data-finger="auriculaire" data-hand="left" style="--size: 1;"
 			><div>A</div></bloc-touche
 		>
-		<bloc-touche data-doigt="annulaire" data-main="gauche" style="--taille: 1;"
+		<bloc-touche data-finger="annulaire" data-hand="left" style="--size: 1;"
 			><div>I</div></bloc-touche
 		>
-		<bloc-touche data-doigt="majeur" data-main="gauche" style="--taille: 1;"
-			><div>E</div></bloc-touche
-		>
-		<bloc-touche data-doigt="index" data-main="gauche" style="--taille: 1;"
-			><div>U</div></bloc-touche
-		>
+		<bloc-touche data-finger="majeur" data-hand="left" style="--size: 1;"><div>E</div></bloc-touche>
+		<bloc-touche data-finger="index" data-hand="left" style="--size: 1;"><div>U</div></bloc-touche>
 		<div style="display: inline-block; width: 50px;" />
-		<bloc-touche data-doigt="index" data-main="droite" style="--taille: 1;"
-			><div>S</div></bloc-touche
+		<bloc-touche data-finger="index" data-hand="right" style="--size: 1;"><div>S</div></bloc-touche>
+		<bloc-touche data-finger="majeur" data-hand="right" style="--size: 1;"><div>N</div></bloc-touche
 		>
-		<bloc-touche data-doigt="majeur" data-main="droite" style="--taille: 1;"
-			><div>N</div></bloc-touche
-		>
-		<bloc-touche data-doigt="annulaire" data-main="droite" style="--taille: 1;"
+		<bloc-touche data-finger="annulaire" data-hand="right" style="--size: 1;"
 			><div>T</div></bloc-touche
 		>
-		<bloc-touche data-doigt="auriculaire" data-main="droite" style="--taille: 1;"
+		<bloc-touche data-finger="auriculaire" data-hand="right" style="--size: 1;"
 			><div>R</div></bloc-touche
 		>
 	</bloc-ligne>

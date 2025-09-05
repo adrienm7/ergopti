@@ -12,9 +12,9 @@
 
 <bloc-clavier id={'clavier_' + nom}>
 	{#each Array(7) as _, i}
-		<bloc-ligne data-ligne={i + 1}>
+		<bloc-ligne data-row={i + 1}>
 			{#each Array(16) as _, j}
-				<bloc-touche data-touche="vide" data-ligne={i + 1} data-colonne={j} style="--taille: 1;">
+				<bloc-touche data-key="vide" data-row={i + 1} data-column={j} style="--size: 1;">
 					<div>&nbsp;</div>
 				</bloc-touche>
 			{/each}
