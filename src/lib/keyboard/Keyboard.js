@@ -60,47 +60,36 @@ export class Keyboard {
 		}
 		try {
 			const keyboardLocation = this.getKeyboardLocation();
-			for (let ligne = 1; ligne <= 7; ligne++) {
-				for (let j = 0; j <= 15; j++) {
+			for (let row = 1; row <= 7; row++) {
+				for (let column = 0; column <= 15; column++) {
 					// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
 					const res = this.data_disposition[this.keyboardInformation.type].find(
-						(el) => el['ligne'] == ligne && el['colonne'] == j
+						(el) => el['row'] == row && el['column'] == column
 					);
-
-					let colonne = j;
-
-					// Interversion de É et de ★ sur les claviers ISO
-					// if (res !== undefined) {
-					// 	if ((this.keyboardInformation.type === 'iso') && (this.keyboardInformation.plus === 'oui') && (res.touche === 'é')) {
-					// 		colonne = j + 1;
-					// 	} else if ((this.keyboardInformation.type === 'iso') && (this.keyboardInformation.plus === 'oui') && (res.touche === 'magique')) {
-					// 		colonne = j - 1;
-					// 	}
-					// }
 
 					// Suppression des event listeners sur la touche
 					const toucheClavier0 = keyboardLocation.querySelector(
-						"bloc-touche[data-ligne='" + ligne + "'][data-colonne='" + colonne + "']"
+						"bloc-touche[data-row='" + row + "'][data-column='" + column + "']"
 					);
 					const toucheClavier = toucheClavier0.cloneNode(true);
 					toucheClavier0.parentNode.replaceChild(toucheClavier, toucheClavier0);
 
 					// Nettoyage des attributs de la touche
 					const attributes = toucheClavier.getAttributeNames();
-					const attributesToKeep = ['data-ligne', 'data-colonne'];
+					const attributesToKeep = ['data-row', 'data-column'];
 					attributes.forEach((attribute) => {
 						if (attribute.startsWith('data-') && !attributesToKeep.includes(attribute)) {
 							toucheClavier.removeAttribute(attribute);
 						}
 					});
 					// Suppression du contenu de la touche
-					toucheClavier.dataset['touche'] = '';
+					toucheClavier.dataset['key'] = '';
 					toucheClavier.dataset['plus'] = 'non';
 					toucheClavier.classList.remove('pressed-key'); // Suppression de la classe css pour les touches pressées
 
 					if (res !== undefined) {
-						const contenuTouche = this.data_disposition.touches.find(
-							(el) => el['touche'] === res['touche']
+						const contenuTouche = this.data_disposition['keys'].find(
+							(el) => el['key'] === res['key']
 						);
 
 						if (
@@ -112,7 +101,7 @@ export class Keyboard {
 						} else {
 							if (this.keyboardInformation.layer === 'Visuel') {
 								if (contenuTouche['type'] === 'ponctuation') {
-									if (res['touche'] === '"') {
+									if (res['key'] === '"') {
 										// Cas particulier de la touche « " »
 										toucheClavier.innerHTML =
 											'<div>' +
@@ -128,7 +117,7 @@ export class Keyboard {
 											'<br/>' +
 											contenuTouche['Primary'] +
 											'</div>';
-										if (contenuTouche['Primary' + '+'] !== undefined && ligne < 6) {
+										if (contenuTouche['Primary' + '+'] !== undefined && row < 6) {
 											// Si la layer + existe ET n’est pas en thumb cluster
 											toucheClavier.dataset['plus'] = 'oui';
 										}
@@ -137,7 +126,7 @@ export class Keyboard {
 									// Cas où la touche n’est pas double
 									if (this.keyboardInformation.plus === 'oui') {
 										// Cas où la touche n’est pas double et + est activé
-										if (contenuTouche['Primary' + '+'] !== undefined && ligne < 6) {
+										if (contenuTouche['Primary' + '+'] !== undefined && row < 6) {
 											// Si la layer + existe ET n’est pas en thumb cluster
 											toucheClavier.innerHTML = '<div>' + contenuTouche['Primary' + '+'] + '</div>';
 											toucheClavier.dataset['plus'] = 'oui';
@@ -153,7 +142,7 @@ export class Keyboard {
 								if (this.keyboardInformation.plus === 'oui') {
 									if (
 										contenuTouche[this.keyboardInformation.layer + '+'] !== undefined &&
-										(ligne < 6 || res.touche === 'Space')
+										(row < 6 || res['key'] === 'Space')
 									) {
 										// Si la layer + existe et n’est pas en thumb cluster. Sur le thumb cluster, on affiche seulement le tap hold en space et pas en Alt ou Ctrl
 										toucheClavier.innerHTML =
@@ -184,25 +173,25 @@ export class Keyboard {
 						// Corrections localisées sur la barre d’espace
 						if (
 							this.keyboardInformation.type === 'ergodox' &&
-							res.touche === 'Space' &&
+							res['key'] === 'Space' &&
 							['Visuel', 'Primary'].includes(this.keyboardInformation.layer)
 						) {
 							toucheClavier.innerHTML = '<div>␣</div>';
 						}
 						if (
 							this.keyboardInformation.type === 'iso' &&
-							res.touche === 'Space' &&
+							res['key'] === 'Space' &&
 							this.keyboardInformation.layer === 'Visuel' &&
 							this.keyboardInformation.plus === 'non'
 						) {
-							toucheClavier.innerHTML = '<div>' + this.data_disposition.nom + '</div>';
+							toucheClavier.innerHTML = '<div>' + this.data_disposition['name'] + '</div>';
 						}
 
 						// On ajoute des this.keyboardInformation dans les data attributes de la touche
-						toucheClavier.dataset['touche'] = res['touche'];
-						toucheClavier.dataset['colonne'] = colonne;
-						toucheClavier.dataset['doigt'] = res['doigt'];
-						toucheClavier.dataset['main'] = res['main'];
+						toucheClavier.dataset['key'] = res['key'];
+						toucheClavier.dataset['column'] = column;
+						toucheClavier.dataset['finger'] = res['finger'];
+						toucheClavier.dataset['hand'] = res['hand'];
 						toucheClavier.dataset['type'] = contenuTouche['type'];
 						toucheClavier.dataset['style'] = '';
 						if (
@@ -227,7 +216,7 @@ export class Keyboard {
 									contenuTouche[this.keyboardInformation.layer + '-style'];
 							}
 						}
-						toucheClavier.style.setProperty('--taille', res['taille']);
+						toucheClavier.style.setProperty('--size', res['size']);
 						let frequence = characterFrequencies[contenuTouche[this.keyboardInformation.layer]];
 						toucheClavier.style.setProperty('--frequence', frequence);
 						let frequence_normalisee =
@@ -247,7 +236,7 @@ export class Keyboard {
 	}
 
 	layerSwitch(pressedKey) {
-		let pressedKeyName = pressedKey.dataset.touche;
+		let pressedKeyName = pressedKey.dataset['key'];
 		const currentLayer = this.keyboardInformation.layer;
 		const plus = this.keyboardInformation.plus === 'oui';
 		const type = this.keyboardInformation.type;
@@ -417,14 +406,14 @@ export class Keyboard {
 			const type = this.keyboardInformation.type;
 
 			const keys = {
-				LShift: keyboardLocation.querySelector("[data-touche='LShift']"),
-				RShift: keyboardLocation.querySelector("[data-touche='RShift']"),
-				LCtrl: keyboardLocation.querySelector("[data-touche='LCtrl']"),
-				RCtrl: keyboardLocation.querySelector("[data-touche='RCtrl']"),
-				LAlt: keyboardLocation.querySelector("[data-touche='LAlt']"),
-				RAlt: keyboardLocation.querySelector("[data-touche='RAlt']"),
-				CapsLock: keyboardLocation.querySelector("[data-touche='CapsLock']"),
-				Space: keyboardLocation.querySelector("[data-touche='Space']")
+				LShift: keyboardLocation.querySelector("[data-key='LShift']"),
+				RShift: keyboardLocation.querySelector("[data-key='RShift']"),
+				LCtrl: keyboardLocation.querySelector("[data-key='LCtrl']"),
+				RCtrl: keyboardLocation.querySelector("[data-key='RCtrl']"),
+				LAlt: keyboardLocation.querySelector("[data-key='LAlt']"),
+				RAlt: keyboardLocation.querySelector("[data-key='RAlt']"),
+				CapsLock: keyboardLocation.querySelector("[data-key='CapsLock']"),
+				Space: keyboardLocation.querySelector("[data-key='Space']")
 			};
 
 			// Utility function to activate a key if it exists
@@ -496,9 +485,7 @@ export class Keyboard {
 			if (i >= text.length) return; // stop condition
 
 			const nextLetter = text.charAt(i);
-			const nextKey = keyboardLocation.querySelector(
-				"bloc-touche[data-touche='" + nextLetter + "']"
-			);
+			const nextKey = keyboardLocation.querySelector("bloc-touche[data-key='" + nextLetter + "']");
 
 			if (nextKey) {
 				nextKey.classList.add('pressed-key');
@@ -507,7 +494,7 @@ export class Keyboard {
 			if (makePreviousKeysDisappear && i > 0) {
 				const previousLetter = text.charAt(i - 1);
 				const previousKey = keyboardLocation.querySelector(
-					"bloc-touche[data-touche='" + previousLetter + "']"
+					"bloc-touche[data-key='" + previousLetter + "']"
 				);
 				if (previousKey) {
 					previousKey.classList.remove('pressed-key');

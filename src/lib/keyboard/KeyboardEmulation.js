@@ -127,8 +127,8 @@ export class KeyboardEmulation extends Keyboard {
 		); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
-			let toucheClavier = this.data_disposition.touches.find((el) => el['touche'] == res['touche']);
-			this.presserToucheClavier(toucheClavier['touche']); // Presser la touche sur le clavier visuel
+			let toucheClavier = this.data_disposition.touches.find((el) => el['key'] == res['key']);
+			this.presserToucheClavier(toucheClavier['key']); // Presser la touche sur le clavier visuel
 			let touche;
 			if (
 				this.altgr &&
@@ -399,7 +399,7 @@ export class KeyboardEmulation extends Keyboard {
 			}
 		});
 		emplacement
-			.querySelector("bloc-touche[data-touche='" + touche + "']")
+			.querySelector("bloc-touche[data-key='" + touche + "']")
 			.classList.add('pressed-key');
 	}
 }
