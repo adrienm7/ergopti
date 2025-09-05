@@ -2,7 +2,7 @@ import * as stores_infos from '$lib/stores_infos.js';
 import { getKeyboardData } from '$lib/keyboard/getKeyboardData.js';
 
 import characterFrequencies from '$lib/keyboard/characterFrequencies.json';
-// Create the "max" and "min" keys containing the maximum value among the frequencies (often the frequency of E) and the minimum value
+// Create the "max" and "min" keys containing the maximum value among the frequencies (the frequency of E) and the minimum value
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
 characterFrequencies.min = Math.min(...Object.values(characterFrequencies));
 // Apply a logarithmic scale to smooth differences between very common and very rare characters
@@ -63,175 +63,204 @@ export class Keyboard {
 			for (let row = 1; row <= 7; row++) {
 				for (let column = 0; column <= 15; column++) {
 					// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
-					const res = this.data_disposition[this.keyboardInformation.type].find(
+					const newKey = this.data_disposition[this.keyboardInformation.type].find(
 						(el) => el['row'] == row && el['column'] == column
 					);
 
-					// Suppression des event listeners sur la touche
-					const toucheClavier0 = keyboardLocation.querySelector(
-						"bloc-touche[data-row='" + row + "'][data-column='" + column + "']"
-					);
-					const toucheClavier = toucheClavier0.cloneNode(true);
-					toucheClavier0.parentNode.replaceChild(toucheClavier, toucheClavier0);
+					const keyboardKey = this.cleanKey(keyboardLocation, row, column);
 
-					// Nettoyage des attributs de la touche
-					const attributes = toucheClavier.getAttributeNames();
-					const attributesToKeep = ['data-row', 'data-column'];
-					attributes.forEach((attribute) => {
-						if (attribute.startsWith('data-') && !attributesToKeep.includes(attribute)) {
-							toucheClavier.removeAttribute(attribute);
-						}
-					});
-					// Suppression du contenu de la touche
-					toucheClavier.dataset['key'] = '';
-					toucheClavier.dataset['plus'] = 'non';
-					toucheClavier.classList.remove('pressed-key'); // Suppression de la classe css pour les touches pressées
-
-					if (res !== undefined) {
-						const contenuTouche = this.data_disposition['keys'].find(
-							(el) => el['key'] === res['key']
+					if (newKey !== undefined) {
+						const newKeyContent = this.data_disposition['keys'].find(
+							(el) => el['key'] === newKey['key']
 						);
 
 						if (
 							this.keyboardInformation.layer !== 'Visuel' &&
-							(contenuTouche[this.keyboardInformation.layer] === '' ||
-								contenuTouche[this.keyboardInformation.layer] === undefined)
+							(newKeyContent[this.keyboardInformation.layer] === '' ||
+								newKeyContent[this.keyboardInformation.layer] === undefined)
 						) {
-							toucheClavier.innerHTML = '<div><div>'; /* Touche vide ou undefined dans le json */
+							keyboardKey.innerHTML = '<div><div>'; /* Undefined key in the selected layer */
 						} else {
 							if (this.keyboardInformation.layer === 'Visuel') {
-								if (contenuTouche['type'] === 'ponctuation') {
-									if (res['key'] === '"') {
+								if (newKeyContent['type'] === 'ponctuation') {
+									if (newKey['key'] === '"') {
 										// Cas particulier de la touche « " »
-										toucheClavier.innerHTML =
+										keyboardKey.innerHTML =
 											'<div>' +
-											contenuTouche['Shift'] +
+											newKeyContent['Shift'] +
 											'<br/>' +
-											contenuTouche['Primary'] +
+											newKeyContent['Primary'] +
 											'</div>';
 									} else {
 										// Toutes les autres touches "doubles"
-										toucheClavier.innerHTML =
+										keyboardKey.innerHTML =
 											'<div>' +
-											contenuTouche['AltGr'] +
+											newKeyContent['AltGr'] +
 											'<br/>' +
-											contenuTouche['Primary'] +
+											newKeyContent['Primary'] +
 											'</div>';
-										if (contenuTouche['Primary' + '+'] !== undefined && row < 6) {
+										if (newKeyContent['Primary' + '+'] !== undefined && row < 6) {
 											// Si la layer + existe ET n’est pas en thumb cluster
-											toucheClavier.dataset['plus'] = 'oui';
+											keyboardKey.dataset['plus'] = 'oui';
 										}
 									}
 								} else {
 									// Cas où la touche n’est pas double
 									if (this.keyboardInformation.plus === 'oui') {
 										// Cas où la touche n’est pas double et + est activé
-										if (contenuTouche['Primary' + '+'] !== undefined && row < 6) {
+										if (newKeyContent['Primary' + '+'] !== undefined && row < 6) {
 											// Si la layer + existe ET n’est pas en thumb cluster
-											toucheClavier.innerHTML = '<div>' + contenuTouche['Primary' + '+'] + '</div>';
-											toucheClavier.dataset['plus'] = 'oui';
+											keyboardKey.innerHTML = '<div>' + newKeyContent['Primary' + '+'] + '</div>';
+											keyboardKey.dataset['plus'] = 'oui';
 										} else {
-											toucheClavier.innerHTML = '<div>' + contenuTouche['Primary'] + '</div>';
+											keyboardKey.innerHTML = '<div>' + newKeyContent['Primary'] + '</div>';
 										}
 									} else {
-										toucheClavier.innerHTML = '<div>' + contenuTouche['Primary'] + '</div>';
+										keyboardKey.innerHTML = '<div>' + newKeyContent['Primary'] + '</div>';
 									}
 								}
 							} else {
 								// Toutes les couches autres que "Visuel"
 								if (this.keyboardInformation.plus === 'oui') {
 									if (
-										contenuTouche[this.keyboardInformation.layer + '+'] !== undefined &&
-										(row < 6 || res['key'] === 'Space')
+										newKeyContent[this.keyboardInformation.layer + '+'] !== undefined &&
+										(row < 6 || newKey['key'] === 'Space')
 									) {
 										// Si la layer + existe et n’est pas en thumb cluster. Sur le thumb cluster, on affiche seulement le tap hold en space et pas en Alt ou Ctrl
-										toucheClavier.innerHTML =
-											'<div>' + contenuTouche[this.keyboardInformation.layer + '+'] + '</div>';
-										toucheClavier.dataset.plus = 'oui';
+										keyboardKey.innerHTML =
+											'<div>' + newKeyContent[this.keyboardInformation.layer + '+'] + '</div>';
+										keyboardKey.dataset.plus = 'oui';
 									} else {
-										toucheClavier.innerHTML =
-											'<div>' + contenuTouche[this.keyboardInformation.layer] + '</div>';
+										keyboardKey.innerHTML =
+											'<div>' + newKeyContent[this.keyboardInformation.layer] + '</div>';
 									}
 								} else {
-									toucheClavier.innerHTML =
-										'<div>' + contenuTouche[this.keyboardInformation.layer] + '</div>';
+									keyboardKey.innerHTML =
+										'<div>' + newKeyContent[this.keyboardInformation.layer] + '</div>';
 								}
 							}
 						}
 
-						if (this.keyboardInformation.controles === 'oui') {
-							// Functionality to switch layer by clicking on a key
-							toucheClavier.addEventListener(
+						// Functionality to switch layer by clicking on a key
+						if (this.keyboardInformation['controls'] === 'oui') {
+							keyboardKey.addEventListener(
 								'click',
 								() => {
-									this.layerSwitch(toucheClavier);
+									this.layerSwitch(keyboardKey);
 								},
 								{ passive: true }
 							);
 						}
 
-						// Corrections localisées sur la barre d’espace
-						if (
-							this.keyboardInformation.type === 'ergodox' &&
-							res['key'] === 'Space' &&
-							['Visuel', 'Primary'].includes(this.keyboardInformation.layer)
-						) {
-							toucheClavier.innerHTML = '<div>␣</div>';
-						}
-						if (
-							this.keyboardInformation.type === 'iso' &&
-							res['key'] === 'Space' &&
-							this.keyboardInformation.layer === 'Visuel' &&
-							this.keyboardInformation.plus === 'non'
-						) {
-							toucheClavier.innerHTML = '<div>' + this.data_disposition['name'] + '</div>';
-						}
-
-						// On ajoute des this.keyboardInformation dans les data attributes de la touche
-						toucheClavier.dataset['key'] = res['key'];
-						toucheClavier.dataset['column'] = column;
-						toucheClavier.dataset['finger'] = res['finger'];
-						toucheClavier.dataset['hand'] = res['hand'];
-						toucheClavier.dataset['type'] = contenuTouche['type'];
-						toucheClavier.dataset['style'] = '';
-						if (
-							this.keyboardInformation.layer === 'Visuel' &&
-							contenuTouche['Primary' + '-style'] !== undefined &&
-							contenuTouche['Primary' + '-style'] !== ''
-						) {
-							toucheClavier.dataset['style'] = contenuTouche['Primary' + '-style'];
-						} else {
-							if (
-								this.keyboardInformation.plus === 'oui' &&
-								contenuTouche[this.keyboardInformation.layer + '+' + '-style'] !== undefined &&
-								contenuTouche[this.keyboardInformation.layer + '+' + '-style'] !== ''
-							) {
-								toucheClavier.dataset['style'] =
-									contenuTouche[this.keyboardInformation.layer + '+' + '-style'];
-							} else if (
-								contenuTouche[this.keyboardInformation.layer + '-style'] !== undefined &&
-								contenuTouche[this.keyboardInformation.layer + '-style'] !== ''
-							) {
-								toucheClavier.dataset['style'] =
-									contenuTouche[this.keyboardInformation.layer + '-style'];
-							}
-						}
-						toucheClavier.style.setProperty('--size', res['size']);
-						let frequence = characterFrequencies[contenuTouche[this.keyboardInformation.layer]];
-						toucheClavier.style.setProperty('--frequence', frequence);
-						let frequence_normalisee =
-							(characterFrequencies[contenuTouche[this.keyboardInformation.layer]] -
-								characterFrequencies['min']) /
-							(characterFrequencies['max'] - characterFrequencies['min']); // Entre 0 et 1 avec 1 pour la lettre la plus fréquente
-						toucheClavier.style.setProperty(
-							'--frequence-normalisee',
-							logarithmicTransformation(frequence_normalisee, 40)
-						);
+						this.postProcessingKeys(keyboardKey, newKey);
+						this.setKeyProperties(keyboardKey, column, newKeyContent, newKey);
 					}
 				}
 			}
 		} catch (error) {
 			return;
+		}
+	}
+
+	cleanKey(keyboardLocation, row, column) {
+		// Suppression des event listeners sur la touche
+		const keyboardKey0 = keyboardLocation.querySelector(
+			"bloc-touche[data-row='" + row + "'][data-column='" + column + "']"
+		);
+		let keyboardKey = keyboardKey0.cloneNode(true);
+		keyboardKey0.parentNode.replaceChild(keyboardKey, keyboardKey0);
+
+		// Nettoyage des attributs de la touche
+		const attributes = keyboardKey.getAttributeNames();
+		const attributesToKeep = ['data-row', 'data-column'];
+		attributes.forEach((attribute) => {
+			if (attribute.startsWith('data-') && !attributesToKeep.includes(attribute)) {
+				keyboardKey.removeAttribute(attribute);
+			}
+		});
+		// Suppression du contenu de la touche
+		keyboardKey.dataset['key'] = '';
+		keyboardKey.dataset['plus'] = 'non';
+		keyboardKey.classList.remove('pressed-key'); // Suppression de la classe css pour les touches pressées
+
+		return keyboardLocation.querySelector(
+			"bloc-touche[data-row='" + row + "'][data-column='" + column + "']"
+		);
+	}
+
+	setKeyProperties(keyboardKey, column, newKeyContent, newKey) {
+		// On ajoute des this.keyboardInformation dans les data attributes de la touche
+		// This enables automatic styling of key groups with CSS
+		keyboardKey.dataset['key'] = newKey['key'];
+		keyboardKey.dataset['column'] = column;
+		keyboardKey.dataset['finger'] = newKey['finger'];
+		keyboardKey.dataset['hand'] = newKey['hand'];
+		keyboardKey.dataset['type'] = newKeyContent['type'];
+		keyboardKey.dataset['style'] = '';
+
+		if (
+			this.keyboardInformation.layer === 'Visuel' &&
+			newKeyContent['Primary' + '-style'] !== undefined &&
+			newKeyContent['Primary' + '-style'] !== ''
+		) {
+			keyboardKey.dataset['style'] = newKeyContent['Primary' + '-style'];
+		} else {
+			if (
+				this.keyboardInformation.plus === 'oui' &&
+				newKeyContent[this.keyboardInformation.layer + '+' + '-style'] !== undefined &&
+				newKeyContent[this.keyboardInformation.layer + '+' + '-style'] !== ''
+			) {
+				keyboardKey.dataset['style'] =
+					newKeyContent[this.keyboardInformation.layer + '+' + '-style'];
+			} else if (
+				newKeyContent[this.keyboardInformation.layer + '-style'] !== undefined &&
+				newKeyContent[this.keyboardInformation.layer + '-style'] !== ''
+			) {
+				keyboardKey.dataset['style'] = newKeyContent[this.keyboardInformation.layer + '-style'];
+			}
+		}
+
+		keyboardKey.style.setProperty('--size', newKey['size']);
+
+		let frequency = characterFrequencies[newKeyContent[this.keyboardInformation.layer]];
+		keyboardKey.style.setProperty('--frequency', frequency);
+
+		let frequency_normalized = // Between 0 et 1 avec 1 pour la lettre la plus fréquente
+			(characterFrequencies[newKeyContent[this.keyboardInformation.layer]] -
+				characterFrequencies['min']) /
+			(characterFrequencies['max'] - characterFrequencies['min']);
+		keyboardKey.style.setProperty(
+			'--frequency_normalized',
+			logarithmicTransformation(frequency_normalized, 40)
+		);
+	}
+
+	postProcessingKeys(keyboardKey, newKey) {
+		// Modifications on the Space key to also show the name of the Layout
+		let plus = this.keyboardInformation.plus === 'oui' ? ' <span class="glow">+</span>' : '';
+		// ISO
+		if (
+			this.keyboardInformation.layer === 'Visuel' &&
+			this.keyboardInformation.type === 'iso' &&
+			newKey['key'] === 'Space'
+		) {
+			keyboardKey.innerHTML = '<div>' + this.data_disposition['name'] + plus + '</div>';
+		}
+		// Ergodox
+		if (
+			this.keyboardInformation.type === 'ergodox' &&
+			newKey['key'] === 'Space' &&
+			['Visuel', 'Primary'].includes(this.keyboardInformation.layer)
+		) {
+			keyboardKey.innerHTML = '<div>␣</div>';
+		}
+
+		if (
+			this.keyboardInformation.layer === 'Visuel' &&
+			this.keyboardInformation.plus === 'oui' &&
+			newKey['key'] === 'magique'
+		) {
+			keyboardKey.innerHTML = '<div><span class="glow" style = "position:initial">★</span></div>';
 		}
 	}
 

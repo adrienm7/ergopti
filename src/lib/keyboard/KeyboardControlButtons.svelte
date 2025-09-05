@@ -3,10 +3,10 @@
 	import { Keyboard } from '$lib/keyboard/Keyboard.js';
 	import { onMount } from 'svelte';
 
-	import ChangementType from '$lib/keyboard/controles/ChangementType.svelte';
-	import ChangementCouleur from '$lib/keyboard/controles/ChangementCouleur.svelte';
-	import ChangementPlus from '$lib/keyboard/controles/ChangementPlus.svelte';
-	import ChangementCouche from '$lib/keyboard/controles/ChangementCouche.svelte';
+	import ChangementType from '$lib/keyboard/controls/ChangementType.svelte';
+	import ChangementCouleur from '$lib/keyboard/controls/ChangementCouleur.svelte';
+	import ChangementPlus from '$lib/keyboard/controls/ChangementPlus.svelte';
+	import ChangementCouche from '$lib/keyboard/controls/ChangementCouche.svelte';
 
 	export let nom;
 	let keyboardInformation;
@@ -33,7 +33,7 @@
 	}
 </script>
 
-<controles-clavier id={'controles_' + nom}>
+<keyboard-controls id={'controls_' + nom}>
 	<ChangementType
 		on:message={handleMessage}
 		coucheValue={keyboardInformation.layer}
@@ -62,4 +62,4 @@
 		couleurValue={keyboardInformation.couleur}
 		plusValue={keyboardInformation.plus}
 	/>
-</controles-clavier>
+</keyboard-controls>

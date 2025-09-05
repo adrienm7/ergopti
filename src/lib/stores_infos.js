@@ -12,7 +12,7 @@ export const presentation = writable({
 	layer: 'Visuel',
 	plus: 'non',
 	couleur: 'oui',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const presentation_plus = writable({
@@ -21,7 +21,7 @@ export const presentation_plus = writable({
 	layer: 'Visuel',
 	plus: 'oui',
 	couleur: 'oui',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const reference = writable({
@@ -30,7 +30,7 @@ export const reference = writable({
 	layer: 'Visuel',
 	plus: 'oui',
 	couleur: 'oui',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const emulation = writable({
@@ -39,7 +39,7 @@ export const emulation = writable({
 	layer: 'Primary',
 	plus: 'oui',
 	couleur: 'oui',
-	controles: 'non'
+	controls: 'non'
 });
 
 export const frequences = writable({
@@ -48,7 +48,7 @@ export const frequences = writable({
 	layer: 'Primary',
 	plus: 'non',
 	couleur: 'freq',
-	controles: 'non'
+	controls: 'non'
 });
 
 export const roulements = writable({
@@ -57,7 +57,7 @@ export const roulements = writable({
 	layer: 'Visuel',
 	plus: 'non',
 	couleur: 'non',
-	controles: 'non'
+	controls: 'non'
 });
 
 export const controle = writable({
@@ -66,7 +66,7 @@ export const controle = writable({
 	layer: 'Ctrl',
 	plus: 'non',
 	couleur: 'oui',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const raccourcis_ergodox = writable({
@@ -75,7 +75,7 @@ export const raccourcis_ergodox = writable({
 	layer: 'Ctrl',
 	plus: 'non',
 	couleur: 'oui',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const symboles = writable({
@@ -84,7 +84,7 @@ export const symboles = writable({
 	layer: 'AltGr',
 	plus: 'non',
 	couleur: 'non',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const symboles_plus = writable({
@@ -93,7 +93,7 @@ export const symboles_plus = writable({
 	layer: 'AltGr',
 	plus: 'oui',
 	couleur: 'non',
-	controles: 'non'
+	controls: 'non'
 });
 
 export const magique = writable({
@@ -102,7 +102,7 @@ export const magique = writable({
 	layer: 'Visuel',
 	plus: 'oui',
 	couleur: 'non',
-	controles: 'non'
+	controls: 'non'
 });
 
 export const layer = writable({
@@ -111,7 +111,7 @@ export const layer = writable({
 	layer: 'Layer',
 	plus: 'oui',
 	couleur: 'non',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const a = writable({
@@ -120,7 +120,7 @@ export const a = writable({
 	layer: 'À',
 	plus: 'oui',
 	couleur: 'non',
-	controles: 'oui'
+	controls: 'oui'
 });
 
 export const virgule = writable({
@@ -129,5 +129,5 @@ export const virgule = writable({
 	layer: ',',
 	plus: 'oui',
 	couleur: 'non',
-	controles: 'oui'
+	controls: 'oui'
 });

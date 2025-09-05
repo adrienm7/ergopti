@@ -127,8 +127,8 @@ export class KeyboardEmulation extends Keyboard {
 		); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
-			let toucheClavier = this.data_disposition.touches.find((el) => el['key'] == res['key']);
-			this.presserToucheClavier(toucheClavier['key']); // Presser la touche sur le clavier visuel
+			let keyboardKey = this.data_disposition.touches.find((el) => el['key'] == res['key']);
+			this.presserToucheClavier(keyboardKey['key']); // Presser la touche sur le clavier visuel
 			let touche;
 			if (
 				this.altgr &&
@@ -163,7 +163,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = toucheClavier['e'];
+					touche = keyboardKey['e'];
 				}
 				this.e = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -171,7 +171,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = toucheClavier['^'];
+					touche = keyboardKey['^'];
 				}
 				this.circonflexe = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -179,7 +179,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = toucheClavier['trema'];
+					touche = keyboardKey['trema'];
 				}
 				this.trema = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -187,7 +187,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = toucheClavier['i'];
+					touche = keyboardKey['i'];
 				}
 				this.i = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -195,7 +195,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = toucheClavier['R'];
+					touche = keyboardKey['R'];
 				}
 				this.R = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -205,7 +205,7 @@ export class KeyboardEmulation extends Keyboard {
 				} else {
 					// On supprime le à avant de taper le raccourci de la layer À
 					this.textarea.value = this.textarea.value.slice(0, -1);
-					touche = toucheClavier['À'];
+					touche = keyboardKey['À'];
 				}
 				this.a_grave = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -215,25 +215,25 @@ export class KeyboardEmulation extends Keyboard {
 				} else {
 					// On supprime le , avant de taper le raccourci de la layer Virgule
 					this.textarea.value = this.textarea.value.slice(0, -1);
-					touche = toucheClavier[','];
+					touche = keyboardKey[','];
 				}
 				this.virgule = false;
 				this.envoiTouche_ReplacerCurseur(touche);
 			} else {
-				this.envoiTouche(event, toucheClavier);
+				this.envoiTouche(event, keyboardKey);
 			}
 		}
 	}
 
-	envoiTouche(event, toucheClavier) {
+	envoiTouche(event, keyboardKey) {
 		/* Ctrl + touche renvoie Ctrl + émulation de touche */
 		/* Ne fonctionne pas actuellement */
 		// if (this.control & !this.altgr) {
 		// 	// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
-		// 	console.log(toucheClavier.touche);
+		// 	console.log(keyboardKey.touche);
 		// 	// Crée un nouvel événement clavier pour "Ctrl + lettre".
 		// 	const ctrlEvent = new KeyboardEvent('keydown', {
-		// 		key: toucheClavier.touche,
+		// 		key: keyboardKey.touche,
 		// 		ctrlKey: true, // Spécifie que la touche Ctrl est enfoncée
 		// 		bubbles: true,
 		// 		cancelable: true
@@ -245,13 +245,13 @@ export class KeyboardEmulation extends Keyboard {
 
 		let touche = '';
 		if (this.keyboardInformation['plus'] === 'oui') {
-			if (toucheClavier[this.layer + '+'] !== undefined) {
-				touche = toucheClavier[this.layer + '+'];
+			if (keyboardKey[this.layer + '+'] !== undefined) {
+				touche = keyboardKey[this.layer + '+'];
 			} else {
-				touche = toucheClavier[this.layer];
+				touche = keyboardKey[this.layer];
 			}
 		} else {
-			touche = toucheClavier[this.layer];
+			touche = keyboardKey[this.layer];
 		}
 
 		touche = touche.replace(/<espace-insecable><\/espace-insecable>/g, ' ');

@@ -204,8 +204,8 @@
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		background-image: inherit; */
-		-webkit-appearance: none;
-		-moz-appearance: none;
+		/* -webkit-appearance: none;
+		-moz-appearance: none; */
 		background-clip: text;
 		border: 1px solid rgb(14, 83, 117);
 		border-radius: 5px;

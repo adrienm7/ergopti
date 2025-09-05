@@ -6,10 +6,17 @@
 }
 
 .card {
-	display: block;
 	align-items: center;
 	border-radius: 7px;
+	display: block;
 	padding: 1rem;
+}
+
+.card {
+	line-height: 1.3em;
+}
+.card kbd-sortie {
+	line-height: 1.8em;
 }
 
 .cards .card:nth-child(even) {
