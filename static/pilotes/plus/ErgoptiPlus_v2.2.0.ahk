@@ -10,7 +10,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 
 #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
-A_MaxHotkeysPerInterval := 200 ; Reduce messages saying too many hotkeys pressed in the interval
+A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed in the interval
 
 SetKeyDelay(0) ; No delay between key presses
 SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
@@ -123,9 +123,11 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
     }
 
     if WinActive("ahk_class Notepad") {
-        SleepDelay := 40
+        SleepDelay := 20
+        SleepDelayBackSpace := 30
     } else {
         SleepDelay := 0
+        SleepDelayBackSpace := 0
     }
 
     ; We pass the abbreviation as argument to delete it manually, as we use the B0 flag
@@ -142,18 +144,24 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
         if (EndChar == "`t") {
             SendFinalResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
-        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
-        SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
-        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
+        Sleep(SleepDelay)
+        loop NumberOfCharactersToDelete {
+            SendFinalResult("{BackSpace}", Map("OnlyText", False))
+            Sleep(SleepDelayBackSpace) ; Necessary for it to work in the Notepad with "," shortcuts
+        }
+        Sleep(SleepDelay)
         SendFinalResult(Replacement, Map("OnlyText", OnlyText))
         SendFinalResult(EndChar)
     } else {
         if (EndChar == "`t") {
             SendNewResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
-        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
-        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
-        Sleep(SleepDelay) ; Necessary for it to work in the Notepad
+        Sleep(SleepDelay)
+        loop NumberOfCharactersToDelete {
+            SendNewResult("{BackSpace}", Map("OnlyText", False))
+            Sleep(SleepDelayBackSpace) ; Necessary for it to work in the Notepad with "," shortcuts
+        }
+        Sleep(SleepDelay)
         SendNewResult(Replacement, Map("OnlyText", OnlyText))
         SendNewResult(EndChar, Map("OnlyText", False))
     }
@@ -616,9 +624,10 @@ global Features := Map(
             "Save",
             "CtrlJ",
             "-",
-            "LAltCapsLockGivesCapsWord",
             "AltGrLAlt",
             "AltGrCapsLock",
+            "LAltCapsLock",
+            "WinCapsLock",
             "-",
             "SelectLine",
             "Screen",
@@ -668,18 +677,18 @@ global Features := Map(
             Enabled: False,
             Description: "Ctrl + S = Ctrl + J",
         },
-        "LAltCapsLockGivesCapsWord", {
-            Enabled: True,
-            Description: "`"LAlt`" + `"CapsLock`" = CapsWord",
-        },
         "AltGrLAlt", Map(
             "BackSpace", {
                 Enabled: False,
                 Description: "`"AltGr`" + `"LAlt`" = BackSpace",
             },
-            "Delete", {
+            "CapsLock", {
                 Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = Delete",
+                Description: "`"AltGr`" + `"LAlt`" = CapsLock",
+            },
+            "CapsWord", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = CapsWord",
             },
             "CtrlBackSpace", {
                 Enabled: True,
@@ -689,16 +698,40 @@ global Features := Map(
                 Enabled: False,
                 Description: "`"AltGr`" + `"LAlt`" = Ctrl + Delete",
             },
+            "Delete", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = Delete",
+            },
+            "Enter", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = Entrée",
+            },
+            "Escape", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"LAlt`" = Échap",
+            },
             "OneShotShift", {
                 Enabled: False,
                 Description: "`"AltGr`" + `"LAlt`" = OneShotShift",
             },
-            "CapsWord", {
+            "Tab", {
                 Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = CapsWord",
+                Description: "`"AltGr`" + `"LAlt`" = Tab",
             },
         ),
         "AltGrCapsLock", Map(
+            "BackSpace", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = BackSpace",
+            },
+            "CapsLock", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = CapsLock",
+            },
+            "CapsWord", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = CapsWord",
+            },
             "CtrlDelete", {
                 Enabled: True,
                 Description: "`"AltGr`" + `"CapsLock`" = Ctrl + Delete",
@@ -707,15 +740,73 @@ global Features := Map(
                 Enabled: False,
                 Description: "`"AltGr`" + `"CapsLock`" = Ctrl + BackSpace",
             },
-            "CapsWord", {
+            "Delete", {
                 Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = CapsWord",
+                Description: "`"AltGr`" + `"CapsLock`" = Delete",
+            },
+            "Enter", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = Entrée",
+            },
+            "Escape", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = Échap",
+            },
+            "OneShotShift", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = OneShotShift",
+            },
+            "Tab", {
+                Enabled: False,
+                Description: "`"AltGr`" + `"CapsLock`" = Tab",
+            },
+        ),
+        "LAltCapsLock", Map(
+            "BackSpace", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = BackSpace",
             },
             "CapsLock", {
                 Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = CapsLock",
+                Description: "`"LAlt`" + `"CapsLock`" = CapsLock",
+            },
+            "CapsWord", {
+                Enabled: True,
+                Description: "`"LAlt`" + `"CapsLock`" = CapsWord",
+            },
+            "CtrlDelete", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = Ctrl + Delete",
+            },
+            "CtrlBackSpace", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = Ctrl + BackSpace",
+            },
+            "Delete", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = Delete",
+            },
+            "Enter", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = Entrée",
+            },
+            "Escape", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = Échap",
+            },
+            "OneShotShift", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = OneShotShift",
+            },
+            "Tab", {
+                Enabled: False,
+                Description: "`"LAlt`" + `"CapsLock`" = Tab",
             },
         ),
+        "WinCapsLock", {
+            Enabled: True,
+            Description: "Win + `"CapsLock`" = CapsLock",
+        },
         "SelectLine", {
             Enabled: True,
             Description: "Win + A(ll) = Sélectionne toute la ligne",
@@ -776,14 +867,59 @@ global Features := Map(
             "TabAlt"
         ],
         "CapsLock", Map(
-            "EnterCtrl", {
-                Enabled: True,
-                Description: "`"CapsLock`" : Enter en tap, Ctrl en hold. CapsLock en Win + `"CapsLock`"",
-                TimeActivationSeconds: 0.2,
-            },
             "BackSpace", {
                 Enabled: False,
-                Description: "`"CapsLock`" : BackSpace. CapsLock en Win + `"CapsLock`"",
+                Description: "`"CapsLock`" : BackSpace",
+            },
+            "BackSpaceCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : BackSpace en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CapsLockCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : CapsLock en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CapsWordCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : CapsWord en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CtrlBackSpaceCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : Ctrl + BackSpace en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CtrlDeleteCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : Ctrl + Delete en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "DeleteCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : Delete en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "EnterCtrl", {
+                Enabled: True,
+                Description: "`"CapsLock`" : Entrée en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "EscapeCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : Échap en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "OneShotShiftCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : OneShotShift en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "TabCtrl", {
+                Enabled: False,
+                Description: "`"CapsLock`" : Tab en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.2,
             },
         ),
         "LShiftCopy", {
@@ -797,18 +933,9 @@ global Features := Map(
             TimeActivationSeconds: 0.35,
         },
         "LAlt", Map(
-            "OneShotShift", {
-                Enabled: False,
-                Description: "`"LAlt`" : OneShotShift en tap, Shift en hold",
-            },
             "AltTabMonitor", {
                 Enabled: False,
                 Description: "`"LAlt`" : Alt+Tab sur le moniteur en tap, Alt en hold",
-                TimeActivationSeconds: 0.2,
-            },
-            "TabLayer", {
-                Enabled: False,
-                Description: "`"LAlt`" : Tab en tap, layer de navigation en hold",
                 TimeActivationSeconds: 0.2,
             },
             "BackSpace", {
@@ -818,6 +945,15 @@ global Features := Map(
             "BackSpaceLayer", {
                 Enabled: True,
                 Description: "`"LAlt`" : BackSpace en tap, layer de navigation en hold. Shift + `"LAlt`" = Delete",
+                TimeActivationSeconds: 0.2,
+            },
+            "OneShotShift", {
+                Enabled: False,
+                Description: "`"LAlt`" : OneShotShift en tap, Shift en hold",
+            },
+            "TabLayer", {
+                Enabled: False,
+                Description: "`"LAlt`" : Tab en tap, layer de navigation en hold",
                 TimeActivationSeconds: 0.2,
             },
         ),
@@ -834,14 +970,54 @@ global Features := Map(
             },
         ),
         "AltGr", Map(
-            "Tab", {
-                Enabled: True,
-                Description: "`"AltGr`" : Tab en tap, AltGr en hold",
+            "BackSpace", {
+                Enabled: False,
+                Description: "`"AltGr`" : BackSpace en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CapsLock", {
+                Enabled: False,
+                Description: "`"AltGr`" : CapsLock en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CapsWord", {
+                Enabled: False,
+                Description: "`"AltGr`" : CapsWord en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CtrlBackSpace", {
+                Enabled: False,
+                Description: "`"AltGr`" : Ctrl + BackSpace en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "CtrlDelete", {
+                Enabled: False,
+                Description: "`"AltGr`" : Ctrl + Delete en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "Delete", {
+                Enabled: False,
+                Description: "`"AltGr`" : Delete en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "Enter", {
+                Enabled: False,
+                Description: "`"AltGr`" : Entrée en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "Escape", {
+                Enabled: False,
+                Description: "`"AltGr`" : Échap en tap, AltGr en hold",
                 TimeActivationSeconds: 0.2,
             },
             "OneShotShift", {
                 Enabled: False,
                 Description: "`"AltGr`" : OneShotShift en tap, AltGr en hold",
+                TimeActivationSeconds: 0.2,
+            },
+            "Tab", {
+                Enabled: True,
+                Description: "`"AltGr`" : Tab en tap, AltGr en hold",
                 TimeActivationSeconds: 0.2,
             },
         ),
@@ -1034,24 +1210,32 @@ GetFeatureByPath(FullPath) {
     return Feature
 }
 
-; Toggle a feature Enabled state
 ToggleMenuVariableByPath(FullPath) {
     Feature := GetFeatureByPath(FullPath)
+    CurrentFeatureActivation := Feature.Enabled ; Needs to be saved before turning off all shortcuts of the category
 
-    ; Chercher position du dernier point
+    ; Find position of the last dot
     pos := InStr(FullPath, ".", , -1)
     if (pos) {
-        FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)   ; tout à gauche du point
-        FeatureName := SubStr(FullPath, pos + 1)      ; tout à droite du point
+        FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)   ; everything left of the last dot
+        FeatureName := SubStr(FullPath, pos + 1)              ; everything right of the last dot
     } else {
         FeatureCategoryPath := FullPath
         FeatureName := ""
     }
 
-    ; MsgBox(Feature.Description " " Feature.Enabled)
-    Feature.Enabled := !Feature.Enabled
-    ; MsgBox(Feature.Description " " Feature.Enabled)
-    Value := Feature.Enabled ? 1 : 0
+    ; Count dot levels in FullPath
+    DotCount := StrLen(FullPath) - StrLen(StrReplace(FullPath, ".", ""))
+    if (DotCount >= 2) {
+        ; Set to False all shortcut possibilities
+        FeatureCategory := GetFeatureByPath(FeatureCategoryPath)
+        for ShortcutName in FeatureCategory {
+            Shortcut := FeatureCategory.Get(ShortcutName)
+            Shortcut.Enabled := False
+            IniWrite(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath, ShortcutName . ".Enabled")
+        }
+    }
+    Feature.Enabled := !CurrentFeatureActivation
     IniWrite(Feature.Enabled, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
     Reload
 }
@@ -1541,19 +1725,25 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
             }
         }
     }
-    
-    ; The regex is to not trigger the wrapping if there are only blank lines
-    ; Fix a bug in Google Sheets where we cannot type - in a selected cell
-    RegEx := "^(\r\n|\r|\n|" Symbol ")+$"
-    If RegExMatch(Symbol, "^[\.\^\$\*\+\-\?\(\)\[\]\{\}\\]+$") {
-        RegEx := "^(\r\n|\r|\n|\" Symbol ")+$"
-    }
-    
+
+    ; This regex is to not trigger the wrapping if there are only blank lines
+    RegEx := "^(\r\n|\r|\n)+$"
+
     if Selection != "" and RegExMatch(Selection, RegEx) = 0 {
         ; Send all the text instantly and without triggering hotstrings while typing it
         SendInstant(LeftSymbol Selection RightSymbol)
     } else {
-        SendNewResult(Symbol)
+        if (Symbol == "^") {
+            ; Doesn’t work otherwise
+            SendEvent("{Text}^")
+            return
+        }
+        for SymbolToEscape in ["+", "!", "#", "{", "}"] {
+            if (Symbol == SymbolToEscape) {
+                Symbol := "{" Symbol "}"
+            }
+        }
+        SendEvent(Symbol) ; SendEvent({Text}) doesn’t work everywhere, for example in Google Sheets
     }
     UpdateLastSentCharacter(Symbol)
 }
@@ -2367,40 +2557,38 @@ RetrieveScancode(Letter) {
 ; ==========================
 
 #HotIf (
-    Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
-    ; We need to handle the shortcut differently when LAlt has been remapped:
-    and not Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
-    and not Features["TapHolds"]["LAlt"]["BackSpace"].Enabled ; No need to add the shortcut here, as it is impossible with a BackSpace key that fires immediately
+    ; We need to handle the shortcut differently when LAlt has been remapped
+    not Features["TapHolds"]["LAlt"]["BackSpace"].Enabled ; No need to add the shortcut here, as it is impossible to have this shortcut with a BackSpace key that fires immediately
     and not Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled ; Here we directly change the result on the layer
     and not Features["TapHolds"]["LAlt"]["TabLayer"].Enabled ; Here we directly change the result on the layer
+    and not Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled ; Necessary to be able to use OneShotShift on LAlt
 )
-SC038 & SC03A:: ToggleCapsWordState()
+SC038 & SC03A:: LAltCapsLockShortcut()
 #HotIf
 
-; This function fixes Features["Shortcuts"]["LAltCapsLockGivesCapsWord"] when used with Features["TapHolds"]["LAlt"]["OneShotShift"]
-; It needs to be used in every remapping of the "CapsLock" key, or the "CapsLock" key itself if no remapping is done
-CapsWordShortcutFix() {
-    if (
-        Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
-        and Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
-        and GetKeyState("SC038", "P")
-    ) {
-        ToggleCapsWordState()
-        return
+LAltCapsLockShortcut() {
+    if Features["Shortcuts"]["LAltCapsLock"]["BackSpace"].Enabled {
+        SendEvent("{BackSpace}")
+    } else if Features["Shortcuts"]["LAltCapsLock"]["CapsLock"].Enabled {
+        ToggleCapsLock()
+    } else if Features["Shortcuts"]["LAltCapsLock"]["CapsWord"].Enabled {
+        ToggleCapsWord()
+    } else if Features["Shortcuts"]["LAltCapsLock"]["CtrlBackSpace"].Enabled {
+        SendInput("^{BackSpace}")
+    } else if Features["Shortcuts"]["LAltCapsLock"]["CtrlDelete"].Enabled {
+        SendInput("^{Delete}")
+    } else if Features["Shortcuts"]["LAltCapsLock"]["Delete"].Enabled {
+        SendInput("{Delete}")
+    } else if Features["Shortcuts"]["LAltCapsLock"]["Enter"].Enabled {
+        SendInput("{Enter}")
+    } else if Features["Shortcuts"]["LAltCapsLock"]["Escape"].Enabled {
+        SendInput("{Escape}")
+    } else if Features["Shortcuts"]["LAltCapsLock"]["OneShotShift"].Enabled {
+        OneShotShift()
+    } else if Features["Shortcuts"]["LAltCapsLock"]["Tab"].Enabled {
+        SendInput("{Tab}")
     }
 }
-
-; When no remapping of the "CapsLock" key is done, add the fix
-#HotIf (
-    Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
-    and Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
-    and not Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled and not LayerEnabled
-)
-~SC03A::
-{
-    CapsWordShortcutFix()
-}
-#HotIf
 
 ; ==========================
 ; ======= 4.2) Shift =======
@@ -2435,103 +2623,116 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
 ; ======= 4.5) AltGr =======
 ; ==========================
 
-#HotIf Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled
-; "AltGr" + "LAlt" = BackSpace
-; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
-SC138 & SC038:: {
-    OneShotShiftFix()
-    if GetKeyState("Shift", "P") {
+#HotIf (
+    Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["CapsLock"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["CapsWord"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["CtrlBackSpace"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["CtrlDelete"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["Delete"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["Enter"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["Escape"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["OneShotShift"].Enabled
+    or Features["Shortcuts"]["AltGrLAlt"]["Tab"].Enabled
+)
+SC138 & SC038:: AltGrLAltShortcut()
+#HotIf
+
+AltGrLAltShortcut() {
+    if Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled {
+        OneShotShiftFix()
+        if GetKeyState("Shift", "P") {
+            ; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
+            SendInput("^{BackSpace}")
+        } else {
+            SendInput("{BackSpace}")
+        }
+    } else if Features["Shortcuts"]["AltGrLAlt"]["CapsLock"].Enabled {
+        ToggleCapsLock()
+    } else if Features["Shortcuts"]["AltGrLAlt"]["CapsWord"].Enabled {
+        ToggleCapsWord()
+    } else if Features["Shortcuts"]["AltGrLAlt"]["CtrlBackSpace"].Enabled {
+        OneShotShiftFix()
+        if GetKeyState("Shift", "P") {
+            ; "Shift" + "AltGr" + "LAlt" = BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
+            SendInput("{BackSpace}")
+        } else {
+            SendInput("^{BackSpace}")
+        }
+    } else if Features["Shortcuts"]["AltGrLAlt"]["CtrlDelete"].Enabled {
+        ; "Shift" + "AltGr" + "LAlt" = Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
+        OneShotShiftFix()
+        if GetKeyState("Shift", "P") {
+            SendInput("{Delete}")
+        } else {
+            SendInput("^{Delete}")
+        }
+    } else if Features["Shortcuts"]["AltGrLAlt"]["Delete"].Enabled {
+        ; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
+        OneShotShiftFix()
+        if GetKeyState("Shift", "P") {
+            SendInput("^{Delete}")
+        } else {
+            SendInput("{Delete}")
+        }
+    } else if Features["Shortcuts"]["AltGrLAlt"]["Enter"].Enabled {
+        SendInput("{Enter}")
+    } else if Features["Shortcuts"]["AltGrLAlt"]["Escape"].Enabled {
+        SendInput("{Escape}")
+    } else if Features["Shortcuts"]["AltGrLAlt"]["OneShotShift"].Enabled {
+        OneShotShift()
+    } else if Features["Shortcuts"]["AltGrLAlt"]["Tab"].Enabled {
+        SendInput("{Tab}")
+    }
+}
+
+#HotIf (
+    Features["Shortcuts"]["AltGrCapsLock"]["BackSpace"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["CapsLock"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["CapsWord"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["CtrlBackSpace"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["CtrlDelete"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["Delete"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["Enter"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["Escape"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["OneShotShift"].Enabled
+    or Features["Shortcuts"]["AltGrCapsLock"]["Tab"].Enabled
+)
+SC138 & SC03A:: AltGrCapsLockShortcut()
+#HotIf
+
+AltGrCapsLockShortcut() {
+    if Features["Shortcuts"]["AltGrCapsLock"]["BackSpace"].Enabled {
+        SendEvent("{BackSpace}")
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["CapsLock"].Enabled {
+        ToggleCapsLock()
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["CapsWord"].Enabled {
+        ToggleCapsWord()
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["CtrlBackSpace"].Enabled {
         SendInput("^{BackSpace}")
-    } else {
-        SendInput("{BackSpace}")
-    }
-}
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrLAlt"]["Delete"].Enabled
-; "AltGr" + "LAlt" = Delete
-; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
-SC138 & SC038:: {
-    OneShotShiftFix()
-    if GetKeyState("Shift", "P") {
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["CtrlDelete"].Enabled {
         SendInput("^{Delete}")
-    } else {
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["Delete"].Enabled {
         SendInput("{Delete}")
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["Enter"].Enabled {
+        SendInput("{Enter}")
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["Escape"].Enabled {
+        SendInput("{Escape}")
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["OneShotShift"].Enabled {
+        OneShotShift()
+    } else if Features["Shortcuts"]["AltGrCapsLock"]["Tab"].Enabled {
+        SendInput("{Tab}")
     }
 }
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrLAlt"]["CtrlBackSpace"].Enabled
-; "AltGr" + "LAlt" = Ctrl + BackSpace
-; "Shift" + "AltGr" + "LAlt" = BackSpace (Can’t use Ctrl because of AltGr = Ctrl + Alt)
-SC138 & SC038:: {
-    OneShotShiftFix()
-    if GetKeyState("Shift", "P") {
-        SendInput("{BackSpace}")
-    } else {
-        SendInput("^{BackSpace}")
-    }
-}
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrLAlt"]["CtrlDelete"].Enabled
-; "AltGr" + "LAlt" = Ctrl + Delete
-; "Shift" + "AltGr" + "LAlt" = Delete (Can’t use Ctrl because of AltGr = Ctrl + Alt)
-SC138 & SC038:: {
-    OneShotShiftFix()
-    if GetKeyState("Shift", "P") {
-        SendInput("{Delete}")
-    } else {
-        SendInput("^{Delete}")
-    }
-}
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrLAlt"]["OneShotShift"].Enabled
-; "AltGr" + "LAlt" = OneShotShift
-SC138 & SC038:: {
-    global OneShotShiftEnabled := True
-    OneShotShift()
-}
-#HotIf
-#HotIf Features["Shortcuts"]["AltGrLAlt"]["CapsWord"].Enabled
-; "AltGr" + "LAlt" = CapsWord
-SC138 & SC038:: {
-    ToggleCapsWordState()
-}
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CtrlDelete"].Enabled
-; "AltGr" + "CapsLock" = Ctrl + Delete
-SC138 & SC03A:: {
-    SendInput("^{Delete}")
-}
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CtrlBackSpace"].Enabled
-; "AltGr" + "CapsLock" = Ctrl + BackSpace
-SC138 & SC03A:: {
-    SendInput("^{BackSpace}")
-}
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CapsWord"].Enabled
-; "AltGr" + "CapsLock" = CapsWord
-SC138 & SC03A:: {
-    ToggleCapsWordState()
-}
-#HotIf
-
-#HotIf Features["Shortcuts"]["AltGrCapsLock"]["CapsLock"].Enabled
-; "AltGr" + "CapsLock" = CapsLock
-SC138 & SC03A:: {
-    SetCapsLockState( not GetCapsLockCondition())
-}
-#HotIf
 
 ; ============================
 ; ======= 4.6) Windows =======
 ; ============================
+
+#HotIf Features["Shortcuts"]["WinCapsLock"].Enabled
+; Win + "CapsLock" to toggle CapsLock
+#SC03A:: ToggleCapsLock()
+#HotIf
 
 if Features["Shortcuts"]["SelectLine"].Enabled {
     ; Win + A (All)
@@ -2837,12 +3038,12 @@ if Features["Shortcuts"]["SelectWord"].Enabled {
 
 ; (cf. https://github.com/qmk/qmk_firmware/blob/master/users/drashna/keyrecords/capwords.md)
 
-ToggleCapsWordState() {
+ToggleCapsWord() {
     global CapsWordEnabled := not CapsWordEnabled
     UpdateCapsLockLED()
 }
 
-DisableCapsWordState() {
+DisableCapsWord() {
     global CapsWordEnabled := False
     UpdateCapsLockLED()
 }
@@ -2856,26 +3057,26 @@ UpdateCapsLockLED() {
 }
 
 ; Defines what deactivates the CapsLock triggered by CapsWord
-#HotIf Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled and CapsWordEnabled
+#HotIf CapsWordEnabled
 SC039::
 {
     SendEvent("{Space}")
     Keywait("SC039") ; Solves bug of 2 sent Spaces when exiting CapsWord with a Space
-    DisableCapsWordState()
+    DisableCapsWord()
 }
 
 ; Big Enter key
 SC01C::
 {
     SendEvent("{Enter}")
-    DisableCapsWordState()
+    DisableCapsWord()
 }
 
 ; Mouse click
 ~LButton::
 ~RButton::
 {
-    DisableCapsWordState()
+    DisableCapsWord()
 }
 #HotIf
 
@@ -2891,47 +3092,101 @@ SC01C::
 ; ======= 5.1) CapsLock =======
 ; =============================
 
-#HotIf Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled and not LayerEnabled
-*SC03A::Enter
-; Tap-hold on "CapsLock" : Enter on tap, Ctrl on hold
-$SC03A::
-{
-    CapsWordShortcutFix()
-    SendEvent("{LControl Down}") ; It is necessary to send an event to then get it in A_PriorKey
+; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock not remapped
+#HotIf (
+    Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
+    and not Features["TapHolds"]["CapsLock"]["BackSpace"]
+    and not CapslockRemappedCondition()
+    and not LayerEnabled
+)
+SC03A:: {
+    if (GetKeyState("SC038", "P")) {
+        LAltCapsLockShortcut()
+        return
+    }
+    ToggleCapsLock()
+}
+#HotIf
+
+#HotIf Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled and not LayerEnabled
+*SC03A:: {
+    if (GetKeyState("SC038", "P")) {
+        LAltCapsLockShortcut()
+        return
+    }
+
+    SendEvent("{Blind}{BackSpace}")
+}
+#HotIf
+
+CapslockRemappedCondition() {
+    return (
+        Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled
+    )
+}
+
+#HotIf CapslockRemappedCondition() and not LayerEnabled
+*SC03A:: {
+    CtrlActivated := False
+    if (GetKeyState("SC01D", "P")) {
+        CtrlActivated := True
+    }
+
+    if (GetKeyState("SC038", "P")) {
+        ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock remapped
+        LAltCapsLockShortcut()
+        return
+    }
+
+    SendEvent("{LCtrl Down}")
     tap := KeyWait("CapsLock", "T" . Features["TapHolds"]["CapsLock"]["EnterCtrl"].TimeActivationSeconds)
-    if (tap and (A_PriorKey == "LControl")) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
-        SendEvent("{LControl Up}")
-        SendEvent("{Enter}")
-        DisableCapsWordState()
+    if (tap and A_PriorKey == "LControl") {
+        SendEvent("{LCtrl Up}")
+        CapsLockShortcut(CtrlActivated)
     }
-}
-SC03A Up:: SendEvent("{LControl Up}")
-
-; It is necessary to do this, otherwise keeping the finger pressed on CapsLock will trigger an infinite number of spaces instead of keeping Ctrl down
-^SC03A:: {
-    if GetKeyState("SC01D", 'P') {
-        SendInput("{LControl Down}{Enter}{LControl Up}")
-    }
+    SendEvent("{LCtrl Up}")
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
-SC03A::BackSpace
-#HotIf
+CapsLockShortcut(CtrlActivated) {
+    if CtrlActivated {
+        SendEvent("{LCtrl Down}")
+    }
 
-#HotIf Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled or Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
-; Win + "CapsLock" to toggle CapsLock
-#SC03A::
-{
-    global CapsWordEnabled := False
-    if GetKeyState("CapsLock", "T") {
-        SetCapsLockState("Off")
+    if Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled {
+        SendEvent("{Blind}{BackSpace}")
+    } else if Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled {
+        ToggleCapsLock()
+    } else if Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled {
+        ToggleCapsWord()
+    } else if Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled {
+        SendInput("^{BackSpace}")
+    } else if Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled {
+        SendInput("^{Delete}")
+    } else if Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled {
+        SendEvent("{Blind}{Delete}")
+    } else if Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled {
+        SendEvent("{Blind}{Enter}")
+        DisableCapsWord()
+    } else if Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled {
+        SendEvent("{Blind}{Escape}")
+    } else if Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled {
+        OneShotShift()
+    } else if Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled {
+        SendEvent("{Blind}{Tab}")
     }
-    else {
-        SetCapsLockState("On")
-    }
+
+    SendEvent("{LCtrl Up}")
 }
-#HotIf
 
 ; =====================================
 ; ======= 5.2) LShift and LCtrl =======
@@ -2964,8 +3219,10 @@ SC03A::BackSpace
     if (
         Now - CharacterSentTime <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000
         and A_PriorKey == "LControl"
+        and not GetKeyState("SC03A", "P") ; "CapsLock"
+        and not GetKeyState("SC038", "P") ; "LAlt"
     ) {
-        SendInput("^v")
+        SendInput("{LCtrl Down}v{LCtrl Up}")
     }
 }
 #HotIf
@@ -2987,7 +3244,6 @@ SC038:: {
         return
     }
 
-    global OneShotShiftEnabled := True
     SendEvent("{LAlt Up}")
     OneShotShift()
     SendInput("{LShift Down}")
@@ -3002,14 +3258,9 @@ SC038::
 {
     UpdateLastSentCharacter("LAlt")
 
-    global LayerEnabled := True
-    ResetNumberOfRepetitions()
-    UpdateCapsLockLED()
-
+    ActivateLayer()
     KeyWait("SC038")
-
-    LayerEnabled := False
-    UpdateCapsLockLED()
+    DisableLayer()
 
     Now := A_TickCount
     CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
@@ -3069,14 +3320,9 @@ SC038::
 {
     UpdateLastSentCharacter("LAlt")
 
-    global LayerEnabled := True
-    ResetNumberOfRepetitions()
-    UpdateCapsLockLED()
-
+    ActivateLayer()
     KeyWait("SC038")
-
-    LayerEnabled := False
-    UpdateCapsLockLED()
+    DisableLayer()
 
     Now := A_TickCount
     CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
@@ -3171,12 +3417,9 @@ SC039::
         return
     }
 
-    global LayerEnabled := True
-    ResetNumberOfRepetitions()
-    UpdateCapsLockLED()
+    ActivateLayer()
     KeyWait("SC039")
-    LayerEnabled := False
-    UpdateCapsLockLED()
+    DisableLayer()
 }
 SC039 Up:: {
     if (
@@ -3228,25 +3471,55 @@ SC039 Up:: {
 ; ======= 5.5) AltGr =======
 ; ==========================
 
-#HotIf Features["TapHolds"]["AltGr"]["Tab"].Enabled and not LayerEnabled
-RAlt::Tab
-; Tap-hold on "AltGr" : Tab on tap, AltGr on hold
+#HotIf (
+    not LayerEnabled
+    and (
+        Features["TapHolds"]["AltGr"]["BackSpace"].Enabled
+        or Features["TapHolds"]["AltGr"]["CapsLock"].Enabled
+        or Features["TapHolds"]["AltGr"]["CapsWord"].Enabled
+        or Features["TapHolds"]["AltGr"]["CtrlBackSpace"].Enabled
+        or Features["TapHolds"]["AltGr"]["CtrlDelete"].Enabled
+        or Features["TapHolds"]["AltGr"]["Delete"].Enabled
+        or Features["TapHolds"]["AltGr"]["Enter"].Enabled
+        or Features["TapHolds"]["AltGr"]["Escape"].Enabled
+        or Features["TapHolds"]["AltGr"]["OneShotShift"].Enabled
+        or Features["TapHolds"]["AltGr"]["Tab"].Enabled
+    )
+)
+; Tap-hold on "AltGr"
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
     tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["Tab"].TimeActivationSeconds)
+    ; TODO: real timeactivationseconds of the selected shortut
     if (tap and A_PriorKey == "RAlt") {
-        DisableCapsWordState()
-        if (GetKeyState("LControl", "P") and GetKeyState("LShift", "P")) {
-            SendInput("^+{Tab}")
-        } else if GetKeyState("LControl", "P") {
-            SendInput("^{Tab}")
-        } else if GetKeyState("LShift", "P") {
-            SendInput("+{Tab}")
-        } else if GetKeyState("LWin", "P") {
-            SendEvent("#{Tab}") ; SendInput doesn’t work in that case
-        } else {
-            SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
+        DisableCapsWord()
+        if Features["TapHolds"]["AltGr"]["BackSpace"].Enabled {
+            SendEvent("{Blind}{BackSpace}") ; SendEvent be able to trigger hotstrings
+            UpdateLastSentCharacter("BackSpace")
+        } else if Features["TapHolds"]["AltGr"]["CapsLock"].Enabled {
+            ToggleCapsLock()
+        } else if Features["TapHolds"]["AltGr"]["CapsWord"].Enabled {
+            ToggleCapsWord()
+        } else if Features["TapHolds"]["AltGr"]["CtrlBackSpace"].Enabled {
+            SendEvent("{Blind}^{BackSpace}")
+            UpdateLastSentCharacter("")
+        } else if Features["TapHolds"]["AltGr"]["CtrlDelete"].Enabled {
+            SendEvent("{Blind}^{Delete}")
+            UpdateLastSentCharacter("")
+        } else if Features["TapHolds"]["AltGr"]["Delete"].Enabled {
+            SendEvent("{Blind}{Delete}")
+            UpdateLastSentCharacter("Delete")
+        } else if Features["TapHolds"]["AltGr"]["Enter"].Enabled {
+            SendEvent("{Blind}{Enter}") ; SendEvent be able to trigger hotstrings with a Enter ending character
+            UpdateLastSentCharacter("Enter")
+        } else if Features["TapHolds"]["AltGr"]["Escape"].Enabled {
+            SendEvent("{Escape}")
+        } else if Features["TapHolds"]["AltGr"]["OneShotShift"].Enabled {
+            OneShotShift()
+        } else if Features["TapHolds"]["AltGr"]["Tab"].Enabled {
+            SendEvent("{Blind}{Tab}") ; SendEvent be able to trigger hotstrings with a Tab ending character
+            UpdateLastSentCharacter("Tab")
         }
     }
 }
@@ -3254,20 +3527,6 @@ RAlt:: ; Necessary to work on layouts like QWERTY
 SC01D & ~SC138 Up::
 RAlt Up:: {
     UpdateLastSentCharacter("")
-}
-#HotIf
-
-#HotIf Features["TapHolds"]["AltGr"]["OneShotShift"].Enabled and not LayerEnabled
-; Tap-hold on "AltGr" : OneShotShift on tap, AltGr on hold
-SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
-RAlt:: ; Necessary to work on layouts like QWERTY
-{
-    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["OneShotShift"].TimeActivationSeconds)
-    if (tap and A_PriorKey == "RAlt") {
-        DisableCapsWordState()
-        global OneShotShiftEnabled := True
-        OneShotShift()
-    }
 }
 #HotIf
 
@@ -3314,7 +3573,6 @@ SC11D::
 #HotIf Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled and not LayerEnabled
 ; Tap-hold on "RCtrl" : OneShotShift on tap, Shift on hold
 SC11D:: {
-    global OneShotShiftEnabled := True
     OneShotShift()
     SendEvent("{LShift Down}")
     KeyWait("SC11D")
@@ -3423,6 +3681,7 @@ GetMonitorFromPoint(X, Y) {
 ; ==============================
 
 OneShotShift() {
+    global OneShotShiftEnabled := True
     ihvText := InputHook("L1 T2 E", "%€.★', ")
     ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
     ihvText.Start()
@@ -3472,10 +3731,29 @@ OneShotShiftFix() {
     global OneShotShiftEnabled := False
 }
 
+ToggleCapsLock() {
+    global CapsWordEnabled := False
+    if GetKeyState("CapsLock", "T") {
+        SetCapsLockState("Off")
+    } else {
+        SetCapsLockState("On")
+    }
+}
+
 ; ================================
 ; ======= Navigation layer =======
 ; ================================
 
+ActivateLayer() {
+    global LayerEnabled := True
+    ResetNumberOfRepetitions()
+    UpdateCapsLockLED()
+}
+DisableLayer() {
+    global LayerEnabled := False
+    A_MaxHotkeysPerInterval := 150 ; Restore old value
+    UpdateCapsLockLED()
+}
 ResetNumberOfRepetitions() {
     SetNumberOfRepetitions(1)
 }
@@ -3487,16 +3765,33 @@ ActionLayer(action) {
     ResetNumberOfRepetitions()
 }
 
-; Fix to get the CapsWord shortcut working when "LAlt" is activating the layer
-#HotIf (
-    Features["Shortcuts"]["LAltCapsLockGivesCapsWord"].Enabled
-    and LayerEnabled
+; Fix to get the CapsWord shortcut working when pressing "LAlt" activates the layer
+#HotIf (LayerEnabled
     and (
         Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
         or Features["TapHolds"]["LAlt"]["TabLayer"].Enabled
+    ) and (
+        Features["Shortcuts"]["LAltCapsLock"]["BackSpace"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CapsLock"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CapsWord"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CtrlBackSpace"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CtrlDelete"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["Delete"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["OneShotShift"].Enabled
     )
 )
-SC03A:: ToggleCapsWordState() ; Overrides the "BackSpace" shortcut on the layer
+; Overrides the "BackSpace" shortcut on the layer
+SC03A:: {
+    DisableLayer() LAltCapsLockShortcut()
+}
+#HotIf
+
+; Fix when LAlt triggers the layer
+#HotIf (
+    Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
+    and LayerEnabled
+)
+SC038:: SendInput("{LAlt Up}") ; Necessary to do this, otherwise multicursor triger in VSCode when scrolling in the layer and then leaving it
 #HotIf
 
 ; Fix when Space triggers the layer
@@ -3511,8 +3806,14 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 ; The base layer will become this one when the navigation layer variable is set to True
 
 SC039:: ActionLayer("{Escape}")
-*WheelUp:: ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
-*WheelDown:: ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
+*WheelUp:: {
+    A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
+    ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
+}
+*WheelDown:: {
+    A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
+    ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
+}
 
 SC01D & ~SC138:: ; RAlt
 RAlt:: ; RAlt on QWERTY
