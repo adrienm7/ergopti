@@ -6,7 +6,7 @@
 	export let nom;
 	let clavier = new Keyboard(nom);
 	onMount(() => {
-		clavier.majClavier();
+		clavier.keyboardUpdate();
 	});
 </script>
 

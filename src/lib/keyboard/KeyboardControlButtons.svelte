@@ -15,7 +15,7 @@
 		keyboardInformation = value;
 	});
 	onMount(() => {
-		clavier.majClavier();
+		clavier.keyboardUpdate();
 	});
 
 	let texte = '';
@@ -29,7 +29,7 @@
 			currentData['layer'] = event.detail.layer;
 			return currentData;
 		});
-		clavier.majClavier();
+		clavier.keyboardUpdate();
 	}
 </script>
 
