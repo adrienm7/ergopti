@@ -24,4 +24,4 @@
 	qui amène les symboles directement sous les doigts.
 </p>
 <tiny-space></tiny-space>
-<KeyboardBasis nom="symboles" />
+<KeyboardBasis name="symboles" />

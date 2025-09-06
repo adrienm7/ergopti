@@ -62,7 +62,7 @@
 
 	<small-space></small-space>
 
-	<KeyboardBasis nom="layer" />
+	<KeyboardBasis name="layer" />
 	<p>
 		Le <kbd>Layer</kbd> de navigation contient quant à lui les flèches directionnelles pour naviguer
 		rapidement dans un texte, mais aussi toutes les combinaisons de ces flèches avec des

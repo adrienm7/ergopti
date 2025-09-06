@@ -136,7 +136,7 @@
 
 <h3>Visualisation des roulements</h3>
 <p>Vous pouvez visualiser les roulements présentés précédemment ci-dessous :</p>
-<KeyboardBasis nom="roulements" />
+<KeyboardBasis name="roulements" />
 <div style="height: 20px" />
 <controles-roulements
 	class="btn-group"
