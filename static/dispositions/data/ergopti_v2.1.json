@@ -2120,7 +2120,7 @@
 		{
 			"key": "LShift",
 			"Primary": "⇧",
-			"Primary+": "⇧<br><span class='tap'>Ⓒ</span>",
+			"Primary+": "<tap-hold><output-hold>⇧</output-hold><br><output-tap>Ⓒ</output-tap></tap-hold>",
 			"Shift": "⇧",
 			"AltGr": "⇧",
 			"ShiftAltGr": "⇧",
@@ -2138,7 +2138,7 @@
 		{
 			"key": "LCtrl",
 			"Primary": "Ctrl",
-			"Primary+": "Ctrl<br><span class='tap'>Ⓥ</span>",
+			"Primary+": "<tap-hold><output-hold>Ctrl</output-hold><br><output-tap>Ⓥ</output-tap></tap-hold>",
 			"Shift": "Ctrl",
 			"AltGr": "Ctrl",
 			"ShiftAltGr": "Ctrl",
@@ -2176,7 +2176,7 @@
 		{
 			"key": "LAlt",
 			"Primary": "Alt",
-			"Primary+": "Layer<br><span class='tap'>↩</span>",
+			"Primary+": "<tap-hold><output-hold>Layer</output-hold><br><output-tap>↩</output-tap></tap-hold>",
 			"Shift": "Alt",
 			"Shift+": "+↩",
 			"AltGr": "Alt",
@@ -2198,7 +2198,7 @@
 		{
 			"key": "RAlt",
 			"Primary": "AltGr",
-			"Primary+": "AltGr<br><span class='tap'>↹</span>",
+			"Primary+": "<tap-hold><output-hold>AltGr</output-hold><br><output-tap>↹</output-tap></tap-hold>",
 			"Shift": "AltGr",
 			"Shift+": "+↹",
 			"AltGr": "AltGr",
@@ -2269,7 +2269,7 @@
 		{
 			"key": "Tab",
 			"Primary": "↹",
-			"Primary+": "Alt<br><span class='tap'>Alt ↹</span>",
+			"Primary+": "<tap-hold><output-hold>Alt</output-hold><br><output-tap>Alt ↹</output-tap></tap-hold>",
 			"Shift": "↹",
 			"AltGr": "↹",
 			"ShiftAltGr": "↹",

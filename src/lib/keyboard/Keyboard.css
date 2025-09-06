@@ -134,6 +134,15 @@ keyboard-key[data-key='aucune'].active {
 	cursor: auto;
 }
 
+keyboard espace-insecable {
+	background-color: white;
+	border-radius: 1px;
+	display: inline-block;
+	height: 0.75em;
+	margin-right: 2px;
+	width: 0.25em;
+}
+
 /*
 ===============================
 ======= Version Ergodox =======
@@ -223,8 +232,12 @@ keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='RAlt'] div {
 	line-height: 1.35;
 }
 
-.tap {
+output-tap {
 	color: rgb(5, 121, 210);
+}
+
+keyboard-key[data-key='RCtrl'] div tap-hold {
+	font-size: 0.8em;
 }
 
 /*
@@ -588,23 +601,4 @@ keyboard,
 }
 #clavier_magique keyboard-key[data-key='magique'] {
 	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
-}
-
-/*
-======================
-======= Divers =======
-======================
-*/
-
-keyboard espace-insecable {
-	background-color: white;
-	border-radius: 1px;
-	display: inline-block;
-	height: 0.75em;
-	margin-right: 2px;
-	width: 0.25em;
-}
-
-.one-shot-shift {
-	font-size: 0.8em;
 }
