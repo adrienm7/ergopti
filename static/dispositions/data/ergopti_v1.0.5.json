@@ -1858,7 +1858,7 @@
 		},
 		{
 			"key": "Space",
-			"Primary": " ",
+			"Primary": "␣",
 			"Primary+": " ",
 			"Shift": "-",
 			"AltGr": "_",

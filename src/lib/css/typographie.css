@@ -62,6 +62,7 @@ i .path2::before,
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	color: transparent;
+	opacity: 1 !important;
 	text-decoration: none;
 }
 
@@ -104,6 +105,7 @@ i .path1::before {
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
 	color: transparent;
+	opacity: 1 !important;
 	text-decoration: none;
 }
 

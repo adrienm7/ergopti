@@ -2251,7 +2251,7 @@
 		},
 		{
 			"key": "Space",
-			"Primary": " ",
+			"Primary": "␣",
 			"Shift": "-",
 			"AltGr": "_",
 			"ShiftAltGr": "",
