@@ -4,7 +4,7 @@
 ========================================
 */
 
-bloc-clavier {
+keyboard {
 	--keyboard-width: 0.9; /* Pourcentage de la longueur de la page */
 	--keyboard-margin: calc(
 		var(--key-margin) * 7
@@ -53,7 +53,7 @@ keyboard-legend {
 =========================================
 */
 
-bloc-touche {
+keyboard-key {
 	--longueur-touche: calc(var(--key-size) * var(--size) - 2 * var(--key-margin));
 	--effet-3d: hsla(
 		var(--key-color),
@@ -97,7 +97,7 @@ bloc-touche {
 kbd,
 kbd-sortie,
 kbd-non,
-bloc-touche {
+keyboard-key {
 	align-items: center;
 	cursor: pointer;
 	font-family: 'Noto Sans', 'Noto Sans Symbols', sans-serif;
@@ -108,8 +108,8 @@ bloc-touche {
 	text-align: center;
 }
 
-bloc-touche:active,
-bloc-touche:hover,
+keyboard-key:active,
+keyboard-key:hover,
 .pressed-key {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 	box-shadow:
@@ -121,13 +121,13 @@ bloc-touche:hover,
 	top: var(--key-depth-change);
 }
 
-bloc-touche[data-key=''] {
+keyboard-key[data-key=''] {
 	display: none;
 }
 
-bloc-touche[data-key='aucune'],
-bloc-touche[data-key='aucune']:hover,
-bloc-touche[data-key='aucune'].active {
+keyboard-key[data-key='aucune'],
+keyboard-key[data-key='aucune']:hover,
+keyboard-key[data-key='aucune'].active {
 	background-color: transparent !important;
 	border-color: transparent;
 	box-shadow: none;
@@ -140,13 +140,13 @@ bloc-touche[data-key='aucune'].active {
 ===============================
 */
 
-/* Séparer en deux la clavier */
-bloc-clavier[data-type='ergodox'] bloc-touche[data-column='6'] {
+/* Separate the keyboard in 2 parts */
+keyboard[data-type='ergodox'] keyboard-key[data-column='6'] {
 	margin-right: 50px;
 }
 
-/* Séparer le thumb cluster du reste du clavier */
-bloc-clavier[data-type='ergodox'] keyboard-row[data-row='6'] {
+/* Separate the thumb cluster from the rest of the keyboard */
+keyboard[data-type='ergodox'] keyboard-row[data-row='6'] {
 	margin-top: 30px;
 }
 
@@ -156,20 +156,20 @@ bloc-clavier[data-type='ergodox'] keyboard-row[data-row='6'] {
 =============================
 */
 
-bloc-clavier[data-layer='Visuel'] bloc-touche[data-type='lettre'] div,
-bloc-clavier[data-layer='Visuel'] bloc-touche[data-type='français'] div {
+keyboard[data-layer='Visuel'] keyboard-key[data-type='lettre'] div,
+keyboard[data-layer='Visuel'] keyboard-key[data-type='français'] div {
 	text-transform: uppercase;
 }
 
-bloc-clavier[data-layer='Visuel'] bloc-touche[data-type='ponctuation'] div {
+keyboard[data-layer='Visuel'] keyboard-key[data-type='ponctuation'] div {
 	font-size: calc(var(--key-text-size) * 0.7);
 	font-weight: bolder;
 	line-height: 1;
 }
 
 /* Cas particulier de la touche Q qui fait Qu */
-bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-key='q'] div,
-bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-key='q'] div {
+keyboard[data-layer='Visuel'][data-plus='oui'] keyboard-key[data-key='q'] div,
+keyboard[data-layer='Shift'][data-plus='oui'] keyboard-key[data-key='q'] div {
 	text-transform: capitalize;
 }
 
@@ -179,12 +179,12 @@ bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-key='q'] div 
 ===========================
 */
 
-bloc-clavier[data-layer='Ctrl'] bloc-touche div {
+keyboard[data-layer='Ctrl'] keyboard-key div {
 	text-transform: uppercase;
 }
 
 /* Ne pas mettre en uppercase les noms des modificateurs */
-bloc-clavier[data-layer='Ctrl'] bloc-touche[data-type='special'] div {
+keyboard[data-layer='Ctrl'] keyboard-key[data-type='special'] div {
 	text-transform: none;
 }
 
@@ -194,52 +194,33 @@ bloc-clavier[data-layer='Ctrl'] bloc-touche[data-type='special'] div {
 ===============================
 */
 
-/* Style de toutes les touches qui changent avec Ergopti+ */
-bloc-clavier[data-plus='oui'] bloc-touche[data-plus='oui']:not([data-key='Space']),
-bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Visuel']
-	bloc-touche[data-key='Space'],
-bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Primary']
-	bloc-touche[data-key='Space'] {
+/* Style of all keys changing with Ergopti+ */
+keyboard[data-plus='oui'] keyboard-key[data-plus='oui']:not([data-key='Space']),
+keyboard[data-plus='oui'][data-type='ergodox'][data-layer='Visuel'] keyboard-key[data-key='Space'],
+keyboard[data-plus='oui'][data-type='ergodox'][data-layer='Primary']
+	keyboard-key[data-key='Space'] {
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
 }
 
-/* Hold-tap */
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
-	bloc-touche[data-key='Space']
-	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
-	bloc-touche[data-key='LCtrl']
-	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
-	bloc-touche[data-key='LCtrl']
-	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
-	bloc-touche[data-key='LAlt']
-	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
-	bloc-touche[data-key='LAlt']
-	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
-	bloc-touche[data-key='RAlt']
-	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
-	bloc-touche[data-key='RAlt']
-	div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel'] bloc-touche[data-key='Tab'] div,
-bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
-	bloc-touche[data-key='Tab']
-	div,
-bloc-clavier[data-plus='oui'] bloc-touche[data-key='CapsLock'] div {
-	font-size: calc(var(--key-text-size) * 0.65);
-	line-height: 1.2;
+keyboard[data-plus='oui'][data-type='iso'][data-layer='Visuel'] keyboard-key[data-key='Space'] div {
+	margin-top: -3px; /* Small fix to adding the "+" that puts the text a bit below its position */
 }
 
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='LShift'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='LShift'] div {
-	font-size: calc(var(--key-text-size) * 0.8);
-	line-height: 1.05;
+/* Tap-holds */
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='Tab'] div,
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='CapsLock'] div {
+	font-size: calc(var(--key-text-size) * 0.65);
+	line-height: 1.1;
+}
+
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LShift'] div,
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LCtrl'] div,
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LAlt'] div,
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='RAlt'] div {
+	font-size: calc(var(--key-text-size) * 0.65);
+	line-height: 1.35;
 }
 
 .tap {
@@ -252,104 +233,108 @@ bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='LShift
 ======================================
 */
 
-/* Affichage différent pour les touches mortes et les couches Ctrl différentes */
-bloc-touche[data-style='morte'],
-bloc-touche[data-style='different'] {
+/* Different style for dead keys and keys with a different Ctrl layer */
+keyboard-key[data-style='morte'],
+keyboard-key[data-style='different'] {
 	--key-color-saturation: 0% !important;
 	--key-color-luminosity: 100% !important;
 	--key-opacity: 5% !important;
-	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
-	font-family: sans-serif;
-	font-weight: normal;
+	font-family: sans-serif; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 }
 
-/* Touches spéciales */
-bloc-touche[data-key='LAlt'] div,
-bloc-touche[data-key='RAlt'] div,
-bloc-touche[data-key='LCtrl'] div,
-bloc-touche[data-key='RCtrl'] div,
-bloc-touche[data-key='CapsLock'] div,
-bloc-touche[data-key='Space'] div,
-bloc-touche[data-key='Win'] div,
-bloc-touche[data-key='Option'] div,
-bloc-touche[data-key='Tab'] div,
-bloc-touche[data-key='Escape'] div {
+/* Special keys with more than one character on them */
+keyboard-key[data-key='Escape'] div,
+keyboard-key[data-key='LCtrl'] div,
+keyboard-key[data-key='Win'] div,
+keyboard-key[data-key='LAlt'] div,
+keyboard-key[data-key='RCtrl'] div {
+	font-size: calc(var(--key-text-size) * 0.75);
+	font-weight: normal;
+}
+keyboard[data-type='iso'] keyboard-key[data-key='Space'] div,
+keyboard[data-type='iso'] keyboard-key[data-key='RAlt'] div,
+keyboard[data-type='iso'] keyboard-key[data-key='Option'] div {
 	font-size: calc(var(--key-text-size) * 0.7);
 	font-weight: normal;
 }
 
-bloc-touche[data-key='RShift'] div,
-bloc-touche[data-key='LShift'] div {
-	font-weight: bold;
+keyboard[data-type='ergodox'] keyboard-key[data-key='RAlt'] div {
+	font-size: 0.65em;
+	font-weight: normal;
 }
 
-bloc-touche[data-key='AltTab'] div {
-	font-size: 0.7em !important;
+keyboard-key[data-key='BackSpace'] div,
+keyboard-key[data-key='Delete'] div {
+	font-size: 0.85em;
+}
+
+keyboard-key[data-key='RShift'] div,
+keyboard-key[data-key='LShift'] div {
+	font-weight: bold; /* Symbol is too thin otherwise */
+}
+
+/* Key appearing on the Ergodox layout */
+keyboard-key[data-key='AltTab'] div {
+	font-size: 0.7em;
 	line-height: 1.15;
 }
 
-bloc-touche[data-key='BackSpace'] div,
-bloc-touche[data-key='Delete'] div {
+/* Smaller font for keys [qu] and [où] */
+keyboard[data-plus='oui'] [data-layer='Primary']keyboard-key[data-key='q'] div,
+keyboard[data-plus='oui'] [data-layer='AltGr'] keyboard-key[data-key='w'] div {
 	font-size: 0.9em;
 }
-
-/* Pas de taille trop grande pour la police des touches [qu] et [où] */
-bloc-clavier[data-layer='Primary'][data-plus='oui'] bloc-touche[data-key='q'] div,
-bloc-clavier[data-layer='AltGr'][data-plus='oui'] bloc-touche[data-key='w'] div {
-	font-size: 0.9em;
-}
-bloc-clavier[data-layer='Visuel'][data-plus='oui'] bloc-touche[data-key='q'] div,
-bloc-clavier[data-layer='Shift'][data-plus='oui'] bloc-touche[data-key='q'] div,
-bloc-clavier[data-layer='ShiftAltGr'][data-plus='oui'] bloc-touche[data-key='w'] div {
+keyboard[data-plus='oui'][data-layer='Visuel'] keyboard-key[data-key='q'] div,
+keyboard[data-plus='oui'][data-layer='Shift'] keyboard-key[data-key='q'] div,
+keyboard[data-plus='oui'][data-layer='ShiftAltGr'] keyboard-key[data-key='w'] div {
 	font-size: 0.85em;
 }
 
-/* Taille plus petite pour la légende Win+V */
-bloc-clavier[data-layer='Layer'] bloc-touche[data-key='Coller'] div {
+/* Smaller font for Win + V */
+keyboard[data-layer='Layer'] keyboard-key[data-key='Coller'] div {
 	font-size: 0.85em;
 }
 
-/* Layer de navigation, pour éviter que les touches avec 3 symboles débordent */
-bloc-clavier[data-layer='Layer']
-	bloc-touche:not([data-finger='pouce']):not([data-type='special'])
+/* Smaller font in navigation layer to prevent keys with 3 symbols to overflow */
+keyboard[data-layer='Layer']
+	keyboard-key:not([data-finger='thumb']):not([data-type='special']):not([data-type='enter'])
 	div {
 	font-size: 0.8em;
 }
 
-bloc-clavier[data-plus='non'] bloc-touche[data-key='CapsLock'] div {
+keyboard[data-layer='Layer'][data-type='ergodox'] keyboard-key[data-key='Space'] div {
+	font-size: 0.65em;
+}
+
+/* Smaller CapsLock symbol */
+keyboard[data-plus='non'] keyboard-key[data-key='CapsLock'] div {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
-
-bloc-clavier[data-layer='Layer'] bloc-touche[data-key='Copier'] div,
-bloc-clavier[data-layer='Layer'] bloc-touche[data-key='Couper'] div {
-	font-size: var(--key-text-size);
-}
-
-/* Layer À, pour éviter que les touches avec 4 symboles débordent */
-bloc-clavier[data-layer='À'] bloc-touche:not([data-type='special']) div {
+/* Smaller font in À layer to prevent keys with 4 symbols to overflow */
+keyboard[data-layer='À'] keyboard-key:not([data-type='special']):not([data-type='enter']) div {
 	font-size: 0.7em;
 }
 
 /*
-=============================
-======= Touche Entrée =======
-=============================
+=========================
+======= Enter key =======
+=========================
 */
 
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter'] {
+keyboard[data-type='iso'] keyboard-key[data-type='enter'] {
 	border-right: none;
 	position: relative;
 	top: 0;
 	z-index: 1;
 }
 
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter'] div {
+keyboard[data-type='iso'] keyboard-key[data-type='enter'] div {
 	font-weight: normal;
 	z-index: 3;
 }
 
 /* On cache la jonction entre la touche et le bas de la touche créé par ::after, avec un rectangle par-dessus */
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::before {
+keyboard[data-type='iso'] keyboard-key[data-type='enter']::before {
 	background-color: var(--couleur-fond-touche);
 	border-radius: 0 calc(var(--key-border-radius) - 1px) 0 0;
 	border-right: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
@@ -363,7 +348,7 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::before {
 }
 
 /* On crée la partie en bas de la touche Entrée */
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::after {
+keyboard[data-type='iso'] keyboard-key[data-type='enter']::after {
 	background-color: var(--couleur-fond-touche);
 	border: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
 	border-radius: 0 0 var(--key-border-radius) var(--key-border-radius);
@@ -383,19 +368,19 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']::after {
 
 /* Ce qui se passe quand on presse la touche Entrée */
 
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:active,
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:hover {
+keyboard[data-type='iso'] keyboard-key[data-type='enter']:active,
+keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover {
 	position: relative;
 	top: var(--key-depth-change);
 }
 
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:active::before,
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:hover::before {
+keyboard[data-type='iso'] keyboard-key[data-type='enter']:active::before,
+keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::before {
 	height: var(--key-size);
 }
 
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:active::after,
-bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:hover::after {
+keyboard[data-type='iso'] keyboard-key[data-type='enter']:active::after,
+keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::after {
 	box-shadow:
 		0 var(--key-pressed-depth) 0 var(--effet-3d),
 		0 var(--key-pressed-depth) 0 var(--effet-3d);
@@ -403,32 +388,32 @@ bloc-clavier[data-type='iso'] bloc-touche[data-type='enter']:hover::after {
 
 /* Couleur de la touche Entrée */
 
-bloc-touche[data-type='enter']::before,
-bloc-touche[data-type='enter']::after {
+keyboard-key[data-type='enter']::before,
+keyboard-key[data-type='enter']::after {
 	background-color: rgb(10, 10, 10) !important;
 	color: white !important;
 }
 
-bloc-touche[data-type='enter']:hover,
-bloc-touche[data-type='enter']:hover::before,
-bloc-touche[data-type='enter']:hover::after,
-bloc-touche[data-type='enter'].pressed-key,
-bloc-touche[data-type='enter'].pressed-key::before,
-bloc-touche[data-type='enter'].pressed-key::after {
+keyboard-key[data-type='enter']:hover,
+keyboard-key[data-type='enter']:hover::before,
+keyboard-key[data-type='enter']:hover::after,
+keyboard-key[data-type='enter'].pressed-key,
+keyboard-key[data-type='enter'].pressed-key::before,
+keyboard-key[data-type='enter'].pressed-key::after {
 	background-color: rgb(210, 210, 210) !important;
 	box-shadow: none;
 	color: #333;
 }
 
 /*
-========================
-======= Couleurs =======
-========================
+======================
+======= Colors =======
+======================
 */
 
 /* Couleur des touches par doigt et hand */
 /* On ne les sépare pas de pile 45 degrés, c’est adapté pour un meilleur rendu */
-bloc-clavier {
+keyboard {
 	--color-left-index-finger: 0deg;
 	--color-left-middle-finger: 35deg; /* 45deg in theory to divide regularly */
 	--color-left-ring-finger: 60deg; /* 90deg in theory to divide regularly */
@@ -439,53 +424,53 @@ bloc-clavier {
 	--color-right-index-finger: 315deg;
 }
 
-bloc-touche[data-hand='left'][data-finger='index'] {
+keyboard-key[data-hand='left'][data-finger='index'] {
 	--key-color: var(--color-left-index-finger);
 }
 
-bloc-touche[data-hand='left'][data-finger='majeur'] {
+keyboard-key[data-hand='left'][data-finger='majeur'] {
 	--key-color: var(--color-left-middle-finger);
 }
 
-bloc-touche[data-hand='left'][data-finger='annulaire'] {
+keyboard-key[data-hand='left'][data-finger='annulaire'] {
 	--key-color: var(--color-left-ring-finger);
 }
 
-bloc-touche[data-hand='left'][data-finger='auriculaire'] {
+keyboard-key[data-hand='left'][data-finger='auriculaire'] {
 	--key-color: var(--color-left-little-finger);
 }
 
-bloc-touche[data-hand='right'][data-finger='index'] {
+keyboard-key[data-hand='right'][data-finger='index'] {
 	--key-color: var(--color-right-index-finger);
 }
 
-bloc-touche[data-hand='right'][data-finger='majeur'] {
+keyboard-key[data-hand='right'][data-finger='majeur'] {
 	--key-color: var(--color-right-middle-finger);
 }
 
-bloc-touche[data-hand='right'][data-finger='annulaire'] {
+keyboard-key[data-hand='right'][data-finger='annulaire'] {
 	--key-color: var(--color-right-ring-finger);
 }
 
-bloc-touche[data-hand='right'][data-finger='auriculaire'] {
+keyboard-key[data-hand='right'][data-finger='auriculaire'] {
 	--key-color: var(--color-right-little-finger);
 }
 
-bloc-clavier[data-type='iso'] bloc-touche[data-type='space'] {
+/* Specific color for the Space bar */
+keyboard[data-type='iso'] keyboard-key[data-type='space'] {
 	/* background-color: rgb(0, 10, 30); */
 }
 
-/* Couleur spéciale pour les touches du pouce */
-bloc-clavier[data-type='ergodox'] bloc-touche[data-finger='pouce'] {
-	/* background-color: var(--couleur-fond-touche); */
+/* Specific color for Ergodox thumb keys */
+keyboard[data-type='ergodox'] keyboard-key[data-finger='thumb'] {
 	background-color: rgba(0, 46, 96, 0.3);
 }
 
 /* === Couleur des touches spéciales === */
 
-bloc-touche[data-type='space'],
-bloc-touche[data-type='special'],
-bloc-touche[data-key='Enter'] {
+keyboard-key[data-type='space'],
+keyboard-key[data-type='special'],
+keyboard-key[data-key='Enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
 	/* Bordure des touches des touches spéciales en blanc pour mieux les mettre en relief */
@@ -498,41 +483,40 @@ bloc-touche[data-key='Enter'] {
 
 /* === Si couleur, ou couleur spéciale === */
 
-bloc-clavier bloc-touche,
-bloc-clavier[data-couleur='oui'] bloc-touche {
+keyboard keyboard-key {
 	--key-color-luminosity: 70%;
 	--key-color-saturation: 100%;
 	--key-opacity: 30%;
 }
 
-bloc-clavier[data-couleur='non'] bloc-touche {
+keyboard[data-couleur='non'] keyboard-key {
 	--key-color: 190 !important;
 	--key-color-luminosity: 70%;
 	--key-opacity: 20%;
 }
 
-bloc-clavier[data-couleur='azerty'] bloc-touche {
+keyboard[data-couleur='azerty'] keyboard-key {
 	--key-color: 200 !important;
 }
-bloc-clavier[data-couleur='azerty'] keyboard-legend {
+keyboard[data-couleur='azerty'] keyboard-legend {
 	color: hsl(200, 100%, 80%);
 }
 
-bloc-clavier[data-couleur='ergopti'] bloc-touche {
+keyboard[data-couleur='ergopti'] keyboard-key {
 	--key-color: 300 !important;
 }
-bloc-clavier[data-couleur='ergopti'] keyboard-legend {
+keyboard[data-couleur='ergopti'] keyboard-legend {
 	color: hsl(300, 100%, 85%);
 }
 
-bloc-clavier[data-couleur='freq'] bloc-touche {
+keyboard[data-couleur='freq'] keyboard-key {
 	--key-color-luminosity: 100%;
 	--key-color-saturation: 0%;
 }
 
-bloc-clavier[data-couleur='freq'] bloc-touche[data-type='lettre'],
-bloc-clavier[data-couleur='freq'] bloc-touche[data-type='français'],
-bloc-clavier[data-couleur='freq'] bloc-touche[data-type='ponctuation'] {
+keyboard[data-couleur='freq'] keyboard-key[data-type='lettre'],
+keyboard[data-couleur='freq'] keyboard-key[data-type='français'],
+keyboard[data-couleur='freq'] keyboard-key[data-type='ponctuation'] {
 	--key-color: calc(180deg * (1 - var(--frequency_normalized)));
 	--key-color-saturation: 90%;
 	--key-color-luminosity: 70%;
@@ -543,11 +527,6 @@ bloc-clavier[data-couleur='freq'] bloc-touche[data-type='ponctuation'] {
 		var(--key-color-luminosity),
 		var(--key-opacity)
 	);
-}
-
-/* Pour avoir exactement le même style d'effet 3D en couleur et noir et blanc */
-bloc-clavier[data-couleur='oui'] bloc-touche[data-finger='pouce'] {
-	--effet-3d: hsla(var(--key-color), 0%, calc(100% - 20%), 70%);
 }
 
 /*
@@ -573,7 +552,7 @@ bloc-clavier[data-couleur='oui'] bloc-touche[data-finger='pouce'] {
 	}
 }
 
-bloc-clavier,
+keyboard,
 #clavier_emulation {
 	--key-size: min(47px, 100vw / 20) !important;
 	--key-margin: min(3px, 0.35vw) !important;
@@ -581,13 +560,13 @@ bloc-clavier,
 	--key-pressed-depth: 0.5px !important;
 }
 
-#clavier_controle bloc-touche[data-column]:nth-child(n + 8):nth-child(-n + 17),
-#clavier_controle bloc-touche[data-column='0'],
-#clavier_raccourcis_ergodox bloc-touche[data-column]:nth-child(n + 8):nth-child(-n + 17) {
+#clavier_controle keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17),
+#clavier_controle keyboard-key[data-column='0'],
+#clavier_raccourcis_ergodox keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17) {
 	display: none;
 }
-#clavier_controle bloc-touche[data-column='6'],
-#clavier_raccourcis_ergodox bloc-touche[data-column='6'] {
+#clavier_controle keyboard-key[data-column='6'],
+#clavier_raccourcis_ergodox keyboard-key[data-column='6'] {
 	margin-right: 0;
 }
 
@@ -595,19 +574,19 @@ bloc-clavier,
 	display: none;
 }
 
-#clavier_magique bloc-touche[data-plus='oui']:not([data-key='magique']) {
+#clavier_magique keyboard-key[data-plus='oui']:not([data-key='magique']) {
 	background: unset !important;
 	--key-color-saturation: 100% !important;
 	--key-color-luminosity: 70% !important;
 	background-color: var(--couleur-fond-touche) !important;
 }
-#clavier_magique bloc-touche[data-plus='oui']:not([data-key='magique']):hover {
+#clavier_magique keyboard-key[data-plus='oui']:not([data-key='magique']):hover {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 }
-#clavier_magique bloc-touche[data-plus='oui'][data-type='special'] {
+#clavier_magique keyboard-key[data-plus='oui'][data-type='special'] {
 	background-color: rgb(10, 10, 10) !important;
 }
-#clavier_magique bloc-touche[data-key='magique'] {
+#clavier_magique keyboard-key[data-key='magique'] {
 	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
 }
 
@@ -617,7 +596,7 @@ bloc-clavier,
 ======================
 */
 
-bloc-clavier espace-insecable {
+keyboard espace-insecable {
 	background-color: white;
 	border-radius: 1px;
 	display: inline-block;

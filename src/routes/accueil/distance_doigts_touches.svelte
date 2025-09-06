@@ -26,29 +26,35 @@
 	plus besoin de bouger les doigts, juste à presser les lettres de la rangée de repos et parfois
 	atteindre la rangée supérieure ou inférieure pour les lettres les moins fréquentes.
 </p>
-<bloc-clavier data-couleur="azerty">
+<keyboard data-couleur="azerty">
 	<keyboard-row class="center">
-		<bloc-touche data-finger="auriculaire" data-hand="left" style="--size: 1;"
-			><div>Q</div></bloc-touche
+		<keyboard-key data-finger="auriculaire" data-hand="left" style="--size: 1;"
+			><div>Q</div></keyboard-key
 		>
-		<bloc-touche data-finger="annulaire" data-hand="left" style="--size: 1;"
-			><div>S</div></bloc-touche
+		<keyboard-key data-finger="annulaire" data-hand="left" style="--size: 1;"
+			><div>S</div></keyboard-key
 		>
-		<bloc-touche data-finger="majeur" data-hand="left" style="--size: 1;"><div>D</div></bloc-touche>
-		<bloc-touche data-finger="index" data-hand="left" style="--size: 1;"><div>F</div></bloc-touche>
+		<keyboard-key data-finger="majeur" data-hand="left" style="--size: 1;"
+			><div>D</div></keyboard-key
+		>
+		<keyboard-key data-finger="index" data-hand="left" style="--size: 1;"><div>F</div></keyboard-key
+		>
 		<div style="display: inline-block; width: 50px;" />
-		<bloc-touche data-finger="index" data-hand="right" style="--size: 1;"><div>J</div></bloc-touche>
-		<bloc-touche data-finger="majeur" data-hand="right" style="--size: 1;"><div>K</div></bloc-touche
+		<keyboard-key data-finger="index" data-hand="right" style="--size: 1;"
+			><div>J</div></keyboard-key
 		>
-		<bloc-touche data-finger="annulaire" data-hand="right" style="--size: 1;"
-			><div>L</div></bloc-touche
+		<keyboard-key data-finger="majeur" data-hand="right" style="--size: 1;"
+			><div>K</div></keyboard-key
 		>
-		<bloc-touche data-finger="auriculaire" data-hand="right" style="--size: 1;"
-			><div>M</div></bloc-touche
+		<keyboard-key data-finger="annulaire" data-hand="right" style="--size: 1;"
+			><div>L</div></keyboard-key
+		>
+		<keyboard-key data-finger="auriculaire" data-hand="right" style="--size: 1;"
+			><div>M</div></keyboard-key
 		>
 	</keyboard-row>
 	<keyboard-legend>Rangée du milieu en AZERTY</keyboard-legend>
-</bloc-clavier>
+</keyboard>
 
 <p>
 	Pourtant, le QWERTY est pire qu’une disposition aléatoire sur ce point. La légende raconte que sa
@@ -69,29 +75,35 @@
 	l’écriture de chaque mot.
 </p>
 
-<bloc-clavier data-couleur="ergopti">
+<keyboard data-couleur="ergopti">
 	<keyboard-row class="center">
-		<bloc-touche data-finger="auriculaire" data-hand="left" style="--size: 1;"
-			><div>A</div></bloc-touche
+		<keyboard-key data-finger="auriculaire" data-hand="left" style="--size: 1;"
+			><div>A</div></keyboard-key
 		>
-		<bloc-touche data-finger="annulaire" data-hand="left" style="--size: 1;"
-			><div>I</div></bloc-touche
+		<keyboard-key data-finger="annulaire" data-hand="left" style="--size: 1;"
+			><div>I</div></keyboard-key
 		>
-		<bloc-touche data-finger="majeur" data-hand="left" style="--size: 1;"><div>E</div></bloc-touche>
-		<bloc-touche data-finger="index" data-hand="left" style="--size: 1;"><div>U</div></bloc-touche>
+		<keyboard-key data-finger="majeur" data-hand="left" style="--size: 1;"
+			><div>E</div></keyboard-key
+		>
+		<keyboard-key data-finger="index" data-hand="left" style="--size: 1;"><div>U</div></keyboard-key
+		>
 		<div style="display: inline-block; width: 50px;" />
-		<bloc-touche data-finger="index" data-hand="right" style="--size: 1;"><div>S</div></bloc-touche>
-		<bloc-touche data-finger="majeur" data-hand="right" style="--size: 1;"><div>N</div></bloc-touche
+		<keyboard-key data-finger="index" data-hand="right" style="--size: 1;"
+			><div>S</div></keyboard-key
 		>
-		<bloc-touche data-finger="annulaire" data-hand="right" style="--size: 1;"
-			><div>T</div></bloc-touche
+		<keyboard-key data-finger="majeur" data-hand="right" style="--size: 1;"
+			><div>N</div></keyboard-key
 		>
-		<bloc-touche data-finger="auriculaire" data-hand="right" style="--size: 1;"
-			><div>R</div></bloc-touche
+		<keyboard-key data-finger="annulaire" data-hand="right" style="--size: 1;"
+			><div>T</div></keyboard-key
+		>
+		<keyboard-key data-finger="auriculaire" data-hand="right" style="--size: 1;"
+			><div>R</div></keyboard-key
 		>
 	</keyboard-row>
 	<keyboard-legend>Rangée du milieu en Ergopti</keyboard-legend>
-</bloc-clavier>
+</keyboard>
 <p>
 	En français et en anglais, le <kbd>E</kbd>
 	est de loin la lettre la plus fréquente. Viennent ensuite les voyelles <kbd>A</kbd>,

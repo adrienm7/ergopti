@@ -399,7 +399,7 @@ export class KeyboardEmulation extends Keyboard {
 			}
 		});
 		emplacement
-			.querySelector("bloc-touche[data-key='" + touche + "']")
+			.querySelector("keyboard-key[data-key='" + touche + "']")
 			.classList.add('pressed-key');
 	}
 }

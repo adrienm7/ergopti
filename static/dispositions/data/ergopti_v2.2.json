@@ -506,7 +506,7 @@
 		{
 			"key": "LAlt",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "5",
 			"column": "2",
 			"size": "1.25"
@@ -515,7 +515,7 @@
 			"key": "Space",
 			"code": "Space",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "5",
 			"column": "4",
 			"size": "7"
@@ -524,7 +524,7 @@
 			"key": "RAlt",
 			"code": "AltRight",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "5",
 			"column": "10",
 			"size": "1.25"
@@ -1038,7 +1038,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "0",
 			"size": "1"
@@ -1046,7 +1046,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "1",
 			"size": "1"
@@ -1054,7 +1054,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "2",
 			"size": "1"
@@ -1062,7 +1062,7 @@
 		{
 			"key": "Enter",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "3",
 			"size": "1"
@@ -1070,7 +1070,7 @@
 		{
 			"key": "LCtrl",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "5",
 			"size": "1"
@@ -1078,7 +1078,7 @@
 		{
 			"key": "LAlt",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "6",
 			"size": "1"
@@ -1086,7 +1086,7 @@
 		{
 			"key": "Escape",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "7",
 			"size": "1"
@@ -1094,7 +1094,7 @@
 		{
 			"key": "RCtrl",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "8",
 			"size": "1"
@@ -1102,7 +1102,7 @@
 		{
 			"key": "Tab",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "9",
 			"size": "1"
@@ -1110,7 +1110,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "0",
 			"size": "1"
@@ -1118,7 +1118,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "1",
 			"size": "1"
@@ -1126,7 +1126,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "2",
 			"size": "1"
@@ -1134,7 +1134,7 @@
 		{
 			"key": "Space",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "3",
 			"size": "1"
@@ -1142,7 +1142,7 @@
 		{
 			"key": "BackSpace",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "5",
 			"size": "1"
@@ -1150,7 +1150,7 @@
 		{
 			"key": "Delete",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "6",
 			"size": "1"
@@ -1158,7 +1158,7 @@
 		{
 			"key": "Win",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "7",
 			"size": "1"
@@ -1166,7 +1166,7 @@
 		{
 			"key": "RShift",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "8",
 			"size": "1"
@@ -1174,7 +1174,7 @@
 		{
 			"key": "RAlt",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "9",
 			"size": "1"
@@ -2322,19 +2322,33 @@
 			"Primary": "⇧",
 			"Primary+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Shift": "⇧",
+			"Shift+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"AltGr": "⇧",
+			"AltGr+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"ShiftAltGr": "⇧",
+			"ShiftAltGr+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Ctrl": "⇧",
+			"Ctrl+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Circonflexe": "⇧",
+			"Circonflexe+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"CirconflexeShift": "⇧",
+			"CirconflexeShift+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Trema": "⇧",
+			"Trema+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"TremaShift": "⇧",
+			"TremaShift+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Exposant": "⇧",
+			"Exposant+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Indice": "⇧",
+			"Indice+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Greek": "⇧",
+			"Greek+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"GreekShift": "⇧",
+			"GreekShift+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"R": "⇧",
+			"R+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Layer": "⇧",
+			"Layer+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"À": "⇧",
 			"À+": "⇧<br><span class='tap'>Ⓒ</span>",
 			",": "⇧",
@@ -2367,19 +2381,33 @@
 			"Primary": "Ctrl",
 			"Primary+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Shift": "Ctrl",
+			"Shift+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"AltGr": "Ctrl",
+			"AltGr+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"ShiftAltGr": "Ctrl",
+			"ShiftAltGr+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Ctrl": "Ctrl",
+			"Ctrl+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Circonflexe": "Ctrl",
+			"Circonflexe+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"CirconflexeShift": "Ctrl",
+			"CirconflexeShift+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Trema": "Ctrl",
+			"Trema+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"TremaShift": "Ctrl",
+			"TremaShift+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Exposant": "Ctrl",
+			"Exposant+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Indice": "Ctrl",
+			"Indice+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Greek": "Ctrl",
+			"Greek+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"GreekShift": "Ctrl",
+			"GreekShift+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"R": "Ctrl",
+			"R+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"Layer": "Ctrl",
+			"Layer+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"À": "Ctrl",
 			"À+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			",": "Ctrl",
@@ -2433,7 +2461,9 @@
 			"AltGr": "Alt",
 			"AltGr+": "^⌫",
 			"ShiftAltGr": "Alt",
+			"ShiftAltGr+": "Layer<br><span class='tap'>⌫</span>",
 			"Ctrl": "Alt",
+			"Ctrl+": "Layer<br><span class='tap'>⌫</span>",
 			"Circonflexe": "Alt",
 			"Circonflexe+": "Layer<br><span class='tap'>⌫</span>",
 			"CirconflexeShift": "Alt",
@@ -2452,7 +2482,7 @@
 			"GreekShift+": "Layer<br><span class='tap'>⌫</span>",
 			"R": "Alt",
 			"R+": "Layer<br><span class='tap'>⌫</span>",
-			"Layer": "Layer",
+			"Layer": "",
 			"À": "LAlt",
 			"À+": "Layer<br><span class='tap'>⌫</span>",
 			",": "LAlt",
@@ -2543,7 +2573,7 @@
 			"Greek": "µ",
 			"GreekShift": "",
 			"R": "ℝ",
-			"Layer": "Layer",
+			"Layer": "",
 			"À": "",
 			",": "",
 			"type": "space"
@@ -2553,19 +2583,33 @@
 			"Primary": "↹",
 			"Primary+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Shift": "↹",
+			"Shift+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"AltGr": "↹",
+			"AltGr+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"ShiftAltGr": "↹",
+			"ShiftAltGr+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Ctrl": "↹",
+			"Ctrl+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Circonflexe": "↹",
+			"Circonflexe+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"CirconflexeShift": "↹",
+			"CirconflexeShift+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Trema": "↹",
+			"Trema+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"TremaShift": "↹",
+			"TremaShift+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Exposant": "↹",
+			"Exposant+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Indice": "↹",
+			"Indice+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Greek": "↹",
+			"Greek+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"GreekShift": "↹",
+			"GreekShift+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"R": "↹",
+			"R+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"Layer": "↹",
+			"Layer+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"À": "↹",
 			"À+": "Alt<br><span class='tap'>Alt ↹</span>",
 			",": "↹",
