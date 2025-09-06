@@ -142,7 +142,11 @@ export class Keyboard {
 						}
 
 						// Functionality to switch layer by clicking on a key
-						if (this.keyboardInformation['controls'] === 'oui') {
+						// We can only have it working 100% correctly on the latest version, as some tap-holds changed
+						if (
+							this.keyboardInformation['controls'] === 'oui'
+							// && this.version == '2.2'
+						) {
 							keyboardKey.addEventListener(
 								'click',
 								() => {
@@ -165,7 +169,7 @@ export class Keyboard {
 	cleanKey(keyboardLocation, row, column) {
 		// Suppression des event listeners sur la touche
 		const keyboardKey0 = keyboardLocation.querySelector(
-			"bloc-touche[data-row='" + row + "'][data-column='" + column + "']"
+			"keyboard-key[data-row='" + row + "'][data-column='" + column + "']"
 		);
 		let keyboardKey = keyboardKey0.cloneNode(true);
 		keyboardKey0.parentNode.replaceChild(keyboardKey, keyboardKey0);
@@ -184,7 +188,7 @@ export class Keyboard {
 		keyboardKey.classList.remove('pressed-key'); // Suppression de la classe css pour les touches pressées
 
 		return keyboardLocation.querySelector(
-			"bloc-touche[data-row='" + row + "'][data-column='" + column + "']"
+			"keyboard-key[data-row='" + row + "'][data-column='" + column + "']"
 		);
 	}
 
@@ -253,6 +257,25 @@ export class Keyboard {
 			newKey['key'] === 'magique'
 		) {
 			keyboardKey.innerHTML = '<div><span class="glow" style = "position:initial">★</span></div>';
+		}
+
+		// For ISO, Layer is on LAlt instead of Space
+		if (
+			this.keyboardInformation.type === 'iso' &&
+			this.keyboardInformation.layer === 'Layer' &&
+			this.keyboardInformation.plus === 'oui' &&
+			newKey['key'] === 'LAlt'
+		) {
+			keyboardKey.innerHTML = '<div>Layer</div>';
+		}
+		// For Ergodox, Layer is on Space instead of LAlt
+		if (
+			this.keyboardInformation.type === 'ergodox' &&
+			this.keyboardInformation.layer === 'Layer' &&
+			this.keyboardInformation.plus === 'oui' &&
+			newKey['key'] === 'Space'
+		) {
+			keyboardKey.innerHTML = '<div>Layer</div>';
 		}
 	}
 
@@ -506,7 +529,7 @@ export class Keyboard {
 			if (i >= text.length) return; // stop condition
 
 			const nextLetter = text.charAt(i);
-			const nextKey = keyboardLocation.querySelector("bloc-touche[data-key='" + nextLetter + "']");
+			const nextKey = keyboardLocation.querySelector("keyboard-key[data-key='" + nextLetter + "']");
 
 			if (nextKey) {
 				nextKey.classList.add('pressed-key');
@@ -515,7 +538,7 @@ export class Keyboard {
 			if (makePreviousKeysDisappear && i > 0) {
 				const previousLetter = text.charAt(i - 1);
 				const previousKey = keyboardLocation.querySelector(
-					"bloc-touche[data-key='" + previousLetter + "']"
+					"keyboard-key[data-key='" + previousLetter + "']"
 				);
 				if (previousKey) {
 					previousKey.classList.remove('pressed-key');

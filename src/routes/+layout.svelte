@@ -136,7 +136,7 @@
 	<Footer />
 </bloc-page>
 
-<bloc-clavier-reference>
+<keyboard-reference>
 	<button id="afficher-clavier-reference" on:click={toggleZIndex}>
 		<i
 			class="icon-keyboard-duotone"
@@ -155,7 +155,7 @@
 			<KeyboardControlButtons nom="reference" />
 		</div>
 	</clavier-reference>
-</bloc-clavier-reference>
+</keyboard-reference>
 
 <!-- <div class="banner">
 	<p>En construction</p>

@@ -506,7 +506,7 @@
 		{
 			"key": "LAlt",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "5",
 			"column": "2",
 			"size": "1.25"
@@ -515,7 +515,7 @@
 			"key": "Space",
 			"code": "Space",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "5",
 			"column": "4",
 			"size": "7"
@@ -524,7 +524,7 @@
 			"key": "RAlt",
 			"code": "AltRight",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "5",
 			"column": "10",
 			"size": "1.25"
@@ -1038,7 +1038,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "0",
 			"size": "1"
@@ -1046,7 +1046,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "1",
 			"size": "1"
@@ -1054,7 +1054,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "2",
 			"size": "1"
@@ -1062,7 +1062,7 @@
 		{
 			"key": "Enter",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "3",
 			"size": "1"
@@ -1070,7 +1070,7 @@
 		{
 			"key": "LCtrl",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "5",
 			"size": "1"
@@ -1078,7 +1078,7 @@
 		{
 			"key": "LAlt",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "6",
 			"size": "1"
@@ -1086,7 +1086,7 @@
 		{
 			"key": "Escape",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "7",
 			"size": "1"
@@ -1094,7 +1094,7 @@
 		{
 			"key": "RCtrl",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "8",
 			"size": "1"
@@ -1102,7 +1102,7 @@
 		{
 			"key": "Tab",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "6",
 			"column": "9",
 			"size": "1"
@@ -1110,7 +1110,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "0",
 			"size": "1"
@@ -1118,7 +1118,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "1",
 			"size": "1"
@@ -1126,7 +1126,7 @@
 		{
 			"key": "aucune",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "2",
 			"size": "1"
@@ -1134,7 +1134,7 @@
 		{
 			"key": "Space",
 			"hand": "left",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "3",
 			"size": "1"
@@ -1142,7 +1142,7 @@
 		{
 			"key": "BackSpace",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "5",
 			"size": "1"
@@ -1150,7 +1150,7 @@
 		{
 			"key": "Delete",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "6",
 			"size": "1"
@@ -1158,7 +1158,7 @@
 		{
 			"key": "Win",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "7",
 			"size": "1"
@@ -1166,7 +1166,7 @@
 		{
 			"key": "RShift",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "8",
 			"size": "1"
@@ -1174,7 +1174,7 @@
 		{
 			"key": "RAlt",
 			"hand": "right",
-			"finger": "pouce",
+			"finger": "thumb",
 			"row": "7",
 			"column": "9",
 			"size": "1"
