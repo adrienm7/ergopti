@@ -23,7 +23,6 @@ bloc-clavier {
 	border: 1px solid hsla(227, 100%, 8%, 0.8);
 	border-radius: 7px; /* Arrondi des coins du clavier */
 	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
-
 	display: block;
 	font-weight: 300; /* La graisse est trop "grosse" pour les labels de touches sinon */
 	margin: 0 auto;
@@ -31,7 +30,7 @@ bloc-clavier {
 	width: max-content;
 }
 
-bloc-ligne {
+keyboard-row {
 	display: flex;
 }
 
@@ -41,7 +40,7 @@ bloc-ligne {
 	justify-content: center;
 }
 
-legende-clavier {
+keyboard-legend {
 	display: block;
 	margin: 0;
 	margin-top: 7px;
@@ -147,7 +146,7 @@ bloc-clavier[data-type='ergodox'] bloc-touche[data-column='6'] {
 }
 
 /* Séparer le thumb cluster du reste du clavier */
-bloc-clavier[data-type='ergodox'] bloc-ligne[data-row='6'] {
+bloc-clavier[data-type='ergodox'] keyboard-row[data-row='6'] {
 	margin-top: 30px;
 }
 
@@ -207,13 +206,27 @@ bloc-clavier[data-plus='oui'][data-type='ergodox'][data-layer='Primary']
 }
 
 /* Hold-tap */
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='Space'] div,
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='LCtrl'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='LCtrl'] div,
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='LAlt'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='LAlt'] div,
-bloc-clavier[data-plus='oui'][data-layer='Visuel'] bloc-touche[data-key='RAlt'] div,
-bloc-clavier[data-plus='oui'][data-layer='Primary'] bloc-touche[data-key='RAlt'] div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
+	bloc-touche[data-key='Space']
+	div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
+	bloc-touche[data-key='LCtrl']
+	div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
+	bloc-touche[data-key='LCtrl']
+	div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
+	bloc-touche[data-key='LAlt']
+	div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
+	bloc-touche[data-key='LAlt']
+	div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel']
+	bloc-touche[data-key='RAlt']
+	div,
+bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
+	bloc-touche[data-key='RAlt']
+	div,
 bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Visuel'] bloc-touche[data-key='Tab'] div,
 bloc-clavier[data-plus='oui'][data-type='iso'][data-layer='Primary']
 	bloc-touche[data-key='Tab']
@@ -259,6 +272,7 @@ bloc-touche[data-key='CapsLock'] div,
 bloc-touche[data-key='Space'] div,
 bloc-touche[data-key='Win'] div,
 bloc-touche[data-key='Option'] div,
+bloc-touche[data-key='Tab'] div,
 bloc-touche[data-key='Escape'] div {
 	font-size: calc(var(--key-text-size) * 0.7);
 	font-weight: normal;
@@ -500,14 +514,14 @@ bloc-clavier[data-couleur='non'] bloc-touche {
 bloc-clavier[data-couleur='azerty'] bloc-touche {
 	--key-color: 200 !important;
 }
-bloc-clavier[data-couleur='azerty'] legende-clavier {
+bloc-clavier[data-couleur='azerty'] keyboard-legend {
 	color: hsl(200, 100%, 80%);
 }
 
 bloc-clavier[data-couleur='ergopti'] bloc-touche {
 	--key-color: 300 !important;
 }
-bloc-clavier[data-couleur='ergopti'] legende-clavier {
+bloc-clavier[data-couleur='ergopti'] keyboard-legend {
 	color: hsl(300, 100%, 85%);
 }
 
@@ -577,7 +591,7 @@ bloc-clavier,
 	margin-right: 0;
 }
 
-#clavier_symboles_plus bloc-ligne:nth-child(n + 5) {
+#clavier_symboles_plus keyboard-row:nth-child(n + 5) {
 	display: none;
 }
 

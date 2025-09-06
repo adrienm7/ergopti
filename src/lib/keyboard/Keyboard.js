@@ -236,9 +236,8 @@ export class Keyboard {
 	}
 
 	postProcessingKeys(keyboardKey, newKey) {
-		// Modifications on the Space key to also show the name of the Layout
+		// Modification on the Space key to also show the name of the Layout
 		let plus = this.keyboardInformation.plus === 'oui' ? ' <span class="glow">+</span>' : '';
-		// ISO
 		if (
 			this.keyboardInformation.layer === 'Visuel' &&
 			this.keyboardInformation.type === 'iso' &&
@@ -246,15 +245,8 @@ export class Keyboard {
 		) {
 			keyboardKey.innerHTML = '<div>' + this.data_disposition['name'] + plus + '</div>';
 		}
-		// Ergodox
-		if (
-			this.keyboardInformation.type === 'ergodox' &&
-			newKey['key'] === 'Space' &&
-			['Visuel', 'Primary'].includes(this.keyboardInformation.layer)
-		) {
-			keyboardKey.innerHTML = '<div>␣</div>';
-		}
 
+		// Make the ★ key glow
 		if (
 			this.keyboardInformation.layer === 'Visuel' &&
 			this.keyboardInformation.plus === 'oui' &&

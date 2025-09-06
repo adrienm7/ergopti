@@ -27,7 +27,7 @@
 	atteindre la rangée supérieure ou inférieure pour les lettres les moins fréquentes.
 </p>
 <bloc-clavier data-couleur="azerty">
-	<bloc-ligne class="center">
+	<keyboard-row class="center">
 		<bloc-touche data-finger="auriculaire" data-hand="left" style="--size: 1;"
 			><div>Q</div></bloc-touche
 		>
@@ -46,8 +46,8 @@
 		<bloc-touche data-finger="auriculaire" data-hand="right" style="--size: 1;"
 			><div>M</div></bloc-touche
 		>
-	</bloc-ligne>
-	<legende-clavier>Rangée du milieu en AZERTY</legende-clavier>
+	</keyboard-row>
+	<keyboard-legend>Rangée du milieu en AZERTY</keyboard-legend>
 </bloc-clavier>
 
 <p>
@@ -70,7 +70,7 @@
 </p>
 
 <bloc-clavier data-couleur="ergopti">
-	<bloc-ligne class="center">
+	<keyboard-row class="center">
 		<bloc-touche data-finger="auriculaire" data-hand="left" style="--size: 1;"
 			><div>A</div></bloc-touche
 		>
@@ -89,8 +89,8 @@
 		<bloc-touche data-finger="auriculaire" data-hand="right" style="--size: 1;"
 			><div>R</div></bloc-touche
 		>
-	</bloc-ligne>
-	<legende-clavier>Rangée du milieu en Ergopti</legende-clavier>
+	</keyboard-row>
+	<keyboard-legend>Rangée du milieu en Ergopti</keyboard-legend>
 </bloc-clavier>
 <p>
 	En français et en anglais, le <kbd>E</kbd>

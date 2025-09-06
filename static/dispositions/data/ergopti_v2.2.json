@@ -2309,14 +2309,18 @@
 			"GreekShift+": "Ctrl<br><span class='tap' style = 'margin-top:-0.4em'>↩</span>",
 			"R": "🔒",
 			"R+": "Ctrl<br><span class='tap' style = 'margin-top:-0.4em'>↩</span>",
-			"Layer": "⌫",
-			"À": "Ctrl<br><span class='tap' style = 'margin-top:-0.4em'>↩</span>",
-			",": "Ctrl<br><span class='tap' style = 'margin-top:-0.4em'>↩</span>",
+			"Layer": "🔒",
+			"Layer+": "⌫",
+			"À": "🔒",
+			"À+": "Ctrl<br><span class='tap' style = 'margin-top:-0.4em'>↩</span>",
+			",": "🔒",
+			",+": "Ctrl<br><span class='tap' style = 'margin-top:-0.4em'>↩</span>",
 			"type": "special"
 		},
 		{
-			"key": "RShift",
+			"key": "LShift",
 			"Primary": "⇧",
+			"Primary+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Shift": "⇧",
 			"AltGr": "⇧",
 			"ShiftAltGr": "⇧",
@@ -2332,13 +2336,14 @@
 			"R": "⇧",
 			"Layer": "⇧",
 			"À": "⇧",
+			"À+": "⇧<br><span class='tap'>Ⓒ</span>",
 			",": "⇧",
+			",+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"type": "special"
 		},
 		{
-			"key": "LShift",
+			"key": "RShift",
 			"Primary": "⇧",
-			"Primary+": "⇧<br><span class='tap'>Ⓒ</span>",
 			"Shift": "⇧",
 			"AltGr": "⇧",
 			"ShiftAltGr": "⇧",
@@ -2376,7 +2381,9 @@
 			"R": "Ctrl",
 			"Layer": "Ctrl",
 			"À": "Ctrl",
+			"À+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			",": "Ctrl",
+			",+": "Ctrl<br><span class='tap'>Ⓥ</span>",
 			"type": "special"
 		},
 		{
@@ -2411,8 +2418,10 @@
 			"R+": "<span class='one-shot-shift'><span class='tap'>OneShot</span><br>Shift</span>",
 			"Layer": "Ctrl",
 			"Layer+": "<span class='one-shot-shift'><span class='tap'>OneShot</span><br>Shift</span>",
-			"À": "<span class='one-shot-shift'><span class='tap'>OneShot</span><br>Shift</span>",
-			",": "<span class='one-shot-shift'><span class='tap'>OneShot</span><br>Shift</span>",
+			"À": "Ctrl",
+			"À+": "<span class='one-shot-shift'><span class='tap'>OneShot</span><br>Shift</span>",
+			",": "Ctrl",
+			",+": "<span class='one-shot-shift'><span class='tap'>OneShot</span><br>Shift</span>",
 			"type": "special"
 		},
 		{
@@ -2444,8 +2453,10 @@
 			"R": "Alt",
 			"R+": "Layer<br><span class='tap'>⌫</span>",
 			"Layer": "Layer",
-			"À": "Layer<br><span class='tap'>⌫</span>",
-			",": "Layer<br><span class='tap'>⌫</span>",
+			"À": "LAlt",
+			"À+": "Layer<br><span class='tap'>⌫</span>",
+			",": "LAlt",
+			",+": "Layer<br><span class='tap'>⌫</span>",
 			"type": "special"
 		},
 		{
@@ -2469,7 +2480,9 @@
 			"R": "AltGr",
 			"Layer": "Esc",
 			"À": "AltGr",
+			"À+": "AltGr<br><span class='tap'>↹</span>",
 			",": "AltGr",
+			",+": "AltGr<br><span class='tap'>↹</span>",
 			"type": "special"
 		},
 		{
@@ -2516,7 +2529,7 @@
 		},
 		{
 			"key": "Space",
-			"Primary": " ",
+			"Primary": "␣",
 			"Shift": "-",
 			"AltGr": "_",
 			"ShiftAltGr": "",
@@ -2554,7 +2567,9 @@
 			"R": "↹",
 			"Layer": "↹",
 			"À": "↹",
+			"À+": "Alt<br><span class='tap'>Alt ↹</span>",
 			",": "↹",
+			",+": "Alt<br><span class='tap'>Alt ↹</span>",
 			"type": "special"
 		},
 		{

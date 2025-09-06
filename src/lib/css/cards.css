@@ -32,6 +32,15 @@
 	color: rgb(0, 4, 43);
 }
 
+.cards .card:nth-child(odd) i .path1,
+.cards .card:nth-child(odd) i .path1::before {
+	background-color: #000e7971 !important;
+}
+.cards .card:nth-child(odd) i .path2::before {
+	background-color: #5ccbff !important;
+	background-image: none;
+}
+
 /* Screen larger than 500px? 2 column */
 @media (min-width: 500px) and (max-width: 900px) {
 	.cards {
