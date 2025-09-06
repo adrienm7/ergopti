@@ -23,5 +23,5 @@
 	qui est plus proche des doigts. C’est exactement ce que fait <Ergopti /> avec sa couche AltGr de symboles
 	qui amène les symboles directement sous les doigts.
 </p>
-<mini-espace></mini-espace>
+<tiny-space></tiny-space>
 <KeyboardBasis nom="symboles" />

@@ -18,7 +18,7 @@
 	crédibles. Toutefois, cela augmentera d’autant les temps de calcul.
 </p>
 
-<mini-espace></mini-espace>
+<tiny-space></tiny-space>
 
 <p>
 	En conclusion, <span class="important"

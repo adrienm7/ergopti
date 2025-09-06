@@ -1,12 +1,12 @@
 main,
 .main {
+	line-height: 1.35;
 	margin: 0 auto; /* Centrer le bloc main horizontalement */
+	max-width: 850px;
 	padding: min(
 		3.5vw,
 		35px
 	); /* Espaces entre le texte et les bords de l'écran, notamment sur mobile */
-	max-width: 850px;
-	line-height: 1.35;
 }
 
 main p,
@@ -28,22 +28,22 @@ main ul li,
 	margin: 0;
 }
 
-mini-espace {
+tiny-space {
 	display: block;
 	height: 5vh;
 }
 
-petit-espace {
+small-space {
 	display: block;
 	height: 10vh;
 }
 
-moyen-espace {
+medium-space {
 	display: block;
 	height: 20vh;
 }
 
-grand-espace {
+big-space {
 	display: block;
 	height: 30vh;
 }
@@ -54,12 +54,12 @@ giga-espace {
 }
 
 hr {
-	border: 0;
 	background-image: linear-gradient(
 		to right,
 		rgba(255, 255, 255, 0),
 		rgba(255, 255, 255, 0.75),
 		rgba(255, 255, 255, 0)
 	);
+	border: 0;
 	height: 1.5px;
 }

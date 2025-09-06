@@ -5,7 +5,7 @@
 	import { page } from '$app/stores';
 
 	import { loadData } from '$lib/keyboard/getKeyboardData.js';
-	import { version, data_disposition, liste_versions, discord_link } from '$lib/stores_infos.js';
+	import { version, layoutData, versionsList, discordLink } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
@@ -14,7 +14,7 @@
 	function handleVersionChange() {
 		loadData(versionValue)
 			.then((data) => {
-				data_disposition.set(data);
+				layoutData.set(data);
 				version.set(versionValue); // Utiliser `set` pour mettre à jour la version dans le store
 				// console.log('Données chargées :', data);
 			})
@@ -77,7 +77,7 @@
 							onchange={handleVersionChange}
 							data-version={versionValue}
 						>
-							{#each liste_versions.reverse() as value}<option {value}>{value}</option>{/each}
+							{#each versionsList.reverse() as value}<option {value}>{value}</option>{/each}
 						</select>
 					</span></span
 				>
@@ -158,7 +158,7 @@
 					>Repo GitHub <i class="icon-github"></i></a
 				>
 				—
-				<a href={discord_link} style="position:relative; bottom:-0.1em; font-size:1em!important"
+				<a href={discordLink} style="position:relative; bottom:-0.1em; font-size:1em!important"
 					>Serveur Discord <i class="icon-discord"></i></a
 				>
 			</div>

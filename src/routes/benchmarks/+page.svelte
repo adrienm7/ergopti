@@ -147,7 +147,7 @@
 			</select>
 		</div>
 	</div>
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<image-block>
 		<enhanced:img
 			src={getImagePath(clavier, corpus)}
@@ -178,7 +178,7 @@
 	<a href="/benchmarks/ergol/v2.1/analyse_ergol_ergopti{version_1dfh}_v2.1_{ergol}.pdf"
 		><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo-L</button></a
 	>
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<embed
 		src="/benchmarks/ergol/v2.1/analyse_ergol_ergopti{version_1dfh}_v2.1_{ergol}.pdf"
 		type="application/pdf"

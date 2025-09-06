@@ -75,7 +75,7 @@
 	de ne plus du tout avoir à utiliser la touche morte <kbd class="morte">◌̂</kbd>, et donc bouger
 	encore moins les mains.
 </p>
-<mini-espace></mini-espace>
+<tiny-space></tiny-space>
 <p>
 	Les plus attentifs d’entre vous remarqueront que l’écriture de <kbd-sortie>Â</kbd-sortie> et de
 	<kbd-sortie>AÎ</kbd-sortie>

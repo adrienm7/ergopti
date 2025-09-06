@@ -27,7 +27,7 @@
 	La touche <kbd>,</kbd> est l’une des plus importantes dans <ErgoptiPlus />. C’est grâce à elle que
 	la plupart des <SFB />s restants sont supprimés. De plus, certaines combinaisons ont aussi été
 	ajoutées pour plus de confort, afin d’éviter de devoir sauter de 2 rangées avec des doigts
-	consécutifs pour écrire un bigramme (donc éviter les <i>ciseaux</i>). C’est le cas de
+	consécutifs pour écrire un bigramme (donc éviter les <em>ciseaux</em>). C’est le cas de
 	<kbd>cl</kbd> ou encore de <kbd>ph</kbd>.
 </p>
 <KeyboardBasis nom="virgule" />
@@ -55,7 +55,7 @@
 	<li>
 		<kbd>ê.</kbd> ➜ <kbd-sortie>u.</kbd-sortie> ;
 	</li>
-	<mini-espace></mini-espace>
+	<tiny-space></tiny-space>
 	<li>
 		<kbd>èy</kbd> ➜ <kbd-sortie>ié</kbd-sortie> ;
 	</li>
@@ -88,9 +88,9 @@
 	Sur le logiciel Excel, la touche <kbd>F4</kbd> permet de répéter la dernière action. Ne pourrait-on
 	pas avoir la même chose sur sa disposition clavier ?
 </p>
-<mini-espace />
+<tiny-space></tiny-space>
 <KeyboardBasis nom="magique" />
-<mini-espace />
+<tiny-space></tiny-space>
 <p>
 	La touche <kbd>★</kbd> est <span class="important">l’ajout principal</span>
 	d’<ErgoptiPlus /> et mérite son excellent emplacement sous l’index gauche. Elle vient en remplacement

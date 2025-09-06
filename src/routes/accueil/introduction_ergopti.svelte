@@ -14,7 +14,7 @@
 		</span>
 	</h1>
 	<KeyboardBasis nom="presentation" />
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<KeyboardControlButtons nom="presentation" />
 </div>
 
@@ -22,7 +22,7 @@
 	<a href="#debut" class="scrollez"><i class="icon-chevron-down"></i></a>
 </div>
 <div id="debut">
-	<petit-espace />
+	<small-space />
 	<hr />
 	<p class="encart-introduction">
 		<strong><Ergopti></Ergopti></strong> est une
@@ -35,7 +35,7 @@
 	<hr />
 </div>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <div class="cards">
 	<div class="card">
@@ -73,7 +73,7 @@
 	<a class="link" href="https://github.com/adrienm7/ergopti">le GitHub du projet</a>.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <div style="text-align:center;">
 	<a href="/telechargements">
@@ -81,7 +81,7 @@
 	</a>
 </div>
 
-<grand-espace />
+<big-space />
 
 <style>
 	.scrollez {

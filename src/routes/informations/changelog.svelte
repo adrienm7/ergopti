@@ -26,12 +26,12 @@
 	modification a permis d’ajouter, sur les touches de chiffres, les chiffres en exposant en
 	<kbd>AltGr</kbd> ainsi que les chiffres en indice en <kbd>Shift</kbd> + <kbd>AltGr</kbd>.
 </p>
-<mini-espace></mini-espace>
+<tiny-space></tiny-space>
 <p>
 	Le deuxième changement, moins visible, est une nette amélioration des touches mortes. Celles-ci
 	sont désormais beaucoup plus complètes et plus logiquement agencées.
 </p>
-<mini-espace></mini-espace>
+<tiny-space></tiny-space>
 <p>
 	Enfin, un gros changement concerne <ErgoptiPlus></ErgoptiPlus> dont le code AutoHotkey a été complètement
 	réécrit. Celui-ci est désormais beaucoup plus simple et robuste. En outre, chaque feature peut désormais

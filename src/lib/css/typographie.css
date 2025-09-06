@@ -53,6 +53,7 @@ strong,
 a,
 i,
 i .path2::before,
+em,
 .hyper,
 .important {
 	-webkit-background-clip: text;

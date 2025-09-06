@@ -16,7 +16,7 @@
 
 	<h2>Tester la disposition en ligne</h2>
 	<KeyboardEmulation />
-	<mini-espace />
+	<tiny-space></tiny-space>
 	{#if isCollapsed}
 		<button on:click={() => (isCollapsed = !isCollapsed)}>
 			Afficher les abréviations implémentées sur cette démo
@@ -26,7 +26,7 @@
 		<button on:click={() => (isCollapsed = !isCollapsed)}>
 			Masquer les abréviations implémentées sur cette démo
 		</button>
-		<mini-espace />
+		<tiny-space></tiny-space>
 		<table>
 			<thead>
 				<tr>

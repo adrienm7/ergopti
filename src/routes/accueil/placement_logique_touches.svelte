@@ -88,7 +88,7 @@
 	</li>
 </ul>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>D’autres sont placées par paires l’une à côté de l’autre :</p>
 <ul>
@@ -132,7 +132,7 @@
 		➜ <kbd-sortie>”</kbd-sortie>.
 	</li>
 </ul>
-<mini-espace />
+<tiny-space></tiny-space>
 <p class="encadre">
 	À noter que les touches sont aussi placées le plus possible par distance selon leur fréquence
 	d’utilisation. Ainsi, les paires de touches très utilisées telles que <kbd>()</kbd>,

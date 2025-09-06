@@ -14,11 +14,11 @@
 		>
 	</h1>
 	<KeyboardBasis nom="presentation_plus" />
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<KeyboardControlButtons nom="presentation_plus" />
 </div>
 
-<petit-espace />
+<small-space />
 
 <hr />
 <p class="main text-center">
@@ -63,10 +63,10 @@
 		utiliser dès le départ.
 	</div>
 </div>
-<mini-espace></mini-espace>
+<tiny-space></tiny-space>
 <hr />
 
-<petit-espace />
+<small-space />
 
 <div class="main">
 	<div class="encadre">
@@ -103,6 +103,6 @@
 			</li>
 		</ul>
 	</div>
-	<mini-espace></mini-espace>
+	<tiny-space></tiny-space>
 	<p>Voici maintenant les nombreuses fonctionnalités d’<ErgoptiPlus /> :</p>
 </div>

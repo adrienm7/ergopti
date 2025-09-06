@@ -470,13 +470,13 @@ keyboard-key[data-hand='right'][data-finger='auriculaire'] {
 }
 
 /* Specific color for the Space bar */
-keyboard[data-type='iso'] keyboard-key[data-type='space'] {
-	/* background-color: rgb(0, 10, 30); */
-}
+/* keyboard[data-type='iso'] keyboard-key[data-type='space'] {
+	background-color: rgb(0, 10, 30);
+} */
 
 /* Specific color for Ergodox thumb keys */
 keyboard[data-type='ergodox'] keyboard-key[data-finger='thumb'] {
-	background-color: rgba(0, 46, 96, 0.3);
+	background-color: rgba(0, 46, 96, 0.7);
 }
 
 /* === Couleur des touches spéciales === */

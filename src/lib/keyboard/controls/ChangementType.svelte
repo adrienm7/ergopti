@@ -3,7 +3,7 @@
 	const dispatch = createEventDispatcher();
 
 	export let typeValue;
-	export let coucheValue;
+	export let layerValue;
 	export let couleurValue;
 	export let plusValue;
 
@@ -15,7 +15,7 @@
 		}
 		dispatch('message', {
 			type: typeValue,
-			layer: coucheValue,
+			layer: layerValue,
 			couleur: couleurValue,
 			plus: plusValue
 		});

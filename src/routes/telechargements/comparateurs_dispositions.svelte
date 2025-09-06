@@ -46,14 +46,14 @@
 		href="https://klanext.keyboard-design.com/">https://klanext.keyboard-design.com/</a
 	> et ses dérivés.
 </p>
-<mini-espace />
+<tiny-space></tiny-space>
 <div>
 	<span>Version ISO : </span><a
 		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso}.fr.iso.json"
 		download><button>ergopti.v{version_mineure_kla_iso}.fr.iso.json</button></a
 	>
 </div>
-<mini-espace />
+<tiny-space></tiny-space>
 <div>
 	<span>Version ISO+ : </span><a
 		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json"
@@ -70,7 +70,7 @@
 		<kbd>Shift</kbd>, mais cela améliore déjà sensiblement les scores.
 	</p>
 </div>
-<mini-espace />
+<tiny-space></tiny-space>
 <div>
 	<span>Version Ergodox : </span><a
 		href="/dispositions/ergodox/ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json"
@@ -86,7 +86,7 @@
 			<option value="standard">Standard — Analyse</option>
 		</select>
 	</div>
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<span>Version pour l’analyseur Ergo-L : </span><a
 		href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
 		download

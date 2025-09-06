@@ -1,27 +1,27 @@
 <script>
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 	import { KeyboardEmulation } from '$lib/keyboard/KeyboardEmulation.js';
-	import { onMount, afterUpdate } from 'svelte';
+	import { onMount } from 'svelte';
 
 	let champTexte = '';
-	let clavier = new KeyboardEmulation('emulation');
+	let keyboard = new KeyboardEmulation('emulation');
 	onMount(() => {
-		clavier.textarea = document.getElementById('input-text');
-		clavier.keyboardUpdate();
+		keyboard.textarea = document.getElementById('input-text');
+		keyboard.keyboardUpdate();
 	});
 </script>
 
 <KeyboardBasis nom="emulation" />
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <div style="margin: 0 auto; width: 100%;">
 	<textarea
 		id="input-text"
 		placeholder="Écrivez ici"
 		bind:value={champTexte}
-		on:keydown={clavier.KeyboardEmulation}
-		on:keyup={clavier.relacherModificateurs}
+		on:keydown={keyboard.KeyboardEmulation}
+		on:keyup={keyboard.relacherModificateurs}
 	/>
 </div>
 

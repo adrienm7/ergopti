@@ -47,6 +47,6 @@
 		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition. Vous aurez
 		alors automatiquement la meilleure version de la disposition : <ErgoptiPlus />
 	</p>
-	<petit-espace />
+	<small-space />
 	<h3>Comment installer la disposition sur Windows</h3>
 	<p>[À faire]</p> -->

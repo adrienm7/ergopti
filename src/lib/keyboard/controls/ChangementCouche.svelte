@@ -3,7 +3,7 @@
 	const dispatch = createEventDispatcher();
 
 	export let typeValue;
-	export let coucheValue;
+	export let layerValue;
 	export let couleurValue;
 	export let plusValue;
 
@@ -31,10 +31,10 @@
 	]);
 
 	function toggleCouche(nouvelleCouche) {
-		coucheValue = nouvelleCouche;
+		layerValue = nouvelleCouche;
 		dispatch('message', {
 			type: typeValue,
-			layer: coucheValue,
+			layer: layerValue,
 			couleur: couleurValue,
 			plus: plusValue
 		});
@@ -43,11 +43,11 @@
 
 <div class="select-degrade">
 	{#if plusValue === 'oui'}
-		<select bind:value={coucheValue} on:change={() => toggleCouche(coucheValue)}>
+		<select bind:value={layerValue} on:change={() => toggleCouche(layerValue)}>
 			{#each couches_plus as value}<option value={value[1]}>{value[0]}</option>{/each}
 		</select>
 	{:else}
-		<select bind:value={coucheValue} on:change={() => toggleCouche(coucheValue)}>
+		<select bind:value={layerValue} on:change={() => toggleCouche(layerValue)}>
 			{#each couches_standard as value}<option value={value[1]}>{value[0]}</option>{/each}
 		</select>
 	{/if}

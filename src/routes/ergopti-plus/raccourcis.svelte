@@ -60,7 +60,7 @@
 		de toggle entre les fenêtres.
 	</p>
 
-	<petit-espace></petit-espace>
+	<small-space></small-space>
 
 	<KeyboardBasis nom="layer" />
 	<p>
@@ -78,7 +78,7 @@
 		en même temps ainsi que les touches de flèches qui sont peu accessibles.
 	</p>
 
-	<petit-espace></petit-espace>
+	<small-space></small-space>
 
 	<li>
 		Tap hold en <kbd>LShift</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>C</kbd-sortie> sur le

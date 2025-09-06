@@ -67,7 +67,7 @@
 </p> -->
 
 <h4>Windows</h4>
-<mini-espace />
+<tiny-space></tiny-space>
 <div>
 	{#if version_mineure_kbdedit_exe !== undefined}
 		<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
@@ -75,7 +75,7 @@
 		</a>
 	{/if}
 </div>
-<mini-espace />
+<tiny-space></tiny-space>
 <div>
 	{#if version_mineure_kbdedit_kbe !== undefined}
 		<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download
@@ -84,7 +84,7 @@
 	{/if}
 </div>
 
-<moyen-espace />
+<medium-space />
 <div>
 	{#if version_mineure_plus !== undefined}
 		<a href="/pilotes/plus/ErgoptiPlus_v{version_mineure_plus}.ahk" download
@@ -113,7 +113,7 @@
 	>.
 </div>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>
 	Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
@@ -134,7 +134,7 @@
 	</li>
 </ol>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>Certains problèmes ont été rapportés avec le pilote d’Ergopti dans quelques logiciels :</p>
 <ul>
@@ -152,7 +152,7 @@
 </p>
 
 <h4>macOS</h4>
-<mini-espace />
+<tiny-space></tiny-space>
 <div>
 	{#if version_mineure_kbdedit_mac !== undefined}
 		<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_mac}.keylayout" download
@@ -163,7 +163,7 @@
 	{/if}
 </div>
 
-<petit-espace />
+<small-space />
 
 <h3 id="ahk">Utilisation sans droits administrateur</h3>
 <p>
@@ -181,7 +181,7 @@
 				></a
 			>
 		</div>
-		<mini-espace />
+		<tiny-space></tiny-space>
 		<p>
 			Ce fichier est un exécutable qui permet de lancer Ergopti sans aucune installation. C’est un
 			script AutoHotkey compilé, il ne nécessite donc même pas d’installer AutoHotkey. Il suffit de
@@ -225,14 +225,14 @@
 	>
 </p>
 {#if version_mineure_kalamine !== undefined}
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<div>
 		<a
 			href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}.toml"
 			download><button>{nom_variante_kalamine}_{version_mineure_kalamine}.toml</button></a
 		>
 	</div>
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<div>
 		<a
 			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.svg"
@@ -249,7 +249,7 @@
 			></a
 		>
 	</div>
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<div>
 		<a
 			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.klc"
@@ -279,7 +279,7 @@
 			></a
 		>
 	</div>
-	<mini-espace />
+	<tiny-space></tiny-space>
 	<div>
 		<a
 			href="/pilotes/kalamine/{variante_kalamine}/{version_mineure_kalamine}/{nom_variante_kalamine}.xkb_symbols"

@@ -1,7 +1,7 @@
 import * as stores_infos from '$lib/stores_infos.js';
 import { getKeyboardData } from '$lib/keyboard/getKeyboardData.js';
 
-import characterFrequencies from '$lib/keyboard/characterFrequencies.json';
+import characterFrequencies from '$lib/keyboard/characterFrequencies.json'; // Data coming from https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en%2Bfr.json
 // Create the "max" and "min" keys containing the maximum value among the frequencies (the frequency of E) and the minimum value
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
 characterFrequencies.min = Math.min(...Object.values(characterFrequencies));
@@ -18,8 +18,8 @@ export class Keyboard {
 		stores_infos['version'].subscribe((value) => {
 			this.version = value;
 		});
-		stores_infos['data_disposition'].subscribe((value) => {
-			this.data_disposition = value;
+		stores_infos['layoutData'].subscribe((value) => {
+			this.layoutData = value;
 			this.keyboardUpdate();
 		});
 
@@ -43,11 +43,11 @@ export class Keyboard {
 		// Lève une exception si le document n'est pas défini
 		throw new Error('Document non défini');
 	}
-
+	é;
 	keyboardUpdate() {
 		// This code isn’t necessary anymore, and when activated it generates many useless requests, as all keyboards will request the same file:
-		// if (this.data_disposition === undefined) {
-		// 	this.data_disposition = getKeyboardData(this.version);
+		// if (this.layoutData === undefined) {
+		// 	this.layoutData = getKeyboardData(this.version);
 		// }
 		this.keysUpdate();
 		this.keyboardInformationUpdate();
@@ -55,7 +55,7 @@ export class Keyboard {
 	}
 
 	keysUpdate() {
-		if (this.data_disposition === undefined) {
+		if (this.layoutData === undefined) {
 			return;
 		}
 		try {
@@ -63,16 +63,14 @@ export class Keyboard {
 			for (let row = 1; row <= 7; row++) {
 				for (let column = 0; column <= 15; column++) {
 					// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
-					const newKey = this.data_disposition[this.keyboardInformation.type].find(
+					const newKey = this.layoutData[this.keyboardInformation.type].find(
 						(el) => el['row'] == row && el['column'] == column
 					);
 
 					const keyboardKey = this.cleanKey(keyboardLocation, row, column);
 
 					if (newKey !== undefined) {
-						const newKeyContent = this.data_disposition['keys'].find(
-							(el) => el['key'] === newKey['key']
-						);
+						const newKeyContent = this.layoutData['keys'].find((el) => el['key'] === newKey['key']);
 
 						if (
 							this.keyboardInformation.layer !== 'Visuel' &&
@@ -247,7 +245,7 @@ export class Keyboard {
 			this.keyboardInformation.type === 'iso' &&
 			newKey['key'] === 'Space'
 		) {
-			keyboardKey.innerHTML = '<div>' + this.data_disposition['name'] + plus + '</div>';
+			keyboardKey.innerHTML = '<div>' + this.layoutData['name'] + plus + '</div>';
 		}
 
 		// Make the ★ key glow
