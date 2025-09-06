@@ -77,13 +77,13 @@ export class KeyboardEmulation extends Keyboard {
 		} else if (this.control) {
 			this.layer = 'Ctrl';
 		} else if (this.circonflexe) {
-			this.layer = '^';
+			this.layer = 'Circonflexe';
 		} else if (this.trema) {
-			this.layer = 'trema';
+			this.layer = 'Trema';
 		} else if (this.e) {
-			this.layer = 'e';
+			this.layer = 'Exposant';
 		} else if (this.i) {
-			this.layer = 'i';
+			this.layer = 'Indice';
 		} else if (this.R) {
 			this.layer = 'R';
 		} else if (this.a_grave) {
@@ -125,9 +125,8 @@ export class KeyboardEmulation extends Keyboard {
 		let res = this.layoutData[this.keyboardInformation.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
-			let keyboardKey = this.layoutData.touches.find((el) => el['key'] == res['key']);
+			const keyboardKey = this.layoutData['keys'].find((el) => el['key'] === res['key']);
 			this.presserToucheClavier(keyboardKey['key']); // Presser la touche sur le clavier visuel
-			let touche;
 			if (
 				this.altgr &&
 				this.shift &&
@@ -161,7 +160,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = keyboardKey['e'];
+					touche = keyboardKey['Exposant'];
 				}
 				this.e = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -177,7 +176,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = keyboardKey['trema'];
+					touche = keyboardKey['Trema'];
 				}
 				this.trema = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -185,7 +184,7 @@ export class KeyboardEmulation extends Keyboard {
 				if (keyPressed === 'Space') {
 					touche = ' ';
 				} else {
-					touche = keyboardKey['i'];
+					touche = keyboardKey['Indice'];
 				}
 				this.i = false;
 				this.envoiTouche_ReplacerCurseur(touche);
@@ -240,7 +239,6 @@ export class KeyboardEmulation extends Keyboard {
 		// 	this.textarea.dispatchEvent(ctrlEvent);
 		// 	return true;
 		// }
-
 		let touche = '';
 		if (this.keyboardInformation['plus'] === 'oui') {
 			if (keyboardKey[this.layer + '+'] !== undefined) {
@@ -253,7 +251,8 @@ export class KeyboardEmulation extends Keyboard {
 		}
 
 		touche = touche.replace(/<espace-insecable><\/espace-insecable>/g, ' ');
-		touche = touche.replace(/Alt<br><span class='tap'>Alt ↹<\/span>/g, '');
+		touche = touche.replace(/<tap-hold>.*<\/tap-hold>/g, '');
+		touche = touche.replace('␣', ' ');
 		this.envoiTouche_ReplacerCurseur(touche);
 	}
 

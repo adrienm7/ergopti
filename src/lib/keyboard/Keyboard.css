@@ -219,25 +219,32 @@ keyboard[data-plus='oui'][data-type='iso'][data-layer='Visuel'] keyboard-key[dat
 
 /* Tap-holds */
 keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='Tab'] div,
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='CapsLock'] div {
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='RAlt'] div {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.1;
 }
-
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='CapsLock'] div,
 keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LShift'] div,
 keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LCtrl'] div,
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LAlt'] div,
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='RAlt'] div {
+keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LAlt'] div {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.35;
 }
 
+tap-hold {
+	display: inline-block;
+}
 output-tap {
 	color: rgb(5, 121, 210);
 }
 
+keyboard-key[data-key='LShift'] div tap-hold output-hold {
+	font-weight: bold;
+}
+
 keyboard-key[data-key='RCtrl'] div tap-hold {
-	font-size: 0.8em;
+	font-size: 0.7em;
+	line-height: 1.5;
 }
 
 /*
@@ -293,8 +300,8 @@ keyboard-key[data-key='AltTab'] div {
 }
 
 /* Smaller font for keys [qu] and [où] */
-keyboard[data-plus='oui'] [data-layer='Primary']keyboard-key[data-key='q'] div,
-keyboard[data-plus='oui'] [data-layer='AltGr'] keyboard-key[data-key='w'] div {
+keyboard[data-plus='oui'][data-layer='Primary'] keyboard-key[data-key='q'] div,
+keyboard[data-plus='oui'][data-layer='AltGr'] keyboard-key[data-key='w'] div {
 	font-size: 0.9em;
 }
 keyboard[data-plus='oui'][data-layer='Visuel'] keyboard-key[data-key='q'] div,
@@ -323,6 +330,12 @@ keyboard[data-layer='Layer'][data-type='ergodox'] keyboard-key[data-key='Space']
 keyboard[data-plus='non'] keyboard-key[data-key='CapsLock'] div {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
+
+/* Smaller font in , layer to prevent keys with 2 symbols to overflow */
+keyboard[data-layer=','] keyboard-key:not([data-type='special']):not([data-type='enter']) div {
+	font-size: 0.9em;
+}
+
 /* Smaller font in À layer to prevent keys with 4 symbols to overflow */
 keyboard[data-layer='À'] keyboard-key:not([data-type='special']):not([data-type='enter']) div {
 	font-size: 0.7em;

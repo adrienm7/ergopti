@@ -70,7 +70,7 @@
 
 <h3>Roulements avec des symboles</h3>
 
-<KeyboardBasis nom="symboles_plus" />
+<KeyboardBasis name="symboles_plus" />
 <tiny-space></tiny-space>
 
 <ul class="margin-top-2">

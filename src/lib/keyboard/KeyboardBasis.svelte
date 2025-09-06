@@ -2,14 +2,14 @@
 	import { Keyboard } from '$lib/keyboard/Keyboard.js';
 	import { onMount, afterUpdate } from 'svelte';
 
-	export let nom;
-	let clavier = new Keyboard(nom);
+	export let name;
+	let clavier = new Keyboard(name);
 	onMount(() => {
 		clavier.keyboardUpdate();
 	});
 </script>
 
-<keyboard id={'clavier_' + nom}>
+<keyboard id={'clavier_' + name}>
 	{#each Array(7) as _, i}
 		<keyboard-row data-row={i + 1}>
 			{#each Array(16) as _, j}

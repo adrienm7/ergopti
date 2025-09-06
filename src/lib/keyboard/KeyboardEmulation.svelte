@@ -3,7 +3,7 @@
 	import { KeyboardEmulation } from '$lib/keyboard/KeyboardEmulation.js';
 	import { onMount } from 'svelte';
 
-	let champTexte = '';
+	let inputBox = '';
 	let keyboard = new KeyboardEmulation('emulation');
 	onMount(() => {
 		keyboard.textarea = document.getElementById('input-text');
@@ -11,7 +11,7 @@
 	});
 </script>
 
-<KeyboardBasis nom="emulation" />
+<KeyboardBasis name="emulation" />
 
 <tiny-space></tiny-space>
 
@@ -19,7 +19,7 @@
 	<textarea
 		id="input-text"
 		placeholder="Écrivez ici"
-		bind:value={champTexte}
+		bind:value={inputBox}
 		on:keydown={keyboard.KeyboardEmulation}
 		on:keyup={keyboard.relacherModificateurs}
 	/>

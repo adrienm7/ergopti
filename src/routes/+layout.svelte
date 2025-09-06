@@ -152,9 +152,9 @@
 
 	<clavier-reference id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 		<div class="conteneur">
-			<KeyboardBasis nom="reference" />
+			<KeyboardBasis name="reference" />
 			<tiny-space></tiny-space>
-			<KeyboardControlButtons nom="reference" />
+			<KeyboardControlButtons name="reference" />
 		</div>
 	</clavier-reference>
 </keyboard-reference>

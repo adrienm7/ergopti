@@ -8,9 +8,9 @@
 	import ChangementPlus from '$lib/keyboard/controls/ChangementPlus.svelte';
 	import ChangementCouche from '$lib/keyboard/controls/ChangementCouche.svelte';
 
-	export let nom;
+	export let name;
 	let keyboardInformation;
-	let clavier = new Keyboard(nom);
+	let clavier = new Keyboard(name);
 	clavier.data_clavier.subscribe((value) => {
 		keyboardInformation = value;
 	});
@@ -33,7 +33,7 @@
 	}
 </script>
 
-<keyboard-controls id={'controls_' + nom}>
+<keyboard-controls id={'controls_' + name}>
 	<ChangementType
 		on:message={handleMessage}
 		layerValue={keyboardInformation.layer}
