@@ -17,8 +17,8 @@
 <p>
 	Par exemple, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Cela peut sembler
 	étrange, tant son apparition est incontournable dans les textes (sauf dans le livre
-	<i>La Disparition</i> qui arrive l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est la lettre
-	la plus fréquente, et de loin. Elle est si fréquente que sur le
+	<em>La Disparition</em> qui arrive l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est la
+	lettre la plus fréquente, et de loin. Elle est si fréquente que sur le
 	<a href="/#clavier_frequences">clavier affichant les touches les plus utilisées</a>
 	de la page d’accueil, une transformation mathématique a été nécessaire pour que les fréquences relatives
 	aux autres touches soient visibles et comparables (passage au logarithme). En effet, si l’on affichait

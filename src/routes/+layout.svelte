@@ -16,7 +16,7 @@
 
 	import { afterUpdate, onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { discord_link } from '$lib/stores_infos.js';
+	import { discordLink } from '$lib/stores_infos.js';
 
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
@@ -24,6 +24,8 @@
 	import { makeIds } from '$lib/js/make-ids.js';
 	import tocbot from 'tocbot';
 	import '$lib/css/tocbot.css';
+
+	import '$lib/keyboard/Keyboard.css';
 
 	import '$lib/css/global.css';
 	import '$lib/css/layout.css';
@@ -114,7 +116,7 @@
 						>
 						—
 						<a
-							href={discord_link}
+							href={discordLink}
 							style="position:relative; bottom:-0.1em; font-size:0.9em!important; color:white"
 							>Serveur Discord <i class="icon-discord"></i></a
 						>
@@ -151,7 +153,7 @@
 	<clavier-reference id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 		<div class="conteneur">
 			<KeyboardBasis nom="reference" />
-			<mini-espace />
+			<tiny-space></tiny-space>
 			<KeyboardControlButtons nom="reference" />
 		</div>
 	</clavier-reference>

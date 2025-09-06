@@ -1,5 +1,4 @@
 <script>
-	import '$lib/keyboard/Keyboard.css';
 	import { Keyboard } from '$lib/keyboard/Keyboard.js';
 	import { onMount, afterUpdate } from 'svelte';
 

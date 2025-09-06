@@ -16,7 +16,7 @@
 	enverra <kbd-sortie>arriver</kbd-sortie>. De même, <kbd>av★</kbd> enverra
 	<kbd-sortie>avv</kbd-sortie> et <kbd>avv★</kbd> enverra <kbd-sortie>avez-vous</kbd-sortie>.
 </p>
-<mini-espace />
+<tiny-space></tiny-space>
 <p class="text-bold">Liste de quelques-unes des abréviations (liste modifiable par vos soins) :</p>
 <ul>
 	<li><kbd>a★</kbd> ➜ <kbd-sortie>ainsi</kbd-sortie> ;</li>

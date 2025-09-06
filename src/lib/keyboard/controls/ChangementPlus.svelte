@@ -3,23 +3,23 @@
 	const dispatch = createEventDispatcher();
 
 	export let typeValue;
-	export let coucheValue;
+	export let layerValue;
 	export let couleurValue;
 	export let plusValue;
 
 	function togglePlus() {
 		if (plusValue === 'oui') {
 			plusValue = 'non';
-			if (coucheValue === 'À' || coucheValue === 'Layer') {
+			if (layerValue === 'À' || layerValue === 'Layer') {
 				// Dans le cas où l’on est sur une couche spécifique à Ergopti+, on change la couche pour une qui existe dans la version standard
-				coucheValue = 'Visuel';
+				layerValue = 'Visuel';
 			}
 		} else {
 			plusValue = 'oui';
 		}
 		dispatch('message', {
 			type: typeValue,
-			layer: coucheValue,
+			layer: layerValue,
 			couleur: couleurValue,
 			plus: plusValue
 		});

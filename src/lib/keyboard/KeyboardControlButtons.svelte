@@ -36,28 +36,28 @@
 <keyboard-controls id={'controls_' + nom}>
 	<ChangementType
 		on:message={handleMessage}
-		coucheValue={keyboardInformation.layer}
+		layerValue={keyboardInformation.layer}
 		typeValue={keyboardInformation.type}
 		couleurValue={keyboardInformation.couleur}
 		plusValue={keyboardInformation.plus}
 	/>
 	<ChangementPlus
 		on:message={handleMessage}
-		coucheValue={keyboardInformation.layer}
+		layerValue={keyboardInformation.layer}
 		typeValue={keyboardInformation.type}
 		couleurValue={keyboardInformation.couleur}
 		plusValue={keyboardInformation.plus}
 	/>
 	<ChangementCouleur
 		on:message={handleMessage}
-		coucheValue={keyboardInformation.layer}
+		layerValue={keyboardInformation.layer}
 		typeValue={keyboardInformation.type}
 		couleurValue={keyboardInformation.couleur}
 		plusValue={keyboardInformation.plus}
 	/>
 	<ChangementCouche
 		on:message={handleMessage}
-		coucheValue={keyboardInformation.layer}
+		layerValue={keyboardInformation.layer}
 		typeValue={keyboardInformation.type}
 		couleurValue={keyboardInformation.couleur}
 		plusValue={keyboardInformation.plus}

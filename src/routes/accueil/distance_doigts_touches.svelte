@@ -145,9 +145,9 @@
 	de la couche <kbd>AltGr</kbd>.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 <KeyboardBasis nom="frequences" />
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>
 	Comme vous pouvez le constater sur le clavier ci-dessus, les lettres les plus fréquentes sont bien

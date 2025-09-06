@@ -25,7 +25,7 @@
 	au clavier, et ce à chaque fois que l’on essaie une nouvelle disposition.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>
 	Les premières versions de ce projet, baptisées <span class="important"
@@ -37,7 +37,7 @@
 </p>
 <p>
 	Rapidement, <Ergopti></Ergopti> s'éloigna d'Optimot sur plusieurs aspects fondamentaux. L'un des points
-	clés était ma volonté d'optimiser les <i>roulements</i>, entraînant de nombreux tests de
+	clés était ma volonté d'optimiser les <em>roulements</em>, entraînant de nombreux tests de
 	disposition des touches pour la homerow, notamment sur la partie droite avec les consonnes. Un des
 	choix majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le <kbd>TSRN</kbd> du
 	BÉPO et d’Optimot. En effet, le bigramme <kbd>NT</kbd> est le plus fréquent des bigrammes
@@ -55,7 +55,7 @@
 	bénéficiant pas de cette alternance.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>
 	La disposition a beaucoup évoluée au fil du temps. En particulier, la touche sur l’index gauche a
@@ -73,7 +73,7 @@
 	d’<Ergopti></Ergopti>.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>
 	À un certain stade de développement, il devint évident que la disposition
@@ -127,7 +127,7 @@
 	que ce ne soit pas un problème en dupliquant ces raccourcis sur les voyelles accentuées.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>
 	<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i> La deuxième étape
@@ -145,7 +145,7 @@
 	accessibilité.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 
 <p>
 	<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i> La troisième

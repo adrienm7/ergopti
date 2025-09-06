@@ -33,7 +33,7 @@
 	</p>
 </div>
 
-<petit-espace></petit-espace>
+<small-space></small-space>
 
 <p>Des roulements pour plus de confort ont été ajoutés :</p>
 
@@ -71,7 +71,7 @@
 <h3>Roulements avec des symboles</h3>
 
 <KeyboardBasis nom="symboles_plus" />
-<mini-espace></mini-espace>
+<tiny-space></tiny-space>
 
 <ul class="margin-top-2">
 	<li>

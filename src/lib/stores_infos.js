@@ -1,10 +1,10 @@
 import { writable } from 'svelte/store';
-export const liste_versions = ['1.1', '2.0', '2.1', '2.2'];
-export const latestVersion = liste_versions[liste_versions.length - 1];
+export const versionsList = ['1.1', '2.0', '2.1', '2.2'];
+export const latestVersion = versionsList[versionsList.length - 1];
 export let version = writable(latestVersion); // Default value
 
-export const data_disposition = writable();
-export const discord_link = 'https://discord.gg/ptxRzBqcQP';
+export const layoutData = writable();
+export const discordLink = 'https://discord.gg/ptxRzBqcQP';
 
 export const presentation = writable({
 	emplacement: 'clavier_presentation',

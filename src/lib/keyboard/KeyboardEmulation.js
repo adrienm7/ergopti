@@ -16,7 +16,7 @@ export class KeyboardEmulation extends Keyboard {
 		this.a_grave = false;
 		this.virgule = false;
 		this.layer = 'Primary'; // Couche par défaut
-		// La portée de this est modifiée dans le textinput sinon et this.data_disposition est undefined
+		// La portée de this est modifiée dans le textinput sinon et this.layoutData est undefined
 		this.KeyboardEmulation = this.KeyboardEmulation.bind(this);
 		this.relacherModificateurs = this.relacherModificateurs.bind(this);
 	}
@@ -122,12 +122,10 @@ export class KeyboardEmulation extends Keyboard {
 
 		// Si touche normale
 		let keyPressed = event.code;
-		let res = this.data_disposition[this.keyboardInformation.type].find(
-			(el) => el['code'] == keyPressed
-		); // La touche de notre layout correspondant au keycode tapé
+		let res = this.layoutData[this.keyboardInformation.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
 		if (res !== undefined) {
 			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
-			let keyboardKey = this.data_disposition.touches.find((el) => el['key'] == res['key']);
+			let keyboardKey = this.layoutData.touches.find((el) => el['key'] == res['key']);
 			this.presserToucheClavier(keyboardKey['key']); // Presser la touche sur le clavier visuel
 			let touche;
 			if (

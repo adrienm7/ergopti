@@ -34,7 +34,7 @@
 
 .cards .card:nth-child(odd) i .path1,
 .cards .card:nth-child(odd) i .path1::before {
-	background-color: #000e7971 !important;
+	background-color: #0014ac6a !important;
 }
 .cards .card:nth-child(odd) i .path2::before {
 	background-color: #5ccbff !important;

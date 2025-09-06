@@ -49,7 +49,7 @@
 	frapper une touche, il y a de fortes probabilités que le frappe suivante se produise avec l’autre
 	main. Toutefois, cela n’arrive pas dans la totalité des cas, c’est pourquoi il convient de
 	s’assurer que le plus possible de frappes intra-mains se fassent à l’aide de roulements, aussi
-	appelés <i>rolls</i> en anglais.
+	appelés <em>rolls</em> en anglais.
 </p>
 <p>
 	Ma définition personnelle d’un "roulement" est un déplacement sur deux doigts consécutifs et

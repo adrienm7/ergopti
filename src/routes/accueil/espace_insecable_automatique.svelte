@@ -26,7 +26,7 @@
 	<kbd>Shift</kbd>, tout en programmant normalement avec la couche <kbd>AltGr</kbd>, qui contient
 	d’ailleurs tout le reste des symboles nécessaires à l’écriture de code.
 </p>
-<mini-espace />
+<tiny-space></tiny-space>
 <div class="encadre">
 	<p class="important margin0">Ainsi, il est facile de se rappeler où est quoi :</p>
 	<ul class="margin0">

@@ -1,7 +1,7 @@
 <script>
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import { page } from '$app/stores';
-	import { discord_link } from '$lib/stores_infos.js';
+	import { discordLink } from '$lib/stores_infos.js';
 	const date = new Date().getFullYear();
 </script>
 
@@ -12,7 +12,7 @@
 			>GitHub <i class="icon-github"></i></a
 		>
 		|
-		<a href={discord_link} class="text-white">Discord <i class="icon-discord"></i></a>
+		<a href={discordLink} class="text-white">Discord <i class="icon-discord"></i></a>
 	</p>
 </footer>
 
@@ -22,15 +22,15 @@
 	}
 
 	footer {
-		display: flex;
-		justify-content: center;
 		align-items: center;
-		margin: 0;
-		box-shadow: 0 0 3px 2px var(--couleur-ombre);
 		background-color: rgba(0, 0, 0, 0.8);
-		padding: 2px;
-		height: var(--hauteur-footer);
+		box-shadow: 0 0 3px 2px var(--couleur-ombre);
 		color: white;
+		display: flex;
+		height: var(--hauteur-footer);
+		justify-content: center;
+		margin: 0;
+		padding: 2px;
 	}
 
 	footer p {

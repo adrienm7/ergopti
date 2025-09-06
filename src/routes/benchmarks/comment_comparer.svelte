@@ -11,7 +11,7 @@
 	>. Ceci est très important, car si vous ne le faites pas, alors vos résultats n’auront aucune
 	valeur.
 </p>
-<mini-espace />
+<tiny-space></tiny-space>
 <h3>Comparer le même type de clavier</h3>
 <p>
 	Ne comparez pas une disposition ISO avec une disposition Ergodox. Sinon, logiquement la
@@ -20,7 +20,7 @@
 	<kbd>Shift</kbd>, <kbd>Enter</kbd>, etc. ne seront plus sur les auriculaires mais sur les pouces.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 <h3>Comparer des claviers possédant une touche pour tous les caractères du corpus</h3>
 <p>
 	Un autre point à bien faire attention est de <span class="important"
@@ -30,7 +30,7 @@
 	dans la disposition anglophone.
 </p>
 
-<mini-espace />
+<tiny-space></tiny-space>
 <h3>Conclusion sur la comparaison de dispositions</h3>
 <p>
 	Comparer des dispositions n’est pas aussi simple qu’on pourrait de prime abord le penser. Il ne
