@@ -4,7 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import KeyboardEmulation from '$lib/keyboard/KeyboardEmulation.svelte';
-	import remplacements from '$lib/keyboard/remplacementsMagique.json';
+	import remplacements from '$lib/keyboard/magicReplacements.json';
 
 	// Variable pour contrôler l'affichage du tableau d’abréviations
 	let isCollapsed = true;

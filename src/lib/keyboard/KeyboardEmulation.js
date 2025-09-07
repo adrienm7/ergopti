@@ -1,27 +1,54 @@
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
-import remplacements from '$lib/keyboard/remplacementsMagique.json';
+import remplacements from '$lib/keyboard/magicReplacements.json';
 
 export class KeyboardEmulation extends Keyboard {
 	constructor(id) {
 		super(id);
+		this.layer = 'Primary'; // Default layer
+
 		this.shift = false;
 		this.alt = false;
 		this.altgr = false;
 		this.control = false;
 		this.circonflexe = false;
 		this.trema = false;
-		this.e = false;
-		this.i = false;
+		this.exposant = false;
+		this.indice = false;
 		this.R = false;
 		this.a_grave = false;
-		this.virgule = false;
-		this.layer = 'Primary'; // Couche par défaut
-		// La portée de this est modifiée dans le textinput sinon et this.layoutData est undefined
-		this.KeyboardEmulation = this.KeyboardEmulation.bind(this);
-		this.relacherModificateurs = this.relacherModificateurs.bind(this);
+		this.comma = false;
+
+		// The scope of "this" is changed in the text input otherwise, and this.layoutData becomes undefined. This prevents this problem
+		this.emulateKey = this.emulateKey.bind(this);
+		this.releaseModifieurs = this.releaseModifieurs.bind(this);
 	}
 
-	activationModificateur(event) {
+	emulateKey(event) {
+		const modifieursActive = this.determineActiveModifieurs(event); // Activate potential modifieurs
+		this.layerUpdate();
+		if (modifieursActive) {
+			// If a modifieur has been pressed, no key to send so we exit the function
+			return;
+		}
+
+		// Do not intercept shortcuts with Ctrl
+		if (this.control && !this.altgr) {
+			// Note: when this.altgr is active, Ctrl is also active, hence the "&& !this.altgr"
+			return;
+		}
+
+		// If a key other than a modifier has been pressed
+		let keyPressed = event.code;
+		let res = this.layoutData[this.keyboardInformation.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
+		if (res !== undefined) {
+			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
+			const keyboardKey = this.layoutData['keys'].find((el) => el['key'] === res['key']);
+			this.pressKey(keyboardKey['key']); // Presser la touche sur le clavier visuel
+			this.determineKeyToSend(keyPressed, event, keyboardKey);
+		}
+	}
+
+	determineActiveModifieurs(event) {
 		if (event.code === 'AltRight' || event.code === 'AltGraph') {
 			this.altgr = true;
 			return true;
@@ -45,29 +72,8 @@ export class KeyboardEmulation extends Keyboard {
 		return false;
 	}
 
-	relacherModificateurs(event) {
-		if (event.code === 'AltRight' || event.code === 'AltGraph') {
-			this.altgr = false;
-		} else if (
-			event.code === 'ShiftLeft' ||
-			event.code === 'ShiftRight' ||
-			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'oui')
-		) {
-			this.shift = false;
-		} else if (event.code === 'AltLeft') {
-			this.alt = false;
-		} else if (
-			event.code === 'ControlLeft' ||
-			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'non')
-		) {
-			this.control = false;
-		}
-		this.setCouche();
-		this.keyboardUpdate();
-	}
-
-	setCouche() {
-		// Déterminer la valeur de `layer`
+	layerUpdate() {
+		// Determine the new value of the layer
 		if (this.altgr && this.shift) {
 			this.layer = 'ShiftAltGr';
 		} else if (this.altgr) {
@@ -80,21 +86,21 @@ export class KeyboardEmulation extends Keyboard {
 			this.layer = 'Circonflexe';
 		} else if (this.trema) {
 			this.layer = 'Trema';
-		} else if (this.e) {
+		} else if (this.exposant) {
 			this.layer = 'Exposant';
-		} else if (this.i) {
+		} else if (this.indice) {
 			this.layer = 'Indice';
 		} else if (this.R) {
 			this.layer = 'R';
 		} else if (this.a_grave) {
 			this.layer = 'À';
-		} else if (this.virgule) {
+		} else if (this.comma) {
 			this.layer = ',';
 		} else {
 			this.layer = 'Primary';
 		}
 
-		// Mettre à jour le store
+		// Update the layer in the store
 		this.data_clavier.update((currentData) => {
 			currentData['layer'] = this.layer;
 			return currentData;
@@ -102,123 +108,115 @@ export class KeyboardEmulation extends Keyboard {
 		this.keyboardUpdate();
 	}
 
-	KeyboardEmulation(event) {
-		let modificateurActive = this.activationModificateur(event); // Activation des éventuelles touches modificatrices
-		this.setCouche();
-		if (this.alt && this.keyboardInformation['plus'] === 'oui') {
-			this.envoiTouche_ReplacerCurseur('Enter');
-			this.alt = false;
-			return true;
-		}
-		if (modificateurActive) {
-			return true;
-		}
-
-		// Ne pas intercepter les raccourcis avec Ctrl
-		if (this.control & !this.altgr) {
-			// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
-			return true;
-		}
-
-		// Si touche normale
-		let keyPressed = event.code;
-		let res = this.layoutData[this.keyboardInformation.type].find((el) => el['code'] == keyPressed); // La touche de notre layout correspondant au keycode tapé
-		if (res !== undefined) {
-			event.preventDefault(); // La touche selon le pilote de l’ordinateur n’est pas tapée
-			const keyboardKey = this.layoutData['keys'].find((el) => el['key'] === res['key']);
-			this.presserToucheClavier(keyboardKey['key']); // Presser la touche sur le clavier visuel
-			if (
-				this.altgr &&
-				this.shift &&
-				keyPressed === 'CapsLock' &&
-				this.keyboardInformation['plus'] === 'oui'
-			) {
-				this.envoiTouche_ReplacerCurseur('Ctrl-Delete');
-				return true;
-			} else if (
-				this.control &&
-				(keyPressed === 'Backspace' ||
-					(keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui'))
-			) {
-				this.envoiTouche_ReplacerCurseur('Ctrl-Backspace');
-				return true;
-			} else if (
-				keyPressed === 'Delete' ||
-				(this.shift && keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui')
-			) {
-				this.envoiTouche_ReplacerCurseur('Delete');
-				return true;
-			} else if (
-				keyPressed === 'Backspace' ||
-				(keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui')
-			) {
-				this.envoiTouche_ReplacerCurseur('Backspace');
-				return true;
-			} else if (keyPressed === 'Enter') {
-				this.envoiTouche_ReplacerCurseur('Enter');
-			} else if (this.e) {
-				if (keyPressed === 'Space') {
-					touche = ' ';
-				} else {
-					touche = keyboardKey['Exposant'];
-				}
-				this.e = false;
-				this.envoiTouche_ReplacerCurseur(touche);
-			} else if (this.circonflexe) {
-				if (keyPressed === 'Space') {
-					touche = ' ';
-				} else {
-					touche = keyboardKey['^'];
-				}
-				this.circonflexe = false;
-				this.envoiTouche_ReplacerCurseur(touche);
-			} else if (this.trema) {
-				if (keyPressed === 'Space') {
-					touche = ' ';
-				} else {
-					touche = keyboardKey['Trema'];
-				}
-				this.trema = false;
-				this.envoiTouche_ReplacerCurseur(touche);
-			} else if (this.i) {
-				if (keyPressed === 'Space') {
-					touche = ' ';
-				} else {
-					touche = keyboardKey['Indice'];
-				}
-				this.i = false;
-				this.envoiTouche_ReplacerCurseur(touche);
-			} else if (this.R) {
-				if (keyPressed === 'Space') {
-					touche = ' ';
-				} else {
-					touche = keyboardKey['R'];
-				}
-				this.R = false;
-				this.envoiTouche_ReplacerCurseur(touche);
-			} else if (this.a_grave) {
-				if (keyPressed === 'Space') {
-					touche = ' ';
-				} else {
-					// On supprime le à avant de taper le raccourci de la layer À
-					this.textarea.value = this.textarea.value.slice(0, -1);
-					touche = keyboardKey['À'];
-				}
-				this.a_grave = false;
-				this.envoiTouche_ReplacerCurseur(touche);
-			} else if (this.virgule) {
-				if (keyPressed === 'Space') {
-					touche = ' ';
-				} else {
-					// On supprime le , avant de taper le raccourci de la layer Virgule
-					this.textarea.value = this.textarea.value.slice(0, -1);
-					touche = keyboardKey[','];
-				}
-				this.virgule = false;
-				this.envoiTouche_ReplacerCurseur(touche);
-			} else {
-				this.envoiTouche(event, keyboardKey);
+	pressKey(key) {
+		// Clean other pressed keys
+		let emplacement = document.getElementById('clavier_' + this.id);
+		const pressedKeys = emplacement.querySelectorAll('.pressed-key');
+		[].forEach.call(pressedKeys, function (el) {
+			if (el.dataset.type !== 'special') {
+				el.classList.remove('pressed-key');
 			}
+		});
+
+		// Press the key
+		emplacement.querySelector("keyboard-key[data-key='" + key + "']").classList.add('pressed-key');
+	}
+
+	determineKeyToSend(keyPressed, event, keyboardKey) {
+		if (this.alt && this.keyboardInformation['plus'] === 'oui') {
+			this.envoiTouche_ReplacerCurseur('BackSpace');
+			return true;
+		} else if (
+			this.altgr &&
+			this.shift &&
+			keyPressed === 'CapsLock' &&
+			this.keyboardInformation['plus'] === 'oui'
+		) {
+			this.envoiTouche_ReplacerCurseur('Ctrl-Delete');
+			return true;
+		} else if (
+			this.control &&
+			(keyPressed === 'BackSpace' ||
+				(keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui'))
+		) {
+			this.envoiTouche_ReplacerCurseur('Ctrl-BackSpace');
+			return true;
+		} else if (
+			keyPressed === 'Delete' ||
+			(this.shift && keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui')
+		) {
+			this.envoiTouche_ReplacerCurseur('Delete');
+			return true;
+		} else if (
+			keyPressed === 'BackSpace' ||
+			(keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui')
+		) {
+			this.envoiTouche_ReplacerCurseur('BackSpace');
+			return true;
+		} else if (keyPressed === 'Enter') {
+			this.envoiTouche_ReplacerCurseur('Enter');
+		} else if (this.exposant) {
+			if (keyPressed === 'Space') {
+				touche = ' ';
+			} else {
+				touche = keyboardKey['Exposant'];
+			}
+			this.exposant = false;
+			this.envoiTouche_ReplacerCurseur(touche);
+		} else if (this.circonflexe) {
+			if (keyPressed === 'Space') {
+				touche = ' ';
+			} else {
+				touche = keyboardKey['^'];
+			}
+			this.circonflexe = false;
+			this.envoiTouche_ReplacerCurseur(touche);
+		} else if (this.trema) {
+			if (keyPressed === 'Space') {
+				touche = ' ';
+			} else {
+				touche = keyboardKey['Trema'];
+			}
+			this.trema = false;
+			this.envoiTouche_ReplacerCurseur(touche);
+		} else if (this.indice) {
+			if (keyPressed === 'Space') {
+				touche = ' ';
+			} else {
+				touche = keyboardKey['Indice'];
+			}
+			this.indice = false;
+			this.envoiTouche_ReplacerCurseur(touche);
+		} else if (this.R) {
+			if (keyPressed === 'Space') {
+				touche = ' ';
+			} else {
+				touche = keyboardKey['R'];
+			}
+			this.R = false;
+			this.envoiTouche_ReplacerCurseur(touche);
+		} else if (this.a_grave) {
+			if (keyPressed === 'Space') {
+				touche = ' ';
+			} else {
+				// On supprime le à avant de taper le raccourci de la layer À
+				this.textarea.value = this.textarea.value.slice(0, -1);
+				touche = keyboardKey['À'];
+			}
+			this.a_grave = false;
+			this.envoiTouche_ReplacerCurseur(touche);
+		} else if (this.comma) {
+			if (keyPressed === 'Space') {
+				touche = ' ';
+			} else {
+				// On supprime le , avant de taper le raccourci de la layer Virgule
+				this.textarea.value = this.textarea.value.slice(0, -1);
+				touche = keyboardKey[','];
+			}
+			this.comma = false;
+			this.envoiTouche_ReplacerCurseur(touche);
+		} else {
+			this.envoiTouche(event, keyboardKey);
 		}
 	}
 
@@ -273,11 +271,11 @@ export class KeyboardEmulation extends Keyboard {
 			touche = ''; /* Ne pas afficher la touche morte */
 		}
 		if (touche === 'ᵉ') {
-			this.e = true;
+			this.exposant = true;
 			touche = ''; /* Ne pas afficher la touche morte */
 		}
 		if (touche === 'ᵢ') {
-			this.i = true;
+			this.indice = true;
 			touche = ''; /* Ne pas afficher la touche morte */
 		}
 		if (touche === 'ℝ') {
@@ -288,15 +286,15 @@ export class KeyboardEmulation extends Keyboard {
 			this.a_grave = true;
 		}
 		if (touche === ',') {
-			this.virgule = true;
+			this.comma = true;
 		}
 
 		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
 		let nouvellePositionCurseur;
-		if (touche === 'Backspace') {
+		if (touche === 'BackSpace') {
 			this.textarea.value = texteAvantCurseur.substring(0, positionCurseur - 1) + texteApresCurseur;
 			nouvellePositionCurseur = positionCurseur - 1;
-		} else if (touche === 'Ctrl-Backspace') {
+		} else if (touche === 'Ctrl-BackSpace') {
 			let texteAvantSuppression = texteAvantCurseur;
 			let texteApresSuppression = texteAvantCurseur.replace(/\s*\S*$/, '');
 			this.textarea.value = texteApresSuppression + texteApresCurseur;
@@ -386,18 +384,25 @@ export class KeyboardEmulation extends Keyboard {
 		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 
-	presserToucheClavier(touche) {
-		// Nettoyage des touches actives
-		let emplacement = document.getElementById('clavier_' + this.id);
-		const touchesActives = emplacement.querySelectorAll('.pressed-key');
-		[].forEach.call(touchesActives, function (el) {
-			if (el.dataset.type !== 'special') {
-				el.classList.remove('pressed-key');
-			}
-		});
-		emplacement
-			.querySelector("keyboard-key[data-key='" + touche + "']")
-			.classList.add('pressed-key');
+	releaseModifieurs(event) {
+		if (event.code === 'AltRight' || event.code === 'AltGraph') {
+			this.altgr = false;
+		} else if (
+			event.code === 'ShiftLeft' ||
+			event.code === 'ShiftRight' ||
+			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'oui')
+		) {
+			this.shift = false;
+		} else if (event.code === 'AltLeft') {
+			this.alt = false;
+		} else if (
+			event.code === 'ControlLeft' ||
+			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'non')
+		) {
+			this.control = false;
+		}
+		this.layerUpdate();
+		this.keyboardUpdate();
 	}
 }
 

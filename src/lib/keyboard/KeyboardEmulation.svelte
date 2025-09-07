@@ -20,8 +20,8 @@
 		id="input-text"
 		placeholder="Écrivez ici"
 		bind:value={inputBox}
-		on:keydown={keyboard.KeyboardEmulation}
-		on:keyup={keyboard.relacherModificateurs}
+		on:keydown={keyboard.emulateKey}
+		on:keyup={keyboard.releaseModifieurs}
 	/>
 </div>
 
