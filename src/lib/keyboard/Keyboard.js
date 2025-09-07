@@ -62,79 +62,71 @@ export class Keyboard {
 			const keyboardLocation = this.getKeyboardLocation();
 			for (let row = 1; row <= 7; row++) {
 				for (let column = 0; column <= 15; column++) {
-					// Récupération de ce qui doit être affiché sur la touche, selon que la géométrie est iso ou ergodox (deux listes de propriétés différentes)
-					const newKey = this.layoutData[this.keyboardInformation.type].find(
+					const key = this.cleanKey(keyboardLocation, row, column);
+
+					// Retrieve what should be displayed on the key, depending on whether the layout is ISO or Ergodox (two different sets of properties)
+					const keyIdentifier = this.layoutData[this.keyboardInformation.type].find(
 						(el) => el['row'] == row && el['column'] == column
 					);
 
-					const keyboardKey = this.cleanKey(keyboardLocation, row, column);
-
-					if (newKey !== undefined) {
-						const newKeyContent = this.layoutData['keys'].find((el) => el['key'] === newKey['key']);
+					if (keyIdentifier !== undefined) {
+						const keyContent = this.layoutData['keys'].find(
+							(el) => el['key'] === keyIdentifier['key']
+						);
 
 						if (
 							this.keyboardInformation.layer !== 'Visuel' &&
-							(newKeyContent[this.keyboardInformation.layer] === '' ||
-								newKeyContent[this.keyboardInformation.layer] === undefined)
+							(keyContent[this.keyboardInformation.layer] === '' ||
+								keyContent[this.keyboardInformation.layer] === undefined)
 						) {
-							keyboardKey.innerHTML = '<div><div>'; /* Undefined key in the selected layer */
+							key.innerHTML = '<div><div>'; /* Undefined key in the selected layer */
 						} else {
 							if (this.keyboardInformation.layer === 'Visuel') {
-								if (newKeyContent['type'] === 'ponctuation') {
-									if (newKey['key'] === '"') {
+								if (keyContent['type'] === 'ponctuation') {
+									if (keyIdentifier['key'] === '"') {
 										// Cas particulier de la touche « " »
-										keyboardKey.innerHTML =
-											'<div>' +
-											newKeyContent['Shift'] +
-											'<br/>' +
-											newKeyContent['Primary'] +
-											'</div>';
+										key.innerHTML =
+											'<div>' + keyContent['Shift'] + '<br/>' + keyContent['Primary'] + '</div>';
 									} else {
 										// Toutes les autres touches "doubles"
-										keyboardKey.innerHTML =
-											'<div>' +
-											newKeyContent['AltGr'] +
-											'<br/>' +
-											newKeyContent['Primary'] +
-											'</div>';
-										if (newKeyContent['Primary' + '+'] !== undefined && row < 6) {
+										key.innerHTML =
+											'<div>' + keyContent['AltGr'] + '<br/>' + keyContent['Primary'] + '</div>';
+										if (keyContent['Primary' + '+'] !== undefined && row < 6) {
 											// Si la layer + existe ET n’est pas en thumb cluster
-											keyboardKey.dataset['plus'] = 'oui';
+											key.dataset['plus'] = 'oui';
 										}
 									}
 								} else {
 									// Cas où la touche n’est pas double
 									if (this.keyboardInformation.plus === 'oui') {
 										// Cas où la touche n’est pas double et + est activé
-										if (newKeyContent['Primary' + '+'] !== undefined && row < 6) {
+										if (keyContent['Primary' + '+'] !== undefined && row < 6) {
 											// Si la layer + existe ET n’est pas en thumb cluster
-											keyboardKey.innerHTML = '<div>' + newKeyContent['Primary' + '+'] + '</div>';
-											keyboardKey.dataset['plus'] = 'oui';
+											key.innerHTML = '<div>' + keyContent['Primary' + '+'] + '</div>';
+											key.dataset['plus'] = 'oui';
 										} else {
-											keyboardKey.innerHTML = '<div>' + newKeyContent['Primary'] + '</div>';
+											key.innerHTML = '<div>' + keyContent['Primary'] + '</div>';
 										}
 									} else {
-										keyboardKey.innerHTML = '<div>' + newKeyContent['Primary'] + '</div>';
+										key.innerHTML = '<div>' + keyContent['Primary'] + '</div>';
 									}
 								}
 							} else {
 								// Toutes les couches autres que "Visuel"
 								if (this.keyboardInformation.plus === 'oui') {
 									if (
-										newKeyContent[this.keyboardInformation.layer + '+'] !== undefined &&
-										(row < 6 || newKey['key'] === 'Space')
+										keyContent[this.keyboardInformation.layer + '+'] !== undefined &&
+										(row < 6 || keyIdentifier['key'] === 'Space')
 									) {
 										// Si la layer + existe et n’est pas en thumb cluster. Sur le thumb cluster, on affiche seulement le tap hold en space et pas en Alt ou Ctrl
-										keyboardKey.innerHTML =
-											'<div>' + newKeyContent[this.keyboardInformation.layer + '+'] + '</div>';
-										keyboardKey.dataset.plus = 'oui';
+										key.innerHTML =
+											'<div>' + keyContent[this.keyboardInformation.layer + '+'] + '</div>';
+										key.dataset.plus = 'oui';
 									} else {
-										keyboardKey.innerHTML =
-											'<div>' + newKeyContent[this.keyboardInformation.layer] + '</div>';
+										key.innerHTML = '<div>' + keyContent[this.keyboardInformation.layer] + '</div>';
 									}
 								} else {
-									keyboardKey.innerHTML =
-										'<div>' + newKeyContent[this.keyboardInformation.layer] + '</div>';
+									key.innerHTML = '<div>' + keyContent[this.keyboardInformation.layer] + '</div>';
 								}
 							}
 						}
@@ -145,17 +137,17 @@ export class Keyboard {
 							this.keyboardInformation['controls'] === 'oui'
 							// && this.version == '2.2'
 						) {
-							keyboardKey.addEventListener(
+							key.addEventListener(
 								'click',
 								() => {
-									this.layerSwitch(keyboardKey);
+									this.layerSwitch(key);
 								},
 								{ passive: true }
 							);
 						}
 
-						this.postProcessingKeys(keyboardKey, newKey);
-						this.setKeyProperties(keyboardKey, column, newKeyContent, newKey);
+						this.postProcessingKeys(key, keyIdentifier);
+						this.setKeyProperties(key, column, keyContent, keyIdentifier);
 					}
 				}
 			}
@@ -169,92 +161,91 @@ export class Keyboard {
 		const keyboardKey0 = keyboardLocation.querySelector(
 			"keyboard-key[data-row='" + row + "'][data-column='" + column + "']"
 		);
-		let keyboardKey = keyboardKey0.cloneNode(true);
-		keyboardKey0.parentNode.replaceChild(keyboardKey, keyboardKey0);
+		let key = keyboardKey0.cloneNode(true);
+		keyboardKey0.parentNode.replaceChild(key, keyboardKey0);
 
 		// Nettoyage des attributs de la touche
-		const attributes = keyboardKey.getAttributeNames();
+		const attributes = key.getAttributeNames();
 		const attributesToKeep = ['data-row', 'data-column'];
 		attributes.forEach((attribute) => {
 			if (attribute.startsWith('data-') && !attributesToKeep.includes(attribute)) {
-				keyboardKey.removeAttribute(attribute);
+				key.removeAttribute(attribute);
 			}
 		});
 		// Suppression du contenu de la touche
-		keyboardKey.dataset['key'] = '';
-		keyboardKey.dataset['plus'] = 'non';
-		keyboardKey.classList.remove('pressed-key'); // Suppression de la classe css pour les touches pressées
+		key.dataset['key'] = '';
+		key.dataset['plus'] = 'non';
+		key.classList.remove('pressed-key'); // Suppression de la classe css pour les touches pressées
 
 		return keyboardLocation.querySelector(
 			"keyboard-key[data-row='" + row + "'][data-column='" + column + "']"
 		);
 	}
 
-	setKeyProperties(keyboardKey, column, newKeyContent, newKey) {
+	setKeyProperties(key, column, keyContent, keyIdentifier) {
 		// On ajoute des this.keyboardInformation dans les data attributes de la touche
 		// This enables automatic styling of key groups with CSS
-		keyboardKey.dataset['key'] = newKey['key'];
-		keyboardKey.dataset['column'] = column;
-		keyboardKey.dataset['finger'] = newKey['finger'];
-		keyboardKey.dataset['hand'] = newKey['hand'];
-		keyboardKey.dataset['type'] = newKeyContent['type'];
-		keyboardKey.dataset['style'] = '';
+		key.dataset['key'] = keyIdentifier['key'];
+		key.dataset['column'] = column;
+		key.dataset['finger'] = keyIdentifier['finger'];
+		key.dataset['hand'] = keyIdentifier['hand'];
+		key.dataset['type'] = keyContent['type'];
+		key.dataset['style'] = '';
 
 		if (
 			this.keyboardInformation.layer === 'Visuel' &&
-			newKeyContent['Primary' + '-style'] !== undefined &&
-			newKeyContent['Primary' + '-style'] !== ''
+			keyContent['Primary' + '-style'] !== undefined &&
+			keyContent['Primary' + '-style'] !== ''
 		) {
-			keyboardKey.dataset['style'] = newKeyContent['Primary' + '-style'];
+			key.dataset['style'] = keyContent['Primary' + '-style'];
 		} else {
 			if (
 				this.keyboardInformation.plus === 'oui' &&
-				newKeyContent[this.keyboardInformation.layer + '+' + '-style'] !== undefined &&
-				newKeyContent[this.keyboardInformation.layer + '+' + '-style'] !== ''
+				keyContent[this.keyboardInformation.layer + '+' + '-style'] !== undefined &&
+				keyContent[this.keyboardInformation.layer + '+' + '-style'] !== ''
 			) {
-				keyboardKey.dataset['style'] =
-					newKeyContent[this.keyboardInformation.layer + '+' + '-style'];
+				key.dataset['style'] = keyContent[this.keyboardInformation.layer + '+' + '-style'];
 			} else if (
-				newKeyContent[this.keyboardInformation.layer + '-style'] !== undefined &&
-				newKeyContent[this.keyboardInformation.layer + '-style'] !== ''
+				keyContent[this.keyboardInformation.layer + '-style'] !== undefined &&
+				keyContent[this.keyboardInformation.layer + '-style'] !== ''
 			) {
-				keyboardKey.dataset['style'] = newKeyContent[this.keyboardInformation.layer + '-style'];
+				key.dataset['style'] = keyContent[this.keyboardInformation.layer + '-style'];
 			}
 		}
 
-		keyboardKey.style.setProperty('--size', newKey['size']);
+		key.style.setProperty('--size', keyIdentifier['size']);
 
-		let frequency = characterFrequencies[newKeyContent[this.keyboardInformation.layer]];
-		keyboardKey.style.setProperty('--frequency', frequency);
+		let frequency = characterFrequencies[keyContent[this.keyboardInformation.layer]];
+		key.style.setProperty('--frequency', frequency);
 
 		let frequency_normalized = // Between 0 et 1 avec 1 pour la lettre la plus fréquente
-			(characterFrequencies[newKeyContent[this.keyboardInformation.layer]] -
+			(characterFrequencies[keyContent[this.keyboardInformation.layer]] -
 				characterFrequencies['min']) /
 			(characterFrequencies['max'] - characterFrequencies['min']);
-		keyboardKey.style.setProperty(
+		key.style.setProperty(
 			'--frequency_normalized',
 			logarithmicTransformation(frequency_normalized, 40)
 		);
 	}
 
-	postProcessingKeys(keyboardKey, newKey) {
+	postProcessingKeys(key, keyIdentifier) {
 		// Modification on the Space key to also show the name of the Layout
 		let plus = this.keyboardInformation.plus === 'oui' ? ' <span class="glow">+</span>' : '';
 		if (
 			this.keyboardInformation.layer === 'Visuel' &&
 			this.keyboardInformation.type === 'iso' &&
-			newKey['key'] === 'Space'
+			keyIdentifier['key'] === 'Space'
 		) {
-			keyboardKey.innerHTML = '<div>' + this.layoutData['name'] + plus + '</div>';
+			key.innerHTML = '<div>' + this.layoutData['name'] + plus + '</div>';
 		}
 
 		// Make the ★ key glow
 		if (
 			this.keyboardInformation.layer === 'Visuel' &&
 			this.keyboardInformation.plus === 'oui' &&
-			newKey['key'] === 'magique'
+			keyIdentifier['key'] === 'magique'
 		) {
-			keyboardKey.innerHTML = '<div><span class="glow" style = "position:initial">★</span></div>';
+			key.innerHTML = '<div><span class="glow" style = "position:initial">★</span></div>';
 		}
 
 		// For ISO, Layer is on LAlt instead of Space
@@ -262,18 +253,18 @@ export class Keyboard {
 			this.keyboardInformation.type === 'iso' &&
 			this.keyboardInformation.layer === 'Layer' &&
 			this.keyboardInformation.plus === 'oui' &&
-			newKey['key'] === 'LAlt'
+			keyIdentifier['key'] === 'LAlt'
 		) {
-			keyboardKey.innerHTML = '<div>Layer</div>';
+			key.innerHTML = '<div>Layer</div>';
 		}
 		// For Ergodox, Layer is on Space instead of LAlt
 		if (
 			this.keyboardInformation.type === 'ergodox' &&
 			this.keyboardInformation.layer === 'Layer' &&
 			this.keyboardInformation.plus === 'oui' &&
-			newKey['key'] === 'Space'
+			keyIdentifier['key'] === 'Space'
 		) {
-			keyboardKey.innerHTML = '<div>Layer</div>';
+			key.innerHTML = '<div>Layer</div>';
 		}
 	}
 
