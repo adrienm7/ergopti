@@ -43,7 +43,7 @@ export class Keyboard {
 		// Lève une exception si le document n'est pas défini
 		throw new Error('Document non défini');
 	}
-	é;
+
 	keyboardUpdate() {
 		// This code isn’t necessary anymore, and when activated it generates many useless requests, as all keyboards will request the same file:
 		// if (this.layoutData === undefined) {
