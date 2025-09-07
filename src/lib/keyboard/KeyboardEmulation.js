@@ -1,22 +1,24 @@
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
-import remplacements from '$lib/keyboard/magicReplacements.json';
+import magicReplacements from '$lib/keyboard/magicReplacements.json';
 
 export class KeyboardEmulation extends Keyboard {
 	constructor(id) {
 		super(id);
-		this['layer'] = 'Primary'; // Default layer
 
-		this['Shift'] = false;
-		this['Alt'] = false;
-		this['AltGr'] = false;
-		this['Ctrl'] = false;
-		this['Circonflexe'] = false;
-		this['Trema'] = false;
-		this['Exposant'] = false;
-		this['Indice'] = false;
-		this['R'] = false;
-		this['À'] = false;
-		this[','] = false;
+		this['layer'] = 'Primary'; // Default layer
+		this['activeLayers'] = {
+			Shift: false,
+			Alt: false,
+			AltGr: false,
+			Ctrl: false,
+			Circonflexe: false,
+			Trema: false,
+			Exposant: false,
+			Indice: false,
+			R: false,
+			À: false,
+			',': false
+		};
 
 		// The scope of "this" is changed in the text input otherwise, and this.layoutData becomes undefined. This prevents this problem
 		this.emulateKey = this.emulateKey.bind(this);
@@ -26,19 +28,22 @@ export class KeyboardEmulation extends Keyboard {
 	layerUpdate() {
 		// Determine the new value of the layer
 		const priorities = [
-			{ cond: this['AltGr'] && this['Shift'], value: 'ShiftAltGr' },
-			{ cond: this['Circonflexe'] && this['Shift'], value: 'CirconflexeShift' },
-			{ cond: this['Trema'] && this['Shift'], value: 'TremaShift' },
-			{ cond: this['AltGr'], value: 'AltGr' },
-			{ cond: this['Shift'], value: 'Shift' },
-			{ cond: this['Ctrl'], value: 'Ctrl' },
-			{ cond: this['Circonflexe'], value: 'Circonflexe' },
-			{ cond: this['Trema'], value: 'Trema' },
-			{ cond: this['Exposant'], value: 'Exposant' },
-			{ cond: this['Indice'], value: 'Indice' },
-			{ cond: this['R'], value: 'R' },
-			{ cond: this['À'], value: 'À' },
-			{ cond: this[','], value: ',' }
+			{ cond: this['activeLayers']['AltGr'] && this['activeLayers']['Shift'], value: 'ShiftAltGr' },
+			{
+				cond: this['activeLayers']['Circonflexe'] && this['activeLayers']['Shift'],
+				value: 'CirconflexeShift'
+			},
+			{ cond: this['activeLayers']['Trema'] && this['activeLayers']['Shift'], value: 'TremaShift' },
+			{ cond: this['activeLayers']['AltGr'], value: 'AltGr' },
+			{ cond: this['activeLayers']['Shift'], value: 'Shift' },
+			{ cond: this['activeLayers']['Ctrl'], value: 'Ctrl' },
+			{ cond: this['activeLayers']['Circonflexe'], value: 'Circonflexe' },
+			{ cond: this['activeLayers']['Trema'], value: 'Trema' },
+			{ cond: this['activeLayers']['Exposant'], value: 'Exposant' },
+			{ cond: this['activeLayers']['Indice'], value: 'Indice' },
+			{ cond: this['activeLayers']['R'], value: 'R' },
+			{ cond: this['activeLayers']['À'], value: 'À' },
+			{ cond: this['activeLayers'][','], value: ',' }
 		];
 		const match = priorities.find((p) => p.cond);
 		this['layer'] = match ? match.value : 'Primary';
@@ -54,10 +59,10 @@ export class KeyboardEmulation extends Keyboard {
 	emulateKey(event) {
 		const activeModifier = this.determineActiveModifier(event); // Activate potential modifier
 		if (activeModifier) {
-			this[activeModifier] = true;
+			this['activeLayers'][activeModifier] = true;
 			this.layerUpdate();
 			if (this.keyboardInformation['plus'] === 'oui' && activeModifier === 'Alt') {
-				this.sendKey('BackSpace');
+				this.sendResult('BackSpace');
 			}
 			// If a modifier has been pressed, no key to send right now, so we exit the function
 			// It is only on the next key pressed that isn’t a modifier that will give the result of this key on the new layer
@@ -65,7 +70,7 @@ export class KeyboardEmulation extends Keyboard {
 		}
 
 		// Do not intercept shortcuts with Ctrl
-		if (this['Ctrl'] && !this['AltGr']) {
+		if (this['activeLayers']['Ctrl'] && !this['activeLayers']['AltGr']) {
 			// Note: when this["AltGr"] is active, Ctrl is also active, hence the "&& !this["AltGr"]"
 			return;
 		}
@@ -99,13 +104,13 @@ export class KeyboardEmulation extends Keyboard {
 
 			const activeDeadKey = this.determineActiveDeadKey(keyContent); // Activate potential dead key
 			if (activeDeadKey) {
-				this[activeDeadKey] = true;
+				this['activeLayers'][activeDeadKey] = true;
 				this.layerUpdate();
 				return;
 			}
 
-			const { keyToSend, charactersToDelete } = this.determineKeyToSend(keyContent);
-			this.sendKey(keyToSend, charactersToDelete);
+			const [resultToSend, charactersToDelete] = this.getResultToSend(keyContent);
+			this.sendResult(resultToSend, charactersToDelete);
 		}
 	}
 
@@ -140,7 +145,7 @@ export class KeyboardEmulation extends Keyboard {
 		};
 		const ActiveDeadKey = deadKeys[keyPressed];
 		if (ActiveDeadKey) {
-			this[ActiveDeadKey] = true;
+			this['activeLayers'][ActiveDeadKey] = true;
 			return ActiveDeadKey;
 		}
 		return false;
@@ -148,201 +153,226 @@ export class KeyboardEmulation extends Keyboard {
 
 	pressKey(key) {
 		// Clean other pressed keys
-		let emplacement = document.getElementById('clavier_' + this['id']);
-		const pressedKeys = emplacement.querySelectorAll('.pressed-key');
+		const keyboardLocation = this.getKeyboardLocation();
+		const pressedKeys = keyboardLocation.querySelectorAll('.pressed-key');
 		[].forEach.call(pressedKeys, function (el) {
-			if (el.dataset.type !== 'special') {
+			if (
+				el.dataset.type !== 'special' ||
+				el.dataset.key === 'BackSpace' ||
+				el.dataset.key === 'Tab'
+			) {
 				el.classList.remove('pressed-key');
 			}
 		});
 
 		// Press the key
-		emplacement.querySelector("keyboard-key[data-key='" + key + "']").classList.add('pressed-key');
+		keyboardLocation
+			.querySelector("keyboard-key[data-key='" + key + "']")
+			.classList.add('pressed-key');
 	}
 
 	getKeyToSend(keyContent) {
-		let keyToSend = '';
+		let resultToSend = '';
 		if (this.keyboardInformation['plus'] === 'oui') {
 			if (keyContent[this['layer'] + '+'] !== undefined) {
-				keyToSend = keyContent[this['layer'] + '+'];
+				resultToSend = keyContent[this['layer'] + '+'];
 			} else {
-				keyToSend = keyContent[this['layer']];
+				resultToSend = keyContent[this['layer']];
 			}
 		} else {
-			keyToSend = keyContent[this['layer']];
+			resultToSend = keyContent[this['layer']];
 		}
-		return keyToSend;
+		return resultToSend;
 	}
 
-	determineKeyToSend(keyContent) {
+	getResultToSend(keyContent) {
 		const keyPressed = keyContent['key'];
-		let keyToSend = this.getKeyToSend(keyContent);
+		let resultToSend = this.getKeyToSend(keyContent);
 		let charactersToDelete = 0;
 
-		// Vérifier si l’une des touches mortes doit être désactivée
-		for (const k of ['Circonflexe', 'Trema', 'Exposant', 'Indice', 'R']) {
-			if (this[k]) {
-				this[k] = false;
+		// If a dead key or assimilated is currently activated, it needs to be deactivated now that we send the character present on it
+		for (const layerName of ['Circonflexe', 'Trema', 'Exposant', 'Indice', 'R', 'À', ',']) {
+			if (this['activeLayers'][layerName]) {
+				if (layerName === 'À' || layerName === ',') {
+					charactersToDelete = 1; // Delete the previously typed "à" or "," before sending the result on the layer
+				}
+				this['activeLayers'][layerName] = false;
 				this.layerUpdate();
 				break;
 			}
 		}
 
-		if (this['layer'] == 'À') {
-			charactersToDelete = 1; // Delete the previously typed "à" before sending the result on the layer À
-			this['À'] = false;
+		// If "à" or "," is on the key to send, we send the character and switch layer
+		if (resultToSend === 'à') {
+			this['activeLayers']['À'] = true;
 			this.layerUpdate();
-		} else if (this['layer'] == ',') {
-			charactersToDelete = 1; // Delete the previously typed "," before sending the result on the layer ,
-			this[','] = false;
+		}
+		if (resultToSend === ',') {
+			this['activeLayers'][','] = true;
 			this.layerUpdate();
-		} else if (keyPressed === 'Enter') {
-			keyToSend = 'Enter';
-		} else if (keyPressed === 'BackSpace') {
-			keyToSend = 'BackSpace';
+		}
+
+		if (keyPressed === 'BackSpace') {
+			resultToSend = 'BackSpace';
 		} else if (
-			this['Ctrl'] &&
+			this['activeLayers']['Ctrl'] &&
 			(keyPressed === 'BackSpace' ||
 				(this.keyboardInformation['plus'] === 'oui' && keyPressed === 'LAlt'))
 		) {
-			keyToSend = 'Ctrl-BackSpace';
+			resultToSend = 'Ctrl-BackSpace';
+		} else if (this['activeLayers']['Ctrl'] & (keyPressed === 'Delete') || resultToSend === '^⌦') {
+			resultToSend = 'Ctrl-Delete';
 		} else if (
 			keyPressed === 'Delete' ||
-			(this.keyboardInformation['plus'] === 'oui' && this['Shift'] && keyPressed === 'LAlt')
+			(this.keyboardInformation['plus'] === 'oui' &&
+				this['activeLayers']['Shift'] &&
+				keyPressed === 'LAlt')
 		) {
-			keyToSend = 'Delete';
+			resultToSend = 'Delete';
+		} else if (
+			keyPressed === 'Enter' ||
+			(this.keyboardInformation['plus'] === 'oui' && keyPressed === 'CapsLock')
+		) {
+			resultToSend = 'Enter';
 		}
-		return { keyToSend, charactersToDelete };
+		return [resultToSend, charactersToDelete];
 	}
 
-	sendKey(touche, charactersToDelete = 0) {
+	sendResult(resultToSend, charactersToDelete = 0) {
+		let newTextAreaValue = this.textarea.value;
 		if (charactersToDelete > 0) {
-			this.textarea.value = this.textarea.value.slice(0, -charactersToDelete);
+			newTextAreaValue = newTextAreaValue.slice(0, -charactersToDelete);
 		}
-		touche = touche.replace(/<espace-insecable><\/espace-insecable>/g, ' ');
-		touche = touche.replace(/<tap-hold>.*<\/tap-hold>/g, '');
-		touche = touche.replace('␣', ' ');
 
-		// Récupérer la position du curseur dans la this.textarea
-		var positionCurseur = this.textarea.selectionStart;
+		// Clean potential html code, added for visualisation reasons, that can’t be rendered in a plain text input box
+		resultToSend = resultToSend.replace(/<espace-insecable><\/espace-insecable>/g, ' ');
+		resultToSend = resultToSend.replace(/<tap-hold>.*<\/tap-hold>/g, '');
+		resultToSend = resultToSend.replace('␣', ' ');
 
-		// Récupérer le texte avant et après la position du curseur
-		var texteAvantCurseur = this.textarea.value.substring(0, positionCurseur);
-		var texteApresCurseur = this.textarea.value.substring(positionCurseur);
+		// Retrieve cursor position as well as text before and after
+		const cursorPosition = this.textarea.selectionStart;
+		const textBeforeCursor = newTextAreaValue.substring(0, cursorPosition);
+		const textAfterCursor = newTextAreaValue.substring(cursorPosition);
 
-		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
-		let nouvellePositionCurseur;
-		if (touche === 'BackSpace') {
-			this.textarea.value = texteAvantCurseur.substring(0, positionCurseur - 1) + texteApresCurseur;
-			nouvellePositionCurseur = positionCurseur - 1;
-		} else if (touche === 'Ctrl-BackSpace') {
-			let texteAvantSuppression = texteAvantCurseur;
-			let texteApresSuppression = texteAvantCurseur.replace(/\s*\S*$/, '');
-			this.textarea.value = texteApresSuppression + texteApresCurseur;
-			let caracteresSupprimes = texteAvantSuppression.length - texteApresSuppression.length;
-			nouvellePositionCurseur = positionCurseur - caracteresSupprimes;
-		} else if (touche === 'Ctrl-Delete') {
-			let texteAvantSuppression = texteApresCurseur;
-			let texteApresSuppression = texteApresCurseur.replace(/^\S+\s*/, '');
-			this.textarea.value = texteAvantCurseur + texteApresSuppression;
-			let caracteresSupprimes = texteAvantSuppression.length - texteApresSuppression.length;
-			nouvellePositionCurseur = positionCurseur;
-		} else if (touche === 'Delete') {
-			console.log('Delete');
-			this.textarea.value =
-				texteAvantCurseur + texteApresCurseur.substring(1, texteApresCurseur.length);
-			nouvellePositionCurseur = positionCurseur;
-		} else if (touche === 'Enter') {
-			this.textarea.value = texteAvantCurseur + '\n' + texteApresCurseur;
-			nouvellePositionCurseur = positionCurseur + 1;
-		} else if (touche === 'Tab') {
-			this.textarea.value = texteAvantCurseur + '\t' + texteApresCurseur;
-			nouvellePositionCurseur = positionCurseur + 1;
-		} else if (touche === '★') {
-			let mot = texteAvantCurseur.split(/\s+/).slice(-1)[0];
+		let newCursorPosition = cursorPosition + 1; // Most times, we add a character
+		// newTextAreaValue will be the concatenation of the 3 updated parts : before, cursor, after
+		if (resultToSend === 'BackSpace') {
+			newTextAreaValue = textBeforeCursor.substring(0, cursorPosition - 1) + textAfterCursor;
+			newCursorPosition = cursorPosition - 1;
+		} else if (resultToSend === 'Ctrl-BackSpace') {
+			const textBeforeSuppression = textBeforeCursor;
+			const textAfterSuppression = textBeforeCursor.replace(/\s*\S*$/, '');
+			newTextAreaValue = textAfterSuppression + textAfterCursor;
+			const suppressedCharactersNumber = textBeforeSuppression.length - textAfterSuppression.length;
+			newCursorPosition = cursorPosition - suppressedCharactersNumber;
+		} else if (resultToSend === 'Ctrl-Delete') {
+			const textAfterSuppression = textAfterCursor.replace(/^\S*\s*/, '');
+			newTextAreaValue = textBeforeCursor + textAfterSuppression;
+			newCursorPosition = cursorPosition;
+		} else if (resultToSend === 'Delete') {
+			newTextAreaValue = textBeforeCursor + textAfterCursor.substring(1, textAfterCursor.length);
+			newCursorPosition = cursorPosition;
+		} else if (resultToSend === 'Enter') {
+			newTextAreaValue = textBeforeCursor + '\n' + textAfterCursor;
+		} else if (resultToSend === 'Tab') {
+			newTextAreaValue = textBeforeCursor + '\t' + textAfterCursor;
+		} else if (resultToSend === '★') {
+			const currentWord = textBeforeCursor.split(/\s+/).slice(-1)[0];
+			if (currentWord.toLowerCase() in magicReplacements) {
+				let replacement = magicReplacements[currentWord.toLowerCase()];
 
-			if (mot.toLowerCase() in remplacements) {
-				let remplacement = remplacements[mot.toLowerCase()];
-
-				if (mot === mot.toUpperCase() && mot.length > 1) {
-					remplacement = remplacement.toUpperCase();
-				} else if (mot === mot.charAt(0).toUpperCase() + mot.slice(1).toLowerCase()) {
-					remplacement = remplacement.charAt(0).toUpperCase() + remplacement.slice(1).toLowerCase();
+				if (currentWord === currentWord.toUpperCase() && currentWord.length > 1) {
+					replacement = replacement.toUpperCase();
+				} else if (
+					currentWord ===
+					currentWord.charAt(0).toUpperCase() + currentWord.slice(1).toLowerCase()
+				) {
+					replacement = replacement.charAt(0).toUpperCase() + replacement.slice(1).toLowerCase();
 				} else {
-					remplacement = remplacement.toLowerCase();
+					replacement = replacement.toLowerCase();
 				}
 
 				let regex = /(\s*)(\S+)$/;
-				let match = texteAvantCurseur.match(regex);
+				let match = textBeforeCursor.match(regex);
 				let prefix = match ? match[1] : '';
 
-				this.textarea.value =
-					texteAvantCurseur.replace(regex, prefix + remplacement) + texteApresCurseur;
-				nouvellePositionCurseur = positionCurseur + remplacement.length;
+				newTextAreaValue = textBeforeCursor.replace(regex, prefix + replacement) + textAfterCursor;
+				newCursorPosition = cursorPosition + replacement.length;
 			} else {
-				this.textarea.value = texteAvantCurseur + texteAvantCurseur.slice(-1) + texteApresCurseur;
-				nouvellePositionCurseur = positionCurseur + 1;
+				// If no replacement is found, double the previous character
+				newTextAreaValue = textBeforeCursor + textBeforeCursor.slice(-1) + textAfterCursor;
 			}
 		} else {
-			this.textarea.value = texteAvantCurseur + touche + texteApresCurseur;
-			nouvellePositionCurseur = positionCurseur + touche.length;
+			newTextAreaValue = textBeforeCursor + resultToSend + textAfterCursor;
+			newCursorPosition = cursorPosition + resultToSend.length;
 		}
 
-		this.ergoptiPlusFeatures(nouvellePositionCurseur);
+		if (this.keyboardInformation['plus'] === 'oui') {
+			[newTextAreaValue, newCursorPosition] = this.ergoptiPlusFeatures(
+				newTextAreaValue,
+				newCursorPosition
+			);
+		}
 
-		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
+		this.textarea.value = newTextAreaValue;
+		this.textarea.setSelectionRange(newCursorPosition, newCursorPosition);
 	}
 
-	ergoptiPlusFeatures(nouvellePositionCurseur) {
-		function remplacerEtAjuster(texte, regex, remplacement, positionCurseur) {
-			// Compte les occurrences dev par exemple, "p'", car on remplaçe deux lettres par trois, il faut donc changer la position du curseur
-			let count = (texte.match(regex) || []).length;
-			return {
-				nouveauTexte: texte.replace(regex, remplacement),
-				nouvellePositionCurseur:
-					positionCurseur + count * (remplacement.length - regex.source.length)
-			};
+	ergoptiPlusFeatures(TextAreaValue, CursorPosition) {
+		let newTextAreaValue = TextAreaValue;
+		let newCursorPosition = CursorPosition;
+
+		function regexReplaceCursor(regex, replacement) {
+			const matchCount = (newTextAreaValue.match(regex) || []).length; // Number of replacements to be made, as it will modify the cursor position
+			newTextAreaValue = newTextAreaValue.replace(regex, replacement);
+			newCursorPosition =
+				newCursorPosition + matchCount * (replacement.length - regex.source.length);
 		}
 
-		/* Évite le SFB NNU par exemple qui est N★U normalement, mais se fait N★Ê */
-		/* Sauf pour le R, car "arrêt" existe en français */
-		this.textarea.value = this.textarea.value.replace(/([^\Wr]){2}ê/g, '$1$1u');
+		/* Prevent SFBs involving ★U, like NNU : N★U is the normal way, but we can also do N★Ê */
+		/* Except for the R, because "arrêt" exists in French */
+		regexReplaceCursor(/([^\Wr]){2}ê/g, '$1$1u');
 
-		/* Apostrophe droite en typographique */
-		this.textarea.value = this.textarea.value.replace(/([cdjlmnst])'/gi, '$1’');
+		/* Automatic typographic apostrophe */
+		regexReplaceCursor(/([cdjlmnst])'/gi, '$1’');
 
-		/* Correction de SFBs avec la touche È */
-		this.textarea.value = this.textarea.value
-			.replace(/èo/g, 'oe')
-			.replace(/èe/g, 'eo')
-			.replace(/è\./g, 'u.')
-			.replace(/è,/g, 'u,');
+		const replacementsSFBs = [
+			[/êé/g, 'aî'],
+			[/éê/g, 'â'],
+			[/eê/g, 'eo'],
+			[/ê\./g, 'u.'],
+			[/ê,/g, 'u,']
+		];
 
-		/* Nouveaux roulements */
-		this.textarea.value = this.textarea.value
-			.replace(/yè/g, 'éi')
-			.replace(/èy/g, 'ié')
-			.replace(/gx/g, 'gt')
-			.replace(/hc/g, 'wh');
-		this.textarea.value = this.textarea.value.replace(/êé/g, 'aî');
-		({ nouveauTexte: this.textarea.value, nouvellePositionCurseur } = remplacerEtAjuster(
-			this.textarea.value,
-			/éê/g,
-			'â',
-			nouvellePositionCurseur
-		));
-		({ nouveauTexte: this.textarea.value, nouvellePositionCurseur } = remplacerEtAjuster(
-			this.textarea.value,
-			/p'/g,
-			'ct',
-			nouvellePositionCurseur
-		));
+		const replacementsRolls = [
+			[/yè/g, 'éi'],
+			[/èy/g, 'ié'],
+			[/hc/g, 'wh'],
+			[/p'/g, 'ct']
+		];
+
+		const replacementsDeadKeyECirc = [
+			[/êa/g, 'â'],
+			[/êi/g, 'î'],
+			[/êo/g, 'ô'],
+			[/êu/g, 'û']
+		];
+
+		for (const [regex, replacement] of [
+			...replacementsSFBs,
+			...replacementsRolls,
+			...replacementsDeadKeyECirc
+		]) {
+			regexReplaceCursor(regex, replacement);
+		}
+
+		return [newTextAreaValue, newCursorPosition];
 	}
 
 	releaseKey(event) {
 		const modifier = this.determineActiveModifier(event);
 		if (modifier) {
-			this[modifier] = false;
+			this['activeLayers'][modifier] = false;
 			this.layerUpdate();
 		}
 	}
