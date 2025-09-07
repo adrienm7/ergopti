@@ -21,7 +21,7 @@
 		placeholder="Écrivez ici"
 		bind:value={inputBox}
 		on:keydown={keyboard.emulateKey}
-		on:keyup={keyboard.releaseModifieurs}
+		on:keyup={keyboard.releaseKey}
 	/>
 </div>
 

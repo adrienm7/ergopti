@@ -449,14 +449,14 @@ export class Keyboard {
 				Space: keyboardLocation.querySelector("[data-key='Space']")
 			};
 
-			// Utility function to activate a key if it exists
-			function activate(key) {
+			// Utility function to pressKey a key if it exists
+			function pressKey(key) {
 				if (keys[key] !== null) {
 					keys[key].classList.add('pressed-key');
 				}
 			}
 
-			// Mapping of keys to activate for each layer
+			// Mapping of keys to pressKey for each layer
 			const layerMap = {
 				Shift: ['LShift', 'RShift'],
 				Ctrl: ['LCtrl'], // RCtrl is a special case
@@ -467,11 +467,11 @@ export class Keyboard {
 				GreekShift: ['LShift', 'RShift']
 			};
 
-			// Activate keys for the current layer
+			// pressKey keys for the current layer
 			const keysToActivate = layerMap[layer];
 			if (keysToActivate !== undefined) {
 				for (const key of keysToActivate) {
-					activate(key);
+					pressKey(key);
 				}
 			}
 
@@ -481,23 +481,23 @@ export class Keyboard {
 				type === 'iso' &&
 				['Shift', 'ShiftAltGr', 'CirconflexeShift', 'TremaShift', 'GreekShift'].includes(layer)
 			) {
-				activate('RCtrl');
+				pressKey('RCtrl');
 			}
 
 			if (layer === 'Ctrl') {
 				if (plus) {
-					activate('CapsLock');
+					pressKey('CapsLock');
 				} else {
-					activate('RCtrl');
+					pressKey('RCtrl');
 				}
 			}
 
 			if (layer === 'Layer') {
 				if (type === 'iso') {
-					activate('LAlt');
+					pressKey('LAlt');
 				}
 				if (type === 'ergodox') {
-					activate('Space');
+					pressKey('Space');
 				}
 			}
 		} catch (error) {
