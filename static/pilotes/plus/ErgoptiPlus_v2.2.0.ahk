@@ -118,7 +118,7 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
     OptionTimeActivationSeconds := HotstringOptions.Has("TimeActivationSeconds") ? HotstringOptions[
         "TimeActivationSeconds"] : 0
 
-    if IsTimeActivationExpired(Abbreviation, OptionTimeActivationSeconds) {
+    if IsTimeActivationExpired(SubStr(Abbreviation, -2, 1), OptionTimeActivationSeconds) {
         return
     }
 
@@ -167,10 +167,9 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
     }
 }
 
-IsTimeActivationExpired(Abbreviation, OptionTimeActivationSeconds) {
+IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
     ; Don’t activate the hotstring if taped too slowly
     Now := A_TickCount
-    PreviousCharacter := SubStr(Abbreviation, -2, 1)
     CharacterSentTime := LastSentCharacterKeyTime.Has(PreviousCharacter) ? LastSentCharacterKeyTime[PreviousCharacter] :
         Now
     if OptionTimeActivationSeconds > 0 {
@@ -1779,6 +1778,11 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
         ; Send all the text instantly and without triggering hotstrings while typing it
         SendInstant(LeftSymbol Selection RightSymbol)
     } else {
+        if (Symbol == "``") {
+            ; Doesn’t work otherwise
+            SendEvent("{Text}``")
+            return
+        }
         if (Symbol == "^") {
             ; Doesn’t work otherwise
             SendEvent("{Text}^")
@@ -4049,17 +4053,21 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
     }
 
     ShouldActivateDeadkey(Combination, MappedValue) {
-        ; We only activate the deadkey if it is the start of a new word, as symbols aren’t put in words
-        ; This condition corrects problems such as writing "même" that give "mê⁂e"
-        ; We could simply have removed the "?" flag in the Hotstring definition, but we want to get the symbols also if we are typing numbers.
-        ; For example to write 01/02 by using the / on the deadkey.
-        if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z★]$") { ; Everything except a letter
-            ; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
-            SendNewResult("{BackSpace 2}", Map("OnlyText", False))
-            SendNewResult(MappedValue)
-        } else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
-            SendNewResult("{BackSpace 2}", Map("OnlyText", False))
-            SendNewResult(MappedValue)
+        if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Features["DistancesReduction"]["DeadKeyECircumflex"]
+        .TimeActivationSeconds
+        ) {
+            ; We only activate the deadkey if it is the start of a new word, as symbols aren’t put in words
+            ; This condition corrects problems such as writing "même" that give "mê⁂e"
+            ; We could simply have removed the "?" flag in the Hotstring definition, but we want to get the symbols also if we are typing numbers.
+            ; For example to write 01/02 by using the / on the deadkey.
+            if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z★]$") { ; Everything except a letter
+                ; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
+                SendNewResult("{BackSpace 2}", Map("OnlyText", False))
+                SendNewResult(MappedValue)
+            } else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
+                SendNewResult("{BackSpace 2}", Map("OnlyText", False))
+                SendNewResult(MappedValue)
+            }
         }
     }
 }
@@ -4619,9 +4627,12 @@ if Features["Autocorrection"]["MultiplePonctuationMarks"].Enabled {
         Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
     )
 
-    CreateHotstring(
-        "*", "...", "…",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+    ; We can’t use the TimeActivationSeconds here, as previous character = current character = "."
+    Hotstring(
+        ":*?B0:" . "...",
+        ; Needs to be activated only after a word, otherwise can cause problem in code, like in js: [...a, ...b]
+        (*) => GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$" ?
+            SendNewResult("{BackSpace 3}…", Map("OnlyText", False)) : ""
     )
 }
 
