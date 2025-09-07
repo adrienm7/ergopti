@@ -216,7 +216,7 @@
 		padding: 4px;
 		padding-bottom: 2px;
 		padding-top: 1px;
-		/* width: 2.3em; */
+		width: 2.6em;
 	}
 
 	.myselect {
