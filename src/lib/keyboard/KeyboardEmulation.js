@@ -4,42 +4,75 @@ import remplacements from '$lib/keyboard/magicReplacements.json';
 export class KeyboardEmulation extends Keyboard {
 	constructor(id) {
 		super(id);
-		this.layer = 'Primary'; // Default layer
+		this['layer'] = 'Primary'; // Default layer
 
-		this.shift = false;
-		this.alt = false;
-		this.altgr = false;
-		this.control = false;
-		this.circonflexe = false;
-		this.trema = false;
-		this.exposant = false;
-		this.indice = false;
-		this.R = false;
-		this.a_grave = false;
-		this.comma = false;
+		this['Shift'] = false;
+		this['Alt'] = false;
+		this['AltGr'] = false;
+		this['Ctrl'] = false;
+		this['Circonflexe'] = false;
+		this['Trema'] = false;
+		this['Exposant'] = false;
+		this['Indice'] = false;
+		this['R'] = false;
+		this['À'] = false;
+		this[','] = false;
 
 		// The scope of "this" is changed in the text input otherwise, and this.layoutData becomes undefined. This prevents this problem
 		this.emulateKey = this.emulateKey.bind(this);
-		this.releaseModifieurs = this.releaseModifieurs.bind(this);
+		this.releaseKey = this.releaseKey.bind(this);
+	}
+
+	layerUpdate() {
+		// Determine the new value of the layer
+		const priorities = [
+			{ cond: this['AltGr'] && this['Shift'], value: 'ShiftAltGr' },
+			{ cond: this['Circonflexe'] && this['Shift'], value: 'CirconflexeShift' },
+			{ cond: this['Trema'] && this['Shift'], value: 'TremaShift' },
+			{ cond: this['AltGr'], value: 'AltGr' },
+			{ cond: this['Shift'], value: 'Shift' },
+			{ cond: this['Ctrl'], value: 'Ctrl' },
+			{ cond: this['Circonflexe'], value: 'Circonflexe' },
+			{ cond: this['Trema'], value: 'Trema' },
+			{ cond: this['Exposant'], value: 'Exposant' },
+			{ cond: this['Indice'], value: 'Indice' },
+			{ cond: this['R'], value: 'R' },
+			{ cond: this['À'], value: 'À' },
+			{ cond: this[','], value: ',' }
+		];
+		const match = priorities.find((p) => p.cond);
+		this['layer'] = match ? match.value : 'Primary';
+
+		// Update the layer in the store
+		this.data_clavier.update((currentData) => {
+			currentData['layer'] = this['layer'];
+			return currentData;
+		});
+		this.keyboardUpdate();
 	}
 
 	emulateKey(event) {
-		const modifieursActive = this.determineActiveModifieurs(event); // Activate potential modifieurs
-		this.layerUpdate();
-		if (modifieursActive) {
-			// If a modifieur has been pressed, no key to send so we exit the function
+		const activeModifier = this.determineActiveModifier(event); // Activate potential modifier
+		if (activeModifier) {
+			this[activeModifier] = true;
+			this.layerUpdate();
+			if (this.keyboardInformation['plus'] === 'oui' && activeModifier === 'Alt') {
+				this.sendKey('BackSpace');
+			}
+			// If a modifier has been pressed, no key to send right now, so we exit the function
+			// It is only on the next key pressed that isn’t a modifier that will give the result of this key on the new layer
 			return;
 		}
 
 		// Do not intercept shortcuts with Ctrl
-		if (this.control && !this.altgr) {
-			// Note: when this.altgr is active, Ctrl is also active, hence the "&& !this.altgr"
+		if (this['Ctrl'] && !this['AltGr']) {
+			// Note: when this["AltGr"] is active, Ctrl is also active, hence the "&& !this["AltGr"]"
 			return;
 		}
 		/* Ctrl + touche renvoie Ctrl + émulation de touche */
 		/* Ne fonctionne pas actuellement */
-		// if (this.control & !this.altgr) {
-		// 	// Attention, quand this.altgr est activé, Ctrl l’est aussi, d’où le &
+		// if (this["Ctrl"] & !this["AltGr"]) {
+		// 	// Attention, quand this["AltGr"] est activé, Ctrl l’est aussi, d’où le &
 		// 	console.log(keyContent.touche);
 		// 	// Crée un nouvel événement clavier pour "Ctrl + lettre".
 		// 	const ctrlEvent = new KeyboardEvent('keydown', {
@@ -63,73 +96,59 @@ export class KeyboardEmulation extends Keyboard {
 		if (keyIdentifier !== undefined) {
 			event.preventDefault(); // Don’t send the key defined in the computer keyboard layout
 			const keyContent = this.layoutData['keys'].find((el) => el['key'] === keyIdentifier['key']);
-			this.determineKeyToSend(keyContent);
+
+			const activeDeadKey = this.determineActiveDeadKey(keyContent); // Activate potential dead key
+			if (activeDeadKey) {
+				this[activeDeadKey] = true;
+				this.layerUpdate();
+				return;
+			}
+
+			const { keyToSend, charactersToDelete } = this.determineKeyToSend(keyContent);
+			this.sendKey(keyToSend, charactersToDelete);
 		}
 	}
 
-	determineActiveModifieurs(event) {
+	determineActiveModifier(event) {
 		if (event.code === 'AltRight' || event.code === 'AltGraph') {
-			this.altgr = true;
-			return true;
+			return 'AltGr';
 		} else if (
 			event.code === 'ShiftLeft' ||
 			event.code === 'ShiftRight' ||
 			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'oui')
 		) {
-			this.shift = true;
-			return true;
+			return 'Shift';
 		} else if (event.code === 'AltLeft') {
-			this.alt = true;
-			return true;
+			return 'Alt';
 		} else if (
 			event.code === 'ControlLeft' ||
 			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'non')
 		) {
-			this.control = true;
-			return true;
+			return 'Ctrl';
 		}
 		return false;
 	}
 
-	layerUpdate() {
-		// Determine the new value of the layer
-		if (this.altgr && this.shift) {
-			this.layer = 'ShiftAltGr';
-		} else if (this.altgr) {
-			this.layer = 'AltGr';
-		} else if (this.shift) {
-			this.layer = 'Shift';
-		} else if (this.control) {
-			this.layer = 'Ctrl';
-		} else if (this.circonflexe) {
-			this.layer = 'Circonflexe';
-		} else if (this.trema) {
-			this.layer = 'Trema';
-		} else if (this.exposant) {
-			this.layer = 'Exposant';
-		} else if (this.indice) {
-			this.layer = 'Indice';
-		} else if (this.R) {
-			this.layer = 'R';
-		} else if (this.a_grave) {
-			this.layer = 'À';
-		} else if (this.comma) {
-			this.layer = ',';
-		} else {
-			this.layer = 'Primary';
+	determineActiveDeadKey(keyContent) {
+		const keyPressed = this.getKeyToSend(keyContent);
+		const deadKeys = {
+			'◌̂': 'Circonflexe',
+			'◌̈': 'Trema',
+			ᵉ: 'Exposant',
+			ᵢ: 'Indice',
+			ℝ: 'R'
+		};
+		const ActiveDeadKey = deadKeys[keyPressed];
+		if (ActiveDeadKey) {
+			this[ActiveDeadKey] = true;
+			return ActiveDeadKey;
 		}
-
-		// Update the layer in the store
-		this.data_clavier.update((currentData) => {
-			currentData['layer'] = this.layer;
-			return currentData;
-		});
-		this.keyboardUpdate();
+		return false;
 	}
 
 	pressKey(key) {
 		// Clean other pressed keys
-		let emplacement = document.getElementById('clavier_' + this.id);
+		let emplacement = document.getElementById('clavier_' + this['id']);
 		const pressedKeys = emplacement.querySelectorAll('.pressed-key');
 		[].forEach.call(pressedKeys, function (el) {
 			if (el.dataset.type !== 'special') {
@@ -141,111 +160,65 @@ export class KeyboardEmulation extends Keyboard {
 		emplacement.querySelector("keyboard-key[data-key='" + key + "']").classList.add('pressed-key');
 	}
 
+	getKeyToSend(keyContent) {
+		let keyToSend = '';
+		if (this.keyboardInformation['plus'] === 'oui') {
+			if (keyContent[this['layer'] + '+'] !== undefined) {
+				keyToSend = keyContent[this['layer'] + '+'];
+			} else {
+				keyToSend = keyContent[this['layer']];
+			}
+		} else {
+			keyToSend = keyContent[this['layer']];
+		}
+		return keyToSend;
+	}
+
 	determineKeyToSend(keyContent) {
 		const keyPressed = keyContent['key'];
+		let keyToSend = this.getKeyToSend(keyContent);
+		let charactersToDelete = 0;
 
-		if (this.alt && this.keyboardInformation['plus'] === 'oui') {
-			this.sendKey('BackSpace');
+		// Vérifier si l’une des touches mortes doit être désactivée
+		for (const k of ['Circonflexe', 'Trema', 'Exposant', 'Indice', 'R']) {
+			if (this[k]) {
+				this[k] = false;
+				this.layerUpdate();
+				break;
+			}
+		}
+
+		if (this['layer'] == 'À') {
+			charactersToDelete = 1; // Delete the previously typed "à" before sending the result on the layer À
+			this['À'] = false;
+			this.layerUpdate();
+		} else if (this['layer'] == ',') {
+			charactersToDelete = 1; // Delete the previously typed "," before sending the result on the layer ,
+			this[','] = false;
+			this.layerUpdate();
+		} else if (keyPressed === 'Enter') {
+			keyToSend = 'Enter';
+		} else if (keyPressed === 'BackSpace') {
+			keyToSend = 'BackSpace';
 		} else if (
-			this.altgr &&
-			keyPressed === 'CapsLock' &&
-			this.keyboardInformation['plus'] === 'oui'
-		) {
-			this.sendKey('Ctrl-Delete');
-		} else if (
-			this.control &&
+			this['Ctrl'] &&
 			(keyPressed === 'BackSpace' ||
 				(this.keyboardInformation['plus'] === 'oui' && keyPressed === 'LAlt'))
 		) {
-			this.sendKey('Ctrl-BackSpace');
+			keyToSend = 'Ctrl-BackSpace';
 		} else if (
 			keyPressed === 'Delete' ||
-			(this.keyboardInformation['plus'] === 'oui' && this.shift && keyPressed === 'LAlt')
+			(this.keyboardInformation['plus'] === 'oui' && this['Shift'] && keyPressed === 'LAlt')
 		) {
-			this.sendKey('Delete');
-		} else if (
-			keyPressed === 'BackSpace' ||
-			(keyPressed === 'CapsLock' && this.keyboardInformation['plus'] === 'oui')
-		) {
-			this.sendKey('BackSpace');
-		} else if (keyPressed === 'Enter') {
-			this.sendKey('Enter');
-		} else if (this.exposant) {
-			if (keyPressed === 'Space') {
-				touche = ' ';
-			} else {
-				touche = keyContent['Exposant'];
-			}
-			this.exposant = false;
-			this.sendKey(touche);
-		} else if (this.indice) {
-			if (keyPressed === 'Space') {
-				touche = ' ';
-			} else {
-				touche = keyContent['Indice'];
-			}
-			this.indice = false;
-			this.sendKey(touche);
-		} else if (this.R) {
-			if (keyPressed === 'Space') {
-				touche = ' ';
-			} else {
-				touche = keyContent['R'];
-			}
-			this.R = false;
-			this.sendKey(touche);
-		} else if (this.circonflexe) {
-			if (keyPressed === 'Space') {
-				touche = ' ';
-			} else {
-				touche = keyContent['^'];
-			}
-			this.circonflexe = false;
-			this.sendKey(touche);
-		} else if (this.trema) {
-			if (keyPressed === 'Space') {
-				touche = ' ';
-			} else {
-				touche = keyContent['Trema'];
-			}
-			this.trema = false;
-			this.sendKey(touche);
-		} else if (this.a_grave) {
-			if (keyPressed === 'Space') {
-				touche = ' ';
-			} else {
-				// On supprime le à avant de taper le raccourci de la layer À
-				this.textarea.value = this.textarea.value.slice(0, -1);
-				touche = keyContent['À'];
-			}
-			this.a_grave = false;
-			this.sendKey(touche);
-		} else if (this.comma) {
-			if (keyPressed === 'Space') {
-				touche = ' ';
-			} else {
-				// On supprime le , avant de taper le raccourci de la layer Virgule
-				this.textarea.value = this.textarea.value.slice(0, -1);
-				touche = keyContent[','];
-			}
-			this.comma = false;
-			this.sendKey(touche);
-		} else {
-			let touche = '';
-			if (this.keyboardInformation['plus'] === 'oui') {
-				if (keyContent[this.layer + '+'] !== undefined) {
-					touche = keyContent[this.layer + '+'];
-				} else {
-					touche = keyContent[this.layer];
-				}
-			} else {
-				touche = keyContent[this.layer];
-			}
-			this.sendKey(touche);
+			keyToSend = 'Delete';
 		}
+		return { keyToSend, charactersToDelete };
 	}
 
-	sendKey(touche) {
+	sendKey(touche, charactersToDelete = 0) {
+		if (charactersToDelete > 0) {
+			this.textarea.value = this.textarea.value.slice(0, -charactersToDelete);
+		}
 		touche = touche.replace(/<espace-insecable><\/espace-insecable>/g, ' ');
 		touche = touche.replace(/<tap-hold>.*<\/tap-hold>/g, '');
 		touche = touche.replace('␣', ' ');
@@ -256,33 +229,6 @@ export class KeyboardEmulation extends Keyboard {
 		// Récupérer le texte avant et après la position du curseur
 		var texteAvantCurseur = this.textarea.value.substring(0, positionCurseur);
 		var texteApresCurseur = this.textarea.value.substring(positionCurseur);
-
-		if (touche === '◌̂') {
-			this.circonflexe = true;
-			touche = ''; /* Ne pas afficher la touche morte */
-		}
-		if (touche === '◌̈') {
-			this.trema = true;
-			touche = ''; /* Ne pas afficher la touche morte */
-		}
-		if (touche === 'ᵉ') {
-			this.exposant = true;
-			touche = ''; /* Ne pas afficher la touche morte */
-		}
-		if (touche === 'ᵢ') {
-			this.indice = true;
-			touche = ''; /* Ne pas afficher la touche morte */
-		}
-		if (touche === 'ℝ') {
-			this.R = true;
-			touche = ''; /* Ne pas afficher la touche morte */
-		}
-		if (touche === 'à') {
-			this.a_grave = true;
-		}
-		if (touche === ',') {
-			this.comma = true;
-		}
 
 		// Concaténer les trois parties pour obtenir le contenu HTML mis à jour
 		let nouvellePositionCurseur;
@@ -342,6 +288,22 @@ export class KeyboardEmulation extends Keyboard {
 			nouvellePositionCurseur = positionCurseur + touche.length;
 		}
 
+		this.ergoptiPlusFeatures(nouvellePositionCurseur);
+
+		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
+	}
+
+	ergoptiPlusFeatures(nouvellePositionCurseur) {
+		function remplacerEtAjuster(texte, regex, remplacement, positionCurseur) {
+			// Compte les occurrences dev par exemple, "p'", car on remplaçe deux lettres par trois, il faut donc changer la position du curseur
+			let count = (texte.match(regex) || []).length;
+			return {
+				nouveauTexte: texte.replace(regex, remplacement),
+				nouvellePositionCurseur:
+					positionCurseur + count * (remplacement.length - regex.source.length)
+			};
+		}
+
 		/* Évite le SFB NNU par exemple qui est N★U normalement, mais se fait N★Ê */
 		/* Sauf pour le R, car "arrêt" existe en français */
 		this.textarea.value = this.textarea.value.replace(/([^\Wr]){2}ê/g, '$1$1u');
@@ -372,39 +334,16 @@ export class KeyboardEmulation extends Keyboard {
 		({ nouveauTexte: this.textarea.value, nouvellePositionCurseur } = remplacerEtAjuster(
 			this.textarea.value,
 			/p'/g,
-			'qu’',
+			'ct',
 			nouvellePositionCurseur
 		));
-
-		this.textarea.setSelectionRange(nouvellePositionCurseur, nouvellePositionCurseur);
 	}
 
-	releaseModifieurs(event) {
-		if (event.code === 'AltRight' || event.code === 'AltGraph') {
-			this.altgr = false;
-		} else if (
-			event.code === 'ShiftLeft' ||
-			event.code === 'ShiftRight' ||
-			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'oui')
-		) {
-			this.shift = false;
-		} else if (event.code === 'AltLeft') {
-			this.alt = false;
-		} else if (
-			event.code === 'ControlLeft' ||
-			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'non')
-		) {
-			this.control = false;
+	releaseKey(event) {
+		const modifier = this.determineActiveModifier(event);
+		if (modifier) {
+			this[modifier] = false;
+			this.layerUpdate();
 		}
-		this.layerUpdate();
 	}
-}
-
-function remplacerEtAjuster(texte, regex, remplacement, positionCurseur) {
-	// Compte les occurrences dev par exemple, "p'", car on remplaçe deux lettres par trois, il faut donc changer la position du curseur
-	let count = (texte.match(regex) || []).length;
-	return {
-		nouveauTexte: texte.replace(regex, remplacement),
-		nouvellePositionCurseur: positionCurseur + count * (remplacement.length - regex.source.length)
-	};
 }
