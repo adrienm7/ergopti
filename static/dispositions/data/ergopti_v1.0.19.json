@@ -1590,7 +1590,7 @@
 			"Layer": "!⇩",
 			"À": "À",
 			",": "j",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "é",
@@ -1602,7 +1602,7 @@
 			"Layer": "!⇧",
 			"À": "",
 			",": "jé",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "è",
@@ -1614,7 +1614,7 @@
 			"Layer": "^+⇤",
 			"À": "",
 			",": "j",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "ê",
@@ -1626,7 +1626,7 @@
 			"Layer": "!+⇧",
 			"À": "",
 			",": "ju",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "%",

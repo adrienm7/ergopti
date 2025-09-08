@@ -1554,7 +1554,7 @@
 			"Ctrl": "z",
 			"Layer": "^+⇤",
 			"À": "À",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "é",
@@ -1565,7 +1565,7 @@
 			"Ctrl": "+",
 			"Layer": "!⇧",
 			"À": "jé",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "è",
@@ -1577,7 +1577,7 @@
 			"Ctrl": "-",
 			"Layer": "!⇩",
 			"À": "",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "ê",
@@ -1588,7 +1588,7 @@
 			"Ctrl": "x",
 			"Layer": "!+⇧",
 			"À": "",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "%",
