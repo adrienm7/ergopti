@@ -516,12 +516,13 @@ export class Keyboard {
 	}
 
 	typeText(text, speed, makePreviousKeysDisappear) {
-		if (!this.location) {
+		const location = this.getKeyboardLocation();
+		if (!location) {
 			return;
 		}
 
 		// Clear previously pressed keys
-		const pressedKeys = this.location.querySelectorAll('.pressed-key');
+		const pressedKeys = location.querySelectorAll('.pressed-key');
 		pressedKeys.forEach(function (el) {
 			el.classList.remove('pressed-key');
 		});
@@ -530,7 +531,7 @@ export class Keyboard {
 			if (i >= text.length) return; // stop condition
 
 			const nextLetter = text.charAt(i);
-			const nextKey = this.location.querySelector(`keyboard-key[data-key='${nextLetter}']`);
+			const nextKey = location.querySelector(`keyboard-key[data-key='${nextLetter}']`);
 
 			if (nextKey) {
 				nextKey.classList.add('pressed-key');
@@ -538,9 +539,7 @@ export class Keyboard {
 
 			if (makePreviousKeysDisappear && i > 0) {
 				const previousLetter = text.charAt(i - 1);
-				const previousKey = this.location.querySelector(
-					`keyboard-key[data-key='${previousLetter}']`
-				);
+				const previousKey = location.querySelector(`keyboard-key[data-key='${previousLetter}']`);
 				if (previousKey) {
 					previousKey.classList.remove('pressed-key');
 				}
