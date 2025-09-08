@@ -51,8 +51,8 @@
 	<li>
 		Le <kbd>K</kbd>, bien que très rare en français et peu fréquent en anglais, est à une position
 		assez lointaine sur un clavier ISO, car en plein milieu du clavier. Il est notamment utilisé en
-		anglais avec les combinaisons <kbd-sortie>SK</kbd-sortie>,
-		<kbd-sortie>CK</kbd-sortie>, etc. Sur un clavier Ergodox, ce problème s’atténue, en particulier
+		anglais avec les combinaisons <kbd-output>SK</kbd-output>,
+		<kbd-output>CK</kbd-output>, etc. Sur un clavier Ergodox, ce problème s’atténue, en particulier
 		sur les claviers concaves de type Kinesis Advantage ou Glove80.
 	</li>
 	<li>
@@ -84,8 +84,8 @@
 	touches mortes <kbd class="morte">◌̂</kbd> et <kbd class="morte">◌̈</kbd> qui seront beaucoup plus
 	rarement utilisées. Ces touches mortes sont en accès direct sur la septième colonne, mais peuvent
 	également être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec <kbd>Shift</kbd> +
-	<kbd>AltGr</kbd> + <kbd>Ê</kbd> pour <kbd-sortie class="morte">◌̂</kbd-sortie> et <kbd>Shift</kbd>
-	+ <kbd>AltGr</kbd> + <kbd>T</kbd> pour le Tréma <kbd-sortie class="morte">◌̈</kbd-sortie>.
+	<kbd>AltGr</kbd> + <kbd>Ê</kbd> pour <kbd-output class="morte">◌̂</kbd-output> et <kbd>Shift</kbd>
+	+ <kbd>AltGr</kbd> + <kbd>T</kbd> pour le Tréma <kbd-output class="morte">◌̈</kbd-output>.
 </p>
 <p>
 	Il n’en demeure pas moins qu’<Ergopti></Ergopti> n’est pas 1DFH (1u Distance From Home). Les lettres
@@ -113,9 +113,9 @@
 		<kbd>CT</kbd> engendre beaucoup de <SFB />s, mais un <SFB /> avec le <kbd>C</kbd> est de toute
 		manière inévitable avec l’une des 4 touches de la homerow droite. Cette combinaison est l’une
 		des moins pires : en fréquence d’apparition,
-		<kbd-sortie>NC</kbd-sortie>
-		> <kbd-sortie>CR</kbd-sortie> >
-		<kbd-sortie>CT</kbd-sortie> > <kbd-sortie>SC</kbd-sortie>.
+		<kbd-output>NC</kbd-output>
+		> <kbd-output>CR</kbd-output> >
+		<kbd-output>CT</kbd-output> > <kbd-output>SC</kbd-output>.
 	</li>
 	<li>
 		<kbd>PT</kbd> : il est triste de se dire que pour quelqu’un utilisant une disposition o<span
@@ -140,9 +140,9 @@
 		souvent précédée ou suivie d’une voyelle. Toutefois, la placer sur l’index gauche permet de
 		mettre cette lettre sur un excellent emplacement tout en n’entraînant aucun <SFB /> supplémentaire
 		sur l’index gauche. Ainsi, la distance des doigts aux touches s’en trouve diminuée, et des roulements
-		très confortables pour l’anglais sont introduits, notamment avec le <kbd>O</kbd> (<kbd-sortie
-			>WO</kbd-sortie
-		>, <kbd-sortie>OW</kbd-sortie>).
+		très confortables pour l’anglais sont introduits, notamment avec le <kbd>O</kbd> (<kbd-output
+			>WO</kbd-output
+		>, <kbd-output>OW</kbd-output>).
 	</li>
 </ul>
 
@@ -151,9 +151,9 @@
 	La touche <kbd>À</kbd> était auparavant au-dessus du <kbd>A</kbd> et la touche <kbd>È</kbd>
 	en-dessous du <kbd>E</kbd>. C’était logique, le A avec le A et le E avec le E. En outre,
 	<kbd>AltGr</kbd>
-	+ <kbd>È</kbd> donnait <kbd-sortie>\</kbd-sortie>, en miroir de <kbd>AltGr</kbd> + <kbd>É</kbd>
-	qui donne <kbd-sortie>/</kbd-sortie>, tandis que <kbd>AltGr</kbd> + <kbd>À</kbd> donnait
-	<kbd-sortie>`</kbd-sortie>.
+	+ <kbd>È</kbd> donnait <kbd-output>\</kbd-output>, en miroir de <kbd>AltGr</kbd> + <kbd>É</kbd>
+	qui donne <kbd-output>/</kbd-output>, tandis que <kbd>AltGr</kbd> + <kbd>À</kbd> donnait
+	<kbd-output>`</kbd-output>.
 </p>
 <p>
 	Cependant, les touches <kbd>À</kbd> et <kbd>È</kbd> ont depuis été interverties. En effet, <ErgoptiPlus

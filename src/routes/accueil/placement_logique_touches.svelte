@@ -16,74 +16,74 @@
 </p>
 <ul>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-sortie>\</kbd-sortie> car le
-		<span class="hyper text-bold">\</span> est au-dessus du A (Le <kbd-sortie>\</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-output>\</kbd-output> car le
+		<span class="hyper text-bold">\</span> est au-dessus du A (Le <kbd-output>\</kbd-output>
 		était auparavant sur le
-		<kbd>È</kbd> et le <kbd-sortie>`</kbd-sortie> sur le <kbd>À</kbd>, car plus logique. Cependant,
+		<kbd>È</kbd> et le <kbd-output>`</kbd-output> sur le <kbd>À</kbd>, car plus logique. Cependant,
 		cela a finalement été déplacé pour placer plus près ce symbole qui est très utilisé en
 		programmation, notamment en LaTeX.) ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-sortie>ç</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-output>ç</kbd-output>
 		car la cédille est sous le <span class="hyper text-bold">C</span> ;
 	</li>
 	<li>
 		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>U</kbd> ➜
-		<kbd-sortie>µ</kbd-sortie>
+		<kbd-output>µ</kbd-output>
 		car cette touche morte permettant d’écrire les lettres grecques (α, β, γ, δ…), dont µ (MU) ;
 	</li>
 	<li>
 		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>E</kbd> ➜
-		<kbd-sortie>ᵉ</kbd-sortie>
+		<kbd-output>ᵉ</kbd-output>
 		car c’est la touche morte <span class="hyper text-bold">E</span>xposant ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-sortie>/</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>É</kbd> ➜ <kbd-output>/</kbd-output>
 		car le <span class="hyper text-bold">/</span> est au-dessus du E ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-sortie>`</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>È</kbd> ➜ <kbd-output>`</kbd-output>
 		car le <span class="hyper text-bold">`</span> est au-dessus du E ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>Ê</kbd> ➜ <kbd-sortie>^</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>Ê</kbd> ➜ <kbd-output>^</kbd-output>
 		car le <span class="hyper text-bold">^</span> est au-dessus du E ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-sortie>#</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>H</kbd> ➜ <kbd-output>#</kbd-output>
 		car c’est la première lettre de <span class="hyper text-bold">H</span>ashtag ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-sortie>=</kbd-sortie> car éga<span
+		<kbd>AltGr</kbd> + <kbd>L</kbd> ➜ <kbd-output>=</kbd-output> car éga<span
 			class="hyper text-bold">L</span
 		> ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>M</kbd> ➜ <kbd-sortie>&</kbd-sortie> car le nom de ce symbole est a<span
+		<kbd>AltGr</kbd> + <kbd>M</kbd> ➜ <kbd-output>&</kbd-output> car le nom de ce symbole est a<span
 			class="hyper text-bold">M</span
 		>persand ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>P</kbd> ➜ <kbd-sortie>+</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>P</kbd> ➜ <kbd-output>+</kbd-output>
 		car c’est la première lettre de <span class="hyper text-bold">P</span>lus ;
 	</li>
 	<li>
 		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>R</kbd> ➜
-		<kbd-sortie>ℝ</kbd-sortie>
+		<kbd-output>ℝ</kbd-output>
 		car c’est la touche morte pour écrire les ensembles mathématiques (ℕ, ℤ, ℚ, ℝ, ℂ), dont l'un des
 		plus connus est <span class="hyper text-bold">R</span> ;
 	</li>
 	<li>
 		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜
-		<kbd-sortie style="font-weight: normal;">◌̈</kbd-sortie>
+		<kbd-output style="font-weight: normal;">◌̈</kbd-output>
 		car c’est la touche morte <span class="hyper text-bold">T</span>réma ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-sortie>|</kbd-sortie> car c’est la barre
+		<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-output>|</kbd-output> car c’est la barre
 		<span class="hyper text-bold">V</span>erticale ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>X</kbd> ➜ <kbd-sortie>*</kbd-sortie>
+		<kbd>AltGr</kbd> + <kbd>X</kbd> ➜ <kbd-output>*</kbd-output>
 		car <span class="hyper text-bold">x</span> ressemble au fois.
 	</li>
 </ul>
@@ -93,43 +93,43 @@
 <p>D’autres sont placées par paires l’une à côté de l’autre :</p>
 <ul>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>{'<'}</kbd-sortie> et <kbd>AltGr</kbd> +
+		<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-output>{'<'}</kbd-output> et <kbd>AltGr</kbd> +
 		<kbd>I</kbd>
-		➜ <kbd-sortie>{'>'}</kbd-sortie> ;
+		➜ <kbd-output>{'>'}</kbd-output> ;
 	</li>
 	<li>
-		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-sortie>≤</kbd-sortie> et
+		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-output>≤</kbd-output> et
 		<kbd>Shift</kbd>
 		+ <kbd>AltGr</kbd> +
 		<kbd>I</kbd>
-		➜ <kbd-sortie>≥</kbd-sortie> ;
+		➜ <kbd-output>≥</kbd-output> ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>E</kbd> ➜ <kbd-sortie>{'{'}</kbd-sortie> et <kbd>AltGr</kbd> +
+		<kbd>AltGr</kbd> + <kbd>E</kbd> ➜ <kbd-output>{'{'}</kbd-output> et <kbd>AltGr</kbd> +
 		<kbd>U</kbd>
-		➜ <kbd-sortie>{'}'}</kbd-sortie> ;
+		➜ <kbd-output>{'}'}</kbd-output> ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>S</kbd> ➜ <kbd-sortie>(</kbd-sortie> et <kbd>AltGr</kbd> +
+		<kbd>AltGr</kbd> + <kbd>S</kbd> ➜ <kbd-output>(</kbd-output> et <kbd>AltGr</kbd> +
 		<kbd>N</kbd>
-		➜ <kbd-sortie>)</kbd-sortie> ;
+		➜ <kbd-output>)</kbd-output> ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-sortie>[</kbd-sortie> et <kbd>AltGr</kbd> +
+		<kbd>AltGr</kbd> + <kbd>T</kbd> ➜ <kbd-output>[</kbd-output> et <kbd>AltGr</kbd> +
 		<kbd>R</kbd>
-		➜ <kbd-sortie>]</kbd-sortie> ;
+		➜ <kbd-output>]</kbd-output> ;
 	</li>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>«</kbd-sortie> et <kbd>AltGr</kbd> +
+		<kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-output>«</kbd-output> et <kbd>AltGr</kbd> +
 		<kbd>F</kbd>
-		➜ <kbd-sortie>»</kbd-sortie> ;
+		➜ <kbd-output>»</kbd-output> ;
 	</li>
 	<li>
-		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-sortie>“</kbd-sortie> et
+		<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>B</kbd> ➜ <kbd-output>“</kbd-output> et
 		<kbd>Shift</kbd>
 		+ <kbd>AltGr</kbd> +
 		<kbd>F</kbd>
-		➜ <kbd-sortie>”</kbd-sortie>.
+		➜ <kbd-output>”</kbd-output>.
 	</li>
 </ul>
 <tiny-space></tiny-space>

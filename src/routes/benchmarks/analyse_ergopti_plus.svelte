@@ -17,7 +17,7 @@
 	Une réelle analyse de <ErgoptiPlus></ErgoptiPlus> nécessite de modifier le corpus afin d’y refléter
 	les nouvelles manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres
 	du corpus pour les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB></SFB>s
-	pris en charge par <ErgoptiPlus></ErgoptiPlus>, comme <kbd-sortie>pt</kbd-sortie> en
+	pris en charge par <ErgoptiPlus></ErgoptiPlus>, comme <kbd-output>pt</kbd-output> en
 	<kbd>,t</kbd>, doivent être remplacés. Un
 	<a href="/corpus/conversion_corpus.py">simple script Python</a> permet de faire ces modifications.
 </p>
@@ -85,9 +85,9 @@
 	La réduction du nombre de touches à taper peut encore s’accroître en personnalisant sa disposition
 	pour y ajouter ses propres raccourcis. Dans la version <ErgoptiPlus></ErgoptiPlus> testés, seule une
 	petite vingtaine de mots très courants ont été remplacés par un raccourci. Parmi ceux-ci :
-	<kbd-sortie>ainsi</kbd-sortie>
-	en <kbd>a★</kbd>, <kbd-sortie>exemple</kbd-sortie> en <kbd>x★</kbd> et
-	<kbd-sortie>faire</kbd-sortie>
+	<kbd-output>ainsi</kbd-output>
+	en <kbd>a★</kbd>, <kbd-output>exemple</kbd-output> en <kbd>x★</kbd> et
+	<kbd-output>faire</kbd-output>
 	en <kbd>f★</kbd>.
 </p>
 <h3>Analyse de la fréquence d’utilisation des doigts</h3>

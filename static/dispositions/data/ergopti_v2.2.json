@@ -2286,7 +2286,7 @@
 			"Shift": "🔒",
 			"Shift+": "<tap-hold><output-hold>Ctrl</output-hold><br><output-tap>↩</output-tap></tap-hold>",
 			"AltGr": "🔒",
-			"AltGr+": "^⌦",
+			"AltGr+": "Ctrl + ⌦",
 			"ShiftAltGr": "🔒",
 			"ShiftAltGr+": "<tap-hold><output-hold>Ctrl</output-hold><br><output-tap>↩</output-tap></tap-hold>",
 			"Ctrl": "🔒",

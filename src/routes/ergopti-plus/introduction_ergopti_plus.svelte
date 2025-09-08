@@ -47,8 +47,8 @@
 	<div class="card">
 		<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajoute de
 		<span class="important">nombreux raccourcis</span>
-		tels qu’un layer de navigation, des tap-holds et des touches <kbd-sortie>Alt + Tab</kbd-sortie>,
-		<kbd-sortie>OneShotShift</kbd-sortie> et <kbd-sortie>CapsWord</kbd-sortie>.
+		tels qu’un layer de navigation, des tap-holds et des touches <kbd-output>Alt + Tab</kbd-output>,
+		<kbd-output>OneShotShift</kbd-output> et <kbd-output>CapsWord</kbd-output>.
 	</div>
 	<div class="card">
 		<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>

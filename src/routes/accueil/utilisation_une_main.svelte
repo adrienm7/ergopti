@@ -40,11 +40,11 @@
 <KeyboardBasis name="controle" />
 <tiny-space></tiny-space>
 <p>
-	Les raccourcis <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>X</kbd-sortie>,
-	<kbd-sortie>Ctrl</kbd-sortie>
-	+ <kbd-sortie>C</kbd-sortie>,
-	<kbd-sortie>Ctrl</kbd-sortie>
-	+ <kbd-sortie>V</kbd-sortie> et <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>Z</kbd-sortie>
+	Les raccourcis <kbd-output>Ctrl</kbd-output> + <kbd-output>X</kbd-output>,
+	<kbd-output>Ctrl</kbd-output>
+	+ <kbd-output>C</kbd-output>,
+	<kbd-output>Ctrl</kbd-output>
+	+ <kbd-output>V</kbd-output> et <kbd-output>Ctrl</kbd-output> + <kbd-output>Z</kbd-output>
 	sont également conservés à gauche. Cela permet de les réaliser sans avoir à bouger la main droite.
 	Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>, <kbd>Ctrl</kbd> +
 	<kbd>É</kbd>,
@@ -78,8 +78,8 @@
 	pressé). Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une touche
 	envoie un raccourci, mais la presser la fait se comporter normalement. Cela permet d’intégrer des
 	touches
-	<kbd-sortie>Copier</kbd-sortie>, <kbd-sortie>Coller</kbd-sortie> et
-	<kbd-sortie>Alt+Tab</kbd-sortie>
+	<kbd-output>Copier</kbd-output>, <kbd-output>Coller</kbd-output> et
+	<kbd-output>Alt+Tab</kbd-output>
 	respectivement sur
 	<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>. En outre, un layer de navigation ainsi que
 	les touches

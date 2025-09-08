@@ -13,7 +13,7 @@
 	ont pour comportement de toujours rester collés au texte qui les précède et les suit.
 </p>
 <p>
-	Ainsi, vous n’aurez plus jamais de <kbd-sortie>?</kbd-sortie> qui se balade au début d’une ligne
+	Ainsi, vous n’aurez plus jamais de <kbd-output>?</kbd-output> qui se balade au début d’une ligne
 	parce qu’il n’y avait plus de place sur la ligne précédente. Cela donne des documents avec un
 	rendu bien plus professionnel. Attention cependant :
 	<span class="important">ne les utilisez pas dans d’autres situations que l'écriture de texte</span

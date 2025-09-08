@@ -15,13 +15,13 @@
 	est beaucoup plus fréquemment utilisé que le <kbd>€</kbd>, que ce soit dans la vie quotidienne ou
 	en programmation. Ainsi, il fallait que la touche la plus facile d’accès des deux (celle située le
 	plus vers l’intérieur du clavier) soit aussi la plus utile. En outre, la touche <kbd>€</kbd> a été
-	modifiée pour mettre le <kbd-sortie>€</kbd-sortie> en AltGr et placer le
-	<kbd-sortie>$</kbd-sortie> en accès direct. Ici encore, c’est parce que ce caractère est beaucoup plus
+	modifiée pour mettre le <kbd-output>€</kbd-output> en AltGr et placer le
+	<kbd-output>$</kbd-output> en accès direct. Ici encore, c’est parce que ce caractère est beaucoup plus
 	utilisé, que ce soit en tant que monnaie, mais aussi en programmation ou sur Excel par exemple.
 </p>
 <p>
-	En outre, les symboles <kbd-sortie>º</kbd-sortie>, <kbd-sortie>°</kbd-sortie> et
-	<kbd-sortie>ª</kbd-sortie> étaient auparavant sur la touche <kbd>0</kbd>. Ils ont été déplacés sur
+	En outre, les symboles <kbd-output>º</kbd-output>, <kbd-output>°</kbd-output> et
+	<kbd-output>ª</kbd-output> étaient auparavant sur la touche <kbd>0</kbd>. Ils ont été déplacés sur
 	la touche <kbd>=</kbd> afin de libérer les emplacements sur la touche <kbd>0</kbd>. Cette
 	modification a permis d’ajouter, sur les touches de chiffres, les chiffres en exposant en
 	<kbd>AltGr</kbd> ainsi que les chiffres en indice en <kbd>Shift</kbd> + <kbd>AltGr</kbd>.
@@ -57,7 +57,7 @@
 	accessible. C’est, tout comme le passage en v2.0, une histoire de longueur des doigts. En outre,
 	le roulement <kbd>CH</kbd> s’en trouve être beaucoup plus confortable, étant désormais un
 	roulement vers l’intérieur. Une autre amélioration est que le <kbd>C</kbd> n’est plus sur le même
-	doigt que le <kbd>D</kbd>, ce qui permet de taper la commande <kbd-sortie>cd</kbd-sortie> (change
+	doigt que le <kbd>D</kbd>, ce qui permet de taper la commande <kbd-output>cd</kbd-output> (change
 	directory) sans <SFB></SFB>.
 </p>
 <p>

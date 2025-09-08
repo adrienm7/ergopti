@@ -220,7 +220,10 @@ export class KeyboardEmulation extends Keyboard {
 				(this.keyboardConfiguration['plus'] === 'yes' && keyPressed === 'LAlt'))
 		) {
 			resultToSend = 'Ctrl-BackSpace';
-		} else if (this['activeLayers']['Ctrl'] & (keyPressed === 'Delete') || resultToSend === '^⌦') {
+		} else if (
+			this['activeLayers']['Ctrl'] & (keyPressed === 'Delete') ||
+			resultToSend === '"Ctrl + ⌦"'
+		) {
 			resultToSend = 'Ctrl-Delete';
 		} else if (
 			keyPressed === 'Delete' ||
