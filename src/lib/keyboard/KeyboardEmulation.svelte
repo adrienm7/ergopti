@@ -7,7 +7,7 @@
 	let keyboard = new KeyboardEmulation('emulation');
 	onMount(() => {
 		keyboard.textarea = document.getElementById('input-text');
-		keyboard.keyboardUpdate();
+		keyboard.updateKeyboard();
 	});
 </script>
 

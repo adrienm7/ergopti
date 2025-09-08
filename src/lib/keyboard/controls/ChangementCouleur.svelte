@@ -8,10 +8,10 @@
 	export let plusValue;
 
 	function toggleCouleur() {
-		if (couleurValue === 'oui') {
-			couleurValue = 'non';
+		if (couleurValue === 'yes') {
+			couleurValue = 'no';
 		} else {
-			couleurValue = 'oui';
+			couleurValue = 'yes';
 		}
 		dispatch('message', {
 			type: typeValue,
@@ -23,7 +23,7 @@
 </script>
 
 <button on:click={toggleCouleur}>
-	{#if couleurValue === 'oui'}
+	{#if couleurValue === 'yes'}
 		{@html '<p><span class="couleur-text-gradient">Couleur</span>&nbsp;➜ Bicolor</p>'}
 	{:else}
 		{@html '<p>Bicolor ➜&nbsp;<span class="couleur-text-gradient">Couleur</span></p>'}
