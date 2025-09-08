@@ -887,7 +887,7 @@ global Features := Map(
         ],
         "CapsLock", Map(
             "__Configuration", {
-                TimeActivationSeconds: 0.2,
+                TimeActivationSeconds: 0.35,
             },
             "BackSpace", {
                 Enabled: False,
@@ -1778,27 +1778,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
         ; Send all the text instantly and without triggering hotstrings while typing it
         SendInstant(LeftSymbol Selection RightSymbol)
     } else {
-        if (Symbol == "``") {
-            ; Doesn’t work otherwise
-            SendEvent("{Text}``")
-            return
-        }
-        if (Symbol == "^") {
-            ; Doesn’t work otherwise
-            SendEvent("{Text}^")
-            return
-        }
-        if (Symbol == "/") {
-            ; Doesn’t work otherwise when double tapping: it gives /ç instead of //
-            SendEvent("{Text}/")
-            return
-        }
-        for SymbolToEscape in ["+", "!", "#", "{", "}"] {
-            if (Symbol == SymbolToEscape) {
-                Symbol := "{" Symbol "}"
-            }
-        }
-        SendEvent(Symbol) ; SendEvent({Text}) doesn’t work everywhere, for example in Google Sheets
+        SendNewResult(Symbol) ; SendEvent({Text}) doesn’t work everywhere, for example in Google Sheets
     }
     UpdateLastSentCharacter(Symbol)
 }
