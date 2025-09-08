@@ -9,13 +9,13 @@
 	import ChangementCouche from '$lib/keyboard/controls/ChangementCouche.svelte';
 
 	export let name;
-	let keyboardInformation;
+	let keyboardConfiguration;
 	let clavier = new Keyboard(name);
 	clavier.data_clavier.subscribe((value) => {
-		keyboardInformation = value;
+		keyboardConfiguration = value;
 	});
 	onMount(() => {
-		clavier.keyboardUpdate();
+		clavier.updateKeyboard();
 	});
 
 	let texte = '';
@@ -29,37 +29,37 @@
 			currentData['layer'] = event.detail.layer;
 			return currentData;
 		});
-		clavier.keyboardUpdate();
+		clavier.updateKeyboard();
 	}
 </script>
 
 <keyboard-controls id={'controls_' + name}>
 	<ChangementType
 		on:message={handleMessage}
-		layerValue={keyboardInformation.layer}
-		typeValue={keyboardInformation.type}
-		couleurValue={keyboardInformation.couleur}
-		plusValue={keyboardInformation.plus}
+		layerValue={keyboardConfiguration.layer}
+		typeValue={keyboardConfiguration.type}
+		couleurValue={keyboardConfiguration.couleur}
+		plusValue={keyboardConfiguration.plus}
 	/>
 	<ChangementPlus
 		on:message={handleMessage}
-		layerValue={keyboardInformation.layer}
-		typeValue={keyboardInformation.type}
-		couleurValue={keyboardInformation.couleur}
-		plusValue={keyboardInformation.plus}
+		layerValue={keyboardConfiguration.layer}
+		typeValue={keyboardConfiguration.type}
+		couleurValue={keyboardConfiguration.couleur}
+		plusValue={keyboardConfiguration.plus}
 	/>
 	<ChangementCouleur
 		on:message={handleMessage}
-		layerValue={keyboardInformation.layer}
-		typeValue={keyboardInformation.type}
-		couleurValue={keyboardInformation.couleur}
-		plusValue={keyboardInformation.plus}
+		layerValue={keyboardConfiguration.layer}
+		typeValue={keyboardConfiguration.type}
+		couleurValue={keyboardConfiguration.couleur}
+		plusValue={keyboardConfiguration.plus}
 	/>
 	<ChangementCouche
 		on:message={handleMessage}
-		layerValue={keyboardInformation.layer}
-		typeValue={keyboardInformation.type}
-		couleurValue={keyboardInformation.couleur}
-		plusValue={keyboardInformation.plus}
+		layerValue={keyboardConfiguration.layer}
+		typeValue={keyboardConfiguration.type}
+		couleurValue={keyboardConfiguration.couleur}
+		plusValue={keyboardConfiguration.plus}
 	/>
 </keyboard-controls>

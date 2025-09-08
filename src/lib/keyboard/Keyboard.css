@@ -177,8 +177,8 @@ keyboard[data-layer='Visuel'] keyboard-key[data-type='ponctuation'] div {
 }
 
 /* Cas particulier de la touche Q qui fait Qu */
-keyboard[data-layer='Visuel'][data-plus='oui'] keyboard-key[data-key='q'] div,
-keyboard[data-layer='Shift'][data-plus='oui'] keyboard-key[data-key='q'] div {
+keyboard[data-layer='Visuel'][data-plus='yes'] keyboard-key[data-key='q'] div,
+keyboard[data-layer='Shift'][data-plus='yes'] keyboard-key[data-key='q'] div {
 	text-transform: capitalize;
 }
 
@@ -204,29 +204,29 @@ keyboard[data-layer='Ctrl'] keyboard-key[data-type='special'] div {
 */
 
 /* Style of all keys changing with Ergopti+ */
-keyboard[data-plus='oui'] keyboard-key[data-plus='oui']:not([data-key='Space']),
-keyboard[data-plus='oui'][data-type='ergodox'][data-layer='Visuel'] keyboard-key[data-key='Space'],
-keyboard[data-plus='oui'][data-type='ergodox'][data-layer='Primary']
+keyboard[data-plus='yes'] keyboard-key[data-plus='yes']:not([data-key='Space']),
+keyboard[data-plus='yes'][data-type='ergodox'][data-layer='Visuel'] keyboard-key[data-key='Space'],
+keyboard[data-plus='yes'][data-type='ergodox'][data-layer='Primary']
 	keyboard-key[data-key='Space'] {
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
 }
 
-keyboard[data-plus='oui'][data-type='iso'][data-layer='Visuel'] keyboard-key[data-key='Space'] div {
+keyboard[data-plus='yes'][data-type='iso'][data-layer='Visuel'] keyboard-key[data-key='Space'] div {
 	margin-top: -3px; /* Small fix to adding the "+" that puts the text a bit below its position */
 }
 
 /* Tap-holds */
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='Tab'] div,
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='RAlt'] div {
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='Tab'] div,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='RAlt'] div {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.1;
 }
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='CapsLock'] div,
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LShift'] div,
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LCtrl'] div,
-keyboard[data-plus='oui'][data-type='iso'] keyboard-key[data-key='LAlt'] div {
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='CapsLock'] div,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LShift'] div,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LCtrl'] div,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LAlt'] div {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.35;
 }
@@ -300,13 +300,13 @@ keyboard-key[data-key='AltTab'] div {
 }
 
 /* Smaller font for keys [qu] and [où] */
-keyboard[data-plus='oui'][data-layer='Primary'] keyboard-key[data-key='q'] div,
-keyboard[data-plus='oui'][data-layer='AltGr'] keyboard-key[data-key='w'] div {
+keyboard[data-plus='yes'][data-layer='Primary'] keyboard-key[data-key='q'] div,
+keyboard[data-plus='yes'][data-layer='AltGr'] keyboard-key[data-key='w'] div {
 	font-size: 0.9em;
 }
-keyboard[data-plus='oui'][data-layer='Visuel'] keyboard-key[data-key='q'] div,
-keyboard[data-plus='oui'][data-layer='Shift'] keyboard-key[data-key='q'] div,
-keyboard[data-plus='oui'][data-layer='ShiftAltGr'] keyboard-key[data-key='w'] div {
+keyboard[data-plus='yes'][data-layer='Visuel'] keyboard-key[data-key='q'] div,
+keyboard[data-plus='yes'][data-layer='Shift'] keyboard-key[data-key='q'] div,
+keyboard[data-plus='yes'][data-layer='ShiftAltGr'] keyboard-key[data-key='w'] div {
 	font-size: 0.85em;
 }
 
@@ -327,7 +327,7 @@ keyboard[data-layer='Layer'][data-type='ergodox'] keyboard-key[data-key='Space']
 }
 
 /* Smaller CapsLock symbol */
-keyboard[data-plus='non'] keyboard-key[data-key='CapsLock'] div {
+keyboard[data-plus='no'] keyboard-key[data-key='CapsLock'] div {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
 
@@ -489,7 +489,7 @@ keyboard-key[data-hand='right'][data-finger='auriculaire'] {
 
 /* Specific color for Ergodox thumb keys */
 keyboard[data-type='ergodox'] keyboard-key[data-finger='thumb'] {
-	background-color: rgba(0, 46, 96, 0.7);
+	background-color: rgba(140, 160, 170, 0.25);
 }
 
 /* === Couleur des touches spéciales === */
@@ -515,7 +515,7 @@ keyboard keyboard-key {
 	--key-opacity: 30%;
 }
 
-keyboard[data-couleur='non'] keyboard-key {
+keyboard[data-couleur='no'] keyboard-key {
 	--key-color: 190 !important;
 	--key-color-luminosity: 70%;
 	--key-opacity: 20%;
@@ -600,16 +600,16 @@ keyboard,
 	display: none;
 }
 
-#clavier_magique keyboard-key[data-plus='oui']:not([data-key='magique']) {
+#clavier_magique keyboard-key[data-plus='yes']:not([data-key='magique']) {
 	background: unset !important;
 	--key-color-saturation: 100% !important;
 	--key-color-luminosity: 70% !important;
 	background-color: var(--couleur-fond-touche) !important;
 }
-#clavier_magique keyboard-key[data-plus='oui']:not([data-key='magique']):hover {
+#clavier_magique keyboard-key[data-plus='yes']:not([data-key='magique']):hover {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 }
-#clavier_magique keyboard-key[data-plus='oui'][data-type='special'] {
+#clavier_magique keyboard-key[data-plus='yes'][data-type='special'] {
 	background-color: rgb(10, 10, 10) !important;
 }
 #clavier_magique keyboard-key[data-key='magique'] {

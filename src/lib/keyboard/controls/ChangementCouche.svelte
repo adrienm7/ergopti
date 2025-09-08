@@ -42,7 +42,7 @@
 </script>
 
 <div class="select-degrade">
-	{#if plusValue === 'oui'}
+	{#if plusValue === 'yes'}
 		<select bind:value={layerValue} on:change={() => toggleCouche(layerValue)}>
 			{#each couches_plus as value}<option value={value[1]}>{value[0]}</option>{/each}
 		</select>

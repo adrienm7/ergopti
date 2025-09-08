@@ -4,7 +4,7 @@
 
 	import { page } from '$app/stores';
 
-	import { loadData } from '$lib/keyboard/getKeyboardData.js';
+	import { getKeyboardData } from '$lib/keyboard/getKeyboardData.js';
 	import { version, layoutData, versionsList, discordLink } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
@@ -12,7 +12,7 @@
 	});
 
 	function handleVersionChange() {
-		loadData(versionValue)
+		getKeyboardData(versionValue)
 			.then((data) => {
 				layoutData.set(data);
 				version.set(versionValue); // Utiliser `set` pour mettre à jour la version dans le store

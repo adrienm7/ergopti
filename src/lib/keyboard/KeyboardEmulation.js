@@ -53,7 +53,7 @@ export class KeyboardEmulation extends Keyboard {
 			currentData['layer'] = this['layer'];
 			return currentData;
 		});
-		this.keyboardUpdate();
+		this.updateKeyboard();
 	}
 
 	emulateKey(event) {
@@ -61,7 +61,7 @@ export class KeyboardEmulation extends Keyboard {
 		if (activeModifier) {
 			this['activeLayers'][activeModifier] = true;
 			this.layerUpdate();
-			if (this.keyboardInformation['plus'] === 'oui' && activeModifier === 'Alt') {
+			if (this.keyboardConfiguration['plus'] === 'yes' && activeModifier === 'Alt') {
 				this.sendResult('BackSpace');
 			}
 			// If a modifier has been pressed, no key to send right now, so we exit the function
@@ -93,7 +93,7 @@ export class KeyboardEmulation extends Keyboard {
 
 		// If a key other than a modifier has been pressed
 		const keyCodePressed = event.code;
-		const keyIdentifier = this.layoutData[this.keyboardInformation.type].find(
+		const keyIdentifier = this.layoutData[this.keyboardConfiguration.type].find(
 			(el) => el['code'] === keyCodePressed
 		);
 		this.pressKey(keyIdentifier['key']); // Press the key location on the visual keyboard layout
@@ -120,14 +120,14 @@ export class KeyboardEmulation extends Keyboard {
 		} else if (
 			event.code === 'ShiftLeft' ||
 			event.code === 'ShiftRight' ||
-			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'oui')
+			(event.code === 'ControlRight' && this.keyboardConfiguration['plus'] === 'yes')
 		) {
 			return 'Shift';
 		} else if (event.code === 'AltLeft') {
 			return 'Alt';
 		} else if (
 			event.code === 'ControlLeft' ||
-			(event.code === 'ControlRight' && this.keyboardInformation['plus'] === 'non')
+			(event.code === 'ControlRight' && this.keyboardConfiguration['plus'] === 'no')
 		) {
 			return 'Ctrl';
 		}
@@ -173,7 +173,7 @@ export class KeyboardEmulation extends Keyboard {
 
 	getKeyToSend(keyContent) {
 		let resultToSend = '';
-		if (this.keyboardInformation['plus'] === 'oui') {
+		if (this.keyboardConfiguration['plus'] === 'yes') {
 			if (keyContent[this['layer'] + '+'] !== undefined) {
 				resultToSend = keyContent[this['layer'] + '+'];
 			} else {
@@ -217,21 +217,21 @@ export class KeyboardEmulation extends Keyboard {
 		} else if (
 			this['activeLayers']['Ctrl'] &&
 			(keyPressed === 'BackSpace' ||
-				(this.keyboardInformation['plus'] === 'oui' && keyPressed === 'LAlt'))
+				(this.keyboardConfiguration['plus'] === 'yes' && keyPressed === 'LAlt'))
 		) {
 			resultToSend = 'Ctrl-BackSpace';
 		} else if (this['activeLayers']['Ctrl'] & (keyPressed === 'Delete') || resultToSend === '^⌦') {
 			resultToSend = 'Ctrl-Delete';
 		} else if (
 			keyPressed === 'Delete' ||
-			(this.keyboardInformation['plus'] === 'oui' &&
+			(this.keyboardConfiguration['plus'] === 'yes' &&
 				this['activeLayers']['Shift'] &&
 				keyPressed === 'LAlt')
 		) {
 			resultToSend = 'Delete';
 		} else if (
 			keyPressed === 'Enter' ||
-			(this.keyboardInformation['plus'] === 'oui' && keyPressed === 'CapsLock')
+			(this.keyboardConfiguration['plus'] === 'yes' && keyPressed === 'CapsLock')
 		) {
 			resultToSend = 'Enter';
 		}
@@ -307,7 +307,7 @@ export class KeyboardEmulation extends Keyboard {
 			newCursorPosition = cursorPosition + resultToSend.length;
 		}
 
-		if (this.keyboardInformation['plus'] === 'oui') {
+		if (this.keyboardConfiguration['plus'] === 'yes') {
 			[newTextAreaValue, newCursorPosition] = this.ergoptiPlusFeatures(
 				newTextAreaValue,
 				newCursorPosition
