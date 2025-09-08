@@ -407,7 +407,7 @@ export class Keyboard {
 		this.location.dataset['type'] = this.keyboardConfiguration['type'];
 		this.location.dataset['layer'] = this.keyboardConfiguration['layer'];
 		this.location.dataset['plus'] = this.keyboardConfiguration['plus'];
-		this.location.dataset['couleur'] = this.keyboardConfiguration.couleur;
+		this.location.dataset['color'] = this.keyboardConfiguration['color'];
 	}
 
 	pressCurrentLayerModifiers() {

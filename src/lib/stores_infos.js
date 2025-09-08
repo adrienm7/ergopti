@@ -8,126 +8,126 @@ export const discordLink = 'https://discord.gg/ptxRzBqcQP';
 
 export const presentation = writable({
 	emplacement: 'clavier_presentation',
+	plus: 'no',
 	type: 'iso',
 	layer: 'Visuel',
-	plus: 'no',
-	couleur: 'yes',
+	color: 'yes',
 	controls: 'yes'
 });
 
 export const presentation_plus = writable({
 	emplacement: 'clavier_presentation_plus',
+	plus: 'yes',
 	type: 'iso',
 	layer: 'Visuel',
-	plus: 'yes',
-	couleur: 'yes',
+	color: 'yes',
 	controls: 'yes'
 });
 
 export const reference = writable({
 	emplacement: 'clavier_reference',
+	plus: 'yes',
 	type: 'ergodox',
 	layer: 'Visuel',
-	plus: 'yes',
-	couleur: 'yes',
+	color: 'yes',
 	controls: 'yes'
 });
 
 export const emulation = writable({
 	emplacement: 'clavier_emulation',
+	plus: 'yes',
 	type: 'iso',
 	layer: 'Primary',
-	plus: 'yes',
-	couleur: 'yes',
+	color: 'yes',
 	controls: 'no'
 });
 
 export const frequences = writable({
 	emplacement: 'clavier_frequences',
+	plus: 'no',
 	type: 'iso',
 	layer: 'Primary',
-	plus: 'no',
-	couleur: 'freq',
+	color: 'freq',
 	controls: 'no'
 });
 
 export const roulements = writable({
 	emplacement: 'clavier_roulements',
+	plus: 'no',
 	type: 'iso',
 	layer: 'Visuel',
-	plus: 'no',
-	couleur: 'no',
+	color: 'no',
 	controls: 'no'
 });
 
 export const controle = writable({
 	emplacement: 'clavier_controle',
+	plus: 'no',
 	type: 'ergodox',
 	layer: 'Ctrl',
-	plus: 'no',
-	couleur: 'yes',
+	color: 'yes',
 	controls: 'yes'
 });
 
 export const raccourcis_ergodox = writable({
 	emplacement: 'clavier_raccourcis_ergodox',
+	plus: 'no',
 	type: 'ergodox',
 	layer: 'Ctrl',
-	plus: 'no',
-	couleur: 'yes',
+	color: 'yes',
 	controls: 'yes'
 });
 
 export const symboles = writable({
 	emplacement: 'clavier_symboles',
+	plus: 'no',
 	type: 'iso',
 	layer: 'AltGr',
-	plus: 'no',
-	couleur: 'no',
+	color: 'no',
 	controls: 'yes'
 });
 
 export const symboles_plus = writable({
 	emplacement: 'clavier_symboles_plus',
+	plus: 'yes',
 	type: 'ergodox',
 	layer: 'AltGr',
-	plus: 'yes',
-	couleur: 'no',
+	color: 'no',
 	controls: 'no'
 });
 
 export const magique = writable({
 	emplacement: 'clavier_magique',
+	plus: 'yes',
 	type: 'iso',
 	layer: 'Visuel',
-	plus: 'yes',
-	couleur: 'no',
+	color: 'no',
 	controls: 'no'
 });
 
 export const layer = writable({
 	emplacement: 'clavier_layer',
+	plus: 'yes',
 	type: 'iso',
 	layer: 'Layer',
-	plus: 'yes',
-	couleur: 'no',
+	color: 'no',
 	controls: 'yes'
 });
 
 export const a = writable({
 	emplacement: 'clavier_a',
+	plus: 'yes',
 	type: 'iso',
 	layer: 'À',
-	plus: 'yes',
-	couleur: 'no',
+	color: 'no',
 	controls: 'yes'
 });
 
 export const virgule = writable({
 	emplacement: 'clavier_virgule',
+	plus: 'yes',
 	type: 'iso',
 	layer: ',',
-	plus: 'yes',
-	couleur: 'no',
+	color: 'no',
 	controls: 'yes'
 });
