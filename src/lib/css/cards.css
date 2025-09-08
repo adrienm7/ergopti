@@ -15,9 +15,6 @@
 .card {
 	line-height: 1.3em;
 }
-.card kbd-output {
-	line-height: 1.8em;
-}
 
 .cards .card:nth-child(even) {
 	background-color: rgba(0, 0, 0, 0.8);

@@ -5,28 +5,25 @@
 */
 
 keyboard {
-	--keyboard-width: 0.9; /* Pourcentage de la longueur de la page */
-	--keyboard-margin: calc(
-		var(--key-margin) * 7
-	); /* Espace entre le bord du clavier et les touches extérieures */
-
+	--keyboard-width: 0.9; /* Percentage of the page width */
 	--key-size: calc(var(--keyboard-width) * 100vw / 15);
 	--key-height: calc(var(--key-size) - 2 * var(--key-margin));
 	--key-margin: calc(var(--keyboard-width) * 0.4vw);
 	--key-depth: 1.5px;
 	--key-border-radius: 0.15em;
 	--key-shadow: rgba(0, 0, 0, 0.3) 5px 3px 5px;
-
 	--key-pressed-depth: 0.75px;
-	--key-depth-change: calc(var(--key-depth) - var(--key-pressed-depth));
+	--key-pressed-depth-change: calc(var(--key-depth) - var(--key-pressed-depth));
+
 	background-color: hsla(216, 100%, 10%, 0.85);
 	border: 1px solid hsla(227, 100%, 8%, 0.8);
-	border-radius: 7px; /* Arrondi des coins du clavier */
+	border-radius: 7px; /* Radius of the rectangle of the keyboard */
 	box-shadow: 0 0 10px 1px rgba(0, 126, 215, 0.8);
 	display: block;
-	font-weight: 300; /* La graisse est trop "grosse" pour les labels de touches sinon */
-	margin: 0 auto;
-	padding: var(--keyboard-margin);
+	margin: 0 auto; /* Center horizontally */
+	padding: calc(
+		var(--key-margin) * 7
+	); /* Space between the keyboard outer rectangle and the keyboard content */
 	width: max-content;
 }
 
@@ -71,35 +68,35 @@ keyboard[data-type='ergodox'] keyboard-row[data-row='6'] {
 */
 
 keyboard-key {
-	--longueur-touche: calc(var(--key-size) * var(--size) - 2 * var(--key-margin));
-	--effet-3d: hsla(
-		var(--key-color),
+	--key-width: calc(var(--key-size) * var(--size) - 2 * var(--key-margin));
+	--effect-3d: hsla(
+		var(--key-color-hue),
 		var(--key-color-saturation),
 		calc(var(--key-color-luminosity) - 20%),
 		70%
 	);
-	--ombres-touche: var(--key-shadow), 0 var(--key-depth) 0 var(--effet-3d);
+	--key-shadows: var(--key-shadow), 0 var(--key-depth) 0 var(--effect-3d);
 	--couleur-fond-touche: hsla(
-		var(--key-color),
+		var(--key-color-hue),
 		var(--key-color-saturation),
 		var(--key-color-luminosity),
 		var(--key-opacity)
 	);
-	--couleur-bordure-touche: hsla(
-		var(--key-color),
+	--key-border-color: hsla(
+		var(--key-color-hue),
 		var(--key-color-saturation),
 		var(--key-color-luminosity),
 		30%
 	);
-	--size-bordure-touche: 1px; /* calc(var(--keyboard-width) * 0.1rem) */
+	--key-border-size: 1px; /* calc(var(--keyboard-width) * 0.1rem) */
 	--key-text-size: calc(var(--key-size) / 2.5);
-	--couleur-texte-touche: hsla(0, 100%, 100%, 90%);
+	--key-text-color: hsla(0, 100%, 100%, 90%);
+
 	background-color: var(--couleur-fond-touche);
-	border: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
+	border: var(--key-border-size) solid var(--key-border-color);
 	border-radius: var(--key-border-radius);
-	box-shadow: var(--ombres-touche);
-	color: var(--couleur-texte-touche);
-	display: inline-flex;
+	box-shadow: var(--key-shadows);
+	color: var(--key-text-color);
 	font-size: var(--key-text-size);
 	font-weight: 300;
 	height: var(--key-height);
@@ -108,7 +105,7 @@ keyboard-key {
 		rgb(0, 0, 0) 0px 0 1px,
 		rgb(0, 0, 0) 0px 0 6px,
 		rgba(0, 0, 0, 0.5) 0px 0 12px;
-	width: var(--longueur-touche);
+	width: var(--key-width);
 }
 
 kbd,
@@ -117,6 +114,7 @@ kbd-non,
 keyboard-key {
 	align-items: center;
 	cursor: pointer;
+	display: inline-flex;
 	font-family: 'Noto Sans', 'Noto Sans Symbols', sans-serif;
 	font-optical-sizing: auto;
 	font-style: normal;
@@ -130,21 +128,21 @@ keyboard-key:hover,
 .pressed-key {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 	box-shadow:
-		0 var(--key-pressed-depth) 0 var(--effet-3d),
+		0 var(--key-pressed-depth) 0 var(--effect-3d),
 		inset 0 0 1px #00000077;
 	color: #333 !important;
 	position: relative;
 	text-shadow: none;
-	top: var(--key-depth-change);
+	top: var(--key-pressed-depth-change);
 }
 
+/* Keys we want to completely disappear */
 keyboard-key[data-key=''] {
 	display: none;
 }
 
-keyboard-key[data-key='aucune'],
-keyboard-key[data-key='aucune']:hover,
-keyboard-key[data-key='aucune'].active {
+/* Keys we want to be invisible, but still occupy the space */
+keyboard-key[data-key='none'] {
 	background-color: transparent !important;
 	border-color: transparent;
 	box-shadow: none;
@@ -157,8 +155,8 @@ keyboard-key[data-key='aucune'].active {
 =============================
 */
 
-keyboard[data-layer='Visuel'] keyboard-key[data-type='lettre'] div,
-keyboard[data-layer='Visuel'] keyboard-key[data-type='français'] div {
+keyboard[data-layer='Visuel'] keyboard-key[data-type='letter'] div,
+keyboard[data-layer='Visuel'] keyboard-key[data-type='french'] div {
 	text-transform: uppercase;
 }
 
@@ -180,7 +178,7 @@ keyboard[data-layer='Shift'][data-plus='yes'] keyboard-key[data-key='q'] div {
 ===========================
 */
 
-/* To uppercase all the keys, except the modifier names */
+/* Uppercase all the keys, except the modifier names */
 keyboard[data-layer='Ctrl'] keyboard-key:not([data-type='special']) div {
 	text-transform: uppercase;
 }
@@ -361,7 +359,7 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter'] div {
 keyboard[data-type='iso'] keyboard-key[data-type='enter']::before {
 	background-color: var(--couleur-fond-touche);
 	border-radius: 0 calc(var(--key-border-radius) - 1px) 0 0;
-	border-right: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
+	border-right: var(--key-border-size) solid var(--key-border-color);
 	content: '';
 	height: var(--key-size);
 	position: absolute;
@@ -374,13 +372,13 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']::before {
 /* On crée la partie en bas de la touche Entrée */
 keyboard[data-type='iso'] keyboard-key[data-type='enter']::after {
 	background-color: var(--couleur-fond-touche);
-	border: var(--size-bordure-touche) solid var(--couleur-bordure-touche);
+	border: var(--key-border-size) solid var(--key-border-color);
 	border-radius: 0 0 var(--key-border-radius) var(--key-border-radius);
 	border-top: none;
 	box-shadow:
 		var(--key-shadow),
-		0 var(--key-depth) 0 var(--effet-3d),
-		-0.5px var(--key-depth) 0 var(--effet-3d);
+		0 var(--key-depth) 0 var(--effect-3d),
+		-0.5px var(--key-depth) 0 var(--effect-3d);
 	content: '';
 	height: calc(var(--key-size) + var(--key-margin) / 2);
 	position: absolute;
@@ -395,7 +393,7 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']::after {
 keyboard[data-type='iso'] keyboard-key[data-type='enter']:active,
 keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover {
 	position: relative;
-	top: var(--key-depth-change);
+	top: var(--key-pressed-depth-change);
 }
 
 keyboard[data-type='iso'] keyboard-key[data-type='enter']:active::before,
@@ -406,8 +404,8 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::before {
 keyboard[data-type='iso'] keyboard-key[data-type='enter']:active::after,
 keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::after {
 	box-shadow:
-		0 var(--key-pressed-depth) 0 var(--effet-3d),
-		0 var(--key-pressed-depth) 0 var(--effet-3d);
+		0 var(--key-pressed-depth) 0 var(--effect-3d),
+		0 var(--key-pressed-depth) 0 var(--effect-3d);
 }
 
 /* Couleur de la touche Entrée */
@@ -449,35 +447,35 @@ keyboard {
 }
 
 keyboard-key[data-hand='left'][data-finger='index'] {
-	--key-color: var(--color-left-index-finger);
+	--key-color-hue: var(--color-left-index-finger);
 }
 
 keyboard-key[data-hand='left'][data-finger='majeur'] {
-	--key-color: var(--color-left-middle-finger);
+	--key-color-hue: var(--color-left-middle-finger);
 }
 
 keyboard-key[data-hand='left'][data-finger='annulaire'] {
-	--key-color: var(--color-left-ring-finger);
+	--key-color-hue: var(--color-left-ring-finger);
 }
 
 keyboard-key[data-hand='left'][data-finger='auriculaire'] {
-	--key-color: var(--color-left-little-finger);
+	--key-color-hue: var(--color-left-little-finger);
 }
 
 keyboard-key[data-hand='right'][data-finger='index'] {
-	--key-color: var(--color-right-index-finger);
+	--key-color-hue: var(--color-right-index-finger);
 }
 
 keyboard-key[data-hand='right'][data-finger='majeur'] {
-	--key-color: var(--color-right-middle-finger);
+	--key-color-hue: var(--color-right-middle-finger);
 }
 
 keyboard-key[data-hand='right'][data-finger='annulaire'] {
-	--key-color: var(--color-right-ring-finger);
+	--key-color-hue: var(--color-right-ring-finger);
 }
 
 keyboard-key[data-hand='right'][data-finger='auriculaire'] {
-	--key-color: var(--color-right-little-finger);
+	--key-color-hue: var(--color-right-little-finger);
 }
 
 /* Specific color for the Space bar */
@@ -498,10 +496,10 @@ keyboard-key[data-key='Enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
 	/* Bordure des touches des touches spéciales en blanc pour mieux les mettre en relief */
-	--couleur-bordure-touche: hsla(var(--key-color), 100%, 100%, 35%);
-	--effet-3d: hsla(var(--key-color), 0%, calc(100% - 20%), 70%);
+	--key-border-color: hsla(var(--key-color-hue), 100%, 100%, 35%);
+	--effect-3d: hsla(var(--key-color-hue), 0%, calc(100% - 20%), 70%);
 	/* Bordure de la version Ergodox */
-	--key-color: 0deg !important;
+	--key-color-hue: 0deg !important;
 	--key-color-saturation: 0% !important;
 }
 
@@ -514,20 +512,20 @@ keyboard keyboard-key {
 }
 
 keyboard[data-couleur='no'] keyboard-key {
-	--key-color: 190 !important;
+	--key-color-hue: 190 !important;
 	--key-color-luminosity: 70%;
 	--key-opacity: 20%;
 }
 
 keyboard[data-couleur='azerty'] keyboard-key {
-	--key-color: 200 !important;
+	--key-color-hue: 200 !important;
 }
 keyboard[data-couleur='azerty'] keyboard-legend {
 	color: hsl(200, 100%, 80%);
 }
 
 keyboard[data-couleur='ergopti'] keyboard-key {
-	--key-color: 300 !important;
+	--key-color-hue: 300 !important;
 }
 keyboard[data-couleur='ergopti'] keyboard-legend {
 	color: hsl(300, 100%, 85%);
@@ -538,15 +536,15 @@ keyboard[data-couleur='freq'] keyboard-key {
 	--key-color-saturation: 0%;
 }
 
-keyboard[data-couleur='freq'] keyboard-key[data-type='lettre'],
-keyboard[data-couleur='freq'] keyboard-key[data-type='français'],
+keyboard[data-couleur='freq'] keyboard-key[data-type='letter'],
+keyboard[data-couleur='freq'] keyboard-key[data-type='french'],
 keyboard[data-couleur='freq'] keyboard-key[data-type='ponctuation'] {
-	--key-color: calc(180deg * (1 - var(--frequency_normalized)));
+	--key-color-hue: calc(180deg * (1 - var(--frequency_normalized)));
 	--key-color-saturation: 90%;
 	--key-color-luminosity: 70%;
 	--key-opacity: 45%;
 	background-color: hsla(
-		var(--key-color),
+		var(--key-color-hue),
 		var(--key-color-saturation),
 		var(--key-color-luminosity),
 		var(--key-opacity)
