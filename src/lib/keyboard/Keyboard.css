@@ -59,9 +59,10 @@ kbd,
 kbd-output,
 kbd-non,
 keyboard-key {
+	align-content: center;
 	align-items: center;
 	cursor: pointer;
-	display: inline-flex;
+	display: inline-block;
 	font-family: 'Noto Sans', 'Noto Sans Symbols', sans-serif;
 	font-optical-sizing: auto;
 	font-style: normal;
@@ -259,12 +260,12 @@ keyboard-key[data-key='Enter'] {
 	--key-color-saturation: 0% !important;
 }
 
-/* Specific color for the Space bar */
+/* Specific color of the Space bar */
 /* keyboard[data-type='iso'] keyboard-key[data-type='space'] {
 	background-color: rgb(0, 10, 30);
 } */
 
-/* Specific color for the Ergodox thumb keys */
+/* Specific color of the Ergodox thumb keys */
 keyboard[data-type='ergodox'] keyboard-key[data-finger='thumb'] {
 	background-color: rgba(140, 160, 170, 0.25);
 }
@@ -377,10 +378,11 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter'] {
 
 keyboard[data-type='iso'] keyboard-key[data-type='enter'] div {
 	font-weight: normal;
+	position: relative;
 	z-index: 3;
 }
 
-/* On cache la jonction entre la touche et le bas de la touche créé par ::after, avec un rectangle par-dessus */
+/* Hide the junction between the key and the bottom of the key created by ::after, using a rectangle on top */
 keyboard[data-type='iso'] keyboard-key[data-type='enter']::before {
 	border-radius: 0 calc(var(--key-border-radius) - 1px) 0 0;
 	border-right: var(--key-border-size) solid var(--key-border-color);
@@ -393,7 +395,7 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']::before {
 	z-index: 2;
 }
 
-/* On crée la partie en bas de la touche Entrée */
+/* Create the bottom part of the Enter key */
 keyboard[data-type='iso'] keyboard-key[data-type='enter']::after {
 	border: var(--key-border-size) solid var(--key-border-color);
 	border-radius: 0 0 var(--key-border-radius) var(--key-border-radius);
@@ -411,7 +413,7 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']::after {
 	z-index: 0;
 }
 
-/* Ce qui se passe quand on presse la touche Entrée */
+/* === What happens when the Enter key is pressed === */
 
 keyboard[data-type='iso'] keyboard-key[data-type='enter']:active,
 keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover {
@@ -431,7 +433,7 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::after {
 		0 var(--key-pressed-depth) 0 var(--effect-3d);
 }
 
-/* Couleur de la touche Entrée */
+/* === Enter key color === */
 
 keyboard-key[data-type='enter']::before,
 keyboard-key[data-type='enter']::after {
@@ -451,9 +453,9 @@ keyboard-key[data-type='enter'].pressed-key::after {
 }
 
 /*
-======================================
-======= Corrections localisées =======
-======================================
+=====================================
+======= Localized corrections =======
+=====================================
 */
 
 /* Different style for dead keys and keys with a different Ctrl layer */
@@ -557,7 +559,7 @@ keyboard-key[data-content='Caps<br>word'] {
 	font-size: calc(var(--key-text-size) * 0.65);
 }
 
-/* Change font to avoid an ugly glyph */
+/* Change font to avoid an ugly % glyph */
 keyboard-key[data-content='%'],
 keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 	font-family:
@@ -570,10 +572,12 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 }
 
 /*
-==================================================
-======= Style par emplacements de claviers =======
-==================================================
+===========================================
+======= Styles by keyboard location =======
+===========================================
 */
+
+/* === 3 main keyboards === */
 
 #clavier_reference {
 	--keyboard-width: 0.6;
@@ -599,19 +603,26 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 	--key-margin: calc(var(--keyboard-width) * 0.34vw);
 }
 
+/* === clavier_controle and clavier_raccourcis_ergodox === */
+
 #clavier_controle keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17),
 #clavier_controle keyboard-key[data-column='0'],
 #clavier_raccourcis_ergodox keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17) {
 	display: none;
 }
+
 #clavier_controle keyboard-key[data-column='6'],
 #clavier_raccourcis_ergodox keyboard-key[data-column='6'] {
 	margin-right: 0;
 }
 
+/* === clavier_symboles_plus === */
+
 #clavier_symboles_plus keyboard-row:nth-child(n + 5) {
 	display: none;
 }
+
+/* === clavier_magique === */
 
 #clavier_magique keyboard-key[data-plus='yes']:not([data-key='magique']) {
 	background: unset !important;
@@ -624,12 +635,15 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 		var(--key-opacity)
 	) !important;
 }
+
 #clavier_magique keyboard-key[data-plus='yes']:not([data-key='magique']):hover {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 }
+
 #clavier_magique keyboard-key[data-plus='yes'][data-type='special'] {
 	background-color: rgb(10, 10, 10) !important;
 }
+
 #clavier_magique keyboard-key[data-key='magique'] {
 	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
 }

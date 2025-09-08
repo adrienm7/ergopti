@@ -14,7 +14,6 @@
 		<keyboard-row data-row={i + 1}>
 			{#each Array(16) as _, j}
 				<keyboard-key data-key="vide" data-row={i + 1} data-column={j} style="--size: 1;">
-					<div>&nbsp;</div>
 				</keyboard-key>
 			{/each}
 		</keyboard-row>
