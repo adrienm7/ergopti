@@ -15,8 +15,8 @@
 	<kbd>pt</kbd>, <kbd>eo</kbd>, <kbd>oe</kbd>,
 	<kbd>ub</kbd>, <kbd>bu</kbd> et <kbd>ds</kbd>. <kbd>ct</kbd> est de loin le plus fréquent.
 	<kbd>eo</kbd> et <kbd>oe</kbd> sont aussi relativement fréquents en anglais (pour écrire
-	<kbd-sortie>does</kbd-sortie>,
-	<kbd-sortie>people</kbd-sortie>, etc.) Tous ces <SFB />s sont supprimés avec <ErgoptiPlus />, plus
+	<kbd-output>does</kbd-output>,
+	<kbd-output>people</kbd-output>, etc.) Tous ces <SFB />s sont supprimés avec <ErgoptiPlus />, plus
 	de nombreux autres encore plus rares.
 </p>
 
@@ -44,38 +44,38 @@
 </p>
 <ul class="margin-top-2">
 	<li>
-		<kbd>êe</kbd> ➜ <kbd-sortie>oe</kbd-sortie> ;
+		<kbd>êe</kbd> ➜ <kbd-output>oe</kbd-output> ;
 	</li>
 	<li>
-		<kbd>eê</kbd> ➜ <kbd-sortie>eo</kbd-sortie> ;
+		<kbd>eê</kbd> ➜ <kbd-output>eo</kbd-output> ;
 	</li>
 	<li>
-		<kbd>ê,</kbd> ➜ <kbd-sortie>u,</kbd-sortie> ;
+		<kbd>ê,</kbd> ➜ <kbd-output>u,</kbd-output> ;
 	</li>
 	<li>
-		<kbd>ê.</kbd> ➜ <kbd-sortie>u.</kbd-sortie> ;
+		<kbd>ê.</kbd> ➜ <kbd-output>u.</kbd-output> ;
 	</li>
 	<tiny-space></tiny-space>
 	<li>
-		<kbd>èy</kbd> ➜ <kbd-sortie>ié</kbd-sortie> ;
+		<kbd>èy</kbd> ➜ <kbd-output>ié</kbd-output> ;
 	</li>
 	<li>
-		<kbd>yè</kbd> ➜ <kbd-sortie>éi</kbd-sortie>.
+		<kbd>yè</kbd> ➜ <kbd-output>éi</kbd-output>.
 	</li>
 	<p>
 		Idéalement, cela devrait plutôt être l’inverse afin d’être plus logique (le son YÈ donnant IÉ).
-		Toutefois, <kbd-sortie>ié</kbd-sortie> étant beaucoup plus fréquent, il mérite d’avoir le roulement
+		Toutefois, <kbd-output>ié</kbd-output> étant beaucoup plus fréquent, il mérite d’avoir le roulement
 		vers l’intérieur qui est plus confortable.
 	</p>
 </ul>
 
 <h3>Utilisation de roulements</h3>
 <ul class="margin-top-2">
-	<li><kbd>êé</kbd> ➜ <kbd-sortie>aî</kbd-sortie> ;</li>
-	<li><kbd>éê</kbd> ➜ <kbd-sortie>â</kbd-sortie> ;</li>
-	<li><kbd>p'</kbd> ➜ <kbd-sortie>ct</kbd-sortie> ;</li>
-	<li><kbd>à★</kbd> ➜ <kbd-sortie>bu</kbd-sortie> ;</li>
-	<li><kbd>àu</kbd> ➜ <kbd-sortie>ub</kbd-sortie>.</li>
+	<li><kbd>êé</kbd> ➜ <kbd-output>aî</kbd-output> ;</li>
+	<li><kbd>éê</kbd> ➜ <kbd-output>â</kbd-output> ;</li>
+	<li><kbd>p'</kbd> ➜ <kbd-output>ct</kbd-output> ;</li>
+	<li><kbd>à★</kbd> ➜ <kbd-output>bu</kbd-output> ;</li>
+	<li><kbd>àu</kbd> ➜ <kbd-output>ub</kbd-output>.</li>
 </ul>
 
 <h3>Touche <kbd>★</kbd> de répétition</h3>
@@ -102,8 +102,8 @@
 <p>
 	La nouvelle touche <kbd>★</kbd>
 	<span class="important">va répéter la dernière touche tapée</span>. Ainsi, <kbd>l★</kbd>
-	va envoyer <kbd-sortie>ll</kbd-sortie>, tandis que <kbd>r★</kbd> va envoyer
-	<kbd-sortie>rr</kbd-sortie>. Cela engendrera cependant un petit <SFB></SFB> pour les lettres doublées
+	va envoyer <kbd-output>ll</kbd-output>, tandis que <kbd>r★</kbd> va envoyer
+	<kbd-output>rr</kbd-output>. Cela engendrera cependant un petit <SFB></SFB> pour les lettres doublées
 	suivies d’un <kbd>U</kbd>, tel que « connu » ou « battu ». La combinaison <kbd>★ê</kbd> permet
 	d’éviter ce problème. Ainsi, « connu » pourra s’écrire <kbd>con★ê</kbd> et « battu » pourra
 	s’écrire <kbd>bat★ê</kbd>.

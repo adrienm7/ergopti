@@ -1,7 +1,7 @@
 /*
-========================================
-======= Style général du clavier =======
-========================================
+=============================================
+======= General style of the keyboard =======
+=============================================
 */
 
 keyboard {
@@ -34,6 +34,7 @@ keyboard-row {
 	display: flex;
 }
 
+/* To center a keyboard row when we want to only show one row out of the entire keyboard */
 .center {
 	align-items: center;
 	display: flex;
@@ -48,8 +49,24 @@ keyboard-legend {
 }
 
 /*
+===============================
+======= Ergodox version =======
+===============================
+*/
+
+/* Separate the keyboard in 2 parts */
+keyboard[data-type='ergodox'] keyboard-key[data-column='6'] {
+	margin-right: 50px;
+}
+
+/* Separate the thumb cluster from the rest of the keyboard */
+keyboard[data-type='ergodox'] keyboard-row[data-row='6'] {
+	margin-top: 30px;
+}
+
+/*
 =========================================
-======= Style général des touches =======
+======= General style of the keys =======
 =========================================
 */
 
@@ -95,7 +112,7 @@ keyboard-key {
 }
 
 kbd,
-kbd-sortie,
+kbd-output,
 kbd-non,
 keyboard-key {
 	align-items: center;
@@ -134,34 +151,9 @@ keyboard-key[data-key='aucune'].active {
 	cursor: auto;
 }
 
-keyboard espace-insecable {
-	background-color: white;
-	border-radius: 1px;
-	display: inline-block;
-	height: 0.75em;
-	margin-right: 2px;
-	width: 0.25em;
-}
-
-/*
-===============================
-======= Version Ergodox =======
-===============================
-*/
-
-/* Separate the keyboard in 2 parts */
-keyboard[data-type='ergodox'] keyboard-key[data-column='6'] {
-	margin-right: 50px;
-}
-
-/* Separate the thumb cluster from the rest of the keyboard */
-keyboard[data-type='ergodox'] keyboard-row[data-row='6'] {
-	margin-top: 30px;
-}
-
 /*
 =============================
-======= Couche Visuel =======
+======= Layer: Visuel =======
 =============================
 */
 
@@ -176,7 +168,7 @@ keyboard[data-layer='Visuel'] keyboard-key[data-type='ponctuation'] div {
 	line-height: 1;
 }
 
-/* Cas particulier de la touche Q qui fait Qu */
+/* Special case of the key Q that gives Qu */
 keyboard[data-layer='Visuel'][data-plus='yes'] keyboard-key[data-key='q'] div,
 keyboard[data-layer='Shift'][data-plus='yes'] keyboard-key[data-key='q'] div {
 	text-transform: capitalize;
@@ -184,17 +176,13 @@ keyboard[data-layer='Shift'][data-plus='yes'] keyboard-key[data-key='q'] div {
 
 /*
 ===========================
-======= Couche Ctrl =======
+======= Layer: Ctrl =======
 ===========================
 */
 
-keyboard[data-layer='Ctrl'] keyboard-key div {
+/* To uppercase all the keys, except the modifier names */
+keyboard[data-layer='Ctrl'] keyboard-key:not([data-type='special']) div {
 	text-transform: uppercase;
-}
-
-/* Ne pas mettre en uppercase les noms des modificateurs */
-keyboard[data-layer='Ctrl'] keyboard-key[data-type='special'] div {
-	text-transform: none;
 }
 
 /*
@@ -218,15 +206,15 @@ keyboard[data-plus='yes'][data-type='iso'][data-layer='Visuel'] keyboard-key[dat
 }
 
 /* Tap-holds */
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='Tab'] div,
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='RAlt'] div {
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='Tab'] div tap-hold,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='RAlt'] div tap-hold {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.1;
 }
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='CapsLock'] div,
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LShift'] div,
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LCtrl'] div,
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LAlt'] div {
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='CapsLock'] div tap-hold,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LShift'] div tap-hold,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LCtrl'] div tap-hold,
+keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LAlt'] div tap-hold {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.35;
 }
@@ -327,8 +315,18 @@ keyboard[data-layer='Layer'][data-type='ergodox'] keyboard-key[data-key='Space']
 }
 
 /* Smaller CapsLock symbol */
-keyboard[data-plus='no'] keyboard-key[data-key='CapsLock'] div {
+keyboard-key[data-key='CapsLock'] div tap-hold,
+keyboard-key[data-key='CapsLock'][data-content='⌫'],
+keyboard-key[data-key='CapsLock'][data-content='⌦'] {
 	font-size: calc(var(--key-text-size) * 0.85);
+}
+keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌫'],
+keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌦'] {
+	font-size: calc(var(--key-text-size) * 0.75);
+}
+
+keyboard-key[data-content='Caps<br>word'] div {
+	font-size: calc(var(--key-text-size) * 0.65);
 }
 
 /* Smaller font in , layer to prevent keys with 2 symbols to overflow */
@@ -614,4 +612,19 @@ keyboard,
 }
 #clavier_magique keyboard-key[data-key='magique'] {
 	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
+}
+
+/*
+==========================================
+======= Html code used in the keys =======
+==========================================
+*/
+
+espace-insecable {
+	background-color: white;
+	border-radius: 1px;
+	display: inline-block;
+	height: 0.75em;
+	margin-right: 2px;
+	width: 0.25em;
 }

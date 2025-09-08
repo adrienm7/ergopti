@@ -26,7 +26,7 @@ select {
 /* Boutons kbd */
 
 kbd,
-kbd-sortie,
+kbd-output,
 kbd-non {
 	--taille: 1;
 	background-color: hsla(100deg, 0%, 60%, 10%);
@@ -50,7 +50,7 @@ kbd {
 	background-color: hsl(0, 0%, 14%);
 }
 
-kbd-sortie {
+kbd-output {
 	background-color: hsla(0, 0%, 100%, 0.9);
 	border: 1px solid rgba(0, 0, 0, 0.3);
 	color: black;
@@ -62,10 +62,10 @@ kbd-non {
 }
 
 kbd:active,
-kbd-sortie:active,
+kbd-output:active,
 kbd-non:active,
 kbd:hover,
-kbd-sortie:hover,
+kbd-output:hover,
 kbd-non:hover {
 	box-shadow: rgba(204, 204, 204, 0.7) 0 0.766667px 0 0;
 	position: relative;
@@ -73,7 +73,7 @@ kbd-non:hover {
 }
 
 kbd.morte,
-kbd-sortie.morte {
+kbd-output.morte {
 	--key-color-saturation: 0% !important;
 	--key-color-luminosity: 100% !important;
 	--key-opacity: 5% !important;
@@ -88,6 +88,6 @@ kbd-sortie.morte {
 	font-weight: normal;
 }
 
-kbd-sortie.morte {
+kbd-output.morte {
 	--key-opacity: 100% !important;
 }

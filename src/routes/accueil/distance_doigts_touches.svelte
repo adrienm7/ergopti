@@ -62,7 +62,7 @@
 	disposition QWERTY aurait, entre autres raisons, été influencé par un aspect purement marketing.
 	En effet, à des fins de démonstrations, auraient été placées sur la rangée supérieure de la
 	machine à écrire toutes les lettres nécessaires pour pouvoir écrire
-	<kbd-sortie>TYPEWRITER</kbd-sortie>.
+	<kbd-output>TYPEWRITER</kbd-output>.
 </p>
 <p>
 	Certaines des touches ayant les fréquences d’apparition les plus rares (en français et en anglais)

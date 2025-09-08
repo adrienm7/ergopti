@@ -26,10 +26,10 @@
 	le plus faible de notre main.
 </p>
 <ul>
-	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-sortie>Tab</kbd-sortie> sur le tap ;</li>
+	<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-output>Tab</kbd-output> sur le tap ;</li>
 	<li>
-		Tap hold en <kbd>Alt</kbd> ➜ <kbd-sortie>Shift</kbd-sortie> en hold et
-		<kbd-sortie>OneShotShift</kbd-sortie> en tap ;
+		Tap hold en <kbd>Alt</kbd> ➜ <kbd-output>Shift</kbd-output> en hold et
+		<kbd-output>OneShotShift</kbd-output> en tap ;
 	</li>
 	<p>
 		Il est beaucoup plus judicieux de mettre <kbd>Shift</kbd> sous un pouce, afin d’éviter
@@ -37,8 +37,8 @@
 		></SFB>s.
 	</p>
 	<li>
-		Tap hold en <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> sur le hold et
-		<kbd-sortie>Enter</kbd-sortie> sur le tap ;
+		Tap hold en <kbd>"CapsLock"</kbd> ➜ <kbd-output>Ctrl</kbd-output> sur le hold et
+		<kbd-output>Enter</kbd-output> sur le tap ;
 	</li>
 	<p>
 		La touche <kbd>Entrée</kbd> est très utilisée sur un clavier, elle l’est même plus que certaines
@@ -49,8 +49,8 @@
 		par exemple sont également fonctionnels avec cette nouvelle touche <kbd>Entrée</kbd>.
 	</p>
 	<li>
-		Tap hold en <kbd>"Tab"</kbd> ➜ <kbd-sortie>Alt</kbd-sortie> sur le hold et
-		<kbd-sortie>Alt+Tab</kbd-sortie> sur le tap ;
+		Tap hold en <kbd>"Tab"</kbd> ➜ <kbd-output>Alt</kbd-output> sur le hold et
+		<kbd-output>Alt+Tab</kbd-output> sur le tap ;
 	</li>
 	<p>
 		Ce raccourci est extrêmement pratique. Avec lui, il n’y a plus besoin de faire la combinaison <kbd
@@ -81,15 +81,15 @@
 	<small-space></small-space>
 
 	<li>
-		Tap hold en <kbd>LShift</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>C</kbd-sortie> sur le
+		Tap hold en <kbd>LShift</kbd> ➜ <kbd-output>Ctrl</kbd-output> + <kbd-output>C</kbd-output> sur le
 		tap ;
 	</li>
 	<li>
-		Tap hold en <kbd>LCtrl</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>V</kbd-sortie> sur le
+		Tap hold en <kbd>LCtrl</kbd> ➜ <kbd-output>Ctrl</kbd-output> + <kbd-output>V</kbd-output> sur le
 		tap ;
 	</li>
 	<p>
-		Avoir la possibilité de <kbd-sortie>Coller</kbd-sortie> par appui de la main gauche sur une touche
+		Avoir la possibilité de <kbd-output>Coller</kbd-output> par appui de la main gauche sur une touche
 		est très utile, particulièrement lorsque la souris est utilisée en même temps par la main droite.
 		Cela permet de remplacer à la volée des parties de texte.
 	</p>
@@ -98,8 +98,8 @@
 <h3>Raccourcis avec AltGr</h3>
 <ul>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
-		<kbd-sortie>BackSpace</kbd-sortie> ;
+		<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-output>Ctrl</kbd-output> +
+		<kbd-output>BackSpace</kbd-output> ;
 	</li>
 	<p>
 		La combinaison <kbd>Ctrl</kbd> + <kbd>BackSpace</kbd> permet de supprimer d’un coup le mot vers
@@ -107,21 +107,21 @@
 		ce raccourci permet de très rapidement corriger des erreurs de frappe.
 	</p>
 	<li>
-		<kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>Ctrl</kbd-sortie> +
-		<kbd-sortie>Delete</kbd-sortie>.
+		<kbd>AltGr</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-output>Ctrl</kbd-output> +
+		<kbd-output>Delete</kbd-output>.
 	</li>
 	<p>Le principe est le même, sauf qu’ici on supprime le mot à droite.</p>
 	<!-- <li>
-				<kbd>AltGr</kbd> + <kbd>LShift</kbd> ➜ <kbd-sortie>Dot-Space-Shift</kbd-sortie> =
-				<kbd-sortie>.</kbd-sortie>
+				<kbd>AltGr</kbd> + <kbd>LShift</kbd> ➜ <kbd-output>Dot-Space-Shift</kbd-output> =
+				<kbd-output>.</kbd-output>
 				+
-				<kbd-sortie>Space</kbd-sortie>
-				+ <kbd-sortie>Shift</kbd-sortie>
+				<kbd-output>Space</kbd-output>
+				+ <kbd-output>Shift</kbd-output>
 			</li> -->
 	<!-- <p>
-				Le <kbd>Dot-Space-Shift</kbd> envoie un <kbd-sortie>Point</kbd-sortie>, puis un
-				<kbd-sortie>Espace</kbd-sortie>, puis active la touche
-				<kbd-sortie>Shift</kbd-sortie>
+				Le <kbd>Dot-Space-Shift</kbd> envoie un <kbd-output>Point</kbd-output>, puis un
+				<kbd-output>Espace</kbd-output>, puis active la touche
+				<kbd-output>Shift</kbd-output>
 				pour la prochaine touche pressée, avant de se désactiver. C’est un gain de temps et de confort,
 				car en un seul raccourci, trois touches sont pressées, dont la touche <kbd>Shift</kbd> qui
 				est peu confortable à presser sur claviers standards (car pressée par les auriculaires). Un
@@ -133,19 +133,19 @@
 
 <h3>Raccourcis avec <kbd>"CapsLock"</kbd> (transformé en <kbd>Enter</kbd>)</h3>
 <ul>
-	<li><kbd>"LAlt"</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>CapsWord</kbd-sortie> ;</li>
+	<li><kbd>"LAlt"</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-output>CapsWord</kbd-output> ;</li>
 	<p>
 		<kbd>CapsWord</kbd> est une sorte de
 		<span class="important">CapsLock qui se désactive automatiquement</span>
 		à la fin d’un "mot". Ainsi, CapsLock se désactive lors de la pression de
 		<kbd>Espace</kbd>, <kbd>,</kbd> ou encore <kbd>Entrée</kbd>. Cette fonctionnalité peut être très
-		utile pour écrire des abréviations telles que <kbd-sortie>QMK</kbd-sortie>,
-		<kbd-sortie>ASCII</kbd-sortie>, <kbd-sortie>FAQ</kbd-sortie>, etc. De plus, elle permet d’écrire
+		utile pour écrire des abréviations telles que <kbd-output>QMK</kbd-output>,
+		<kbd-output>ASCII</kbd-output>, <kbd-output>FAQ</kbd-output>, etc. De plus, elle permet d’écrire
 		plus aisément les noms des variables et constantes en programmation comme
-		<kbd-sortie>KC_SPC</kbd-sortie>, <kbd-sortie>SERVER_NAME</kbd-sortie>, etc.
+		<kbd-output>KC_SPC</kbd-output>, <kbd-output>SERVER_NAME</kbd-output>, etc.
 	</p>
 	<li>
-		<kbd>Windows</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-sortie>CapsLock</kbd-sortie>, pour ne pas
+		<kbd>Windows</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-output>CapsLock</kbd-output>, pour ne pas
 		perdre la fonctionnalité.
 	</li>
 </ul>

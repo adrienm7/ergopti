@@ -140,7 +140,7 @@
 <ul>
 	<li>
 		Microsoft Excel : Taper un <kbd>+</kbd> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause des problèmes
-		d’édition de la cellule : tout ce qui est tapé avant disparaît et le <kbd-sortie>+</kbd-sortie>
+		d’édition de la cellule : tout ce qui est tapé avant disparaît et le <kbd-output>+</kbd-output>
 		apparaît. Une solution est de faire <kbd>Shift</kbd> + <kbd>=</kbd> (touche tout en haut à
 		gauche, sur la rangée des chiffres), car le <kbd>+</kbd> est aussi à cet emplacement.
 	</li>
@@ -205,12 +205,12 @@
 	d’installation pour plusieurs systèmes d’exploitation. Cependant, les fichiers plus bas n’ont pas
 	encore été testés. De plus, certaines fonctionnalités vont manquer, comme la modification de la
 	couche <kbd>Ctrl</kbd> pour avoir les raccourcis
-	<kbd-sortie>Ctrl</kbd-sortie>
-	+ <kbd-sortie>X</kbd-sortie>,
-	<kbd-sortie>Ctrl</kbd-sortie>
-	+ <kbd-sortie>C</kbd-sortie>, <kbd-sortie>Ctrl</kbd-sortie> + <kbd-sortie>V</kbd-sortie> et
-	<kbd-sortie>Ctrl</kbd-sortie>
-	+ <kbd-sortie>Z</kbd-sortie> sur la main gauche.
+	<kbd-output>Ctrl</kbd-output>
+	+ <kbd-output>X</kbd-output>,
+	<kbd-output>Ctrl</kbd-output>
+	+ <kbd-output>C</kbd-output>, <kbd-output>Ctrl</kbd-output> + <kbd-output>V</kbd-output> et
+	<kbd-output>Ctrl</kbd-output>
+	+ <kbd-output>Z</kbd-output> sur la main gauche.
 </p>
 <p>
 	Si vous êtes sur Windows ou macOS, il est fortement recommandé d’utiliser plutôt <a

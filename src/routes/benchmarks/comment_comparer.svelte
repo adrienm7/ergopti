@@ -50,7 +50,7 @@
 </p>
 <p>
 	De même, si une disposition part du principe que l’appui sur la touche <kbd>Q</kbd> donne
-	<kbd-sortie>QU</kbd-sortie>
+	<kbd-output>QU</kbd-output>
 	comme le proposent Optimot ou <ErgoptiPlus></ErgoptiPlus>, alors il faut s’assurer que le corpus
 	reflète aussi cette modification. Pour cela, il convient de remplacer tous les "qu" par des "q"
 	dans le corpus. Cela permet alors de placer le <kbd>Q</kbd> sur la colonne du <kbd>U</kbd> sans
