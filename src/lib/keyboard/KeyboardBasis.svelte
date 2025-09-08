@@ -9,7 +9,7 @@
 	});
 </script>
 
-<keyboard id={'clavier_' + name}>
+<keyboard id={'keyboard_' + name}>
 	{#each Array(7) as _, i}
 		<keyboard-row data-row={i + 1}>
 			{#each Array(16) as _, j}

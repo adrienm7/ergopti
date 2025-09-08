@@ -7,7 +7,7 @@ export const layoutData = writable();
 export const discordLink = 'https://discord.gg/ptxRzBqcQP';
 
 export const presentation = writable({
-	emplacement: 'clavier_presentation',
+	emplacement: 'keyboard_presentation',
 	plus: 'no',
 	type: 'iso',
 	layer: 'Visuel',
@@ -16,7 +16,7 @@ export const presentation = writable({
 });
 
 export const presentation_plus = writable({
-	emplacement: 'clavier_presentation_plus',
+	emplacement: 'keyboard_presentation_plus',
 	plus: 'yes',
 	type: 'iso',
 	layer: 'Visuel',
@@ -25,7 +25,7 @@ export const presentation_plus = writable({
 });
 
 export const reference = writable({
-	emplacement: 'clavier_reference',
+	emplacement: 'keyboard_reference',
 	plus: 'yes',
 	type: 'ergodox',
 	layer: 'Visuel',
@@ -34,7 +34,7 @@ export const reference = writable({
 });
 
 export const emulation = writable({
-	emplacement: 'clavier_emulation',
+	emplacement: 'keyboard_emulation',
 	plus: 'yes',
 	type: 'iso',
 	layer: 'Primary',
@@ -43,7 +43,7 @@ export const emulation = writable({
 });
 
 export const frequences = writable({
-	emplacement: 'clavier_frequences',
+	emplacement: 'keyboard_frequences',
 	plus: 'no',
 	type: 'iso',
 	layer: 'Primary',
@@ -52,7 +52,7 @@ export const frequences = writable({
 });
 
 export const roulements = writable({
-	emplacement: 'clavier_roulements',
+	emplacement: 'keyboard_roulements',
 	plus: 'no',
 	type: 'iso',
 	layer: 'Visuel',
@@ -61,7 +61,7 @@ export const roulements = writable({
 });
 
 export const controle = writable({
-	emplacement: 'clavier_controle',
+	emplacement: 'keyboard_controle',
 	plus: 'no',
 	type: 'ergodox',
 	layer: 'Ctrl',
@@ -70,7 +70,7 @@ export const controle = writable({
 });
 
 export const raccourcis_ergodox = writable({
-	emplacement: 'clavier_raccourcis_ergodox',
+	emplacement: 'keyboard_raccourcis_ergodox',
 	plus: 'no',
 	type: 'ergodox',
 	layer: 'Ctrl',
@@ -79,7 +79,7 @@ export const raccourcis_ergodox = writable({
 });
 
 export const symboles = writable({
-	emplacement: 'clavier_symboles',
+	emplacement: 'keyboard_symboles',
 	plus: 'no',
 	type: 'iso',
 	layer: 'AltGr',
@@ -88,7 +88,7 @@ export const symboles = writable({
 });
 
 export const symboles_plus = writable({
-	emplacement: 'clavier_symboles_plus',
+	emplacement: 'keyboard_symboles_plus',
 	plus: 'yes',
 	type: 'ergodox',
 	layer: 'AltGr',
@@ -97,7 +97,7 @@ export const symboles_plus = writable({
 });
 
 export const magique = writable({
-	emplacement: 'clavier_magique',
+	emplacement: 'keyboard_magique',
 	plus: 'yes',
 	type: 'iso',
 	layer: 'Visuel',
@@ -106,7 +106,7 @@ export const magique = writable({
 });
 
 export const layer = writable({
-	emplacement: 'clavier_layer',
+	emplacement: 'keyboard_layer',
 	plus: 'yes',
 	type: 'iso',
 	layer: 'Layer',
@@ -115,7 +115,7 @@ export const layer = writable({
 });
 
 export const a = writable({
-	emplacement: 'clavier_a',
+	emplacement: 'keyboard_a',
 	plus: 'yes',
 	type: 'iso',
 	layer: 'À',
@@ -124,7 +124,7 @@ export const a = writable({
 });
 
 export const virgule = writable({
-	emplacement: 'clavier_virgule',
+	emplacement: 'keyboard_virgule',
 	plus: 'yes',
 	type: 'iso',
 	layer: ',',

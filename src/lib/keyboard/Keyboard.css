@@ -579,52 +579,52 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 
 /* === 3 main keyboards === */
 
-#clavier_reference {
+#keyboard_reference {
 	--keyboard-width: 0.6;
 }
 
-#clavier_presentation,
-#clavier_presentation_plus {
+#keyboard_presentation,
+#keyboard_presentation_plus {
 	--keyboard-width: 0.55;
 }
 
 @media (max-width: 700px) {
-	#clavier_reference,
-	#clavier_presentation,
-	#clavier_presentation_plus {
+	#keyboard_reference,
+	#keyboard_presentation,
+	#keyboard_presentation_plus {
 		--keyboard-width: 0.9;
 	}
 }
 
-#clavier_reference keyboard-key,
-#clavier_presentation keyboard-key,
-#clavier_presentation_plus keyboard-key {
+#keyboard_reference keyboard-key,
+#keyboard_presentation keyboard-key,
+#keyboard_presentation_plus keyboard-key {
 	--key-size: calc(var(--keyboard-width) * 100vw / 15);
 	--key-margin: calc(var(--keyboard-width) * 0.34vw);
 }
 
-/* === clavier_controle and clavier_raccourcis_ergodox === */
+/* === keyboard_controle and keyboard_raccourcis_ergodox === */
 
-#clavier_controle keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17),
-#clavier_controle keyboard-key[data-column='0'],
-#clavier_raccourcis_ergodox keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17) {
+#keyboard_controle keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17),
+#keyboard_controle keyboard-key[data-column='0'],
+#keyboard_raccourcis_ergodox keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17) {
 	display: none;
 }
 
-#clavier_controle keyboard-key[data-column='6'],
-#clavier_raccourcis_ergodox keyboard-key[data-column='6'] {
+#keyboard_controle keyboard-key[data-column='6'],
+#keyboard_raccourcis_ergodox keyboard-key[data-column='6'] {
 	margin-right: 0;
 }
 
-/* === clavier_symboles_plus === */
+/* === keyboard_symboles_plus === */
 
-#clavier_symboles_plus keyboard-row:nth-child(n + 5) {
+#keyboard_symboles_plus keyboard-row:nth-child(n + 5) {
 	display: none;
 }
 
-/* === clavier_magique === */
+/* === keyboard_magique === */
 
-#clavier_magique keyboard-key[data-plus='yes']:not([data-key='magique']) {
+#keyboard_magique keyboard-key[data-plus='yes']:not([data-key='magique']) {
 	background: unset !important;
 	--key-color-saturation: 100% !important;
 	--key-color-luminosity: 70% !important;
@@ -636,15 +636,15 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 	) !important;
 }
 
-#clavier_magique keyboard-key[data-plus='yes']:not([data-key='magique']):hover {
+#keyboard_magique keyboard-key[data-plus='yes']:not([data-key='magique']):hover {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 }
 
-#clavier_magique keyboard-key[data-plus='yes'][data-type='special'] {
+#keyboard_magique keyboard-key[data-plus='yes'][data-type='special'] {
 	background-color: rgb(10, 10, 10) !important;
 }
 
-#clavier_magique keyboard-key[data-key='magique'] {
+#keyboard_magique keyboard-key[data-key='magique'] {
 	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
 }
 

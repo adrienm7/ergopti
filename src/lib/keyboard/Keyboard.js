@@ -41,7 +41,7 @@ export class Keyboard {
 			return null;
 		}
 
-		const idKeyboard = `clavier_${this.id}`;
+		const idKeyboard = `keyboard_${this.id}`;
 		const location = document.getElementById(idKeyboard);
 
 		if (!location) {
