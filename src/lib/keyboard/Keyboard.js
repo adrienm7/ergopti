@@ -229,23 +229,25 @@ export class Keyboard {
 		const layer = this.keyboardConfiguration['layer'];
 
 		// Override the Space key content to also show the name of the layout
-		const plusSymbol = plus ? ' <span class="glow">+</span>' : '';
+		const plusSymbol = plus
+			? '<span class="glow" style = "position:relative; top:-0.5px; margin-left:0.1em">+</span>'
+			: '';
 		if (type === 'iso' && layer === 'Visuel' && keyName === 'Space') {
-			key.innerHTML = `<div>${this.layoutData['name']}${plusSymbol}</div>`;
+			key.innerHTML = this.layoutData['name'] + plusSymbol;
 		}
 
 		// Make the ★ key glow
 		if (plus && layer === 'Visuel' && keyName === 'magique') {
-			key.innerHTML = '<div><span class="glow" style = "position:initial">★</span></div>';
+			key.innerHTML = '<span class="glow" style = "position:initial">★</span>';
 		}
 
 		// For ISO, Layer is on LAlt instead of Space
 		if (plus && type === 'iso' && layer === 'Layer' && keyName === 'LAlt') {
-			key.innerHTML = '<div>Layer</div>';
+			key.innerHTML = 'Layer';
 		}
 		// For Ergodox, Layer is on Space instead of LAlt
 		if (plus && type === 'ergodox' && layer === 'Layer' && keyName === 'Space') {
-			key.innerHTML = '<div>Layer</div>';
+			key.innerHTML = 'Layer';
 		}
 	}
 
