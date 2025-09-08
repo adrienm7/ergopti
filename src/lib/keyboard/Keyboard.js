@@ -31,38 +31,50 @@ export class Keyboard {
 		this.data_clavier.subscribe((value) => {
 			this.keyboardConfiguration = value;
 		});
+
+		this.keyboardLocation = this.getKeyboardLocation();
 	}
 
 	getKeyboardLocation() {
-		if (typeof document !== 'undefined') {
-			const idKeyboard = `clavier_${this.id}`;
-			const keyboardLocation = document.getElementById(idKeyboard);
-			if (keyboardLocation === null) {
-				throw new Error(`Emplacement clavier ${idKeyboard} introuvable`);
-			}
-			return keyboardLocation;
+		if (typeof document === 'undefined') {
+			console.error('[Keyboard] Document not defined (likely running outside the browser)');
+			return null;
 		}
-		throw new Error('Document non défini');
+
+		const idKeyboard = `clavier_${this.id}`;
+		const keyboardLocation = document.getElementById(idKeyboard);
+
+		if (!keyboardLocation) {
+			console.error(`[Keyboard] Element with id "${idKeyboard}" not found in the DOM`);
+			return null;
+		}
+
+		return keyboardLocation;
 	}
 
 	updateKeyboard() {
-		if (this.layoutData !== undefined) {
-			this.updateKeys();
-			this.updateKeyboardConfiguration();
-			this.pressCurrentLayerModifiers();
+		this.keyboardLocation = this.getKeyboardLocation();
+		if (!this.keyboardLocation || !this.layoutData || !this.keyboardConfiguration) {
+			return;
 		}
+
+		this.updateKeys();
+		this.updateKeyboardConfiguration();
+		this.pressCurrentLayerModifiers();
 	}
 
 	updateKeys() {
-		const keyboardLocation = this.getKeyboardLocation();
+		if (!this.keyboardLocation || !this.layoutData || !this.keyboardConfiguration) {
+			return;
+		}
 
 		for (let row = 1; row <= 7; row++) {
 			for (let column = 0; column <= 15; column++) {
-				const key = this.cleanKey(keyboardLocation, row, column);
+				const key = this.cleanKey(this.keyboardLocation, row, column);
 
 				// Retrieve the id of the key at the specific location row x column
 				// This id depends whether the layout is ISO or Ergodox (two different sets of properties)
-				const keyIdentifier = this.layoutData[this.keyboardConfiguration.type].find(
+				const keyIdentifier = this.layoutData[this.keyboardConfiguration['type']].find(
 					(el) => el['row'] == row && el['column'] == column
 				);
 
@@ -123,18 +135,18 @@ export class Keyboard {
 
 	fillKey(key, keyContent, row) {
 		if (
-			this.keyboardConfiguration.layer !== 'Visuel' &&
-			(keyContent[this.keyboardConfiguration.layer] === '' ||
-				keyContent[this.keyboardConfiguration.layer] === undefined)
+			this.keyboardConfiguration['layer'] !== 'Visuel' &&
+			(keyContent[this.keyboardConfiguration['layer']] === '' ||
+				keyContent[this.keyboardConfiguration['layer']] === undefined)
 		) {
 			/* Undefined key in the selected layer */
 			return;
 		}
 
 		let keyDiv = key.querySelector('div');
-		const plus = this.keyboardConfiguration.plus === 'yes';
+		const plus = this.keyboardConfiguration['plus'] === 'yes';
 
-		if (this.keyboardConfiguration.layer === 'Visuel') {
+		if (this.keyboardConfiguration['layer'] === 'Visuel') {
 			if (keyContent['type'] === 'ponctuation') {
 				// Every "double" keys of ponctuation
 				keyDiv.innerHTML = `<output-altgr>${keyContent['AltGr']}</output-altgr><br/><output-primary>${keyContent['Primary']}</output-primary>`;
@@ -150,18 +162,18 @@ export class Keyboard {
 			}
 		} else {
 			// All layers other than "Visuel"
-			if (plus && keyContent[this.keyboardConfiguration.layer + '+'] !== undefined && row < 6) {
+			if (plus && keyContent[this.keyboardConfiguration['layer'] + '+'] !== undefined && row < 6) {
 				// If the + layer exists AND the key isn’t on the thumb cluster
-				keyDiv.innerHTML = keyContent[this.keyboardConfiguration.layer + '+'];
+				keyDiv.innerHTML = keyContent[this.keyboardConfiguration['layer'] + '+'];
 				key.dataset.plus = 'yes';
 			} else {
-				keyDiv.innerHTML = keyContent[this.keyboardConfiguration.layer];
+				keyDiv.innerHTML = keyContent[this.keyboardConfiguration['layer']];
 			}
 		}
 	}
 
 	setKeyProperties(key, keyIdentifier, keyContent, column) {
-		// On ajoute des this.keyboardConfiguration dans les data attributes de la touche
+		// Fill data attributes of the key
 		// This enables automatic styling of key groups with CSS
 		key.dataset['key'] = keyIdentifier['key'];
 		key.dataset['finger'] = keyIdentifier['finger'];
@@ -170,28 +182,28 @@ export class Keyboard {
 		key.dataset['column'] = column;
 
 		if (
-			this.keyboardConfiguration.layer === 'Visuel' &&
+			this.keyboardConfiguration['layer'] === 'Visuel' &&
 			keyContent['Primary' + '-style'] !== undefined
 		) {
 			key.dataset['style'] = keyContent['Primary' + '-style'];
 		} else {
 			if (
-				this.keyboardConfiguration.plus === 'yes' &&
-				keyContent[this.keyboardConfiguration.layer + '+' + '-style'] !== undefined
+				this.keyboardConfiguration['plus'] === 'yes' &&
+				keyContent[this.keyboardConfiguration['layer'] + '+' + '-style'] !== undefined
 			) {
-				key.dataset['style'] = keyContent[this.keyboardConfiguration.layer + '+' + '-style'];
-			} else if (keyContent[this.keyboardConfiguration.layer + '-style'] !== undefined) {
-				key.dataset['style'] = keyContent[this.keyboardConfiguration.layer + '-style'];
+				key.dataset['style'] = keyContent[this.keyboardConfiguration['layer'] + '+' + '-style'];
+			} else if (keyContent[this.keyboardConfiguration['layer'] + '-style'] !== undefined) {
+				key.dataset['style'] = keyContent[this.keyboardConfiguration['layer'] + '-style'];
 			}
 		}
 
 		key.style.setProperty('--size', keyIdentifier['size']);
 
-		const frequency = characterFrequencies[keyContent[this.keyboardConfiguration.layer]];
+		const frequency = characterFrequencies[keyContent[this.keyboardConfiguration['layer']]];
 		key.style.setProperty('--frequency', frequency);
 
 		const frequency_normalized = // Between 0 et 1 with 1 for the most frequent key
-			(characterFrequencies[keyContent[this.keyboardConfiguration.layer]] -
+			(characterFrequencies[keyContent[this.keyboardConfiguration['layer']]] -
 				characterFrequencies['min']) /
 			(characterFrequencies['max'] - characterFrequencies['min']);
 		key.style.setProperty(
@@ -204,10 +216,10 @@ export class Keyboard {
 		const keyName = key.dataset['key'];
 
 		// Override the Space key content to also show the name of the layout
-		const plus = this.keyboardConfiguration.plus === 'yes' ? ' <span class="glow">+</span>' : '';
+		const plus = this.keyboardConfiguration['plus'] === 'yes' ? ' <span class="glow">+</span>' : '';
 		if (
-			this.keyboardConfiguration.layer === 'Visuel' &&
-			this.keyboardConfiguration.type === 'iso' &&
+			this.keyboardConfiguration['layer'] === 'Visuel' &&
+			this.keyboardConfiguration['type'] === 'iso' &&
 			keyName === 'Space'
 		) {
 			key.innerHTML = `<div>${this.layoutData['name']}${plus}</div>`;
@@ -215,8 +227,8 @@ export class Keyboard {
 
 		// Make the ★ key glow
 		if (
-			this.keyboardConfiguration.layer === 'Visuel' &&
-			this.keyboardConfiguration.plus === 'yes' &&
+			this.keyboardConfiguration['layer'] === 'Visuel' &&
+			this.keyboardConfiguration['plus'] === 'yes' &&
 			keyName === 'magique'
 		) {
 			key.innerHTML = '<div><span class="glow" style = "position:initial">★</span></div>';
@@ -224,18 +236,18 @@ export class Keyboard {
 
 		// For ISO, Layer is on LAlt instead of Space
 		if (
-			this.keyboardConfiguration.type === 'iso' &&
-			this.keyboardConfiguration.layer === 'Layer' &&
-			this.keyboardConfiguration.plus === 'yes' &&
+			this.keyboardConfiguration['type'] === 'iso' &&
+			this.keyboardConfiguration['layer'] === 'Layer' &&
+			this.keyboardConfiguration['plus'] === 'yes' &&
 			keyName === 'LAlt'
 		) {
 			key.innerHTML = '<div>Layer</div>';
 		}
 		// For Ergodox, Layer is on Space instead of LAlt
 		if (
-			this.keyboardConfiguration.type === 'ergodox' &&
-			this.keyboardConfiguration.layer === 'Layer' &&
-			this.keyboardConfiguration.plus === 'yes' &&
+			this.keyboardConfiguration['type'] === 'ergodox' &&
+			this.keyboardConfiguration['layer'] === 'Layer' &&
+			this.keyboardConfiguration['plus'] === 'yes' &&
 			keyName === 'Space'
 		) {
 			key.innerHTML = '<div>Layer</div>';
@@ -243,10 +255,11 @@ export class Keyboard {
 	}
 
 	layerSwitch(pressedKey) {
+		const currentLayer = this.keyboardConfiguration['layer'];
+		const plus = this.keyboardConfiguration['plus'] === 'yes';
+		const type = this.keyboardConfiguration['type'];
+
 		let pressedKeyName = pressedKey.dataset['key'];
-		const currentLayer = this.keyboardConfiguration.layer;
-		const plus = this.keyboardConfiguration.plus === 'yes';
-		const type = this.keyboardConfiguration.type;
 		let newLayer = currentLayer;
 
 		if (
@@ -394,28 +407,34 @@ export class Keyboard {
 	}
 
 	updateKeyboardConfiguration() {
-		const keyboardLocation = this.getKeyboardLocation();
-		keyboardLocation.dataset['type'] = this.keyboardConfiguration.type;
-		keyboardLocation.dataset['layer'] = this.keyboardConfiguration.layer;
-		keyboardLocation.dataset['plus'] = this.keyboardConfiguration.plus;
-		keyboardLocation.dataset['couleur'] = this.keyboardConfiguration.couleur;
+		if (!this.keyboardLocation || !this.keyboardConfiguration) {
+			return;
+		}
+
+		this.keyboardLocation.dataset['type'] = this.keyboardConfiguration['type'];
+		this.keyboardLocation.dataset['layer'] = this.keyboardConfiguration['layer'];
+		this.keyboardLocation.dataset['plus'] = this.keyboardConfiguration['plus'];
+		this.keyboardLocation.dataset['couleur'] = this.keyboardConfiguration.couleur;
 	}
 
 	pressCurrentLayerModifiers() {
-		const keyboardLocation = this.getKeyboardLocation();
-		const layer = this.keyboardConfiguration.layer;
-		const plus = this.keyboardConfiguration.plus === 'yes';
-		const type = this.keyboardConfiguration.type;
+		if (!this.keyboardLocation || !this.keyboardConfiguration) {
+			return;
+		}
+
+		const layer = this.keyboardConfiguration['layer'];
+		const plus = this.keyboardConfiguration['plus'] === 'yes';
+		const type = this.keyboardConfiguration['type'];
 
 		const keys = {
-			LShift: keyboardLocation.querySelector("[data-key='LShift']"),
-			RShift: keyboardLocation.querySelector("[data-key='RShift']"),
-			LCtrl: keyboardLocation.querySelector("[data-key='LCtrl']"),
-			RCtrl: keyboardLocation.querySelector("[data-key='RCtrl']"),
-			LAlt: keyboardLocation.querySelector("[data-key='LAlt']"),
-			RAlt: keyboardLocation.querySelector("[data-key='RAlt']"),
-			CapsLock: keyboardLocation.querySelector("[data-key='CapsLock']"),
-			Space: keyboardLocation.querySelector("[data-key='Space']")
+			LShift: this.keyboardLocation.querySelector("[data-key='LShift']"),
+			RShift: this.keyboardLocation.querySelector("[data-key='RShift']"),
+			LCtrl: this.keyboardLocation.querySelector("[data-key='LCtrl']"),
+			RCtrl: this.keyboardLocation.querySelector("[data-key='RCtrl']"),
+			LAlt: this.keyboardLocation.querySelector("[data-key='LAlt']"),
+			RAlt: this.keyboardLocation.querySelector("[data-key='RAlt']"),
+			CapsLock: this.keyboardLocation.querySelector("[data-key='CapsLock']"),
+			Space: this.keyboardLocation.querySelector("[data-key='Space']")
 		};
 
 		// Utility function to pressKey a key if it exists
@@ -478,6 +497,9 @@ export class Keyboard {
 
 	typeText(text, speed, makePreviousKeysDisappear) {
 		const keyboardLocation = this.getKeyboardLocation();
+		if (!keyboardLocation) {
+			return;
+		}
 
 		// Clear previously pressed keys
 		const pressedKeys = keyboardLocation.querySelectorAll('.pressed-key');
