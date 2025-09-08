@@ -80,7 +80,15 @@ export class Keyboard {
 					const keyContent = this.layoutData['keys'].find(
 						(el) => el['key'] === keyIdentifier['key']
 					);
-					this.fillKey(key, keyContent, row);
+
+					if (keyIdentifier['key'] === 'Enter') {
+						// For Enter, it is mandatory to create a sub div, as this key is created from scratch with CSS by using pseudo-elements on the key
+						key.innerHTML = '<div></div>';
+						this.fillKey(key.querySelector('div'), keyContent, row);
+					} else {
+						this.fillKey(key, keyContent, row);
+					}
+
 					this.setKeyProperties(key, keyIdentifier, keyContent, column);
 					this.postProcessingKey(key);
 
@@ -123,7 +131,7 @@ export class Keyboard {
 		newKey.dataset['key'] = '';
 
 		// Key content and style cleaning
-		newKey.innerHTML = '<div><div>';
+		newKey.innerHTML = '';
 		newKey.className = '';
 		newKey.style = '';
 
@@ -144,31 +152,30 @@ export class Keyboard {
 			return;
 		}
 
-		let keyDiv = key.querySelector('div');
 		const plus = this.keyboardConfiguration['plus'] === 'yes';
 
 		if (this.keyboardConfiguration['layer'] === 'Visuel') {
 			if (keyContent['type'] === 'ponctuation') {
 				// Every "double" keys of ponctuation
-				keyDiv.innerHTML = `<output-altgr>${keyContent['AltGr']}</output-altgr><br/><output-primary>${keyContent['Primary']}</output-primary>`;
+				key.innerHTML = `<output-altgr>${keyContent['AltGr']}</output-altgr><br/><output-primary>${keyContent['Primary']}</output-primary>`;
 			} else {
 				// All keys that aren’t "double"
 				if (plus && keyContent['Primary' + '+'] !== undefined && row < 6) {
 					// If the + layer exists AND the key isn’t on the thumb cluster
-					keyDiv.innerHTML = keyContent['Primary' + '+'];
+					key.innerHTML = keyContent['Primary' + '+'];
 					key.dataset['plus'] = 'yes';
 				} else {
-					keyDiv.innerHTML = keyContent['Primary'];
+					key.innerHTML = keyContent['Primary'];
 				}
 			}
 		} else {
 			// All layers other than "Visuel"
 			if (plus && keyContent[this.keyboardConfiguration['layer'] + '+'] !== undefined && row < 6) {
 				// If the + layer exists AND the key isn’t on the thumb cluster
-				keyDiv.innerHTML = keyContent[this.keyboardConfiguration['layer'] + '+'];
+				key.innerHTML = keyContent[this.keyboardConfiguration['layer'] + '+'];
 				key.dataset['plus'] = 'yes';
 			} else {
-				keyDiv.innerHTML = keyContent[this.keyboardConfiguration['layer']];
+				key.innerHTML = keyContent[this.keyboardConfiguration['layer']];
 			}
 		}
 	}
@@ -181,7 +188,7 @@ export class Keyboard {
 		// Fill the data attributes of the key
 		// This enables automatic styling of key groups with CSS
 		key.dataset['key'] = keyIdentifier['key'];
-		key.dataset['content'] = key.querySelector('div').innerHTML;
+		key.dataset['content'] = key.innerHTML;
 		key.dataset['finger'] = keyIdentifier['finger'];
 		key.dataset['hand'] = keyIdentifier['hand'];
 		key.dataset['type'] = keyContent['type'];
