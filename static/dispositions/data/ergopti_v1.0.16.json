@@ -980,7 +980,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "left",
 			"finger": "index",
 			"row": "5",
@@ -988,7 +988,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "right",
 			"finger": "index",
 			"row": "5",
@@ -1036,7 +1036,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "left",
 			"finger": "thumb",
 			"row": "6",
@@ -1044,7 +1044,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "left",
 			"finger": "thumb",
 			"row": "6",
@@ -1052,7 +1052,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "left",
 			"finger": "thumb",
 			"row": "6",
@@ -1108,7 +1108,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "left",
 			"finger": "thumb",
 			"row": "7",
@@ -1116,7 +1116,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "left",
 			"finger": "thumb",
 			"row": "7",
@@ -1124,7 +1124,7 @@
 			"size": "1"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"hand": "left",
 			"finger": "thumb",
 			"row": "7",
@@ -1190,7 +1190,7 @@
 			"Ctrl": "a",
 			"Layer": "^⇧",
 			"À": "",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "b",
@@ -1201,7 +1201,7 @@
 			"Ctrl": "b",
 			"Layer": "↹",
 			"À": "fs",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "c",
@@ -1212,7 +1212,7 @@
 			"Layer": "⊞+⇦",
 			"Ctrl": "c",
 			"À": "cd",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "d",
@@ -1223,7 +1223,7 @@
 			"Ctrl": "d",
 			"Layer": "^+⇦",
 			"À": "ds",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "e",
@@ -1235,7 +1235,7 @@
 			"Ctrl": "e",
 			"Layer": "⇩",
 			"À": "je",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "f",
@@ -1246,7 +1246,7 @@
 			"Ctrl": "f",
 			"Layer": "+<span style='font-weight: light;'>↩</span>",
 			"À": "sf",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "g",
@@ -1257,7 +1257,7 @@
 			"Ctrl": "g",
 			"Layer": "+⇨",
 			"À": "gl",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "h",
@@ -1268,7 +1268,7 @@
 			"Ctrl": "h",
 			"Layer": "⊞⇦",
 			"À": "ph",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "i",
@@ -1279,7 +1279,7 @@
 			"Ctrl": "i",
 			"Layer": "⇧",
 			"À": "ji",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "j",
@@ -1291,7 +1291,7 @@
 			"Ctrl": "j",
 			"Layer": "",
 			"À": "",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "k",
@@ -1302,7 +1302,7 @@
 			"Ctrl": "k",
 			"Layer": "",
 			"À": "",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "l",
@@ -1313,7 +1313,7 @@
 			"Ctrl": "l",
 			"Layer": "+⇦",
 			"À": "cl",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "m",
@@ -1324,7 +1324,7 @@
 			"Ctrl": "m",
 			"Layer": "⊞⇨",
 			"À": "adm",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "n",
@@ -1335,7 +1335,7 @@
 			"Ctrl": "n",
 			"Layer": "⇦",
 			"À": "nl",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "o",
@@ -1346,7 +1346,7 @@
 			"Ctrl": "o",
 			"Layer": "^⇥",
 			"À": "jo",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "p",
@@ -1357,7 +1357,7 @@
 			"Ctrl": "p",
 			"Layer": "",
 			"À": "xp",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "q",
@@ -1370,7 +1370,7 @@
 			"Ctrl": "q",
 			"Layer": "⇥",
 			"À": "",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "r",
@@ -1382,7 +1382,7 @@
 			"Ctrl": "r",
 			"Layer": "^⇨",
 			"À": "rq",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "s",
@@ -1393,7 +1393,7 @@
 			"Ctrl": "s",
 			"Layer": "^⇦",
 			"À": "cs",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "t",
@@ -1405,7 +1405,7 @@
 			"Ctrl": "t",
 			"Layer": "⇨",
 			"À": "pt",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "u",
@@ -1417,7 +1417,7 @@
 			"Ctrl": "u",
 			"Layer": "^⇩",
 			"À": "ju",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "v",
@@ -1428,7 +1428,7 @@
 			"Ctrl": "v",
 			"Layer": "⇤",
 			"À": "adv",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "w",
@@ -1441,7 +1441,7 @@
 			"Ctrl": "w",
 			"Layer": "^+⇥",
 			"À": "ja",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "x",
@@ -1452,7 +1452,7 @@
 			"Ctrl": "x",
 			"Layer": "⊞+⇨",
 			"À": "'re",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "y",
@@ -1463,7 +1463,7 @@
 			"Ctrl": "y",
 			"Layer": "^⇤",
 			"À": "aj",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": "z",
@@ -1474,7 +1474,7 @@
 			"Ctrl": "z",
 			"Layer": "",
 			"À": "",
-			"type": "lettre"
+			"type": "letter"
 		},
 		{
 			"key": ",",
@@ -1554,7 +1554,7 @@
 			"Ctrl": "z",
 			"Layer": "^+⇤",
 			"À": "À",
-			"type": "français"
+			"type": "'french'"
 		},
 		{
 			"key": "é",
@@ -1565,7 +1565,7 @@
 			"Ctrl": "+",
 			"Layer": "!⇧",
 			"À": "jé",
-			"type": "français"
+			"type": "'french'"
 		},
 		{
 			"key": "è",
@@ -1577,7 +1577,7 @@
 			"Ctrl": "-",
 			"Layer": "!⇩",
 			"À": "",
-			"type": "français"
+			"type": "'french'"
 		},
 		{
 			"key": "ê",
@@ -1588,7 +1588,7 @@
 			"Ctrl": "x",
 			"Layer": "!+⇧",
 			"À": "",
-			"type": "français"
+			"type": "'french'"
 		},
 		{
 			"key": "%",
@@ -1961,7 +1961,7 @@
 			"type": "vide"
 		},
 		{
-			"key": "aucune",
+			"key": "none",
 			"Primary": "",
 			"Shift": "",
 			"AltGr": "",
@@ -1969,7 +1969,7 @@
 			"Ctrl": "",
 			"Layer": "",
 			"À": "",
-			"type": "aucune"
+			"type": "none"
 		}
 	]
 }
