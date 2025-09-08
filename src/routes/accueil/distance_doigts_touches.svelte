@@ -26,7 +26,7 @@
 	plus besoin de bouger les doigts, juste à presser les lettres de la rangée de repos et parfois
 	atteindre la rangée supérieure ou inférieure pour les lettres les moins fréquentes.
 </p>
-<keyboard data-couleur="azerty">
+<keyboard data-color="azerty">
 	<keyboard-row class="center">
 		<keyboard-key data-finger="auriculaire" data-hand="left" style="--size: 1;"
 			><div>Q</div></keyboard-key
@@ -75,7 +75,7 @@
 	l’écriture de chaque mot.
 </p>
 
-<keyboard data-couleur="ergopti">
+<keyboard data-color="ergopti">
 	<keyboard-row class="center">
 		<keyboard-key data-finger="auriculaire" data-hand="left" style="--size: 1;"
 			><div>A</div></keyboard-key
