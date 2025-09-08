@@ -1915,7 +1915,7 @@
 			"Layer": "!⇩",
 			"À": "",
 			",": "j",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "é",
@@ -1937,7 +1937,7 @@
 			"Layer": "!⇧",
 			"À": "ying",
 			",": "jé",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "è",
@@ -1959,7 +1959,7 @@
 			"Layer": "^+⇤",
 			"À": "",
 			",": "z",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "ê",
@@ -1982,7 +1982,7 @@
 			"Layer": "!+⇧",
 			"À": "able",
 			",": "ju",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "ç",
@@ -2003,7 +2003,7 @@
 			"Layer": "",
 			"À": "",
 			",": "",
-			"type": "'french'"
+			"type": "french"
 		},
 		{
 			"key": "%",
