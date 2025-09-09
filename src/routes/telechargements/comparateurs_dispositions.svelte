@@ -37,81 +37,83 @@
 	let variante_kalamine = 'standard';
 </script>
 
-<h2>Fichiers pour les comparateurs de dispositions</h2>
+<section>
+	<h2>Fichiers pour les comparateurs de dispositions</h2>
 
-<h3>KLAnext</h3>
-<p>
-	Pour notamment les utiliser sur le site <a
-		class="link"
-		href="https://klanext.keyboard-design.com/">https://klanext.keyboard-design.com/</a
-	> et ses dérivés.
-</p>
-<tiny-space></tiny-space>
-<div>
-	<span>Version ISO : </span><a
-		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso}.fr.iso.json"
-		download><button>ergopti.v{version_mineure_kla_iso}.fr.iso.json</button></a
-	>
-</div>
-<tiny-space></tiny-space>
-<div>
-	<span>Version ISO+ : </span><a
-		href="/dispositions/iso/ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json"
-		download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
-	>
+	<h3>KLAnext</h3>
 	<p>
-		➜ Il n’y a de loin pas toutes les fonctionnalités de <ErgoptiPlus></ErgoptiPlus> dans ce fichier
-		ISO+, car c’est impossible de les ajouter. Pour pouvoir les prendre en compte, comme l’utilisation
-		de la touche
-		<kbd>★</kbd>, il faudrait nécessairement modifier le corpus utilisé en entrée. Cependant, dans
-		le même temps, cela va fausser toutes les comparaisons avec les autres dispositions. Par
-		conséquent, la version ISO+ contient uniquement le déplacement des touches <kbd>Entrée</kbd>
-		et
-		<kbd>Shift</kbd>, mais cela améliore déjà sensiblement les scores.
+		Pour notamment les utiliser sur le site <a
+			class="link"
+			href="https://klanext.keyboard-design.com/">https://klanext.keyboard-design.com/</a
+		> et ses dérivés.
 	</p>
-</div>
-<tiny-space></tiny-space>
-<div>
-	<span>Version Ergodox : </span><a
-		href="/dispositions/ergodox/ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json"
-		download><button>ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
-	>
-</div>
-
-<h3>Ergo-L</h3>
-<div>
+	<tiny-space></tiny-space>
 	<div>
-		<select bind:value={variante_kalamine} style="height: 2rem">
-			<option value="1dk" selected>1DFH</option>
-			<option value="standard">Standard — Analyse</option>
-		</select>
+		<span>Version ISO : </span><a
+			href="/dispositions/iso/ergopti.v{version_mineure_kla_iso}.fr.iso.json"
+			download><button>ergopti.v{version_mineure_kla_iso}.fr.iso.json</button></a
+		>
 	</div>
 	<tiny-space></tiny-space>
-	<span>Version pour l’analyseur Ergo-L : </span><a
-		href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
-		download
-		><button
-			>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</button
-		></a
-	>
-	<p>
-		À noter que sur <a class="link" href="https://github.com/Nuclear-Squid/ergol"
-			>l’analyseur Ergo-L</a
-		>, les touches assignées à chaque doigt diffèrent. Par exemple, la touche <kbd>À</kbd>
-		est assignée à l’annulaire et non au majeur. Cela entraîne un <SFB />, car la touche
-		<kbd>J</kbd>
-		se retrouve sur le même doigt que la touche <kbd>E</kbd>. Le <kbd>J</kbd> doit normalement être
-		sous le <kbd>U</kbd>. D’où la nécessité de déplacer le <kbd>K</kbd>, qui corrige ce problème,
-		mais qui place alors le
-		<kbd>K</kbd>
-		sous le <kbd>A</kbd> au lieu de sous le <kbd>U</kbd>.
-	</p>
-	<p>
-		En résumé, l’analyse Ergo-L ne sera pas tout à fait avec la vraie disposition, ceci à cause du
-		déplacement du <kbd>K</kbd>. Toutefois, les résultats seront quand même très similaires,
-		peut-être avec un tout petit plus de <SFB></SFB>s sur le <kbd>A</kbd> que dans la réalité, car
-		il y a plus de
-		<kbd-output>KA</kbd-output>
-		que de <kbd-output>KU</kbd-output>.
-	</p>
-</div>
+	<div>
+		<span>Version ISO+ : </span><a
+			href="/dispositions/iso/ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json"
+			download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
+		>
+		<p>
+			➜ Il n’y a de loin pas toutes les fonctionnalités de <ErgoptiPlus></ErgoptiPlus> dans ce fichier
+			ISO+, car c’est impossible de les ajouter. Pour pouvoir les prendre en compte, comme l’utilisation
+			de la touche
+			<kbd>★</kbd>, il faudrait nécessairement modifier le corpus utilisé en entrée. Cependant, dans
+			le même temps, cela va fausser toutes les comparaisons avec les autres dispositions. Par
+			conséquent, la version ISO+ contient uniquement le déplacement des touches <kbd>Entrée</kbd>
+			et
+			<kbd>Shift</kbd>, mais cela améliore déjà sensiblement les scores.
+		</p>
+	</div>
+	<tiny-space></tiny-space>
+	<div>
+		<span>Version Ergodox : </span><a
+			href="/dispositions/ergodox/ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json"
+			download><button>ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
+		>
+	</div>
+
+	<h3>Ergo-L</h3>
+	<div>
+		<div>
+			<select bind:value={variante_kalamine} style="height: 2rem">
+				<option value="1dk" selected>1DFH</option>
+				<option value="standard">Standard — Analyse</option>
+			</select>
+		</div>
+		<tiny-space></tiny-space>
+		<span>Version pour l’analyseur Ergo-L : </span><a
+			href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
+			download
+			><button
+				>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</button
+			></a
+		>
+		<p>
+			À noter que sur <a class="link" href="https://github.com/Nuclear-Squid/ergol"
+				>l’analyseur Ergo-L</a
+			>, les touches assignées à chaque doigt diffèrent. Par exemple, la touche <kbd>À</kbd>
+			est assignée à l’annulaire et non au majeur. Cela entraîne un <SFB />, car la touche
+			<kbd>J</kbd>
+			se retrouve sur le même doigt que la touche <kbd>E</kbd>. Le <kbd>J</kbd> doit normalement
+			être sous le <kbd>U</kbd>. D’où la nécessité de déplacer le <kbd>K</kbd>, qui corrige ce
+			problème, mais qui place alors le
+			<kbd>K</kbd>
+			sous le <kbd>A</kbd> au lieu de sous le <kbd>U</kbd>.
+		</p>
+		<p>
+			En résumé, l’analyse Ergo-L ne sera pas tout à fait avec la vraie disposition, ceci à cause du
+			déplacement du <kbd>K</kbd>. Toutefois, les résultats seront quand même très similaires,
+			peut-être avec un tout petit plus de <SFB></SFB>s sur le <kbd>A</kbd> que dans la réalité, car
+			il y a plus de
+			<kbd-output>KA</kbd-output>
+			que de <kbd-output>KU</kbd-output>.
+		</p>
+	</div>
+</section>

@@ -10,7 +10,7 @@
 	let isCollapsed = true;
 </script>
 
-<div class="main">
+<section class="main">
 	<h1 data-aos="zoom-in">Utiliser <Ergopti></Ergopti></h1>
 	<hr class="margin-h1" />
 
@@ -44,7 +44,7 @@
 			</tbody>
 		</table>
 	{/if}
-</div>
+</section>
 
 <style>
 	table {

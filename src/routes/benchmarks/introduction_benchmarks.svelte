@@ -4,7 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 </script>
 
-<div class="main">
+<section class="main">
 	<h1 data-aos="zoom-in">Benchmarks</h1>
 	<hr class="margin-h1" />
 
@@ -27,4 +27,4 @@
 		> est par exemple très complet, mais nécessite de cloner leur projet GitHub en local et créer un
 		fichier de disposition. Il n’y a pas d’interface graphique simple comme KLAnext par exemple.
 	</p>
-</div>
+</section>
