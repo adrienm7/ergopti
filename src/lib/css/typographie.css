@@ -13,17 +13,9 @@ ul,
 }
 
 .ergopti-title {
-	-webkit-background-clip: text;
-	background-clip: text;
-	font-size: 2.5rem;
-	line-height: 1;
+	line-height: 0.95;
 	margin: 7vh 0;
 	z-index: 2;
-	-webkit-text-fill-color: transparent;
-	background-image: linear-gradient(to bottom, white, rgb(155, 155, 155));
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
-	color: transparent;
 }
 
 .encart-introduction {

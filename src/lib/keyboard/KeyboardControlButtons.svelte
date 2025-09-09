@@ -24,7 +24,7 @@
 		// Permet de mettre à jour les données du clavier en fonction des contrôles
 		clavier.data_clavier.update((currentData) => {
 			currentData['type'] = event.detail.type;
-			currentData['couleur'] = event.detail.couleur;
+			currentData['color'] = event.detail.color;
 			currentData['plus'] = event.detail.plus;
 			currentData['layer'] = event.detail.layer;
 			return currentData;
@@ -38,28 +38,28 @@
 		on:message={handleMessage}
 		layerValue={keyboardConfiguration.layer}
 		typeValue={keyboardConfiguration.type}
-		couleurValue={keyboardConfiguration.couleur}
+		colorValue={keyboardConfiguration.color}
 		plusValue={keyboardConfiguration.plus}
 	/>
 	<ChangementPlus
 		on:message={handleMessage}
 		layerValue={keyboardConfiguration.layer}
 		typeValue={keyboardConfiguration.type}
-		couleurValue={keyboardConfiguration.couleur}
+		colorValue={keyboardConfiguration.color}
 		plusValue={keyboardConfiguration.plus}
 	/>
 	<ChangementCouleur
 		on:message={handleMessage}
 		layerValue={keyboardConfiguration.layer}
 		typeValue={keyboardConfiguration.type}
-		couleurValue={keyboardConfiguration.couleur}
+		colorValue={keyboardConfiguration.color}
 		plusValue={keyboardConfiguration.plus}
 	/>
 	<ChangementCouche
 		on:message={handleMessage}
 		layerValue={keyboardConfiguration.layer}
 		typeValue={keyboardConfiguration.type}
-		couleurValue={keyboardConfiguration.couleur}
+		colorValue={keyboardConfiguration.color}
 		plusValue={keyboardConfiguration.plus}
 	/>
 </keyboard-controls>

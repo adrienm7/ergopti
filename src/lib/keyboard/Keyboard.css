@@ -5,13 +5,16 @@
 */
 
 keyboard {
+	--keyboard-width: 0.75;
+	--keyboard-padding: clamp(7px, calc(100vw / 70), 50px);
+	--keyboard-border-radius: var(--keyboard-padding);
 	background-color: hsla(208, 100%, 10%, 0.7);
 	border: 1px solid hsla(225, 100%, 8%, 0.8);
-	border-radius: 13px; /* Radius of the keyboard rectangle */
+	border-radius: var(--keyboard-border-radius);
 	box-shadow: rgba(255, 255, 255, 0.8) 0px 1px 4px;
 	display: block;
 	margin: 0 auto; /* Center horizontally */
-	padding: 20px; /* Space between the keyboard outer rectangle and the keyboard content */
+	padding: var(--keyboard-padding);
 	width: max-content;
 }
 
@@ -72,11 +75,11 @@ keyboard-key {
 }
 
 keyboard-key {
-	--key-size: min(47px, 100vw / 20);
-	--key-margin: min(3px, 0.35vw);
+	--key-size: calc(100vw / 20 * var(--keyboard-width));
+	--key-margin: calc(0.28vw * var(--keyboard-width));
 
-	--key-depth: 1.75px;
-	--key-pressed-depth: 0.75px;
+	--key-depth: 2px;
+	--key-pressed-depth: 1px;
 	--key-pressed-depth-change: calc(var(--key-depth) - var(--key-pressed-depth));
 
 	--key-shadow: rgba(0, 0, 0, 0.3) 5px 3px 5px;
@@ -92,7 +95,7 @@ keyboard-key {
 		var(--key-color-luminosity),
 		30%
 	);
-	--key-border-radius: 0.17em;
+	--key-border-radius: calc(var(--keyboard-border-radius) / 5);
 	--key-border-size: 1px;
 	--key-text-size: calc(var(--key-size) / 2.5);
 
@@ -116,6 +119,13 @@ keyboard-key {
 		rgb(0, 0, 0) 0px 0 6px,
 		rgba(0, 0, 0, 0.5) 0px 0 12px;
 	width: calc(var(--key-size) * var(--size) - 2 * var(--key-margin));
+}
+
+@media (max-width: 450px) {
+	keyboard-key {
+		--key-depth: 1px;
+		--key-pressed-depth: 0.5px;
+	}
 }
 
 keyboard-key:active,
@@ -487,13 +497,13 @@ keyboard[data-type='iso'] keyboard-key[data-key='Option'] {
 }
 
 keyboard[data-type='ergodox'] keyboard-key[data-key='RAlt'] {
-	font-size: 0.65em;
+	font-size: calc(var(--key-text-size) * 0.65);
 	font-weight: normal;
 }
 
 keyboard-key[data-key='BackSpace'],
 keyboard-key[data-key='Delete'] {
-	font-size: 0.85em;
+	font-size: calc(var(--key-text-size) * 0.85);
 }
 
 keyboard-key[data-key='RShift'],
@@ -503,45 +513,45 @@ keyboard-key[data-key='LShift'] {
 
 /* Key appearing on the Ergodox layout */
 keyboard-key[data-key='AltTab'] {
-	font-size: 0.7em;
+	font-size: calc(var(--key-text-size) * 0.7);
 	line-height: 1.15;
 }
 
 /* Smaller font for keys [qu] and [où] */
 keyboard[data-plus='yes'][data-layer='Primary'] keyboard-key[data-key='q'],
 keyboard[data-plus='yes'][data-layer='AltGr'] keyboard-key[data-key='w'] {
-	font-size: 0.9em;
+	font-size: calc(var(--key-text-size) * 0.9);
 }
 keyboard[data-plus='yes'][data-layer='Visuel'] keyboard-key[data-key='q'],
 keyboard[data-plus='yes'][data-layer='Shift'] keyboard-key[data-key='q'],
 keyboard[data-plus='yes'][data-layer='ShiftAltGr'] keyboard-key[data-key='w'] {
-	font-size: 0.85em;
+	font-size: calc(var(--key-text-size) * 0.85);
 }
 
 /* Smaller font for Win + V */
 keyboard[data-layer='Layer'] keyboard-key[data-key='Coller'] {
-	font-size: 0.85em;
+	font-size: calc(var(--key-text-size) * 0.85);
 }
 
 /* Smaller font in , layer to prevent keys with 2 symbols to overflow */
 keyboard[data-layer=','] keyboard-key:not([data-type='special']):not([data-type='enter']) {
-	font-size: 0.9em;
+	font-size: calc(var(--key-text-size) * 0.9);
 }
 
 /* Smaller font in À layer to prevent keys with 4 symbols to overflow */
 keyboard[data-layer='À'] keyboard-key:not([data-type='special']):not([data-type='enter']) {
-	font-size: 0.7em;
+	font-size: calc(var(--key-text-size) * 0.7);
 }
 
 /* Smaller font in navigation layer to prevent keys with 3 symbols to overflow */
 keyboard[data-layer='Layer']
 	keyboard-key:not([data-finger='thumb']):not([data-type='special']):not([data-type='enter']) {
-	font-size: 0.8em;
+	font-size: calc(var(--key-text-size) * 0.8);
 }
 
 /* Label "Layer" overflows otherwise */
 keyboard[data-layer='Layer'][data-type='ergodox'] keyboard-key[data-key='Space'] {
-	font-size: 0.65em;
+	font-size: calc(var(--key-text-size) * 0.65);
 }
 
 /* Smaller CapsLock symbol */
@@ -580,12 +590,12 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 /* === 3 main keyboards === */
 
 #keyboard_reference {
-	--keyboard-width: 0.6;
+	--keyboard-width: 0.85;
 }
 
 #keyboard_presentation,
 #keyboard_presentation_plus {
-	--keyboard-width: 0.55;
+	--keyboard-width: 0.8;
 }
 
 @media (max-width: 700px) {
@@ -594,13 +604,6 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 	#keyboard_presentation_plus {
 		--keyboard-width: 0.9;
 	}
-}
-
-#keyboard_reference keyboard-key,
-#keyboard_presentation keyboard-key,
-#keyboard_presentation_plus keyboard-key {
-	--key-size: calc(var(--keyboard-width) * 100vw / 15);
-	--key-margin: calc(var(--keyboard-width) * 0.34vw);
 }
 
 /* === keyboard_controle and keyboard_raccourcis_ergodox === */

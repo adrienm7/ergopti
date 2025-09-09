@@ -26,10 +26,12 @@
 	}
 </script>
 
-<button on:click={togglePlus}>
-	{#if plusValue === 'yes'}
-		{@html '<p><span class="hyper">Plus</span>&nbsp;➜ Standard</p>'}
-	{:else}
-		{@html '<p>Standard ➜&nbsp;<span class="hyper" style = "padding:0; margin:0">Plus</span></p>'}
-	{/if}
-</button>
+<keyboard-control-plus>
+	<button on:click={togglePlus}>
+		{#if plusValue === 'yes'}
+			{@html '<p><span class="hyper">Plus</span>&nbsp;➜ Standard</p>'}
+		{:else}
+			{@html '<p>Standard ➜&nbsp;<span class="hyper" style = "padding:0; margin:0">Plus</span></p>'}
+		{/if}
+	</button>
+</keyboard-control-plus>
