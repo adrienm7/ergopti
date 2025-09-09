@@ -4,28 +4,30 @@
 
 	export let typeValue;
 	export let layerValue;
-	export let couleurValue;
+	export let colorValue;
 	export let plusValue;
 
 	function toggleCouleur() {
-		if (couleurValue === 'yes') {
-			couleurValue = 'no';
+		if (colorValue === 'yes') {
+			colorValue = 'no';
 		} else {
-			couleurValue = 'yes';
+			colorValue = 'yes';
 		}
 		dispatch('message', {
 			type: typeValue,
 			layer: layerValue,
-			couleur: couleurValue,
+			color: colorValue,
 			plus: plusValue
 		});
 	}
 </script>
 
-<button on:click={toggleCouleur}>
-	{#if couleurValue === 'yes'}
-		{@html '<p><span class="couleur-text-gradient">Couleur</span>&nbsp;➜ Bicolor</p>'}
-	{:else}
-		{@html '<p>Bicolor ➜&nbsp;<span class="couleur-text-gradient">Couleur</span></p>'}
-	{/if}
-</button>
+<keyboard-control-color>
+	<button on:click={toggleCouleur}>
+		{#if colorValue === 'yes'}
+			{@html '<p><span class="color-text-gradient">Couleur</span>&nbsp;➜ Bicolor</p>'}
+		{:else}
+			{@html '<p>Bicolor ➜&nbsp;<span class="color-text-gradient">Couleur</span></p>'}
+		{/if}
+	</button>
+</keyboard-control-color>

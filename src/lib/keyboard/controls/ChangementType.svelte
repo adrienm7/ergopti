@@ -22,10 +22,12 @@
 	}
 </script>
 
-<button on:click={toggleType}>
-	{#if typeValue === 'ergodox'}
-		{@html '<p><span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
-	{:else}
-		{@html '<p>ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
-	{/if}
-</button>
+<keyboard-control-type>
+	<button on:click={toggleType}>
+		{#if typeValue === 'ergodox'}
+			{@html '<p><span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>'}
+		{:else}
+			{@html '<p>ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span></p>'}
+		{/if}
+	</button>
+</keyboard-control-type>

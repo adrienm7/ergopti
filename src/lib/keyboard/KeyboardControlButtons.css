@@ -1,24 +1,19 @@
-keyboard-controls button a {
-	color: inherit;
-	text-decoration: none;
+keyboard-controls button,
+keyboard-controls keyboard-control-layer::before {
+	background-color: rgba(0, 14, 26, 0.7);
+}
+
+keyboard-controls {
+	--button-radius: 7px;
+	display: flex;
+	font-size: 0.75rem;
+	margin: 0 auto;
+	width: fit-content; /* To center the controls */
 }
 
 keyboard-controls button:hover {
 	background-color: white;
-	color: rgba(0, 0, 0, 0.8);
-}
-
-keyboard-controls {
-	--arrondi-bouton: 7px;
-	display: flex;
-	font-size: 0.75rem;
-	margin: 0 auto;
-	width: fit-content; /* Pour centrer */
-}
-
-keyboard-controls > :first-child {
-	border-left: 2px solid rgba(255, 255, 255, 0.8);
-	border-radius: var(--arrondi-bouton) 0 0 var(--arrondi-bouton);
+	color: black;
 }
 
 keyboard-controls button,
@@ -29,22 +24,50 @@ keyboard-controls select {
 	border-right: 0;
 	color: white;
 	cursor: pointer;
+	height: 3em;
 	padding: 10px;
 }
-@media (max-width: 450px) {
-	keyboard-controls p {
-		width: min-content;
-	}
+
+keyboard-control-type button {
+	border-left: 2px solid rgba(255, 255, 255, 0.8);
+	border-radius: var(--button-radius) 0 0 var(--button-radius);
 }
 
-keyboard-controls select {
+/*
+===================================
+======= Text in the buttons =======
+===================================
+*/
+
+.ergodox-text-gradient {
+	background: linear-gradient(to top, #128500 0%, #1aff00 70%);
+}
+
+.color-text-gradient {
+	background: linear-gradient(to top, rgb(255, 47, 0) 0%, rgb(255, 174, 0) 70%);
+}
+
+keyboard-control-layer select {
+	background: linear-gradient(to top, #600074 20%, #d400ff 30%);
+}
+
+.ergodox-text-gradient,
+.color-text-gradient,
+keyboard-control-layer select {
 	background-clip: text;
 	-webkit-background-clip: text;
-	background-image: linear-gradient(to top, #600074 20%, #d400ff 30%);
-	border: none;
-	border: 0;
-	border-radius: 0 var(--arrondi-bouton) var(--arrondi-bouton) 0;
 	color: transparent;
+}
+
+/*
+======================
+======= Select =======
+======================
+*/
+
+keyboard-controls select {
+	border: 0;
+	border-radius: 0 var(--button-radius) var(--button-radius) 0;
 	font-family: inherit;
 	height: 100%;
 	line-height: 1.3;
@@ -57,15 +80,14 @@ keyboard-controls select option {
 	font-family: inherit;
 }
 
-.select-degrade {
+keyboard-control-layer {
 	border: 2px solid white;
-	border-radius: 0 var(--arrondi-bouton) var(--arrondi-bouton) 0;
+	border-radius: 0 var(--button-radius) var(--button-radius) 0;
 	position: relative !important;
 }
 
-.select-degrade::before {
-	background-color: rgba(0, 0, 0, 0.5);
-	border-radius: 0 calc(var(--arrondi-bouton) - 3px) calc(var(--arrondi-bouton) - 3px) 0;
+keyboard-control-layer::before {
+	border-radius: 0 calc(var(--button-radius) - 3px) calc(var(--button-radius) - 3px) 0;
 	content: '';
 	height: 100%;
 	left: 0;
@@ -74,15 +96,8 @@ keyboard-controls select option {
 	width: 100%;
 	z-index: 0;
 }
-.select-degrade:hover::before {
-	background-color: white;
-}
 
-.select-degrade:hover::after {
-	color: black;
-}
-
-.select-degrade::after {
+keyboard-control-layer::after {
 	color: white;
 	content: '▼';
 	position: absolute;
@@ -90,12 +105,26 @@ keyboard-controls select option {
 	top: 35%;
 }
 
-/* Cas où le fond est blanc */
+keyboard-control-layer:hover::before {
+	background-color: white;
+}
+
+keyboard-control-layer:hover::after {
+	color: black;
+}
+
+/*
+===================
+======= Old =======
+===================
+*/
+
+/* When the background is white */
 
 /* section keyboard-controls button,
 section keyboard-controls select {
-	color: #333;
 	border: 2px solid rgba(0, 0, 0, 0.8);
+	color: #333;
 }
 
 section keyboard-controls > :first-child {
@@ -115,21 +144,3 @@ section keyboard-controls button:hover {
 	background-color: rgb(0, 0, 0);
 	color: rgba(255, 255, 255, 0.8);
 } */
-
-/* Couleur du texte des boutons */
-
-.ergodox-text-gradient {
-	background: linear-gradient(to top, #128500 0%, #1aff00 70%);
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	line-height: 1.1em;
-}
-
-.couleur-text-gradient {
-	background: linear-gradient(to top, rgb(255, 47, 0) 0%, rgb(255, 174, 0) 70%);
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	line-height: 1.1em;
-}
