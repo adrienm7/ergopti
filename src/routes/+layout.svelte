@@ -10,7 +10,7 @@
 	import DispositionPlus from './accueil/ergopti_plus.svelte';
 
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import KeyboardControlButtons from '$lib/keyboard/KeyboardControlButtons.svelte';
+	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
 
 	import 'modern-normalize';
 
@@ -24,8 +24,6 @@
 	import { makeIds } from '$lib/js/make-ids.js';
 	import tocbot from 'tocbot';
 	import '$lib/css/tocbot.css';
-
-	import '$lib/keyboard/Keyboard.css';
 
 	import '$lib/css/global.css';
 	import '$lib/css/layout.css';
@@ -154,7 +152,7 @@
 		<div class="conteneur">
 			<KeyboardBasis name="reference" />
 			<tiny-space></tiny-space>
-			<KeyboardControlButtons name="reference" />
+			<KeyboardControls name="reference" />
 		</div>
 	</clavier-reference>
 </keyboard-reference>

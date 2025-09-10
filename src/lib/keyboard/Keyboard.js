@@ -1,6 +1,6 @@
 import * as stores_infos from '$lib/stores_infos.js';
 
-import characterFrequencies from '$lib/keyboard/characterFrequencies.json'; // Data coming from https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en%2Bfr.json
+import characterFrequencies from '$lib/keyboard/data/characterFrequencies.json'; // Data coming from https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en%2Bfr.json
 // Create the "max" and "min" keys containing the maximum value among the frequencies (the frequency of E) and the minimum value
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
 characterFrequencies.min = Math.min(...Object.values(characterFrequencies));
@@ -24,11 +24,8 @@ export class Keyboard {
 			this.version = value;
 		});
 
-		// Enable modification of the keyboard data in the store
-		this.data_clavier = stores_infos[this.id];
-
 		// Subscribe to the store to receive real-time updates of the keyboard configuration
-		this.data_clavier.subscribe((value) => {
+		stores_infos[this.id].subscribe((value) => {
 			this.keyboardConfiguration = value;
 		});
 
@@ -237,7 +234,7 @@ export class Keyboard {
 
 		// Override the Space key content to also show the name of the layout
 		const plusSymbol = plus
-			? '<span class="glow" style = "position:relative; top:-0.5px; margin-left:0.1em">+</span>'
+			? '<span class="glow" style = "position:relative; margin-left:0.1em">+</span>'
 			: '';
 		if (type === 'iso' && layer === 'Visuel' && keyName === 'Space') {
 			key.innerHTML = this.layoutData['name'] + plusSymbol;
@@ -400,7 +397,7 @@ export class Keyboard {
 		// Most keys pressed won’t change the layer, as only some modifiers and deadkeys defined in this code do
 		// Then, the layer variable is updated, and finally the keyboard
 		if (newLayer !== layer) {
-			this.data_clavier.update((currentData) => {
+			stores_infos[this.id].update((currentData) => {
 				currentData['layer'] = newLayer;
 				return currentData;
 			});

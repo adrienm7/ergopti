@@ -3,8 +3,7 @@
 	import { KeyboardEmulation } from '$lib/keyboard/KeyboardEmulation.js';
 	import { onMount } from 'svelte';
 
-	let inputBox = '';
-	let keyboard = new KeyboardEmulation('emulation');
+	const keyboard = new KeyboardEmulation('emulation');
 	onMount(() => {
 		keyboard.textarea = document.getElementById('input-text');
 		keyboard.updateKeyboard();
@@ -15,15 +14,13 @@
 
 <tiny-space></tiny-space>
 
-<div style="margin: 0 auto; width: 100%;">
-	<textarea
-		id="input-text"
-		placeholder="Écrivez ici"
-		bind:value={inputBox}
-		on:keydown={keyboard.emulateKey}
-		on:keyup={keyboard.releaseKey}
-	/>
-</div>
+<textarea
+	id="input-text"
+	placeholder="Tapez ici"
+	on:keydown={keyboard.emulateKey}
+	on:keyup={keyboard.releaseKey}
+>
+</textarea>
 
 <style>
 	#input-text {
@@ -31,9 +28,7 @@
 		border: none;
 		border-radius: 5px;
 		color: rgba(255, 255, 255, 0.9);
-		display: block;
 		height: 200px;
-		margin: 0 auto;
 		padding: 15px;
 		resize: none;
 		width: 100%;

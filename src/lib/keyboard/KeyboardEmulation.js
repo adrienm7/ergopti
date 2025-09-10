@@ -1,5 +1,6 @@
+import * as stores_infos from '$lib/stores_infos.js';
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
-import magicReplacements from '$lib/keyboard/magicReplacements.json';
+import magicReplacements from '$lib/keyboard/data/magicReplacements.json';
 
 export class KeyboardEmulation extends Keyboard {
 	constructor(id) {
@@ -20,7 +21,7 @@ export class KeyboardEmulation extends Keyboard {
 			',': false
 		};
 
-		// The scope of "this" is changed in the text input otherwise, and this.layoutData becomes undefined. This prevents this problem
+		// We use bind here is because otherwise the scope of "this" is changed in the text input and this.layoutData becomes undefined
 		this.emulateKey = this.emulateKey.bind(this);
 		this.releaseKey = this.releaseKey.bind(this);
 	}
@@ -46,52 +47,48 @@ export class KeyboardEmulation extends Keyboard {
 			{ cond: this['activeLayers'][','], value: ',' }
 		];
 		const match = priorities.find((p) => p.cond);
-		this['layer'] = match ? match.value : 'Primary';
+		this['layer'] = match ? match.value : 'Primary'; // If no match, use default value Primary
 
 		// Update the layer in the store
-		this.data_clavier.update((currentData) => {
+		stores_infos[this.id].update((currentData) => {
 			currentData['layer'] = this['layer'];
 			return currentData;
 		});
+		// Update the visual keyboard to show the new layer
 		this.updateKeyboard();
 	}
 
 	emulateKey(event) {
-		const activeModifier = this.determineActiveModifier(event); // Activate potential modifier
+		const activeModifier = this.determineActiveModifier(event); // Determine if the key pressed is a modifier
 		if (activeModifier) {
-			this['activeLayers'][activeModifier] = true;
+			this['activeLayers'][activeModifier] = true; // Set the modifier state to active
 			this.layerUpdate();
 			if (this.keyboardConfiguration['plus'] === 'yes' && activeModifier === 'Alt') {
 				this.sendResult('BackSpace');
 			}
 			// If a modifier has been pressed, no key to send right now, so we exit the function
-			// It is only on the next key pressed that isn’t a modifier that will give the result of this key on the new layer
+			// It is only on the next key pressed that isn’t a modifier that the result of this key on the new layer will be given
 			return;
 		}
 
 		// Do not intercept shortcuts with Ctrl
 		if (this['activeLayers']['Ctrl'] && !this['activeLayers']['AltGr']) {
 			// Note: when this["AltGr"] is active, Ctrl is also active, hence the "&& !this["AltGr"]"
+
+			// Ctrl + key gives Ctrl + key emulation: Doesn’t work yet, may not be possible due to security reasons
+			/*
+            const ctrlEvent = new KeyboardEvent('keydown', {
+				key: 'KeyA', // keyContent.touche,
+				ctrlKey: true, // Spécifie que la touche Ctrl est enfoncée
+				bubbles: true,
+				cancelable: true
+			});
+			this.textarea.dispatchEvent(ctrlEvent);
+            */
 			return;
 		}
-		/* Ctrl + touche renvoie Ctrl + émulation de touche */
-		/* Ne fonctionne pas actuellement */
-		// if (this["Ctrl"] & !this["AltGr"]) {
-		// 	// Attention, quand this["AltGr"] est activé, Ctrl l’est aussi, d’où le &
-		// 	console.log(keyContent.touche);
-		// 	// Crée un nouvel événement clavier pour "Ctrl + lettre".
-		// 	const ctrlEvent = new KeyboardEvent('keydown', {
-		// 		key: keyContent.touche,
-		// 		ctrlKey: true, // Spécifie que la touche Ctrl est enfoncée
-		// 		bubbles: true,
-		// 		cancelable: true
-		// 	});
-		// 	// Envoie l'événement au même input
-		// 	this.textarea.dispatchEvent(ctrlEvent);
-		// 	return true;
-		// }
 
-		// If a key other than a modifier has been pressed
+		// If a key other than a modifier was pressed
 		const keyCodePressed = event.code;
 		const keyIdentifier = this.layoutData[this.keyboardConfiguration.type].find(
 			(el) => el['code'] === keyCodePressed
@@ -102,53 +99,16 @@ export class KeyboardEmulation extends Keyboard {
 			event.preventDefault(); // Don’t send the key defined in the computer keyboard layout
 			const keyContent = this.layoutData['keys'].find((el) => el['key'] === keyIdentifier['key']);
 
-			const activeDeadKey = this.determineActiveDeadKey(keyContent); // Activate potential dead key
+			const activeDeadKey = this.determineActiveDeadKey(keyContent); // Activate a potential dead key
 			if (activeDeadKey) {
 				this['activeLayers'][activeDeadKey] = true;
 				this.layerUpdate();
 				return;
 			}
 
-			const [resultToSend, charactersToDelete] = this.getResultToSend(keyContent);
+			const [resultToSend, charactersToDelete] = this.getResultToSendFinal(keyContent);
 			this.sendResult(resultToSend, charactersToDelete);
 		}
-	}
-
-	determineActiveModifier(event) {
-		if (event.code === 'AltRight' || event.code === 'AltGraph') {
-			return 'AltGr';
-		} else if (
-			event.code === 'ShiftLeft' ||
-			event.code === 'ShiftRight' ||
-			(event.code === 'ControlRight' && this.keyboardConfiguration['plus'] === 'yes')
-		) {
-			return 'Shift';
-		} else if (event.code === 'AltLeft') {
-			return 'Alt';
-		} else if (
-			event.code === 'ControlLeft' ||
-			(event.code === 'ControlRight' && this.keyboardConfiguration['plus'] === 'no')
-		) {
-			return 'Ctrl';
-		}
-		return false;
-	}
-
-	determineActiveDeadKey(keyContent) {
-		const keyPressed = this.getKeyToSend(keyContent);
-		const deadKeys = {
-			'◌̂': 'Circonflexe',
-			'◌̈': 'Trema',
-			ᵉ: 'Exposant',
-			ᵢ: 'Indice',
-			ℝ: 'R'
-		};
-		const ActiveDeadKey = deadKeys[keyPressed];
-		if (ActiveDeadKey) {
-			this['activeLayers'][ActiveDeadKey] = true;
-			return ActiveDeadKey;
-		}
-		return false;
 	}
 
 	pressKey(key) {
@@ -157,9 +117,9 @@ export class KeyboardEmulation extends Keyboard {
 		const pressedKeys = keyboardLocation.querySelectorAll('.pressed-key');
 		[].forEach.call(pressedKeys, function (el) {
 			if (
-				el.dataset.type !== 'special' ||
-				el.dataset.key === 'BackSpace' ||
-				el.dataset.key === 'Tab'
+				el.dataset['type'] !== 'special' ||
+				el.dataset['key'] === 'BackSpace' ||
+				el.dataset['key'] === 'Tab'
 			) {
 				el.classList.remove('pressed-key');
 			}
@@ -171,7 +131,39 @@ export class KeyboardEmulation extends Keyboard {
 			.classList.add('pressed-key');
 	}
 
-	getKeyToSend(keyContent) {
+	determineActiveModifier(event) {
+		const plus = this.keyboardConfiguration['plus'] === 'yes';
+
+		if (event.code === 'AltRight' || event.code === 'AltGraph') {
+			return 'AltGr';
+		} else if (
+			event.code === 'ShiftLeft' ||
+			event.code === 'ShiftRight' ||
+			(plus && event.code === 'ControlRight')
+		) {
+			return 'Shift';
+		} else if (event.code === 'AltLeft') {
+			return 'Alt';
+		} else if (event.code === 'ControlLeft' || (!plus && event.code === 'ControlRight')) {
+			return 'Ctrl';
+		}
+
+		return false;
+	}
+
+	determineActiveDeadKey(keyContent) {
+		const keyPressed = this.getResultToSend(keyContent);
+		const deadKeys = {
+			'◌̂': 'Circonflexe',
+			'◌̈': 'Trema',
+			ᵉ: 'Exposant',
+			ᵢ: 'Indice',
+			ℝ: 'R'
+		};
+		return deadKeys[keyPressed];
+	}
+
+	getResultToSend(keyContent) {
 		let resultToSend = '';
 		if (this.keyboardConfiguration['plus'] === 'yes') {
 			if (keyContent[this['layer'] + '+'] !== undefined) {
@@ -185,9 +177,10 @@ export class KeyboardEmulation extends Keyboard {
 		return resultToSend;
 	}
 
-	getResultToSend(keyContent) {
+	getResultToSendFinal(keyContent) {
+		const plus = this.keyboardConfiguration['plus'] === 'yes';
 		const keyPressed = keyContent['key'];
-		let resultToSend = this.getKeyToSend(keyContent);
+		let resultToSend = this.getResultToSend(keyContent);
 		let charactersToDelete = 0;
 
 		// If a dead key or assimilated is currently activated, it needs to be deactivated now that we send the character present on it
@@ -216,8 +209,7 @@ export class KeyboardEmulation extends Keyboard {
 			resultToSend = 'BackSpace';
 		} else if (
 			this['activeLayers']['Ctrl'] &&
-			(keyPressed === 'BackSpace' ||
-				(this.keyboardConfiguration['plus'] === 'yes' && keyPressed === 'LAlt'))
+			(keyPressed === 'BackSpace' || (plus && keyPressed === 'LAlt'))
 		) {
 			resultToSend = 'Ctrl-BackSpace';
 		} else if (
@@ -227,15 +219,10 @@ export class KeyboardEmulation extends Keyboard {
 			resultToSend = 'Ctrl-Delete';
 		} else if (
 			keyPressed === 'Delete' ||
-			(this.keyboardConfiguration['plus'] === 'yes' &&
-				this['activeLayers']['Shift'] &&
-				keyPressed === 'LAlt')
+			(plus && this['activeLayers']['Shift'] && keyPressed === 'LAlt')
 		) {
 			resultToSend = 'Delete';
-		} else if (
-			keyPressed === 'Enter' ||
-			(this.keyboardConfiguration['plus'] === 'yes' && keyPressed === 'CapsLock')
-		) {
+		} else if (keyPressed === 'Enter' || (plus && keyPressed === 'CapsLock')) {
 			resultToSend = 'Enter';
 		}
 		return [resultToSend, charactersToDelete];
@@ -351,7 +338,24 @@ export class KeyboardEmulation extends Keyboard {
 			[/yè/g, 'éi'],
 			[/èy/g, 'ié'],
 			[/hc/g, 'wh'],
-			[/p'/g, 'ct']
+			[/sx/g, 'sk'],
+			[/cx/g, 'ck'],
+			[/eé/g, 'eé'],
+			[/p'/g, 'ct'],
+			[/<@/g, '</'],
+			[/<%/g, '<='],
+			[/>%/g, '>='],
+			[/#!/g, ' := '],
+			[/!#/g, ' != '],
+			[/\(#/g, '("'],
+			[/\[#/g, '["'],
+			[/\[\)/g, ' = ""'],
+			[/\\\"/g, '/*'],
+			[/\"\\/g, '*\\'],
+			[/$=/g, ' => '],
+			[/=$/g, ' <= '],
+			[/+?/g, ' -> '],
+			[/?+/g, ' <- ']
 		];
 
 		const replacementsDeadKeyECirc = [
