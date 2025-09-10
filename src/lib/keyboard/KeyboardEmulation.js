@@ -352,10 +352,10 @@ export class KeyboardEmulation extends Keyboard {
 			[/\[\)/g, ' = ""'],
 			[/\\\"/g, '/*'],
 			[/\"\\/g, '*\\'],
-			[/$=/g, ' => '],
-			[/=$/g, ' <= '],
-			[/+?/g, ' -> '],
-			[/?+/g, ' <- ']
+			[/\$=/g, ' => '],
+			[/=\$/g, ' <= '],
+			[/\+\?/g, ' -> '],
+			[/\?\+/g, ' <- ']
 		];
 
 		const replacementsDeadKeyECirc = [
