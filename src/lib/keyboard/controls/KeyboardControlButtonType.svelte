@@ -2,10 +2,10 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
 
-	export let typeValue;
-	export let layerValue;
-	export let couleurValue;
 	export let plusValue;
+	export let typeValue;
+	export let colorValue;
+	export let layerValue;
 
 	function toggleType() {
 		if (typeValue === 'iso') {
@@ -14,10 +14,10 @@
 			typeValue = 'iso';
 		}
 		dispatch('message', {
+			plus: plusValue,
 			type: typeValue,
-			layer: layerValue,
-			couleur: couleurValue,
-			plus: plusValue
+			color: colorValue,
+			layer: layerValue
 		});
 	}
 </script>

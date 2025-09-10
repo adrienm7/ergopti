@@ -12,12 +12,6 @@ ul,
 	}
 }
 
-.ergopti-title {
-	line-height: 0.95;
-	margin: 7vh 0;
-	z-index: 2;
-}
-
 .encart-introduction {
 	line-height: 1.35rem;
 	margin: 0 auto;
@@ -129,27 +123,6 @@ a:has(button) {
 }
 .text-black {
 	color: black;
-}
-
-.surlignage-blanc {
-	background-color: white;
-	border-radius: 0.2em;
-	color: black;
-	padding: 0 0.3em;
-}
-
-.font-size-big {
-	font-size: 3.5rem;
-}
-
-.font-size-medium {
-	font-size: 1.7rem;
-}
-
-@media (max-width: 600px) {
-	.font-size-medium {
-		font-size: 1.5rem;
-	}
 }
 
 /* Correction d’un bug d’affichage entre SFB et s dans l’introduction de la page d’accueil */

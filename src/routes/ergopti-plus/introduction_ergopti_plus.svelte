@@ -14,9 +14,9 @@
 				><ErgoptiPlus></ErgoptiPlus></span
 			>
 		</h1>
-		<KeyboardBasis name="presentation_plus" />
+		<KeyboardBasis id="presentation_plus" />
 		<tiny-space></tiny-space>
-		<KeyboardControls name="presentation_plus" />
+		<KeyboardControls id="presentation_plus" />
 	</div>
 
 	<small-space></small-space>

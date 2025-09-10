@@ -68,5 +68,5 @@
 		les suffixes les plus communs,
 		<span class="important">entraînant une augmentation de vitesse</span>.
 	</p>
-	<KeyboardBasis name="a" />
+	<KeyboardBasis id="a" />
 </section>

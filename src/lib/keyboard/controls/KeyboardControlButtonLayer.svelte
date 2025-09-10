@@ -2,10 +2,10 @@
 	import { createEventDispatcher } from 'svelte';
 	const dispatch = createEventDispatcher();
 
-	export let typeValue;
-	export let layerValue;
-	export let couleurValue;
 	export let plusValue;
+	export let typeValue;
+	export let colorValue;
+	export let layerValue;
 
 	let couches_standard = [
 		['Visuel', 'Visuel'],
@@ -33,10 +33,10 @@
 	function toggleCouche(nouvelleCouche) {
 		layerValue = nouvelleCouche;
 		dispatch('message', {
+			plus: plusValue,
 			type: typeValue,
-			layer: layerValue,
-			couleur: couleurValue,
-			plus: plusValue
+			color: colorValue,
+			layer: layerValue
 		});
 	}
 </script>

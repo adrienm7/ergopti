@@ -5,7 +5,7 @@
 
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 	import { Keyboard } from '$lib/keyboard/Keyboard.js';
-	let clavier = new Keyboard('roulements');
+	const keyboard = new Keyboard('roulements');
 
 	let texte;
 	let roulements_voyelles = [
@@ -138,18 +138,17 @@
 
 	<h3>Visualisation des roulements</h3>
 	<p>Vous pouvez visualiser les roulements présentés précédemment ci-dessous :</p>
-	<KeyboardBasis name="roulements" />
+	<KeyboardBasis id="roulements" />
 	<div style="height: 20px" />
-	<controles-roulements
-		class="btn-group"
+	<keyboard-control-rolls
 		style="width: 100%; margin: 0 auto; display: inline-block; text-align: center"
 	>
-		<select bind:value={texte} on:change={() => clavier.typeText(texte, 250, false)}>
+		<select bind:value={texte} on:change={() => keyboard.typeText(texte, 250, false)}>
 			<option selected disabled hidden>Sélectionner le roulement</option>
 			<option disabled>• Roulements voyelles •</option>
 			{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}
 			<option disabled>• Roulements consonnes •</option>
 			{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
 		</select>
-	</controles-roulements>
+	</keyboard-control-rolls>
 </section>

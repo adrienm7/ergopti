@@ -9,15 +9,10 @@
 
 	<h3>Version 2.2 (Septembre 2025)</h3>
 	<p>
-		Le changement le plus visible d’<Ergopti></Ergopti> v2.2 est l’interversion de la touche
-		<kbd>€</kbd>
-		avec la touche <kbd>%</kbd> sur la rangée des chiffres. Celle-ci a été réalisée car le
-		<kbd>%</kbd>
-		est beaucoup plus fréquemment utilisé que le <kbd>€</kbd>, que ce soit dans la vie quotidienne
-		ou en programmation. Ainsi, il fallait que la touche la plus facile d’accès des deux (celle
-		située le plus vers l’intérieur du clavier) soit aussi la plus utile. En outre, la touche
-		<kbd>€</kbd>
-		a été modifiée pour mettre le <kbd-output>€</kbd-output> en AltGr et placer le
+		Le changement le plus visible d’<Ergopti></Ergopti> v2.2 est la permutation des touches
+		<kbd>€</kbd>, <kbd>%</kbd> et <kbd>=</kbd> sur la rangée des chiffres. Celle-ci a été réalisée
+		afin d’améliorer l’accès aux touches les plus fréquentes. De plus, la touche
+		<kbd>€</kbd> a été modifiée pour mettre le <kbd-output>€</kbd-output> en AltGr et placer le
 		<kbd-output>$</kbd-output> en accès direct. Ici encore, c’est parce que ce caractère est beaucoup
 		plus utilisé, que ce soit en tant que monnaie, mais aussi en programmation ou sur Excel par exemple.
 	</p>

@@ -31,7 +31,7 @@
 		consécutifs pour écrire un bigramme (donc éviter les <em>ciseaux</em>). C’est le cas de
 		<kbd>cl</kbd> ou encore de <kbd>ph</kbd>.
 	</p>
-	<KeyboardBasis name="virgule" />
+	<KeyboardBasis id="virgule" />
 	<p>
 		Comme vous pouvez le constater, la touche <kbd>,</kbd> est vraiment pour supprimer les derniers
 		petits <SFB />s restants. La disposition <Ergopti /> éliminait déjà la majorité d’entre eux.
@@ -90,7 +90,7 @@
 		pas avoir la même chose sur sa disposition clavier ?
 	</p>
 	<tiny-space></tiny-space>
-	<KeyboardBasis name="magique" />
+	<KeyboardBasis id="magique" />
 	<tiny-space></tiny-space>
 	<p>
 		La touche <kbd>★</kbd> est <span class="important">l’ajout principal</span>

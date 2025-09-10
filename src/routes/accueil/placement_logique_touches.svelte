@@ -77,7 +77,7 @@
 		</li>
 		<li>
 			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜
-			<kbd-output style="font-weight: normal;">◌̈</kbd-output>
+			<kbd-output class="morte">◌̈</kbd-output>
 			car c’est la touche morte <span class="hyper text-bold">T</span>réma ;
 		</li>
 		<li>

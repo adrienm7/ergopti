@@ -548,7 +548,7 @@
 	],
 	"ergodox": [
 		{
-			"key": "=",
+			"key": "$",
 			"hand": "left",
 			"finger": "auriculaire",
 			"row": "1",
@@ -964,7 +964,7 @@
 			"size": "1"
 		},
 		{
-			"key": "$",
+			"key": "=",
 			"hand": "left",
 			"finger": "majeur",
 			"row": "5",

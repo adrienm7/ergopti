@@ -26,5 +26,5 @@
 		symboles qui amène les symboles directement sous les doigts.
 	</p>
 	<tiny-space></tiny-space>
-	<KeyboardBasis name="symboles" />
+	<KeyboardBasis id="symboles" />
 </section>

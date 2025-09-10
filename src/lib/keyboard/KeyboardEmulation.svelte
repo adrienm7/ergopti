@@ -10,7 +10,7 @@
 	});
 </script>
 
-<KeyboardBasis name="emulation" />
+<KeyboardBasis id="emulation" />
 
 <tiny-space></tiny-space>
 

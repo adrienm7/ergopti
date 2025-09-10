@@ -9,9 +9,9 @@
 	import KeyboardControlButtonPlus from '$lib/keyboard/controls/KeyboardControlButtonPlus.svelte';
 	import KeyboardControlButtonLayer from '$lib/keyboard/controls/KeyboardControlButtonLayer.svelte';
 
-	export let name;
+	export let id;
 	let keyboardConfiguration;
-	let keyboard = new Keyboard(name);
+	const keyboard = new Keyboard(id);
 	stores_infos[keyboard.id].subscribe((value) => {
 		keyboardConfiguration = value;
 	});
@@ -22,9 +22,9 @@
 	function handleMessage(event) {
 		// Permet de mettre à jour les données du clavier en fonction des contrôles
 		stores_infos[keyboard.id].update((currentData) => {
+			currentData['plus'] = event.detail['plus'];
 			currentData['type'] = event.detail['type'];
 			currentData['color'] = event.detail['color'];
-			currentData['plus'] = event.detail['plus'];
 			currentData['layer'] = event.detail['layer'];
 			return currentData;
 		});
@@ -32,33 +32,33 @@
 	}
 </script>
 
-<keyboard-controls id={'controls_' + name}>
-	<KeyboardControlButtonType
-		on:message={handleMessage}
-		layerValue={keyboardConfiguration['layer']}
-		typeValue={keyboardConfiguration['type']}
-		colorValue={keyboardConfiguration['color']}
-		plusValue={keyboardConfiguration['plus']}
-	/>
+<keyboard-controls id={'controls_' + id}>
 	<KeyboardControlButtonPlus
 		on:message={handleMessage}
-		layerValue={keyboardConfiguration['layer']}
+		plusValue={keyboardConfiguration['plus']}
 		typeValue={keyboardConfiguration['type']}
 		colorValue={keyboardConfiguration['color']}
+		layerValue={keyboardConfiguration['layer']}
+	/>
+	<KeyboardControlButtonType
+		on:message={handleMessage}
 		plusValue={keyboardConfiguration['plus']}
+		typeValue={keyboardConfiguration['type']}
+		colorValue={keyboardConfiguration['color']}
+		layerValue={keyboardConfiguration['layer']}
 	/>
 	<KeyboardControlButtonColor
 		on:message={handleMessage}
-		layerValue={keyboardConfiguration['layer']}
+		plusValue={keyboardConfiguration['plus']}
 		typeValue={keyboardConfiguration['type']}
 		colorValue={keyboardConfiguration['color']}
-		plusValue={keyboardConfiguration['plus']}
+		layerValue={keyboardConfiguration['layer']}
 	/>
 	<KeyboardControlButtonLayer
 		on:message={handleMessage}
-		layerValue={keyboardConfiguration['layer']}
+		plusValue={keyboardConfiguration['plus']}
 		typeValue={keyboardConfiguration['type']}
 		colorValue={keyboardConfiguration['color']}
-		plusValue={keyboardConfiguration['plus']}
+		layerValue={keyboardConfiguration['layer']}
 	/>
 </keyboard-controls>

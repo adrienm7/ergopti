@@ -1,4 +1,8 @@
 .cards {
+	--bg-black: rgba(0, 0, 0, 0.75);
+	--bg-white: rgba(255, 255, 255, 0.9);
+	--icon-color-white1: #172ed76a;
+	--icon-color-white2: #5ccbff;
 	display: grid;
 	gap: 1rem;
 	margin: 0 auto;
@@ -6,60 +10,80 @@
 }
 
 .card {
-	align-items: center;
 	border-radius: 7px;
 	display: block;
+	line-height: 1.3em;
 	padding: 1rem;
 }
 
-.card {
-	line-height: 1.3em;
-}
-
 .cards .card:nth-child(even) {
-	background-color: rgba(0, 0, 0, 0.8);
+	background-color: var(--bg-black);
 	color: white;
 }
 .cards .card:nth-child(odd) {
-	background-color: rgba(255, 255, 255, 0.9);
+	background-color: var(--bg-white);
 	color: black;
 }
 
-.cards .card:nth-child(odd) i {
-	color: rgb(0, 4, 43);
-}
-
+/* Adapt icons color to the background of the card */
 .cards .card:nth-child(odd) i .path1,
 .cards .card:nth-child(odd) i .path1::before {
-	background-color: #0014ac6a !important;
+	background-color: var(--icon-color-white1) !important;
 }
 .cards .card:nth-child(odd) i .path2::before {
-	background-color: #5ccbff !important;
+	background-color: var(--icon-color-white2) !important;
 	background-image: none;
 }
 
-/* Screen larger than 500px? 2 column */
+/* Screen larger than 500px ➜ 2 column */
 @media (min-width: 500px) and (max-width: 900px) {
 	.cards {
 		grid-template-columns: repeat(2, 1fr);
 	}
 
+	/* Color order changes if only 2 columns */
 	.cards .card:nth-child(1),
 	.cards .card:nth-child(4),
 	.cards .card:nth-child(5) {
-		background-color: rgba(0, 0, 0, 0.8);
-		color: white;
+		background-color: var(--bg-white);
+		color: black;
 	}
-
 	.cards .card:nth-child(2),
 	.cards .card:nth-child(3),
 	.cards .card:nth-child(6) {
-		background-color: rgba(255, 255, 255, 0.9);
-		color: black;
+		background-color: var(--bg-black);
+		color: white;
+	}
+
+	.cards .card:nth-child(1) i .path1,
+	.cards .card:nth-child(1) i .path1::before {
+		background-color: var(--icon-color-white1) !important;
+	}
+	.cards .card:nth-child(1) i .path2::before {
+		background-color: var(--icon-color-white2) !important;
+		background-image: none;
+	}
+
+	.cards .card:nth-child(4) i .path1,
+	.cards .card:nth-child(4) i .path1::before {
+		background-color: var(--icon-color-white1) !important;
+	}
+	.cards .card:nth-child(4) i .path2::before {
+		background-color: var(--icon-color-white2) !important;
+		background-image: none;
+	}
+
+	.cards .card:nth-child(5) i .path1,
+	.cards .card:nth-child(5) i .path1::before {
+		background-color: var(--icon-color-white1) !important;
+	}
+	.cards .card:nth-child(5) i .path2::before {
+		background-color: var(--icon-color-white2) !important;
+		background-image: none;
 	}
 }
 
-/* Screen larger than 900px? 3 columns */
+/* Screen larger than 900px ➜ 3 columns */
 @media (min-width: 900px) {
 	.cards {
 		grid-template-columns: repeat(3, 1fr);
