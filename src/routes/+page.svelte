@@ -4,7 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import KeyboardControlButtons from '$lib/keyboard/KeyboardControlButtons.svelte';
+	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
 	import Layout from './+layout.svelte';
 
 	import AlternanceMains from './accueil/alternance_mains.svelte';

@@ -562,7 +562,7 @@ keyboard-key[data-key='CapsLock'][data-content='⌦'] {
 }
 keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌫'],
 keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌦'] {
-	font-size: calc(var(--key-text-size) * 0.75);
+	font-size: calc(var(--key-text-size) * 0.7);
 }
 
 keyboard-key[data-content='Caps<br>word'] {

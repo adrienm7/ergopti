@@ -4,7 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import KeyboardControlButtons from '$lib/keyboard/KeyboardControlButtons.svelte';
+	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
 </script>
 
 <section>
@@ -16,7 +16,7 @@
 		</h1>
 		<KeyboardBasis name="presentation_plus" />
 		<tiny-space></tiny-space>
-		<KeyboardControlButtons name="presentation_plus" />
+		<KeyboardControls name="presentation_plus" />
 	</div>
 
 	<small-space></small-space>

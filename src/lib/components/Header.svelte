@@ -4,7 +4,7 @@
 
 	import { page } from '$app/stores';
 
-	import { getKeyboardData } from '$lib/keyboard/getKeyboardData.js';
+	import { getKeyboardData } from '$lib/keyboard/data/getKeyboardData.js';
 	import { version, layoutData, versionsList, discordLink } from '$lib/stores_infos.js';
 	let versionValue;
 	version.subscribe((value) => {
