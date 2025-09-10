@@ -4,29 +4,20 @@ image-block {
 }
 
 image-block img {
-	margin: 0 auto;
 	border: 10px solid rgba(0, 0, 0, 0.5);
 	border-radius: 10px;
+	margin: 0 auto;
 	width: 100%;
 	/* box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px; */
 }
 
 image-block p {
-	font-weight: bold;
 	font-size: 1.3rem;
+	font-weight: bold;
 }
 
 /* Correction du problème d’images étirées */
 picture img {
-	width: 100% !important;
 	height: auto !important;
-}
-
-/* Deactivate AOS for people who get animation sick */
-@media (prefers-reduced-motion: reduce) {
-	[data-aos] {
-		transform: none !important;
-		opacity: 1 !important;
-		transition: none !important;
-	}
+	width: 100% !important;
 }

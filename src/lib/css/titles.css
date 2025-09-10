@@ -1,3 +1,9 @@
+.ergopti-title {
+	line-height: 0.95;
+	margin: 7vh 0;
+	z-index: 2;
+}
+
 h1 {
 	-webkit-background-clip: text;
 	background-clip: text;
@@ -29,7 +35,7 @@ h2 {
 	font-weight: 400;
 	margin: 0;
 	margin-bottom: 10vh;
-	margin-top: 33vh;
+	margin-top: 33vh !important;
 	text-align: center;
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
@@ -64,4 +70,13 @@ h4 {
 	font-size: 1.4rem;
 	margin-bottom: 5vh;
 	margin-top: 13vh;
+}
+
+/* Deactivate AOS for people who get animation sick */
+@media (prefers-reduced-motion: reduce) {
+	[data-aos] {
+		opacity: 1 !important;
+		transform: none !important;
+		transition: none !important;
+	}
 }

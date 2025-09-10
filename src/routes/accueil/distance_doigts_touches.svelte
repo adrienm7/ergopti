@@ -149,7 +149,7 @@
 	</p>
 
 	<tiny-space></tiny-space>
-	<KeyboardBasis name="frequences" />
+	<KeyboardBasis id="frequences" />
 	<tiny-space></tiny-space>
 
 	<p>

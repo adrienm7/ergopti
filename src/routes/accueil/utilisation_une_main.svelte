@@ -38,7 +38,7 @@
 		<kbd>Z</kbd>
 	</h3>
 
-	<KeyboardBasis name="controle" />
+	<KeyboardBasis id="controle" />
 	<tiny-space></tiny-space>
 	<p>
 		Les raccourcis <kbd-output>Ctrl</kbd-output> + <kbd-output>X</kbd-output>,
@@ -54,7 +54,7 @@
 	</p>
 
 	<h3>Touches de raccourci sur la version Ergodox</h3>
-	<KeyboardBasis name="raccourcis_ergodox" />
+	<KeyboardBasis id="raccourcis_ergodox" />
 	<tiny-space></tiny-space>
 	<p>
 		La version d’<Ergopti /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation

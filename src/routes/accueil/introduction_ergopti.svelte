@@ -14,9 +14,9 @@
 				><Ergopti></Ergopti><span>&nbsp;—</span>
 			</span>
 		</h1>
-		<KeyboardBasis name="presentation" />
+		<KeyboardBasis id="presentation" />
 		<tiny-space></tiny-space>
-		<KeyboardControls name="presentation" />
+		<KeyboardControls id="presentation" />
 	</div>
 
 	<div style="margin: 0 auto; text-align:center; padding-top: 5px;">

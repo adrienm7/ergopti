@@ -2,10 +2,10 @@
 	import { createEventDispatcher } from 'svelte';
 	const dispatch = createEventDispatcher();
 
-	export let typeValue;
-	export let layerValue;
-	export let colorValue;
 	export let plusValue;
+	export let typeValue;
+	export let colorValue;
+	export let layerValue;
 
 	function toggleCouleur() {
 		if (colorValue === 'yes') {
@@ -14,10 +14,10 @@
 			colorValue = 'yes';
 		}
 		dispatch('message', {
+			plus: plusValue,
 			type: typeValue,
-			layer: layerValue,
 			color: colorValue,
-			plus: plusValue
+			layer: layerValue
 		});
 	}
 </script>

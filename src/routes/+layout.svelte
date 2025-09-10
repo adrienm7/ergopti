@@ -28,9 +28,9 @@
 	import '$lib/css/global.css';
 	import '$lib/css/layout.css';
 	import '$lib/css/cards.css';
-	import '$lib/css/espacements.css';
+	import '$lib/css/spacing.css';
 	import '$lib/css/titles.css';
-	import '$lib/css/typographie.css';
+	import '$lib/css/typography.css';
 	import '$lib/css/ergopti_name.css';
 	import '$lib/css/images.css';
 	import '$lib/css/buttons.css';
@@ -150,9 +150,9 @@
 
 	<clavier-reference id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
 		<div class="conteneur">
-			<KeyboardBasis name="reference" />
+			<KeyboardBasis id="reference" />
 			<tiny-space></tiny-space>
-			<KeyboardControls name="reference" />
+			<KeyboardControls id="reference" />
 		</div>
 	</clavier-reference>
 </keyboard-reference>
