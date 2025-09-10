@@ -313,10 +313,16 @@ export class KeyboardEmulation extends Keyboard {
 		let newCursorPosition = CursorPosition;
 
 		function regexReplaceCursor(regex, replacement) {
-			const matchCount = (newTextAreaValue.match(regex) || []).length; // Number of replacements to be made, as it will modify the cursor position
+			const matches = [...newTextAreaValue.matchAll(regex)];
 			newTextAreaValue = newTextAreaValue.replace(regex, replacement);
-			newCursorPosition =
-				newCursorPosition + matchCount * (replacement.length - regex.source.length);
+
+			// Attention, regex escapes characters with "\".
+			// Thus, the number of characters really typed isn’t the length of the regex string
+			const charactersAddedCount = matches.reduce(
+				(acc, m) => acc + (replacement.length - m[0].length),
+				0
+			); // For each match, calculate the number of characters added in the text input and sum them all
+			newCursorPosition = newCursorPosition + charactersAddedCount;
 		}
 
 		/* Prevent SFBs involving ★U, like NNU : N★U is the normal way, but we can also do N★Ê */
@@ -349,6 +355,9 @@ export class KeyboardEmulation extends Keyboard {
 			[/!#/g, ' != '],
 			[/\(#/g, '("'],
 			[/\[#/g, '["'],
+			[/#\]/g, '"]'],
+			[/#\[/g, '"]'],
+			[/#\(/g, '")'],
 			[/\[\)/g, ' = ""'],
 			[/\\\"/g, '/*'],
 			[/\"\\/g, '*\\'],
@@ -365,10 +374,23 @@ export class KeyboardEmulation extends Keyboard {
 			[/êu/g, 'û']
 		];
 
+		function* caseHandling(list) {
+			for (const [regex, replacement] of list) {
+				// Lowercase replacement given in the list
+				yield [regex, replacement];
+				// Uppercase
+				yield [new RegExp(regex.source.toUpperCase(), regex.flags), replacement.toUpperCase()];
+				// Title case (first letter uppercase, rest lowercase)
+				const titleSrc = regex.source.charAt(0).toUpperCase() + regex.source.slice(1);
+				const titleRepl = replacement.charAt(0).toUpperCase() + replacement.slice(1);
+				yield [new RegExp(titleSrc, regex.flags), titleRepl];
+			}
+		}
+
 		for (const [regex, replacement] of [
-			...replacementsSFBs,
-			...replacementsRolls,
-			...replacementsDeadKeyECirc
+			...caseHandling(replacementsSFBs),
+			...caseHandling(replacementsRolls),
+			...caseHandling(replacementsDeadKeyECirc)
 		]) {
 			regexReplaceCursor(regex, replacement);
 		}
