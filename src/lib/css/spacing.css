@@ -28,6 +28,10 @@ main ul li,
 	margin: 0;
 }
 
+.margin-h1 {
+	margin-bottom: 10vh;
+}
+
 tiny-space {
 	display: block;
 	height: 5vh;

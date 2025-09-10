@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2>Menu de gestion des fonctionnalités</h2>
+	<h2 class="first-h2">Menu de gestion des fonctionnalités</h2>
 
 	<enhanced:img
 		src="$lib/images/menu_ergopti_plus.jpg"

@@ -280,15 +280,30 @@
 		display: inline-block;
 	}
 
-	header #menu #menu-pages p[aria-current='page'] .titre,
 	header #menu #menu-pages p:not([aria-current='page']) .titre:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		background-image: linear-gradient(to right, var(--gradient-blue));
+		background-image: linear-gradient(var(--gradient-blue));
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		color: transparent;
+	}
+
+	header #menu #menu-pages p[aria-current='page'] .titre,
+	header #menu #menu-pages p[aria-current='page'] i .path1::before,
+	header #menu #menu-pages p[aria-current='page'] i .path2::before {
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-image: linear-gradient(var(--gradient-purple));
+		-webkit-box-decoration-break: clone;
+		box-decoration-break: clone;
+		color: transparent;
+	}
+
+	header #menu #menu-pages p[aria-current='page'] i .path1::before {
+		background-image: linear-gradient(var(--gradient-purple-dark));
 	}
 
 	header .header-logo {
@@ -462,8 +477,9 @@
 			padding-right: 0;
 		}
 
-		header #menu #menu-pages p[aria-current='page'] a::after {
-			background-image: linear-gradient(to right, var(--gradient-blue));
+		/* Underline selected page */
+		/* header #menu #menu-pages p[aria-current='page'] a::after {
+			background-image: linear-gradient(var(--gradient-purple));
 			border-radius: 5px;
 			bottom: -5px;
 			content: '';
@@ -471,7 +487,7 @@
 			height: 3px;
 			position: relative;
 			width: 100%;
-		}
+		} */
 
 		/* header #menu #menu-pages p:not([aria-current='page']) .titre:hover::after {
 		content: '';
