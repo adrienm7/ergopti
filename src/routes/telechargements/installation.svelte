@@ -41,7 +41,7 @@
 </script>
 
 <section>
-	<h2>Installation</h2>
+	<h2 class="first-h2">Installation</h2>
 	<div class="encadre text-center">
 		<span style="font-weight:bold;">Note :</span> Les fichiers d’installation n’existent au complet qu’à
 		partir de la 1.1.

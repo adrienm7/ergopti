@@ -1,13 +1,13 @@
 .toc-list {
-	margin: 0;
-	padding: 0;
 	font-size: 0.85rem;
 	list-style-type: none;
+	margin: 0;
+	padding: 0;
 	text-align: left;
 }
 .toc-list .toc-list {
-	margin-left: 1rem;
 	list-style: inside;
+	margin-left: 1rem;
 }
 
 .toc-list .node-name--H2 {
@@ -25,7 +25,7 @@
 }
 
 .toc-list .is-active-link {
-	background: linear-gradient(#f2dfff, #db4bff);
+	background: linear-gradient(var(--gradient-purple));
 	background-clip: text;
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;

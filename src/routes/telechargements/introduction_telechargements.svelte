@@ -14,7 +14,7 @@
 	<h1 data-aos="zoom-in">Utiliser <Ergopti></Ergopti></h1>
 	<hr class="margin-h1" />
 
-	<h2>Tester la disposition en ligne</h2>
+	<h2 class="first-h2">Tester la disposition en ligne</h2>
 	<KeyboardEmulation />
 	<tiny-space></tiny-space>
 	{#if isCollapsed}

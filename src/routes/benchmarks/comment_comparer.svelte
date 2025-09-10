@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2>Comment bien utiliser KLAnext</h2>
+	<h2 class="first-h2">Comment bien utiliser KLAnext</h2>
 	<p>
 		Pour bien utiliser des comparateurs de disposition, il faut <span class="important"
 			>comparer ce qui est comparable</span

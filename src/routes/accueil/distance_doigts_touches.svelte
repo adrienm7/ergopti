@@ -7,7 +7,7 @@
 </script>
 
 <section>
-	<h2>Distance des doigts aux touches</h2>
+	<h2 class="first-h2">Distance des doigts aux touches</h2>
 	<h3>Optimisation de la rangée du milieu</h3>
 
 	<p>

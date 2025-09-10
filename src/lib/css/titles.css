@@ -26,7 +26,7 @@ h1 {
 }
 
 h2 {
-	background: linear-gradient(#f2dfff, #db4bff);
+	background: linear-gradient(var(--gradient-purple));
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: white;
@@ -35,7 +35,7 @@ h2 {
 	font-weight: 400;
 	margin: 0;
 	margin-bottom: 10vh;
-	margin-top: 33vh !important;
+	margin-top: 33vh;
 	text-align: center;
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
@@ -57,7 +57,7 @@ h3 {
 	width: fit-content;
 }
 
-h2:first-of-type {
+.first-h2 {
 	margin-top: 2vh;
 }
 

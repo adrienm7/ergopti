@@ -5,7 +5,7 @@
 </script>
 
 <section>
-	<h2>Genèse et inspirations</h2>
+	<h2 class="first-h2">Genèse et inspirations</h2>
 	<p>
 		La genèse de la disposition <Ergopti></Ergopti> remonte à début 2022, suite à la découverte de la
 		disposition
