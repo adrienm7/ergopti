@@ -1826,7 +1826,7 @@ global DeadkeyMappingCircumflex := Map(
     "o", "ô", "O", "Ô",
     "p", "¶", "P", "¶",
     "q", "☒", "Q", "☐",
-    "r", "/", "R", "/",
+    "r", "/", "R", "\",
     "s", "ß", "S", "ẞ",
     "t", "!", "T", "¡",
     "u", "û", "U", "Û",
@@ -2080,7 +2080,7 @@ global DeadkeyMappingCurrency := Map(
 
 if Features["Layout"]["DirectAccessDigits"].Enabled {
     ; === Number row ===
-    SC029:: SendNewResult("=")
+    SC029:: SendNewResult("$") ; We need to do this, otherwise it may trigger and lock AltGr
     RemapKey("SC002", "1")
     RemapKey("SC003", "2")
     RemapKey("SC004", "3")
@@ -2091,8 +2091,8 @@ if Features["Layout"]["DirectAccessDigits"].Enabled {
     RemapKey("SC009", "8")
     RemapKey("SC00A", "9")
     RemapKey("SC00B", "0")
-    SC00C:: SendNewResult("%") ; Non letter characters don’t use RemapKey. Otherwise when tapping % for example, it will trigger and lock AltGr
-    SC00D:: SendNewResult("$")
+    SC00C:: SendNewResult("%") ; We need to do this, otherwise it may trigger and lock AltGr
+    RemapKey("SC00D", "=")
 }
 
 if Features["Layout"]["ErgoptiBase"].Enabled {
@@ -2153,7 +2153,11 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC039:: WrapTextIfSelected("-", "-", "-")
 
     ; === Number row ===
-    +SC029:: SendNewResult("º")
+    +SC029:: {
+        SendNewResult(" ") ; Thin non-breaking space
+        Sleep(HotstringsTriggerDelay)
+        SendNewResult("€")
+    }
     +SC002:: SendNewResult("1")
     +SC003:: SendNewResult("2")
     +SC004:: SendNewResult("3")
@@ -2169,11 +2173,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
         Sleep(HotstringsTriggerDelay)
         SendNewResult("%")
     }
-    +SC00D:: {
-        SendNewResult(" ") ; Thin non-breaking space
-        Sleep(HotstringsTriggerDelay)
-        SendNewResult("€")
-    }
+    +SC00D:: SendNewResult("º")
 
     ; === Top row ===
     +SC010:: SendNewResult("È")
@@ -2247,7 +2247,7 @@ SC02E:: SendNewResult("★")
 
 #HotIf GetCapsLockCondition() and Features["Layout"]["ErgoptiBase"].Enabled
 ; === Number row ===
-SC029:: SendNewResult("=")
+SC029:: SendNewResult("$")
 SC002:: SendNewResult("1")
 SC003:: SendNewResult("2")
 SC004:: SendNewResult("3")
@@ -2259,7 +2259,7 @@ SC009:: SendNewResult("8")
 SC00A:: SendNewResult("9")
 SC00B:: SendNewResult("0")
 SC00C:: SendNewResult("%")
-SC00D:: SendNewResult("$")
+SC00D:: SendNewResult("=")
 
 ; === Top row ===
 SC010:: SendNewResult("È")
@@ -2371,7 +2371,7 @@ SC138 & SC018:: RemapAltGr(
 SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
 
 ; === Number row ===
-SC138 & SC029:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"))
+SC138 & SC029:: RemapAltGr((*) => SendNewResult("€"), (*) => DeadKey(DeadkeyMappingCurrency))
 SC138 & SC002:: RemapAltGr((*) => SendNewResult("¹"), (*) => SendNewResult("₁"))
 SC138 & SC003:: RemapAltGr((*) => SendNewResult("²"), (*) => SendNewResult("₂"))
 SC138 & SC004:: RemapAltGr((*) => SendNewResult("³"), (*) => SendNewResult("₃"))
@@ -2383,7 +2383,7 @@ SC138 & SC009:: RemapAltGr((*) => SendNewResult("⁸"), (*) => SendNewResult("�
 SC138 & SC00A:: RemapAltGr((*) => SendNewResult("⁹"), (*) => SendNewResult("₉"))
 SC138 & SC00B:: RemapAltGr((*) => SendNewResult("⁰"), (*) => SendNewResult("₀"))
 SC138 & SC00C:: RemapAltGr((*) => SendNewResult("‰"), (*) => SendNewResult("‱"))
-SC138 & SC00D:: RemapAltGr((*) => SendNewResult("€"), (*) => DeadKey(DeadkeyMappingCurrency))
+SC138 & SC00D:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"))
 
 ; ======= Ctrl + Alt is different from AltGr on the Number row =======
 ; Some programs use these shortcuts, like in Google Docs where it changes the heading
@@ -3231,8 +3231,14 @@ CapsLockShortcut(CtrlActivated) {
 ; Tap-hold on "LShift" : Ctrl + C on tap, Shift on hold
 ~$SC02A::
 {
-    tap := KeyWait("LShift", "T" . Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds)
-    if (tap and (A_PriorKey == "LShift")) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
+    TimeBefore := A_TickCount
+    KeyWait("SC02A")
+    TimeAfter := A_TickCount
+    tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds * 1000)
+    if (
+        tap
+        and A_PriorKey == "LShift"
+    ) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
         SendInput("{LCtrl Down}c{LCtrl Up}")
     }
 }
@@ -3246,13 +3252,12 @@ CapsLockShortcut(CtrlActivated) {
 ~$SC01D::
 {
     UpdateLastSentCharacter("LControl")
-}
-
-~SC01D Up:: {
-    Now := A_TickCount
-    CharacterSentTime := LastSentCharacterKeyTime.Has("LControl") ? LastSentCharacterKeyTime["LControl"] : Now
+    TimeBefore := A_TickCount
+    KeyWait("SC01D")
+    TimeAfter := A_TickCount
+    tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000)
     if (
-        Now - CharacterSentTime <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000
+        tap
         and A_PriorKey == "LControl"
         and not GetKeyState("SC03A", "P") ; "CapsLock"
         and not GetKeyState("SC038", "P") ; "LAlt"

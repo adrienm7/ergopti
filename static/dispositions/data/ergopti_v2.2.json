@@ -4,7 +4,7 @@
 	"site": "https://ergopti.fr",
 	"iso": [
 		{
-			"key": "=",
+			"key": "$",
 			"code": "Backquote",
 			"hand": "left",
 			"finger": "auriculaire",
@@ -112,7 +112,7 @@
 			"size": "1"
 		},
 		{
-			"key": "$",
+			"key": "=",
 			"code": "Equal",
 			"hand": "right",
 			"finger": "auriculaire",
@@ -548,7 +548,7 @@
 	],
 	"ergodox": [
 		{
-			"key": "$",
+			"key": "=",
 			"hand": "left",
 			"finger": "auriculaire",
 			"row": "1",
@@ -964,7 +964,7 @@
 			"size": "1"
 		},
 		{
-			"key": "=",
+			"key": "$",
 			"hand": "left",
 			"finger": "majeur",
 			"row": "5",
@@ -2032,7 +2032,7 @@
 			"Shift": "º",
 			"AltGr": "°",
 			"ShiftAltGr": "ª",
-			"Ctrl": "=",
+			"Ctrl": "+",
 			"Circonflexe": "",
 			"CirconflexeShift": "",
 			"Trema": "",
@@ -2051,10 +2051,10 @@
 			"key": "$",
 			"Primary": "$",
 			"Shift": "<espace-insecable></espace-insecable>€",
-			"AltGr": "$",
+			"AltGr": "€",
 			"ShiftAltGr": "¤",
 			"ShiftAltGr-style": "morte",
-			"Ctrl": "+",
+			"Ctrl": "$",
 			"Circonflexe": "",
 			"CirconflexeShift": "",
 			"Trema": "",
