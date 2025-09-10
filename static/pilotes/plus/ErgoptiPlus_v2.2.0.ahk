@@ -2092,7 +2092,7 @@ if Features["Layout"]["DirectAccessDigits"].Enabled {
     RemapKey("SC00A", "9")
     RemapKey("SC00B", "0")
     SC00C:: SendNewResult("%") ; We need to do this, otherwise it may trigger and lock AltGr
-    RemapKey("SC00D", "=")
+    SC00D:: SendNewResult("=") ; We need to do this, otherwise it may trigger and lock AltGr
 }
 
 if Features["Layout"]["ErgoptiBase"].Enabled {
