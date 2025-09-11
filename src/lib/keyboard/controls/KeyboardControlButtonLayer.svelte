@@ -3,11 +3,9 @@
 	const dispatch = createEventDispatcher();
 
 	export let plusValue;
-	export let typeValue;
-	export let colorValue;
 	export let layerValue;
 
-	let couches_standard = [
+	const baseLayers = [
 		['Visuel', 'Visuel'],
 		['➀ Primaire', 'Primary'],
 		['➁ Shift', 'Shift'],
@@ -24,31 +22,26 @@
 		['Indice', 'Indice'],
 		['ℝ', 'R']
 	];
-	let couches_plus = couches_standard.concat([
+
+	const extraLayers = [
 		['★ Layer', 'Layer'],
 		['★ Virgule', ','],
 		['★ À', 'À']
-	]);
+	];
 
-	function toggleCouche(nouvelleCouche) {
-		layerValue = nouvelleCouche;
-		dispatch('message', {
-			plus: plusValue,
-			type: typeValue,
-			color: colorValue,
-			layer: layerValue
-		});
+	// Pick the right list depending on plusValue
+	$: availableLayers = plusValue === 'yes' ? baseLayers.concat(extraLayers) : baseLayers;
+
+	function changeLayer(newLayer) {
+		layerValue = newLayer;
+		dispatch('message', { layer: newLayer });
 	}
 </script>
 
 <keyboard-control-layer>
-	{#if plusValue === 'yes'}
-		<select bind:value={layerValue} on:change={() => toggleCouche(layerValue)}>
-			{#each couches_plus as value}<option value={value[1]}>{value[0]}</option>{/each}
-		</select>
-	{:else}
-		<select bind:value={layerValue} on:change={() => toggleCouche(layerValue)}>
-			{#each couches_standard as value}<option value={value[1]}>{value[0]}</option>{/each}
-		</select>
-	{/if}
+	<select bind:value={layerValue} on:change={() => changeLayer(layerValue)}>
+		{#each availableLayers as [label, value]}
+			<option {value}>{label}</option>
+		{/each}
+	</select>
 </keyboard-control-layer>

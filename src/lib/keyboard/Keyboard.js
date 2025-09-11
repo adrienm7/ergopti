@@ -1,4 +1,5 @@
 import * as stores_infos from '$lib/stores_infos.js';
+import { get } from 'svelte/store';
 
 import characterFrequencies from '$lib/keyboard/data/characterFrequencies.json'; // Data coming from https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en%2Bfr.json
 // Create the "max" and "min" keys containing the maximum value among the frequencies (the frequency of E) and the minimum value
@@ -12,24 +13,17 @@ function logarithmicTransformation(value, scaleFactor) {
 export class Keyboard {
 	constructor(id) {
 		this.id = id;
+		this.location = this.getKeyboardLocation();
 
 		// Automatically update the keyboard as soon as layoutData changes
 		stores_infos['layoutData'].subscribe((value) => {
-			this.layoutData = value;
 			this.updateKeyboard();
 		});
 
-		// Subscribe to the store to always have the version currently selected
-		stores_infos['version'].subscribe((value) => {
-			this.version = value;
-		});
-
-		// Subscribe to the store to receive real-time updates of the keyboard configuration
+		// Automatically update the keyboard as soon as the keyboard configuration changes
 		stores_infos[this.id].subscribe((value) => {
-			this.keyboardConfiguration = value;
+			this.updateKeyboard();
 		});
-
-		this.location = this.getKeyboardLocation();
 	}
 
 	getKeyboardLocation() {
@@ -51,14 +45,16 @@ export class Keyboard {
 
 	updateKeyboard() {
 		console.info('[Keyboard] Update of the keyboard');
-		this.location = this.getKeyboardLocation();
+		if (!this.location) {
+			this.location = this.getKeyboardLocation();
+		}
 		this.updateKeys();
 		this.updateKeyboardConfiguration();
 		this.pressCurrentLayerModifiers();
 	}
 
 	updateKeys() {
-		if (!this.layoutData || !this.keyboardConfiguration || !this.location) {
+		if (!get(stores_infos['layoutData']) || !get(stores_infos[this.id]) || !this.location) {
 			return;
 		}
 
@@ -68,13 +64,13 @@ export class Keyboard {
 
 				// Retrieve the id of the key at the specific location row x column
 				// This id depends whether the layout is ISO or Ergodox (two different sets of properties)
-				const keyIdentifier = this.layoutData[this.keyboardConfiguration['type']].find(
-					(el) => el['row'] == row && el['column'] == column
-				);
+				const keyIdentifier = get(stores_infos['layoutData'])[
+					get(stores_infos[this.id])['type']
+				].find((el) => el['row'] == row && el['column'] == column);
 
 				if (keyIdentifier !== undefined) {
 					// Retrieve what should be displayed on the key of this id
-					const keyContent = this.layoutData['keys'].find(
+					const keyContent = get(stores_infos['layoutData'])['keys'].find(
 						(el) => el['key'] === keyIdentifier['key']
 					);
 
@@ -93,8 +89,8 @@ export class Keyboard {
 					// It is only working 100% correctly on the latest version, as some tap-holds changed compared to previous versions
 					// We still keep it enabled on old versions, as a 80%-working functionality is better than nothing
 					if (
-						this.keyboardConfiguration['controls'] === 'yes'
-						// && this.version === '2.2'
+						get(stores_infos[this.id])['controls'] === 'yes'
+						// && get(stores_infos['version']) === '2.2'
 					) {
 						key.addEventListener(
 							'click',
@@ -136,22 +132,22 @@ export class Keyboard {
 	}
 
 	fillKey(key, keyContent, row) {
-		if (!this.keyboardConfiguration) {
+		if (!get(stores_infos[this.id])) {
 			return;
 		}
 
 		if (
-			this.keyboardConfiguration['layer'] !== 'Visuel' &&
-			(keyContent[this.keyboardConfiguration['layer']] === '' ||
-				keyContent[this.keyboardConfiguration['layer']] === undefined)
+			get(stores_infos[this.id])['layer'] !== 'Visuel' &&
+			(keyContent[get(stores_infos[this.id])['layer']] === '' ||
+				keyContent[get(stores_infos[this.id])['layer']] === undefined)
 		) {
 			/* Undefined key in the selected layer */
 			return;
 		}
 
-		const plus = this.keyboardConfiguration['plus'] === 'yes';
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
 
-		if (this.keyboardConfiguration['layer'] === 'Visuel') {
+		if (get(stores_infos[this.id])['layer'] === 'Visuel') {
 			if (keyContent['type'] === 'ponctuation') {
 				// Every "double" keys of ponctuation
 				key.innerHTML = `<output-altgr>${keyContent['AltGr']}</output-altgr><br/><output-primary>${keyContent['Primary']}</output-primary>`;
@@ -167,18 +163,18 @@ export class Keyboard {
 			}
 		} else {
 			// All layers other than "Visuel"
-			if (plus && keyContent[this.keyboardConfiguration['layer'] + '+'] !== undefined && row < 6) {
+			if (plus && keyContent[get(stores_infos[this.id])['layer'] + '+'] !== undefined && row < 6) {
 				// If the + layer exists AND the key isn’t on the thumb cluster
-				key.innerHTML = keyContent[this.keyboardConfiguration['layer'] + '+'];
+				key.innerHTML = keyContent[get(stores_infos[this.id])['layer'] + '+'];
 				key.dataset['plus'] = 'yes';
 			} else {
-				key.innerHTML = keyContent[this.keyboardConfiguration['layer']];
+				key.innerHTML = keyContent[get(stores_infos[this.id])['layer']];
 			}
 		}
 	}
 
 	setKeyProperties(key, keyIdentifier, keyContent, column) {
-		if (!this.keyboardConfiguration) {
+		if (!get(stores_infos[this.id])) {
 			return;
 		}
 
@@ -192,28 +188,28 @@ export class Keyboard {
 		key.dataset['column'] = column;
 
 		if (
-			this.keyboardConfiguration['layer'] === 'Visuel' &&
+			get(stores_infos[this.id])['layer'] === 'Visuel' &&
 			keyContent['Primary' + '-style'] !== undefined
 		) {
 			key.dataset['style'] = keyContent['Primary' + '-style'];
 		} else {
 			if (
-				this.keyboardConfiguration['plus'] === 'yes' &&
-				keyContent[this.keyboardConfiguration['layer'] + '+' + '-style'] !== undefined
+				get(stores_infos[this.id])['plus'] === 'yes' &&
+				keyContent[get(stores_infos[this.id])['layer'] + '+' + '-style'] !== undefined
 			) {
-				key.dataset['style'] = keyContent[this.keyboardConfiguration['layer'] + '+' + '-style'];
-			} else if (keyContent[this.keyboardConfiguration['layer'] + '-style'] !== undefined) {
-				key.dataset['style'] = keyContent[this.keyboardConfiguration['layer'] + '-style'];
+				key.dataset['style'] = keyContent[get(stores_infos[this.id])['layer'] + '+' + '-style'];
+			} else if (keyContent[get(stores_infos[this.id])['layer'] + '-style'] !== undefined) {
+				key.dataset['style'] = keyContent[get(stores_infos[this.id])['layer'] + '-style'];
 			}
 		}
 
 		key.style.setProperty('--size', keyIdentifier['size']);
 
-		const frequency = characterFrequencies[keyContent[this.keyboardConfiguration['layer']]];
+		const frequency = characterFrequencies[keyContent[get(stores_infos[this.id])['layer']]];
 		key.style.setProperty('--frequency', frequency);
 
 		const frequency_normalized = // Between 0 et 1 with 1 for the most frequent key
-			(characterFrequencies[keyContent[this.keyboardConfiguration['layer']]] -
+			(characterFrequencies[keyContent[get(stores_infos[this.id])['layer']]] -
 				characterFrequencies['min']) /
 			(characterFrequencies['max'] - characterFrequencies['min']);
 		key.style.setProperty(
@@ -223,21 +219,21 @@ export class Keyboard {
 	}
 
 	postProcessingKey(key) {
-		if (!this.layoutData || !this.keyboardConfiguration) {
+		if (!get(stores_infos['layoutData']) || !get(stores_infos[this.id])) {
 			return;
 		}
 
 		const keyName = key.dataset['key'];
-		const plus = this.keyboardConfiguration['plus'] === 'yes';
-		const type = this.keyboardConfiguration['type'];
-		const layer = this.keyboardConfiguration['layer'];
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
+		const type = get(stores_infos[this.id])['type'];
+		const layer = get(stores_infos[this.id])['layer'];
 
 		// Override the Space key content to also show the name of the layout
 		const plusSymbol = plus
 			? '<span class="glow" style = "position:relative; margin-left:0.1em">+</span>'
 			: '';
 		if (type === 'iso' && layer === 'Visuel' && keyName === 'Space') {
-			key.innerHTML = this.layoutData['name'] + plusSymbol;
+			key.innerHTML = get(stores_infos['layoutData'])['name'] + plusSymbol;
 		}
 
 		// Make the ★ key glow
@@ -256,13 +252,13 @@ export class Keyboard {
 	}
 
 	layerSwitch(pressedKey) {
-		if (!this.layoutData || !this.keyboardConfiguration) {
+		if (!get(stores_infos['layoutData']) || !get(stores_infos[this.id])) {
 			return;
 		}
 
-		const plus = this.keyboardConfiguration['plus'] === 'yes';
-		const type = this.keyboardConfiguration['type'];
-		const layer = this.keyboardConfiguration['layer'];
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
+		const type = get(stores_infos[this.id])['type'];
+		const layer = get(stores_infos[this.id])['layer'];
 
 		let pressedKeyName = pressedKey.dataset['key'];
 		let pressedKeyContent = pressedKey.dataset['content'];
@@ -319,7 +315,9 @@ export class Keyboard {
 			}
 
 			// Only change the layer if it exists on the Option key, as this key is always set on all layers to "Option"
-			const keyContent = this.layoutData['keys'].find((el) => el['key'] === 'Option');
+			const keyContent = get(stores_infos['layoutData'])['keys'].find(
+				(el) => el['key'] === 'Option'
+			);
 			const keyContentOnNewLayer = keyContent[newLayerTemp];
 			if (keyContentOnNewLayer) {
 				newLayer = newLayerTemp;
@@ -406,18 +404,18 @@ export class Keyboard {
 	}
 
 	updateKeyboardConfiguration() {
-		if (!this.keyboardConfiguration || !this.location) {
+		if (!get(stores_infos[this.id]) || !this.location) {
 			return;
 		}
 
-		this.location.dataset['type'] = this.keyboardConfiguration['type'];
-		this.location.dataset['layer'] = this.keyboardConfiguration['layer'];
-		this.location.dataset['plus'] = this.keyboardConfiguration['plus'];
-		this.location.dataset['color'] = this.keyboardConfiguration['color'];
+		this.location.dataset['type'] = get(stores_infos[this.id])['type'];
+		this.location.dataset['layer'] = get(stores_infos[this.id])['layer'];
+		this.location.dataset['plus'] = get(stores_infos[this.id])['plus'];
+		this.location.dataset['color'] = get(stores_infos[this.id])['color'];
 	}
 
 	pressCurrentLayerModifiers() {
-		if (!this.layoutData || !this.keyboardConfiguration || !this.location) {
+		if (!get(stores_infos['layoutData']) || !get(stores_infos[this.id]) || !this.location) {
 			return;
 		}
 
@@ -430,9 +428,9 @@ export class Keyboard {
 			return contentOnLayer || '';
 		}
 
-		const plus = this.keyboardConfiguration['plus'] === 'yes';
-		const type = this.keyboardConfiguration['type'];
-		const layer = this.keyboardConfiguration['layer'];
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
+		const type = get(stores_infos[this.id])['type'];
+		const layer = get(stores_infos[this.id])['layer'];
 
 		const keys = {
 			LShift: this.location.querySelector("[data-key='LShift']"),
@@ -475,7 +473,9 @@ export class Keyboard {
 		if (
 			plus &&
 			type === 'iso' &&
-			getKeyContent(this.layoutData, 'RCtrl', layer + (plus ? '+' : '')).includes('Shift') &&
+			getKeyContent(get(stores_infos['layoutData']), 'RCtrl', layer + (plus ? '+' : '')).includes(
+				'Shift'
+			) &&
 			['Shift', 'ShiftAltGr', 'CirconflexeShift', 'TremaShift', 'GreekShift'].includes(layer)
 		) {
 			pressKey('RCtrl');
@@ -488,15 +488,29 @@ export class Keyboard {
 			if (
 				type === 'iso' &&
 				plus &&
-				getKeyContent(this.layoutData, 'CapsLock', layer + (plus ? '+' : '')).includes('Ctrl') &&
-				!getKeyContent(this.layoutData, 'CapsLock', layer + (plus ? '+' : '')).includes('Ctrl +') // Not on Ctrl + Key shortcuts
+				getKeyContent(
+					get(stores_infos['layoutData']),
+					'CapsLock',
+					layer + (plus ? '+' : '')
+				).includes('Ctrl') &&
+				!getKeyContent(
+					get(stores_infos['layoutData']),
+					'CapsLock',
+					layer + (plus ? '+' : '')
+				).includes('Ctrl +') // Not on Ctrl + Key shortcuts
 			) {
 				pressKey('CapsLock');
 			}
 			if (
 				type === 'iso' &&
-				getKeyContent(this.layoutData, 'RCtrl', layer + (plus ? '+' : '')).includes('Ctrl') &&
-				!getKeyContent(this.layoutData, 'RCtrl', layer + (plus ? '+' : '')).includes('Ctrl +') // Not on Ctrl + Key shortcuts
+				getKeyContent(get(stores_infos['layoutData']), 'RCtrl', layer + (plus ? '+' : '')).includes(
+					'Ctrl'
+				) &&
+				!getKeyContent(
+					get(stores_infos['layoutData']),
+					'RCtrl',
+					layer + (plus ? '+' : '')
+				).includes('Ctrl +') // Not on Ctrl + Key shortcuts
 			) {
 				pressKey('RCtrl');
 			}
