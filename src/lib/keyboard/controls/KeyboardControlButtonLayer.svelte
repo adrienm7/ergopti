@@ -1,9 +1,7 @@
-<script>
-	import { createEventDispatcher } from 'svelte';
-	const dispatch = createEventDispatcher();
-
-	export let plusValue;
-	export let layerValue;
+<script lang="ts">
+	export let plusValue: string;
+	export let layerValue: string;
+	export let updateConfig: (partial: { layer: string }) => void;
 
 	const baseLayers = [
 		['Visuel', 'Visuel'],
@@ -32,9 +30,8 @@
 	// Pick the right list depending on plusValue
 	$: availableLayers = plusValue === 'yes' ? baseLayers.concat(extraLayers) : baseLayers;
 
-	function changeLayer(newLayer) {
-		layerValue = newLayer;
-		dispatch('message', { layer: newLayer });
+	function changeLayer(newLayer: string) {
+		updateConfig({ layer: newLayer });
 	}
 </script>
 

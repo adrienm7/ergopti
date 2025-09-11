@@ -2483,9 +2483,9 @@
 			"R": "Alt",
 			"R+": "<tap-hold><output-hold>Layer</output-hold><br><output-tap>⌫</output-tap></tap-hold>",
 			"Layer": "",
-			"À": "LAlt",
+			"À": "Alt",
 			"À+": "<tap-hold><output-hold>Layer</output-hold><br><output-tap>⌫</output-tap></tap-hold>",
-			",": "LAlt",
+			",": "Alt",
 			",+": "<tap-hold><output-hold>Layer</output-hold><br><output-tap>⌫</output-tap></tap-hold>",
 			"type": "special"
 		},

@@ -14,27 +14,31 @@
 		keyboardConfig = value;
 	});
 
-	function updateKeyboardConfig(event) {
+	function updateKeyboardConfig(partialConfig) {
 		stores_infos[id].update((currentKeyboardConfig) => ({
 			...currentKeyboardConfig,
-			...event.detail
+			...partialConfig
 		}));
 	}
 </script>
 
 <keyboard-controls id={`controls_${id}`}>
 	<KeyboardControlButtonPlus
-		on:message={updateKeyboardConfig}
+		updateConfig={updateKeyboardConfig}
 		plusValue={keyboardConfig['plus']}
 		layerValue={keyboardConfig['layer']}
 	/>
-	<KeyboardControlButtonType on:message={updateKeyboardConfig} typeValue={keyboardConfig['type']} />
+	<KeyboardControlButtonType
+		updateConfig={updateKeyboardConfig}
+		typeValue={keyboardConfig['type']}
+	/>
 	<KeyboardControlButtonColor
-		on:message={updateKeyboardConfig}
+		updateConfig={updateKeyboardConfig}
 		colorValue={keyboardConfig['color']}
 	/>
 	<KeyboardControlButtonLayer
-		on:message={updateKeyboardConfig}
+		updateConfig={updateKeyboardConfig}
 		layerValue={keyboardConfig['layer']}
+		plusValue={keyboardConfig['plus']}
 	/>
 </keyboard-controls>

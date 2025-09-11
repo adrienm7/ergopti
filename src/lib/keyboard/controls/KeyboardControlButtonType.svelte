@@ -1,14 +1,10 @@
-<script>
-	import { createEventDispatcher } from 'svelte';
-	const dispatch = createEventDispatcher();
-
-	export let typeValue;
+<script lang="ts">
+	export let typeValue: string;
+	export let updateConfig: (partial: { type: string }) => void;
 
 	function toggleType() {
 		const newType = typeValue === 'iso' ? 'ergodox' : 'iso';
-		typeValue = newType;
-
-		dispatch('message', { type: newType });
+		updateConfig({ type: newType });
 	}
 </script>
 
