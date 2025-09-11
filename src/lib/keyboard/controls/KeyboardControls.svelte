@@ -1,8 +1,6 @@
 <script>
 	import * as stores_infos from '$lib/stores_infos.js';
 	import '$lib/keyboard/controls/KeyboardControls.css';
-	import { Keyboard } from '$lib/keyboard/Keyboard.js';
-	import { onMount } from 'svelte';
 
 	import KeyboardControlButtonType from '$lib/keyboard/controls/KeyboardControlButtonType.svelte';
 	import KeyboardControlButtonColor from '$lib/keyboard/controls/KeyboardControlButtonColor.svelte';
@@ -10,55 +8,33 @@
 	import KeyboardControlButtonLayer from '$lib/keyboard/controls/KeyboardControlButtonLayer.svelte';
 
 	export let id;
-	let keyboardConfiguration;
-	const keyboard = new Keyboard(id);
-	stores_infos[keyboard.id].subscribe((value) => {
-		keyboardConfiguration = value;
-	});
-	onMount(() => {
-		keyboard.updateKeyboard();
+
+	let keyboardConfig;
+	stores_infos[id].subscribe((value) => {
+		keyboardConfig = value;
 	});
 
-	function handleMessage(event) {
-		// Permet de mettre à jour les données du clavier en fonction des contrôles
-		stores_infos[keyboard.id].update((currentData) => {
-			currentData['plus'] = event.detail['plus'];
-			currentData['type'] = event.detail['type'];
-			currentData['color'] = event.detail['color'];
-			currentData['layer'] = event.detail['layer'];
-			return currentData;
-		});
-		keyboard.updateKeyboard();
+	function updateKeyboardConfig(event) {
+		stores_infos[id].update((currentKeyboardConfig) => ({
+			...currentKeyboardConfig,
+			...event.detail
+		}));
 	}
 </script>
 
-<keyboard-controls id={'controls_' + id}>
+<keyboard-controls id={`controls_${id}`}>
 	<KeyboardControlButtonPlus
-		on:message={handleMessage}
-		plusValue={keyboardConfiguration['plus']}
-		typeValue={keyboardConfiguration['type']}
-		colorValue={keyboardConfiguration['color']}
-		layerValue={keyboardConfiguration['layer']}
+		on:message={updateKeyboardConfig}
+		plusValue={keyboardConfig['plus']}
+		layerValue={keyboardConfig['layer']}
 	/>
-	<KeyboardControlButtonType
-		on:message={handleMessage}
-		plusValue={keyboardConfiguration['plus']}
-		typeValue={keyboardConfiguration['type']}
-		colorValue={keyboardConfiguration['color']}
-		layerValue={keyboardConfiguration['layer']}
-	/>
+	<KeyboardControlButtonType on:message={updateKeyboardConfig} typeValue={keyboardConfig['type']} />
 	<KeyboardControlButtonColor
-		on:message={handleMessage}
-		plusValue={keyboardConfiguration['plus']}
-		typeValue={keyboardConfiguration['type']}
-		colorValue={keyboardConfiguration['color']}
-		layerValue={keyboardConfiguration['layer']}
+		on:message={updateKeyboardConfig}
+		colorValue={keyboardConfig['color']}
 	/>
 	<KeyboardControlButtonLayer
-		on:message={handleMessage}
-		plusValue={keyboardConfiguration['plus']}
-		typeValue={keyboardConfiguration['type']}
-		colorValue={keyboardConfiguration['color']}
-		layerValue={keyboardConfiguration['layer']}
+		on:message={updateKeyboardConfig}
+		layerValue={keyboardConfig['layer']}
 	/>
 </keyboard-controls>
