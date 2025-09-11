@@ -5369,7 +5369,7 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
         Value := ""
         loop StrLen(Combo) {
             ComboLetter := SubStr(Combo, A_Index, 1)
-            Value := Value . "{Tab}" . PersonalInformationHotstrings[ComboLetter]
+            Value := Value . PersonalInformationHotstrings[ComboLetter] . "{Tab}"
         }
         CreateHotstring("*", "@" Combo "★", Value, Map("OnlyText", False).Set("FinalResult", True))
     }
