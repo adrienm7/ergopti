@@ -1,4 +1,5 @@
 import * as stores_infos from '$lib/stores_infos.js';
+import { get } from 'svelte/store';
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
 import magicReplacements from '$lib/keyboard/data/magicReplacements.json';
 
@@ -7,7 +8,7 @@ export class KeyboardEmulation extends Keyboard {
 		super(id);
 
 		this['layer'] = 'Primary'; // Default layer
-		this['activeLayers'] = {
+		this['modifiers'] = {
 			Shift: false,
 			Alt: false,
 			AltGr: false,
@@ -21,7 +22,7 @@ export class KeyboardEmulation extends Keyboard {
 			',': false
 		};
 
-		// We use bind here is because otherwise the scope of "this" is changed in the text input and this.layoutData becomes undefined
+		// We use bind here is because otherwise the scope of "this" is changed in the text input and this["name"] becomes undefined
 		this.emulateKey = this.emulateKey.bind(this);
 		this.releaseKey = this.releaseKey.bind(this);
 	}
@@ -29,22 +30,22 @@ export class KeyboardEmulation extends Keyboard {
 	layerUpdate() {
 		// Determine the new value of the layer
 		const priorities = [
-			{ cond: this['activeLayers']['AltGr'] && this['activeLayers']['Shift'], value: 'ShiftAltGr' },
+			{ cond: this['modifiers']['AltGr'] && this['modifiers']['Shift'], value: 'ShiftAltGr' },
 			{
-				cond: this['activeLayers']['Circonflexe'] && this['activeLayers']['Shift'],
+				cond: this['modifiers']['Circonflexe'] && this['modifiers']['Shift'],
 				value: 'CirconflexeShift'
 			},
-			{ cond: this['activeLayers']['Trema'] && this['activeLayers']['Shift'], value: 'TremaShift' },
-			{ cond: this['activeLayers']['AltGr'], value: 'AltGr' },
-			{ cond: this['activeLayers']['Shift'], value: 'Shift' },
-			{ cond: this['activeLayers']['Ctrl'], value: 'Ctrl' },
-			{ cond: this['activeLayers']['Circonflexe'], value: 'Circonflexe' },
-			{ cond: this['activeLayers']['Trema'], value: 'Trema' },
-			{ cond: this['activeLayers']['Exposant'], value: 'Exposant' },
-			{ cond: this['activeLayers']['Indice'], value: 'Indice' },
-			{ cond: this['activeLayers']['R'], value: 'R' },
-			{ cond: this['activeLayers']['À'], value: 'À' },
-			{ cond: this['activeLayers'][','], value: ',' }
+			{ cond: this['modifiers']['Trema'] && this['modifiers']['Shift'], value: 'TremaShift' },
+			{ cond: this['modifiers']['AltGr'], value: 'AltGr' },
+			{ cond: this['modifiers']['Shift'], value: 'Shift' },
+			{ cond: this['modifiers']['Ctrl'], value: 'Ctrl' },
+			{ cond: this['modifiers']['Circonflexe'], value: 'Circonflexe' },
+			{ cond: this['modifiers']['Trema'], value: 'Trema' },
+			{ cond: this['modifiers']['Exposant'], value: 'Exposant' },
+			{ cond: this['modifiers']['Indice'], value: 'Indice' },
+			{ cond: this['modifiers']['R'], value: 'R' },
+			{ cond: this['modifiers']['À'], value: 'À' },
+			{ cond: this['modifiers'][','], value: ',' }
 		];
 		const match = priorities.find((p) => p.cond);
 		this['layer'] = match ? match.value : 'Primary'; // If no match, use default value Primary
@@ -59,11 +60,15 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	emulateKey(event) {
+		const layoutData = get(stores_infos['layoutData']);
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
+		const type = get(stores_infos[this.id])['type'];
+
 		const activeModifier = this.determineActiveModifier(event); // Determine if the key pressed is a modifier
 		if (activeModifier) {
-			this['activeLayers'][activeModifier] = true; // Set the modifier state to active
+			this['modifiers'][activeModifier] = true; // Set the modifier state to active
 			this.layerUpdate();
-			if (this.keyboardConfiguration['plus'] === 'yes' && activeModifier === 'Alt') {
+			if (plus && activeModifier === 'Alt') {
 				this.sendResult('BackSpace');
 			}
 			// If a modifier has been pressed, no key to send right now, so we exit the function
@@ -72,7 +77,7 @@ export class KeyboardEmulation extends Keyboard {
 		}
 
 		// Do not intercept shortcuts with Ctrl
-		if (this['activeLayers']['Ctrl'] && !this['activeLayers']['AltGr']) {
+		if (this['modifiers']['Ctrl'] && !this['modifiers']['AltGr']) {
 			// Note: when this["AltGr"] is active, Ctrl is also active, hence the "&& !this["AltGr"]"
 
 			// Ctrl + key gives Ctrl + key emulation: Doesn’t work yet, may not be possible due to security reasons
@@ -90,18 +95,16 @@ export class KeyboardEmulation extends Keyboard {
 
 		// If a key other than a modifier was pressed
 		const keyCodePressed = event.code;
-		const keyIdentifier = this.layoutData[this.keyboardConfiguration.type].find(
-			(el) => el['code'] === keyCodePressed
-		);
+		const keyIdentifier = layoutData[type].find((el) => el['code'] === keyCodePressed);
 		this.pressKey(keyIdentifier['key']); // Press the key location on the visual keyboard layout
 
 		if (keyIdentifier !== undefined) {
 			event.preventDefault(); // Don’t send the key defined in the computer keyboard layout
-			const keyContent = this.layoutData['keys'].find((el) => el['key'] === keyIdentifier['key']);
+			const keyContent = layoutData['keys'].find((el) => el['key'] === keyIdentifier['key']);
 
 			const activeDeadKey = this.determineActiveDeadKey(keyContent); // Activate a potential dead key
 			if (activeDeadKey) {
-				this['activeLayers'][activeDeadKey] = true;
+				this['modifiers'][activeDeadKey] = true;
 				this.layerUpdate();
 				return;
 			}
@@ -113,7 +116,7 @@ export class KeyboardEmulation extends Keyboard {
 
 	pressKey(key) {
 		// Clean other pressed keys
-		const keyboardLocation = this.getKeyboardLocation();
+		const keyboardLocation = this.location;
 		const pressedKeys = keyboardLocation.querySelectorAll('.pressed-key');
 		[].forEach.call(pressedKeys, function (el) {
 			if (
@@ -126,13 +129,11 @@ export class KeyboardEmulation extends Keyboard {
 		});
 
 		// Press the key
-		keyboardLocation
-			.querySelector("keyboard-key[data-key='" + key + "']")
-			.classList.add('pressed-key');
+		keyboardLocation.querySelector(`keyboard-key[data-key='${key}']`).classList.add('pressed-key');
 	}
 
 	determineActiveModifier(event) {
-		const plus = this.keyboardConfiguration['plus'] === 'yes';
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
 
 		if (event.code === 'AltRight' || event.code === 'AltGraph') {
 			return 'AltGr';
@@ -164,8 +165,10 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	getResultToSend(keyContent) {
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
 		let resultToSend = '';
-		if (this.keyboardConfiguration['plus'] === 'yes') {
+
+		if (plus) {
 			if (keyContent[this['layer'] + '+'] !== undefined) {
 				resultToSend = keyContent[this['layer'] + '+'];
 			} else {
@@ -178,18 +181,18 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	getResultToSendFinal(keyContent) {
-		const plus = this.keyboardConfiguration['plus'] === 'yes';
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
 		const keyPressed = keyContent['key'];
 		let resultToSend = this.getResultToSend(keyContent);
 		let charactersToDelete = 0;
 
 		// If a dead key or assimilated is currently activated, it needs to be deactivated now that we send the character present on it
 		for (const layerName of ['Circonflexe', 'Trema', 'Exposant', 'Indice', 'R', 'À', ',']) {
-			if (this['activeLayers'][layerName]) {
+			if (this['modifiers'][layerName]) {
 				if (layerName === 'À' || layerName === ',') {
 					charactersToDelete = 1; // Delete the previously typed "à" or "," before sending the result on the layer
 				}
-				this['activeLayers'][layerName] = false;
+				this['modifiers'][layerName] = false;
 				this.layerUpdate();
 				break;
 			}
@@ -197,29 +200,29 @@ export class KeyboardEmulation extends Keyboard {
 
 		// If "à" or "," is on the key to send, we send the character and switch layer
 		if (resultToSend === 'à') {
-			this['activeLayers']['À'] = true;
+			this['modifiers']['À'] = true;
 			this.layerUpdate();
 		}
 		if (resultToSend === ',') {
-			this['activeLayers'][','] = true;
+			this['modifiers'][','] = true;
 			this.layerUpdate();
 		}
 
 		if (keyPressed === 'BackSpace') {
 			resultToSend = 'BackSpace';
 		} else if (
-			this['activeLayers']['Ctrl'] &&
+			this['modifiers']['Ctrl'] &&
 			(keyPressed === 'BackSpace' || (plus && keyPressed === 'LAlt'))
 		) {
 			resultToSend = 'Ctrl-BackSpace';
 		} else if (
-			this['activeLayers']['Ctrl'] & (keyPressed === 'Delete') ||
+			this['modifiers']['Ctrl'] & (keyPressed === 'Delete') ||
 			resultToSend === '"Ctrl + ⌦"'
 		) {
 			resultToSend = 'Ctrl-Delete';
 		} else if (
 			keyPressed === 'Delete' ||
-			(plus && this['activeLayers']['Shift'] && keyPressed === 'LAlt')
+			(plus && this['modifiers']['Shift'] && keyPressed === 'LAlt')
 		) {
 			resultToSend = 'Delete';
 		} else if (keyPressed === 'Enter' || (plus && keyPressed === 'CapsLock')) {
@@ -229,6 +232,7 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	sendResult(resultToSend, charactersToDelete = 0) {
+		const plus = get(stores_infos[this.id])['plus'] === 'yes';
 		let newTextAreaValue = this.textarea.value;
 		if (charactersToDelete > 0) {
 			newTextAreaValue = newTextAreaValue.slice(0, -charactersToDelete);
@@ -297,7 +301,7 @@ export class KeyboardEmulation extends Keyboard {
 			newCursorPosition = cursorPosition + resultToSend.length;
 		}
 
-		if (this.keyboardConfiguration['plus'] === 'yes') {
+		if (plus) {
 			[newTextAreaValue, newCursorPosition] = this.ergoptiPlusFeatures(
 				newTextAreaValue,
 				newCursorPosition
@@ -401,7 +405,7 @@ export class KeyboardEmulation extends Keyboard {
 	releaseKey(event) {
 		const modifier = this.determineActiveModifier(event);
 		if (modifier) {
-			this['activeLayers'][modifier] = false;
+			this['modifiers'][modifier] = false;
 			this.layerUpdate();
 		}
 	}
