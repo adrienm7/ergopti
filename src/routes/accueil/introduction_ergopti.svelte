@@ -20,7 +20,7 @@
 	</div>
 
 	<div style="margin: 0 auto; text-align:center; padding-top: 5px;">
-		<a href="#debut" class="scrollez"><i class="icon-chevron-down"></i></a>
+		<a href="#debut" class="scroll-down"><i class="icon-chevron-down"></i></a>
 	</div>
 	<div id="debut">
 		<small-space />
@@ -86,14 +86,15 @@
 </section>
 
 <style>
-	.scrollez {
+	.scroll-down {
 		-webkit-animation: bounce7 2.5s infinite;
 		animation: bounce7 2.5s infinite;
 		color: white;
 		display: block;
 		font-size: 4rem;
 		font-size: clamp(20px, 4rem, 100px);
-		text-align: center;
+		margin: 0 auto;
+		width: fit-content;
 	}
 
 	@keyframes bounce7 {
@@ -110,7 +111,7 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.scrollez {
+		.scroll-down {
 			animation: none;
 		}
 	}
