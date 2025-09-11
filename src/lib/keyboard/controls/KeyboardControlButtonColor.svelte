@@ -1,10 +1,21 @@
-<script lang="ts">
-	export let colorValue: string;
-	export let updateConfig: (partial: { color: string }) => void;
+<script>
+	import * as stores_infos from '$lib/stores_infos.js';
+
+	export let id;
+
+	let colorValue;
+
+	stores_infos[id].subscribe((config) => {
+		colorValue = config.color;
+	});
 
 	function toggleColor() {
 		const newColor = colorValue === 'yes' ? 'no' : 'yes';
-		updateConfig({ color: newColor });
+
+		stores_infos[id].update((current) => ({
+			...current,
+			color: newColor
+		}));
 	}
 </script>
 

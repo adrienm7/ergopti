@@ -1,10 +1,21 @@
-<script lang="ts">
-	export let typeValue: string;
-	export let updateConfig: (partial: { type: string }) => void;
+<script>
+	import * as stores_infos from '$lib/stores_infos.js';
+
+	export let id;
+
+	let typeValue;
+
+	stores_infos[id].subscribe((config) => {
+		typeValue = config.type;
+	});
 
 	function toggleType() {
 		const newType = typeValue === 'iso' ? 'ergodox' : 'iso';
-		updateConfig({ type: newType });
+
+		stores_infos[id].update((current) => ({
+			...current,
+			type: newType
+		}));
 	}
 </script>
 

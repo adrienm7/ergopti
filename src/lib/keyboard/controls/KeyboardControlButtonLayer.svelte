@@ -1,7 +1,7 @@
-<script lang="ts">
-	export let plusValue: string;
-	export let layerValue: string;
-	export let updateConfig: (partial: { layer: string }) => void;
+<script>
+	import * as stores_infos from '$lib/stores_infos.js';
+
+	export let id;
 
 	const baseLayers = [
 		['Visuel', 'Visuel'],
@@ -27,11 +27,19 @@
 		['★ À', 'À']
 	];
 
-	// Pick the right list depending on plusValue
-	$: availableLayers = plusValue === 'yes' ? baseLayers.concat(extraLayers) : baseLayers;
+	let layerValue;
+	let availableLayers;
 
-	function changeLayer(newLayer: string) {
-		updateConfig({ layer: newLayer });
+	stores_infos[id].subscribe((config) => {
+		layerValue = config.layer;
+		availableLayers = config.plus === 'yes' ? baseLayers.concat(extraLayers) : baseLayers;
+	});
+
+	function changeLayer(newLayer) {
+		stores_infos[id].update((current) => ({
+			...current,
+			layer: newLayer
+		}));
 	}
 </script>
 

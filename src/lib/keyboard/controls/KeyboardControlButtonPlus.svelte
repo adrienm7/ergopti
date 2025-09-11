@@ -1,11 +1,19 @@
-<script lang="ts">
-	export let plusValue: string;
-	export let layerValue: string;
-	export let updateConfig: (partial: { plus: string; layer: string }) => void;
+<script>
+	import * as stores_infos from '$lib/stores_infos.js';
+
+	export let id;
+
+	let plusValue;
+	let layerValue;
+
+	stores_infos[id].subscribe((config) => {
+		plusValue = config.plus;
+		layerValue = config.layer;
+	});
 
 	function togglePlus() {
-		let newPlus: string;
-		let newLayer: string = layerValue;
+		let newPlus;
+		let newLayer = layerValue;
 
 		if (plusValue === 'yes') {
 			newPlus = 'no';
@@ -18,10 +26,11 @@
 			newPlus = 'yes';
 		}
 
-		updateConfig({
+		stores_infos[id].update((current) => ({
+			...current,
 			plus: newPlus,
 			layer: newLayer
-		});
+		}));
 	}
 </script>
 
