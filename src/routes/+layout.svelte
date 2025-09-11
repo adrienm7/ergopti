@@ -137,7 +137,7 @@
 </bloc-page>
 
 <keyboard-reference>
-	<button id="afficher-clavier-reference" on:click={toggleZIndex}>
+	<button id="afficher-clavier-reference" onclick={toggleZIndex}>
 		<i
 			class="icon-keyboard-duotone"
 			style="width:100%; display:{affiche === 'none' ? 'block' : 'none'}"

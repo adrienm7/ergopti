@@ -18,12 +18,12 @@
 	<KeyboardEmulation />
 	<tiny-space></tiny-space>
 	{#if isCollapsed}
-		<button on:click={() => (isCollapsed = !isCollapsed)}>
+		<button onclick={() => (isCollapsed = !isCollapsed)}>
 			Afficher les abréviations implémentées sur cette démo
 		</button>
 	{/if}
 	{#if !isCollapsed}
-		<button on:click={() => (isCollapsed = !isCollapsed)}>
+		<button onclick={() => (isCollapsed = !isCollapsed)}>
 			Masquer les abréviations implémentées sur cette démo
 		</button>
 		<tiny-space></tiny-space>
