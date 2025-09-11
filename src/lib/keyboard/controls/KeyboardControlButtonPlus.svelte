@@ -1,29 +1,24 @@
-<script>
-	import { createEventDispatcher } from 'svelte';
-	const dispatch = createEventDispatcher();
-
-	export let plusValue;
-	export let layerValue;
+<script lang="ts">
+	export let plusValue: string;
+	export let layerValue: string;
+	export let updateConfig: (partial: { plus: string; layer: string }) => void;
 
 	function togglePlus() {
-		let newPlus,
-			newLayer = layerValue;
+		let newPlus: string;
+		let newLayer: string = layerValue;
 
 		if (plusValue === 'yes') {
 			newPlus = 'no';
 
 			// Reset the layer if it is specific to Ergopti+
-			if (layerValue === 'À' || layerValue === 'Layer') {
+			if ([',', 'À', 'Layer'].includes(layerValue)) {
 				newLayer = 'Visuel';
 			}
 		} else {
 			newPlus = 'yes';
 		}
 
-		plusValue = newPlus;
-		layerValue = newLayer;
-
-		dispatch('message', {
+		updateConfig({
 			plus: newPlus,
 			layer: newLayer
 		});

@@ -13,7 +13,6 @@ function logarithmicTransformation(value, scaleFactor) {
 export class Keyboard {
 	constructor(id) {
 		this.id = id;
-		this.location = this.getKeyboardLocation();
 
 		// Automatically update the keyboard as soon as layoutData changes
 		stores_infos['layoutData'].subscribe((value) => {

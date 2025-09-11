@@ -1,13 +1,10 @@
-<script>
-	import { createEventDispatcher } from 'svelte';
-	const dispatch = createEventDispatcher();
-
-	export let colorValue;
+<script lang="ts">
+	export let colorValue: string;
+	export let updateConfig: (partial: { color: string }) => void;
 
 	function toggleColor() {
 		const newColor = colorValue === 'yes' ? 'no' : 'yes';
-		colorValue = newColor;
-		dispatch('message', { color: newColor });
+		updateConfig({ color: newColor });
 	}
 </script>
 
