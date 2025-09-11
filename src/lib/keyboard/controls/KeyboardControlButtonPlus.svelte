@@ -31,7 +31,7 @@
 </script>
 
 <keyboard-control-plus>
-	<button on:click={togglePlus}>
+	<button onclick={togglePlus}>
 		{#if plusValue === 'yes'}
 			<p><span class="hyper">Plus</span>&nbsp;➜ Standard</p>
 		{:else}

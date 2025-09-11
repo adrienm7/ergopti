@@ -122,7 +122,7 @@
 	</p>
 
 	<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
-		<button on:click={toggleClavier} style="height:2.5rem;">
+		<button onclick={toggleClavier} style="height:2.5rem;">
 			{#if clavier === 'ergodox'}
 				{@html '<p><strong class="ergodox-text-gradient">Ergodox</strong> ➜&nbsp;ISO</p>'}
 			{:else}

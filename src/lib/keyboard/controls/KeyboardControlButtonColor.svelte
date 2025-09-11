@@ -12,7 +12,7 @@
 </script>
 
 <keyboard-control-color>
-	<button on:click={toggleColor}>
+	<button onclick={toggleColor}>
 		{#if colorValue === 'yes'}
 			<p><span class="color-text-gradient">Color</span>&nbsp;➜ Bicolor</p>
 		{:else}
