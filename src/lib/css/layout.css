@@ -10,19 +10,19 @@
 	display: flex;
 	flex-direction: column;
 	margin: 0;
-	padding: 0;
 	min-height: 100vh;
+	padding: 0;
 }
 
 #main-content {
-	width: var(--largeur-main);
 	overflow-x: hidden; /* Très important pour que les animations AOS horizontales n’agrandissent pas l’écran */
+	width: var(--largeur-main);
 }
 
 bloc-main {
+	background: #00000090;
 	display: flex;
 	flex-direction: row;
-	background: #00000090;
 	padding-bottom: 10vh;
 }
 
@@ -37,35 +37,35 @@ main,
 }
 
 #sidebar > div {
-	position: sticky;
-	top: calc(var(--hauteur-header) + 2rem);
+	background: rgba(0, 0, 0, 0.6);
 	border: 1px solid rgba(255, 255, 255, 0.3);
 	border-left: none;
 	border-radius: 0 10px 10px 0;
-	background: rgba(0, 0, 0, 0.6);
-	padding: 1rem;
 	height: fit-content;
-	max-height: calc(100vh - var(--hauteur-header) - 4rem);
+	max-height: calc(100vh - var(--header-height) - 4rem);
 	/* box-shadow: 0px 0px 6px 3px var(--couleur-ombre); */
 	overflow: auto;
+	padding: 1rem;
+	position: sticky;
+	top: calc(var(--header-height) + 2rem);
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1280px) {
 	#sidebar {
 		display: none;
 	}
 	#main-content {
 		width: 100vw;
 	}
-	#menu-contenu {
+	#menu-page-content {
 		display: block;
 	}
 	#page-toc-mobile {
 		padding-left: var(--marge-fenetre);
 	}
 }
-@media (min-width: 1400px) {
-	#menu-contenu {
+@media (min-width: 1280px) {
+	#menu-page-content {
 		display: none;
 	}
 }
