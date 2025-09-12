@@ -6,23 +6,6 @@
 
 	import { getKeyboardData } from '$lib/keyboard/data/getKeyboardData.js';
 	import { version, layoutData, versionsList, discordLink } from '$lib/stores_infos.js';
-	let versionValue;
-	version.subscribe((value) => {
-		versionValue = value;
-	});
-
-	function handleVersionChange() {
-		getKeyboardData(versionValue)
-			.then((data) => {
-				layoutData.set(data);
-				version.set(versionValue); // Utiliser `set` pour mettre à jour la version dans le store
-				// console.log('Données chargées :', data);
-			})
-			.catch((error) => {
-				console.error('Erreur lors du chargement des données :', error);
-			});
-	}
-	handleVersionChange();
 
 	function closeMenu() {
 		document.getElementById('menu-btn').checked = false;
@@ -57,6 +40,20 @@
 	$effect(() => {
 		toggleOverflowMenu();
 		window.addEventListener('resize', toggleOverflowMenu);
+
+		return () => {
+			window.removeEventListener('resize', toggleOverflowMenu);
+		};
+	});
+
+	$effect(() => {
+		getKeyboardData($version)
+			.then((data) => {
+				layoutData.set(data);
+			})
+			.catch((error) => {
+				console.error('Error while loading layout data:', error);
+			});
 	});
 </script>
 
@@ -73,13 +70,10 @@
 				<a href="/" aria-label="Accéder à la page d’accueil">
 					<Ergopti></Ergopti>
 				</a>
-				<select
-					id="version-selection"
-					bind:value={versionValue}
-					onchange={handleVersionChange}
-					data-version={versionValue}
-				>
-					{#each versionsList as value}<option {value}>{value}</option>{/each}
+				<select id="version-selection" bind:value={$version}>
+					{#each versionsList as v}
+						<option value={v}>{v}</option>
+					{/each}
 				</select>
 				<a
 					href="/informations/#changelog"
@@ -105,7 +99,9 @@
 				aria-label="Accéder à la page Ergopti"
 				aria-current={$page.url.pathname === '/' ? 'page' : undefined}
 			>
-				<i class="icon-keyboard-duotone"><span class="path1"></span><span class="path2"></span></i>
+				<i class="icon-keyboard-duotone" style="position:relative; right:2px; top:0.5px">
+					<span class="path1"></span><span class="path2"></span>
+				</i>
 				<span class="title">Ergopti</span>
 			</a>
 			<a
@@ -114,42 +110,46 @@
 				aria-label="Accéder à la page Ergopti+"
 				aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
 			>
-				<i class="icon-circle-star">
+				<i class="icon-circle-star" style="position:relative; right:-1px; margin-left:1px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
-				<span class="title" style="position:relative; top:-2px; right:1px"
-					>Ergopti<span class="glow">+</span></span
-				></a
-			>
+				<span class="title">
+					Ergopti<span class="glow">+</span>
+				</span>
+			</a>
 			<a
 				href="/benchmarks"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Benchmarks"
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 			>
-				<i class="icon-chart-mixed" style="position:relative; right:2px; top:-2px"
-					><span class="path1"></span><span class="path2"></span>
+				<i class="icon-chart-mixed" style="position:relative; right:3px; top:-2px; margin-left:6px">
+					<span class="path1"></span><span class="path2"></span>
 				</i>
-				<span class="title">Benchmarks</span></a
-			>
+				<span class="title">Benchmarks</span>
+			</a>
 			<a
 				href="/telechargements"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Téléchargements"
 				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 			>
-				<i class="icon-download"><span class="path1"></span><span class="path2"></span></i>
-				<span class="title">Téléchargements</span></a
-			>
+				<i class="icon-download" style="margin-left:3px">
+					<span class="path1"></span><span class="path2"></span>
+				</i>
+				<span class="title">Téléchargements</span>
+			</a>
 			<a
 				href="/informations"
 				onclick={closeMenu}
 				aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
 				aria-label="Accéder à la page Informations"
 			>
-				<i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
-				<span class="title">Informations</span></a
-			>
+				<i class="icon-circle-info">
+					<span class="path1"></span><span class="path2"></span>
+				</i>
+				<span class="title">Informations</span>
+			</a>
 		</div>
 		<div id="menu-page-content">
 			<p id="menu-page-content-title">Contenu de la page</p>
@@ -301,7 +301,7 @@
 	}
 
 	#menu-pages a[aria-current='page'] .title {
-		line-height: 1.3; /* Opthewrwise, the gradient is cut */
+		line-height: 1.3; /* Othewrwise, the gradient is cut */
 	}
 
 	#menu-pages a[aria-current='page'] .title,
@@ -427,12 +427,9 @@
 			padding-left: calc(2 * var(--espacement-items-menu) + 5px);
 		}
 		#menu-pages a .title {
+			display: inline-flex;
 			font-size: 1rem;
 			text-align: center; /* Dans le cas où le texte passe sur deux lignes car trop long */
-		}
-
-		#menu-pages a i {
-			margin-right: 5px;
 		}
 
 		#menu-pages a:not(:last-child)::after {
@@ -443,6 +440,15 @@
 			position: relative;
 			right: calc((-1) * var(--espacement-items-menu));
 			width: 5px;
+		}
+
+		#menu-pages a i {
+			margin-right: 5px;
+		}
+
+		/* Correct problem of the "+" of Ergopti+ title being too low */
+		.title .glow {
+			top: -0.125em;
 		}
 
 		/* Underline selected page */
