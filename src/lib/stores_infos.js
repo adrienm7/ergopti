@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
-export const versionsList = ['1.1', '2.0', '2.1', '2.2'];
-export const latestVersion = versionsList[versionsList.length - 1];
+export const versionsList = ['1.1', '2.0', '2.1', '2.2'].reverse();
+export const latestVersion = versionsList[0];
 export let version = writable(latestVersion); // Default value
 
 export const layoutData = writable();

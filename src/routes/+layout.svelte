@@ -212,7 +212,7 @@
 		left: 0;
 		overflow: scroll;
 		overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
-		padding-top: var(--hauteur-header);
+		padding-top: var(--header-height);
 		position: fixed;
 		transition: all 0.2s ease-in-out;
 		width: 100vw;
@@ -226,6 +226,6 @@
 		flex-direction: column;
 		justify-content: center;
 		margin: var(--marge) 0;
-		min-height: calc(100vh - var(--hauteur-header) - 2 * var(--marge) + 1px);
+		min-height: calc(100vh - var(--header-height) - 2 * var(--marge) + 1px);
 	}
 </style>

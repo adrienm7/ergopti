@@ -40,3 +40,7 @@
 .toc-list .toc-list li {
 	margin-top: 0;
 }
+
+#page-toc-mobile {
+	display: block;
+}
