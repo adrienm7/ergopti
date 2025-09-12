@@ -99,7 +99,7 @@
 				aria-label="Accéder à la page Ergopti"
 				aria-current={$page.url.pathname === '/' ? 'page' : undefined}
 			>
-				<i class="icon-keyboard-duotone" style="position:relative; right:2px; top:0.5px">
+				<i class="icon-keyboard-duotone" style="margin-right:7px; margin-top:2px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title">Ergopti</span>
@@ -110,10 +110,10 @@
 				aria-label="Accéder à la page Ergopti+"
 				aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
 			>
-				<i class="icon-circle-star" style="position:relative; right:-1px; margin-left:1px">
+				<i class="icon-circle-star" style="margin-right:3px; margin-top:2px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
-				<span class="title">
+				<span class="title" style="margin-top:3px;">
 					Ergopti<span class="glow">+</span>
 				</span>
 			</a>
@@ -123,10 +123,10 @@
 				aria-label="Accéder à la page Benchmarks"
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 			>
-				<i class="icon-chart-mixed" style="position:relative; right:3px; top:-2px; margin-left:6px">
+				<i class="icon-chart-mixed" style="margin-right:7px; margin-top:-2px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
-				<span class="title">Benchmarks</span>
+				<span class="title" style="margin-top:3px;">Benchmarks</span>
 			</a>
 			<a
 				href="/telechargements"
@@ -134,7 +134,7 @@
 				aria-label="Accéder à la page Téléchargements"
 				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
 			>
-				<i class="icon-download" style="margin-left:3px">
+				<i class="icon-download" style="margin-right:3px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title">Téléchargements</span>
@@ -145,7 +145,7 @@
 				aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
 				aria-label="Accéder à la page Informations"
 			>
-				<i class="icon-circle-info">
+				<i class="icon-circle-info" style="margin-right:5px; margin-top:2px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title">Informations</span>
@@ -183,8 +183,8 @@
 		--header-color-mobile: rgba(0, 16, 36, 0.975);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
-		--espacement-items-menu: clamp(5px, 1vw, 50px);
-		--couleur-ombre: rgba(200, 233, 255, 0.4);
+		--items-menu-spacing: clamp(4px, 0.7vw, 25px);
+		--menu-separators-color: rgb(200, 233, 255);
 		--marge-fenetre: var(--marge-bords-menu);
 		--header-height: clamp(70px, 5.5vw, 120px);
 		--couleur-icone-hamburger: white;
@@ -290,6 +290,20 @@
 		display: none;
 	}
 
+	#menu-pages {
+		display: flex;
+	}
+
+	#menu-pages a {
+		align-items: center;
+		display: flex;
+	}
+
+	#menu-pages a .title {
+		display: inline-flex;
+		font-size: 1rem;
+	}
+
 	#menu-pages a:not([aria-current='page']) .title:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
@@ -301,7 +315,7 @@
 	}
 
 	#menu-pages a[aria-current='page'] .title {
-		line-height: 1.3; /* Othewrwise, the gradient is cut */
+		line-height: 1.3; /* Otherwise, the gradient is cut */
 	}
 
 	#menu-pages a[aria-current='page'] .title,
@@ -318,6 +332,11 @@
 
 	#menu-pages a[aria-current='page'] i .path1::before {
 		background-image: linear-gradient(var(--gradient-purple-dark));
+	}
+
+	/* Correct problem of the "+" of Ergopti+ title being too low */
+	.title .glow {
+		top: -0.125em;
 	}
 
 	/* Menu mobile */
@@ -337,13 +356,14 @@
 			z-index: 98;
 		}
 
+		#menu-pages {
+			flex-direction: column;
+		}
+
 		#menu-pages a {
 			border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-			display: block;
-			line-height: 1em;
 			padding: var(--hauteur-element-menu-mobile) 0;
 			padding-left: var(--marge-fenetre);
-			text-decoration: none;
 		}
 
 		/* menu icon */
@@ -416,39 +436,23 @@
 	/* Menu on large screens */
 	@media (min-width: 1280px) {
 		#menu-pages {
-			display: flex;
+			flex-direction: row;
 			padding-right: var(--marge-bords-menu);
 		}
 
 		#menu-pages a {
-			align-items: center;
-			display: flex;
-			height: var(--header-height);
-			padding-left: calc(2 * var(--espacement-items-menu) + 5px);
-		}
-		#menu-pages a .title {
-			display: inline-flex;
-			font-size: 1rem;
-			text-align: center; /* Dans le cas où le texte passe sur deux lignes car trop long */
+			margin: 0 var(--items-menu-spacing);
 		}
 
 		#menu-pages a:not(:last-child)::after {
-			background-color: transparent;
-			box-shadow: 2px 0 2px 0px var(--couleur-ombre);
+			background-color: #5b5b5b;
+			border-radius: 3px;
 			content: '';
-			height: 100%;
+			display: inline-block;
+			height: calc(0.5 * var(--header-height));
 			position: relative;
-			right: calc((-1) * var(--espacement-items-menu));
-			width: 5px;
-		}
-
-		#menu-pages a i {
-			margin-right: 5px;
-		}
-
-		/* Correct problem of the "+" of Ergopti+ title being too low */
-		.title .glow {
-			top: -0.125em;
+			right: calc(-1 * var(--items-menu-spacing));
+			width: 3px;
 		}
 
 		/* Underline selected page */
