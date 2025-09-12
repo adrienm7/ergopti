@@ -32,7 +32,6 @@ def main(input_path: str = None, directory_path: str = None):
             content = f.read()
 
         content = fix_invalid_symbols(content)
-        content = ensure_keymap2_has_euro(content)
         content = swap_keys_10_and_50(content)
 
         # Add keymap 4
@@ -71,23 +70,6 @@ def fix_invalid_symbols(content):
             """\t\t<action id="&amp;">\n\t\t\t<when state="none" output="&#x0026;"/>""",
         )
     )
-
-
-def ensure_keymap2_has_euro(content):
-    pattern = r'(<keyMap index="2">.*?</keyMap>)'
-    match = re.search(pattern, content, flags=re.DOTALL)
-    if not match:
-        return content
-
-    block = match.group(1)
-    if re.search(r'<key code="24".*€', block):
-        return content
-
-    new_block = re.sub(
-        r"(</keyMap>)", '\t<key code="24" output=" €"/>\n\t\t\\1', block
-    )
-
-    return content.replace(block, new_block, 1)
 
 
 def swap_keys_10_and_50(content):
@@ -136,6 +118,7 @@ def replace_keymap_index(content, from_index, to_index):
 
 
 def fix_keymap4_symbols(content):
+    # This code is for getting the Ctrl + and Ctrl - zoom shortcuts working
     def replace_in_keymap(match):
         # Replace only in this keymap (index 4)
         header, body, footer = match.groups()

@@ -1800,27 +1800,40 @@ DeadKey(Mapping) {
     }
 }
 
-; TODO : if KbdEdit is upgraded, some new Unicode characters will become available.
-; This AutoHotkey script has all the characters, and the KbdEdit file has some missing ones.
-; For example, there is no 🄋 character yet in KbdEdit, so we use a temporary ➉ as it is better than nothing
+; TODO : if KbdEdit is upgraded, some "NEW" Unicode characters will become available
+; This AutoHotkey script has all the characters, and the KbdEdit file has some missing ones
+; For example, there is no 🄋 character yet in KbdEdit, but it is already available in this emulation
 
 global DeadkeyMappingCircumflex := Map(
+    " ", "^", "^", "^",
+    "'", "⚠",
+    ",", "➜",
+    ".", "•",
+    "/", "⁄",
+    "0", "🄋", ; NEW
+    "1", "➀",
+    "2", "➁",
+    "3", "➂",
+    "4", "➃",
+    "5", "➄",
+    "6", "➅",
+    "7", "➆",
+    "8", "➇",
+    "9", "➈",
+    ":", "▶",
+    ";", "↪",
     "a", "â", "A", "Â",
-    "à", "œ", "À", "Œ",
     "b", "⚐", "B", "⚑",
     "c", "º", "C", "°",
     "d", "★", "D", "☆",
     "e", "ê", "E", "Ê",
-    "é", "æ", "É", "Æ",
-    "è", "ó", "È", "Ó",
-    "ê", "á", "Ê", "Á",
     "f", "✅", "F", "☑",
     "g", "ĝ", "G", "Ĝ",
     "h", "ĥ", "H", "Ĥ",
     "i", "î", "I", "Î",
     "j", "ĵ", "J", "Ĵ",
     "k", "☺", "K", "☻",
-    "l", "†", "‡", "☻",
+    "l", "†", "L", "‡",
     "m", "⁂", "M", "⁂",
     "n", "ñ", "N", "Ñ",
     "o", "ô", "O", "Ô",
@@ -1835,26 +1848,24 @@ global DeadkeyMappingCircumflex := Map(
     "x", "✕", "X", "✖",
     "y", "ŷ", "Y", "Ŷ",
     "z", "ẑ", "Z", "Ẑ",
-    " ", "^", "^", "^",
-    "'", "⚠",
-    ".", "•",
-    ":", "▶",
-    ",", "➜",
-    ";", "↪",
-    "/", "⁄",
-    "0", "🄋",
-    "1", "➀",
-    "2", "➁",
-    "3", "➂",
-    "4", "➃",
-    "5", "➄",
-    "6", "➅",
-    "7", "➆",
-    "8", "➇",
-    "9", "➈",
+    "à", "œ", "À", "Œ",
+    "è", "ó", "È", "Ó",
+    "é", "æ", "É", "Æ",
+    "ê", "á", "Ê", "Á",
 )
 
 global DeadkeyMappingDiaresis := Map(
+    " ", "¨", "¨", "¨",
+    "0", "🄌", ; NEW
+    "1", "➊",
+    "2", "➋",
+    "3", "➌",
+    "4", "➍",
+    "5", "➎",
+    "6", "➏",
+    "7", "➐",
+    "8", "➑",
+    "9", "➒",
     "a", "ä", "A", "Ä",
     "c", "©", "C", "©",
     "e", "ë", "E", "Ë",
@@ -1869,22 +1880,28 @@ global DeadkeyMappingDiaresis := Map(
     "w", "ẅ", "W", "Ẅ",
     "x", "ẍ", "X", "Ẍ",
     "y", "ÿ", "Y", "Ÿ",
-    " ", "¨", "¨", "¨",
-    "0", "🄌",
-    "1", "➊",
-    "2", "➋",
-    "3", "➌",
-    "4", "➍",
-    "5", "➎",
-    "6", "➏",
-    "7", "➐",
-    "8", "➑",
-    "9", "➒",
 )
 
 global DeadkeyMappingSuperscript := Map(
+    " ", "ᵉ",
+    "(", "⁽", ")", "⁾",
+    "+", "⁺",
+    ",", "ᶿ",
+    "-", "⁻",
+    ".", "ᵝ",
+    "/", "̸",
+    "0", "⁰",
+    "1", "¹",
+    "2", "²",
+    "3", "³",
+    "4", "⁴",
+    "5", "⁵",
+    "6", "⁶",
+    "7", "⁷",
+    "8", "⁸",
+    "9", "⁹",
+    "=", "⁼",
     "a", "ᵃ", "A", "ᴬ",
-    "æ", "𐞃", "Æ", "ᴭ",
     "b", "ᵇ", "B", "ᴮ",
     "c", "ᶜ", "C", "ꟲ",
     "d", "ᵈ", "D", "ᴰ",
@@ -1899,79 +1916,31 @@ global DeadkeyMappingSuperscript := Map(
     "m", "ᵐ", "M", "ᴹ",
     "n", "ⁿ", "N", "ᴺ",
     "o", "ᵒ", "O", "ᴼ",
-    "œ", "ꟹ", "Œ", "ꟹ",
-    "œ", "ꟹ", "Œ", "ꟹ",
     "p", "ᵖ", "P", "ᴾ",
-    "q", "𐞥", "Q", "ꟴ",
+    "q", "𐞥", "Q", "ꟴ", ; 𐞥 is NEW
     "r", "ʳ", "R", "ᴿ",
-    "s", "ˢ", "S", "ˢ",
+    "s", "ˢ", "S", "", ; There is no superscript capital s yet in Unicode
     "t", "ᵗ", "T", "ᵀ",
     "u", "ᵘ", "U", "ᵁ",
     "v", "ᵛ", "V", "ⱽ",
     "w", "ʷ", "W", "ᵂ",
-    "x", "ˣ", "X", "ˣ",
-    "y", "ʸ", "Y", "ʸ",
-    "z", "ᶻ", "Z", "ᶻ",
-    " ", "ᵉ",
-    ",", "ᶿ",
-    ".", "ᵝ",
-    "ê", "ᵠ", "Ê", "ᵠ",
-    "é", "ᵟ", "É", "ᵟ",
-    "è", "ᵞ", "È", "ᵞ",
-    "à", "ᵡ", "À", "ᵡ",
-    "(", "⁽", ")", "⁾",
+    "x", "ˣ", "X", "", ; There is no superscript capital x yet in Unicode
+    "y", "ʸ", "Y", "", ; There is no superscript capital y yet in Unicode
+    "z", "ᶻ", "Z", "", ; There is no superscript capital z yet in Unicode
     "[", "˹", "]", "˺",
-    "+", "⁺", "-", "⁻",
-    "/", "̸",
-    "=", "⁼",
-    "0", "⁰",
-    "1", "¹",
-    "2", "²",
-    "3", "³",
-    "4", "⁴",
-    "5", "⁵",
-    "6", "⁶",
-    "7", "⁷",
-    "8", "⁸",
-    "9", "⁹",
+    "à", "ᵡ", "À", "", ; There is no superscript capital ᵡ yet in Unicode
+    "æ", "𐞃", "Æ", "ᴭ", ; 𐞃 is NEW
+    "è", "ᵞ", "È", "", ; There is no superscript capital ᵞ yet in Unicode
+    "é", "ᵟ", "É", "", ; There is no superscript capital ᵟ yet in Unicode
+    "ê", "ᵠ", "Ê", "", ; There is no superscript capital ᵠ yet in Unicode
+    "œ", "ꟹ", "Œ", "", ; There is no superscript capital œ yet in Unicode
 )
 
 global DeadkeyMappingSubscript := Map(
-    "a", "ₐ", "A", "ᴀ",
-    "æ", "ᴁ", "Æ", "ᴁ",
-    "b", "ᵦ", "B", "ʙ",
-    "c", "ᴄ", "C", "ᴄ",
-    "d", "ᴅ", "D", "ᴅ",
-    "e", "ₑ", "E", "ᴇ",
-    "f", "ꜰ", "F", "ꜰ",
-    "g", "ᵧ", "G", "ɢ",
-    "h", "ₕ", "H", "ʜ",
-    "i", "ᵢ", "I", "ɪ",
-    "j", "ⱼ", "J", "ᴊ",
-    "k", "ₖ", "K", "ᴋ",
-    "l", "ₗ", "L", "ʟ",
-    "m", "ₘ", "M", "ᴍ",
-    "n", "ₙ", "N", "ɴ",
-    "o", "ₒ", "O", "ᴏ",
-    "œ", "ɶ", "Œ", "ɶ",
-    "p", "ᵨ", "P", "ₚ",
-    "q", "ꞯ", "Q", "ꞯ",
-    "r", "ᵣ", "R", "ʀ",
-    "s", "ₛ", "S", "ꜱ",
-    "t", "ₜ", "T", "ᴛ",
-    "u", "ᵤ", "U", "ᴜ",
-    "v", "ᵥ", "V", "ᴠ",
-    "w", "ᴡ", "W", "ᴡ",
-    "x", "ₓ", "X", "ₓ",
-    "y", "ʏ", "Y", "ʏ",
-    "z", "ᴢ", "Z", "ᴢ",
     " ", "ᵢ",
-    "ê", "ᵩ", "Ê", "ᵩ",
-    "è", "ᵧ", "È", "ᵧ",
     "(", "₍", ")", "₎",
-    "[", "˻", "]", "˼",
     "+", "₊", "-", "₋",
-    "/", "̸", "=", "₌",
+    "/", "̸",
     "0", "₀",
     "1", "₁",
     "2", "₂",
@@ -1982,17 +1951,49 @@ global DeadkeyMappingSubscript := Map(
     "7", "₇",
     "8", "₈",
     "9", "₉",
+    "=", "₌",
+    "a", "ₐ", "A", "ᴀ",
+    "b", "ᵦ", "B", "ʙ", ; ᵦ, not real subscript b
+    "c", "", "C", "ᴄ", ; There is no subscript c yet in Unicode
+    "d", "", "D", "ᴅ", ; There is no subscript d yet in Unicode
+    "e", "ₑ", "E", "ᴇ", ; There is no subscript f yet in Unicode
+    "f", "", "F", "ꜰ",
+    "g", "ᵧ", "G", "ɢ", ; ᵧ, not real subscript g
+    "h", "ₕ", "H", "ʜ",
+    "i", "ᵢ", "I", "ɪ",
+    "j", "ⱼ", "J", "ᴊ",
+    "k", "ₖ", "K", "ᴋ",
+    "l", "ₗ", "L", "ʟ",
+    "m", "ₘ", "M", "ᴍ",
+    "n", "ₙ", "N", "ɴ",
+    "o", "ₒ", "O", "ᴏ",
+    "p", "ᵨ", "P", "ₚ",
+    "q", "", "Q", "ꞯ", ; There is no subscript q yet in Unicode
+    "r", "ᵣ", "R", "ʀ",
+    "s", "ₛ", "S", "ꜱ",
+    "t", "ₜ", "T", "ᴛ",
+    "u", "ᵤ", "U", "ᴜ",
+    "v", "ᵥ", "V", "ᴠ",
+    "w", "", "W", "ᴡ", ; There is no subscript w yet in Unicode
+    "x", "ₓ", "X", "ᵪ", ; There is no subscript capital x yet in Unicode, we use subscript capital chi instead
+    "y", "ᵧ", "Y", "ʏ", ; There is no subscript y yet in Unicode, we use subscript gamma instead
+    "z", "", "Z", "ᴢ", ; There is no subscript z yet in Unicode
+    "[", "˻", "]", "˼",
+    "æ", "", "Æ", "ᴁ", ; There is no subscript æ yet in Unicode
+    "ê", "ᵩ", "Ê", "", ; There is no subscript capital ᵩ yet in Unicode
+    "œ", "", "Œ", "ɶ", ; There is no subscript œ yet in Unicode
 )
 
 global DeadkeyMappingGreek := Map(
+    " ", "µ",
+    "'", "ς",
+    "-", "Μ",
+    "_", "Ω", ; Attention, Ohm symbol and not capital Omega
     "a", "α", "A", "Α",
-    "à", "θ", "À", "Θ",
     "b", "β", "B", "Β",
     "c", "ψ", "C", "Ψ",
     "d", "δ", "D", "Δ",
     "e", "ε", "E", "Ε",
-    "é", "η", "É", "Η",
-    "ê", "ϕ", "Ê", "ϕ",
     "f", "φ", "F", "Φ",
     "g", "γ", "G", "Γ",
     "h", "η", "H", "Η",
@@ -2014,37 +2015,45 @@ global DeadkeyMappingGreek := Map(
     "x", "ξ", "X", "Ξ",
     "y", "υ", "Y", "Υ",
     "z", "ζ", "Z", "Ζ",
-    " ", "µ", "_", "Ω",
-    "'", "ς"
+    "é", "η", "É", "Η",
+    "ê", "ϕ", "Ê", "", ; Alternative phi character
 )
 
 global DeadkeyMappingR := Map(
-    "b", "ℬ", "B", "ℬ",
-    "c", "ℂ", "C", "ℂ",
-    "e", "⅀", "E", "⅀",
-    "f", "𝔽", "F", "ℱ",
-    "g", "ℊ", "G", "ℊ",
-    "h", "ℍ", "H", "ℋ",
-    "j", "ℑ", "J", "ℐ",
-    "l", "ℓ", "L", "ℒ",
-    "m", "ℳ", "M", "ℳ",
-    "n", "ℕ", "N", "ℕ",
-    "p", "ℙ", "P", "ℙ",
-    "q", "ℚ", "Q", "ℚ",
-    "r", "ℝ", "R", "ℝ",
-    "s", "⅀", "S", "⅀",
-    "t", "ℭ", "T", "ℭ",
-    "u", "ℿ", "U", "ℿ",
-    "x", "ℜ", "X", "ℛ",
-    "z", "ℤ", "Z", "ℨ",
-    " ", "ℝ", "'", "ℜ",
+    " ", "ℝ",
+    "'", "ℜ",
     "(", "⟦", ")", "⟧",
     "[", "⟦", "]", "⟧",
     "<", "⟪", ">", "⟫",
     "«", "⟪", "»", "⟫",
+    "b", "", "B", "ℬ",
+    "c", "", "C", "ℂ",
+    "e", "", "E", "⅀",
+    "f", "", "F", "ℱ",
+    "g", "ℊ", "G", "ℊ",
+    "h", "", "H", "ℋ",
+    "j", "", "J", "ℐ",
+    "l", "ℓ", "L", "ℒ",
+    "m", "", "M", "ℳ",
+    "n", "", "N", "ℕ",
+    "p", "", "P", "ℙ",
+    "q", "", "Q", "ℚ",
+    "r", "", "R", "ℝ",
+    "s", "", "S", "⅀",
+    "t", "", "T", "ℭ",
+    "u", "", "U", "ℿ",
+    "x", "", "X", "ℛ",
+    "z", "", "Z", "ℨ",
 )
 
 global DeadkeyMappingCurrency := Map(
+    " ", "¤",
+    "$", "£",
+    "&", "৳",
+    "'", "£",
+    "-", "£",
+    "_", "€",
+    "``", "₰",
     "a", "؋", "A", "₳",
     "b", "₿", "B", "฿",
     "c", "¢", "C", "₵",
@@ -2066,12 +2075,6 @@ global DeadkeyMappingCurrency := Map(
     "u", "元", "U", "圓",
     "w", "₩", "W", "₩",
     "y", "¥", "Y", "円",
-    "$", "£",
-    "&", "৳",
-    "'", "£",
-    "-", "£",
-    "_", "€",
-    " ", "¤"
 )
 
 ; =========================
@@ -5661,6 +5664,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "imp★", "impossible")
     CreateCaseSensitiveHotstrings("*", "inf★", "inférieur")
     CreateCaseSensitiveHotstrings("*", "info★", "information")
+    CreateCaseSensitiveHotstrings("*", "infos★", "informations")
     CreateHotstring("*", "insta★", "Instagram")
     CreateCaseSensitiveHotstrings("*", "intart★", "intelligence artificielle")
     CreateCaseSensitiveHotstrings("*", "inter★", "international")
