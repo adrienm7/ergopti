@@ -78,7 +78,7 @@ keyboard-key {
 	--key-size: calc(100vw / 20 * var(--keyboard-width));
 	--key-margin: calc(0.28vw * var(--keyboard-width));
 
-	--key-depth: 2px;
+	--key-depth: calc(var(--key-size) * 0.06);
 	--key-pressed-depth: 1px;
 	--key-pressed-depth-change: calc(var(--key-depth) - var(--key-pressed-depth));
 
@@ -121,10 +121,11 @@ keyboard-key {
 	width: calc(var(--key-size) * var(--size) - 2 * var(--key-margin));
 }
 
-@media (max-width: 450px) {
+@media (max-width: 500px) {
 	keyboard-key {
 		--key-depth: 1px;
 		--key-pressed-depth: 0.5px;
+		--key-border-radius: calc(var(--keyboard-border-radius) / 8);
 	}
 }
 

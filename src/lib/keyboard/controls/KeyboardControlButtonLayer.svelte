@@ -22,14 +22,14 @@
 		['Grec ⇧', 'GreekShift'],
 		['ℝ', 'R'],
 		['ℝ ⇧', 'RShift'],
-		['Currency', 'Currency'],
-		['Currency ⇧', 'CurrencyShift']
+		['Monnaie', 'Currency'],
+		['Monnaie ⇧', 'CurrencyShift']
 	];
 
 	const extraLayers = [
-		['★ Layer', 'Layer'],
+		['★ Layer de navigation', 'Layer'],
 		['★ Virgule', ','],
-		['★ À', 'À']
+		['★ Suffixes en À', 'À']
 	];
 
 	let layerValue;

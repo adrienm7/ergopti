@@ -85,7 +85,7 @@
 		{/if}
 	</div>
 
-	<medium-space />
+	<medium-space></medium-space>
 	<div>
 		{#if version_mineure_plus !== undefined}
 			<a href="/pilotes/plus/ErgoptiPlus_v{version_mineure_plus}.ahk" download
@@ -142,16 +142,9 @@
 		<li>
 			Microsoft Excel : Taper un <kbd>+</kbd> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause des
 			problèmes d’édition de la cellule : tout ce qui est tapé avant disparaît et le
-			<kbd-output>+</kbd-output>
-			apparaît. Une solution est de faire <kbd>Shift</kbd> + <kbd>=</kbd> (touche tout en haut à
-			gauche, sur la rangée des chiffres), car le <kbd>+</kbd> est aussi à cet emplacement.
+			<kbd-output>+</kbd-output> apparaît. Ce problème est résolu en utilisant le script ErgoptiPlus.ahk.
 		</li>
 	</ul>
-	<p>
-		Ces problèmes peuvent être résolus avec le script ErgoptiPlus.ahk. Il est possible de mettre les
-		variables de fonctionnalités supplémentaires du début de script à 0 afin de n’avoir que les
-		corrections.
-	</p>
 
 	<h4>macOS</h4>
 	<tiny-space></tiny-space>
