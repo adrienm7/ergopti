@@ -282,6 +282,10 @@ export class Keyboard {
 				Circonflexe: 'CirconflexeShift',
 				TremaShift: 'Trema',
 				Trema: 'TremaShift',
+				ExposantShift: 'Exposant',
+				Exposant: 'ExposantShift',
+				IndiceShift: 'Indice',
+				Indice: 'IndiceShift',
 				GreekShift: 'Greek',
 				Greek: 'GreekShift',
 				RShift: 'R',
@@ -290,8 +294,6 @@ export class Keyboard {
 				Currency: 'CurrencyShift',
 				À: 'Shift',
 				',': 'Shift',
-				Exposant: 'Shift',
-				Indice: 'Shift',
 				default: 'Shift'
 			},
 			RAlt: {
@@ -464,6 +466,8 @@ export class Keyboard {
 			ShiftAltGr: ['LShift', 'RShift', 'RAlt'],
 			CirconflexeShift: ['LShift', 'RShift'],
 			TremaShift: ['LShift', 'RShift'],
+			ExposantShift: ['LShift', 'RShift'],
+			IndiceShift: ['LShift', 'RShift'],
 			GreekShift: ['LShift', 'RShift'],
 			RShift: ['LShift', 'RShift'],
 			CurrencyShift: ['LShift', 'RShift']
@@ -489,6 +493,8 @@ export class Keyboard {
 				'ShiftAltGr',
 				'CirconflexeShift',
 				'TremaShift',
+				'ExposantShift',
+				'IndiceShift',
 				'GreekShift',
 				'RShift',
 				'CurrencyShift'

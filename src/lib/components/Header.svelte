@@ -183,7 +183,7 @@
 		--header-color-mobile: rgba(0, 16, 36, 0.975);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
-		--items-menu-spacing: clamp(4px, 0.7vw, 25px);
+		--items-menu-spacing: clamp(4px, 0.8vw, 25px);
 		--menu-separators-color: rgb(200, 233, 255);
 		--marge-fenetre: var(--marge-bords-menu);
 		--header-height: clamp(70px, 5.5vw, 120px);
