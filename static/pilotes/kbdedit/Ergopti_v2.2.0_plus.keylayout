@@ -948,10 +948,6 @@
 			<when state="s5" output="ᵉ"/>
 			<when state="s6" output="ᵢ"/>
 			<when state="s7" output="ℝ"/>
-			<when state="s8" output=", "/>
-			<when state="s9" output="à "/>
-			<when state="s10" output="q "/>
-			<when state="s11" output="' "/>
 		</action>
 		<action id="$">
 			<when state="none" output="$"/>
@@ -1334,7 +1330,6 @@
 			<when state="s7" output="ℿ"/>
 			<when state="s8" output="Ju"/>
 			<when state="s9" output="Ub"/>
-			<when state="s10" output="Quu"/>
 			<when state="s11" output="’u"/>
 		</action>
 		<action id="V">
@@ -1629,7 +1624,6 @@
 			<when state="s6" output="ᵤ"/>
 			<when state="s8" output="ju"/>
 			<when state="s9" output="ub"/>
-			<when state="s10" output="quu"/>
 			<when state="s11" output="’u"/>
 		</action>
 		<action id="v">

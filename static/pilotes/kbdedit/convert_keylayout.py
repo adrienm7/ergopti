@@ -231,98 +231,104 @@ def sort_keys(content):
 # ======= 2/ Create the "_plus" keylayout =======
 # ===============================================
 
-mapping_comma = [
-    (" ", ", "),
-    ("à", "j"),
-    ("a", "ja"),
-    ("e", "je"),
-    ("é", "jé"),
-    ("i", "ji"),
-    ("o", "jo"),
-    ("u", "ju"),
-    ("ê", "ju"),
-    ("'", "j’"),
-    # Far letters
-    ("è", "z"),
-    ("y", "k"),
-    ("c", "ç"),
-    ("x", "où"),
-    ("s", "q"),
-    # SFBs
-    ("f", "fl"),
-    ("g", "gl"),
-    ("h", "ph"),
-    ("z", "bj"),
-    ("v", "dv"),
-    ("n", "nl"),
-    ("t", "pt"),
-    ("r", "rq"),
-    ("q", "qu’"),
-    ("m", "ms"),
-    ("d", "ds"),
-    ("l", "cl"),
-    ("p", "xp"),
-]
 
-mapping_a_grave = [
-    (" ", "à "),
-    # SFB reductions
-    ("★", "bu"),
-    ("j", "bu"),
-    ("u", "ub"),
-    # Common word endings
-    ("a", "aire"),
-    ("c", "ction"),
-    ("cd", "could"),
-    ("shd", "should"),
-    ("d", "would"),
-    ("é", "ying"),
-    ("ê", "able"),
-    ("f", "iste"),
-    ("g", "ought"),
-    ("h", "techn"),
-    ("i", "ight"),
-    ("k", "ique"),
-    ("l", "elle"),
-    ("p", "ence"),
-    ("m", "isme"),
-    ("n", "ation"),
-    ("q", "ique"),
-    ("r", "erre"),
-    ("s", "ement"),
-    ("t", "ettre"),
-    ("v", "ment"),
-    ("x", "ieux"),
-    ("z", "ez-vous"),
-    ("'", "ance"),
-]
-
-mapping_q = [
-    (" ", "q "),
-    ("a", "qua"),
-    ("e", "que"),
-    ("é", "qué"),
-    ("è", "què"),
-    ("ê", "quê"),
-    ("i", "qui"),
-    ("o", "quo"),
-    ("y", "quy"),
-    ("'", "qu’"),
-    ("’", "qu’"),
-]
-
-mapping_apostrophe = [
-    (" ", "' "),
-    ("a", "’a"),
-    ("e", "’e"),
-    ("é", "’é"),
-    ("è", "’è"),
-    ("ê", "’ê"),
-    ("i", "’i"),
-    ("o", "’o"),
-    ("u", "’u"),
-    ("y", "’y"),
-]
+mappings = {
+    "comma_sfbs": {
+        "trigger": ",",
+        "map": [
+            ("à", "j"),
+            ("a", "ja"),
+            ("e", "je"),
+            ("é", "jé"),
+            ("i", "ji"),
+            ("o", "jo"),
+            ("u", "ju"),
+            ("ê", "ju"),
+            ("'", "j’"),
+            # Far letters
+            ("è", "z"),
+            ("y", "k"),
+            ("c", "ç"),
+            ("x", "où"),
+            ("s", "q"),
+            # SFBs
+            ("f", "fl"),
+            ("g", "gl"),
+            ("h", "ph"),
+            ("z", "bj"),
+            ("v", "dv"),
+            ("n", "nl"),
+            ("t", "pt"),
+            ("r", "rq"),
+            ("q", "qu’"),
+            ("m", "ms"),
+            ("d", "ds"),
+            ("l", "cl"),
+            ("p", "xp"),
+        ],
+    },
+    "a_grave_sfbs": {
+        "trigger": "à",
+        "map": [
+            ("★", "bu"),
+            ("j", "bu"),
+            ("u", "ub"),
+            ("a", "aire"),
+            ("c", "ction"),
+            ("cd", "could"),
+            ("shd", "should"),
+            ("d", "would"),
+            ("é", "ying"),
+            ("ê", "able"),
+            ("f", "iste"),
+            ("g", "ought"),
+            ("h", "techn"),
+            ("i", "ight"),
+            ("k", "ique"),
+            ("l", "elle"),
+            ("p", "ence"),
+            ("m", "isme"),
+            ("n", "ation"),
+            ("q", "ique"),
+            ("r", "erre"),
+            ("s", "ement"),
+            ("t", "ettre"),
+            ("v", "ment"),
+            ("x", "ieux"),
+            ("z", "ez-vous"),
+            ("'", "ance"),
+        ],
+    },
+    "q_mapping": {
+        "trigger": "q",
+        "map": [
+            ("a", "qua"),
+            ("e", "que"),
+            ("é", "qué"),
+            ("è", "què"),
+            ("ê", "quê"),
+            ("i", "qui"),
+            ("o", "quo"),
+            ("y", "quy"),
+            ("'", "qu’"),
+            ("’", "qu’"),
+        ],
+    },
+    "typographic_apostrophe": {
+        "trigger": "'",
+        "map": [
+            ("a", "’a"),
+            ("e", "’e"),
+            ("é", "’é"),
+            ("è", "’è"),
+            ("ê", "’ê"),
+            ("i", "’i"),
+            ("o", "’o"),
+            ("u", "’u"),
+            ("y", "’y"),
+        ],
+    },
+}
 
 
 def create_keylayout_plus(input_path: str, directory_path: str = None):
@@ -340,37 +346,39 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
             continue
 
         content = read_file(file_path)
+        start_layer = find_next_available_layer(content)
 
-        action_layer_map = {
-            ",": 8,
-            "à": 9,
-            "q": 10,
-            "'": 11,
-        }
+        for i, (feature, data) in enumerate(mappings.items()):
+            layer = start_layer + i
+            trigger_key = data["trigger"]
 
-        content = assign_action_layers(content, action_layer_map)
+            # Assign trigger key to this layer
+            content = assign_action_layer(content, trigger_key, layer)
 
-        # Layer 8: comma
-        for action_id, output in prepare_mapping(mapping_comma):
-            content = add_action_state(content, action_id, 8, output)
-        content = add_terminator_state(content, 8, ",")
+            # Add trigger key as dead key
+            content = add_terminator_state(content, layer, trigger_key)
 
-        # Layer 9: à
-        for action_id, output in prepare_mapping(mapping_a_grave):
-            content = add_action_state(content, action_id, 9, output)
-        content = add_terminator_state(content, 9, "à")
-
-        # Layer 10: q
-        for action_id, output in prepare_mapping(mapping_q):
-            content = add_action_state(content, action_id, 10, output)
-        content = add_terminator_state(content, 10, "q")
-
-        # Layer 11: apostrophe dead key
-        for action_id, output in prepare_mapping(mapping_apostrophe):
-            content = add_action_state(content, action_id, 11, output)
-        content = add_terminator_state(content, 11, "'")
+            # Add all feature actions
+            for action_id, output in prepare_mapping(data["map"]):
+                content = add_action_state(content, action_id, layer, output)
 
         write_file(new_file_path, content)
+
+
+def find_next_available_layer(content: str) -> int:
+    """
+    Scans the keylayout content to find the highest layer number in use
+    and returns the next available layer number.
+    """
+    # Find all 'when state="sX"' numbers
+    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', content)]
+    # Find all 'next="sX"' numbers
+    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', content)]
+
+    max_layer = max(state_indices + next_indices, default=0)
+    next_layer = max_layer + 1
+    print(f"Next available layer: s{next_layer}")
+    return next_layer
 
 
 def prepare_mapping(mapping):
@@ -459,30 +467,21 @@ def add_terminator_state(content: str, state_number: int, output: str) -> str:
     return re.sub(pattern, repl, content, flags=re.DOTALL)
 
 
-def assign_action_layers(content: str, action_layer_map: dict) -> str:
+def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
     """
-    Assigns the correct layer (state) for each <action id="..."> based on the mapping.
-    Modifies the default <when state="none" output="..."/> line to include a 'next' state
-    corresponding to the layer.
-
-    action_layer_map: dict mapping action_id to layer number, e.g. {",": 8, "à": 9, "'": 14}
+    Assigns a next state (layer) to a single <action id="..."> in the content.
+    Modifies the default <when state="none"/> line to include a 'next' state.
     """
-    pattern = r'(<action id="([^"]+)">)(.*?)(</action>)'
+    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
 
     def repl(match):
-        full_header, action_id, body, footer = match.groups()
-        if action_id in action_layer_map:
-            layer_num = action_layer_map[action_id]
-
-            # Look for the default line with state="none" and output="..."
-            def replace_default_line(m):
-                return f'<when state="none" next="s{layer_num}"/>'
-
-            body = re.sub(
-                r'<when state="none" output="([^"]+)"/>',
-                replace_default_line,
-                body,
-            )
+        full_header, body, footer = match.groups()
+        # Replace default state="none" with next layer
+        body = re.sub(
+            r'<when state="none"[^>]*>',
+            f'<when state="none" next="s{layer_num}"/>',
+            body,
+        )
         return f"{full_header}{body}{footer}"
 
     return re.sub(pattern, repl, content, flags=re.DOTALL)
