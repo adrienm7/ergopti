@@ -65,27 +65,30 @@
 		<div id="ergopti-title">
 			<strong>
 				<a class="no-gradient text-white" href="/">
-					Disposition <span class="morespace">clavier </span>
+					<span class="min-width-300">Disposition </span>
+					<span class="min-width-350">clavier </span>
 				</a>
 				<a href="/" aria-label="Accéder à la page d’accueil">
 					<Ergopti></Ergopti>
 				</a>
-				<select id="version-selection" bind:value={$version}>
-					{#each versionsList as v}
-						<option value={v}>{v}</option>
-					{/each}
-				</select>
-				<a
-					href="/informations/#changelog"
-					aria-label="Accéder à la page d’accueil"
-					style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
-				>
-					<i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
-				</a>
+				<div class="min-width-400">
+					<select id="version-selection" bind:value={$version}>
+						{#each versionsList as v}
+							<option value={v}>{v}</option>
+						{/each}
+					</select>
+					<a
+						href="/informations/#changelog"
+						aria-label="Accéder à la page d’accueil"
+						style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
+					>
+						<i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
+					</a>
+				</div>
 			</strong>
 			<p id="ergopti-subtitle">
-				<strong class="hyper" style="font-size:1.1em">Ergonomie optimisée</strong>
-				<span class="morespace2"> pour le français, l’anglais et le code</span>
+				<strong class="min-width-300 hyper" style="font-size:1.1em">Ergonomie optimisée</strong>
+				<span class="min-width-600"> pour le français, l’anglais et le code</span>
 			</p>
 		</div>
 	</div>
@@ -162,11 +165,11 @@
 			></div>
 			<div style="height:70px"></div>
 			<div class="links">
-				<a href="https://github.com/adrienm7/ergopti" style="font-size:1em!important">
+				<a href="https://github.com/adrienm7/ergopti">
 					Repo GitHub <i class="icon-github"></i>
 				</a>
 				<span> — </span>
-				<a href={discordLink} style="position:relative; bottom:-0.1em; font-size:1em!important">
+				<a href={discordLink} style="position:relative; bottom:-0.1em;">
 					Serveur Discord
 					<i class="icon-discord"></i>
 				</a>
@@ -219,6 +222,7 @@
 	}
 	.links a {
 		display: inline !important;
+		font-size: 1em !important;
 	}
 
 	/*
@@ -247,17 +251,29 @@
 		margin: 0;
 	}
 
-	.morespace,
-	.morespace2 {
+	.min-width-300,
+	.min-width-350,
+	.min-width-400,
+	.min-width-600 {
 		display: none;
 	}
+	@media (min-width: 300px) {
+		.min-width-300 {
+			display: inline;
+		}
+	}
+	@media (min-width: 350px) {
+		.min-width-350 {
+			display: inline;
+		}
+	}
 	@media (min-width: 400px) {
-		.morespace {
+		.min-width-400 {
 			display: inline;
 		}
 	}
 	@media (min-width: 600px) {
-		.morespace2 {
+		.min-width-600 {
 			display: inline;
 		}
 	}
@@ -301,7 +317,7 @@
 
 	#menu-pages a .title {
 		display: inline-flex;
-		font-size: 1rem;
+		font-size: 0.95em;
 	}
 
 	#menu-pages a:not([aria-current='page']) .title:hover {

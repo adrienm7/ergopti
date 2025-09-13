@@ -85,12 +85,7 @@ export class Keyboard {
 					this.postProcessingKey(key);
 
 					// Functionality to switch layer by clicking on a key
-					// It is only working 100% correctly on the latest version, as some tap-holds changed compared to previous versions
-					// We still keep it enabled on old versions, as a 80%-working functionality is better than nothing
-					if (
-						get(stores_infos[this.id])['controls'] === 'yes'
-						// && get(stores_infos['version']) === '2.2'
-					) {
+					if (get(stores_infos[this.id])['controls'] === 'yes') {
 						key.addEventListener(
 							'click',
 							() => {

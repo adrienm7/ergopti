@@ -1,6 +1,7 @@
 keyboard-controls button,
 keyboard-controls keyboard-control-layer::before {
 	background-color: rgba(0, 14, 26, 0.7);
+	height: 100%;
 }
 
 keyboard-controls {
@@ -24,7 +25,7 @@ keyboard-controls select {
 	border-right: 0;
 	color: white;
 	cursor: pointer;
-	height: 3em;
+	min-height: 3em;
 	padding: 10px;
 }
 
@@ -66,13 +67,14 @@ keyboard-control-layer select {
 */
 
 keyboard-control-layer {
-	height: 100%;
+	min-height: 3em;
 	position: relative;
 }
 
 keyboard-control-layer select {
 	border: 2px solid white;
 	border-radius: 0 var(--button-radius) var(--button-radius) 0;
+	height: 100%;
 	line-height: 1.3;
 	position: relative;
 }
@@ -97,7 +99,7 @@ keyboard-control-layer::after {
 	content: '▼';
 	position: absolute;
 	right: 10%;
-	top: 32%;
+	top: 35%;
 }
 
 keyboard-control-layer:hover::before {
