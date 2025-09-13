@@ -14,15 +14,23 @@
 
 <tiny-space></tiny-space>
 
-<textarea
-	id="input-text"
-	placeholder="Tapez ici"
-	on:keydown={keyboard.emulateKey}
-	on:keyup={keyboard.releaseKey}
->
-</textarea>
+<div class="main">
+	<textarea
+		id="input-text"
+		placeholder="Tapez ici"
+		on:keydown={keyboard.emulateKey}
+		on:keyup={keyboard.releaseKey}
+	>
+	</textarea>
+</div>
 
 <style>
+	.main {
+		/* Override the .main class */
+		padding-bottom: 0;
+		padding-top: 10px;
+	}
+
 	#input-text {
 		background-color: rgba(0, 0, 0, 0.4);
 		border: none;

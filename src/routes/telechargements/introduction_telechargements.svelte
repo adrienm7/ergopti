@@ -10,13 +10,14 @@
 	let isCollapsed = true;
 </script>
 
-<section class="main">
+<div class="main">
 	<h1 data-aos="zoom-in">Utiliser <Ergopti></Ergopti></h1>
 	<hr class="margin-h1" />
+</div>
 
-	<h2 class="first-h2">Tester la disposition en ligne</h2>
-	<KeyboardEmulation />
-	<tiny-space></tiny-space>
+<h2 class="first-h2">Tester la disposition en ligne</h2>
+<KeyboardEmulation />
+<div class="main">
 	{#if isCollapsed}
 		<button onclick={() => (isCollapsed = !isCollapsed)}>
 			Afficher les abréviations implémentées sur cette démo
@@ -44,7 +45,7 @@
 			</tbody>
 		</table>
 	{/if}
-</section>
+</div>
 
 <style>
 	table {
