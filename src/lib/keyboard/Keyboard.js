@@ -284,6 +284,10 @@ export class Keyboard {
 				Trema: 'TremaShift',
 				GreekShift: 'Greek',
 				Greek: 'GreekShift',
+				RShift: 'R',
+				R: 'RShift',
+				CurrencyShift: 'Currency',
+				Currency: 'CurrencyShift',
 				À: 'Shift',
 				',': 'Shift',
 				Exposant: 'Shift',
@@ -343,6 +347,9 @@ export class Keyboard {
 		}
 		if (pressedKeyContent === 'ℝ' && deadKey) {
 			newLayer = 'R';
+		}
+		if (pressedKeyContent === '¤' && deadKey) {
+			newLayer = 'Currency';
 		}
 
 		if (plus) {
@@ -457,7 +464,9 @@ export class Keyboard {
 			ShiftAltGr: ['LShift', 'RShift', 'RAlt'],
 			CirconflexeShift: ['LShift', 'RShift'],
 			TremaShift: ['LShift', 'RShift'],
-			GreekShift: ['LShift', 'RShift']
+			GreekShift: ['LShift', 'RShift'],
+			RShift: ['LShift', 'RShift'],
+			CurrencyShift: ['LShift', 'RShift']
 		};
 
 		// pressKey keys for the current layer
@@ -475,7 +484,15 @@ export class Keyboard {
 			getKeyContent(get(stores_infos['layoutData']), 'RCtrl', layer + (plus ? '+' : '')).includes(
 				'Shift'
 			) &&
-			['Shift', 'ShiftAltGr', 'CirconflexeShift', 'TremaShift', 'GreekShift'].includes(layer)
+			[
+				'Shift',
+				'ShiftAltGr',
+				'CirconflexeShift',
+				'TremaShift',
+				'GreekShift',
+				'RShift',
+				'CurrencyShift'
+			].includes(layer)
 		) {
 			pressKey('RCtrl');
 		}

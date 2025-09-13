@@ -11,14 +11,17 @@
 		['➃ Shift + AltGr', 'ShiftAltGr'],
 		['Ctrl', 'Ctrl'],
 		['Circonflexe', 'Circonflexe'],
-		['Circonflexe Shift', 'CirconflexeShift'],
+		['Circonflexe ⇧', 'CirconflexeShift'],
 		['Tréma', 'Trema'],
-		['Tréma Shift', 'TremaShift'],
-		['Grec', 'Greek'],
-		['Grec Shift', 'GreekShift'],
+		['Tréma ⇧', 'TremaShift'],
 		['Exposant', 'Exposant'],
 		['Indice', 'Indice'],
-		['ℝ', 'R']
+		['Grec', 'Greek'],
+		['Grec ⇧', 'GreekShift'],
+		['ℝ', 'R'],
+		['ℝ ⇧', 'RShift'],
+		['Currency', 'Currency'],
+		['Currency ⇧', 'CurrencyShift']
 	];
 
 	const extraLayers = [

@@ -408,7 +408,7 @@
 			"size": "1"
 		},
 		{
-			"key": "magique",
+			"key": "j",
 			"code": "KeyC",
 			"hand": "left",
 			"finger": "index",
@@ -876,7 +876,7 @@
 			"size": "1"
 		},
 		{
-			"key": "magique",
+			"key": "j",
 			"hand": "left",
 			"finger": "index",
 			"row": "4",
@@ -1672,7 +1672,7 @@
 			"type": "ponctuation"
 		},
 		{
-			"key": "magique",
+			"key": "j",
 			"Primary": "j",
 			"Primary+": "★",
 			"Shift": "J",

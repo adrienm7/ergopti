@@ -1,7 +1,7 @@
 <?xml version="1.1" encoding="utf-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-09-12 at 23:28 (GMT+0)-->
-<keyboard group="126" id="-20043" maxout="1" name="Ergopti v2.2.0 Beta 1">
+<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-09-13 at 00:55 (GMT+0)-->
+<keyboard group="126" id="-20043" maxout="1" name="Ergopti v2.2.0 Beta 2">
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
@@ -1428,6 +1428,7 @@
 			<when state="none" output="è"/>
 			<when state="s1" output="ó"/>
 			<when state="s5" output="ᵞ"/>
+			<when state="s6" output="ᵧ"/>
 		</action>
 		<action id="é">
 			<when state="none" output="é"/>
