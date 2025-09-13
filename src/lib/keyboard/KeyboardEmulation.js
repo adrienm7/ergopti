@@ -18,6 +18,7 @@ export class KeyboardEmulation extends Keyboard {
 			Exposant: false,
 			Indice: false,
 			R: false,
+			Currency: false,
 			À: false,
 			',': false
 		};
@@ -36,11 +37,15 @@ export class KeyboardEmulation extends Keyboard {
 				value: 'CirconflexeShift'
 			},
 			{ cond: this['modifiers']['Trema'] && this['modifiers']['Shift'], value: 'TremaShift' },
+			{ cond: this['modifiers']['R'] && this['modifiers']['Shift'], value: 'RShift' },
+			{ cond: this['modifiers']['Currency'] && this['modifiers']['Shift'], value: 'CurrencyShift' },
 			{ cond: this['modifiers']['AltGr'], value: 'AltGr' },
 			{ cond: this['modifiers']['Shift'], value: 'Shift' },
 			{ cond: this['modifiers']['Ctrl'], value: 'Ctrl' },
 			{ cond: this['modifiers']['Circonflexe'], value: 'Circonflexe' },
 			{ cond: this['modifiers']['Trema'], value: 'Trema' },
+			{ cond: this['modifiers']['R'], value: 'R' },
+			{ cond: this['modifiers']['Currency'], value: 'Currency' },
 			{ cond: this['modifiers']['Exposant'], value: 'Exposant' },
 			{ cond: this['modifiers']['Indice'], value: 'Indice' },
 			{ cond: this['modifiers']['R'], value: 'R' },
@@ -159,7 +164,8 @@ export class KeyboardEmulation extends Keyboard {
 			'◌̈': 'Trema',
 			ᵉ: 'Exposant',
 			ᵢ: 'Indice',
-			ℝ: 'R'
+			ℝ: 'R',
+			'¤': 'Currency'
 		};
 		return deadKeys[keyPressed];
 	}
@@ -187,7 +193,16 @@ export class KeyboardEmulation extends Keyboard {
 		let charactersToDelete = 0;
 
 		// If a dead key or assimilated is currently activated, it needs to be deactivated now that we send the character present on it
-		for (const layerName of ['Circonflexe', 'Trema', 'Exposant', 'Indice', 'R', 'À', ',']) {
+		for (const layerName of [
+			'Circonflexe',
+			'Trema',
+			'Exposant',
+			'Indice',
+			'R',
+			'Currency',
+			'À',
+			','
+		]) {
 			if (this['modifiers'][layerName]) {
 				if (layerName === 'À' || layerName === ',') {
 					charactersToDelete = 1; // Delete the previously typed "à" or "," before sending the result on the layer
