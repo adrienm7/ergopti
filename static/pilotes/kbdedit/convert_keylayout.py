@@ -592,18 +592,18 @@ mappings = {
             ("#", " != "),
         ],
     },
-    # "rolls_backslash": {
-    #     "trigger": "\\",
-    #     "map": [
-    #         ('"', "/*"),
-    #     ],
-    # },
-    # "rolls_quote": {
-    #     "trigger": '"',
-    #     "map": [
-    #         ("\\", "*/"),
-    #     ],
-    # },
+    "rolls_backslash": {
+        "trigger": "\\",
+        "map": [
+            ('"', "/*"),
+        ],
+    },
+    "rolls_quote": {
+        "trigger": '"',
+        "map": [
+            ("\\", "*/"),
+        ],
+    },
     "rolls_dollar": {
         "trigger": "$",
         "map": [
@@ -707,8 +707,8 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
         content = append_plus_to_keyboard_name(content)
         content = ergopti_plus_altgr_symbols(content)
         content = ergopti_plus_shiftaltgr_symbols(content)
-        start_layer = find_next_available_layer(content)
 
+        start_layer = find_next_available_layer(content)
         for i, (feature, data) in enumerate(mappings.items()):
             layer = start_layer + i
             trigger_key = data["trigger"]
@@ -733,6 +733,15 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
 
                 # Now add the when state to the corresponding <action id="..."> (ensure_action_block is called inside)
                 content = add_action_state(content, action_id, layer, output)
+
+        # Correct problem of the " character
+        content = (
+            content.replace('id="""', "id='\"'")
+            .replace('output="""', "output='\"'")
+            .replace(
+                '<key code="8" output=\'"\'/>', '<key code="8" action=\'"\'/>'
+            )
+        )
 
         write_file(new_file_path, content)
 

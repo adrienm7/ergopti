@@ -522,8 +522,8 @@
 			<key code="4" output="|"/>
 			<key code="5" action=":"/>
 			<key code="6" action="/"/>
-			<key code="7" output="\"/>
-			<key code="8" output='"'/>
+			<key code="7" action="\"/>
+			<key code="8" action='"'/>
 			<key code="9" action=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -766,7 +766,7 @@
 			<key code="5" action=":"/>
 			<key code="6" action="/"/>
 			<key code="7" output="\"/>
-			<key code="8" output='"'/>
+			<key code="8" action='"'/>
 			<key code="9" action=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -950,9 +950,9 @@
 			<when state="s7" output="ℝ"/>
 		</action>
 		<action id="$">
-			<when state="none" next="s23"/>
+			<when state="none" next="s25"/>
 			<when state="s2" output="£"/>
-			<when state="s24" output=" &#x003C;= "/>
+			<when state="s26" output=" &#x003C;= "/>
 		</action>
 		<action id="&amp;">
 			<when state="none" output="&#x0026;"/>
@@ -968,11 +968,11 @@
 			<when state="s14" output="ance"/>
 			<when state="s15" output="qu’"/>
 			<when state="s17" output="ct"/>
-			<when state="s28" output="J’"/>
-			<when state="s29" output="J’"/>
-			<when state="s34" output="Ance"/>
-			<when state="s35" output="Qu’"/>
-			<when state="s36" output="Ct"/>
+			<when state="s30" output="J’"/>
+			<when state="s31" output="J’"/>
+			<when state="s36" output="Ance"/>
+			<when state="s37" output="Qu’"/>
+			<when state="s38" output="Ct"/>
 		</action>
 		<action id="(">
 			<when state="none" output="("/>
@@ -988,10 +988,10 @@
 			<when state="s7" output="⟧"/>
 		</action>
 		<action id="+">
-			<when state="none" next="s25"/>
+			<when state="none" next="s27"/>
 			<when state="s5" output="⁺"/>
 			<when state="s6" output="₊"/>
-			<when state="s26" output=" &#x003C;- "/>
+			<when state="s28" output=" &#x003C;- "/>
 		</action>
 		<action id=",">
 			<when state="none" next="s9"/>
@@ -1085,11 +1085,11 @@
 			<when state="s6" output="₉"/>
 		</action>
 		<action id=":">
-			<when state="none" next="s29"/>
+			<when state="none" next="s31"/>
 			<when state="s1" output="▶"/>
 		</action>
 		<action id=";">
-			<when state="none" next="s28"/>
+			<when state="none" next="s30"/>
 			<when state="s1" output="↪"/>
 		</action>
 		<action id="&lt;">
@@ -1097,10 +1097,10 @@
 			<when state="s7" output="⟪"/>
 		</action>
 		<action id="=">
-			<when state="none" next="s24"/>
+			<when state="none" next="s26"/>
 			<when state="s5" output="⁼"/>
 			<when state="s6" output="₌"/>
-			<when state="s23" output=" => "/>
+			<when state="s25" output=" => "/>
 		</action>
 		<action id="&gt;">
 			<when state="none" output="&#x003E;"/>
@@ -1125,7 +1125,7 @@
 			<when state="s7" output="ℬ"/>
 		</action>
 		<action id="C">
-			<when state="none" next="s37"/>
+			<when state="none" next="s39"/>
 			<when state="s1" output="°"/>
 			<when state="s2" output="₵"/>
 			<when state="s3" output="©"/>
@@ -1143,7 +1143,7 @@
 			<when state="s6" output="ᴅ"/>
 		</action>
 		<action id="E">
-			<when state="none" next="s30"/>
+			<when state="none" next="s32"/>
 			<when state="s1" output="Ê"/>
 			<when state="s2" output="₠"/>
 			<when state="s3" output="Ë"/>
@@ -1171,7 +1171,7 @@
 			<when state="s7" output="ℊ"/>
 		</action>
 		<action id="H">
-			<when state="none" next="s39"/>
+			<when state="none" next="s41"/>
 			<when state="s1" output="Ĥ"/>
 			<when state="s2" output="₴"/>
 			<when state="s3" output="Ḧ"/>
@@ -1243,7 +1243,7 @@
 			<when state="s6" output="ᴏ"/>
 		</action>
 		<action id="P">
-			<when state="none" next="s36"/>
+			<when state="none" next="s38"/>
 			<when state="s1" output="¶"/>
 			<when state="s2" output="₧"/>
 			<when state="s4" output="Π"/>
@@ -1251,7 +1251,7 @@
 			<when state="s7" output="ℙ"/>
 		</action>
 		<action id="Q">
-			<when state="none" next="s35"/>
+			<when state="none" next="s37"/>
 			<when state="s1" output="☐"/>
 			<when state="s4" output="Χ"/>
 			<when state="s5" output="ꟴ"/>
@@ -1269,7 +1269,7 @@
 			<when state="s7" output="ℝ"/>
 		</action>
 		<action id="S">
-			<when state="none" next="s38"/>
+			<when state="none" next="s40"/>
 			<when state="s1" output="ẞ"/>
 			<when state="s2" output="₷"/>
 			<when state="s3" output=" "/>
@@ -1322,7 +1322,7 @@
 			<when state="s7" output="ℛ"/>
 		</action>
 		<action id="Y">
-			<when state="none" next="s33"/>
+			<when state="none" next="s35"/>
 			<when state="s1" output="Ŷ"/>
 			<when state="s2" output="円"/>
 			<when state="s3" output="Ÿ"/>
@@ -1375,11 +1375,11 @@
 			<when state="s14" output="aire"/>
 			<when state="s15" output="qua"/>
 			<when state="s16" output="’a"/>
-			<when state="s27" output="Â"/>
-			<when state="s28" output="Ja"/>
-			<when state="s29" output="Ja"/>
-			<when state="s34" output="Aire"/>
-			<when state="s35" output="Qua"/>
+			<when state="s29" output="Â"/>
+			<when state="s30" output="Ja"/>
+			<when state="s31" output="Ja"/>
+			<when state="s36" output="Aire"/>
+			<when state="s37" output="Qua"/>
 		</action>
 		<action id="b">
 			<when state="none" output="b"/>
@@ -1399,10 +1399,10 @@
 			<when state="s9" output="ç"/>
 			<when state="s14" output="ction"/>
 			<when state="s20" output="wh"/>
-			<when state="s28" output="Ç"/>
-			<when state="s29" output="Ç"/>
-			<when state="s34" output="Ction"/>
-			<when state="s39" output="Wh"/>
+			<when state="s30" output="Ç"/>
+			<when state="s31" output="Ç"/>
+			<when state="s36" output="Ction"/>
+			<when state="s41" output="Wh"/>
 		</action>
 		<action id="d">
 			<when state="none" output="d"/>
@@ -1413,9 +1413,9 @@
 			<when state="s6" output="ᴅ"/>
 			<when state="s9" output="ds"/>
 			<when state="s14" output="would"/>
-			<when state="s28" output="Ds"/>
-			<when state="s29" output="Ds"/>
-			<when state="s34" output="Would"/>
+			<when state="s30" output="Ds"/>
+			<when state="s31" output="Ds"/>
+			<when state="s36" output="Would"/>
 		</action>
 		<action id="e">
 			<when state="none" next="s10"/>
@@ -1429,10 +1429,10 @@
 			<when state="s9" output="je"/>
 			<when state="s15" output="que"/>
 			<when state="s16" output="’e"/>
-			<when state="s27" output="Oe"/>
-			<when state="s28" output="Je"/>
-			<when state="s29" output="Je"/>
-			<when state="s35" output="Que"/>
+			<when state="s29" output="Oe"/>
+			<when state="s30" output="Je"/>
+			<when state="s31" output="Je"/>
+			<when state="s37" output="Que"/>
 		</action>
 		<action id="f">
 			<when state="none" output="f"/>
@@ -1443,9 +1443,9 @@
 			<when state="s6" output="ꜰ"/>
 			<when state="s9" output="fl"/>
 			<when state="s14" output="iste"/>
-			<when state="s28" output="Fl"/>
-			<when state="s29" output="Fl"/>
-			<when state="s34" output="Iste"/>
+			<when state="s30" output="Fl"/>
+			<when state="s31" output="Fl"/>
+			<when state="s36" output="Iste"/>
 		</action>
 		<action id="g">
 			<when state="none" output="g"/>
@@ -1457,9 +1457,9 @@
 			<when state="s7" output="ℊ"/>
 			<when state="s9" output="gl"/>
 			<when state="s14" output="ought"/>
-			<when state="s28" output="Gl"/>
-			<when state="s29" output="Gl"/>
-			<when state="s34" output="Ought"/>
+			<when state="s30" output="Gl"/>
+			<when state="s31" output="Gl"/>
+			<when state="s36" output="Ought"/>
 		</action>
 		<action id="h">
 			<when state="none" next="s20"/>
@@ -1472,9 +1472,9 @@
 			<when state="s9" output="ph"/>
 			<when state="s14" output="techn"/>
 			<when state="s16" output="’h"/>
-			<when state="s28" output="Ph"/>
-			<when state="s29" output="Ph"/>
-			<when state="s34" output="Techn"/>
+			<when state="s30" output="Ph"/>
+			<when state="s31" output="Ph"/>
+			<when state="s36" output="Techn"/>
 		</action>
 		<action id="i">
 			<when state="none" output="i"/>
@@ -1489,11 +1489,11 @@
 			<when state="s14" output="ight"/>
 			<when state="s15" output="qui"/>
 			<when state="s16" output="’i"/>
-			<when state="s27" output="Î"/>
-			<when state="s28" output="Ji"/>
-			<when state="s29" output="Ji"/>
-			<when state="s34" output="Ight"/>
-			<when state="s35" output="Qui"/>
+			<when state="s29" output="Î"/>
+			<when state="s30" output="Ji"/>
+			<when state="s31" output="Ji"/>
+			<when state="s36" output="Ight"/>
+			<when state="s37" output="Qui"/>
 		</action>
 		<action id="j">
 			<when state="none" output="j"/>
@@ -1503,8 +1503,8 @@
 			<when state="s6" output="ⱼ"/>
 			<when state="s8" output="œu"/>
 			<when state="s14" output="bu"/>
-			<when state="s27" output="Œu"/>
-			<when state="s34" output="Bu"/>
+			<when state="s29" output="Œu"/>
+			<when state="s36" output="Bu"/>
 		</action>
 		<action id="k">
 			<when state="none" output="k"/>
@@ -1514,7 +1514,7 @@
 			<when state="s5" output="ᵏ"/>
 			<when state="s6" output="ₖ"/>
 			<when state="s14" output="ique"/>
-			<when state="s34" output="Ique"/>
+			<when state="s36" output="Ique"/>
 		</action>
 		<action id="l">
 			<when state="none" output="l"/>
@@ -1526,9 +1526,9 @@
 			<when state="s7" output="ℓ"/>
 			<when state="s9" output="cl"/>
 			<when state="s14" output="elle"/>
-			<when state="s28" output="Cl"/>
-			<when state="s29" output="Cl"/>
-			<when state="s34" output="Elle"/>
+			<when state="s30" output="Cl"/>
+			<when state="s31" output="Cl"/>
+			<when state="s36" output="Elle"/>
 		</action>
 		<action id="m">
 			<when state="none" output="m"/>
@@ -1539,9 +1539,9 @@
 			<when state="s6" output="ₘ"/>
 			<when state="s9" output="ms"/>
 			<when state="s14" output="isme"/>
-			<when state="s28" output="Ms"/>
-			<when state="s29" output="Ms"/>
-			<when state="s34" output="Isme"/>
+			<when state="s30" output="Ms"/>
+			<when state="s31" output="Ms"/>
+			<when state="s36" output="Isme"/>
 		</action>
 		<action id="n">
 			<when state="none" output="n"/>
@@ -1553,9 +1553,9 @@
 			<when state="s6" output="ₙ"/>
 			<when state="s9" output="nl"/>
 			<when state="s14" output="ation"/>
-			<when state="s28" output="Nl"/>
-			<when state="s29" output="Nl"/>
-			<when state="s34" output="Ation"/>
+			<when state="s30" output="Nl"/>
+			<when state="s31" output="Nl"/>
+			<when state="s36" output="Ation"/>
 		</action>
 		<action id="o">
 			<when state="none" output="o"/>
@@ -1569,10 +1569,10 @@
 			<when state="s9" output="jo"/>
 			<when state="s15" output="quo"/>
 			<when state="s16" output="’o"/>
-			<when state="s27" output="Ô"/>
-			<when state="s28" output="Jo"/>
-			<when state="s29" output="Jo"/>
-			<when state="s35" output="Quo"/>
+			<when state="s29" output="Ô"/>
+			<when state="s30" output="Jo"/>
+			<when state="s31" output="Jo"/>
+			<when state="s37" output="Quo"/>
 		</action>
 		<action id="p">
 			<when state="none" next="s17"/>
@@ -1583,9 +1583,9 @@
 			<when state="s6" output="ₚ"/>
 			<when state="s9" output="xp"/>
 			<when state="s14" output="ence"/>
-			<when state="s28" output="Xp"/>
-			<when state="s29" output="Xp"/>
-			<when state="s34" output="Ence"/>
+			<when state="s30" output="Xp"/>
+			<when state="s31" output="Xp"/>
+			<when state="s36" output="Ence"/>
 		</action>
 		<action id="q">
 			<when state="none" next="s15"/>
@@ -1593,9 +1593,9 @@
 			<when state="s4" output="χ"/>
 			<when state="s9" output="qu’"/>
 			<when state="s14" output="ique"/>
-			<when state="s28" output="Qu’"/>
-			<when state="s29" output="Qu’"/>
-			<when state="s34" output="Ique"/>
+			<when state="s30" output="Qu’"/>
+			<when state="s31" output="Qu’"/>
+			<when state="s36" output="Ique"/>
 		</action>
 		<action id="r">
 			<when state="none" output="r"/>
@@ -1607,9 +1607,9 @@
 			<when state="s6" output="ᵣ"/>
 			<when state="s9" output="rq"/>
 			<when state="s14" output="erre"/>
-			<when state="s28" output="Rq"/>
-			<when state="s29" output="Rq"/>
-			<when state="s34" output="Erre"/>
+			<when state="s30" output="Rq"/>
+			<when state="s31" output="Rq"/>
+			<when state="s36" output="Erre"/>
 		</action>
 		<action id="s">
 			<when state="none" next="s19"/>
@@ -1621,9 +1621,9 @@
 			<when state="s6" output="ₛ"/>
 			<when state="s9" output="qu"/>
 			<when state="s14" output="ement"/>
-			<when state="s28" output="Qu"/>
-			<when state="s29" output="Qu"/>
-			<when state="s34" output="Ement"/>
+			<when state="s30" output="Qu"/>
+			<when state="s31" output="Qu"/>
+			<when state="s36" output="Ement"/>
 		</action>
 		<action id="t">
 			<when state="none" output="t"/>
@@ -1636,9 +1636,9 @@
 			<when state="s9" output="pt"/>
 			<when state="s14" output="ettre"/>
 			<when state="s16" output="’t"/>
-			<when state="s28" output="Pt"/>
-			<when state="s29" output="Pt"/>
-			<when state="s34" output="Ettre"/>
+			<when state="s30" output="Pt"/>
+			<when state="s31" output="Pt"/>
+			<when state="s36" output="Ettre"/>
 		</action>
 		<action id="u">
 			<when state="none" output="u"/>
@@ -1652,10 +1652,10 @@
 			<when state="s9" output="ju"/>
 			<when state="s14" output="ub"/>
 			<when state="s16" output="’u"/>
-			<when state="s27" output="Û"/>
-			<when state="s28" output="Ju"/>
-			<when state="s29" output="Ju"/>
-			<when state="s34" output="Ub"/>
+			<when state="s29" output="Û"/>
+			<when state="s30" output="Ju"/>
+			<when state="s31" output="Ju"/>
+			<when state="s36" output="Ub"/>
 		</action>
 		<action id="v">
 			<when state="none" output="v"/>
@@ -1665,9 +1665,9 @@
 			<when state="s6" output="ᵥ"/>
 			<when state="s9" output="dv"/>
 			<when state="s14" output="ment"/>
-			<when state="s28" output="Dv"/>
-			<when state="s29" output="Dv"/>
-			<when state="s34" output="Ment"/>
+			<when state="s30" output="Dv"/>
+			<when state="s31" output="Dv"/>
+			<when state="s36" output="Ment"/>
 		</action>
 		<action id="w">
 			<when state="none" output="w"/>
@@ -1687,11 +1687,11 @@
 			<when state="s14" output="ieux"/>
 			<when state="s18" output="ck"/>
 			<when state="s19" output="sk"/>
-			<when state="s28" output="Où"/>
-			<when state="s29" output="Où"/>
-			<when state="s34" output="Ieux"/>
-			<when state="s37" output="Ck"/>
-			<when state="s38" output="Sk"/>
+			<when state="s30" output="Où"/>
+			<when state="s31" output="Où"/>
+			<when state="s36" output="Ieux"/>
+			<when state="s39" output="Ck"/>
+			<when state="s40" output="Sk"/>
 		</action>
 		<action id="y">
 			<when state="none" next="s13"/>
@@ -1704,9 +1704,9 @@
 			<when state="s9" output="k"/>
 			<when state="s12" output="ié"/>
 			<when state="s16" output="’y"/>
-			<when state="s28" output="K"/>
-			<when state="s29" output="K"/>
-			<when state="s32" output="Ié"/>
+			<when state="s30" output="K"/>
+			<when state="s31" output="K"/>
+			<when state="s34" output="Ié"/>
 		</action>
 		<action id="z">
 			<when state="none" output="z"/>
@@ -1715,9 +1715,9 @@
 			<when state="s5" output="ᶻ"/>
 			<when state="s9" output="bj"/>
 			<when state="s14" output="ez-vous"/>
-			<when state="s28" output="Bj"/>
-			<when state="s29" output="Bj"/>
-			<when state="s34" output="Ez-Vous"/>
+			<when state="s30" output="Bj"/>
+			<when state="s31" output="Bj"/>
+			<when state="s36" output="Ez-Vous"/>
 		</action>
 		<action id="¤">
 			<when state="none" next="s2"/>
@@ -1730,20 +1730,20 @@
 			<when state="none" next="s4"/>
 		</action>
 		<action id="À">
-			<when state="none" next="s34"/>
+			<when state="none" next="s36"/>
 			<when state="s1" output="Œ"/>
 		</action>
 		<action id="È">
-			<when state="none" next="s32"/>
+			<when state="none" next="s34"/>
 			<when state="s1" output="Ó"/>
 		</action>
 		<action id="É">
-			<when state="none" next="s31"/>
+			<when state="none" next="s33"/>
 			<when state="s1" output="Æ"/>
 			<when state="s4" output="Η"/>
 		</action>
 		<action id="Ê">
-			<when state="none" next="s27"/>
+			<when state="none" next="s29"/>
 			<when state="s1" output="Á"/>
 		</action>
 		<action id="à">
@@ -1752,9 +1752,9 @@
 			<when state="s5" output="ᵡ"/>
 			<when state="s8" output="æ"/>
 			<when state="s9" output="j"/>
-			<when state="s27" output="Æ"/>
-			<when state="s28" output="J"/>
-			<when state="s29" output="J"/>
+			<when state="s29" output="Æ"/>
+			<when state="s30" output="J"/>
+			<when state="s31" output="J"/>
 		</action>
 		<action id="è">
 			<when state="none" next="s12"/>
@@ -1765,10 +1765,10 @@
 			<when state="s13" output="éi"/>
 			<when state="s15" output="què"/>
 			<when state="s16" output="’è"/>
-			<when state="s28" output="Z"/>
-			<when state="s29" output="Z"/>
-			<when state="s33" output="Éi"/>
-			<when state="s35" output="Què"/>
+			<when state="s30" output="Z"/>
+			<when state="s31" output="Z"/>
+			<when state="s35" output="Éi"/>
+			<when state="s37" output="Què"/>
 		</action>
 		<action id="é">
 			<when state="none" next="s11"/>
@@ -1781,12 +1781,12 @@
 			<when state="s14" output="ying"/>
 			<when state="s15" output="qué"/>
 			<when state="s16" output="’é"/>
-			<when state="s27" output="Aî"/>
-			<when state="s28" output="Jé"/>
-			<when state="s29" output="Jé"/>
-			<when state="s30" output="Ez"/>
-			<when state="s34" output="Ying"/>
-			<when state="s35" output="Qué"/>
+			<when state="s29" output="Aî"/>
+			<when state="s30" output="Jé"/>
+			<when state="s31" output="Jé"/>
+			<when state="s32" output="Ez"/>
+			<when state="s36" output="Ying"/>
+			<when state="s37" output="Qué"/>
 		</action>
 		<action id="ê">
 			<when state="none" next="s8"/>
@@ -1800,12 +1800,12 @@
 			<when state="s14" output="able"/>
 			<when state="s15" output="quê"/>
 			<when state="s16" output="’ê"/>
-			<when state="s28" output="Ju"/>
-			<when state="s29" output="Ju"/>
-			<when state="s30" output="Eo"/>
-			<when state="s31" output="Â"/>
-			<when state="s34" output="Able"/>
-			<when state="s35" output="Quê"/>
+			<when state="s30" output="Ju"/>
+			<when state="s31" output="Ju"/>
+			<when state="s32" output="Eo"/>
+			<when state="s33" output="Â"/>
+			<when state="s36" output="Able"/>
+			<when state="s37" output="Quê"/>
 		</action>
 		<action id="Œ">
 			<when state="none" output="Œ"/>
@@ -1836,36 +1836,44 @@
 			<when state="none" output="★"/>
 			<when state="s8" output="œu"/>
 			<when state="s14" output="bu"/>
-			<when state="s27" output="Œu"/>
-			<when state="s34" output="Bu"/>
+			<when state="s29" output="Œu"/>
+			<when state="s36" output="Bu"/>
 		</action>
 		<action id="’">
 			<when state="none" output="’"/>
 			<when state="s9" output="j’"/>
 			<when state="s14" output="ance"/>
 			<when state="s15" output="qu’"/>
-			<when state="s28" output="J’"/>
-			<when state="s29" output="J’"/>
-			<when state="s34" output="Ance"/>
-			<when state="s35" output="Qu’"/>
+			<when state="s30" output="J’"/>
+			<when state="s31" output="J’"/>
+			<when state="s36" output="Ance"/>
+			<when state="s37" output="Qu’"/>
 		</action>
 		<action id="cd">
 			<when state="none" output="cd"/>
 			<when state="s14" output="could"/>
-			<when state="s34" output="Could"/>
+			<when state="s36" output="Could"/>
 		</action>
 		<action id="shd">
 			<when state="none" output="shd"/>
 			<when state="s14" output="should"/>
-			<when state="s34" output="Should"/>
+			<when state="s36" output="Should"/>
 		</action>
 		<action id="#">
 			<when state="none" next="s21"/>
 			<when state="s22" output=" != "/>
 		</action>
+		<action id="\">
+			<when state="none" next="s23"/>
+			<when state="s24" output="*/"/>
+		</action>
+		<action id='"'>
+			<when state="none" next="s24"/>
+			<when state="s23" output="/*"/>
+		</action>
 		<action id="?">
-			<when state="none" next="s26"/>
-			<when state="s25" output=" -> "/>
+			<when state="none" next="s28"/>
+			<when state="s27" output=" -> "/>
 		</action>
 	</actions>
 	<terminators>
@@ -1891,23 +1899,25 @@
 		<when state="s20" output="h"/>
 		<when state="s21" output="#"/>
 		<when state="s22" output="!"/>
-		<when state="s23" output="$"/>
-		<when state="s24" output="="/>
-		<when state="s25" output="+"/>
-		<when state="s26" output="?"/>
-		<when state="s27" output="Ê"/>
-		<when state="s28" output=";"/>
-		<when state="s29" output=":"/>
-		<when state="s30" output="E"/>
-		<when state="s31" output="É"/>
-		<when state="s32" output="È"/>
-		<when state="s33" output="Y"/>
-		<when state="s34" output="À"/>
-		<when state="s35" output="Q"/>
-		<when state="s36" output="P"/>
-		<when state="s37" output="C"/>
-		<when state="s38" output="S"/>
-		<when state="s39" output="H"/>
+		<when state="s23" output="\"/>
+		<when state="s24" output='"'/>
+		<when state="s25" output="$"/>
+		<when state="s26" output="="/>
+		<when state="s27" output="+"/>
+		<when state="s28" output="?"/>
+		<when state="s29" output="Ê"/>
+		<when state="s30" output=";"/>
+		<when state="s31" output=":"/>
+		<when state="s32" output="E"/>
+		<when state="s33" output="É"/>
+		<when state="s34" output="È"/>
+		<when state="s35" output="Y"/>
+		<when state="s36" output="À"/>
+		<when state="s37" output="Q"/>
+		<when state="s38" output="P"/>
+		<when state="s39" output="C"/>
+		<when state="s40" output="S"/>
+		<when state="s41" output="H"/>
 	</terminators>
 </keyboard>
 
