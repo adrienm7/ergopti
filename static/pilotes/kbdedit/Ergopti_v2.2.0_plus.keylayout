@@ -199,7 +199,7 @@
 			<key code="75" action="/"/>
 			<key code="76" output="&#x000D;"/>
 			<key code="78" action="-"/>
-			<key code="81" output="="/>
+			<key code="81" action="="/>
 			<key code="82" action="0"/>
 			<key code="83" action="1"/>
 			<key code="84" action="2"/>
@@ -298,7 +298,7 @@
 			<key code="75" action="/"/>
 			<key code="76" output="&#x000D;"/>
 			<key code="78" action="-"/>
-			<key code="81" output="="/>
+			<key code="81" action="="/>
 			<key code="96" output="&#x0010;"/>
 			<key code="97" output="&#x0010;"/>
 			<key code="98" output="&#x0010;"/>
@@ -387,7 +387,7 @@
 			<key code="75" action="/"/>
 			<key code="76" output="&#x000D;"/>
 			<key code="78" action="-"/>
-			<key code="81" output="="/>
+			<key code="81" action="="/>
 			<key code="96" output="&#x0010;"/>
 			<key code="97" output="&#x0010;"/>
 			<key code="98" output="&#x0010;"/>
@@ -568,7 +568,7 @@
 			<key code="51" output="&#x0008;"/>
 			<key code="71" output="&#x001B;"/>
 			<key code="76" output="&#x000D;"/>
-			<key code="81" output="="/>
+			<key code="81" action="="/>
 			<key code="96" output="&#x0010;"/>
 			<key code="97" output="&#x0010;"/>
 			<key code="98" output="&#x0010;"/>
@@ -950,7 +950,7 @@
 			<when state="s7" output="ℝ"/>
 		</action>
 		<action id="$">
-			<when state="none" output="$"/>
+			<when state="none" next="s21"/>
 			<when state="s2" output="£"/>
 		</action>
 		<action id="&amp;">
@@ -1091,6 +1091,7 @@
 			<when state="none" output="="/>
 			<when state="s5" output="⁼"/>
 			<when state="s6" output="₌"/>
+			<when state="s21" output=" => "/>
 		</action>
 		<action id="&gt;">
 			<when state="none" output="&#x003E;"/>
@@ -1438,6 +1439,7 @@
 			<when state="s6" output="ₕ"/>
 			<when state="s9" output="ph"/>
 			<when state="s14" output="techn"/>
+			<when state="s16" output="’h"/>
 		</action>
 		<action id="i">
 			<when state="none" output="i"/>
@@ -1766,6 +1768,7 @@
 		<when state="s18" output="s"/>
 		<when state="s19" output="h"/>
 		<when state="s20" output="!"/>
+		<when state="s21" output="$"/>
 	</terminators>
 </keyboard>
 

@@ -528,6 +528,7 @@ mappings = {
             ("é", "’é"),
             ("è", "’è"),
             ("ê", "’ê"),
+            ("h", "’h"),
             ("i", "’i"),
             ("o", "’o"),
             ("t", "’t"),
@@ -603,12 +604,13 @@ mappings = {
     #         ("\\", "*/"),
     #     ],
     # },
-    # "rolls_dollar": {
-    #     "trigger": "$",
-    #     "map": [
-    #         ("=", " => "),
-    #     ],
-    # },
+    "rolls_dollar": {
+        "trigger": "$",
+        "map": [
+            ("=", " => "),
+        ],
+    },
+    # Rolls equal gives error
     # "rolls_equal": {
     #     "trigger": "=",
     #     "map": [
