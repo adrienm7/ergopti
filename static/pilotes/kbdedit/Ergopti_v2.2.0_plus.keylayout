@@ -559,7 +559,7 @@
 			<key code="41" action="]"/>
 			<key code="42" output="!"/>
 			<key code="43" action="="/>
-			<key code="44" output="?"/>
+			<key code="44" action="?"/>
 			<key code="45" action="&amp;"/>
 			<key code="46" action="$"/>
 			<key code="47" action="+"/>
@@ -952,6 +952,7 @@
 		<action id="$">
 			<when state="none" next="s21"/>
 			<when state="s2" output="£"/>
+			<when state="s22" output=" &#x003C;= "/>
 		</action>
 		<action id="&amp;">
 			<when state="none" output="&#x0026;"/>
@@ -980,9 +981,10 @@
 			<when state="s7" output="⟧"/>
 		</action>
 		<action id="+">
-			<when state="none" output="+"/>
+			<when state="none" next="s23"/>
 			<when state="s5" output="⁺"/>
 			<when state="s6" output="₊"/>
+			<when state="s24" output=" &#x003C;- "/>
 		</action>
 		<action id=",">
 			<when state="none" next="s9"/>
@@ -1088,7 +1090,7 @@
 			<when state="s7" output="⟪"/>
 		</action>
 		<action id="=">
-			<when state="none" output="="/>
+			<when state="none" next="s22"/>
 			<when state="s5" output="⁼"/>
 			<when state="s6" output="₌"/>
 			<when state="s21" output=" => "/>
@@ -1746,6 +1748,10 @@
 			<when state="none" output="#"/>
 			<when state="s20" output=" != "/>
 		</action>
+		<action id="?">
+			<when state="none" next="s24"/>
+			<when state="s23" output=" -> "/>
+		</action>
 	</actions>
 	<terminators>
 		<when state="s1" output="^"/>
@@ -1769,6 +1775,9 @@
 		<when state="s19" output="h"/>
 		<when state="s20" output="!"/>
 		<when state="s21" output="$"/>
+		<when state="s22" output="="/>
+		<when state="s23" output="+"/>
+		<when state="s24" output="?"/>
 	</terminators>
 </keyboard>
 
