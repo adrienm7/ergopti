@@ -610,25 +610,24 @@ mappings = {
             ("=", " => "),
         ],
     },
-    # Rolls equal gives error
-    # "rolls_equal": {
-    #     "trigger": "=",
-    #     "map": [
-    #         ("$", " <= "),
-    #     ],
-    # },
-    # "rolls_plus": {
-    #     "trigger": "+",
-    #     "map": [
-    #         ("?", " -> "),
-    #     ],
-    # },
-    # "rolls_question_mark": {
-    #     "trigger": "?",
-    #     "map": [
-    #         ("+", " <- "),
-    #     ],
-    # },
+    "rolls_equal": {
+        "trigger": "=",
+        "map": [
+            ("$", " <= "),
+        ],
+    },
+    "rolls_plus": {
+        "trigger": "+",
+        "map": [
+            ("?", " -> "),
+        ],
+    },
+    "rolls_question_mark": {
+        "trigger": "?",
+        "map": [
+            ("+", " <- "),
+        ],
+    },
 }
 
 
@@ -667,7 +666,7 @@ def add_uppercase_mappings(orig_mappings):
     return new_mappings
 
 
-def escape_quotes_in_mappings(orig_mappings):
+def escape_symbols_in_mappings(orig_mappings):
     """
     Go through all mappings and replace every " character
     in the outputs with &#x0022; to avoid XML issues.
@@ -677,7 +676,7 @@ def escape_quotes_in_mappings(orig_mappings):
         trigger = data["trigger"]
         fixed_map = []
         for trig, out in data["map"]:
-            fixed_out = out.replace('"', "&#x0022;")
+            fixed_out = out.replace('"', "&#x0022;").replace("<", "&#x003C;")
             fixed_map.append((trig, fixed_out))
         new_mappings[key] = {
             "trigger": trigger,
@@ -687,7 +686,7 @@ def escape_quotes_in_mappings(orig_mappings):
 
 
 # mappings = add_uppercase_mappings(mappings)
-# mappings = escape_quotes_in_mappings(mappings)
+mappings = escape_symbols_in_mappings(mappings)
 
 
 def create_keylayout_plus(input_path: str, directory_path: str = None):
