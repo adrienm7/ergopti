@@ -536,12 +536,12 @@ mappings = {
             ("y", "’y"),
         ],
     },
-    # "roll_ct": {
-    #     "trigger": "p",
-    #     "map": [
-    #         ("'", "ct"),
-    #     ],
-    # },
+    "roll_ct": {
+        "trigger": "p",
+        "map": [
+            ("'", "ct"),
+        ],
+    },
     "roll_ck": {
         "trigger": "c",
         "map": [
@@ -685,7 +685,7 @@ def escape_symbols_in_mappings(orig_mappings):
     return new_mappings
 
 
-# mappings = add_uppercase_mappings(mappings)
+mappings = add_uppercase_mappings(mappings)
 mappings = escape_symbols_in_mappings(mappings)
 
 
