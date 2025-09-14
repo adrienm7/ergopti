@@ -233,7 +233,20 @@ def sort_keys(content):
 
 
 mappings = {
-    "comma_sfbs": {
+    "e_circumflex_deadkey": {
+        "trigger": "ê",
+        "map": [
+            ("a", "â"),
+            ("à", "œ"),
+            ("é", "æ"),
+            ("e", "oe"),
+            ("é", "aî"),
+            ("i", "î"),
+            ("o", "ô"),
+            ("u", "û"),
+        ],
+    },
+    "comma_j_letters_sfbs": {
         "trigger": ",",
         "map": [
             ("à", "j"),
@@ -245,6 +258,7 @@ mappings = {
             ("u", "ju"),
             ("ê", "ju"),
             ("'", "j’"),
+            ("’", "j’"),
             # Far letters
             ("è", "z"),
             ("y", "k"),
@@ -267,12 +281,39 @@ mappings = {
             ("p", "xp"),
         ],
     },
-    "a_grave_sfbs": {
+    "e": {
+        "trigger": "e",
+        "map": [
+            ("ê", "eo"),
+            ("é", "ez"),
+        ],
+    },
+    "e_acute_sfbs": {
+        "trigger": "é",
+        "map": [
+            ("ê", "â"),
+        ],
+    },
+    "e_grave_y": {
+        "trigger": "è",
+        "map": [
+            ("y", "ié"),
+        ],
+    },
+    "y_e_grave": {
+        "trigger": "y",
+        "map": [
+            ("è", "éi"),
+        ],
+    },
+    "a_grave_suffixes": {
         "trigger": "à",
         "map": [
+            # SFB with "bu" or "ub"
             ("★", "bu"),
             ("j", "bu"),
             ("u", "ub"),
+            # Common suffixes
             ("a", "aire"),
             ("c", "ction"),
             ("cd", "could"),
@@ -297,9 +338,10 @@ mappings = {
             ("x", "ieux"),
             ("z", "ez-vous"),
             ("'", "ance"),
+            ("’", "ance"),
         ],
     },
-    "q_mapping": {
+    "q_with_u": {
         "trigger": "q",
         "map": [
             ("a", "qua"),
@@ -323,14 +365,9 @@ mappings = {
             ("ê", "’ê"),
             ("i", "’i"),
             ("o", "’o"),
+            ("t", "’t"),
             ("u", "’u"),
             ("y", "’y"),
-        ],
-    },
-    "roll_hc": {
-        "trigger": "h",
-        "map": [
-            ("c", "wh"),
         ],
     },
     "roll_ct": {
@@ -339,18 +376,92 @@ mappings = {
             ("'", "ct"),
         ],
     },
-    # "roll_parenthesis_hashtag": {
-    #     "trigger": "(",
-    #     "map": [
-    #         ("#", '"('),
-    #     ],
-    # },
-    # "roll_hashtag_parenthesis": {
-    #     "trigger": "#",
-    #     "map": [
-    #         ("(", '")'),
-    #     ],
-    # },
+    "roll_ck": {
+        "trigger": "c",
+        "map": [
+            ("x", "ck"),
+        ],
+    },
+    "roll_sk": {
+        "trigger": "s",
+        "map": [
+            ("x", "sk"),
+        ],
+    },
+    "roll_wh": {
+        "trigger": "h",
+        "map": [
+            ("c", "wh"),
+        ],
+    },
+    "rolls_hashtag": {
+        "trigger": "#",
+        "map": [
+            ("!", " := "),
+            ("(", '")'),
+            ("[", '"]'),
+        ],
+    },
+    "rolls_left_parenthesis": {
+        "trigger": "(",
+        "map": [
+            ("#", '("'),
+        ],
+    },
+    "rolls_left_bracket": {
+        "trigger": "[",
+        "map": [
+            ("#", '["'),
+        ],
+    },
+    "rolls_right_bracket": {
+        "trigger": "]",
+        "map": [
+            ("#", '"]'),
+        ],
+    },
+    "rolls_exclamation_mark": {
+        "trigger": "!",
+        "map": [
+            ("#", " != "),
+        ],
+    },
+    "rolls_backslash": {
+        "trigger": "\\",
+        "map": [
+            ('"', "/*"),
+        ],
+    },
+    "rolls_quote": {
+        "trigger": '"',
+        "map": [
+            ("\\", "*/"),
+        ],
+    },
+    "rolls_dollar": {
+        "trigger": "$",
+        "map": [
+            ("=", " => "),
+        ],
+    },
+    "rolls_equal": {
+        "trigger": "=",
+        "map": [
+            ("$", " <= "),
+        ],
+    },
+    "rolls_plus": {
+        "trigger": "+",
+        "map": [
+            ("?", " -> "),
+        ],
+    },
+    "rolls_question_mark": {
+        "trigger": "?",
+        "map": [
+            ("+", " <- "),
+        ],
+    },
 }
 
 
@@ -389,7 +500,27 @@ def add_uppercase_mappings(orig_mappings):
     return new_mappings
 
 
+def escape_quotes_in_mappings(mappings):
+    """
+    Go through all mappings and replace every " character
+    in the outputs with &#x0022; to avoid XML issues.
+    """
+    new_mappings = {}
+    for key, data in mappings.items():
+        trigger = data["trigger"]
+        fixed_map = []
+        for trig, out in data["map"]:
+            fixed_out = out.replace('"', "&#x0022;")
+            fixed_map.append((trig, fixed_out))
+        new_mappings[key] = {
+            "trigger": trigger,
+            "map": fixed_map,
+        }
+    return new_mappings
+
+
 mappings = add_uppercase_mappings(mappings)
+mappings = escape_quotes_in_mappings(mappings)
 
 
 def create_keylayout_plus(input_path: str, directory_path: str = None):
@@ -408,7 +539,6 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
 
         content = read_file(file_path)
         content = append_plus_to_keyboard_name(content)
-        content = assign_action_layer(content, "ê", 1)
         start_layer = find_next_available_layer(content)
 
         for i, (feature, data) in enumerate(mappings.items()):
