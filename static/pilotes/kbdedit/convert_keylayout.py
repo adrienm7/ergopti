@@ -568,13 +568,13 @@ mappings = {
             ("[", '"]'),
         ],
     },
-    # "rolls_chevron_left": {
-    #     "trigger": "<",
-    #     "map": [
-    #         ("@", "</"),
-    #         ("%", " <= "),
-    #     ],
-    # },
+    "rolls_chevron_left": {
+        "trigger": "<",
+        "map": [
+            ("@", "</"),
+            # ("%", " <= "),
+        ],
+    },
     "rolls_chevron_right": {
         "trigger": ">",
         "map": [
@@ -659,6 +659,8 @@ def add_uppercase_mappings(orig_mappings):
 
     new_mappings = orig_mappings.copy()  # Keep the original intact
     for key, data in orig_mappings.items():
+        if len(data["map"]) == 0:
+            continue
         trigger = data["trigger"]
         new_map = [(k, v.title()) for k, v in data["map"]]
 
@@ -689,6 +691,12 @@ def escape_symbols_in_mappings(orig_mappings):
     for key, data in orig_mappings.items():
         trigger = data["trigger"]
         fixed_map = []
+        if len(data["map"]) == 0:
+            new_mappings[key] = {
+                "trigger": trigger,
+                "map": [],
+            }
+            continue
         for trig, out in data["map"]:
             fixed_out = out.replace('"', "&#x0022;").replace("<", "&#x003C;")
             fixed_map.append((trig, fixed_out))
@@ -730,6 +738,9 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
                 f"Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
             )
 
+            if len(data["map"]) == 0:
+                continue
+
             # Assign trigger key to this layer
             content = ensure_action_block(content, trigger_key, trigger_key)
             content = assign_action_layer(content, trigger_key, layer)
@@ -756,6 +767,7 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
                 '<key code="8" output=\'"\'/>', '<key code="8" action=\'"\'/>'
             )
             .replace('"/>"/>', '"/>')
+            .replace('output="<"', 'output="&#x003C;"')
         )
 
         write_file(new_file_path, content)
@@ -891,6 +903,10 @@ def ensure_action_block(doc: str, action_id: str, output_value: str) -> str:
     - Matches <action ... id="ID" ...> or <action ... id='ID' ...> wherever the id attribute is placed.
     - If missing, inserts the block before the first </actions>, using the same indentation.
     """
+    if action_id == "<":
+        action_id = "&lt;"
+    if action_id == ">":
+        action_id = "&gt;"
     # Match <action ... id="action_id" ...> or with single quotes, id can be anywhere in the tag
     pattern = rf'<action\b[^>]*\bid\s*=\s*(["\']){re.escape(action_id)}\1'
 
