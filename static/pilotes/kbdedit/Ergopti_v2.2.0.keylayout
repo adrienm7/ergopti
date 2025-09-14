@@ -838,7 +838,7 @@
 			<key code="125" output="&#x001F;"/>
 			<key code="126" output="&#x001E;"/>
 		</keyMap>
-<keyMap index="9">
+		<keyMap index="9">
 			<key code="0" action="a"/>
 			<key code="1" action="i"/>
 			<key code="2" action="e"/>

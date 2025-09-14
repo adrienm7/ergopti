@@ -170,7 +170,7 @@ def add_keymap_9(content):
     keymap_9 = build_custom_keymap(9, base_body)
     return re.sub(
         r'(<keyMap index="8">.*?</keyMap>)',
-        r"\1\n" + keymap_9,
+        r"\1\n\t\t" + keymap_9,
         content,
         flags=re.DOTALL,
     )
@@ -250,7 +250,7 @@ mappings = {
             ("y", "k"),
             ("c", "ç"),
             ("x", "où"),
-            ("s", "q"),
+            ("s", "qu"),
             # SFBs
             ("f", "fl"),
             ("g", "gl"),
@@ -309,7 +309,6 @@ mappings = {
             ("ê", "quê"),
             ("i", "qui"),
             ("o", "quo"),
-            ("y", "quy"),
             ("'", "qu’"),
             ("’", "qu’"),
         ],
@@ -328,7 +327,69 @@ mappings = {
             ("y", "’y"),
         ],
     },
+    "roll_hc": {
+        "trigger": "h",
+        "map": [
+            ("c", "wh"),
+        ],
+    },
+    "roll_ct": {
+        "trigger": "p",
+        "map": [
+            ("'", "ct"),
+        ],
+    },
+    # "roll_parenthesis_hashtag": {
+    #     "trigger": "(",
+    #     "map": [
+    #         ("#", '"('),
+    #     ],
+    # },
+    # "roll_hashtag_parenthesis": {
+    #     "trigger": "#",
+    #     "map": [
+    #         ("(", '")'),
+    #     ],
+    # },
 }
+
+
+def add_uppercase_mappings(orig_mappings):
+    """
+    Generate mappings for uppercase triggers.
+    - Alphabetic triggers become uppercase.
+    - Special triggers can be replaced by one or more alternatives defined in `special_upper_triggers`.
+    - All outputs are capitalized (titlecase).
+    """
+    # Define special triggers and their uppercase replacements (can be multiple)
+    special_upper_triggers = {
+        ",": [";", ":"],
+    }
+
+    new_mappings = orig_mappings.copy()  # Keep the original intact
+    for key, data in orig_mappings.items():
+        trigger = data["trigger"]
+        new_map = [(k, v.title()) for k, v in data["map"]]
+
+        if trigger in special_upper_triggers:
+            # Create a mapping for each replacement
+            for i, replacement in enumerate(special_upper_triggers[trigger]):
+                upper_key = f"{key}_upper{i}"
+                new_mappings[upper_key] = {
+                    "trigger": replacement,
+                    "map": new_map,
+                }
+        elif trigger.isalpha():
+            upper_key = key + "_upper"
+            new_mappings[upper_key] = {
+                "trigger": trigger.upper(),
+                "map": new_map,
+            }
+
+    return new_mappings
+
+
+mappings = add_uppercase_mappings(mappings)
 
 
 def create_keylayout_plus(input_path: str, directory_path: str = None):
@@ -346,6 +407,8 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
             continue
 
         content = read_file(file_path)
+        content = append_plus_to_keyboard_name(content)
+        content = assign_action_layer(content, "ê", 1)
         start_layer = find_next_available_layer(content)
 
         for i, (feature, data) in enumerate(mappings.items()):
@@ -363,6 +426,21 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
                 content = add_action_state(content, action_id, layer, output)
 
         write_file(new_file_path, content)
+
+
+def append_plus_to_keyboard_name(content: str) -> str:
+    """
+    Appends ' Plus' to the keyboard name in the <keyboard> tag.
+    """
+    pattern = r'(<keyboard\b[^>]*\bname=")([^"]+)(")'
+
+    def repl(match):
+        prefix, name, suffix = match.groups()
+        if not name.endswith(" Plus"):
+            name += " Plus"
+        return f"{prefix}{name}{suffix}"
+
+    return re.sub(pattern, repl, content)
 
 
 def find_next_available_layer(content: str) -> int:
@@ -403,7 +481,7 @@ def prepare_mapping(mapping):
     return merge_mappings(mapping, mapping_upper)
 
 
-def create_uppercase_mapping(mapping):
+def create_uppercase_mapping(mapping, titlecase=False):
     """
     Given a mapping of lowercase keys to outputs, generate a mapping for uppercase keys.
     Only letters are uppercased; other symbols are left unchanged.
@@ -415,7 +493,10 @@ def create_uppercase_mapping(mapping):
 
         # Uppercase the output if it starts with a letter
         if output and output[0].isalpha():
-            output_upper = output[0].upper() + output[1:]
+            if titlecase:
+                output_upper = output[0].upper() + output[1:]
+            else:
+                output_upper = output.upper()
         else:
             output_upper = output
 
