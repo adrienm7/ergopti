@@ -395,12 +395,13 @@ mappings = {
     "e_circumflex_deadkey": {
         "trigger": "ê",
         "map": [
+            ("à", "æ"),
             ("a", "â"),
-            ("à", "œ"),
-            ("é", "æ"),
-            ("e", "oe"),
             ("é", "aî"),
+            ("e", "oe"),
             ("i", "î"),
+            ("j", "œu"),
+            ("★", "œu"),
             ("o", "ô"),
             ("u", "û"),
         ],
@@ -410,12 +411,12 @@ mappings = {
         "map": [
             ("à", "j"),
             ("a", "ja"),
-            ("e", "je"),
             ("é", "jé"),
+            ("ê", "ju"),
+            ("e", "je"),
             ("i", "ji"),
             ("o", "jo"),
             ("u", "ju"),
-            ("ê", "ju"),
             ("'", "j’"),
             ("’", "j’"),
             # Far letters
@@ -443,8 +444,8 @@ mappings = {
     "e": {
         "trigger": "e",
         "map": [
-            ("ê", "eo"),
             ("é", "ez"),
+            ("ê", "eo"),
         ],
     },
     "e_acute_sfbs": {
@@ -469,8 +470,8 @@ mappings = {
         "trigger": "à",
         "map": [
             # SFB with "bu" or "ub"
-            ("★", "bu"),
             ("j", "bu"),
+            ("★", "bu"),
             ("u", "ub"),
             # Common suffixes
             ("a", "aire"),
@@ -535,12 +536,12 @@ mappings = {
             ("'", "ct"),
         ],
     },
-    # "roll_ck": {
-    #     "trigger": "c",
-    #     "map": [
-    #         ("x", "ck"),
-    #     ],
-    # },
+    "roll_ck": {
+        "trigger": "c",
+        "map": [
+            ("x", "ck"),
+        ],
+    },
     # "roll_sk": {
     #     "trigger": "s",
     #     "map": [
@@ -705,15 +706,20 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
         for i, (feature, data) in enumerate(mappings.items()):
             layer = start_layer + i
             trigger_key = data["trigger"]
+            print(
+                f"Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
+            )
 
             # Assign trigger key to this layer
             content = assign_action_layer(content, trigger_key, layer)
 
             # Add trigger key as dead key
             content = add_terminator_state(content, layer, trigger_key)
+            print("ok")
 
             # Add all feature actions
-            for action_id, output in prepare_mapping(data["map"]):
+            for action_id, output in data["map"]:
+                print(f"  - action '{action_id}' → '{output}'")
                 content = add_action_state(content, action_id, layer, output)
 
         write_file(new_file_path, content)
@@ -782,28 +788,6 @@ def find_next_available_layer(content: str) -> int:
     next_layer = max_layer + 1
     print(f"Next available layer: s{next_layer}")
     return next_layer
-
-
-def prepare_mapping(mapping):
-    """
-    Given a base mapping, return a merged mapping including:
-    - original mapping
-    - automatically generated uppercase mapping
-    - no duplicate keys
-    """
-
-    def merge_mappings(*mappings):
-        seen = set()
-        merged = []
-        for m in mappings:
-            for key, output in m:
-                if key not in seen:
-                    merged.append((key, output))
-                    seen.add(key)
-        return merged
-
-    mapping_upper = create_uppercase_mapping(mapping)
-    return merge_mappings(mapping, mapping_upper)
 
 
 def create_uppercase_mapping(mapping, titlecase=False):
