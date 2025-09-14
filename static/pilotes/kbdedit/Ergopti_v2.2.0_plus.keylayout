@@ -986,6 +986,7 @@
 			<when state="s5" output="⁾"/>
 			<when state="s6" output="₎"/>
 			<when state="s7" output="⟧"/>
+			<when state="s23" output=" = &#x0022;"/>
 		</action>
 		<action id="+">
 			<when state="none" next="s30"/>
