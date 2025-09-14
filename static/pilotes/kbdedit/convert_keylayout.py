@@ -568,19 +568,33 @@ mappings = {
             ("[", '"]'),
         ],
     },
-    "rolls_left_parenthesis": {
+    # "rolls_chevron_left": {
+    #     "trigger": "<",
+    #     "map": [
+    #         ("@", "</"),
+    #         ("%", " <= "),
+    #     ],
+    # },
+    # "rolls_chevron_right": {
+    #     "trigger": ">",
+    #     "map": [
+    #         ("%", " >= "),
+    #     ],
+    # },
+    "rolls_parenthesis_left": {
         "trigger": "(",
         "map": [
             ("#", '("'),
         ],
     },
-    "rolls_left_bracket": {
+    "rolls_bracket_left": {
         "trigger": "[",
         "map": [
             ("#", '["'),
+            (")", ' = "'),
         ],
     },
-    "rolls_right_bracket": {
+    "rolls_bracket_right": {
         "trigger": "]",
         "map": [
             ("#", '"]'),
