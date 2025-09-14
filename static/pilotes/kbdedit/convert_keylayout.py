@@ -699,8 +699,8 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
 
         content = read_file(file_path)
         content = append_plus_to_keyboard_name(content)
-        # content = fix_keymap5_symbols(content)
-        # content = fix_keymap6_symbols(content)
+        content = fix_keymap5_symbols(content)
+        content = ergopti_plus_altgr_symbols(content)
         start_layer = find_next_available_layer(content)
 
         for i, (feature, data) in enumerate(mappings.items()):
@@ -740,14 +740,21 @@ def append_plus_to_keyboard_name(content: str) -> str:
     return re.sub(pattern, repl, content)
 
 
-def fix_keymap5_symbols(content):
-    # This code replaces specific outputs in keymap index 5 = AltGr
+def fix_keymap5_symbols(content: str) -> str:
+    """
+    Replace specific symbols in keymap index 5 (AltGr), forcing output="...".
+    - 'ç' becomes '!'
+    - 'œ' becomes '%'
+    All existing action="..." or output="..." attributes are replaced with output="...".
+    """
+
     def replace_in_keymap(match):
         header, body, footer = match.groups()
-        # output="ç" → "!"
-        body = re.sub(r'(<key[^>]*(output|action)=")ç(")', r"\1!\3", body)
-        # output="œ" → "%"
-        body = re.sub(r'(<key[^>]*(output|action)=")œ(")', r"\1%\3", body)
+
+        # Replace 'ç' → '!' and 'œ' → '%'
+        body = re.sub(r'(<key[^>]*)(output|action)="ç"', r'\1output="!"', body)
+        body = re.sub(r'(<key[^>]*)(output|action)="œ"', r'\1output="%"', body)
+
         return f"{header}{body}{footer}"
 
     return re.sub(
@@ -758,7 +765,7 @@ def fix_keymap5_symbols(content):
     )
 
 
-def fix_keymap6_symbols(content):
+def ergopti_plus_altgr_symbols(content):
     # This code replaces specific outputs in keymap index 6 = Shift + AltGr
     def replace_in_keymap(match):
         header, body, footer = match.groups()
@@ -766,12 +773,20 @@ def fix_keymap6_symbols(content):
         body = re.sub(r'(<key[^>]*(output|action)=")Ç(")', r"\1 !\3", body)
         return f"{header}{body}{footer}"
 
-    return re.sub(
+    content = re.sub(
         r'(<keyMap index="6">)(.*?)(</keyMap>)',
         replace_in_keymap,
         content,
         flags=re.DOTALL,
     )
+    content = re.sub(
+        r'(<keyMap index="7">)(.*?)(</keyMap>)',
+        replace_in_keymap,
+        content,
+        flags=re.DOTALL,
+    )
+
+    return content
 
 
 def find_next_available_layer(content: str) -> int:
