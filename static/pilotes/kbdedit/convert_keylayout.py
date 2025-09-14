@@ -530,18 +530,18 @@ mappings = {
             ("y", "’y"),
         ],
     },
-    "roll_ct": {
-        "trigger": "p",
-        "map": [
-            ("'", "ct"),
-        ],
-    },
-    "roll_ck": {
-        "trigger": "c",
-        "map": [
-            ("x", "ck"),
-        ],
-    },
+    # "roll_ct": {
+    #     "trigger": "p",
+    #     "map": [
+    #         ("'", "ct"),
+    #     ],
+    # },
+    # "roll_ck": {
+    #     "trigger": "c",
+    #     "map": [
+    #         ("x", "ck"),
+    #     ],
+    # },
     # "roll_sk": {
     #     "trigger": "s",
     #     "map": [

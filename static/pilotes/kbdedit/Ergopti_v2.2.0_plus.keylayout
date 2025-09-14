@@ -966,7 +966,6 @@
 			<when state="s9" output="j’"/>
 			<when state="s14" output="ance"/>
 			<when state="s15" output="qu’"/>
-			<when state="s17" output="ct"/>
 		</action>
 		<action id="(">
 			<when state="none" output="("/>
@@ -1375,7 +1374,7 @@
 			<when state="s6" output="ᵦ"/>
 		</action>
 		<action id="c">
-			<when state="none" next="s18"/>
+			<when state="none" output="c"/>
 			<when state="s1" output="º"/>
 			<when state="s2" output="¢"/>
 			<when state="s3" output="©"/>
@@ -1517,7 +1516,7 @@
 			<when state="s16" output="’o"/>
 		</action>
 		<action id="p">
-			<when state="none" next="s17"/>
+			<when state="none" output="p"/>
 			<when state="s1" output="¶"/>
 			<when state="s2" output="₱"/>
 			<when state="s4" output="π"/>
@@ -1605,7 +1604,6 @@
 			<when state="s6" output="ₓ"/>
 			<when state="s9" output="où"/>
 			<when state="s14" output="ieux"/>
-			<when state="s18" output="ck"/>
 		</action>
 		<action id="y">
 			<when state="none" next="s13"/>
@@ -1732,8 +1730,6 @@
 		<when state="s14" output="à"/>
 		<when state="s15" output="q"/>
 		<when state="s16" output="'"/>
-		<when state="s17" output="p"/>
-		<when state="s18" output="c"/>
 	</terminators>
 </keyboard>
 
