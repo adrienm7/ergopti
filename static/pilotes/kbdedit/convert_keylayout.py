@@ -60,6 +60,11 @@ def apply_key_substitutions(content, substitutions):
     return content
 
 
+# ===============================
+# ======= Bundle creation =======
+# ===============================
+
+
 def create_bundle(
     version: str,
     *keylayout_files: str,
@@ -69,44 +74,62 @@ def create_bundle(
 ):
     """
     Create a .bundle package for macOS keyboard layouts, with logos.
-    - Uses logo_ergopti.icns for normal layouts.
-    - Uses logo_ergopti_plus.icns if the keylayout name ends with _plus.keylayout.
     """
-
     base_dir = Path(directory_path) if directory_path else Path(__file__).parent
     bundle_name = f"Ergopti_{version}.bundle"
     bundle_path = base_dir / bundle_name
 
-    # Cleanup old bundle if exists
     if bundle_path.exists():
         shutil.rmtree(bundle_path)
 
-    # Create required directories
     resources_path = bundle_path / "Contents" / "Resources"
     resources_path.mkdir(parents=True, exist_ok=True)
 
     info_plist_entries = []
-
     for f in keylayout_files:
         src = Path(base_dir) / f
         if not src.exists():
             raise FileNotFoundError(f"Keylayout file not found: {src}")
+        info_plist_entries.append(
+            copy_keylayout_and_logo(src, base_dir, resources_path)
+        )
 
-        # Copy keylayout file
-        shutil.copy(src, resources_path / src.name)
+    # Write Info.plist
+    info_plist_content = generate_info_plist(version, info_plist_entries)
+    with open(
+        bundle_path / "Contents" / "Info.plist", "w", encoding="utf-8"
+    ) as f:
+        f.write(info_plist_content)
+    print(f"Bundle created at: {bundle_path}")
 
-        # Choose logo depending on filename
-        if src.stem.endswith("_plus"):
-            logo_filename = "logo_ergopti_plus.icns"
-        else:
-            logo_filename = "logo_ergopti.icns"
+    zip_path = None
+    if zip_bundle:
+        zip_path = base_dir / f"{bundle_name}.zip"
+        zip_bundle_folder(bundle_path, base_dir, zip_path)
+        if cleanup:
+            shutil.rmtree(bundle_path)
+            print(f"Removed bundle folder: {bundle_path}")
 
-        logo_path = base_dir / logo_filename
-        if logo_path.exists():
-            shutil.copy(logo_path, resources_path / logo_filename)
-            print(f"Added logo: {logo_filename}")
-            info_plist_entries.append(
-                f"""
+    return bundle_path if not cleanup else None, zip_path
+
+
+def copy_keylayout_and_logo(
+    src: Path, base_dir: Path, resources_path: Path
+) -> str:
+    """Copy the keylayout file and its corresponding logo. Return the Info.plist entry."""
+    shutil.copy(src, resources_path / src.name)
+
+    # Choose logo
+    if src.stem.endswith("_plus"):
+        logo_filename = "logo_ergopti_plus.icns"
+    else:
+        logo_filename = "logo_ergopti.icns"
+
+    logo_path = base_dir / logo_filename
+    if logo_path.exists():
+        shutil.copy(logo_path, resources_path / logo_filename)
+        print(f"Added logo: {logo_filename}")
+        return f"""
         <dict>
             <key>TISInputSourceID</key>
             <string>com.ergopti.{src.stem}</string>
@@ -117,11 +140,9 @@ def create_bundle(
             <key>ICNS</key>
             <string>{logo_filename}</string>
         </dict>"""
-            )
-        else:
-            print(f"⚠️ No logo found for {src.stem}, continuing without it")
-            info_plist_entries.append(
-                f"""
+    else:
+        print(f"⚠️ No logo found for {src.stem}, continuing without it")
+        return f"""
         <dict>
             <key>TISInputSourceID</key>
             <string>com.ergopti.{src.stem}</string>
@@ -130,10 +151,11 @@ def create_bundle(
             <key>TSMInputSourceType</key>
             <string>TISTypeKeyboardLayout</string>
         </dict>"""
-            )
 
-    # Create Info.plist
-    info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+
+def generate_info_plist(version: str, entries: list[str]) -> str:
+    """Generate the full Info.plist content."""
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -148,37 +170,24 @@ def create_bundle(
     <string>BNDL</string>
     <key>TSMInputSources</key>
     <array>
-        {"".join(info_plist_entries)}
+        {"".join(entries)}
     </array>
 </dict>
 </plist>
 """
-    with open(
-        bundle_path / "Contents" / "Info.plist", "w", encoding="utf-8"
-    ) as f:
-        f.write(info_plist_content)
 
-    print(f"Bundle created at: {bundle_path}")
 
-    # Optionally create a zip archive
-    zip_path = None
-    if zip_bundle:
-        zip_path = base_dir / f"{bundle_name}.zip"
-        if zip_path.exists():
-            zip_path.unlink()
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for root, _, files in os.walk(bundle_path):
-                for file in files:
-                    file_path = Path(root) / file
-                    relative_path = file_path.relative_to(base_dir)
-                    zipf.write(file_path, relative_path)
-        print(f"Zipped bundle at: {zip_path}")
-
-        if cleanup:
-            shutil.rmtree(bundle_path)
-            print(f"Removed bundle folder: {bundle_path}")
-
-    return bundle_path if not cleanup else None, zip_path
+def zip_bundle_folder(bundle_path: Path, base_dir: Path, zip_path: Path):
+    """Zip the bundle folder into a .zip file."""
+    if zip_path.exists():
+        zip_path.unlink()
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, _, files in os.walk(bundle_path):
+            for file in files:
+                file_path = Path(root) / file
+                relative_path = file_path.relative_to(base_dir)
+                zipf.write(file_path, relative_path)
+    print(f"Zipped bundle at: {zip_path}")
 
 
 # ========================================
@@ -624,13 +633,13 @@ def add_uppercase_mappings(orig_mappings):
     return new_mappings
 
 
-def escape_quotes_in_mappings(mappings):
+def escape_quotes_in_mappings(orig_mappings):
     """
     Go through all mappings and replace every " character
     in the outputs with &#x0022; to avoid XML issues.
     """
     new_mappings = {}
-    for key, data in mappings.items():
+    for key, data in orig_mappings.items():
         trigger = data["trigger"]
         fixed_map = []
         for trig, out in data["map"]:
@@ -663,6 +672,8 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
 
         content = read_file(file_path)
         content = append_plus_to_keyboard_name(content)
+        content = fix_keymap5_symbols(content)
+        content = fix_keymap6_symbols(content)
         start_layer = find_next_available_layer(content)
 
         for i, (feature, data) in enumerate(mappings.items()):
@@ -695,6 +706,40 @@ def append_plus_to_keyboard_name(content: str) -> str:
         return f"{prefix}{name}{suffix}"
 
     return re.sub(pattern, repl, content)
+
+
+def fix_keymap5_symbols(content):
+    # This code replaces specific outputs in keymap index 5 = AltGr
+    def replace_in_keymap(match):
+        header, body, footer = match.groups()
+        # output="ç" → "!"
+        body = re.sub(r'(<key[^>]*(output|action)=")ç(")', r"\1!\3", body)
+        # output="œ" → "%"
+        body = re.sub(r'(<key[^>]*(output|action)=")œ(")', r"\1%\3", body)
+        return f"{header}{body}{footer}"
+
+    return re.sub(
+        r'(<keyMap index="5">)(.*?)(</keyMap>)',
+        replace_in_keymap,
+        content,
+        flags=re.DOTALL,
+    )
+
+
+def fix_keymap6_symbols(content):
+    # This code replaces specific outputs in keymap index 6 = Shift + AltGr
+    def replace_in_keymap(match):
+        header, body, footer = match.groups()
+        # output="Ç" → " !" (avec espace fine insécable avant le !)
+        body = re.sub(r'(<key[^>]*(output|action)=")Ç(")', r"\1 !\3", body)
+        return f"{header}{body}{footer}"
+
+    return re.sub(
+        r'(<keyMap index="6">)(.*?)(</keyMap>)',
+        replace_in_keymap,
+        content,
+        flags=re.DOTALL,
+    )
 
 
 def find_next_available_layer(content: str) -> int:
