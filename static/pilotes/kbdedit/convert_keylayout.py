@@ -73,7 +73,8 @@ def create_bundle(
     cleanup: bool = True,
 ):
     """
-    Create a .bundle package for macOS keyboard layouts, with logos.
+    Create a .bundle package for macOS keyboard layouts.
+    Each keylayout gets a corresponding logo with the same name.
     """
     base_dir = Path(directory_path) if directory_path else Path(__file__).parent
     bundle_name = f"Ergopti_{version}.bundle"
@@ -96,19 +97,20 @@ def create_bundle(
 
     # Write Info.plist
     info_plist_content = generate_info_plist(version, info_plist_entries)
-    with open(
-        bundle_path / "Contents" / "Info.plist", "w", encoding="utf-8"
-    ) as f:
-        f.write(info_plist_content)
-    print(f"Bundle created at: {bundle_path}")
+    info_plist_path = bundle_path / "Contents" / "Info.plist"
+    info_plist_path.write_text(info_plist_content, encoding="utf-8")
+
+    # Write version.plist
+    version_plist_content = generate_version_plist(version)
+    version_plist_path = bundle_path / "Contents" / "version.plist"
+    version_plist_path.write_text(version_plist_content, encoding="utf-8")
 
     zip_path = None
     if zip_bundle:
-        zip_path = base_dir / f"{bundle_name}.zip"
-        zip_bundle_folder(bundle_path, base_dir, zip_path)
+        zip_path = bundle_path.with_suffix(".bundle.zip")
+        zip_bundle_folder(bundle_path, zip_path)
         if cleanup:
             shutil.rmtree(bundle_path)
-            print(f"Removed bundle folder: {bundle_path}")
 
     return bundle_path if not cleanup else None, zip_path
 
@@ -116,76 +118,100 @@ def create_bundle(
 def copy_keylayout_and_logo(
     src: Path, base_dir: Path, resources_path: Path
 ) -> str:
-    """Copy the keylayout file and its corresponding logo. Return the Info.plist entry."""
-    shutil.copy(src, resources_path / src.name)
+    """Copy the keylayout and its logo, renaming the logo to match the keylayout filename."""
 
-    # Choose logo
-    if src.stem.endswith("_plus"):
+    # Copy keylayout file
+    dest_layout = resources_path / src.name
+    shutil.copy(src, dest_layout)
+
+    # Determine logo to use based on keyboard name containing "plus" (case-insensitive)
+    content = src.read_text(encoding="utf-8")
+    match = re.search(r'<keyboard\b[^>]*\bname="([^"]+)"', content)
+    keyboard_name_in_xml = match.group(1) if match else src.stem
+
+    if "plus" in keyboard_name_in_xml.lower():
         logo_filename = "logo_ergopti_plus.icns"
     else:
         logo_filename = "logo_ergopti.icns"
 
     logo_path = base_dir / logo_filename
     if logo_path.exists():
-        shutil.copy(logo_path, resources_path / logo_filename)
-        print(f"Added logo: {logo_filename}")
-        return f"""
-        <dict>
-            <key>TISInputSourceID</key>
-            <string>com.ergopti.{src.stem}</string>
-            <key>TISIntendedLanguage</key>
-            <string>fr</string>
-            <key>TSMInputSourceType</key>
-            <string>TISTypeKeyboardLayout</string>
-            <key>ICNS</key>
-            <string>{logo_filename}</string>
-        </dict>"""
+        # Rename logo to match keylayout filename
+        dest_logo = resources_path / f"{src.stem}.icns"
+        shutil.copy(logo_path, dest_logo)
+        icon_tag = f"""
+        <key>TISIconIsTemplate</key>
+        <false/>
+        <key>ICNS</key>
+        <string>{dest_logo.name}</string>"""
+        print(f"Added logo {logo_filename} as {dest_logo.name}")
     else:
-        print(f"⚠️ No logo found for {src.stem}, continuing without it")
-        return f"""
-        <dict>
-            <key>TISInputSourceID</key>
-            <string>com.ergopti.{src.stem}</string>
-            <key>TISIntendedLanguage</key>
-            <string>fr</string>
-            <key>TSMInputSourceType</key>
-            <string>TISTypeKeyboardLayout</string>
-        </dict>"""
+        print(f"⚠️ Logo file not found: {logo_filename}, continuing without it")
+        icon_tag = ""
+
+    # Use keylayout filename as the plist key
+    plist_key = f"KLInfo_{src.stem}"
+
+    # Generate Info.plist entry
+    return f"""
+    <key>{plist_key}</key>
+    <dict>
+        <key>TICapsLockLanguageSwitchCapable</key>
+        <true/>{icon_tag}
+        <key>TISInputSourceID</key>
+        <string>org.sil.ukelele.keyboardlayout.ergopti.{src.stem.lower()}</string>
+        <key>TISIntendedLanguage</key>
+        <string>fr</string>
+    </dict>"""
 
 
 def generate_info_plist(version: str, entries: list[str]) -> str:
-    """Generate the full Info.plist content."""
+    """Generate the full Info.plist content without localized translations."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Ergopti {version}</string>
     <key>CFBundleIdentifier</key>
-    <string>com.ergopti.{version}</string>
+    <string>org.sil.ukelele.keyboardlayout.ergopti</string>
+    <key>CFBundleName</key>
+    <string>Ergopti</string>
     <key>CFBundleVersion</key>
     <string>{version}</string>
-    <key>CFBundlePackageType</key>
-    <string>BNDL</string>
-    <key>TSMInputSources</key>
-    <array>
-        {"".join(entries)}
-    </array>
+    {"".join(entries)}
 </dict>
 </plist>
 """
 
 
-def zip_bundle_folder(bundle_path: Path, base_dir: Path, zip_path: Path):
-    """Zip the bundle folder into a .zip file."""
+def generate_version_plist(version: str) -> str:
+    """Generate the version.plist content dynamically."""
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>BuildVersion</key>
+    <string>{version}</string>
+    <key>ProjectName</key>
+    <string>Ergopti</string>
+    <key>SourceVersion</key>
+    <string>{version}</string>
+</dict>
+</plist>
+"""
+
+
+def zip_bundle_folder(bundle_path: Path, zip_path: Path):
+    """Zip the entire bundle folder so that unzipping preserves the bundle folder."""
     if zip_path.exists():
         zip_path.unlink()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(bundle_path):
             for file in files:
                 file_path = Path(root) / file
-                relative_path = file_path.relative_to(base_dir)
+                # Relative path from the parent of the bundle folder to keep the bundle folder itself
+                relative_path = file_path.relative_to(bundle_path.parent)
                 zipf.write(file_path, relative_path)
     print(f"Zipped bundle at: {zip_path}")
 
@@ -509,92 +535,92 @@ mappings = {
             ("'", "ct"),
         ],
     },
-    "roll_ck": {
-        "trigger": "c",
-        "map": [
-            ("x", "ck"),
-        ],
-    },
-    "roll_sk": {
-        "trigger": "s",
-        "map": [
-            ("x", "sk"),
-        ],
-    },
-    "roll_wh": {
-        "trigger": "h",
-        "map": [
-            ("c", "wh"),
-        ],
-    },
-    "rolls_hashtag": {
-        "trigger": "#",
-        "map": [
-            ("!", " := "),
-            ("(", '")'),
-            ("[", '"]'),
-        ],
-    },
-    "rolls_left_parenthesis": {
-        "trigger": "(",
-        "map": [
-            ("#", '("'),
-        ],
-    },
-    "rolls_left_bracket": {
-        "trigger": "[",
-        "map": [
-            ("#", '["'),
-        ],
-    },
-    "rolls_right_bracket": {
-        "trigger": "]",
-        "map": [
-            ("#", '"]'),
-        ],
-    },
-    "rolls_exclamation_mark": {
-        "trigger": "!",
-        "map": [
-            ("#", " != "),
-        ],
-    },
-    "rolls_backslash": {
-        "trigger": "\\",
-        "map": [
-            ('"', "/*"),
-        ],
-    },
-    "rolls_quote": {
-        "trigger": '"',
-        "map": [
-            ("\\", "*/"),
-        ],
-    },
-    "rolls_dollar": {
-        "trigger": "$",
-        "map": [
-            ("=", " => "),
-        ],
-    },
-    "rolls_equal": {
-        "trigger": "=",
-        "map": [
-            ("$", " <= "),
-        ],
-    },
-    "rolls_plus": {
-        "trigger": "+",
-        "map": [
-            ("?", " -> "),
-        ],
-    },
-    "rolls_question_mark": {
-        "trigger": "?",
-        "map": [
-            ("+", " <- "),
-        ],
-    },
+    # "roll_ck": {
+    #     "trigger": "c",
+    #     "map": [
+    #         ("x", "ck"),
+    #     ],
+    # },
+    # "roll_sk": {
+    #     "trigger": "s",
+    #     "map": [
+    #         ("x", "sk"),
+    #     ],
+    # },
+    # "roll_wh": {
+    #     "trigger": "h",
+    #     "map": [
+    #         ("c", "wh"),
+    #     ],
+    # },
+    # "rolls_hashtag": {
+    #     "trigger": "#",
+    #     "map": [
+    #         ("!", " := "),
+    #         ("(", '")'),
+    #         ("[", '"]'),
+    #     ],
+    # },
+    # "rolls_left_parenthesis": {
+    #     "trigger": "(",
+    #     "map": [
+    #         ("#", '("'),
+    #     ],
+    # },
+    # "rolls_left_bracket": {
+    #     "trigger": "[",
+    #     "map": [
+    #         ("#", '["'),
+    #     ],
+    # },
+    # "rolls_right_bracket": {
+    #     "trigger": "]",
+    #     "map": [
+    #         ("#", '"]'),
+    #     ],
+    # },
+    # "rolls_exclamation_mark": {
+    #     "trigger": "!",
+    #     "map": [
+    #         ("#", " != "),
+    #     ],
+    # },
+    # "rolls_backslash": {
+    #     "trigger": "\\",
+    #     "map": [
+    #         ('"', "/*"),
+    #     ],
+    # },
+    # "rolls_quote": {
+    #     "trigger": '"',
+    #     "map": [
+    #         ("\\", "*/"),
+    #     ],
+    # },
+    # "rolls_dollar": {
+    #     "trigger": "$",
+    #     "map": [
+    #         ("=", " => "),
+    #     ],
+    # },
+    # "rolls_equal": {
+    #     "trigger": "=",
+    #     "map": [
+    #         ("$", " <= "),
+    #     ],
+    # },
+    # "rolls_plus": {
+    #     "trigger": "+",
+    #     "map": [
+    #         ("?", " -> "),
+    #     ],
+    # },
+    # "rolls_question_mark": {
+    #     "trigger": "?",
+    #     "map": [
+    #         ("+", " <- "),
+    #     ],
+    # },
 }
 
 
@@ -652,8 +678,8 @@ def escape_quotes_in_mappings(orig_mappings):
     return new_mappings
 
 
-mappings = add_uppercase_mappings(mappings)
-mappings = escape_quotes_in_mappings(mappings)
+# mappings = add_uppercase_mappings(mappings)
+# mappings = escape_quotes_in_mappings(mappings)
 
 
 def create_keylayout_plus(input_path: str, directory_path: str = None):
@@ -672,8 +698,8 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
 
         content = read_file(file_path)
         content = append_plus_to_keyboard_name(content)
-        content = fix_keymap5_symbols(content)
-        content = fix_keymap6_symbols(content)
+        # content = fix_keymap5_symbols(content)
+        # content = fix_keymap6_symbols(content)
         start_layer = find_next_available_layer(content)
 
         for i, (feature, data) in enumerate(mappings.items()):
