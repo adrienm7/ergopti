@@ -575,12 +575,12 @@ mappings = {
     #         ("%", " <= "),
     #     ],
     # },
-    # "rolls_chevron_right": {
-    #     "trigger": ">",
-    #     "map": [
-    #         ("%", " >= "),
-    #     ],
-    # },
+    "rolls_chevron_right": {
+        "trigger": ">",
+        "map": [
+            ("%", " >= "),
+        ],
+    },
     "rolls_parenthesis_left": {
         "trigger": "(",
         "map": [
@@ -755,6 +755,7 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
             .replace(
                 '<key code="8" output=\'"\'/>', '<key code="8" action=\'"\'/>'
             )
+            .replace('"/>"/>', '"/>')
         )
 
         write_file(new_file_path, content)
@@ -1023,18 +1024,26 @@ def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
     """
     Assigns a next state (layer) to a single <action id="..."> in the content.
     Modifies the default <when state="none"/> line to include a 'next' state.
+    Works even if action_id is encoded as &lt; or &#x003C; in the XML.
     """
-    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
+    # autoriser id="<" OU id="&lt;" OU id="&#x003C;"
+    if action_id == "<":
+        id_pattern = r"(?:<|&lt;|&#x003C;)"
+    elif action_id == ">":
+        id_pattern = r"(?:>|&gt;|&#x003E;)"
+    else:
+        id_pattern = re.escape(action_id)
+
+    pattern = rf'(<action id="{id_pattern}">)(.*?)(</action>)'
 
     def repl(match):
-        full_header, body, footer = match.groups()
-        # Replace default state="none" with next layer
+        header, body, footer = match.groups()
         body = re.sub(
             r'<when state="none"[^>]*>',
             f'<when state="none" next="s{layer_num}"/>',
             body,
         )
-        return f"{full_header}{body}{footer}"
+        return f"{header}{body}{footer}"
 
     return re.sub(pattern, repl, content, flags=re.DOTALL)
 
