@@ -560,14 +560,14 @@ mappings = {
             ("c", "wh"),
         ],
     },
-    # "rolls_hashtag": {
-    #     "trigger": "#",
-    #     "map": [
-    #         ("!", " := "),
-    #         ("(", '")'),
-    #         ("[", '"]'),
-    #     ],
-    # },
+    "rolls_hashtag": {
+        "trigger": "#",
+        "map": [
+            ("!", " := "),
+            ("(", '")'),
+            ("[", '"]'),
+        ],
+    },
     # "rolls_left_parenthesis": {
     #     "trigger": "(",
     #     "map": [
@@ -717,6 +717,7 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
             )
 
             # Assign trigger key to this layer
+            content = ensure_action_block(content, trigger_key, trigger_key)
             content = assign_action_layer(content, trigger_key, layer)
 
             # Add trigger key as dead key
