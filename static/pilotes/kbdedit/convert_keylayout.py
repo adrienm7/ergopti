@@ -572,7 +572,7 @@ mappings = {
         "trigger": "<",
         "map": [
             ("@", "</"),
-            # ("%", " <= "),
+            ("%", " <= "),
         ],
     },
     "rolls_chevron_right": {
@@ -847,12 +847,14 @@ def ergopti_plus_altgr_symbols(content: str) -> str:
     """
     In <keyMap index="5">:
       - If a <key ...> has output="ç" or action="ç", replace its output/action attributes
-        with a single action="!" (preserving other attributes such as code/modifiers).
+        with a single action="!".
       - If a <key ...> has output="œ" or action="œ", replace its output/action attributes
         with a single action="%".
+      - If a <key ...> has output="ù" or action="ù", replace its output/action attributes
+        with a single output="où".
       - Do NOT touch other <key> elements.
     After the keyMap modification, ensure <action id="!"> and <action id="%"> exist
-    (they are inserted before the first </actions> if missing).
+    (inserted before the first </actions> if missing).
     """
 
     def replace_in_keymap(match):
@@ -860,34 +862,36 @@ def ergopti_plus_altgr_symbols(content: str) -> str:
 
         def repl_key(key_match):
             key_tag = key_match.group(0)
-            # If this key contains ç (either as output or action)
-            if re.search(r'(?:\boutput|\baction)="ç"', key_tag):
-                # remove only output="..." and action="..." attributes from this key
-                new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", key_tag)
-                # insert action="!" before the final > or />
-                if new_tag.endswith("/>"):
-                    new_tag = new_tag[:-2].rstrip() + ' action="!"/>'
-                else:
-                    new_tag = new_tag[:-1].rstrip() + ' action="!">'
-                return new_tag
 
-            # If this key contains œ (either as output or action)
+            if re.search(r'(?:\boutput|\baction)="ç"', key_tag):
+                new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", key_tag)
+                return (
+                    new_tag[:-2].rstrip() + ' action="!"/>'
+                    if new_tag.endswith("/>")
+                    else new_tag[:-1].rstrip() + ' action="!">'
+                )
+
             if re.search(r'(?:\boutput|\baction)="œ"', key_tag):
                 new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", key_tag)
-                if new_tag.endswith("/>"):
-                    new_tag = new_tag[:-2].rstrip() + ' action="%"/>'
-                else:
-                    new_tag = new_tag[:-1].rstrip() + ' action="%">'
-                return new_tag
+                return (
+                    new_tag[:-2].rstrip() + ' action="%"/>'
+                    if new_tag.endswith("/>")
+                    else new_tag[:-1].rstrip() + ' action="%">'
+                )
 
-            # Otherwise leave the key unchanged
+            if re.search(r'(?:\boutput|\baction)="ù"', key_tag):
+                new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", key_tag)
+                return (
+                    new_tag[:-2].rstrip() + ' output="où"/>'
+                    if new_tag.endswith("/>")
+                    else new_tag[:-1].rstrip() + ' output="où">'
+                )
+
             return key_tag
 
-        # Replace only <key ...> elements inside this keyMap body
         body_fixed = re.sub(r"<key\b[^>]*\/?>", repl_key, body)
         return f"{header}{body_fixed}{footer}"
 
-    # Apply only to keyMap index="5"
     pattern = r'(<keyMap index="5">)(.*?)(</keyMap>)'
     fixed = re.sub(pattern, replace_in_keymap, content, flags=re.DOTALL)
 
@@ -931,22 +935,19 @@ def ergopti_plus_shiftaltgr_symbols(content):
     # This code replaces specific outputs in keymap index 6 = Shift + AltGr
     def replace_in_keymap(match):
         header, body, footer = match.groups()
-        # output="Ç" → " !" (avec espace fine insécable avant le !)
+        # output="Ç" → " !" (fine non-breaking space + !)
         body = re.sub(r'(<key[^>]*(output|action)=")Ç(")', r"\1 !\3", body)
+        # output="Ù" → "Où"
+        body = re.sub(r'(<key[^>]*(output|action)=")Ù(")', r"\1Où\3", body)
         return f"{header}{body}{footer}"
 
-    content = re.sub(
-        r'(<keyMap index="6">)(.*?)(</keyMap>)',
-        replace_in_keymap,
-        content,
-        flags=re.DOTALL,
-    )
-    content = re.sub(
-        r'(<keyMap index="7">)(.*?)(</keyMap>)',
-        replace_in_keymap,
-        content,
-        flags=re.DOTALL,
-    )
+    for idx in (6, 7):
+        content = re.sub(
+            rf'(<keyMap index="{idx}">)(.*?)(</keyMap>)',
+            replace_in_keymap,
+            content,
+            flags=re.DOTALL,
+        )
 
     return content
 

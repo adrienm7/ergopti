@@ -530,7 +530,7 @@
 			<key code="12" action="`"/>
 			<key code="13" action="@"/>
 			<key code="14" action="%"/>
-			<key code="15" output="ù"/>
+			<key code="15" output="où"/>
 			<key code="16" output=" »"/>
 			<key code="17" output="« "/>
 			<key code="18" output="¹"/>
@@ -611,7 +611,7 @@
 			<key code="12" output="„"/>
 			<key code="13" output="€"/>
 			<key code="14" action="Œ"/>
-			<key code="15" output="Ù"/>
+			<key code="15" output="Où"/>
 			<key code="16" output="”"/>
 			<key code="17" output="“"/>
 			<key code="18" output="₁"/>
@@ -692,7 +692,7 @@
 			<key code="12" output="„"/>
 			<key code="13" output="€"/>
 			<key code="14" action="Œ"/>
-			<key code="15" output="Ù"/>
+			<key code="15" output="Où"/>
 			<key code="16" output="”"/>
 			<key code="17" output="“"/>
 			<key code="18" output="₁"/>
@@ -1832,6 +1832,7 @@
 		</action>
 		<action id="%">
 			<when state="none" output="%"/>
+			<when state="s22" output=" &#x003C;= "/>
 			<when state="s23" output=" >= "/>
 		</action>
 		<action id="★">
