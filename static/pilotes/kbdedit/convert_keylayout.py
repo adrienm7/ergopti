@@ -327,6 +327,11 @@ def add_keymap_9(content):
         return content
     _, base_body, _ = extract_keymap(content, 4)
     keymap_9 = build_custom_keymap(9, base_body)
+
+    # Convert all action="..." to output="..." inside this new keyMap
+    # Otherwise trying to do comamnd s for example will activate the action, so the deadkey on ergoptiplus, and not save
+    keymap_9 = re.sub(r'action="([^"]+)"', r'output="\1"', keymap_9)
+
     return re.sub(
         r'(<keyMap index="8">.*?</keyMap>)',
         r"\1\n\t\t" + keymap_9,
@@ -580,12 +585,12 @@ mappings = {
     #         ("#", '"]'),
     #     ],
     # },
-    # "rolls_exclamation_mark": {
-    #     "trigger": "!",
-    #     "map": [
-    #         ("#", " != "),
-    #     ],
-    # },
+    "rolls_exclamation_mark": {
+        "trigger": "!",
+        "map": [
+            ("#", " != "),
+        ],
+    },
     # "rolls_backslash": {
     #     "trigger": "\\",
     #     "map": [
@@ -699,8 +704,8 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
 
         content = read_file(file_path)
         content = append_plus_to_keyboard_name(content)
-        content = fix_keymap5_symbols(content)
         content = ergopti_plus_altgr_symbols(content)
+        content = ergopti_plus_shiftaltgr_symbols(content)
         start_layer = find_next_available_layer(content)
 
         for i, (feature, data) in enumerate(mappings.items()):
@@ -715,14 +720,74 @@ def create_keylayout_plus(input_path: str, directory_path: str = None):
 
             # Add trigger key as dead key
             content = add_terminator_state(content, layer, trigger_key)
-            print("ok")
 
             # Add all feature actions
             for action_id, output in data["map"]:
                 print(f"  - action '{action_id}' → '{output}'")
+
+                # Ensure any <key ... output="action_id"> is converted to action="action_id"
+                # This preserves key codes/modifiers and avoids having <key ... output="..."> which would break action linking
+                content = ensure_key_uses_action(content, action_id)
+
+                # Now add the when state to the corresponding <action id="..."> (ensure_action_block is called inside)
                 content = add_action_state(content, action_id, layer, output)
 
         write_file(new_file_path, content)
+
+
+def ensure_key_uses_action(content: str, action_id: str) -> str:
+    """
+    Ensure that in <keyMap index="1|2|3|5"> blocks,
+    any <key ... output="action_id" or action="action_id"> becomes
+    <key ... action="action_id"> (preserving other attributes).
+    Only modifies <key> tags that actually reference the action_id;
+    leaves other keyMaps untouched.
+    """
+
+    literal = re.escape(action_id)
+    hex_variants = []
+    if len(action_id) == 1:
+        codepoint = ord(action_id)
+        hex_variants = [f"&#x{codepoint:04X};", f"&#x{codepoint:04x};"]
+
+    def process_keymap(match):
+        # use explicit group access to avoid unpacking issues
+        header = match.group(1)
+        body = match.group(2)
+        footer = match.group(3)
+
+        def repl_key(tag_match):
+            tag = tag_match.group(0)
+            found = False
+            if re.search(rf'\b(?:output|action)="{literal}"', tag):
+                found = True
+            else:
+                for hv in hex_variants:
+                    if re.search(
+                        rf'\b(?:output|action)="{re.escape(hv)}"', tag
+                    ):
+                        found = True
+                        break
+
+            if not found:
+                return tag  # leave untouched
+
+            # remove only output="..." and action="..."
+            new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", tag)
+
+            # insert the unified action="..."
+            if new_tag.endswith("/>"):
+                new_tag = new_tag[:-2].rstrip() + f' action="{action_id}"/>'
+            else:
+                new_tag = new_tag[:-1].rstrip() + f' action="{action_id}">'
+            return new_tag
+
+        body = re.sub(r"<key\b[^>]*\/?>", repl_key, body)
+        return f"{header}{body}{footer}"
+
+    # NON-CAPTURING group for the index alternation to ensure exactly 3 capture groups
+    pattern = r'(<keyMap index="(?:1|2|3|5)">)(.*?)(</keyMap>)'
+    return re.sub(pattern, process_keymap, content, flags=re.DOTALL)
 
 
 def append_plus_to_keyboard_name(content: str) -> str:
@@ -740,32 +805,87 @@ def append_plus_to_keyboard_name(content: str) -> str:
     return re.sub(pattern, repl, content)
 
 
-def fix_keymap5_symbols(content: str) -> str:
+def ergopti_plus_altgr_symbols(content: str) -> str:
     """
-    Replace specific symbols in keymap index 5 (AltGr), forcing output="...".
-    - 'ç' becomes '!'
-    - 'œ' becomes '%'
-    All existing action="..." or output="..." attributes are replaced with output="...".
+    In <keyMap index="5">:
+      - If a <key ...> has output="ç" or action="ç", replace its output/action attributes
+        with a single action="!" (preserving other attributes such as code/modifiers).
+      - If a <key ...> has output="œ" or action="œ", replace its output/action attributes
+        with a single action="%".
+      - Do NOT touch other <key> elements.
+    After the keyMap modification, ensure <action id="!"> and <action id="%"> exist
+    (they are inserted before the first </actions> if missing).
     """
 
     def replace_in_keymap(match):
         header, body, footer = match.groups()
 
-        # Replace 'ç' → '!' and 'œ' → '%'
-        body = re.sub(r'(<key[^>]*)(output|action)="ç"', r'\1output="!"', body)
-        body = re.sub(r'(<key[^>]*)(output|action)="œ"', r'\1output="%"', body)
+        def repl_key(key_match):
+            key_tag = key_match.group(0)
+            # If this key contains ç (either as output or action)
+            if re.search(r'(?:\boutput|\baction)="ç"', key_tag):
+                # remove only output="..." and action="..." attributes from this key
+                new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", key_tag)
+                # insert action="!" before the final > or />
+                if new_tag.endswith("/>"):
+                    new_tag = new_tag[:-2].rstrip() + ' action="!"/>'
+                else:
+                    new_tag = new_tag[:-1].rstrip() + ' action="!">'
+                return new_tag
 
-        return f"{header}{body}{footer}"
+            # If this key contains œ (either as output or action)
+            if re.search(r'(?:\boutput|\baction)="œ"', key_tag):
+                new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", key_tag)
+                if new_tag.endswith("/>"):
+                    new_tag = new_tag[:-2].rstrip() + ' action="%"/>'
+                else:
+                    new_tag = new_tag[:-1].rstrip() + ' action="%">'
+                return new_tag
 
-    return re.sub(
-        r'(<keyMap index="5">)(.*?)(</keyMap>)',
-        replace_in_keymap,
-        content,
-        flags=re.DOTALL,
-    )
+            # Otherwise leave the key unchanged
+            return key_tag
+
+        # Replace only <key ...> elements inside this keyMap body
+        body_fixed = re.sub(r"<key\b[^>]*\/?>", repl_key, body)
+        return f"{header}{body_fixed}{footer}"
+
+    # Apply only to keyMap index="5"
+    pattern = r'(<keyMap index="5">)(.*?)(</keyMap>)'
+    fixed = re.sub(pattern, replace_in_keymap, content, flags=re.DOTALL)
+
+    fixed = ensure_action_block(fixed, "!", "!")
+    fixed = ensure_action_block(fixed, "%", "%")
+
+    return fixed
 
 
-def ergopti_plus_altgr_symbols(content):
+def ensure_action_block(doc: str, action_id: str, output_value: str) -> str:
+    """
+    Ensure an <action id="..."> block exists.
+    - Matches <action ... id="ID" ...> or <action ... id='ID' ...> wherever the id attribute is placed.
+    - If missing, inserts the block before the first </actions>, using the same indentation.
+    """
+    # Match <action ... id="action_id" ...> or with single quotes, id can be anywhere in the tag
+    pattern = rf'<action\b[^>]*\bid\s*=\s*(["\']){re.escape(action_id)}\1'
+
+    if not re.search(pattern, doc):
+        # Try to detect indentation of the closing </actions> to keep style consistent
+        m = re.search(r"^(?P<indent>\s*)</actions>", doc, flags=re.MULTILINE)
+        indent = m.group("indent") if m else "\t"
+
+        block = (
+            f'{indent}<action id="{action_id}">\n'
+            f'{indent}\t\t<when state="none" output="{output_value}"/>\n'
+            f"{indent}\t</action>\n{indent}"
+        )
+
+        # Insert the block right before the first </actions>
+        doc = re.sub(r"(</actions>)", block + r"\1", doc, count=1)
+
+    return doc
+
+
+def ergopti_plus_shiftaltgr_symbols(content):
     # This code replaces specific outputs in keymap index 6 = Shift + AltGr
     def replace_in_keymap(match):
         header, body, footer = match.groups()
@@ -836,6 +956,7 @@ def add_action_state(
     Raises a ValueError if a <when> with the same state already exists.
     """
     pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
+    content = ensure_action_block(content, action_id, action_id)
 
     def repl(match):
         header, body, footer = match.groups()
@@ -849,7 +970,8 @@ def add_action_state(
         new_line = f'\t<when state="s{state_number}" output="{output}"/>'
         return f"{header}{body}{new_line}\n\t\t{footer}"
 
-    return re.sub(pattern, repl, content, flags=re.DOTALL)
+    content = re.sub(pattern, repl, content, flags=re.DOTALL)
+    return content
 
 
 def add_terminator_state(content: str, state_number: int, output: str) -> str:
