@@ -1374,7 +1374,7 @@
 			<when state="s6" output="ᵦ"/>
 		</action>
 		<action id="c">
-			<when state="none" output="c"/>
+			<when state="none" next="s17"/>
 			<when state="s1" output="º"/>
 			<when state="s2" output="¢"/>
 			<when state="s3" output="©"/>
@@ -1382,6 +1382,7 @@
 			<when state="s5" output="ᶜ"/>
 			<when state="s9" output="ç"/>
 			<when state="s14" output="ction"/>
+			<when state="s19" output="wh"/>
 		</action>
 		<action id="d">
 			<when state="none" output="d"/>
@@ -1428,7 +1429,7 @@
 			<when state="s14" output="ought"/>
 		</action>
 		<action id="h">
-			<when state="none" output="h"/>
+			<when state="none" next="s19"/>
 			<when state="s1" output="ĥ"/>
 			<when state="s2" output="₴"/>
 			<when state="s3" output="ḧ"/>
@@ -1544,7 +1545,7 @@
 			<when state="s14" output="erre"/>
 		</action>
 		<action id="s">
-			<when state="none" output="s"/>
+			<when state="none" next="s18"/>
 			<when state="s1" output="ß"/>
 			<when state="s2" output="₪"/>
 			<when state="s3" output=" "/>
@@ -1604,6 +1605,8 @@
 			<when state="s6" output="ₓ"/>
 			<when state="s9" output="où"/>
 			<when state="s14" output="ieux"/>
+			<when state="s17" output="ck"/>
+			<when state="s18" output="sk"/>
 		</action>
 		<action id="y">
 			<when state="none" next="s13"/>
@@ -1730,6 +1733,9 @@
 		<when state="s14" output="à"/>
 		<when state="s15" output="q"/>
 		<when state="s16" output="'"/>
+		<when state="s17" output="c"/>
+		<when state="s18" output="s"/>
+		<when state="s19" output="h"/>
 	</terminators>
 </keyboard>
 
