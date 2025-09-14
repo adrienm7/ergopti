@@ -536,24 +536,24 @@ mappings = {
     #         ("'", "ct"),
     #     ],
     # },
-    # "roll_ck": {
-    #     "trigger": "c",
-    #     "map": [
-    #         ("x", "ck"),
-    #     ],
-    # },
-    # "roll_sk": {
-    #     "trigger": "s",
-    #     "map": [
-    #         ("x", "sk"),
-    #     ],
-    # },
-    # "roll_wh": {
-    #     "trigger": "h",
-    #     "map": [
-    #         ("c", "wh"),
-    #     ],
-    # },
+    "roll_ck": {
+        "trigger": "c",
+        "map": [
+            ("x", "ck"),
+        ],
+    },
+    "roll_sk": {
+        "trigger": "s",
+        "map": [
+            ("x", "sk"),
+        ],
+    },
+    "roll_wh": {
+        "trigger": "h",
+        "map": [
+            ("c", "wh"),
+        ],
+    },
     # "rolls_hashtag": {
     #     "trigger": "#",
     #     "map": [
