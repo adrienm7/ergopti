@@ -12,28 +12,28 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 
 	switch (name) {
 		case 'kbdedit_exe':
-			files = import.meta.glob('/static/pilotes/kbdedit/*.exe');
+			files = import.meta.glob('/static/drivers/windows/*.exe');
 			break;
 		case 'kbdedit_kbe':
-			files = import.meta.glob('/static/pilotes/kbdedit/*.kbe');
+			files = import.meta.glob('/static/drivers/windows/*.kbe');
 			break;
 		case 'kbdedit_mac':
-			files = import.meta.glob('/static/pilotes/kbdedit/*.keylayout');
+			files = import.meta.glob('/static/drivers/macos/*.keylayout');
 			break;
 		case 'ahk':
 			files = import.meta.glob('/static/pilotes/ahk/*.exe');
 			break;
 		case 'plus':
-			files = import.meta.glob('/static/pilotes/plus/*.ahk');
+			files = import.meta.glob('/static/drivers/autohotkey/*.ahk');
 			break;
 		case 'kla_iso':
-			files = import.meta.glob('/static/layouts/iso/*.json');
+			files = import.meta.glob('/static/layouts/kla_iso/*.json');
 			break;
 		case 'kla_iso_plus':
-			files = import.meta.glob('/static/layouts/iso/*+.json');
+			files = import.meta.glob('/static/layouts/kla_iso/*+.json');
 			break;
 		case 'kla_ergodox':
-			files = import.meta.glob('/static/layouts/ergodox/*.json');
+			files = import.meta.glob('/static/layouts/kla_ergodox/*.json');
 			break;
 		case 'kalamine_1dk':
 			files = import.meta.glob('/static/pilotes/kalamine/1dk/*.toml');
@@ -48,7 +48,7 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			);
 			break;
 		default:
-			files = import.meta.glob('/static/layouts/ergodox/*.json'); // Valeur par défaut
+			files = import.meta.glob('/static/layouts/kla_ergodox/*.json'); // Valeur par défaut
 			break;
 	}
 

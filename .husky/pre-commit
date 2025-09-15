@@ -5,4 +5,4 @@
 npm run clean-ahk
 
 # Stage any changes made by the cleanup
-git add static/pilotes/plus/*.ahk
+git add static/drivers/autohotkey/*.ahk

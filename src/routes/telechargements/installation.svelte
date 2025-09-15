@@ -71,7 +71,7 @@
 	<tiny-space></tiny-space>
 	<div>
 		{#if version_mineure_kbdedit_exe !== undefined}
-			<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
+			<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
 				<button class="bouton-telechargement">☛ Ergopti_v{version_mineure_kbdedit_exe}.exe</button>
 			</a>
 		{/if}
@@ -79,7 +79,7 @@
 	<tiny-space></tiny-space>
 	<div>
 		{#if version_mineure_kbdedit_kbe !== undefined}
-			<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download
+			<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download
 				><button>Fichier source KbdEdit de Ergopti_v{version_mineure_kbdedit_kbe}</button></a
 			>
 		{/if}
@@ -88,7 +88,7 @@
 	<medium-space></medium-space>
 	<div>
 		{#if version_mineure_plus !== undefined}
-			<a href="/pilotes/plus/ErgoptiPlus_v{version_mineure_plus}.ahk" download
+			<a href="/drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download
 				><button class="bouton-telechargement">☛ ErgoptiPlus_v{version_mineure_plus}.ahk</button></a
 			>
 		{/if}
@@ -150,7 +150,7 @@
 	<tiny-space></tiny-space>
 	<div>
 		{#if version_mineure_kbdedit_mac !== undefined}
-			<a href="/pilotes/kbdedit/Ergopti_v{version_mineure_kbdedit_mac}.keylayout" download
+			<a href="/drivers/macos/Ergopti_v{version_mineure_kbdedit_mac}.keylayout" download
 				><button class="bouton-telechargement"
 					>☛ Ergopti_v{version_mineure_kbdedit_mac}.keylayout</button
 				></a
