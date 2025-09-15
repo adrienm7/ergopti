@@ -1,8 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 
-const dirPath = 'static/pilotes/plus';
+const dirPath = 'static/drivers/autohotkey';
 const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.ahk'));
+
+// This code removes the personal configuration (section 2) from AHK files
+// It activates when a new commit is made and modifies the AHK files just before creating the actual commit.
 
 files.forEach((file) => {
 	const filePath = path.join(dirPath, file);
