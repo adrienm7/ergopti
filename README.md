@@ -1,6 +1,6 @@
 # Disposition Ergopti
 
-![Couche de base](static/img/ergopti_visuel.jpg)
+![Couche de base](static/img/ergopti_visuel.png)
 
 ---
 
@@ -14,12 +14,12 @@ Ergopti est une disposition de clavier ergonomique et optimisée possédant les 
 - Licence libre (MIT) ;
 - **Chiffres en accès direct** ;
 - Couche AltGr permettant d’accéder aux symboles de programmation, avec un placement logique pour faciliter la mémorisation ;
-  ![Couche AltGr](static/img/ergopti_altgr.jpg)
+  ![Couche AltGr](static/img/ergopti_altgr.png)
 - **Conservation de raccourcis usuels** : les raccourcis <kbd>Ctrl-{A, C, V, X, Z}</kbd> sont disponibles à gauche du clavier ;
-  ![Couche Ctrl](static/img/ergopti_ctrl.jpg)
+  ![Couche Ctrl](static/img/ergopti_ctrl.png)
 - Support de tous les caractères spéciaux utilisés en français (majuscules accentuées, lettres entrelacées, symboles de ponctuation…) ;
 - **Version « Ergopti + » avec de nombreuses autres fonctionnalités** :
-  ![Couche de base +](static/img/ergopti_plus.jpg)
+  ![Couche de base +](static/img/ergopti_plus.png)
   - touche <kbd>★</kbd> de répétition (par exemple <kbd>el★e</kbd> donne <kbd>elle</kbd>) ;
   - touche <kbd>★</kbd> d’abréviations (par exemple <kbd>pex★</kbd> donne <kbd>par exemple</kbd>) ;
   - suppression de tous les SFBs restants (par exemple <kbd>,t</kbd> donne <kbd>pt</kbd>) ;
