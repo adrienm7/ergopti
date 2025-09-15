@@ -41,9 +41,9 @@
 	</ul>
 	<p>
 		Avec cette fonction d’abréviations, <ErgoptiPlus></ErgoptiPlus>
-		<span class="important">devient plus qu’une disposition clavier</span>. Elle devient un outil de
-		productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes les plus
-		fréquents.
+		<span class="important">devient plus qu’une disposition clavier</span>. Elle se transforme en un
+		outil de productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes
+		les plus fréquents.
 	</p>
 	<p>
 		C’est une fonctionnalité tout à fait optionnelle, libre à vous de ne pas utiliser les

@@ -75,8 +75,13 @@ keyboard-key {
 	text-align: center;
 }
 
+p kbd,
+p kbd-output {
+	line-height: 1.2em;
+}
+
 keyboard-key {
-	--key-size: calc(var(--keyboard-width) / 15);
+	--key-size: calc(var(--keyboard-width) / 16);
 	--key-margin: calc(0.05 * var(--key-size));
 
 	--key-depth: calc(var(--key-size) * 0.06);
