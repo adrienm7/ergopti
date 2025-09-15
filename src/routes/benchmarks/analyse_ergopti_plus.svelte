@@ -20,7 +20,8 @@
 		du corpus pour les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB
 		></SFB>s pris en charge par <ErgoptiPlus></ErgoptiPlus>, comme <kbd-output>pt</kbd-output> en
 		<kbd>,t</kbd>, doivent être remplacés. Un
-		<a href="/corpus/conversion_corpus.py">simple script Python</a> permet de faire ces modifications.
+		<a href="/corpus/conversion_corpus.py" class="link">simple script Python</a> permet de faire ces
+		modifications.
 	</p>
 	<p>
 		Toutefois, modifier le corpus rend la comparaison avec les autres dispositions plus compliquée,
@@ -47,7 +48,7 @@
 		disposition. Ainsi, l’utilisation d’<ErgoptiPlus></ErgoptiPlus> divise par environ 8 le nombre de
 		<SFB></SFB>s d’<Ergopti></Ergopti>.
 	</p>
-	<p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
+	<p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
 	<h4><Ergopti></Ergopti></h4>
 	<image-block>
 		<enhanced:img
@@ -68,7 +69,7 @@
 		></ErgoptiPlus>. Il y a sans doute possiblité d’améliorer cela, c’est un point à l’étude. En
 		dehors de cela, les réductions de <SFB></SFB>s sont spectaculaires, en particulier sur les
 		annulaires et auriculaires. Enfin, l’index droit voit son nombre de <SFB></SFB>s chuter
-		drastiquement, de 27 000 à 2500, soit une division par 10 !
+		drastiquement, de 27 000 à 2500, soit une division par 10 !
 	</p>
 	<h3>Analyse de la distance parcourue</h3>
 	<p>

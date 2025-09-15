@@ -19,7 +19,7 @@
 	</p>
 	<tiny-space></tiny-space>
 	<p class="text-bold">
-		Liste de quelques-unes des abréviations (liste modifiable par vos soins) :
+		Liste de quelques-unes des abréviations (liste modifiable par vos soins) :
 	</p>
 	<ul>
 		<li><kbd>a★</kbd> ➜ <kbd-output>ainsi</kbd-output> ;</li>
@@ -63,7 +63,7 @@
 	</p>
 	<p>
 		Par exemple, au lieu de taper 5 lettres pour écrire le suffixe
-		<kbd-output>ement</kbd-output>, très souvent utilisé en français, deux frappes suffisent :
+		<kbd-output>ement</kbd-output>, très souvent utilisé en français, deux frappes suffisent :
 		<kbd>às</kbd>. Ces raccourcis vont diviser par deux le nombre de touches nécessaires pour écrire
 		les suffixes les plus communs,
 		<span class="important">entraînant une augmentation de vitesse</span>.

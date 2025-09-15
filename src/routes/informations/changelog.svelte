@@ -66,11 +66,11 @@
 	<h3>Version 2.0 (Janvier 2025)</h3>
 	<p>
 		<Ergopti></Ergopti> v2.0 est une évolution majeure de la disposition, d’où le changement de numérotation.
-		La modification est en réalité très simple :
+		La modification est en réalité très simple :
 		<strong>interversion de la rangée inférieure de la main droite avec la rangée supérieure</strong
 		>.
 	</p>
-	<p>Ce changement n’est pas anodin et apporte les bénéfices suivants :</p>
+	<p>Ce changement n’est pas anodin et apporte les bénéfices suivants :</p>
 	<ul>
 		<li>bigrammes <kbd>TH</kbd> et <kbd>SH</kbd> beaucoup plus confortables sur clavier ISO ;</li>
 		<li>bigramme <kbd>ND</kbd> beaucoup plus confortable ;</li>

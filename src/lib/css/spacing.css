@@ -2,11 +2,8 @@ main,
 .main {
 	line-height: 1.35;
 	margin: 0 auto; /* Centrer le bloc main horizontalement */
-	max-width: 850px;
-	padding: min(
-		3.5vw,
-		35px
-	); /* Espaces entre le texte et les bords de l'écran, notamment sur mobile */
+	padding: 3vw; /* Espaces entre le texte et les bords de l'écran, notamment sur mobile */
+	width: var(--main-width);
 }
 
 main p,
@@ -50,11 +47,6 @@ medium-space {
 big-space {
 	display: block;
 	height: 30vh;
-}
-
-giga-espace {
-	display: block;
-	height: 50vh;
 }
 
 hr {

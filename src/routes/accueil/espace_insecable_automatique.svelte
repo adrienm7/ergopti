@@ -16,7 +16,7 @@
 	<p>
 		Ainsi, vous n’aurez plus jamais de <kbd-output>?</kbd-output> qui se balade au début d’une ligne
 		parce qu’il n’y avait plus de place sur la ligne précédente. Cela donne des documents avec un
-		rendu bien plus professionnel. Attention cependant :
+		rendu bien plus professionnel. Attention cependant :
 		<span class="important"
 			>ne les utilisez pas dans d’autres situations que l'écriture de texte</span
 		>. Par exemple, en programmation, un espace insécable peut causer des erreurs, sans forcément
@@ -30,7 +30,7 @@
 	</p>
 	<tiny-space></tiny-space>
 	<div class="encadre">
-		<p class="important margin0">Ainsi, il est facile de se rappeler où est quoi :</p>
+		<p class="important margin0">Ainsi, il est facile de se rappeler où est quoi :</p>
 		<ul class="margin0">
 			<li>le français est en <kbd>Shift</kbd> ;</li>
 			<li class="margin0">la programmation est en <kbd>AltGr</kbd>.</li>

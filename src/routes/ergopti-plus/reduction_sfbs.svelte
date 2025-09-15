@@ -41,7 +41,7 @@
 	<p>
 		Les touches <kbd>È</kbd> et <kbd>Ê</kbd> permettent de se débarrasser des quelques <SFB />s se
 		trouvant sur la main gauche. Plus particulièrement, ce sont les <SFB />s sur les touches
-		<kbd>I</kbd>, <kbd>E</kbd> ainsi qu’en <kbd>U</kbd> :
+		<kbd>I</kbd>, <kbd>E</kbd> ainsi qu’en <kbd>U</kbd> :
 	</p>
 	<ul class="margin-top-2">
 		<li>
@@ -87,7 +87,7 @@
 	</p>
 	<p>
 		Sur le logiciel Excel, la touche <kbd>F4</kbd> permet de répéter la dernière action. Ne pourrait-on
-		pas avoir la même chose sur sa disposition clavier ?
+		pas avoir la même chose sur sa disposition clavier ?
 	</p>
 	<tiny-space></tiny-space>
 	<KeyboardBasis id="magique" />

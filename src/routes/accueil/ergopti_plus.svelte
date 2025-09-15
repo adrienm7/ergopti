@@ -31,7 +31,7 @@
 					<ErgoptiPlus /> permet d’avoir une disposition encore meilleure. Les <SFB />s sont
 					éradiqués, les roulements sont améliorés et les doigts ont encore moins de distance à
 					parcourir. Découvrez cette amélioration (optionnelle) de la disposition en consultant la
-					page associée :
+					page associée :
 				</p>
 				<a href="/ergopti-plus" style="text-decoration: none;"
 					><button

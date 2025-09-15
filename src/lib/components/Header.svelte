@@ -155,7 +155,7 @@
 			</a>
 		</div>
 		<div id="menu-page-content">
-			<p id="menu-page-content-title">Contenu de la page</p>
+			<nav id="menu-page-content-title">Contenu de la page</nav>
 			<hr />
 			<br />
 			<div
@@ -330,8 +330,9 @@
 		color: transparent;
 	}
 
-	#menu-pages a[aria-current='page'] .title {
-		line-height: 1.3; /* Otherwise, the gradient is cut */
+	#menu-pages a .title {
+		/* Otherwise, the gradient is cut */
+		padding: 0.08em 0;
 	}
 
 	#menu-pages a[aria-current='page'] .title,

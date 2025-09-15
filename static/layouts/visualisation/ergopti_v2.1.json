@@ -1340,6 +1340,7 @@
 		{
 			"key": "j",
 			"Primary": "j",
+			"Primary+": "★",
 			"Shift": "J",
 			"AltGr": "◌̈",
 			"AltGr-style": "morte",

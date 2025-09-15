@@ -8,7 +8,7 @@
 
 ---
 
-Ergopti est une disposition de clavier ergonomique et optimisée possédant les caractéristiques suivantes :
+Ergopti est une disposition de clavier ergonomique et optimisée possédant les caractéristiques suivantes :
 
 - Disposition **optimisée pour le français, l’anglais et le code** ;
 - Licence libre (MIT) ;
@@ -18,7 +18,7 @@ Ergopti est une disposition de clavier ergonomique et optimisée possédant les 
 - **Conservation de raccourcis usuels** : les raccourcis <kbd>Ctrl-{A, C, V, X, Z}</kbd> sont disponibles à gauche du clavier ;
   ![Couche Ctrl](static/img/ergopti_ctrl.png)
 - Support de tous les caractères spéciaux utilisés en français (majuscules accentuées, lettres entrelacées, symboles de ponctuation…) ;
-- **Version « Ergopti + » avec de nombreuses autres fonctionnalités** :
+- **Version « Ergopti + » avec de nombreuses autres fonctionnalités** :
   ![Couche de base +](static/img/ergopti_plus.png)
   - touche <kbd>★</kbd> de répétition (par exemple <kbd>el★e</kbd> donne <kbd>elle</kbd>) ;
   - touche <kbd>★</kbd> d’abréviations (par exemple <kbd>pex★</kbd> donne <kbd>par exemple</kbd>) ;
@@ -28,7 +28,7 @@ Ergopti est une disposition de clavier ergonomique et optimisée possédant les 
   - ajout de nouveaux roulements de confort (par exemple <kbd>hc</kbd> donne <kbd>wh</kbd>) ;
   - etc.
  
-➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/telechargements#clavier_emulation.
+➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/telechargements#clavier_emulation.
 
 ---
 
@@ -46,13 +46,13 @@ Le code de génération de ces claviers est fait sur-mesure pour mes besoins (no
 ## Développement
 
 Après avoir cloné le projet, se placer dans le répertoire ergopti.
-Puis, installer les dépendances :
+Puis, installer les dépendances :
 
 ```bash
 npm install  # ou pnpm install ou yarn
 ```
 
-Une fois cela fait, démarrer un serveur de développement avec la commande suivante :
+Une fois cela fait, démarrer un serveur de développement avec la commande suivante :
 
 ```bash
 npm run dev
@@ -60,7 +60,7 @@ npm run dev
 
 Cela devrait ouvrir un serveur local à l’adresse http://localhost:5173/.
 
-Il est également possible de démarrer le serveur et d’ouvrir automatiquement l'application dans un nouvel onglet de navigateur :
+Il est également possible de démarrer le serveur et d’ouvrir automatiquement l'application dans un nouvel onglet de navigateur :
 
 ```bash
 npm run dev -- --open
@@ -68,13 +68,13 @@ npm run dev -- --open
 
 ## Build
 
-Pour créer une version de production de l'application, utiliser :
+Pour créer une version de production de l'application, utiliser :
 
 ```bash
 npm run build
 ```
 
-Une fois cela fait, pour prévisualiser la version de production, exécuter :
+Une fois cela fait, pour prévisualiser la version de production, exécuter :
 
 ```bash
 npm run preview

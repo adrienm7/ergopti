@@ -1,5 +1,6 @@
 p,
 ul,
+.encadre,
 .tooltiptext {
 	text-align: justify;
 }
@@ -7,6 +8,7 @@ ul,
 @media (max-width: 600px) {
 	p,
 	ul,
+	.encadre,
 	.tooltiptext {
 		text-align: left;
 	}
@@ -36,7 +38,6 @@ strong,
 	font-weight: bold;
 }
 
-a,
 i,
 i .path2::before,
 em,
@@ -99,9 +100,7 @@ i .path1::before {
 .no-gradient,
 .text-white,
 .text-black,
-nav a,
-a button,
-a:has(button) {
+nav a {
 	background: none;
 	-webkit-background-clip: border-box;
 	background-clip: border-box;

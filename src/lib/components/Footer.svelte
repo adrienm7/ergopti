@@ -23,7 +23,7 @@
 		color: white;
 		display: flex;
 		font-size: 0.9rem;
-		height: 60px;
+		height: min(calc(5vh + 2vw), 80px);
 		justify-content: center;
 	}
 </style>

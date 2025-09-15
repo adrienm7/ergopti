@@ -146,7 +146,7 @@
 		sur cette ligne comme en AZERTY est une très mauvaise idée, car cette lettre est beaucoup utilisée
 		en français. Par exemple, en français, le <kbd>É</kbd> est environ 2 fois plus fréquent que le
 		<kbd>J</kbd>, dont la touche est pourtant en AZERTY sur l’un des meilleurs emplacements du
-		clavier : la touche de repos de l’index.
+		clavier : la touche de repos de l’index.
 	</p>
 	<p>
 		Enfin, contrairement à BÉPO ou Optimot, <Ergopti /> ne place pas de symboles de programmation ou
@@ -166,6 +166,8 @@
 	</p>
 	<p>
 		Attention toutefois, car ces fréquences vont varier selon le texte analysé et la langue de
-		celui-ci. Vous trouverez plus de détails sur la page <a href="/benchmarks">Benchmarks</a>.
+		celui-ci. Vous trouverez plus de détails sur la page <a href="/benchmarks" class="link"
+			>Benchmarks</a
+		>.
 	</p>
 </section>

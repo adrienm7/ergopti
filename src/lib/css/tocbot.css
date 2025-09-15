@@ -15,13 +15,13 @@
 }
 
 .toc-list .toc-link {
-	/* background-image: linear-gradient(to right, var(--gradient-blue));
 	background-clip: text;
 	-webkit-background-clip: text;
+	background-image: linear-gradient(to right, var(--gradient-blue));
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
-	-moz-text-fill-color: transparent; */
-	color: var(--couleur-bleue);
+	-moz-text-fill-color: transparent;
+	/* color: var(--couleur-bleue); */
 }
 
 .toc-list .is-active-link {
