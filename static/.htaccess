@@ -1,3 +1,9 @@
+# This file isn’t used by GitHub Pages.
+# We still keep it in case we one day migrate to another hosting provider that supports Apache.
+
+
+# ======= RÉÉCRITURE D’URL =======
+
 # Activer le moteur de réécriture
 RewriteEngine On
 RewriteBase /
