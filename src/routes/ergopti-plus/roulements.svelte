@@ -11,7 +11,7 @@
 
 	<div class="encadre">
 		<p class="margin0">
-			<b>Note :</b> Dans de très rares cas, ces raccourcis vous empêcheront d’écrire ce que vous
+			<b>Note :</b> Dans de très rares cas, ces raccourcis vous empêcheront d’écrire ce que vous
 			voulez réellement écrire. En effet, avec <ErgoptiPlus />, les combinaisons de touches
 			extrêmement rares comme
 			<kbd>HC</kbd>
@@ -36,7 +36,7 @@
 
 	<small-space></small-space>
 
-	<p>Des roulements pour plus de confort ont été ajoutés :</p>
+	<p>Des roulements pour plus de confort ont été ajoutés :</p>
 
 	<h3>Roulements avec des lettres</h3>
 	<ul class="margin-top-2">

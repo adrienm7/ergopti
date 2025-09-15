@@ -26,7 +26,7 @@
 		<ErgoptiPlus /> est une variante améliorée de la disposition <Ergopti /> qui tire parti des meilleures
 		fonctionnalités des claviers programmables et outils d’automatisation. Elle se rapproche de très
 		près de la
-		<span class="important">disposition clavier idéale</span>. En effet, elle :
+		<span class="important">disposition clavier idéale</span>. En effet, elle :
 	</p>
 	<div class="cards">
 		<div class="card">
@@ -73,7 +73,7 @@
 	<div class="main">
 		<div class="encadre">
 			Cependant, l’utilisation d’<ErgoptiPlus></ErgoptiPlus> nécessite des
-			<span class="important">outils de programmation de clavier :</span>
+			<span class="important">outils de programmation de clavier :</span>
 			<ul>
 				<li>
 					Sur Windows, le programme <a class="link" href="https://www.autohotkey.com/">AutoHotkey</a
@@ -107,6 +107,6 @@
 			</ul>
 		</div>
 		<tiny-space></tiny-space>
-		<p>Voici maintenant les nombreuses fonctionnalités d’<ErgoptiPlus /> :</p>
+		<p>Voici maintenant les nombreuses fonctionnalités d’<ErgoptiPlus /> :</p>
 	</div>
 </section>

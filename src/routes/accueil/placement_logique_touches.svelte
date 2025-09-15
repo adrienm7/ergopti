@@ -13,17 +13,15 @@
 		notamment le cas grâce à une séparation des lettres par main : les voyelles sont toutes
 		présentes à gauche et les consonnes à droite (sauf le <kbd>W</kbd>, le <kbd>B</kbd> et le
 		<kbd>K</kbd>). En outre, le placement logique des caractères est particulièrement présent sur la
-		couche
-		<kbd>AltGr</kbd> :
+		couche <kbd>AltGr</kbd> :
 	</p>
 	<ul>
 		<li>
 			<kbd>AltGr</kbd> + <kbd>À</kbd> ➜ <kbd-output>\</kbd-output> car le
 			<span class="hyper text-bold">\</span> est au-dessus du A (Le <kbd-output>\</kbd-output>
-			était auparavant sur le
-			<kbd>È</kbd> et le <kbd-output>`</kbd-output> sur le <kbd>À</kbd>, car plus logique.
-			Cependant, cela a finalement été déplacé pour placer plus près ce symbole qui est très utilisé
-			en programmation, notamment en LaTeX.) ;
+			était auparavant sur le <kbd>È</kbd> et le <kbd-output>`</kbd-output> sur le <kbd>À</kbd>, car
+			plus logique. Cependant, cela a finalement été déplacé pour placer plus près ce symbole qui
+			est très utilisé en programmation, notamment en LaTeX.) ;
 		</li>
 		<li>
 			<kbd>AltGr</kbd> + <kbd>C</kbd> ➜ <kbd-output>ç</kbd-output>
@@ -71,14 +69,13 @@
 		</li>
 		<li>
 			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>R</kbd> ➜
-			<kbd-output>ℝ</kbd-output>
-			car c’est la touche morte pour écrire les ensembles mathématiques (ℕ, ℤ, ℚ, ℝ, ℂ), dont l'un des
-			plus connus est <span class="hyper text-bold">R</span> ;
+			<kbd-output>ℝ</kbd-output> car c’est la touche morte pour écrire les ensembles mathématiques
+			(ℕ, ℤ, ℚ, ℝ, ℂ), dont l'un des plus connus est <span class="hyper text-bold">R</span> ;
 		</li>
 		<li>
 			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>T</kbd> ➜
-			<kbd-output class="morte">◌̈</kbd-output>
-			car c’est la touche morte <span class="hyper text-bold">T</span>réma ;
+			<kbd-output class="morte">◌̈</kbd-output> car c’est la touche morte
+			<span class="hyper text-bold">T</span>réma ;
 		</li>
 		<li>
 			<kbd>AltGr</kbd> + <kbd>V</kbd> ➜ <kbd-output>|</kbd-output> car c’est la barre
@@ -92,7 +89,7 @@
 
 	<tiny-space></tiny-space>
 
-	<p>D’autres sont placées par paires l’une à côté de l’autre :</p>
+	<p>D’autres sont placées par paires l’une à côté de l’autre :</p>
 	<ul>
 		<li>
 			<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <kbd-output>{'<'}</kbd-output> et <kbd>AltGr</kbd> +

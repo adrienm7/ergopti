@@ -63,7 +63,7 @@
 
 	<p>
 		La disposition a beaucoup évoluée au fil du temps. En particulier, la touche sur l’index gauche
-		a plusieurs fois changé :
+		a plusieurs fois changé :
 		<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd> et enfin la création d’une touche spéciale
 		<kbd>★</kbd>
 		et le déplacement de <kbd>É</kbd> sur l’annulaire gauche.

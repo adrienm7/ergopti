@@ -103,7 +103,7 @@
 		appuyer sur la touche morte, puis sur la lettre.
 	</p>
 	<p class="encadre">
-		<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
+		<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
 		<a href="/benchmarks">page de benchmarks</a>
 		ainsi que sur la <a href="/telechargements">page de téléchargements</a>, par installation via
 		Kalamine. Elle utilise le fait qu’<Ergopti></Ergopti> ait été conçue de base pour utiliser de nouvelles
@@ -133,7 +133,7 @@
 		</li>
 	</ul>
 	<p class="encadre">
-		<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation d’<ErgoptiPlus
+		<b>Note :</b> Tous ces problèmes de <SFB></SFB>s sont résolus grâce à l’utilisation d’<ErgoptiPlus
 		></ErgoptiPlus>, y compris pour les <SFB></SFB>s encore plus rares qui ne sont pas listés ici.
 		<i class="icon-face-smile"><span class="path1"></span><span class="path2"></span></i>
 	</p>

@@ -5,8 +5,9 @@
 */
 
 keyboard {
-	--keyboard-width: 0.75;
-	--keyboard-padding: clamp(7px, calc(100vw / 70), 50px);
+	--keyboard-percentage: 0.9;
+	--keyboard-width: calc(var(--main-width) * var(--keyboard-percentage));
+	--keyboard-padding: clamp(7px, calc(var(--keyboard-width) / 50), 50px);
 	--keyboard-border-radius: var(--keyboard-padding);
 	background-color: hsla(208, 100%, 10%, 0.7);
 	border: 1px solid hsla(225, 100%, 8%, 0.8);
@@ -75,8 +76,8 @@ keyboard-key {
 }
 
 keyboard-key {
-	--key-size: calc(100vw / 20 * var(--keyboard-width));
-	--key-margin: calc(0.28vw * var(--keyboard-width));
+	--key-size: calc(var(--keyboard-width) / 15);
+	--key-margin: calc(0.05 * var(--key-size));
 
 	--key-depth: calc(var(--key-size) * 0.06);
 	--key-pressed-depth: 1px;
@@ -591,19 +592,21 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 /* === 3 main keyboards === */
 
 #keyboard_reference {
-	--keyboard-width: 0.85;
+	--keyboard-width: 50vw;
 }
 
 #keyboard_presentation,
-#keyboard_presentation_plus {
-	--keyboard-width: 0.8;
+#keyboard_presentation_plus,
+#keyboard_emulation {
+	--keyboard-width: calc(35vw + 25vh);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
 	#keyboard_reference,
 	#keyboard_presentation,
-	#keyboard_presentation_plus {
-		--keyboard-width: 0.9;
+	#keyboard_presentation_plus,
+	#keyboard_presentation_emulation {
+		--keyboard-width: 90vw;
 	}
 }
 

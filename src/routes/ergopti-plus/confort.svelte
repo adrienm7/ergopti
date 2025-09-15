@@ -22,7 +22,7 @@
 		La touche <kbd-output>Delete</kbd-output> se trouve quant à elle sur la combinaison
 		<kbd>Shift</kbd> + <kbd>"RCtrl"</kbd>.
 	</p>
-	<p>Pour être encore plus rapide, deux raccourcis optionnels ont aussi été implémentés :</p>
+	<p>Pour être encore plus rapide, deux raccourcis optionnels ont aussi été implémentés :</p>
 	<ul>
 		<li>
 			<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-output>Ctrl</kbd-output> +
@@ -154,7 +154,7 @@
 		temps.
 	</p>
 
-	<p class="text-bold">En résumé :</p>
+	<p class="text-bold">En résumé :</p>
 	<ul class="margin-top-2">
 		<li><kbd>,a</kbd> ➜ <kbd-output>ja</kbd-output> ;</li>
 		<li><kbd>,i</kbd> ➜ <kbd-output>ji</kbd-output> ;</li>
@@ -197,7 +197,7 @@
 	</p>
 	<p>
 		C’est pour toutes ces raisons qu’il est possible d’utiliser la touche <kbd>,</kbd> comme une
-		super touche morte avec <ErgoptiPlus></ErgoptiPlus> :
+		super touche morte avec <ErgoptiPlus></ErgoptiPlus> :
 	</p>
 	<ul>
 		<li><kbd>,</kbd> + <kbd>è</kbd> = <kbd-output>z</kbd-output> ;</li>

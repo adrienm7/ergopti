@@ -43,7 +43,7 @@
 <section>
 	<h2 class="first-h2">Installation</h2>
 	<div class="encadre text-center">
-		<span style="font-weight:bold;">Note :</span> Les fichiers d’installation n’existent au complet qu’à
+		<span style="font-weight:bold;">Note :</span> Les fichiers d’installation n’existent au complet qu’à
 		partir de la 1.1.
 	</div>
 
@@ -119,7 +119,7 @@
 	<p>
 		Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
 		désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement
-		du script ErgoptiPlus au démarrage, il est possible de suivre les étapes suivantes :
+		du script ErgoptiPlus au démarrage, il est possible de suivre les étapes suivantes :
 	</p>
 	<ol>
 		<li>
@@ -137,7 +137,7 @@
 
 	<tiny-space></tiny-space>
 
-	<p>Certains problèmes ont été rapportés avec le pilote d’Ergopti dans quelques logiciels :</p>
+	<p>Certains problèmes ont été rapportés avec le pilote d’Ergopti dans quelques logiciels :</p>
 	<ul>
 		<li>
 			Microsoft Excel : Taper un <kbd>+</kbd> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause des

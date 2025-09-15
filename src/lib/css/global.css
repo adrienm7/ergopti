@@ -5,6 +5,7 @@
 	--gradient-purple-dark: #ab2dff 0%, #62007a 100%;
 
 	--largeur-main: 72.5vw;
+	--main-width: clamp(min(850px, 100vw), var(--largeur-main), 950px);
 }
 
 html,

@@ -21,6 +21,8 @@
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
 
+	import { wrapKbdWithPunctuation } from '$lib/js/wrapKbdWithPunctuation.js';
+
 	import { makeIds } from '$lib/js/make-ids.js';
 	import tocbot from 'tocbot';
 	import '$lib/css/tocbot.css';
@@ -34,6 +36,7 @@
 	import '$lib/css/ergopti_name.css';
 	import '$lib/css/images.css';
 	import '$lib/css/buttons.css';
+	import '$lib/css/banner.css';
 
 	import '$lib/icons/icomoon/style.css';
 
@@ -56,6 +59,8 @@
 	});
 
 	afterUpdate(() => {
+		wrapKbdWithPunctuation(document);
+
 		makeIds(document.getElementById('main-content'));
 		document.querySelectorAll('h2').forEach(function (h2) {
 			h2.setAttribute('data-aos', 'zoom-out');
@@ -98,7 +103,7 @@
 			{/if}
 		</bloc-introduction>
 		<bloc-main>
-			<aside id="sidebar">
+			<nav id="sidebar">
 				<div>
 					<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
 						Contenu de la page
@@ -120,7 +125,7 @@
 						>
 					</p>
 				</div>
-			</aside>
+			</nav>
 			<div id="main-content">
 				<main>
 					<slot />
@@ -157,9 +162,9 @@
 	</clavier-reference>
 </keyboard-reference>
 
-<!-- <div class="banner">
-	<p>En construction</p>
-</div> -->
+<div class="banner">
+	<p>NOUVEAU : Version 2.2</p>
+</div>
 
 <style>
 	#afficher-clavier-reference {

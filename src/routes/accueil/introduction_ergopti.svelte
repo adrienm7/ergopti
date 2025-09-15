@@ -41,7 +41,7 @@
 	<div class="cards">
 		<div class="card">
 			<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i>
-			<span class="text-bold">Diminution de la distance parcourue</span> par les doigts pour moins de
+			<span class="important">Diminution de la distance parcourue</span> par les doigts pour moins de
 			fatigue et plus de vitesse.
 		</div>
 		<div class="card">
@@ -52,7 +52,7 @@
 		</div>
 		<div class="card">
 			<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
-			<span class="text-bold">Alternance des mains</span> maximisée pour paralléliser la frappe et ainsi
+			<span class="important">Alternance des mains</span> maximisée pour paralléliser la frappe et ainsi
 			écrire plus vite.
 		</div>
 		<div class="card">
@@ -61,7 +61,7 @@
 		</div>
 		<div class="card">
 			<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>
-			<span class="text-bold">Placement logique</span> des symboles, permettant de s’en souvenir aisément.
+			<span class="important">Placement logique</span> des symboles, permettant de s’en souvenir aisément.
 		</div>
 		<div class="card">
 			<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i>
