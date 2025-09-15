@@ -1,0 +1,1 @@
+The screenshots were enhanced by https://imgupscaler.ai/
