@@ -27,13 +27,13 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			files = import.meta.glob('/static/pilotes/plus/*.ahk');
 			break;
 		case 'kla_iso':
-			files = import.meta.glob('/static/dispositions/iso/*.json');
+			files = import.meta.glob('/static/layouts/iso/*.json');
 			break;
 		case 'kla_iso_plus':
-			files = import.meta.glob('/static/dispositions/iso/*+.json');
+			files = import.meta.glob('/static/layouts/iso/*+.json');
 			break;
 		case 'kla_ergodox':
-			files = import.meta.glob('/static/dispositions/ergodox/*.json');
+			files = import.meta.glob('/static/layouts/ergodox/*.json');
 			break;
 		case 'kalamine_1dk':
 			files = import.meta.glob('/static/pilotes/kalamine/1dk/*.toml');
@@ -48,7 +48,7 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			);
 			break;
 		default:
-			files = import.meta.glob('/static/dispositions/ergodox/*.json'); // Valeur par défaut
+			files = import.meta.glob('/static/layouts/ergodox/*.json'); // Valeur par défaut
 			break;
 	}
 
