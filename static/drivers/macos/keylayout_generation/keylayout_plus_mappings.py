@@ -247,67 +247,127 @@ mappings = {
 }
 
 
-def add_uppercase_mappings(orig_mappings):
+def add_case_sensitive_mappings(orig_mappings: dict) -> dict:
     """
-    Generate mappings for uppercase triggers.
-    - Alphabetic triggers become uppercase.
-    - Special triggers can be replaced by one or more alternatives defined in `special_upper_triggers`.
-    - All outputs are capitalized (titlecase).
+    Generate mappings for all trigger/key case combinations.
+    Special handling for triggers like ',' to produce multiple uppercase variants.
+    Applies correct output capitalisation depending on trigger/key case.
+    - Trigger uppercase + key uppercase -> output uppercase
+    - Trigger uppercase + key lowercase -> output titlecase
+    - Trigger lowercase + key uppercase -> output titlecase
+    - Trigger lowercase + key lowercase -> output as is
+    Avoids duplicates if lower=upper (e.g., ★).
     """
-    # Define special triggers and their uppercase replacements (can be multiple)
-    special_upper_triggers = {
-        ",": [";", ":"],
-    }
-
-    new_mappings = orig_mappings.copy()  # Keep the original intact
+    new_mappings = orig_mappings.copy()
     for key, data in orig_mappings.items():
-        if len(data["map"]) == 0:
+        if not data.get("map"):
             continue
-        trigger = data["trigger"]
-        new_map = [(k, v.title()) for k, v in data["map"]]
-
-        if trigger in special_upper_triggers:
-            # Create a mapping for each replacement
-            for i, replacement in enumerate(special_upper_triggers[trigger]):
-                upper_key = f"{key}_upper{i}"
-                new_mappings[upper_key] = {
-                    "trigger": replacement,
-                    "map": new_map,
-                }
-        elif trigger.isalpha():
-            upper_key = key + "_upper"
-            new_mappings[upper_key] = {
-                "trigger": trigger.upper(),
-                "map": new_map,
-            }
-
+        process_mapping(new_mappings, key, data)
     return new_mappings
 
 
-def escape_symbols_in_mappings(orig_mappings):
+def process_mapping(new_mappings: dict, key: str, data: dict):
+    """Process a single mapping entry and add all case-sensitive variants."""
+    trigger = data["trigger"]
+    trigger_variants = get_trigger_variants(trigger)
+    for trigger_val, is_trigger_upper in trigger_variants:
+        triggers_to_add = expand_special_trigger(trigger_val, is_trigger_upper)
+        for actual_trigger in triggers_to_add:
+            new_key_name = f"{key}_{actual_trigger}_map"
+            new_map = build_case_map(data["map"], is_trigger_upper)
+            new_mappings[new_key_name] = {
+                "trigger": actual_trigger,
+                "map": new_map,
+            }
+
+
+def get_trigger_variants(trigger: str) -> list[tuple[str, bool]]:
+    """Return trigger variants: lowercase and uppercase."""
+    return [(trigger, False), (trigger.upper(), True)]
+
+
+def expand_special_trigger(trigger: str, is_upper: bool) -> list[str]:
+    """Return list of actual triggers for special uppercase triggers."""
+    special_upper_triggers = {",": [";", ":"]}
+    if is_upper and trigger in special_upper_triggers:
+        return special_upper_triggers[trigger]
+    return [trigger]
+
+
+def build_case_map(
+    mapping: list[tuple[str, str]], is_trigger_upper: bool
+) -> list[tuple[str, str]]:
     """
-    Go through all mappings and replace every " character
-    in the outputs with &#x0022; to avoid XML issues.
+    Generate all key case combinations for a given trigger case.
+    Applies output capitalisation rules.
+    """
+    new_map = []
+    seen_keys = set()
+    for key_char, value in mapping:
+        for is_key_upper in [False, True]:
+            key_case = key_char.upper() if is_key_upper else key_char
+            if key_case in seen_keys:
+                continue
+            seen_keys.add(key_case)
+            out = get_output_for_case(is_trigger_upper, is_key_upper, value)
+            new_map.append((key_case, out))
+    return new_map
+
+
+def get_output_for_case(
+    trigger_upper: bool, key_upper: bool, value: str
+) -> str:
+    """
+    Determine the output based on the case of trigger and key:
+    - Lower + lower -> original
+    - Lower + upper -> titlecase
+    - Upper + lower -> titlecase
+    - Upper + upper -> uppercase
+    """
+    if trigger_upper and key_upper:
+        return value.upper()
+    elif trigger_upper or key_upper:
+        return value.title()
+    else:
+        return value
+
+
+def escape_symbols_in_mappings(orig_mappings: dict) -> dict:
+    """
+    Go through all mappings and replace XML-breaking characters in the outputs
+    with their numeric character references, avoiding double escaping.
     """
     new_mappings = {}
     for key, data in orig_mappings.items():
         trigger = data["trigger"]
-        fixed_map = []
-        if len(data["map"]) == 0:
-            new_mappings[key] = {
-                "trigger": trigger,
-                "map": [],
-            }
+        if not data["map"]:
+            new_mappings[key] = {"trigger": trigger, "map": []}
             continue
+
+        fixed_map = []
         for trig, out in data["map"]:
-            fixed_out = out.replace('"', "&#x0022;").replace("<", "&#x003C;")
+            fixed_out = escape_xml_characters(out)
             fixed_map.append((trig, fixed_out))
-        new_mappings[key] = {
-            "trigger": trigger,
-            "map": fixed_map,
-        }
+
+        new_mappings[key] = {"trigger": trigger, "map": fixed_map}
+
     return new_mappings
 
 
-mappings = add_uppercase_mappings(mappings)
+def escape_xml_characters(value: str) -> str:
+    """
+    Escape &, <, >, " in value for XML, but leave already escaped sequences intact.
+    """
+    if "&#x" in value:
+        return value
+    return (
+        value.replace("&", "&#x0026;")
+        .replace("<", "&#x003C;")
+        .replace(">", "&#x003E;")
+        .replace('"', "&#x0022;")
+    )
+
+
+# Apply case-sensitive mappings and escape XML characters
+mappings = add_case_sensitive_mappings(mappings)
 mappings = escape_symbols_in_mappings(mappings)
