@@ -19,8 +19,8 @@ def main(
     and builds a macOS bundle containing these keylayouts.
 
     Returns:
-        str: Path to the generated bundle zip file (as string). If the bundle already exists
-        and overwrite=False, returns the path to the existing bundle.
+        str: Path to the generated bundle zip file (as string).
+            If the bundle already exists and overwrite=False, returns the path to the existing bundle.
     """
 
     # Determine output directory
@@ -56,18 +56,18 @@ def main(
         version = match.group(1) if match else "vX.X.X"
         print(f"Layout version: {version}")
 
-        standard_file_path = process_keylayout_v0(
+        base_file_path = process_keylayout_v0(
             kbdedit_file_path, output_directory, overwrite
         )
         plus_file_path = process_keylayout_plus(
-            standard_file_path, output_directory, overwrite
+            base_file_path, output_directory, overwrite
         )
 
         bundle_file_path = build_bundle(
             version,
             output_directory,
             overwrite,
-            [standard_file_path, plus_file_path],
+            [base_file_path, plus_file_path],
         )
         last_bundle_path = str(bundle_file_path)
 
@@ -108,7 +108,7 @@ def process_keylayout_v0(
     kbdedit_file_path: Path, output_directory: Path, overwrite: bool
 ) -> Path:
     """Open, correct and save the base keylayout (v0 → normal)."""
-    standard_file_path = output_directory / (
+    base_file_path = output_directory / (
         kbdedit_file_path.stem.replace("_v0", "") + kbdedit_file_path.suffix
     )
 
@@ -116,36 +116,36 @@ def process_keylayout_v0(
         f"➡️  Creating corrected keylayout from: {kbdedit_file_path}"
     )  # Needs double space after emoji
 
-    if not can_overwrite_file(standard_file_path, overwrite):
-        return standard_file_path
+    if not can_overwrite_file(base_file_path, overwrite):
+        return base_file_path
 
     with kbdedit_file_path.open("r", encoding="utf-8") as f:
         content = f.read()
 
     content_corrected = correct_keylayout(content)
-    with standard_file_path.open("w", encoding="utf-8") as f:
+    with base_file_path.open("w", encoding="utf-8") as f:
         f.write(content_corrected)
 
-    print(f"✅ Corrected keylayout saved at: {standard_file_path}")
-    return standard_file_path
+    print(f"✅ Corrected keylayout saved at: {base_file_path}")
+    return base_file_path
 
 
 def process_keylayout_plus(
-    standard_file_path: Path, output_directory: Path, overwrite: bool
+    base_file_path: Path, output_directory: Path, overwrite: bool
 ) -> Path:
     """Open a corrected keylayout and create the _plus version."""
     plus_file_path = output_directory / (
-        standard_file_path.stem.replace(".keylayout", "_plus.keylayout")
+        base_file_path.stem + "_plus" + base_file_path.suffix
     )
 
     print(
-        f"➡️  Creating plus version from: {standard_file_path}"
+        f"➡️  Creating plus version from: {base_file_path}"
     )  # Needs double space after emoji
 
     if not can_overwrite_file(plus_file_path, overwrite):
         return plus_file_path
 
-    with standard_file_path.open("r", encoding="utf-8") as f:
+    with base_file_path.open("r", encoding="utf-8") as f:
         content = f.read()
 
     content_plus = create_keylayout_plus(content)
