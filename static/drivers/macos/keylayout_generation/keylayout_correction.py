@@ -25,11 +25,12 @@ def correct_keylayout(content: str) -> str:
     print(f"{file_indentation}➕ Adding keymap 9…")
     content = add_keymap_select_9(content)
     keymap_4_content = extract_keymap_body(content, 4)
-    content = add_keymap_9(content, keymap_4_content)
+    content = add_keymap(content, 9, keymap_4_content)
 
     print(f"{file_indentation}🎨 Cosmetic ordering and sorting…")
     content = reorder_modifiers_and_attributes(content)
     content = sort_keys(content)
+    content = sort_keymaps(content)
 
     print("✅ Keylayout corrections complete.")
     return content
@@ -131,59 +132,105 @@ def add_keymap_select_9(content: str) -> str:
     )
 
 
-def add_keymap_9(content: str, new_keymap9: str) -> str:
-    """Add keymap index 9 by inserting a prepared keymap after index 8."""
-    print(f"{file_indentation}\t🔹 Adding keymap 9…")
-    if '<keyMap index="9">' in content:
-        print(f"{file_indentation}\t\t⚠️ Keymap 9 already exists, skipping.")
+def add_keymap(content: str, index: int, keymap_body: str) -> str:
+    """
+    Add a keyMap with a given index just before the closing </keyMapSet> tag.
+    If a keyMap with the same index already exists, the new keyMap is not added.
+    """
+    print(f"{file_indentation}\t🔹 Adding keymap {index}…")
+    if f'<keyMap index="{index}">' in content:
+        print(
+            f"{file_indentation}\t\t⚠️ Keymap {index} already exists, skipping."
+        )
         return content
-    keymap_9 = re.sub(r'action="([^"]+)"', r'output="\1"', new_keymap9)
+
+    insertion = f'\n\t\t<keyMap index="{index}">{keymap_body}</keyMap>\n'
+    # Insert just before the closing </keyMapSet> tag
     return re.sub(
-        r'(<keyMap index="8">.*?</keyMap>)',
-        r'\1\n\t\t<keyMap index="9">' + keymap_9 + "</keyMap>",
-        content,
-        flags=re.DOTALL,
+        r"(</keyMapSet>)", insertion + r"\1", content, flags=re.DOTALL
     )
 
 
 def reorder_modifiers_and_attributes(content: str) -> str:
-    """Reorder modifiers and attributes for cosmetic consistency."""
+    """Standardize encoding, maxout, and key/modifier orders for cosmetic consistency."""
     print(f"{file_indentation}\t🔹 Reordering modifiers and attributes…")
-    content = re.sub(r'encoding="utf-8"', 'encoding="UTF-8"', content)
-    content = re.sub(r'maxout="1"\s+(name="[^"]+")', r'\1 maxout="3"', content)
-    content = re.sub(r'keys="anyOption caps"', 'keys="caps anyOption"', content)
-    content = re.sub(
-        r'keys="anyOption caps anyShift"',
-        'keys="anyShift caps anyOption"',
-        content,
-    )
-    content = re.sub(
-        r'keys="anyOption anyShift"', 'keys="anyShift anyOption"', content
-    )
-    content = re.sub(r'keys="caps anyShift"', 'keys="anyShift caps"', content)
-    content = content.replace(
-        '\t\t\t<modifier keys="command caps? anyOption? control?"/>\n\t\t\t<modifier keys="control caps? anyOption?"/>',
-        '\t\t\t<modifier keys="caps? anyOption? command anyControl?"/>\n\t\t\t<modifier keys="caps? anyOption? anyControl"/>',
-    )
+
+    # Standardize encoding
+    content = content.replace('encoding="utf-8"', 'encoding="UTF-8"')
+
+    # Increase maxout from 1 to 3
+    content = re.sub(r'maxout="1"', 'maxout="3"', content)
+
+    # Standardize key orders and specific modifier blocks
+    key_replacements = {
+        'keys="anyOption caps anyShift"': 'keys="anyShift caps anyOption"',
+        'keys="anyOption anyShift"': 'keys="anyShift anyOption"',
+        'keys="anyOption caps"': 'keys="caps anyOption"',
+        'keys="caps anyShift"': 'keys="anyShift caps"',
+        'keys="command caps? anyOption? control?"': 'keys="caps? anyOption? command anyControl?"',
+        'keys="control caps? anyOption?"': 'keys="caps? anyOption? anyControl"',
+    }
+    for old, new in key_replacements.items():
+        content = content.replace(old, new)
+
     return content
 
 
 def sort_keys(content: str) -> str:
-    """Sort all <key> elements in each keyMap by their code attribute."""
+    """Sort all <key> elements in each <keyMap> block by their code attribute."""
     print(f"{file_indentation}\t🔹 Sorting keys by code…")
 
     def sort_block(match):
-        header = match.group(1)
-        body = match.group(2)
+        header, body, footer = match.groups()
+        # Extract all <key .../> elements
         keys = re.findall(r"(\s*<key[^>]+/>)", body)
+        # Sort keys numerically by their code attribute
         keys_sorted = sorted(
             keys, key=lambda k: int(re.search(r'code="(\d+)"', k).group(1))
         )
-        return f"{header}" + "".join(keys_sorted) + "\n\t\t</keyMap>"
+        # Reconstruct the block
+        return f"{header}{''.join(keys_sorted)}\n\t\t{footer}"
 
     return re.sub(
-        r'(<keyMap index="\d+">)(.*?)(\n\t\t</keyMap>)',
+        r'(<keyMap index="\d+">)(.*?)(</keyMap>)',
         sort_block,
         content,
         flags=re.DOTALL,
     )
+
+
+def sort_keymaps(content: str) -> str:
+    """Sort all <keyMap> blocks numerically by their index inside <keyMapSet>."""
+    print(f"{file_indentation}\t🔹 Sorting keyMaps inside keyMapSet…")
+
+    # Extract the keyMapSet block
+    match = re.search(
+        r"(<keyMapSet.*?>)(.*?)(</keyMapSet>)", content, flags=re.DOTALL
+    )
+    if not match:
+        return content  # Nothing to sort if no keyMapSet found
+
+    header, body, footer = match.groups()
+
+    # Extract all keyMap blocks in the body
+    keymaps = re.findall(
+        r'(<keyMap index="(\d+)">.*?</keyMap>)', body, flags=re.DOTALL
+    )
+    if not keymaps:
+        return content  # No keymaps to sort
+
+    # Sort by index numerically
+    keymaps_sorted = sorted(keymaps, key=lambda k: int(k[1]))
+
+    # Reconstruct the keyMapSet with sorted keyMaps
+    new_body = "".join("\n\t\t" + k[0] for k in keymaps_sorted)
+    sorted_keymapset = header + new_body + "\n\t" + footer
+
+    # Replace the old keyMapSet in content
+    content = re.sub(
+        r"(<keyMapSet.*?>.*?</keyMapSet>)",
+        sorted_keymapset,
+        content,
+        flags=re.DOTALL,
+    )
+    return content
