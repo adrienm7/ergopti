@@ -2,6 +2,8 @@ import re
 
 from keylayout_plus_mappings import mappings
 
+LOGS_INDENTATION = "\t"
+
 
 def create_keylayout_plus(content: str):
     """
