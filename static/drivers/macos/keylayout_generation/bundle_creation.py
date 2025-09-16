@@ -9,25 +9,22 @@ bundle_identifier = "keyboardlayout.ergopti"
 
 def create_bundle(
     version: str,
-    keylayout_files: list[Path],
-    logo_files: list[Path],
-    directory_path: Path = None,
-    zip_bundle: bool = True,
+    output_dir: Path,
+    keylayout_paths: list[Path],
+    logo_paths: list[Path],
     cleanup: bool = True,
 ):
     """
     Create a .bundle package for macOS keyboard layouts.
-    keylayout_files and logo_files must be lists of the same length.
+    keylayout_paths and logo_paths must be lists of the same length.
     """
-    if len(keylayout_files) != len(logo_files):
+    if len(keylayout_paths) != len(logo_paths):
         raise ValueError(
-            "keylayout_files and logo_files must have the same length"
+            "keylayout_paths and logo_paths must have the same length"
         )
 
     base_dir = (
-        directory_path.resolve()
-        if directory_path
-        else Path(__file__).parent.resolve()
+        output_dir.resolve() if output_dir else Path(__file__).parent.resolve()
     )
     bundle_name = f"Ergopti_{version}.bundle"
     bundle_path = base_dir / bundle_name
@@ -39,11 +36,11 @@ def create_bundle(
     resources_path.mkdir(parents=True, exist_ok=True)
 
     info_plist_entries = []
-    for keylayout, logo in zip(keylayout_files, logo_files):
+    for keylayout, logo in zip(keylayout_paths, logo_paths):
         if not keylayout.exists():
             raise FileNotFoundError(f"Keylayout file not found: {keylayout}")
         if not logo.exists():
-            print(f"⚠️ Logo file not found: {logo}, continuing without it")
+            print(f"\t⚠️ Logo file not found: {logo}, continuing without it")
             logo_path_to_use = None
         else:
             logo_path_to_use = logo
@@ -62,7 +59,7 @@ def create_bundle(
             <false/>
             <key>ICNS</key>
             <string>{dest_logo.name}</string>"""
-            print(f"Added logo {logo_path_to_use.name} as {dest_logo.name}")
+            print(f"\tAdded logo {logo_path_to_use.name} as {dest_logo.name}")
 
         plist_key = f"KLInfo_{keylayout.stem}"
         info_plist_entries.append(f"""
@@ -86,12 +83,12 @@ def create_bundle(
     version_plist_path = bundle_path / "Contents" / "version.plist"
     version_plist_path.write_text(version_plist_content, encoding="utf-8")
 
+    # Zip the bundle
     zip_path = None
-    if zip_bundle:
-        zip_path = bundle_path.with_suffix(".bundle.zip")
-        zip_bundle_folder(bundle_path, zip_path)
-        if cleanup:
-            shutil.rmtree(bundle_path)
+    zip_path = bundle_path.with_suffix(".bundle.zip")
+    zip_bundle_folder(bundle_path, zip_path)
+    if cleanup:
+        shutil.rmtree(bundle_path)
 
     return (bundle_path if not cleanup else None, zip_path)
 
@@ -194,4 +191,4 @@ def zip_bundle_folder(bundle_path: Path, zip_path: Path):
                 # Relative path from the parent of the bundle folder to keep the bundle folder itself
                 relative_path = file_path.relative_to(bundle_path.parent)
                 zipf.write(file_path, relative_path)
-    print(f"Zipped bundle at: {zip_path}")
+    print(f"\t📦 Zipped bundle at: {zip_path}")
