@@ -347,7 +347,7 @@ def escape_symbols_in_mappings(orig_mappings: dict) -> dict:
         fixed_map = []
         for trig, out in data["map"]:
             fixed_out = escape_xml_characters(out)
-            fixed_map.append((trig, fixed_out))
+            fixed_map.append((escape_xml_characters(trig), fixed_out))
 
         new_mappings[key] = {"trigger": trigger, "map": fixed_map}
 
@@ -365,6 +365,7 @@ def escape_xml_characters(value: str) -> str:
         .replace("<", "&#x003C;")
         .replace(">", "&#x003E;")
         .replace('"', "&#x0022;")
+        .replace("'", "&#x0027;")
     )
 
 
