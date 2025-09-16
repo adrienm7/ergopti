@@ -17,7 +17,7 @@ def create_keylayout_plus(content: str):
         layer = start_layer + i
         trigger_key = data["trigger"]
         print(
-            f"Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
+            f"\t\tAdding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
         )
 
         if len(data["map"]) == 0:
@@ -32,7 +32,7 @@ def create_keylayout_plus(content: str):
 
         # Add all feature actions
         for action_id, output in data["map"]:
-            # print(f"  - action '{action_id}' → '{output}'")
+            print(f"\t\t\tAdding action '{action_id}' ➜ '{output}'")
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
             # This preserves key codes/modifiers and avoids having <key ... output="..."> which would break action linking
@@ -244,7 +244,7 @@ def find_next_available_layer(content: str) -> int:
 
     max_layer = max(state_indices + next_indices, default=0)
     next_layer = max_layer + 1
-    print(f"Next available layer: s{next_layer}")
+    print(f"\t\tNext available layer: s{next_layer}")
     return next_layer
 
 
