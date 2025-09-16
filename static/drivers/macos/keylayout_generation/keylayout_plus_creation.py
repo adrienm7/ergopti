@@ -1,6 +1,6 @@
 import re
 
-from keylayout_plus_mappings import mappings
+from keylayout_plus_mappings import escape_xml_characters, mappings
 
 LOGS_INDENTATION = "\t"
 
@@ -10,6 +10,24 @@ def create_keylayout_plus(content: str):
     Create a '_plus' variant of the corrected keylayout, with extra actions.
     """
 
+    content = (
+        content.replace('output="\'"', "output='&#x0027;'")
+        .replace('action="\'"', 'action="&#x0027;"')
+        .replace('id="\'"', 'id="&#x0027;"')
+        .replace('output="<"', 'output="&#x003C;"')
+        .replace('action="<"', 'action="&#x003C;"')
+        .replace('id="<"', 'id="&#x003C;"')
+        .replace('output=">"', 'output="&#x003E;"')
+        .replace('action=">"', 'action="&#x003E;"')
+        .replace('id=">"', 'id="&#x003E;"')
+    )
+
+    content = content.replace("&lt;", "&#x003C;")
+    content = content.replace("&gt;", "&#x003E;")
+    content = content.replace("&amp;", "&#x0026;")
+    content = content.replace("&quot;", "&#x0022;")
+    content = content.replace("&apos;", "&#x0027;")
+
     content = append_plus_to_keyboard_name(content)
     content = ergopti_plus_altgr_symbols(content)
     content = ergopti_plus_shiftaltgr_symbols(content)
@@ -18,6 +36,7 @@ def create_keylayout_plus(content: str):
     for i, (feature, data) in enumerate(mappings.items()):
         layer = start_layer + i
         trigger_key = data["trigger"]
+        trigger_key = escape_xml_characters(trigger_key)
         print(
             f"\t\tAdding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
         )
@@ -34,6 +53,7 @@ def create_keylayout_plus(content: str):
 
         # Add all feature actions
         for action_id, output in data["map"]:
+            action_id = escape_xml_characters(action_id)
             print(f"\t\t\tAdding action '{action_id}' ➜ '{output}'")
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
@@ -50,7 +70,101 @@ def create_keylayout_plus(content: str):
         .replace('<key code="8" output=\'"\'/>', '<key code="8" action=\'"\'/>')
         .replace('"/>"/>', '"/>')
         .replace('output="<"', 'output="&#x003C;"')
+        .replace("'\"'", "'&#x0022;'")
     )
+
+    # Enter
+    # content = ensure_key_action(content, 36, "Enter", "&#x000D;")
+
+    # # Tab
+    # content = ensure_key_action(content, 48, "Tab", "&#x0009;")
+
+    # # Escape
+    # content = ensure_key_action(content, 53, "Escape", "&#x001B;")
+
+    # # Space
+    # content = ensure_key_action(content, 49, "Space", "&#x0020;")
+
+    # problematic = [
+    #     (36, "Enter", "&#x000A;"),  # Return / Enter -> LF
+    #     (48, "Tab", "&#x0009;"),  # Tab
+    #     (53, "Escape", "&#x001B;"),  # Escape
+    #     (49, "Space", "&#x0020;"),  # Space
+    # ]
+
+    # for action_id, name, output in problematic:
+    #     content = ensure_key_uses_action(content, action_id)
+    #     content = add_action_state(content, action_id, layer, output)
+    return content
+
+
+def ensure_key_action(
+    content: str,
+    key_code: int,
+    action_id: str,
+    xml_output: str,
+    max_state: int = 100,
+) -> str:
+    """
+    Ensure a key uses an action and has all states up to max_state.
+
+    Parameters:
+    - key_code: code attribute of the <key>
+    - action_id: id for the <action> element
+    - xml_output: output for each <when state="sX"/>
+    - max_state: number of states to create (default 100)
+    """
+    # Make the <key> use action="xml_output"
+    content = re.sub(
+        rf'(<key\s+code="{key_code}")([^>]*)/>',
+        rf'\1 action="{xml_output}"/>',
+        content,
+    )
+
+    max_state = find_next_available_layer(content) - 1
+
+    # Create <action id="xml_output"> with all states if missing
+    if not re.search(rf'<action\s+id="{re.escape(xml_output)}">', content):
+        m = re.search(r"(?m)^(?P<indent>\s*)</actions>", content)
+        indent = m.group("indent") if m else "\t\t"
+        # Add state="none" plus s1..s{max_state}
+        states = "\n".join(
+            [f'{indent}\t\t<when state="none" output="{xml_output}"/>']
+            + [
+                f'{indent}\t\t<when state="s{i}" output="{xml_output}"/>'
+                for i in range(1, max_state + 1)
+            ]
+        )
+        action_block = f'{indent}\t<action id="{xml_output}">\n{states}\n\t{indent}</action>\n'
+        if m:
+            content = content[: m.start()] + action_block + content[m.start() :]
+        else:
+            content += action_block
+    else:
+        # Add missing states to existing action, including state="none"
+        if not re.search(
+            rf'<action\s+id="{re.escape(xml_output)}">.*<when state="none"',
+            content,
+            re.DOTALL,
+        ):
+            content = re.sub(
+                rf'(<action\s+id="{re.escape(xml_output)}">.*?)(</action>)',
+                rf'\1\t\t<when state="none" output="{xml_output}"/>\n\2',
+                content,
+                flags=re.DOTALL,
+            )
+        for i in range(1, max_state + 1):
+            if not re.search(
+                rf'<action\s+id="{re.escape(xml_output)}">.*<when state="s{i}"',
+                content,
+                re.DOTALL,
+            ):
+                content = re.sub(
+                    rf'(<action\s+id="{re.escape(xml_output)}">.*?)(</action>)',
+                    rf'\1\t\t<when state="s{i}" output="{xml_output}"/>\n\2',
+                    content,
+                    flags=re.DOTALL,
+                )
 
     return content
 

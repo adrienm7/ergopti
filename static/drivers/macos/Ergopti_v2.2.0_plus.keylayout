@@ -84,7 +84,7 @@
 			<key code="41" action="r"/>
 			<key code="42" action="^"/>
 			<key code="43" action="l"/>
-			<key code="44" action="'"/>
+			<key code="44" action="&#x0027;"/>
 			<key code="45" action="m"/>
 			<key code="46" action="d"/>
 			<key code="47" action="p"/>
@@ -183,7 +183,7 @@
 			<key code="41" action="R"/>
 			<key code="42" action="^"/>
 			<key code="43" action="L"/>
-			<key code="44" action="'"/>
+			<key code="44" action="&#x0027;"/>
 			<key code="45" action="M"/>
 			<key code="46" action="D"/>
 			<key code="47" action="P"/>
@@ -460,7 +460,7 @@
 			<key code="41" output="r"/>
 			<key code="42" output="^"/>
 			<key code="43" output="l"/>
-			<key code="44" output="'"/>
+			<key code="44" output='&#x0027;'/>
 			<key code="45" output="m"/>
 			<key code="46" output="d"/>
 			<key code="47" output="p"/>
@@ -523,7 +523,7 @@
 			<key code="5" action=":"/>
 			<key code="6" action="/"/>
 			<key code="7" action="\"/>
-			<key code="8" action='"'/>
+			<key code="8" action='&#x0022;'/>
 			<key code="9" action=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -766,7 +766,7 @@
 			<key code="5" action=":"/>
 			<key code="6" action="/"/>
 			<key code="7" output="\"/>
-			<key code="8" action='"'/>
+			<key code="8" action='&#x0022;'/>
 			<key code="9" action=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -883,7 +883,7 @@
 			<key code="41" output="r"/>
 			<key code="42" output="^"/>
 			<key code="43" output="l"/>
-			<key code="44" output="'"/>
+			<key code="44" output='&#x0027;'/>
 			<key code="45" output="m"/>
 			<key code="46" output="d"/>
 			<key code="47" output="p"/>
@@ -959,7 +959,7 @@
 			<when state="none" output="&#x0026;"/>
 			<when state="s2" output="৳"/>
 		</action>
-		<action id="'">
+		<action id="&#x0027;">
 			<when state="none" next="s51"/>
 			<when state="s1" output="⚠"/>
 			<when state="s2" output="£"/>
@@ -2157,23 +2157,17 @@
 			<when state="s65" output="&#x0022;]"/>
 			<when state="s66" output=" != "/>
 		</action>
-		<action id="&lt;">
-			<when state="none" next="s61"/>
-		</action>
 		<action id="@">
 			<when state="none" output="@"/>
 			<when state="s22" output="&#x003C;/"/>
 			<when state="s61" output="&#x003C;/"/>
-		</action>
-		<action id="&gt;">
-			<when state="none" next="s62"/>
 		</action>
 		<action id="\">
 			<when state="none" next="s67"/>
 			<when state="s29" output="*/"/>
 			<when state="s68" output="*/"/>
 		</action>
-		<action id='"'>
+		<action id="&#x0022;">
 			<when state="none" next="s68"/>
 			<when state="s28" output="/*"/>
 			<when state="s67" output="/*"/>
@@ -2210,20 +2204,20 @@
 		<when state="s13" output="y"/>
 		<when state="s14" output="à"/>
 		<when state="s15" output="q"/>
-		<when state="s16" output="'"/>
+		<when state="s16" output="&#x0027;"/>
 		<when state="s17" output="p"/>
 		<when state="s18" output="c"/>
 		<when state="s19" output="s"/>
 		<when state="s20" output="h"/>
 		<when state="s21" output="#"/>
 		<when state="s22" output="&#x003C;"/>
-		<when state="s23" output=">"/>
+		<when state="s23" output="&#x003E;"/>
 		<when state="s24" output="("/>
 		<when state="s25" output="["/>
 		<when state="s26" output="]"/>
 		<when state="s27" output="!"/>
 		<when state="s28" output="\"/>
-		<when state="s29" output='"'/>
+		<when state="s29" output="&#x0022;"/>
 		<when state="s30" output="$"/>
 		<when state="s31" output="="/>
 		<when state="s32" output="+"/>
@@ -2245,7 +2239,7 @@
 		<when state="s48" output="À"/>
 		<when state="s49" output="q"/>
 		<when state="s50" output="Q"/>
-		<when state="s51" output="'"/>
+		<when state="s51" output="&#x0027;"/>
 		<when state="s52" output="p"/>
 		<when state="s53" output="P"/>
 		<when state="s54" output="c"/>
@@ -2256,13 +2250,13 @@
 		<when state="s59" output="H"/>
 		<when state="s60" output="#"/>
 		<when state="s61" output="&#x003C;"/>
-		<when state="s62" output=">"/>
+		<when state="s62" output="&#x003E;"/>
 		<when state="s63" output="("/>
 		<when state="s64" output="["/>
 		<when state="s65" output="]"/>
 		<when state="s66" output="!"/>
 		<when state="s67" output="\"/>
-		<when state="s68" output='"'/>
+		<when state="s68" output="&#x0022;"/>
 		<when state="s69" output="$"/>
 		<when state="s70" output="="/>
 		<when state="s71" output="+"/>
