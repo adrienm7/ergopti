@@ -4,7 +4,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-bundle_identifier = "keyboardlayout.ergopti"
+bundle_identifier = "com.apple.com.keyboardlayout.ergopti"
 
 
 def create_bundle(
@@ -155,7 +155,7 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
     <key>CFBundleName</key>
     <string>Ergopti</string>
     <key>CFBundleVersion</key>
-    <string>{version}</string>
+    <string>{version.lstrip("v")}</string>
     {"".join(entries)}
 </dict>
 </plist>

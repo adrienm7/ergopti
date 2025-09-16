@@ -18,12 +18,18 @@ def correct_keylayout(content: str) -> str:
     content = swap_keys_10_and_50(content)
 
     print(f"{file_indentation}➕ Adding keymap 4…")
-    content = replace_keymap_index(content, from_index=0, to_index=4)
+    _, block0, _ = split_keymap(content, 0)
+    _, base_body0, _ = split_keymap_block(block0)
+    new_keymap4 = modify_accented_letters_shortcuts(4, base_body0)
+    content = replace_keymap(content, to_index=4, new_keymap=new_keymap4)
     content = fix_keymap4_symbols(content)
 
     print(f"{file_indentation}➕ Adding keymap 9…")
     content = add_keymap_select_9(content)
-    content = add_keymap_9(content)
+    _, block4, _ = split_keymap(content, 4)
+    _, base_body4, _ = split_keymap_block(block4)
+    new_keymap9 = modify_accented_letters_shortcuts(9, base_body4)
+    content = add_keymap_9(content, new_keymap9)
 
     print(f"{file_indentation}🎨 Cosmetic ordering and sorting…")
     content = reorder_modifiers_and_attributes(content)
@@ -34,25 +40,68 @@ def correct_keylayout(content: str) -> str:
 
 
 def fix_invalid_symbols(content: str) -> str:
-    """Fix invalid XML symbols for <, >, & in action outputs."""
-    print(f"{file_indentation}\t🔹 Fixing invalid symbols for <, >, &…")
-    content = content.replace(
-        """\t\t<action id="&lt;">\n\t\t\t<when state="none" output="&lt;"/>""",
-        """\t\t<action id="&lt;">\n\t\t\t<when state="none" output="&#x003C;"/>""",
+    """
+    Fix invalid XML symbols for <, >, & only inside `output` attributes.
+
+    This function scans the text once, finds each `output="..."` attribute,
+    and replaces the characters &, <, and > with their XML entity equivalents:
+        &  -> &#x0026;
+        <  -> &#x003C;
+        >  -> &#x003E;
+
+    The rest of the content is left unchanged.
+
+    Args:
+        content (str): The raw keylayout XML content.
+
+    Returns:
+        str: The content with fixed symbols inside `output` attributes.
+    """
+    print(
+        f"{file_indentation}\t🔹 Fixing invalid symbols in output attributes…"
     )
-    content = content.replace(
-        """\t\t<action id="&gt;">\n\t\t\t<when state="none" output="&gt;"/>""",
-        """\t\t<action id="&gt;">\n\t\t\t<when state="none" output="&#x003E;"/>""",
-    )
-    content = content.replace(
-        """\t\t<action id="&amp;">\n\t\t\t<when state="none" output="&amp;"/>""",
-        """\t\t<action id="&amp;">\n\t\t\t<when state="none" output="&#x0026;"/>""",
-    )
-    return content
+
+    result = []
+    i = 0
+
+    while True:
+        # Find the start of the next output attribute
+        start = content.find('output="', i)
+        if start == -1:
+            # No more output attributes, append the remainder
+            result.append(content[i:])
+            break
+
+        # Find the closing quote of the output value
+        end = content.find('"', start + len('output="'))
+        if end == -1:
+            # Malformed attribute, append the rest and exit
+            result.append(content[i:])
+            break
+
+        # Append everything up to and including 'output="'
+        result.append(content[i : start + len('output="')])
+
+        # Extract the attribute value
+        value = content[start + len('output="') : end]
+
+        # Replace problematic characters
+        value = value.replace("&lt;", "&#x003C;")
+        value = value.replace("&gt;", "&#x003E;")
+        value = value.replace("&amp;", "&#x0026;")
+
+        # Append the fixed value and the closing quote
+        result.append(value)
+        result.append('"')
+
+        # Move the index past this attribute
+        i = end + 1
+
+    return "".join(result)
 
 
 def swap_keys_10_and_50(content: str) -> str:
-    """Swap key codes 10 and 50 in the content."""
+    """Swap key codes 10 and 50."""
     print(f"{file_indentation}\t🔹 Swapping key codes 10 and 50…")
     content = re.sub(r'code="50"', "TEMP_CODE", content)
     content = re.sub(r'code="10"', 'code="50"', content)
@@ -60,26 +109,30 @@ def swap_keys_10_and_50(content: str) -> str:
     return content
 
 
-def build_custom_keymap(index: int, base_body: str) -> str:
-    """Build a custom keymap with specified substitutions for certain codes."""
-    print(f"{file_indentation}\t🔹 Building custom keymap index {index}…")
-    substitutions = {
-        'code="6"[^>]*?/>': '<key code="6" output="c"/>',
-        'code="7"[^>]*?/>': '<key code="7" action="v"/>',
-        'code="50"[^>]*?/>': '<key code="50" output="x"/>',
-        'code="12"[^>]*?/>': '<key code="12" action="z"/>',
-    }
-    new_body = apply_key_substitutions(base_body, substitutions)
-    return f'<keyMap index="{index}">{new_body}\n\t\t</keyMap>'
-
-
-def extract_keymap(content: str, index: int):
-    """Extract the header, body, and footer of a keyMap by index."""
+def split_keymap(content: str, index: int):
+    """Split content into before, the full keyMap block, and after."""
     match = re.search(
-        rf'(<keyMap index="{index}">)(.*?)(</keyMap>)', content, flags=re.DOTALL
+        rf'(<keyMap index="{index}">.*?</keyMap>)',
+        content,
+        flags=re.DOTALL,
     )
     if not match:
         raise ValueError(f'<keyMap index="{index}"> block not found.')
+    before = content[: match.start()]
+    block = match.group(1)
+    after = content[match.end() :]
+    return before, block, after
+
+
+def split_keymap_block(block: str):
+    """Split a keyMap block into header, body, and footer."""
+    match = re.search(
+        r'(<keyMap index="\d+">)(.*?)(</keyMap>)',
+        block,
+        flags=re.DOTALL,
+    )
+    if not match:
+        raise ValueError("Invalid keyMap block structure.")
     return match.group(1), match.group(2), match.group(3)
 
 
@@ -92,13 +145,22 @@ def apply_key_substitutions(content: str, substitutions: dict) -> str:
     return content
 
 
-def replace_keymap_index(content: str, from_index: int, to_index: int) -> str:
-    """Copy a keymap from one index to another, building a new keymap block."""
-    print(
-        f"{file_indentation}\t🔹 Replacing keymap {to_index} based on {from_index}…"
-    )
-    _, base_body, _ = extract_keymap(content, from_index)
-    new_keymap = build_custom_keymap(to_index, base_body)
+def modify_accented_letters_shortcuts(index: int, base_body: str) -> str:
+    """Build a custom keymap with specified substitutions for certain codes."""
+    print(f"{file_indentation}\t🔹 Building custom keymap index {index}…")
+    substitutions = {
+        'code="6"[^>]*?/>': '<key code="6" output="c"/>',
+        'code="7"[^>]*?/>': '<key code="7" action="v"/>',
+        'code="50"[^>]*?/>': '<key code="50" output="x"/>',
+        'code="12"[^>]*?/>': '<key code="12" action="z"/>',
+    }
+    new_body = apply_key_substitutions(base_body, substitutions)
+    return f'<keyMap index="{index}">{new_body}\n\t\t</keyMap>'
+
+
+def replace_keymap(content: str, to_index: int, new_keymap: str) -> str:
+    """Replace an existing keymap with a new one."""
+    print(f"{file_indentation}\t🔹 Replacing keymap {to_index}…")
     return re.sub(
         rf'<keyMap index="{to_index}">.*?</keyMap>',
         new_keymap,
@@ -114,10 +176,14 @@ def fix_keymap4_symbols(content: str) -> str:
     def replace_in_keymap(match):
         header, body, footer = match.groups()
         body = re.sub(
-            r'(<key code="24"[^>]*(output|action)=")[^"]*(")', r"\1+\3", body
+            r'(<key code="24"[^>]*(output|action)=")[^"]*(")',
+            r"\1+\3",
+            body,
         )
         body = re.sub(
-            r'(<key code="27"[^>]*(output|action)=")[^"]*(")', r"\1-\3", body
+            r'(<key code="27"[^>]*(output|action)=")[^"]*(")',
+            r"\1-\3",
+            body,
         )
         return f"{header}{body}{footer}"
 
@@ -129,16 +195,15 @@ def fix_keymap4_symbols(content: str) -> str:
     )
 
 
-def add_keymap_9(content: str) -> str:
-    """Add keymap index 9 by copying keymap 4, convert actions to outputs."""
+def add_keymap_9(content: str, new_keymap9: str) -> str:
+    """Add keymap index 9 by inserting a prepared keymap after index 8."""
     print(f"{file_indentation}\t🔹 Adding keymap 9…")
     if '<keyMap index="9">' in content:
         print(f"{file_indentation}\t\t⚠️ Keymap 9 already exists, skipping.")
         return content
 
-    _, base_body, _ = extract_keymap(content, 4)
-    keymap_9 = build_custom_keymap(9, base_body)
-    keymap_9 = re.sub(r'action="([^"]+)"', r'output="\1"', keymap_9)
+    # Convert actions to outputs
+    keymap_9 = re.sub(r'action="([^"]+)"', r'output="\1"', new_keymap9)
 
     return re.sub(
         r'(<keyMap index="8">.*?</keyMap>)',
