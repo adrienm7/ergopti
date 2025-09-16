@@ -515,8 +515,8 @@
 			<key code="126" output="&#x001E;"/>
 		</keyMap>
 		<keyMap index="5">
-			<key code="0" action="&lt;"/>
-			<key code="1" action="&gt;"/>
+			<key code="0" action="&#x003C;"/>
+			<key code="1" action="&#x003E;"/>
 			<key code="2" output="{"/>
 			<key code="3" output="}"/>
 			<key code="4" output="|"/>
@@ -560,7 +560,7 @@
 			<key code="42" action="!"/>
 			<key code="43" action="="/>
 			<key code="44" action="?"/>
-			<key code="45" action="&amp;"/>
+			<key code="45" action="&#x0026;"/>
 			<key code="46" action="$"/>
 			<key code="47" action="+"/>
 			<key code="49" action="_"/>
@@ -758,8 +758,8 @@
 			<key code="126" output="&#x001E;"/>
 		</keyMap>
 		<keyMap index="8">
-			<key code="0" action="&lt;"/>
-			<key code="1" action="&gt;"/>
+			<key code="0" action="&#x003C;"/>
+			<key code="1" action="&#x003E;"/>
 			<key code="2" output="{"/>
 			<key code="3" output="}"/>
 			<key code="4" output="|"/>
@@ -802,7 +802,7 @@
 			<key code="42" output="!"/>
 			<key code="43" action="="/>
 			<key code="44" output="?"/>
-			<key code="45" action="&amp;"/>
+			<key code="45" action="&#x0026;"/>
 			<key code="46" action="$"/>
 			<key code="47" action="+"/>
 			<key code="49" output=" - "/>
@@ -954,7 +954,7 @@
 			<when state="s2" output="£"/>
 			<when state="s31" output=" &#x003C;= "/>
 		</action>
-		<action id="&amp;">
+		<action id="&#x0026;">
 			<when state="none" output="&#x0026;"/>
 			<when state="s2" output="৳"/>
 		</action>
@@ -1093,7 +1093,7 @@
 			<when state="none" next="s35"/>
 			<when state="s1" output="↪"/>
 		</action>
-		<action id="&lt;">
+		<action id="&#x003C;">
 			<when state="none" next="s22"/>
 			<when state="s7" output="⟪"/>
 		</action>
@@ -1103,7 +1103,7 @@
 			<when state="s6" output="₌"/>
 			<when state="s30" output=" => "/>
 		</action>
-		<action id="&gt;">
+		<action id="&#x003E;">
 			<when state="none" next="s23"/>
 			<when state="s7" output="⟫"/>
 		</action>
@@ -1869,9 +1869,15 @@
 			<when state="s26" output="&#x0022;]"/>
 			<when state="s27" output=" != "/>
 		</action>
+		<action id="&lt;">
+			<when state="none" next="s22"/>
+		</action>
 		<action id="@">
 			<when state="none" output="@"/>
 			<when state="s22" output="&#x003C;/"/>
+		</action>
+		<action id="&gt;">
+			<when state="none" next="s23"/>
 		</action>
 		<action id="\">
 			<when state="none" next="s28"/>

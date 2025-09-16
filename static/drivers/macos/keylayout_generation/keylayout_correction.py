@@ -39,65 +39,14 @@ def correct_keylayout(content: str) -> str:
     return content
 
 
+# Tester cette version
 def fix_invalid_symbols(content: str) -> str:
-    """
-    Fix invalid XML symbols for <, >, & only inside `output` attributes.
-
-    This function scans the text once, finds each `output="..."` attribute,
-    and replaces the characters &, <, and > with their XML entity equivalents:
-        &  -> &#x0026;
-        <  -> &#x003C;
-        >  -> &#x003E;
-
-    The rest of the content is left unchanged.
-
-    Args:
-        content (str): The raw keylayout XML content.
-
-    Returns:
-        str: The content with fixed symbols inside `output` attributes.
-    """
-    print(
-        f"{file_indentation}\t🔹 Fixing invalid symbols in output attributes…"
-    )
-
-    result = []
-    i = 0
-
-    while True:
-        # Find the start of the next output attribute
-        start = content.find('output="', i)
-        if start == -1:
-            # No more output attributes, append the remainder
-            result.append(content[i:])
-            break
-
-        # Find the closing quote of the output value
-        end = content.find('"', start + len('output="'))
-        if end == -1:
-            # Malformed attribute, append the rest and exit
-            result.append(content[i:])
-            break
-
-        # Append everything up to and including 'output="'
-        result.append(content[i : start + len('output="')])
-
-        # Extract the attribute value
-        value = content[start + len('output="') : end]
-
-        # Replace problematic characters
-        value = value.replace("&lt;", "&#x003C;")
-        value = value.replace("&gt;", "&#x003E;")
-        value = value.replace("&amp;", "&#x0026;")
-
-        # Append the fixed value and the closing quote
-        result.append(value)
-        result.append('"')
-
-        # Move the index past this attribute
-        i = end + 1
-
-    return "".join(result)
+    """Fix invalid XML symbols for <, > and &."""
+    print(f"{file_indentation}\t🔹 Fixing invalid symbols for <, > and &…")
+    content = content.replace("&lt;", "&#x003C;")
+    content = content.replace("&gt;", "&#x003E;")
+    content = content.replace("&amp;", "&#x0026;")
+    return content
 
 
 def swap_keys_10_and_50(content: str) -> str:
