@@ -1,16 +1,11 @@
 import re
 
-from common import (
-    apply_key_substitutions,
-    extract_keymap,
-)
-
 # For the moment, keylayout files are created with KbdEdit 24.7.0
 # Some issues corrected here won’t be needed to be corrected anymore if KbdEdit is upgraded
 # See http://www.kbdedit.com/release_notes.html
 
 
-def keylayout_corrector(content):
+def correct_keylayout(content):
     content = fix_invalid_symbols(content)
     content = swap_keys_10_and_50(content)
 
@@ -61,6 +56,23 @@ def build_custom_keymap(index, base_body):
     }
     new_body = apply_key_substitutions(base_body, substitutions)
     return f'<keyMap index="{index}">{new_body}\n\t\t</keyMap>'
+
+
+def extract_keymap(content, index):
+    match = re.search(
+        rf'(<keyMap index="{index}">)(.*?)(</keyMap>)', content, flags=re.DOTALL
+    )
+    if not match:
+        raise ValueError(f'<keyMap index="{index}"> block not found.')
+    return match.group(1), match.group(2), match.group(3)
+
+
+def apply_key_substitutions(content, substitutions):
+    for pattern, replacement in substitutions.items():
+        content = re.sub(
+            rf"\s*<key {pattern}", f"\n\t\t\t{replacement}", content
+        )
+    return content
 
 
 def replace_keymap_index(content, from_index, to_index):

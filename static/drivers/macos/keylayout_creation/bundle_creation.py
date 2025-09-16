@@ -4,6 +4,8 @@ import shutil
 import zipfile
 from pathlib import Path
 
+bundle_identifier = "keyboardlayout.ergopti"
+
 
 def create_bundle(
     version: str,
@@ -69,7 +71,7 @@ def create_bundle(
             <key>TICapsLockLanguageSwitchCapable</key>
             <true/>{icon_tag}
             <key>TISInputSourceID</key>
-            <string>org.sil.ukelele.keyboardlayout.ergopti.{keylayout.stem.lower()}</string>
+            <string>{bundle_identifier}.{keylayout.stem.lower()}</string>
             <key>TISIntendedLanguage</key>
             <string>fr</string>
         </dict>""")
@@ -138,7 +140,7 @@ def copy_keylayout_and_logo(
         <key>TICapsLockLanguageSwitchCapable</key>
         <true/>{icon_tag}
         <key>TISInputSourceID</key>
-        <string>org.sil.ukelele.keyboardlayout.ergopti.{src.stem.lower()}</string>
+        <string>{bundle_identifier}.{src.stem.lower()}</string>
         <key>TISIntendedLanguage</key>
         <string>fr</string>
     </dict>"""
@@ -152,7 +154,7 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>org.sil.ukelele.keyboardlayout.ergopti</string>
+    <string>{bundle_identifier}</string>
     <key>CFBundleName</key>
     <string>Ergopti</string>
     <key>CFBundleVersion</key>

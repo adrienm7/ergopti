@@ -32,7 +32,7 @@ def create_keylayout_plus(content: str):
 
         # Add all feature actions
         for action_id, output in data["map"]:
-            print(f"  - action '{action_id}' → '{output}'")
+            # print(f"  - action '{action_id}' → '{output}'")
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
             # This preserves key codes/modifiers and avoids having <key ... output="..."> which would break action linking
