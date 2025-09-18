@@ -1,3 +1,5 @@
+from pprint import pprint
+
 mappings = {
     "e_circumflex_deadkey": {
         "trigger": "ê",
@@ -372,3 +374,21 @@ def escape_xml_characters(value: str) -> str:
 # Apply case-sensitive mappings and escape XML characters
 mappings = add_case_sensitive_mappings(mappings)
 mappings = escape_symbols_in_mappings(mappings)
+
+
+def check_duplicate_triggers(mappings: dict):
+    """Check for duplicate trigger characters in the mappings."""
+    triggers = {}
+    for key, data in mappings.items():
+        trigger = data["trigger"]
+        if trigger in triggers:
+            print(
+                f"Duplicate trigger '{trigger}' found in '{key}' and '{triggers[trigger]}'"
+            )
+        else:
+            triggers[trigger] = key
+
+
+check_duplicate_triggers(mappings)
+if __name__ == "__main__":
+    pprint(mappings, indent=2, width=120)
