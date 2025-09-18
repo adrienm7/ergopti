@@ -1,1 +1,1 @@
-The screenshots were enhanced by https://imgupscaler.ai/
+The screenshots were enhanced by https://imgupscaler.ai/ and then https://www.upscale.media/
