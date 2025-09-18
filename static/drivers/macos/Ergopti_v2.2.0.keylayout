@@ -964,6 +964,14 @@
 			<when state="s4" output="ς"/>
 			<when state="s7" output="ℜ"/>
 		</action>
+		<action id="&#x003C;">
+			<when state="none" output="&#x003C;"/>
+			<when state="s7" output="⟪"/>
+		</action>
+		<action id="&#x003E;">
+			<when state="none" output="&#x003E;"/>
+			<when state="s7" output="⟫"/>
+		</action>
 		<action id="(">
 			<when state="none" output="("/>
 			<when state="s5" output="⁽"/>
@@ -1080,18 +1088,10 @@
 			<when state="none" output=";"/>
 			<when state="s1" output="↪"/>
 		</action>
-		<action id="&#x003C;">
-			<when state="none" output="&#x003C;"/>
-			<when state="s7" output="⟪"/>
-		</action>
 		<action id="=">
 			<when state="none" output="="/>
 			<when state="s5" output="⁼"/>
 			<when state="s6" output="₌"/>
-		</action>
-		<action id="&#x003E;">
-			<when state="none" output="&#x003E;"/>
-			<when state="s7" output="⟫"/>
 		</action>
 		<action id="A">
 			<when state="none" output="A"/>
