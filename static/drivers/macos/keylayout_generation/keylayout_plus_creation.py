@@ -38,7 +38,7 @@ def create_keylayout_plus(content: str):
         trigger_key = data["trigger"]
         trigger_key = escape_xml_characters(trigger_key)
         print(
-            f"\t\tAdding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
+            f"{LOGS_INDENTATION}Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
         )
 
         if len(data["map"]) == 0:
@@ -54,7 +54,9 @@ def create_keylayout_plus(content: str):
         # Add all feature actions
         for action_id, output in data["map"]:
             action_id = escape_xml_characters(action_id)
-            print(f"\t\t\tAdding action '{action_id}' ➜ '{output}'")
+            print(
+                f"{LOGS_INDENTATION}\tAdding action '{action_id}' ➜ '{output}'"
+            )
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
             # This preserves key codes/modifiers and avoids having <key ... output="..."> which would break action linking
@@ -126,12 +128,12 @@ def ensure_key_action(
     # Create <action id="xml_output"> with all states if missing
     if not re.search(rf'<action\s+id="{re.escape(xml_output)}">', content):
         m = re.search(r"(?m)^(?P<indent>\s*)</actions>", content)
-        indent = m.group("indent") if m else "\t\t"
+        indent = m.group("indent") if m else "\t"
         # Add state="none" plus s1..s{max_state}
         states = "\n".join(
-            [f'{indent}\t\t<when state="none" output="{xml_output}"/>']
+            [f'{indent}\t<when state="none" output="{xml_output}"/>']
             + [
-                f'{indent}\t\t<when state="s{i}" output="{xml_output}"/>'
+                f'{indent}\t<when state="s{i}" output="{xml_output}"/>'
                 for i in range(1, max_state + 1)
             ]
         )
@@ -149,7 +151,7 @@ def ensure_key_action(
         ):
             content = re.sub(
                 rf'(<action\s+id="{re.escape(xml_output)}">.*?)(</action>)',
-                rf'\1\t\t<when state="none" output="{xml_output}"/>\n\2',
+                rf'\1\t<when state="none" output="{xml_output}"/>\n\2',
                 content,
                 flags=re.DOTALL,
             )
@@ -161,7 +163,7 @@ def ensure_key_action(
             ):
                 content = re.sub(
                     rf'(<action\s+id="{re.escape(xml_output)}">.*?)(</action>)',
-                    rf'\1\t\t<when state="s{i}" output="{xml_output}"/>\n\2',
+                    rf'\1\t<when state="s{i}" output="{xml_output}"/>\n\2',
                     content,
                     flags=re.DOTALL,
                 )
@@ -317,7 +319,7 @@ def ensure_action_block(doc: str, action_id: str, output_value: str) -> str:
 
         block = (
             f'{indent}<action id="{action_id}">\n'
-            f'{indent}\t\t<when state="none" output="{output_value}"/>\n'
+            f'{indent}\t<when state="none" output="{output_value}"/>\n'
             f"{indent}\t</action>\n{indent}"
         )
 
@@ -360,7 +362,7 @@ def find_next_available_layer(content: str) -> int:
 
     max_layer = max(state_indices + next_indices, default=0)
     next_layer = max_layer + 1
-    print(f"\t\tNext available layer: s{next_layer}")
+    print(f"{LOGS_INDENTATION}Next available layer: s{next_layer}")
     return next_layer
 
 
@@ -407,7 +409,7 @@ def add_action_state(
             )
 
         new_line = f'\t<when state="s{state_number}" output="{output}"/>'
-        return f"{header}{body}{new_line}\n\t\t{footer}"
+        return f"{header}{body}{new_line}\n\t{footer}"
 
     content = re.sub(pattern, repl, content, flags=re.DOTALL)
     return content

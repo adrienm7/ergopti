@@ -28,10 +28,11 @@ def correct_keylayout(content: str) -> str:
     content = add_keymap(content, 9, keymap_4_content)
 
     print(f"{LOGS_INDENTATION}🎨 Cosmetic ordering and sorting…")
+    content = normalize_attribute_entities(content)
     content = reorder_modifiers_and_attributes(content)
     content = sort_keymaps(content)
     content = sort_keys(content)
-    content = normalize_attribute_entities(content)
+    content = sort_actions(content)
 
     print("✅ Keylayout corrections complete.")
     return content
@@ -57,6 +58,7 @@ def swap_keys_10_and_50(content: str) -> str:
 
 def extract_keymap_body(content: str, index: int) -> str:
     """Extract only the inner body of a keyMap by index."""
+    print(f"{LOGS_INDENTATION}\t🔹 Extracting body of keymap {index}…")
     match = re.search(
         rf'<keyMap index="{index}">(.*?)</keyMap>',
         content,
@@ -90,8 +92,8 @@ def modify_accented_letters_shortcuts(body: str) -> str:
 
 
 def convert_actions_to_outputs(body: str) -> str:
-    """Convert all action="..." attributes to output="..." while keeping their values."""
-    print(f"{LOGS_INDENTATION}\t🔹 Converting action attributes to output…")
+    """Convert all action="..." attributes to output="..."."""
+    print(f"{LOGS_INDENTATION}\t🔹 Converting all action attributes to output…")
     return re.sub(r'action="([^"]+)"', r'output="\1"', body)
 
 
@@ -152,9 +154,65 @@ def add_keymap(content: str, index: int, keymap_body: str) -> str:
     )
 
 
+def normalize_attribute_entities(content: str) -> str:
+    """
+    Normalize XML-breaking characters inside attribute values only.
+    Converts <, >, &, ", ' (and named entities) into their hex escapes.
+    Works for both single-quoted and double-quoted attributes, and multi-symbol values.
+    """
+    print(f"{LOGS_INDENTATION}\t🔹 Normalizing attribute entities…")
+
+    entity_normalization_map = {
+        "&#x003C;": ["<", "&lt;"],
+        "&#x003E;": [">", "&gt;"],
+        "&#x0026;": ["&", "&amp;"],
+        "&#x0022;": ['"', "&quot;"],
+        "&#x0027;": ["'", "&apos;"],
+    }
+
+    alias_to_hex_entity = {
+        alias: hex_entity
+        for hex_entity, aliases in entity_normalization_map.items()
+        for alias in aliases
+    }
+
+    def normalize_value(value: str) -> str:
+        normalized_chars = []
+        i = 0
+        while i < len(value):
+            if value[i] == "&":
+                semicolon_index = value.find(";", i)
+                if semicolon_index != -1:
+                    entity = value[i : semicolon_index + 1]
+                    if entity.startswith("&#x"):  # Already hex escape → keep
+                        normalized_chars.append(entity)
+                        i = semicolon_index + 1
+                        continue
+                    if entity in alias_to_hex_entity:  # Known named entity
+                        normalized_chars.append(alias_to_hex_entity[entity])
+                        i = semicolon_index + 1
+                        continue
+            # Raw character
+            char = value[i]
+            normalized_chars.append(alias_to_hex_entity.get(char, char))
+            i += 1
+        return "".join(normalized_chars)
+
+    def replace_attribute(match):
+        attr_name = match.group(1)
+        quote = match.group(2)  # Either " or ', but we force it to become "
+        value = match.group(3)
+        return f'{attr_name}="{normalize_value(value)}"'
+
+    # Match attributes like output="...", output='...', action="..."
+    return re.sub(r'(\w+)\s*=\s*(["\'])(.*?)\2', replace_attribute, content)
+
+
 def reorder_modifiers_and_attributes(content: str) -> str:
     """Standardize encoding, maxout, and key/modifier orders for cosmetic consistency."""
-    print(f"{LOGS_INDENTATION}\t🔹 Reordering modifiers and attributes…")
+    print(
+        f"{LOGS_INDENTATION}\t🔹 Reordering modifiers and attributes inside modifierMap…"
+    )
 
     # Standardize encoding
     content = content.replace('encoding="utf-8"', 'encoding="UTF-8"')
@@ -216,7 +274,7 @@ def sort_keymaps(content: str) -> str:
 
 def sort_keys(content: str) -> str:
     """Sort all <key> elements in each <keyMap> block by their code attribute."""
-    print(f"{LOGS_INDENTATION}\t🔹 Sorting keys by code…")
+    print(f"{LOGS_INDENTATION}\t🔹 Sorting keys by code inside each keyMap…")
 
     def sort_block(match):
         header, body, footer = match.groups()
@@ -237,52 +295,44 @@ def sort_keys(content: str) -> str:
     )
 
 
-def normalize_attribute_entities(content: str) -> str:
-    """
-    Normalize XML-breaking characters inside attribute values only.
-    Converts <, >, &, ", ' (and named entities) into their canonical hex escapes.
-    Works for both single-quoted and double-quoted attributes, and multi-symbol values.
-    """
+def sort_actions(content: str) -> str:
+    """Sort all <action> blocks by their id attribute inside the <actions> block."""
+    print(
+        f"{LOGS_INDENTATION}\t🔹 Sorting actions by id inside the <actions> block…"
+    )
 
-    canonical_map = {
-        "&#x003C;": ["<", "&lt;"],
-        "&#x003E;": [">", "&gt;"],
-        "&#x0026;": ["&", "&amp;"],
-        "&#x0022;": ['"', "&quot;"],
-        "&#x0027;": ["'", "&apos;"],
-    }
+    # Extract the <actions> block
+    match = re.search(
+        r"(<actions.*?>)(.*?)(</actions>)", content, flags=re.DOTALL
+    )
+    if not match:
+        print(
+            f"{LOGS_INDENTATION}\t\t⚠️ No <actions> block found, skipping sorting."
+        )
+        return content
 
-    replacements = {
-        alt: canon for canon, alts in canonical_map.items() for alt in alts
-    }
+    header, body, footer = match.groups()
 
-    def normalize_value(value: str) -> str:
-        result = []
-        i = 0
-        while i < len(value):
-            if value[i] == "&":
-                semicolon = value.find(";", i)
-                if semicolon != -1:
-                    entity = value[i : semicolon + 1]
-                    if entity.startswith("&#x"):  # already hex escape → keep
-                        result.append(entity)
-                        i = semicolon + 1
-                        continue
-                    if entity in replacements:  # known named entity
-                        result.append(replacements[entity])
-                        i = semicolon + 1
-                        continue
-            # raw char
-            ch = value[i]
-            result.append(replacements.get(ch, ch))
-            i += 1
-        return "".join(result)
+    # Extract full <action ...>...</action> blocks (including nested <when>)
+    actions = re.findall(
+        r"(\s*<action\b.*?>.*?</action>)", body, flags=re.DOTALL
+    )
 
-    def replacer(match):
-        attr_name = match.group(1)
-        quote = match.group(2)  # Either " or ', but we force it to become "
-        value = match.group(3)
-        return f'{attr_name}="{normalize_value(value)}"'
+    # Sort by id attribute
+    def get_id(action: str) -> str:
+        m = re.search(r'id="([^"]+)"', action)
+        return m.group(1) if m else ""
 
-    # Match attributes like output="...", output='...', action="..."
-    return re.sub(r'(\w+)\s*=\s*(["\'])(.*?)\2', replacer, content)
+    actions_sorted = sorted(actions, key=get_id)
+
+    # Rebuild the <actions> block with sorted actions
+    new_body = "".join(actions_sorted)
+    sorted_actions_block = f"{header}{new_body}\n\t{footer}"
+
+    # Replace in content
+    return re.sub(
+        r"(<actions.*?>.*?</actions>)",
+        sorted_actions_block,
+        content,
+        flags=re.DOTALL,
+    )
