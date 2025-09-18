@@ -73,14 +73,7 @@ export class Keyboard {
 						(el) => el['key'] === keyIdentifier['key']
 					);
 
-					if (keyIdentifier['key'] === 'Enter') {
-						// For Enter, it is mandatory to create a sub div, as this key is created from scratch with CSS by using pseudo-elements on the key
-						key.innerHTML = '<div></div>';
-						this.fillKey(key.querySelector('div'), keyContent, row);
-					} else {
-						this.fillKey(key, keyContent, row);
-					}
-
+					this.fillKey(key, keyContent, row);
 					this.setKeyProperties(key, keyIdentifier, keyContent, column);
 					this.postProcessingKey(key);
 
@@ -118,7 +111,7 @@ export class Keyboard {
 		newKey.dataset['key'] = '';
 
 		// Key content and style cleaning
-		newKey.innerHTML = '';
+		newKey.replaceChildren(document.createElement('div'));
 		newKey.className = '';
 		newKey.style = '';
 
@@ -126,6 +119,8 @@ export class Keyboard {
 	}
 
 	fillKey(key, keyContent, row) {
+		const keyDiv = key.querySelector('div');
+		// const keyDiv = key;
 		if (!get(stores_infos[this.id])) {
 			return;
 		}
@@ -144,25 +139,25 @@ export class Keyboard {
 		if (get(stores_infos[this.id])['layer'] === 'Visuel') {
 			if (keyContent['type'] === 'ponctuation') {
 				// Every "double" keys of ponctuation
-				key.innerHTML = `<output-altgr>${keyContent['AltGr']}</output-altgr><br/><output-primary>${keyContent['Primary']}</output-primary>`;
+				keyDiv.innerHTML = `<output-altgr>${keyContent['AltGr']}</output-altgr><br/><output-primary>${keyContent['Primary']}</output-primary>`;
 			} else {
 				// All keys that aren’t "double"
 				if (plus && keyContent['Primary' + '+'] !== undefined && row < 6) {
 					// If the + layer exists AND the key isn’t on the thumb cluster
-					key.innerHTML = keyContent['Primary' + '+'];
+					keyDiv.innerHTML = keyContent['Primary' + '+'];
 					key.dataset['plus'] = 'yes';
 				} else {
-					key.innerHTML = keyContent['Primary'];
+					keyDiv.innerHTML = keyContent['Primary'];
 				}
 			}
 		} else {
 			// All layers other than "Visuel"
 			if (plus && keyContent[get(stores_infos[this.id])['layer'] + '+'] !== undefined && row < 6) {
 				// If the + layer exists AND the key isn’t on the thumb cluster
-				key.innerHTML = keyContent[get(stores_infos[this.id])['layer'] + '+'];
+				keyDiv.innerHTML = keyContent[get(stores_infos[this.id])['layer'] + '+'];
 				key.dataset['plus'] = 'yes';
 			} else {
-				key.innerHTML = keyContent[get(stores_infos[this.id])['layer']];
+				keyDiv.innerHTML = keyContent[get(stores_infos[this.id])['layer']];
 			}
 		}
 	}

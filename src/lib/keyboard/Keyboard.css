@@ -487,6 +487,13 @@ keyboard-key[data-style='morte'] {
 	font-family: sans-serif; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 }
 
+keyboard-key[data-key='j'] div {
+	/* J key seems lower than the others otherwise */
+	position: relative;
+	right: -0.05em;
+	top: -0.125em;
+}
+
 /* Special keys with more than one character on them */
 keyboard-key[data-key='Escape'],
 keyboard-key[data-key='LCtrl'],
