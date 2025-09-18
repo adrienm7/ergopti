@@ -460,7 +460,7 @@
 			<key code="41" output="r"/>
 			<key code="42" output="^"/>
 			<key code="43" output="l"/>
-			<key code="44" output='&#x0027;'/>
+			<key code="44" output="&#x0027;"/>
 			<key code="45" output="m"/>
 			<key code="46" output="d"/>
 			<key code="47" output="p"/>
@@ -523,7 +523,7 @@
 			<key code="5" action=":"/>
 			<key code="6" action="/"/>
 			<key code="7" action="\"/>
-			<key code="8" action='&#x0022;'/>
+			<key code="8" action="&#x0022;"/>
 			<key code="9" action=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -766,7 +766,7 @@
 			<key code="5" action=":"/>
 			<key code="6" action="/"/>
 			<key code="7" output="\"/>
-			<key code="8" action='&#x0022;'/>
+			<key code="8" output="&#x0022;"/>
 			<key code="9" action=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -883,7 +883,7 @@
 			<key code="41" output="r"/>
 			<key code="42" output="^"/>
 			<key code="43" output="l"/>
-			<key code="44" output='&#x0027;'/>
+			<key code="44" output="&#x0027;"/>
 			<key code="45" output="m"/>
 			<key code="46" output="d"/>
 			<key code="47" output="p"/>

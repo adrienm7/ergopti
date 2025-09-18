@@ -31,6 +31,7 @@ def correct_keylayout(content: str) -> str:
     content = reorder_modifiers_and_attributes(content)
     content = sort_keymaps(content)
     content = sort_keys(content)
+    content = normalize_attribute_entities(content)
 
     print("✅ Keylayout corrections complete.")
     return content
@@ -176,29 +177,6 @@ def reorder_modifiers_and_attributes(content: str) -> str:
     return content
 
 
-def sort_keys(content: str) -> str:
-    """Sort all <key> elements in each <keyMap> block by their code attribute."""
-    print(f"{LOGS_INDENTATION}\t🔹 Sorting keys by code…")
-
-    def sort_block(match):
-        header, body, footer = match.groups()
-        # Extract all <key .../> elements
-        keys = re.findall(r"(\s*<key[^>]+/>)", body)
-        # Sort keys numerically by their code attribute
-        keys_sorted = sorted(
-            keys, key=lambda k: int(re.search(r'code="(\d+)"', k).group(1))
-        )
-        # Reconstruct the block
-        return f"{header}{''.join(keys_sorted)}\n\t\t{footer}"
-
-    return re.sub(
-        r'(<keyMap index="\d+">)(.*?)(</keyMap>)',
-        sort_block,
-        content,
-        flags=re.DOTALL,
-    )
-
-
 def sort_keymaps(content: str) -> str:
     """Sort all <keyMap> blocks numerically by their index inside <keyMapSet>."""
     print(f"{LOGS_INDENTATION}\t🔹 Sorting keyMaps inside keyMapSet…")
@@ -234,3 +212,77 @@ def sort_keymaps(content: str) -> str:
         flags=re.DOTALL,
     )
     return content
+
+
+def sort_keys(content: str) -> str:
+    """Sort all <key> elements in each <keyMap> block by their code attribute."""
+    print(f"{LOGS_INDENTATION}\t🔹 Sorting keys by code…")
+
+    def sort_block(match):
+        header, body, footer = match.groups()
+        # Extract all <key .../> elements
+        keys = re.findall(r"(\s*<key[^>]+/>)", body)
+        # Sort keys numerically by their code attribute
+        keys_sorted = sorted(
+            keys, key=lambda k: int(re.search(r'code="(\d+)"', k).group(1))
+        )
+        # Reconstruct the block
+        return f"{header}{''.join(keys_sorted)}\n\t\t{footer}"
+
+    return re.sub(
+        r'(<keyMap index="\d+">)(.*?)(</keyMap>)',
+        sort_block,
+        content,
+        flags=re.DOTALL,
+    )
+
+
+def normalize_attribute_entities(content: str) -> str:
+    """
+    Normalize XML-breaking characters inside attribute values only.
+    Converts <, >, &, ", ' (and named entities) into their canonical hex escapes.
+    Works for both single-quoted and double-quoted attributes, and multi-symbol values.
+    """
+
+    canonical_map = {
+        "&#x003C;": ["<", "&lt;"],
+        "&#x003E;": [">", "&gt;"],
+        "&#x0026;": ["&", "&amp;"],
+        "&#x0022;": ['"', "&quot;"],
+        "&#x0027;": ["'", "&apos;"],
+    }
+
+    replacements = {
+        alt: canon for canon, alts in canonical_map.items() for alt in alts
+    }
+
+    def normalize_value(value: str) -> str:
+        result = []
+        i = 0
+        while i < len(value):
+            if value[i] == "&":
+                semicolon = value.find(";", i)
+                if semicolon != -1:
+                    entity = value[i : semicolon + 1]
+                    if entity.startswith("&#x"):  # already hex escape → keep
+                        result.append(entity)
+                        i = semicolon + 1
+                        continue
+                    if entity in replacements:  # known named entity
+                        result.append(replacements[entity])
+                        i = semicolon + 1
+                        continue
+            # raw char
+            ch = value[i]
+            result.append(replacements.get(ch, ch))
+            i += 1
+        return "".join(result)
+
+    def replacer(match):
+        attr_name = match.group(1)
+        quote = match.group(2)  # Either " or ', but we force it to become "
+        value = match.group(3)
+        return f'{attr_name}="{normalize_value(value)}"'
+
+    # Match attributes like output="...", output='...', action="..."
+    return re.sub(r'(\w+)\s*=\s*(["\'])(.*?)\2', replacer, content)
