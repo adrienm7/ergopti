@@ -62,13 +62,12 @@ def create_bundle(
             print(f"\tAdded logo {logo_path_to_use.name} as {dest_logo.name}")
 
         plist_key = f"KLInfo_{keylayout.stem}"
-        info_plist_entries.append(f"""
-        <key>{plist_key}</key>
+        info_plist_entries.append(f"""<key>{plist_key}</key>
         <dict>
             <key>TICapsLockLanguageSwitchCapable</key>
             <true/>{icon_tag}
             <key>TISInputSourceID</key>
-            <string>{bundle_identifier}.{keylayout.stem.lower()}</string>
+            <string>{bundle_identifier}.{"plus" if "plus" in keylayout.stem.lower() else "standard"}</string>
             <key>TISIntendedLanguage</key>
             <string>fr</string>
         </dict>""")
@@ -156,7 +155,7 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
     <string>Ergopti</string>
     <key>CFBundleVersion</key>
     <string>{version.lstrip("v")}</string>
-    {"".join(entries)}
+    {"\n\t".join(entries)}
 </dict>
 </plist>
 """

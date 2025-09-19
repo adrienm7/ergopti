@@ -13,6 +13,12 @@ def correct_keylayout(content: str) -> str:
     """
     print(f"{LOGS_INDENTATION}🔧 Starting keylayout corrections…")
 
+    content = re.sub(
+        r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
+        r"\1Ergopti Standard\3",
+        content,
+    )
+
     content = fix_invalid_symbols(content)
     content = swap_keys_10_and_50(content)
 

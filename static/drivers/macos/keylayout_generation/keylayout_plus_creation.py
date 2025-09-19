@@ -13,6 +13,12 @@ def create_keylayout_plus(content: str):
     """
     print(f"{LOGS_INDENTATION}🔧 Starting keylayout plus creation…")
 
+    content = re.sub(
+        r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
+        r"\1Ergopti Plus\3",
+        content,
+    )
+
     content = append_plus_to_keyboard_name(content)
     content = ergopti_plus_altgr_symbols(content)
     content = ergopti_plus_shiftaltgr_symbols(content)
@@ -23,7 +29,7 @@ def create_keylayout_plus(content: str):
         trigger_key = data["trigger"]
         trigger_key = escape_xml_characters(trigger_key)
         print(
-            f"{LOGS_INDENTATION}Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}"
+            f"{LOGS_INDENTATION}🔹 Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}…"
         )
 
         if len(data["map"]) == 0:
@@ -40,7 +46,7 @@ def create_keylayout_plus(content: str):
         for action_id, output in data["map"]:
             action_id = escape_xml_characters(action_id)
             print(
-                f"{LOGS_INDENTATION}\tAdding action '{action_id}' ➜ '{output}'"
+                f"{LOGS_INDENTATION}\t— Adding action '{action_id}' ➜ '{output}'…"
             )
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
