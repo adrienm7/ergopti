@@ -1791,11 +1791,11 @@
 			<when state="s3" output="¨"/>
 		</action>
 		<action id="!">
-			<when state="none" next="s27"/>
+				<when state="none" next="s27"/>
 			<when state="s21" output=" := "/>
 		</action>
 		<action id="#">
-			<when state="none" next="s21"/>
+				<when state="none" next="s21"/>
 			<when state="s24" output="(&#x0022;"/>
 			<when state="s25" output="[&#x0022;"/>
 			<when state="s26" output="&#x0022;]"/>
@@ -1807,12 +1807,12 @@
 			<when state="s31" output=" &#x003C;= "/>
 		</action>
 		<action id="%">
-		<when state="none" output="%"/>
+			<when state="none" output="%"/>
 			<when state="s22" output=" &#x003C;= "/>
 			<when state="s23" output=" &#x003E;= "/>
 		</action>
 		<action id="&#x0022;">
-			<when state="none" next="s29"/>
+				<when state="none" next="s29"/>
 			<when state="s28" output="/*"/>
 		</action>
 		<action id="&#x0026;">
@@ -1968,11 +1968,11 @@
 			<when state="s30" output=" =&#x003E; "/>
 		</action>
 		<action id="?">
-			<when state="none" next="s33"/>
+				<when state="none" next="s33"/>
 			<when state="s32" output=" -&#x003E; "/>
 		</action>
 		<action id="@">
-		<when state="none" output="@"/>
+			<when state="none" output="@"/>
 			<when state="s22" output="&#x003C;/"/>
 		</action>
 		<action id="[">
@@ -1983,7 +1983,7 @@
 			<when state="s21" output="&#x0022;]"/>
 		</action>
 		<action id="\">
-			<when state="none" next="s28"/>
+				<when state="none" next="s28"/>
 			<when state="s29" output="*/"/>
 		</action>
 		<action id="]">
@@ -2009,7 +2009,7 @@
 			<when state="none" next="s2"/>
 		</action>
 		<action id="’">
-			<when state="none" next="s46"/>
+				<when state="none" next="s46"/>
 			<when state="s8" output="j’"/>
 			<when state="s9" output="ance"/>
 			<when state="s17" output="qu’"/>
@@ -2018,7 +2018,7 @@
 			<when state="s43" output="Qu’"/>
 		</action>
 		<action id="★">
-		<when state="none" output="★"/>
+			<when state="none" output="★"/>
 			<when state="s9" output="bu"/>
 			<when state="s14" output="œu"/>
 			<when state="s35" output="Bu"/>
