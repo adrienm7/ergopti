@@ -1,9 +1,9 @@
 import re
 from pathlib import Path
 
-from bundle_creation import create_bundle
 from keylayout_correction import correct_keylayout
 from keylayout_plus_creation import create_keylayout_plus
+from utilities.bundle_creation import create_bundle
 
 
 def main(
@@ -171,8 +171,8 @@ def build_bundle(
     # Determine logo files
     script_dir = Path(__file__).resolve().parent
     default_logos = [
-        script_dir / "logo_ergopti.icns",
-        script_dir / "logo_ergopti_plus.icns",
+        script_dir / "files" / "logo_ergopti.icns",
+        script_dir / "files" / "logo_ergopti_plus.icns",
     ]
     logo_paths = [
         Path(p) for p in (logo_paths if logo_paths else default_logos)
