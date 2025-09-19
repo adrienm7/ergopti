@@ -11,24 +11,7 @@ def create_keylayout_plus(content: str):
     """
     Create a '_plus' variant of the corrected keylayout, with extra actions.
     """
-
-    content = (
-        content.replace('output="\'"', "output='&#x0027;'")
-        .replace('action="\'"', 'action="&#x0027;"')
-        .replace('id="\'"', 'id="&#x0027;"')
-        .replace('output="<"', 'output="&#x003C;"')
-        .replace('action="<"', 'action="&#x003C;"')
-        .replace('id="<"', 'id="&#x003C;"')
-        .replace('output=">"', 'output="&#x003E;"')
-        .replace('action=">"', 'action="&#x003E;"')
-        .replace('id=">"', 'id="&#x003E;"')
-    )
-
-    content = content.replace("&lt;", "&#x003C;")
-    content = content.replace("&gt;", "&#x003E;")
-    content = content.replace("&amp;", "&#x0026;")
-    content = content.replace("&quot;", "&#x0022;")
-    content = content.replace("&apos;", "&#x0027;")
+    print(f"{LOGS_INDENTATION}🔧 Starting keylayout plus creation…")
 
     content = append_plus_to_keyboard_name(content)
     content = ergopti_plus_altgr_symbols(content)
@@ -67,145 +50,11 @@ def create_keylayout_plus(content: str):
             # Now add the when state to the corresponding <action id="..."> (ensure_action_block is called inside)
             content = add_action_state(content, action_id, layer, output)
 
-    # Correct problem of the " character
-    content = (
-        content.replace('id="""', "id='\"'")
-        .replace('output="""', "output='\"'")
-        .replace('<key code="8" output=\'"\'/>', '<key code="8" action=\'"\'/>')
-        .replace('"/>"/>', '"/>')
-        .replace('output="<"', 'output="&#x003C;"')
-        .replace("'\"'", "'&#x0022;'")
-    )
-
     content = sort_keylayout(content)
     validate_keylayout(content)
+
+    print("✅ Keylayout plus creation complete.")
     return content
-
-
-def ensure_key_action(
-    content: str,
-    key_code: int,
-    action_id: str,
-    xml_output: str,
-    max_state: int = 100,
-) -> str:
-    """
-    Ensure a key uses an action and has all states up to max_state.
-
-    Parameters:
-    - key_code: code attribute of the <key>
-    - action_id: id for the <action> element
-    - xml_output: output for each <when state="sX"/>
-    - max_state: number of states to create (default 100)
-    """
-    # Make the <key> use action="xml_output"
-    content = re.sub(
-        rf'(<key\s+code="{key_code}")([^>]*)/>',
-        rf'\1 action="{xml_output}"/>',
-        content,
-    )
-
-    max_state = find_next_available_layer(content) - 1
-
-    # Create <action id="xml_output"> with all states if missing
-    if not re.search(rf'<action\s+id="{re.escape(xml_output)}">', content):
-        m = re.search(r"(?m)^(?P<indent>\s*)</actions>", content)
-        indent = m.group("indent") if m else "\t"
-        # Add state="none" plus s1..s{max_state}
-        states = "\n".join(
-            [f'{indent}\t<when state="none" output="{xml_output}"/>']
-            + [
-                f'{indent}\t<when state="s{i}" output="{xml_output}"/>'
-                for i in range(1, max_state + 1)
-            ]
-        )
-        action_block = f'{indent}\t<action id="{xml_output}">\n{states}\n\t{indent}</action>\n'
-        if m:
-            content = content[: m.start()] + action_block + content[m.start() :]
-        else:
-            content += action_block
-    else:
-        # Add missing states to existing action, including state="none"
-        if not re.search(
-            rf'<action\s+id="{re.escape(xml_output)}">.*<when state="none"',
-            content,
-            re.DOTALL,
-        ):
-            content = re.sub(
-                rf'(<action\s+id="{re.escape(xml_output)}">.*?)(</action>)',
-                rf'\1\t<when state="none" output="{xml_output}"/>\n\2',
-                content,
-                flags=re.DOTALL,
-            )
-        for i in range(1, max_state + 1):
-            if not re.search(
-                rf'<action\s+id="{re.escape(xml_output)}">.*<when state="s{i}"',
-                content,
-                re.DOTALL,
-            ):
-                content = re.sub(
-                    rf'(<action\s+id="{re.escape(xml_output)}">.*?)(</action>)',
-                    rf'\1\t<when state="s{i}" output="{xml_output}"/>\n\2',
-                    content,
-                    flags=re.DOTALL,
-                )
-
-    return content
-
-
-def ensure_key_uses_action(content: str, action_id: str) -> str:
-    """
-    Ensure that in <keyMap index="1|2|3|5"> blocks,
-    any <key ... output="action_id" or action="action_id"> becomes
-    <key ... action="action_id"> (preserving other attributes).
-    Only modifies <key> tags that actually reference the action_id;
-    leaves other keyMaps untouched.
-    """
-
-    literal = re.escape(action_id)
-    hex_variants = []
-    if len(action_id) == 1:
-        codepoint = ord(action_id)
-        hex_variants = [f"&#x{codepoint:04X};", f"&#x{codepoint:04x};"]
-
-    def process_keymap(match):
-        # use explicit group access to avoid unpacking issues
-        header = match.group(1)
-        body = match.group(2)
-        footer = match.group(3)
-
-        def repl_key(tag_match):
-            tag = tag_match.group(0)
-            found = False
-            if re.search(rf'\b(?:output|action)="{literal}"', tag):
-                found = True
-            else:
-                for hv in hex_variants:
-                    if re.search(
-                        rf'\b(?:output|action)="{re.escape(hv)}"', tag
-                    ):
-                        found = True
-                        break
-
-            if not found:
-                return tag  # leave untouched
-
-            # remove only output="..." and action="..."
-            new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", tag)
-
-            # insert the unified action="..."
-            if new_tag.endswith("/>"):
-                new_tag = new_tag[:-2].rstrip() + f' action="{action_id}"/>'
-            else:
-                new_tag = new_tag[:-1].rstrip() + f' action="{action_id}">'
-            return new_tag
-
-        body = re.sub(r"<key\b[^>]*\/?>", repl_key, body)
-        return f"{header}{body}{footer}"
-
-    # NON-CAPTURING group for the index alternation to ensure exactly 3 capture groups
-    pattern = r'(<keyMap index="(?:1|2|3|5)">)(.*?)(</keyMap>)'
-    return re.sub(pattern, process_keymap, content, flags=re.DOTALL)
 
 
 def append_plus_to_keyboard_name(content: str) -> str:
@@ -300,15 +149,70 @@ def ensure_action_block(doc: str, action_id: str, output_value: str) -> str:
         indent = m.group("indent") if m else "\t"
 
         block = (
-            f'{indent}<action id="{action_id}">\n'
-            f'{indent}\t<when state="none" output="{output_value}"/>\n'
-            f"{indent}\t</action>\n{indent}"
+            f'\t<action id="{action_id}">\n\t\t'
+            f'\t<when state="none" output="{output_value}"/>\n\t\t'
+            f"</action>\n\t"
         )
 
         # Insert the block right before the first </actions>
         doc = re.sub(r"(</actions>)", block + r"\1", doc, count=1)
 
     return doc
+
+
+def ensure_key_uses_action(content: str, action_id: str) -> str:
+    """
+    Ensure that in <keyMap index="1|2|3|5"> blocks,
+    any <key ... output="action_id" or action="action_id"> becomes
+    <key ... action="action_id"> (preserving other attributes).
+    Only modifies <key> tags that actually reference the action_id;
+    leaves other keyMaps untouched.
+    """
+
+    literal = re.escape(action_id)
+    hex_variants = []
+    if len(action_id) == 1:
+        codepoint = ord(action_id)
+        hex_variants = [f"&#x{codepoint:04X};", f"&#x{codepoint:04x};"]
+
+    def process_keymap(match):
+        # use explicit group access to avoid unpacking issues
+        header = match.group(1)
+        body = match.group(2)
+        footer = match.group(3)
+
+        def repl_key(tag_match):
+            tag = tag_match.group(0)
+            found = False
+            if re.search(rf'\b(?:output|action)="{literal}"', tag):
+                found = True
+            else:
+                for hv in hex_variants:
+                    if re.search(
+                        rf'\b(?:output|action)="{re.escape(hv)}"', tag
+                    ):
+                        found = True
+                        break
+
+            if not found:
+                return tag  # leave untouched
+
+            # remove only output="..." and action="..."
+            new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", tag)
+
+            # insert the unified action="..."
+            if new_tag.endswith("/>"):
+                new_tag = new_tag[:-2].rstrip() + f' action="{action_id}"/>'
+            else:
+                new_tag = new_tag[:-1].rstrip() + f' action="{action_id}">'
+            return new_tag
+
+        body = re.sub(r"<key\b[^>]*\/?>", repl_key, body)
+        return f"{header}{body}{footer}"
+
+    # NON-CAPTURING group for the index alternation to ensure exactly 3 capture groups
+    pattern = r'(<keyMap index="(?:1|2|3|5)">)(.*?)(</keyMap>)'
+    return re.sub(pattern, process_keymap, content, flags=re.DOTALL)
 
 
 def ergopti_plus_shiftaltgr_symbols(content):
