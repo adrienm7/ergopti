@@ -32,7 +32,6 @@ def correct_keylayout(content: str) -> str:
 
     content = normalize_attribute_entities(content)
     content = sort_keylayout(content)
-
     validate_keylayout(content)
 
     print("✅ Keylayout corrections complete.")

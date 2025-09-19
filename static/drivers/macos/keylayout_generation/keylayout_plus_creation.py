@@ -1,6 +1,8 @@
 import re
 
 from keylayout_plus_mappings import escape_xml_characters, mappings
+from keylayout_sorting import sort_keylayout
+from keylayout_tests import validate_keylayout
 
 LOGS_INDENTATION = "\t"
 
@@ -75,28 +77,8 @@ def create_keylayout_plus(content: str):
         .replace("'\"'", "'&#x0022;'")
     )
 
-    # Enter
-    # content = ensure_key_action(content, 36, "Enter", "&#x000D;")
-
-    # # Tab
-    # content = ensure_key_action(content, 48, "Tab", "&#x0009;")
-
-    # # Escape
-    # content = ensure_key_action(content, 53, "Escape", "&#x001B;")
-
-    # # Space
-    # content = ensure_key_action(content, 49, "Space", "&#x0020;")
-
-    # problematic = [
-    #     (36, "Enter", "&#x000A;"),  # Return / Enter -> LF
-    #     (48, "Tab", "&#x0009;"),  # Tab
-    #     (53, "Escape", "&#x001B;"),  # Escape
-    #     (49, "Space", "&#x0020;"),  # Space
-    # ]
-
-    # for action_id, name, output in problematic:
-    #     content = ensure_key_uses_action(content, action_id)
-    #     content = add_action_state(content, action_id, layer, output)
+    content = sort_keylayout(content)
+    validate_keylayout(content)
     return content
 
 
@@ -366,29 +348,6 @@ def find_next_available_layer(content: str) -> int:
     return next_layer
 
 
-def create_uppercase_mapping(mapping, titlecase=False):
-    """
-    Given a mapping of lowercase keys to outputs, generate a mapping for uppercase keys.
-    Only letters are uppercased; other symbols are left unchanged.
-    """
-    uppercase_mapping = []
-    for key, output in mapping:
-        # Uppercase the key if it is a letter
-        key_upper = key.upper() if key.isalpha() else key
-
-        # Uppercase the output if it starts with a letter
-        if output and output[0].isalpha():
-            if titlecase:
-                output_upper = output[0].upper() + output[1:]
-            else:
-                output_upper = output.upper()
-        else:
-            output_upper = output
-
-        uppercase_mapping.append((key_upper, output_upper))
-    return uppercase_mapping
-
-
 def add_action_state(
     content: str, action_id: str, state_number: int, output: str
 ) -> str:
@@ -409,7 +368,7 @@ def add_action_state(
             )
 
         new_line = f'\t<when state="s{state_number}" output="{output}"/>'
-        return f"{header}{body}{new_line}\n\t{footer}"
+        return f"{header}{body}{new_line}\n\t\t{footer}"
 
     content = re.sub(pattern, repl, content, flags=re.DOTALL)
     return content
@@ -455,7 +414,7 @@ def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
         header, body, footer = match.groups()
         body = re.sub(
             r'<when state="none"[^>]*>',
-            f'<when state="none" next="s{layer_num}"/>',
+            f'\t<when state="none" next="s{layer_num}"/>',
             body,
         )
         return f"{header}{body}{footer}"

@@ -1,92 +1,51 @@
 from pprint import pprint
 
 mappings = {
-    "e_circumflex_deadkey": {
-        "trigger": "ê",
-        "map": [
-            ("à", "æ"),
-            ("a", "â"),
-            ("é", "aî"),
-            ("e", "oe"),
-            ("i", "î"),
-            ("j", "œu"),
-            ("★", "œu"),
-            ("o", "ô"),
-            ("u", "û"),
-        ],
-    },
     "comma_j_letters_sfbs": {
         "trigger": ",",
         "map": [
-            ("à", "j"),
             ("a", "ja"),
+            ("à", "j"),
+            ("e", "je"),
             ("é", "jé"),
             ("ê", "ju"),
-            ("e", "je"),
             ("i", "ji"),
             ("o", "jo"),
             ("u", "ju"),
             ("'", "j’"),
             ("’", "j’"),
             # Far letters
-            ("è", "z"),
-            ("y", "k"),
             ("c", "ç"),
-            ("x", "où"),
+            ("è", "z"),
             ("s", "qu"),
+            ("x", "où"),
+            ("y", "k"),
             # SFBs
+            ("d", "ds"),
             ("f", "fl"),
             ("g", "gl"),
             ("h", "ph"),
-            ("z", "bj"),
-            ("v", "dv"),
-            ("n", "nl"),
-            ("t", "pt"),
-            ("r", "rq"),
-            ("q", "qu’"),
-            ("m", "ms"),
-            ("d", "ds"),
             ("l", "cl"),
+            ("m", "ms"),
+            ("n", "nl"),
             ("p", "xp"),
-        ],
-    },
-    "e": {
-        "trigger": "e",
-        "map": [
-            ("é", "ez"),
-            ("ê", "eo"),
-        ],
-    },
-    "e_acute_sfbs": {
-        "trigger": "é",
-        "map": [
-            ("ê", "â"),
-        ],
-    },
-    "e_grave_y": {
-        "trigger": "è",
-        "map": [
-            ("y", "ié"),
-        ],
-    },
-    "y_e_grave": {
-        "trigger": "y",
-        "map": [
-            ("è", "éi"),
+            ("q", "qu’"),
+            ("r", "rq"),
+            ("t", "pt"),
+            ("v", "dv"),
+            ("z", "bj"),
         ],
     },
     "a_grave_suffixes": {
         "trigger": "à",
         "map": [
-            # SFB with "bu" or "ub"
+            # SFBs with "bu" or "ub"
             ("j", "bu"),
             ("★", "bu"),
             ("u", "ub"),
             # Common suffixes
             ("a", "aire"),
             ("c", "ction"),
-            ("cd", "could"),
-            ("shd", "should"),
             ("d", "would"),
             ("é", "ying"),
             ("ê", "able"),
@@ -110,6 +69,57 @@ mappings = {
             ("’", "ance"),
         ],
     },
+    "roll_ck": {
+        "trigger": "c",
+        "map": [
+            ("x", "ck"),
+        ],
+    },
+    "e": {
+        "trigger": "e",
+        "map": [
+            ("é", "ez"),
+            ("ê", "eo"),
+        ],
+    },
+    "e_acute_sfb": {
+        "trigger": "é",
+        "map": [
+            ("ê", "â"),
+        ],
+    },
+    "e_grave_y": {
+        "trigger": "è",
+        "map": [
+            ("y", "ié"),
+        ],
+    },
+    "e_circumflex_deadkey": {
+        "trigger": "ê",
+        "map": [
+            ("a", "â"),
+            ("à", "æ"),
+            ("e", "oe"),
+            ("é", "aî"),
+            ("i", "î"),
+            ("j", "œu"),
+            ("★", "œu"),  # Different than the AutoHotkey version
+            ("o", "ô"),
+            ("u", "û"),
+        ],
+    },
+    "roll_wh": {
+        "trigger": "h",
+        "map": [
+            ("c", "wh"),
+        ],
+    },
+    "roll_ct": {
+        "trigger": "p",
+        "map": [
+            ("'", "ct"),
+        ],
+    },
     "q_with_u": {
         "trigger": "q",
         "map": [
@@ -122,6 +132,18 @@ mappings = {
             ("o", "quo"),
             ("'", "qu’"),
             ("’", "qu’"),
+        ],
+    },
+    "roll_sk": {
+        "trigger": "s",
+        "map": [
+            ("x", "sk"),
+        ],
+    },
+    "y_e_grave": {
+        "trigger": "y",
+        "map": [
+            ("è", "éi"),
         ],
     },
     "typographic_apostrophe": {
@@ -140,30 +162,9 @@ mappings = {
             ("y", "’y"),
         ],
     },
-    "roll_ct": {
-        "trigger": "p",
-        "map": [
-            ("'", "ct"),
-        ],
-    },
-    "roll_ck": {
-        "trigger": "c",
-        "map": [
-            ("x", "ck"),
-        ],
-    },
-    "roll_sk": {
-        "trigger": "s",
-        "map": [
-            ("x", "sk"),
-        ],
-    },
-    "roll_wh": {
-        "trigger": "h",
-        "map": [
-            ("c", "wh"),
-        ],
-    },
+    # ===============================
+    # === Symbols and punctuation ===
+    # ===============================
     "rolls_hashtag": {
         "trigger": "#",
         "map": [
@@ -260,22 +261,45 @@ def add_case_sensitive_mappings(orig_mappings: dict) -> dict:
     - Trigger lowercase + key lowercase -> output as is
     Avoids duplicates if lower=upper (e.g., ★).
     """
-    new_mappings = orig_mappings.copy()
+    # First, ensure all original mappings have both lower/upper key variants
+    new_mappings = {}
+    for key, data in orig_mappings.items():
+        if not data.get("map"):
+            new_mappings[key] = data.copy()
+            continue
+        # Replace the map with all key variants (lower/upper)
+        new_mappings[key] = {
+            "trigger": data["trigger"],
+            "map": build_case_map(data["map"], is_trigger_upper=False),
+        }
+
+    used_triggers = set()
+    for data in new_mappings.values():
+        used_triggers.add(data["trigger"])
     for key, data in orig_mappings.items():
         if not data.get("map"):
             continue
-        process_mapping(new_mappings, key, data)
+        process_mapping(new_mappings, key, data, used_triggers)
     return new_mappings
 
 
-def process_mapping(new_mappings: dict, key: str, data: dict):
-    """Process a single mapping entry and add all case-sensitive variants."""
+def process_mapping(
+    new_mappings: dict, key: str, data: dict, used_triggers: set
+):
+    """Process a single mapping entry and add all case-sensitive variants, avoiding duplicate triggers."""
     trigger = data["trigger"]
     trigger_variants = get_trigger_variants(trigger)
     for trigger_val, is_trigger_upper in trigger_variants:
         triggers_to_add = expand_special_trigger(trigger_val, is_trigger_upper)
         for actual_trigger in triggers_to_add:
-            new_key_name = f"{key}_{actual_trigger}_map"
+            if actual_trigger in used_triggers:
+                continue  # Skip duplicate trigger
+            used_triggers.add(actual_trigger)
+            # Use _uppercase for uppercase triggers, else _map
+            if is_trigger_upper or (trigger_val != actual_trigger):
+                new_key_name = f"{key}_uppercase"
+            else:
+                new_key_name = f"{key}_map"
             new_map = build_case_map(data["map"], is_trigger_upper)
             new_mappings[new_key_name] = {
                 "trigger": actual_trigger,
@@ -290,7 +314,10 @@ def get_trigger_variants(trigger: str) -> list[tuple[str, bool]]:
 
 def expand_special_trigger(trigger: str, is_upper: bool) -> list[str]:
     """Return list of actual triggers for special uppercase triggers."""
-    special_upper_triggers = {",": [";", ":"]}
+    special_upper_triggers = {",": [";", ":"], "'": ["?", "’"]}
+    # Always return both ; and : for comma in uppercase context
+    if is_upper and trigger == ",":
+        return [";", ":"]
     if is_upper and trigger in special_upper_triggers:
         return special_upper_triggers[trigger]
     return [trigger]
@@ -304,15 +331,15 @@ def build_case_map(
     Applies output capitalisation rules.
     """
     new_map = []
-    seen_keys = set()
     for key_char, value in mapping:
-        for is_key_upper in [False, True]:
-            key_case = key_char.upper() if is_key_upper else key_char
-            if key_case in seen_keys:
-                continue
-            seen_keys.add(key_case)
-            out = get_output_for_case(is_trigger_upper, is_key_upper, value)
-            new_map.append((key_case, out))
+        # Always add both lowercase and uppercase variants
+        key_lower = key_char.lower()
+        key_upper = key_char.upper()
+        out_lower = get_output_for_case(is_trigger_upper, False, value)
+        out_upper = get_output_for_case(is_trigger_upper, True, value)
+        new_map.append((key_lower, out_lower))
+        if key_upper != key_lower:
+            new_map.append((key_upper, out_upper))
     return new_map
 
 

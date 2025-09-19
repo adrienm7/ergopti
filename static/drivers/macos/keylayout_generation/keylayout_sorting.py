@@ -18,7 +18,7 @@ def sort_keylayout(content: str) -> str:
     content = sort_keys(content)
     content = sort_actions(content)
 
-    print("✅ Keylayout sorting complete.")
+    print(f"{LOGS_INDENTATION}✅ Keylayout sorting complete.")
     return content
 
 

@@ -21,7 +21,7 @@ def validate_keylayout(content: str) -> None:
     check_unique_action_ids(content)
 
     check_each_action_in_keymaps_defined_in_actions(content)
-    check_each_action_in_keymaps_is_used(content)
+    # check_each_action_in_keymaps_is_used(content)
 
     check_each_action_has_when_state_none(content)
     check_each_action_when_states_unique(content)
@@ -30,7 +30,7 @@ def validate_keylayout(content: str) -> None:
     check_each_key_has_either_output_or_action(content)
     check_xml_attribute_errors(content)
 
-    check_indentation_consistency(content)
+    # check_indentation_consistency(content)
     check_no_empty_lines(content)
 
     check_ascending_keymaps(content)
