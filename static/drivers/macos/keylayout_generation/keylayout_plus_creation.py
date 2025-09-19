@@ -1,8 +1,9 @@
 import re
 
-from keylayout_plus_mappings import escape_xml_characters, mappings
-from keylayout_sorting import sort_keylayout
-from keylayout_tests import validate_keylayout
+from keylayout_plus_mappings import mappings
+from tests.run_all_tests import validate_keylayout
+from utilities.keylayout_sorting import sort_keylayout
+from utilities.mappings_functions import escape_xml_characters
 
 LOGS_INDENTATION = "\t"
 
@@ -13,11 +14,11 @@ def create_keylayout_plus(content: str):
     """
     print(f"{LOGS_INDENTATION}🔧 Starting keylayout plus creation…")
 
-    content = append_plus_to_keyboard_name(content)
+    content = append_plus_to_layout_name(content)
     content = ergopti_plus_altgr_symbols(content)
     content = ergopti_plus_shiftaltgr_symbols(content)
 
-    start_layer = find_next_available_layer(content)
+    start_layer = get_last_used_layer(content) + 1
     for i, (feature, data) in enumerate(mappings.items()):
         layer = start_layer + i
         trigger_key = data["trigger"]
@@ -57,7 +58,7 @@ def create_keylayout_plus(content: str):
     return content
 
 
-def append_plus_to_keyboard_name(content: str) -> str:
+def append_plus_to_layout_name(content: str) -> str:
     """
     Append ' Plus' to the keyboard name in the <keyboard> tag.
     """
@@ -232,20 +233,22 @@ def ergopti_plus_shiftaltgr_symbols(content):
     return content
 
 
-def find_next_available_layer(content: str) -> int:
+def get_last_used_layer(content: str) -> int:
     """
-    Scans the keylayout content to find the highest layer number in use
-    and returns the next available layer number.
+    Scan the keylayout content to find the highest layer number in use.
+    Returns this number (not the next available one).
+    Useful to get the last used layer, then add +1 if needed.
     """
-    # Find all 'when state="sX"' numbers
+    # Find all numbers in 'state="sX"' and 'next="sX"'
     state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', content)]
-    # Find all 'next="sX"' numbers
     next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', content)]
 
-    max_layer = max(state_indices + next_indices, default=0)
-    next_layer = max_layer + 1
-    print(f"{LOGS_INDENTATION}Next available layer: s{next_layer}")
-    return next_layer
+    if state_indices or next_indices:
+        max_layer = max(state_indices + next_indices)
+    else:
+        max_layer = 0
+    print(f"{LOGS_INDENTATION}Last used layer: s{max_layer}")
+    return max_layer
 
 
 def add_action_state(

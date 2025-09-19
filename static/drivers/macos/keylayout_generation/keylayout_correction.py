@@ -1,7 +1,7 @@
 import re
 
-from keylayout_sorting import sort_keylayout
-from keylayout_tests import validate_keylayout
+from tests.run_all_tests import validate_keylayout
+from utilities.keylayout_sorting import sort_keylayout
 
 LOGS_INDENTATION = "\t"
 
