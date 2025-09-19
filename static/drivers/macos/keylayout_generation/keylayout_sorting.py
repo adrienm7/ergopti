@@ -17,6 +17,7 @@ def sort_keylayout(content: str) -> str:
     content = sort_keymaps(content)
     content = sort_keys(content)
     content = sort_actions(content)
+    content = sort_terminators(content)
 
     print(f"{LOGS_INDENTATION}✅ Keylayout sorting complete.")
     return content
@@ -164,4 +165,30 @@ def sort_actions(body: str) -> str:
     # Replace <actions> block in the body
     return re.sub(
         r"(<actions.*?>)(.*?)(</actions>)", sort_block, body, flags=re.DOTALL
+    )
+
+
+def sort_terminators(body: str) -> str:
+    """
+    Sort the <when .../> lines inside the <terminators> block by the numeric value of state.
+    """
+    print(f"{LOGS_INDENTATION}\t🔹 Sorting terminators by state…")
+
+    def state_key(line):
+        m = re.search(r'state="s(\d+)"', line)
+        return int(m.group(1)) if m else 0
+
+    def sort_block(match):
+        header, inner, footer = match.groups()
+        # Extract all <when .../> lines
+        whens = re.findall(r"(\s*<when[^>]+/>)", inner)
+        # Sort by state number
+        whens_sorted = sorted(whens, key=state_key)
+        return f"{header}{''.join(whens_sorted)}\n\t{footer}"
+
+    return re.sub(
+        r"(<terminators.*?>)(.*?)(</terminators>)",
+        sort_block,
+        body,
+        flags=re.DOTALL,
     )

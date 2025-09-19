@@ -25,6 +25,8 @@ def validate_keylayout(content: str) -> None:
 
     check_each_action_has_when_state_none(content)
     check_each_action_when_states_unique(content)
+    check_terminators_when_states_unique(content)
+    check_when_states_defined_in_terminators(content)
     check_each_when_has_output_or_next(content)
 
     check_each_key_has_either_output_or_action(content)
@@ -455,6 +457,109 @@ def check_each_action_when_states_unique(body: str) -> None:
 
     print(
         f"{LOGS_INDENTATION}\t✅ All <when> states are unique within each <action>."
+    )
+
+
+def check_terminators_when_states_unique(body: str) -> None:
+    """
+    Ensure that all <when> states inside the <terminators> block are unique.
+    Raises ValueError if duplicate states are found.
+    """
+    print(
+        f"{LOGS_INDENTATION}\t➡️  Checking that <when> states are unique within <terminators>…"
+    )  # Needs double space after emoji
+
+    # Extract the <terminators> block
+    match = re.search(
+        r"<terminators[^>]*>(.*?)</terminators>", body, flags=re.DOTALL
+    )
+    if not match:
+        print(
+            f"{LOGS_INDENTATION}\t\t⚠️  No <terminators> block found, skipping."
+        )  # Needs double space after emoji
+        return
+
+    terminators_body = match.group(1)
+    states = re.findall(r'state=["\']([^"\']+)["\']', terminators_body)
+    seen = set()
+    duplicates = []
+
+    for s in states:
+        if s in seen:
+            duplicates.append(s)
+        else:
+            seen.add(s)
+
+    if duplicates:
+        print(
+            f"{LOGS_INDENTATION}\t❌ Duplicate <when> states found inside <terminators>:"
+        )
+        for s in set(duplicates):
+            print(f'{LOGS_INDENTATION}\t\t— state="{s}"')
+        raise ValueError(
+            "Duplicate <when> states found in <terminators> block."
+        )
+
+    print(
+        f"{LOGS_INDENTATION}\t✅ All <when> states are unique within <terminators>."
+    )
+
+
+def check_when_states_defined_in_terminators(body: str) -> None:
+    """
+    Ensure that every state used in a <when> inside <actions> is defined in the <terminators> block.
+    Raises ValueError if any state is missing in <terminators>.
+    """
+    print(
+        f"{LOGS_INDENTATION}\t➡️  Checking that all <when> states in <actions> are defined in <terminators>…"
+    )
+
+    # Extract all states used in <when> inside <actions>
+    actions_match = re.search(
+        r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL
+    )
+    if not actions_match:
+        print(f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping.")
+        return
+    _, actions_body, _ = actions_match.groups()
+    when_states = set(
+        re.findall(r'<when[^>]*state=["\']([^"\']+)["\']', actions_body)
+    )
+
+    # Extract all states defined in <terminators>
+    terminators_match = re.search(
+        r"<terminators[^>]*>(.*?)</terminators>", body, flags=re.DOTALL
+    )
+    if not terminators_match:
+        print(
+            f"{LOGS_INDENTATION}\t\t⚠️  No <terminators> block found, skipping."
+        )
+        return
+    terminators_body = terminators_match.group(1)
+    terminator_states = set(
+        re.findall(r'state=["\']([^"\']+)["\']', terminators_body)
+    )
+
+    # Exclude special states (like 'none') if needed
+    special_states = {"none"}
+    missing_states = [
+        s
+        for s in when_states
+        if s not in terminator_states and s not in special_states
+    ]
+
+    if missing_states:
+        print(
+            f"{LOGS_INDENTATION}\t❌ <when> states in <actions> missing in <terminators>:"
+        )
+        for s in missing_states:
+            print(f'{LOGS_INDENTATION}\t\t— state="{s}"')
+        raise ValueError(
+            "Some <when> states in <actions> are not defined in <terminators> block."
+        )
+
+    print(
+        f"{LOGS_INDENTATION}\t✅ All <when> states in <actions> are defined in <terminators>."
     )
 
 
