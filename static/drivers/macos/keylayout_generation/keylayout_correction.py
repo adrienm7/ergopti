@@ -15,7 +15,7 @@ def correct_keylayout(content: str) -> str:
 
     content = re.sub(
         r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
-        r"\1Ergopti Standard\3",
+        r"\1Ergopti\3",
         content,
     )
 
