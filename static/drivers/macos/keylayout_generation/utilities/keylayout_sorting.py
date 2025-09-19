@@ -52,9 +52,7 @@ def reorder_modifiers_and_attributes(body: str) -> str:
 
 def sort_keymaps(body: str) -> str:
     """Sort all <keyMap> blocks numerically by their index inside <keyMapSet>."""
-    print(
-        f"{LOGS_INDENTATION}\t🔹 Sorting keyMaps inside keyMapSet…"
-    )  # Needs double space after emoji
+    print(f"{LOGS_INDENTATION}\t🔹 Sorting keyMaps inside keyMapSet…")
 
     # Function to sort a single <keyMapSet> block
     def sort_block(match):

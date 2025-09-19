@@ -11,16 +11,12 @@ def main(
     input_directory: str = "",
     output_directory: Path = None,
     overwrite: bool = False,
-) -> str:
+) -> None:
     """
-    Main entry point: generate corrected & plus keylayouts and create a bundle from them.
+    Main entry point: generate corrected and plus keylayouts. Then, create a bundle containing them.
 
-    Processes one or more v0 keylayouts, generates their corrected and _plus versions,
+    Processes one or more _v0 keylayouts, generates their corrected and _plus versions,
     and builds a macOS bundle containing these keylayouts.
-
-    Returns:
-        str: Path to the generated bundle zip file (as string).
-            If the bundle already exists and overwrite=False, returns the path to the existing bundle.
     """
 
     # Determine output directory
@@ -32,28 +28,32 @@ def main(
 
     # Determine input directory
     if input_directory:
-        base_dir = Path(input_directory).resolve()
+        kbdedit_files_directory = Path(input_directory).resolve()
     else:
         # If no path is provided, use the "../raw_kbdedit_keylayouts" folder
-        base_dir = (
+        kbdedit_files_directory = (
             Path(__file__).resolve().parent.parent / "raw_kbdedit_keylayouts"
         )
 
     # Find files to process
     if file_name:
-        kbdedit_file_paths = [base_dir / file_name]  # Process only one file
+        kbdedit_file_paths = [
+            kbdedit_files_directory / file_name
+        ]  # Process only one file
     else:
         kbdedit_file_paths = list(
-            base_dir.glob("*_v0.keylayout")
+            kbdedit_files_directory.glob("*_v0.keylayout")
         )  # All _v0 keylayouts
 
-    last_bundle_path: str = ""
     for kbdedit_file_path in kbdedit_file_paths:
-        log_section(f"Processing {kbdedit_file_path.name}")
+        log_section(f"Processing {kbdedit_file_path.name}…")
 
         # Extract version from filename
-        match = re.search(r"_v(\d+\.\d+\.\d+)", kbdedit_file_path.name)
-        version = match.group(1) if match else "vX.X.X"
+        with kbdedit_file_path.open("r", encoding="utf-8") as f:
+            content = f.read()
+            # Capture everything after " v" up to the next quote in the name attribute
+            match = re.search(r'name="[^"]* (v[^"]+)"', content)
+            version = match.group(1).strip() if match else "vX.X.X"
         print(f"Layout version: {version}")
 
         base_file_path = process_keylayout_v0(
@@ -63,15 +63,12 @@ def main(
             base_file_path, output_directory, overwrite
         )
 
-        bundle_file_path = build_bundle(
+        build_bundle(
             version,
             output_directory,
             overwrite,
             [base_file_path, plus_file_path],
         )
-        last_bundle_path = str(bundle_file_path)
-
-    return last_bundle_path
 
 
 def log_section(title: str) -> None:
@@ -90,13 +87,9 @@ def can_overwrite_file(file_path: Path, overwrite: bool) -> bool:
         bool: True if we proceed with overwrite or file doesn't exist, False if we skip.
     """
     if file_path.exists():
-        print(
-            f"\t⚠️  Destination file already exists: {file_path}"
-        )  # Needs double space after emoji
+        print(f"\t⚠️  Destination file already exists: {file_path}")
         if overwrite:
-            print(
-                f"\t✏️  Overwriting: {file_path}"
-            )  # Needs double space after emoji
+            print(f"\t✏️  Overwriting: {file_path}")
             return True
         else:
             print(f"\t🚫 Skipping modification: {file_path}")
@@ -107,14 +100,12 @@ def can_overwrite_file(file_path: Path, overwrite: bool) -> bool:
 def process_keylayout_v0(
     kbdedit_file_path: Path, output_directory: Path, overwrite: bool
 ) -> Path:
-    """Open, correct and save the base keylayout (v0 → normal)."""
+    """Open, correct and save the base keylayout (v0 ➜ base)."""
     base_file_path = output_directory / (
         kbdedit_file_path.stem.replace("_v0", "") + kbdedit_file_path.suffix
     )
 
-    print(
-        f"➡️  Creating corrected keylayout from: {kbdedit_file_path}"
-    )  # Needs double space after emoji
+    print(f"➡️  Creating corrected keylayout from: {kbdedit_file_path}")
 
     if not can_overwrite_file(base_file_path, overwrite):
         return base_file_path
@@ -123,6 +114,7 @@ def process_keylayout_v0(
         content = f.read()
 
     content_corrected = correct_keylayout(content)
+
     with base_file_path.open("w", encoding="utf-8") as f:
         f.write(content_corrected)
 
@@ -138,9 +130,7 @@ def process_keylayout_plus(
         base_file_path.stem + "_plus" + base_file_path.suffix
     )
 
-    print(
-        f"➡️  Creating plus version from: {base_file_path}"
-    )  # Needs double space after emoji
+    print(f"➡️  Creating plus version from: {base_file_path}")
 
     if not can_overwrite_file(plus_file_path, overwrite):
         return plus_file_path
@@ -149,6 +139,7 @@ def process_keylayout_plus(
         content = f.read()
 
     content_plus = create_keylayout_plus(content)
+
     with plus_file_path.open("w", encoding="utf-8") as f:
         f.write(content_plus)
 
@@ -164,9 +155,12 @@ def build_bundle(
     logo_paths: list[Path] = None,
 ) -> Path:
     """Build the macOS bundle with the generated keylayouts."""
-    print(
-        f"➡️  Building bundle for version {version}"
-    )  # Needs double space after emoji
+    print(f"➡️  Building bundle for version {version}")
+
+    match = re.search(r"(v\d+\.\d+\.\d+)", version)
+    simple_version = match.group(1) if match else version
+    bundle_name = f"Ergopti_{simple_version}.bundle"
+    bundle_path = output_directory / bundle_name
 
     # Determine logo files
     script_dir = Path(__file__).resolve().parent
@@ -183,14 +177,13 @@ def build_bundle(
     elif len(logo_paths) > len(keylayout_paths):
         logo_paths = logo_paths[: len(keylayout_paths)]
 
-    bundle_file_path = output_directory / f"Ergopti_{version}.bundle"
-    bundle_zip_path = bundle_file_path.parent / (bundle_file_path.name + ".zip")
+    bundle_zip_path = bundle_path.with_suffix(".zip")
     if not can_overwrite_file(bundle_zip_path, overwrite):
         return bundle_zip_path
 
     create_bundle(
+        bundle_path,
         version,
-        output_directory,
         keylayout_paths,
         logo_paths,
     )
