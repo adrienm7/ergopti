@@ -41,7 +41,7 @@ mappings = {
         "map": [
             # SFBs with "bu" or "ub"
             ("j", "bu"),
-            ("★", "bu"),
+            # ("★", "bu"),
             ("u", "ub"),
             # Common suffixes
             ("a", "aire"),
@@ -102,8 +102,8 @@ mappings = {
             ("e", "oe"),
             ("é", "aî"),
             ("i", "î"),
-            ("j", "œu"),
-            ("★", "œu"),  # Different than the AutoHotkey version
+            ("j", "œu"),  # Different than the AutoHotkey version
+            # ("★", "œu"),
             ("o", "ô"),
             ("u", "û"),
         ],

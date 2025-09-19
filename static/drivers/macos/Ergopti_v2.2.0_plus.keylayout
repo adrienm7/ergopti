@@ -2017,13 +2017,6 @@
 			<when state="s35" output="Ance"/>
 			<when state="s43" output="Qu’"/>
 		</action>
-		<action id="★">
-			<when state="none" output="★"/>
-			<when state="s9" output="bu"/>
-			<when state="s14" output="œu"/>
-			<when state="s35" output="Bu"/>
-			<when state="s40" output="Œu"/>
-		</action>
 	</actions>
 	<terminators>
 		<when state="s1" output="^"/>

@@ -59,7 +59,7 @@ def create_keylayout_plus(content: str):
 
 def append_plus_to_keyboard_name(content: str) -> str:
     """
-    Appends ' Plus' to the keyboard name in the <keyboard> tag.
+    Append ' Plus' to the keyboard name in the <keyboard> tag.
     """
     pattern = r'(<keyboard\b[^>]*\bname=")([^"]+)(")'
 
@@ -144,10 +144,6 @@ def ensure_action_block(doc: str, action_id: str, output_value: str) -> str:
     pattern = rf'<action\b[^>]*\bid\s*=\s*(["\']){re.escape(action_id)}\1'
 
     if not re.search(pattern, doc):
-        # Try to detect indentation of the closing </actions> to keep style consistent
-        m = re.search(r"^(?P<indent>\s*)</actions>", doc, flags=re.MULTILINE)
-        indent = m.group("indent") if m else "\t"
-
         block = (
             f'\t<action id="{action_id}">\n\t\t'
             f'\t<when state="none" output="{output_value}"/>\n\t\t'
