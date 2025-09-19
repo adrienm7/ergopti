@@ -304,21 +304,13 @@ def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
     Modifies the default <when state="none"/> line to include a 'next' state.
     Works even if action_id is encoded as &lt; or &#x003C; in the XML.
     """
-    # autoriser id="<" OU id="&lt;" OU id="&#x003C;"
-    if action_id == "<":
-        id_pattern = r"(?:<|&lt;|&#x003C;)"
-    elif action_id == ">":
-        id_pattern = r"(?:>|&gt;|&#x003E;)"
-    else:
-        id_pattern = re.escape(action_id)
-
-    pattern = rf'(<action id="{id_pattern}">)(.*?)(</action>)'
+    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
 
     def repl(match):
         header, body, footer = match.groups()
         body = re.sub(
             r'<when state="none"[^>]*>',
-            f'\t<when state="none" next="s{layer_num}"/>',
+            f'<when state="none" next="s{layer_num}"/>',
             body,
         )
         return f"{header}{body}{footer}"

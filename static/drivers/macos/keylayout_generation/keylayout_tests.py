@@ -30,7 +30,7 @@ def validate_keylayout(content: str) -> None:
     check_each_key_has_either_output_or_action(content)
     check_xml_attribute_errors(content)
 
-    # check_indentation_consistency(content)
+    check_indentation_consistency(content)
     check_no_empty_lines(content)
 
     check_ascending_keymaps(content)
