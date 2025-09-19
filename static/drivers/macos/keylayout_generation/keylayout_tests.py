@@ -21,7 +21,7 @@ def validate_keylayout(content: str) -> None:
     check_unique_action_ids(content)
 
     check_each_action_in_keymaps_defined_in_actions(content)
-    # check_each_action_in_keymaps_is_used(content)
+    check_each_action_in_keymaps_is_used(content)
 
     check_each_action_has_when_state_none(content)
     check_each_action_when_states_unique(content)
