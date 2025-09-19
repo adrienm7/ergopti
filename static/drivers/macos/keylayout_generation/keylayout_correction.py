@@ -13,14 +13,8 @@ def correct_keylayout(content: str) -> str:
     """
     print(f"{LOGS_INDENTATION}🔧 Starting keylayout corrections…")
 
-    content = re.sub(
-        r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
-        r"\1Ergopti\3",
-        content,
-    )
-
     content = fix_invalid_symbols(content)
-    content = swap_keys_10_and_50(content)
+    content = swap_keys(content, 10, 50)
 
     print(f"{LOGS_INDENTATION}➕ Modifying keymap 4…")
     keymap_0_content = extract_keymap_body(content, 0)
@@ -53,12 +47,12 @@ def fix_invalid_symbols(body: str) -> str:
     return body
 
 
-def swap_keys_10_and_50(body: str) -> str:
+def swap_keys(body: str, key1: int, key2: int) -> str:
     """Swap key codes 10 and 50."""
-    print(f"{LOGS_INDENTATION}\t🔹 Swapping key codes 10 and 50…")
-    body = re.sub(r'code="50"', "TEMP_CODE", body)
-    body = re.sub(r'code="10"', 'code="50"', body)
-    body = re.sub(r"TEMP_CODE", 'code="10"', body)
+    print(f"{LOGS_INDENTATION}\t🔹 Swapping key codes {key1} and {key2}…")
+    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
+    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
+    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
     return body
 
 

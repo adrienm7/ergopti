@@ -13,12 +13,6 @@ def create_keylayout_plus(content: str):
     """
     print(f"{LOGS_INDENTATION}🔧 Starting keylayout plus creation…")
 
-    content = re.sub(
-        r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
-        r"\1Ergopti Plus\3",
-        content,
-    )
-
     content = append_plus_to_keyboard_name(content)
     content = ergopti_plus_altgr_symbols(content)
     content = ergopti_plus_shiftaltgr_symbols(content)
