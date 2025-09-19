@@ -97,9 +97,7 @@ def check_no_empty_lines(body: str) -> None:
     Raises ValueError if empty lines are found.
     Displays the preceding line for context.
     """
-    print(
-        f"{LOGS_INDENTATION}\t➡️  Checking for empty lines…"
-    )  # Needs double space after emoji
+    print(f"{LOGS_INDENTATION}\t➡️  Checking for empty lines…")
 
     lines = body.splitlines()
 
@@ -143,7 +141,7 @@ def check_ascending_keymaps(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking ascending order of <keyMap> indices…"
-    )  # Needs double space after emoji
+    )
 
     keymap_matches = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', body)
     indices = [int(idx) for idx in keymap_matches]
@@ -179,7 +177,7 @@ def check_ascending_keys_in_keymaps(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking ascending order of <key> codes inside each <keyMap>…"
-    )  # Needs double space after emoji
+    )
 
     issues_found = {}
 
@@ -233,7 +231,7 @@ def check_ascending_actions(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking alphabetical order of <action> IDs…"
-    )  # Needs double space after emoji
+    )
 
     action_matches = re.findall(r'<action\s+id=["\']([^"\']+)["\']', body)
     last_key = None

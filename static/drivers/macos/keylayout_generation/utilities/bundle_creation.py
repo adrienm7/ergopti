@@ -8,8 +8,8 @@ bundle_identifier = "com.apple.com.keyboardlayout.ergopti"
 
 
 def create_bundle(
+    bundle_path: Path,
     version: str,
-    output_dir: Path,
     keylayout_paths: list[Path],
     logo_paths: list[Path],
     cleanup: bool = True,
@@ -24,12 +24,6 @@ def create_bundle(
         raise ValueError(
             "keylayout_paths and logo_paths must have the same length"
         )
-
-    base_dir = (
-        output_dir.resolve() if output_dir else Path(__file__).parent.resolve()
-    )
-    bundle_name = f"Ergopti_{version}.bundle"
-    bundle_path = base_dir / bundle_name
 
     if bundle_path.exists():
         shutil.rmtree(bundle_path)

@@ -13,16 +13,14 @@ def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking that all keyMap actions exist in <actions>…"
-    )  # Needs double space after emoji
+    )
 
     # Extract all action IDs defined in <actions>
     actions_match = re.search(
         r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL
     )
     if not actions_match:
-        print(
-            f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping."
-        )  # Needs double space after emoji
+        print(f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping.")
         return
 
     _, actions_body, _ = actions_match.groups()
@@ -74,16 +72,14 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking that all <actions> are used in keyMaps…"
-    )  # Needs double space after emoji
+    )
 
     # Extract the <actions> block
     actions_match = re.search(
         r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL
     )
     if not actions_match:
-        print(
-            f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping."
-        )  # Needs double space after emoji
+        print(f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping.")
         return
 
     _, actions_body, _ = actions_match.groups()

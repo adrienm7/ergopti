@@ -138,9 +138,7 @@ def check_xml_attribute_errors(body: str) -> None:
     Raises ValueError if malformed attributes are found.
     Displays the offending lines.
     """
-    print(
-        f"{LOGS_INDENTATION}\t➡️  Checking for malformed XML attributes…"
-    )  # Needs double space after emoji
+    print(f"{LOGS_INDENTATION}\t➡️  Checking for malformed XML attributes…")
 
     lines = body.splitlines()
     errors = []

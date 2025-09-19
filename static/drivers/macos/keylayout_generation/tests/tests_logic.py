@@ -53,7 +53,7 @@ def check_each_action_when_states_unique(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking that <when> states are unique within each <action>…"
-    )  # Needs double space after emoji
+    )
 
     # Extract <action> blocks
     action_blocks = re.findall(
@@ -112,7 +112,7 @@ def check_terminators_when_states_unique(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking that <when> states are unique within <terminators>…"
-    )  # Needs double space after emoji
+    )
 
     # Extract the <terminators> block
     match = re.search(
@@ -121,7 +121,7 @@ def check_terminators_when_states_unique(body: str) -> None:
     if not match:
         print(
             f"{LOGS_INDENTATION}\t\t⚠️  No <terminators> block found, skipping."
-        )  # Needs double space after emoji
+        )
         return
 
     terminators_body = match.group(1)
@@ -216,14 +216,12 @@ def check_each_when_has_output_or_next(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking that every <when> inside <actions> has at least one of output or next…"
-    )  # Needs double space after emoji
+    )
 
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
-        print(
-            f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping."
-        )  # Needs double space after emoji
+        print(f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping.")
         return
 
     _, actions_body, _ = match.groups()

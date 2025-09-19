@@ -11,9 +11,7 @@ def check_each_key_has_a_code(body: str) -> None:
     Raises ValueError if any <key> is missing its code.
     Displays all <key> elements without a code.
     """
-    print(
-        f"{LOGS_INDENTATION}\t➡️  Checking that every <key> has a code…"
-    )  # Needs double space after emoji
+    print(f"{LOGS_INDENTATION}\t➡️  Checking that every <key> has a code…")
 
     missing_code_found = {}
 
@@ -58,18 +56,14 @@ def check_each_action_has_id(body: str) -> None:
     Raises ValueError if any <action> is missing its ID.
     Displays all <action> elements without an ID.
     """
-    print(
-        f"{LOGS_INDENTATION}\t➡️  Checking that every <action> has an ID…"
-    )  # Needs double space after emoji
+    print(f"{LOGS_INDENTATION}\t➡️  Checking that every <action> has an ID…")
 
     missing_id_found = {}
 
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
-        print(
-            f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping."
-        )  # Needs double space after emoji
+        print(f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping.")
         return
 
     _, actions_body, _ = match.groups()
@@ -119,7 +113,7 @@ def check_unique_codes_in_keymaps(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking for duplicate key codes inside each keyMap…"
-    )  # Needs double space after emoji
+    )
 
     duplicates_found = {}
 
@@ -181,14 +175,12 @@ def check_unique_action_ids(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking for duplicate action IDs inside <actions>…"
-    )  # Needs double space after emoji
+    )
 
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
-        print(
-            f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping."
-        )  # Needs double space after emoji
+        print(f"{LOGS_INDENTATION}\t\t⚠️  No <actions> block found, skipping.")
         return body
 
     _, actions_body, _ = match.groups()
@@ -232,7 +224,7 @@ def check_each_key_has_either_output_or_action(body: str) -> None:
     """
     print(
         f"{LOGS_INDENTATION}\t➡️  Checking that each <key> has either output or action (exclusive)…"
-    )  # Needs double space after emoji
+    )
 
     violations = {}
 
