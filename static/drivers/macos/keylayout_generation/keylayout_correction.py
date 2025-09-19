@@ -13,7 +13,11 @@ def correct_keylayout(content: str) -> str:
     """
     print(f"{LOGS_INDENTATION}🔧 Starting keylayout corrections…")
 
+    # Remove XML comments (<!-- ... -->)
+    content = re.sub(r"<!--.*?-->\n", "", content, flags=re.DOTALL)
+
     content = fix_invalid_symbols(content)
+    content = normalize_attribute_entities(content)
     content = swap_keys(content, 10, 50)
 
     print(f"{LOGS_INDENTATION}➕ Modifying keymap 4…")
@@ -30,7 +34,6 @@ def correct_keylayout(content: str) -> str:
     keymap_4_content = extract_keymap_body(content, 4)
     content = add_keymap(content, 9, keymap_4_content)
 
-    content = normalize_attribute_entities(content)
     content = sort_keylayout(content)
     validate_keylayout(content)
 
@@ -39,12 +42,69 @@ def correct_keylayout(content: str) -> str:
 
 
 def fix_invalid_symbols(body: str) -> str:
-    """Fix invalid XML symbols for <, > and &."""
+    """
+    Fix invalid XML symbols for <, > and &.
+    This function won’t be necessary anymore in new versions of KbdEdit.
+    """
     print(f"{LOGS_INDENTATION}\t🔹 Fixing invalid symbols for <, > and &…")
     body = body.replace("&lt;", "&#x003C;")  # <
     body = body.replace("&gt;", "&#x003E;")  # >
     body = body.replace("&amp;", "&#x0026;")  # &
     return body
+
+
+def normalize_attribute_entities(body: str) -> str:
+    """
+    Normalize XML-breaking characters inside attribute values only.
+    Converts <, >, &, ", ' (and named entities) into their hex escapes.
+    Works for both single-quoted and double-quoted attributes, and multi-symbol values.
+    """
+    print(f"{LOGS_INDENTATION}\t🔹 Normalizing attribute entities…")
+
+    entity_normalization_map = {
+        "&#x003C;": ["<", "&lt;"],
+        "&#x003E;": [">", "&gt;"],
+        "&#x0026;": ["&", "&amp;"],
+        "&#x0022;": ['"', "&quot;"],
+        "&#x0027;": ["'", "&apos;"],
+    }
+
+    alias_to_hex_entity = {
+        alias: hex_entity
+        for hex_entity, aliases in entity_normalization_map.items()
+        for alias in aliases
+    }
+
+    def normalize_value(value: str) -> str:
+        normalized_chars = []
+        i = 0
+        while i < len(value):
+            if value[i] == "&":
+                semicolon_index = value.find(";", i)
+                if semicolon_index != -1:
+                    entity = value[i : semicolon_index + 1]
+                    if entity.startswith("&#x"):  # Already hex escape → keep
+                        normalized_chars.append(entity)
+                        i = semicolon_index + 1
+                        continue
+                    if entity in alias_to_hex_entity:  # Known named entity
+                        normalized_chars.append(alias_to_hex_entity[entity])
+                        i = semicolon_index + 1
+                        continue
+            # Raw character
+            char = value[i]
+            normalized_chars.append(alias_to_hex_entity.get(char, char))
+            i += 1
+        return "".join(normalized_chars)
+
+    def replace_attribute(match):
+        attr_name = match.group(1)
+        quote = match.group(2)  # Either " or ', but we force it to become "
+        value = match.group(3)
+        return f'{attr_name}="{normalize_value(value)}"'
+
+    # Match attributes like output="...", output='...', action="..."
+    return re.sub(r'(\w+)\s*=\s*(["\'])(.*?)\2', replace_attribute, body)
 
 
 def swap_keys(body: str, key1: int, key2: int) -> str:
@@ -150,57 +210,3 @@ def add_keymap(body: str, index: int, keymap_body: str) -> str:
     insertion = f'\n\t\t<keyMap index="{index}">{keymap_body}</keyMap>\n'
     # Insert just before the closing </keyMapSet> tag
     return re.sub(r"(</keyMapSet>)", insertion + r"\1", body, flags=re.DOTALL)
-
-
-def normalize_attribute_entities(body: str) -> str:
-    """
-    Normalize XML-breaking characters inside attribute values only.
-    Converts <, >, &, ", ' (and named entities) into their hex escapes.
-    Works for both single-quoted and double-quoted attributes, and multi-symbol values.
-    """
-    print(f"{LOGS_INDENTATION}\t🔹 Normalizing attribute entities…")
-
-    entity_normalization_map = {
-        "&#x003C;": ["<", "&lt;"],
-        "&#x003E;": [">", "&gt;"],
-        "&#x0026;": ["&", "&amp;"],
-        "&#x0022;": ['"', "&quot;"],
-        "&#x0027;": ["'", "&apos;"],
-    }
-
-    alias_to_hex_entity = {
-        alias: hex_entity
-        for hex_entity, aliases in entity_normalization_map.items()
-        for alias in aliases
-    }
-
-    def normalize_value(value: str) -> str:
-        normalized_chars = []
-        i = 0
-        while i < len(value):
-            if value[i] == "&":
-                semicolon_index = value.find(";", i)
-                if semicolon_index != -1:
-                    entity = value[i : semicolon_index + 1]
-                    if entity.startswith("&#x"):  # Already hex escape → keep
-                        normalized_chars.append(entity)
-                        i = semicolon_index + 1
-                        continue
-                    if entity in alias_to_hex_entity:  # Known named entity
-                        normalized_chars.append(alias_to_hex_entity[entity])
-                        i = semicolon_index + 1
-                        continue
-            # Raw character
-            char = value[i]
-            normalized_chars.append(alias_to_hex_entity.get(char, char))
-            i += 1
-        return "".join(normalized_chars)
-
-    def replace_attribute(match):
-        attr_name = match.group(1)
-        quote = match.group(2)  # Either " or ', but we force it to become "
-        value = match.group(3)
-        return f'{attr_name}="{normalize_value(value)}"'
-
-    # Match attributes like output="...", output='...', action="..."
-    return re.sub(r'(\w+)\s*=\s*(["\'])(.*?)\2', replace_attribute, body)
