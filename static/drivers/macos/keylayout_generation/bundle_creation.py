@@ -17,6 +17,9 @@ def create_bundle(
     """
     Create a .bundle package for macOS keyboard layouts.
     keylayout_paths and logo_paths must be lists of the same length.
+    Localized layout names (per-layout) are written into InfoPlist.strings
+    so that each layout display name can be replaced by "Ergopti v{version}"
+    or "Ergopti+ v{version}" for plus layouts.
     """
     if len(keylayout_paths) != len(logo_paths):
         raise ValueError(
@@ -36,6 +39,9 @@ def create_bundle(
     resources_path.mkdir(parents=True, exist_ok=True)
 
     info_plist_entries = []
+    # store tuples (original_display_name, is_plus)
+    layout_localization_infos: list[tuple[str, bool]] = []
+
     for keylayout, logo in zip(keylayout_paths, logo_paths):
         if not keylayout.exists():
             raise FileNotFoundError(f"Keylayout file not found: {keylayout}")
@@ -45,11 +51,22 @@ def create_bundle(
         else:
             logo_path_to_use = logo
 
-        # Copier le keylayout
+        # read keylayout to extract original display name if present
+        content = keylayout.read_text(encoding="utf-8")
+        m = re.search(r'<keyboard\b[^>]*\bname="([^"]+)"', content)
+        original_name = m.group(1) if m else keylayout.stem
+
+        # determine plus vs standard (check both stem and original name)
+        is_plus = ("plus" in keylayout.stem.lower()) or (
+            "plus" in original_name.lower()
+        )
+        layout_localization_infos.append((original_name, is_plus))
+
+        # copy keylayout file
         dest_layout = resources_path / keylayout.name
         shutil.copy(keylayout, dest_layout)
 
-        # Copier le logo et renommer pour correspondre au keylayout
+        # copy logo file and rename to match keylayout stem if available
         icon_tag = ""
         if logo_path_to_use:
             dest_logo = resources_path / f"{keylayout.stem}.icns"
@@ -62,12 +79,16 @@ def create_bundle(
             print(f"\tAdded logo {logo_path_to_use.name} as {dest_logo.name}")
 
         plist_key = f"KLInfo_{keylayout.stem}"
+        input_source_id = (
+            f"{bundle_identifier}.plus" if is_plus else bundle_identifier
+        )
+
         info_plist_entries.append(f"""<key>{plist_key}</key>
         <dict>
             <key>TICapsLockLanguageSwitchCapable</key>
             <true/>{icon_tag}
             <key>TISInputSourceID</key>
-            <string>{bundle_identifier}.{"plus" if "plus" in keylayout.stem.lower() else "standard"}</string>
+            <string>{bundle_identifier}{".plus" if is_plus else ""}</string>
             <key>TISIntendedLanguage</key>
             <string>fr</string>
         </dict>""")
@@ -76,6 +97,9 @@ def create_bundle(
     info_plist_content = generate_info_plist(version, info_plist_entries)
     info_plist_path = bundle_path / "Contents" / "Info.plist"
     info_plist_path.write_text(info_plist_content, encoding="utf-8")
+
+    # Write localized InfoPlist.strings that map original layout names to Ergopti v{version} / Ergopti+ v{version}
+    generate_localizations(bundle_path, version, layout_localization_infos)
 
     # Write version.plist
     version_plist_content = generate_version_plist(version)
@@ -90,56 +114,6 @@ def create_bundle(
         shutil.rmtree(bundle_path)
 
     return (bundle_path if not cleanup else None, zip_path)
-
-
-def copy_keylayout_and_logo(
-    src: Path, base_dir: Path, resources_path: Path
-) -> str:
-    """Copy the keylayout and its logo, renaming the logo to match the keylayout filename."""
-
-    # Copy keylayout file
-    dest_layout = resources_path / src.name
-    shutil.copy(src, dest_layout)
-
-    # Determine logo to use based on keyboard name containing "plus" (case-insensitive)
-    content = src.read_text(encoding="utf-8")
-    match = re.search(r'<keyboard\b[^>]*\bname="([^"]+)"', content)
-    keyboard_name_in_xml = match.group(1) if match else src.stem
-
-    if "plus" in keyboard_name_in_xml.lower():
-        logo_filename = "logo_ergopti_plus.icns"
-    else:
-        logo_filename = "logo_ergopti.icns"
-
-    logo_path = base_dir / logo_filename
-    if logo_path.exists():
-        # Rename logo to match keylayout filename
-        dest_logo = resources_path / f"{src.stem}.icns"
-        shutil.copy(logo_path, dest_logo)
-        icon_tag = f"""
-        <key>TISIconIsTemplate</key>
-        <false/>
-        <key>ICNS</key>
-        <string>{dest_logo.name}</string>"""
-        print(f"Added logo {logo_filename} as {dest_logo.name}")
-    else:
-        print(f"⚠️ Logo file not found: {logo_filename}, continuing without it")
-        icon_tag = ""
-
-    # Use keylayout filename as the plist key
-    plist_key = f"KLInfo_{src.stem}"
-
-    # Generate Info.plist entry
-    return f"""
-    <key>{plist_key}</key>
-    <dict>
-        <key>TICapsLockLanguageSwitchCapable</key>
-        <true/>{icon_tag}
-        <key>TISInputSourceID</key>
-        <string>{bundle_identifier}.{src.stem.lower()}</string>
-        <key>TISIntendedLanguage</key>
-        <string>fr</string>
-    </dict>"""
 
 
 def generate_info_plist(version: str, entries: list[str]) -> str:
@@ -159,6 +133,37 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
 </dict>
 </plist>
 """
+
+
+def generate_localizations(
+    bundle_path: Path, version: str, layouts: list[tuple[str, bool]]
+):
+    """
+    Generate localized InfoPlist.strings files (en and fr).
+    Each original layout name is mapped to either:
+      - "Ergopti v{version}"  (standard)
+      - "Ergopti+ v{version}" (plus)
+    Both English and French files receive the same mappings.
+    """
+    for lang in ("en", "fr"):
+        lproj_dir = bundle_path / "Contents" / "Resources" / f"{lang}.lproj"
+        lproj_dir.mkdir(parents=True, exist_ok=True)
+        strings_path = lproj_dir / "InfoPlist.strings"
+
+        lines = []
+        for original_name, is_plus in layouts:
+            localized = (
+                f"Ergopti+ v{version}" if is_plus else f"Ergopti v{version}"
+            )
+            # ensure quotes inside original_name are escaped
+            escaped_original = original_name.replace('"', '\\"')
+            escaped_localized = localized.replace('"', '\\"')
+            lines.append(f'"{escaped_original}" = "{escaped_localized}";')
+
+        strings_content = "\n".join(lines) + "\n"
+        # write as UTF-16 for macOS compatibility (includes BOM)
+        strings_path.write_text(strings_content, encoding="utf-16")
+        print(f"\t🌍 Added localization mappings for {lang}: {strings_path}")
 
 
 def generate_version_plist(version: str) -> str:
@@ -187,7 +192,6 @@ def zip_bundle_folder(bundle_path: Path, zip_path: Path):
         for root, _, files in os.walk(bundle_path):
             for file in files:
                 file_path = Path(root) / file
-                # Relative path from the parent of the bundle folder to keep the bundle folder itself
                 relative_path = file_path.relative_to(bundle_path.parent)
                 zipf.write(file_path, relative_path)
     print(f"\t📦 Zipped bundle at: {zip_path}")

@@ -108,9 +108,7 @@ def process_keylayout_v0(
     kbdedit_file_path: Path, output_directory: Path, overwrite: bool
 ) -> Path:
     """Open, correct and save the base keylayout (v0 → normal)."""
-    base_file_path = output_directory / (
-        "Ergopti Standard" + kbdedit_file_path.suffix
-    )
+    base_file_path = output_directory / ("Ergopti" + kbdedit_file_path.suffix)
 
     print(
         f"➡️  Creating corrected keylayout from: {kbdedit_file_path}"
