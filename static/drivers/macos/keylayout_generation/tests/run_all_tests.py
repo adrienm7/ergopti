@@ -50,7 +50,9 @@ def validate_keylayout(content: str) -> None:
     """
     logger.launch("%s🔎 Validating keylayout…", LOGS_INDENTATION)
 
-    logger.info("%s=== XML structure & syntax checks ===", LOGS_INDENTATION)
+    logger.info(
+        "%s=== XML structure & syntax checks ===", LOGS_INDENTATION + "     "
+    )
     check_valid_xml_structure(content)
     check_required_blocks_present(content)
     check_forbidden_tags_or_attributes(content)
@@ -60,7 +62,8 @@ def validate_keylayout(content: str) -> None:
     check_max_min_code_state_values(content)
 
     logger.info(
-        "%s=== Key & Action presence/uniqueness checks ===", LOGS_INDENTATION
+        "%s=== Key & Action presence/uniqueness checks ===",
+        LOGS_INDENTATION + "     ",
     )
     check_each_key_has_a_code(content)
     check_each_action_has_id(content)
@@ -69,12 +72,15 @@ def validate_keylayout(content: str) -> None:
     check_unique_action_ids(content)
     check_each_key_has_either_output_or_action(content)
 
-    logger.info("%s=== Action & KeyMap cross-references ===", LOGS_INDENTATION)
+    logger.info(
+        "%s=== Action & KeyMap cross-references ===", LOGS_INDENTATION + "     "
+    )
     check_each_action_in_keymaps_defined_in_actions(content)
     check_each_action_in_keymaps_is_used(content)
 
     logger.info(
-        "%s=== Action/When/Terminator logic checks ===", LOGS_INDENTATION
+        "%s=== Action/When/Terminator logic checks ===",
+        LOGS_INDENTATION + "     ",
     )
     check_each_action_has_when_state_none(content)
     check_each_action_when_states_unique(content)
@@ -82,7 +88,9 @@ def validate_keylayout(content: str) -> None:
     check_when_states_defined_in_terminators(content)
     check_each_when_has_output_or_next(content)
 
-    logger.info("%s=== Cosmetic & ordering checks ===", LOGS_INDENTATION)
+    logger.info(
+        "%s=== Cosmetic & ordering checks ===", LOGS_INDENTATION + "     "
+    )
     check_indentation_consistency(content)
     check_no_empty_lines(content)
     check_ascending_keymaps(content)

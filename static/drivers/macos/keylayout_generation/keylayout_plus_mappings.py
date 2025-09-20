@@ -1,5 +1,5 @@
 """
-Mappings for the new dead keys of Ergopti Plus.
+Mappings for the new dead keys of Ergopti+.
 """
 
 import logging
@@ -11,8 +11,23 @@ from utilities.mappings_functions import (
 )
 
 logger = logging.getLogger("ergopti")
+LOGS_INDENTATION = "\t\t"
 
-plus_mappings = {
+
+def get_plus_mappings() -> dict:
+    """Return the Ergopti+ mappings dictionary."""
+    logger.launch("%s Preparing Ergopti+ mappings…", LOGS_INDENTATION)
+
+    mappings = PLUS_MAPPINGS.copy()
+    mappings = add_case_sensitive_mappings(mappings)
+    mappings = escape_symbols_in_mappings(mappings)
+
+    check_duplicate_triggers(mappings)
+
+    return mappings
+
+
+PLUS_MAPPINGS = {
     "comma_j_letters_sfbs": {
         "trigger": ",",
         "map": [
@@ -262,27 +277,26 @@ plus_mappings = {
 }
 
 
-plus_mappings = add_case_sensitive_mappings(plus_mappings)
-plus_mappings = escape_symbols_in_mappings(plus_mappings)
-
-
-def check_duplicate_triggers(mappings: dict):
+def check_duplicate_triggers(mappings_to_check: dict):
     """Check for duplicate trigger characters in the plus_mappings."""
     triggers = {}
-    for key, data in mappings.items():
+    for key, data in mappings_to_check.items():
         trigger = data["trigger"]
         if trigger in triggers:
             logger.error(
-                "Duplicate trigger '%s' found in '%s' and '%s'",
+                "%sDuplicate trigger '%s' found in '%s' and '%s'",
+                LOGS_INDENTATION,
                 trigger,
                 key,
                 triggers[trigger],
             )
         else:
             triggers[trigger] = key
+    logger.success(
+        "%sNo duplicate triggers found in the Ergopti+ mappings.",
+        LOGS_INDENTATION,
+    )
 
-
-check_duplicate_triggers(plus_mappings)
 
 if __name__ == "__main__":
-    pprint(plus_mappings, indent=2, width=120)
+    pprint(get_plus_mappings(), indent=2, width=120)

@@ -1,4 +1,4 @@
-"""Tests for validating a keylayout."""
+"""Tests for validating logic in a keylayout."""
 
 import logging
 import re
@@ -36,17 +36,17 @@ def check_each_action_has_when_state_none(body: str) -> None:
     if offending_actions:
         logger.info(
             '%sSome <action> blocks are missing a <when state="none">:',
-            LOGS_INDENTATION + "\t",
+            LOGS_INDENTATION + "\t\t",
         )
         for action_id, block in offending_actions:
-            logger.info("%s— %s", LOGS_INDENTATION + "\t\t", block.strip())
+            logger.info("%s— %s", LOGS_INDENTATION + "\t\t\t", block.strip())
         raise ValueError(
             'Some <action> blocks do not contain a <when state="none">.'
         )
 
     logger.success(
         '%sAll <action> blocks have at least one <when state="none">.',
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION + "\t\t",
     )
 
 

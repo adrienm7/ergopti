@@ -1,4 +1,4 @@
-"""Tests for validating a keylayout."""
+"""Tests for validating cosmetic part of keylayout."""
 
 import logging
 import re

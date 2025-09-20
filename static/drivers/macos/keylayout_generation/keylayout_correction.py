@@ -1,3 +1,5 @@
+"""Functions to correct and modify a keylayout content."""
+
 import logging
 import re
 
