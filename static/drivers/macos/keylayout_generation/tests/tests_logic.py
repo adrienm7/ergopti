@@ -14,7 +14,8 @@ def check_each_action_has_when_state_none(body: str) -> None:
     Displays all offending <action> blocks.
     """
     logger.info(
-        f'{LOGS_INDENTATION}\t🔹 Checking that each <action> has a <when state="none">…'
+        '%s🔹 Checking that each <action> has a <when state="none">…',
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract <action> blocks
@@ -34,16 +35,18 @@ def check_each_action_has_when_state_none(body: str) -> None:
 
     if offending_actions:
         logger.info(
-            f'{LOGS_INDENTATION}\tSome <action> blocks are missing a <when state="none">:'
+            '%sSome <action> blocks are missing a <when state="none">:',
+            LOGS_INDENTATION + "\t",
         )
         for action_id, block in offending_actions:
-            logger.info(f"{LOGS_INDENTATION}\t\t— {block.strip()}")
+            logger.info("%s— %s", LOGS_INDENTATION + "\t\t", block.strip())
         raise ValueError(
             'Some <action> blocks do not contain a <when state="none">.'
         )
 
     logger.success(
-        f'{LOGS_INDENTATION}\tAll <action> blocks have at least one <when state="none">.'
+        '%sAll <action> blocks have at least one <when state="none">.',
+        LOGS_INDENTATION + "\t",
     )
 
 
@@ -54,7 +57,8 @@ def check_each_action_when_states_unique(body: str) -> None:
     Displays all duplicates.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that <when> states are unique within each <action>…"
+        "%s🔹 Checking that <when> states are unique within each <action>…",
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract <action> blocks
@@ -84,26 +88,30 @@ def check_each_action_when_states_unique(body: str) -> None:
 
     if duplicates_found:
         logger.info(
-            f"{LOGS_INDENTATION}\tDuplicate <when> states found inside <action> blocks:"
+            "%sDuplicate <when> states found inside <action> blocks:",
+            LOGS_INDENTATION + "\t",
         )
         for action_id, (block, duplicates) in duplicates_found.items():
-            logger.info(f"{LOGS_INDENTATION}\t\t• Action ID « {action_id} »:")
-
+            logger.info(
+                "%s• Action ID « %s »:", LOGS_INDENTATION + "\t\t", action_id
+            )
             # Extract all <when ...> tags from the action block
             when_blocks = re.findall(r"(<when\b[^>]*?/>)", block)
-
             # Print only the duplicated states
             for when_tag in when_blocks:
                 state_match = re.search(r'state=["\']([^"\']+)["\']', when_tag)
                 if state_match and state_match.group(1) in duplicates:
-                    logger.info(f"{LOGS_INDENTATION}\t\t\t— {when_tag.strip()}")
+                    logger.info(
+                        "%s— %s", LOGS_INDENTATION + "\t\t\t", when_tag.strip()
+                    )
 
         raise ValueError(
             "Some <action> blocks contain duplicate <when> states."
         )
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tAll <when> states are unique within each <action>."
+        "%sAll <when> states are unique within each <action>.",
+        LOGS_INDENTATION + "\t\t",
     )
 
 
@@ -113,7 +121,8 @@ def check_terminators_when_states_unique(body: str) -> None:
     Raises ValueError if duplicate states are found.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that <when> states are unique within <terminators>…"
+        "%s🔹 Checking that <when> states are unique within <terminators>…",
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract the <terminators> block
@@ -122,7 +131,8 @@ def check_terminators_when_states_unique(body: str) -> None:
     )
     if not match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <terminators> block found, skipping."
+            "%sNo <terminators> block found, skipping.",
+            LOGS_INDENTATION + "\t\t",
         )
         return
 
@@ -139,16 +149,18 @@ def check_terminators_when_states_unique(body: str) -> None:
 
     if duplicates:
         logger.error(
-            f"{LOGS_INDENTATION}\tDuplicate <when> states found inside <terminators>:"
+            "%sDuplicate <when> states found inside <terminators>:",
+            LOGS_INDENTATION + "\t",
         )
         for s in set(duplicates):
-            logger.error(f'{LOGS_INDENTATION}\t\t— state="{s}"')
+            logger.error('%s— state="%s"', LOGS_INDENTATION + "\t\t", s)
         raise ValueError(
             "Duplicate <when> states found in <terminators> block."
         )
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tAll <when> states are unique within <terminators>."
+        "%sAll <when> states are unique within <terminators>.",
+        LOGS_INDENTATION + "\t\t",
     )
 
 
@@ -158,7 +170,8 @@ def check_when_states_defined_in_terminators(body: str) -> None:
     Raises ValueError if any state is missing in <terminators>.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that all <when> states in <actions> are defined in <terminators>…"
+        "%s🔹 Checking that all <when> states in <actions> are defined in <terminators>…",
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract all states used in <when> inside <actions>
@@ -167,7 +180,7 @@ def check_when_states_defined_in_terminators(body: str) -> None:
     )
     if not actions_match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <actions> block found, skipping."
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
         )
         return
     _, actions_body, _ = actions_match.groups()
@@ -181,7 +194,8 @@ def check_when_states_defined_in_terminators(body: str) -> None:
     )
     if not terminators_match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <terminators> block found, skipping."
+            "%sNo <terminators> block found, skipping.",
+            LOGS_INDENTATION + "\t\t",
         )
         return
     terminators_body = terminators_match.group(1)
@@ -199,13 +213,15 @@ def check_when_states_defined_in_terminators(body: str) -> None:
 
     if missing_states:
         logger.error(
-            f"{LOGS_INDENTATION}\t<when> states in <actions> missing in <terminators>:"
+            "%s<when> states in <actions> missing in <terminators>:",
+            LOGS_INDENTATION + "\t",
         )
         for s in missing_states:
-            logger.error(f'{LOGS_INDENTATION}\t\t— state="{s}"')
+            logger.error('%s— state="%s"', LOGS_INDENTATION + "\t\t", s)
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tAll <when> states in <actions> are defined in <terminators>."
+        "%sAll <when> states in <actions> are defined in <terminators>.",
+        LOGS_INDENTATION + "\t\t",
     )
 
 
@@ -216,14 +232,15 @@ def check_each_when_has_output_or_next(body: str) -> None:
     Displays the action ID and offending <when> blocks.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that every <when> inside <actions> has at least one of output or next…"
+        "%s🔹 Checking that every <when> inside <actions> has at least one of output or next…",
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <actions> block found, skipping."
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
         )
         return
 
@@ -254,16 +271,22 @@ def check_each_when_has_output_or_next(body: str) -> None:
 
     if violations:
         logger.error(
-            f"{LOGS_INDENTATION}\t<when> blocks missing output or next detected:"
+            "%s<when> blocks missing output or next detected:",
+            LOGS_INDENTATION + "\t",
         )
         for action_id, whens in violations.items():
-            logger.error(f"{LOGS_INDENTATION}\t\t• Action ID « {action_id} »:")
+            logger.error(
+                "%s• Action ID « %s »:", LOGS_INDENTATION + "\t\t", action_id
+            )
             for when_tag in whens:
-                logger.error(f"{LOGS_INDENTATION}\t\t\t— {when_tag.strip()}")
+                logger.error(
+                    "%s— %s", LOGS_INDENTATION + "\t\t\t", when_tag.strip()
+                )
         raise ValueError(
             "Some <when> blocks inside <actions> are missing both output and next."
         )
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tAll <when> blocks inside <actions> have at least one of output or next."
+        "%sAll <when> blocks inside <actions> have at least one of output or next.",
+        LOGS_INDENTATION + "\t\t",
     )

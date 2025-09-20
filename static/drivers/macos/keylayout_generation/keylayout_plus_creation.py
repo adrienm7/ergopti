@@ -14,7 +14,7 @@ def create_keylayout_plus(content: str):
     """
     Create a '_plus' variant of the corrected keylayout, with extra actions.
     """
-    logger.info(f"{LOGS_INDENTATION}🔧 Starting keylayout plus creation…")
+    logger.info("%s🔧 Starting keylayout plus creation…", LOGS_INDENTATION)
 
     content = append_plus_to_layout_name(content)
     content = ergopti_plus_altgr_symbols(content)
@@ -26,7 +26,11 @@ def create_keylayout_plus(content: str):
         trigger_key = data["trigger"]
         trigger_key = escape_xml_characters(trigger_key)
         logger.info(
-            f"{LOGS_INDENTATION}\t🔹 Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}…"
+            "%s\t🔹 Adding feature '%s' with trigger '%s' at layer s%d…",
+            LOGS_INDENTATION,
+            feature,
+            trigger_key,
+            layer,
         )
 
         if len(data["map"]) == 0:
@@ -43,7 +47,10 @@ def create_keylayout_plus(content: str):
         for action_id, output in data["map"]:
             action_id = escape_xml_characters(action_id)
             logger.debug(
-                f"{LOGS_INDENTATION}\t\t— Adding action '{action_id}' ➜ '{output}'…"
+                "%s— Adding action '%s' ➜ '%s'…",
+                LOGS_INDENTATION + "\t\t",
+                action_id,
+                output,
             )
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
@@ -249,7 +256,7 @@ def get_last_used_layer(content: str) -> int:
         max_layer = max(state_indices + next_indices)
     else:
         max_layer = 0
-    logger.info(f"{LOGS_INDENTATION}Last used layer: s{max_layer}")
+    logger.info("%sLast used layer: s%d", LOGS_INDENTATION, max_layer)
     return max_layer
 
 

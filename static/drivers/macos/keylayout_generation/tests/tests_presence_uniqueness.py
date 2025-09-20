@@ -13,7 +13,9 @@ def check_each_key_has_a_code(body: str) -> None:
     Raises ValueError if any <key> is missing its code.
     Displays all <key> elements without a code.
     """
-    logger.info(f"{LOGS_INDENTATION}\t🔹 Checking that every <key> has a code…")
+    logger.info(
+        "%s🔹 Checking that every <key> has a code…", LOGS_INDENTATION + "\t"
+    )
 
     missing_code_found = {}
 
@@ -41,17 +43,21 @@ def check_each_key_has_a_code(body: str) -> None:
 
     if missing_code_found:
         logger.error(
-            f"{LOGS_INDENTATION}\t<key> elements missing code detected:"
+            "%s<key> elements missing code detected:", LOGS_INDENTATION + "\t"
         )
         for keymap_name, tags in missing_code_found.items():
-            logger.error(f"{LOGS_INDENTATION}\t\t• KeyMap {keymap_name}:")
+            logger.error(
+                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
+            )
             for tag in tags:
-                logger.error(f"{LOGS_INDENTATION}\t\t\t— {tag.strip()}")
+                logger.error("%s— %s", LOGS_INDENTATION + "\t\t\t", tag.strip())
         raise ValueError(
             "Some <key> elements are missing their code attribute."
         )
 
-    logger.success(f"{LOGS_INDENTATION}\t\tAll <key> elements have a code.")
+    logger.success(
+        "%sAll <key> elements have a code.", LOGS_INDENTATION + "\t\t"
+    )
 
 
 def check_each_action_has_id(body: str) -> None:
@@ -61,7 +67,7 @@ def check_each_action_has_id(body: str) -> None:
     Displays all <action> elements without an ID.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that every <action> has an ID…"
+        "%s🔹 Checking that every <action> has an ID…", LOGS_INDENTATION + "\t"
     )
 
     missing_id_found = {}
@@ -70,7 +76,7 @@ def check_each_action_has_id(body: str) -> None:
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <actions> block found, skipping."
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
         )
         return
 
@@ -88,31 +94,39 @@ def check_each_action_has_id(body: str) -> None:
 
     if missing_id_found:
         logger.error(
-            f"{LOGS_INDENTATION}\t<action> elements missing ID detected:"
+            "%s<action> elements missing ID detected:", LOGS_INDENTATION + "\t"
         )
         for block_name, tags in missing_id_found.items():
             for tag in tags:
-                logger.error(f"{LOGS_INDENTATION}\t\t— {tag.strip()}")
+                logger.error("%s— %s", LOGS_INDENTATION + "\t\t", tag.strip())
         raise ValueError(
             "Some <action> elements are missing their ID attribute."
         )
 
-    logger.success(f"{LOGS_INDENTATION}\t\tAll <action> elements have an ID.")
+    logger.success(
+        "%sAll <action> elements have an ID.", LOGS_INDENTATION + "\t\t"
+    )
 
 
 def check_unique_keymap_indices(body: str) -> None:
     """
     Checks that no <keyMap> index is duplicated.
     """
-    logger.info(f"{LOGS_INDENTATION}\t🔹 Checking unique <keyMap> indices…")
+    logger.info(
+        "%s🔹 Checking unique <keyMap> indices…", LOGS_INDENTATION + "\t"
+    )
     indices = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', body)
     duplicates = set([x for x in indices if indices.count(x) > 1])
     if duplicates:
         logger.error(
-            f"{LOGS_INDENTATION}\tDuplicate <keyMap> indices: {', '.join(duplicates)}"
+            "%sDuplicate <keyMap> indices: %s",
+            LOGS_INDENTATION + "\t",
+            ", ".join(duplicates),
         )
         raise ValueError("Duplicate <keyMap> indices found.")
-    logger.success(f"{LOGS_INDENTATION}\t\tAll <keyMap> indices are unique.")
+    logger.success(
+        "%sAll <keyMap> indices are unique.", LOGS_INDENTATION + "\t\t"
+    )
 
 
 def check_unique_codes_in_keymaps(body: str) -> None:
@@ -122,7 +136,8 @@ def check_unique_codes_in_keymaps(body: str) -> None:
     Displays all occurrences of duplicate codes with their output/action values.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking for duplicate key codes inside each keyMap…"
+        "%s🔹 Checking for duplicate key codes inside each keyMap…",
+        LOGS_INDENTATION + "\t",
     )
 
     duplicates_found = {}
@@ -166,16 +181,20 @@ def check_unique_codes_in_keymaps(body: str) -> None:
                 duplicates_found[keymap_label][key_code] = full_key_tags
 
     if duplicates_found:
-        logger.error(f"{LOGS_INDENTATION}\tDuplicate key codes detected:")
+        logger.error("%sDuplicate key codes detected:", LOGS_INDENTATION + "\t")
         for keymap_name, code_tags in duplicates_found.items():
-            logger.error(f"{LOGS_INDENTATION}\t\t• KeyMap {keymap_name}:")
+            logger.error(
+                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
+            )
             for key_code, duplicated_tags in code_tags.items():
                 for key_code_tag in duplicated_tags:
-                    logger.error(f"{LOGS_INDENTATION}\t\t\t— {key_code_tag}")
+                    logger.error(
+                        "%s— %s", LOGS_INDENTATION + "\t\t\t", key_code_tag
+                    )
         raise ValueError("Duplicate key codes found in <keyMap> blocks.")
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tNo duplicate key codes in each keyMap."
+        "%sNo duplicate key codes in each keyMap.", LOGS_INDENTATION + "\t\t"
     )
 
 
@@ -186,14 +205,15 @@ def check_unique_action_ids(body: str) -> None:
     Displays all occurrences of duplicate IDs with their full <action> content.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking for duplicate action IDs inside <actions>…"
+        "%s🔹 Checking for duplicate action IDs inside <actions>…",
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <actions> block found, skipping."
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
         )
         return body
 
@@ -220,14 +240,18 @@ def check_unique_action_ids(body: str) -> None:
     }
 
     if duplicates_found:
-        logger.error(f"{LOGS_INDENTATION}\tDuplicate action IDs detected:")
+        logger.error(
+            "%sDuplicate action IDs detected:", LOGS_INDENTATION + "\t"
+        )
         for action_id, blocks in duplicates_found.items():
-            logger.error(f"{LOGS_INDENTATION}\t\t• ID « {action_id} »:")
+            logger.error("%s• ID « %s »:", LOGS_INDENTATION + "\t\t", action_id)
             for block in blocks:
-                logger.error(f"{LOGS_INDENTATION}\t\t\t— {block.strip()}")
+                logger.error(
+                    "%s— %s", LOGS_INDENTATION + "\t\t\t", block.strip()
+                )
         raise ValueError("Duplicate action IDs found in <actions> block.")
 
-    logger.success(f"{LOGS_INDENTATION}\t\tNo duplicate action IDs.")
+    logger.success("%sNo duplicate action IDs.", LOGS_INDENTATION + "\t\t")
 
 
 def check_each_key_has_either_output_or_action(body: str) -> None:
@@ -237,7 +261,8 @@ def check_each_key_has_either_output_or_action(body: str) -> None:
     Displays all offending <key> elements.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that each <key> has either output or action (exclusive)…"
+        "%s🔹 Checking that each <key> has either output or action (exclusive)…",
+        LOGS_INDENTATION + "\t",
     )
 
     violations = {}
@@ -272,16 +297,19 @@ def check_each_key_has_either_output_or_action(body: str) -> None:
 
     if violations:
         logger.error(
-            f"{LOGS_INDENTATION}\tViolations detected in <key> elements:"
+            "%sViolations detected in <key> elements:", LOGS_INDENTATION + "\t"
         )
         for keymap_name, tags in violations.items():
-            logger.error(f"{LOGS_INDENTATION}\t\t• KeyMap {keymap_name}:")
+            logger.error(
+                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
+            )
             for tag in tags:
-                logger.error(f"{LOGS_INDENTATION}\t\t\t— {tag}")
+                logger.error("%s— %s", LOGS_INDENTATION + "\t\t\t", tag)
         raise ValueError(
             "Some <key> elements have invalid output/action configuration."
         )
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tAll <key> elements have valid output/action configuration."
+        "%sAll <key> elements have valid output/action configuration.",
+        LOGS_INDENTATION + "\t\t",
     )
