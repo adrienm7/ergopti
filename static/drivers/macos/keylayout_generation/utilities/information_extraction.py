@@ -14,7 +14,16 @@ def extract_version_from_file(file_path) -> str:
 
     with file_path.open("r", encoding="utf-8") as f:
         content = f.read()
-        # Capture everything after " v" up to the next quote in the name attribute
-        match = re.search(r'name="[^"]* (v[^"]+)"', content)
-        version = match.group(1).strip() if match else "vX.X.X"
+
+    name_match = re.search(r'name="([^"]+)"', content)
+    if name_match:
+        name_value = name_match.group(1)
+        # Look for v followed by digit or 'version', then capture up to space, quote or end
+        version_match = re.search(
+            r"((v\d|version).*)", name_value, re.IGNORECASE
+        )
+        version = version_match.group(1).strip() if version_match else "vX.X.X"
+    else:
+        version = "vX.X.X"
+
     return version
