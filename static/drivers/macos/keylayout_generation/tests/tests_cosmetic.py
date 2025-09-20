@@ -89,10 +89,13 @@ def check_indentation_consistency(body: str) -> None:
         for line_number, parent, current, content_line in inconsistencies:
             parent_str = parent if parent is not None else 0
             logger.error(
-                f"{LOGS_INDENTATION}\t\t— Line {line_number}: Indentation {current} "
-                f"too shallow relative to parent {parent_str}:\n"
-                f"{LOGS_INDENTATION}\t\t\t{content_line}"
+                "%s— Line %s: Indentation %s too shallow relative to parent %s:",
+                LOGS_INDENTATION + "\t\t",
+                line_number,
+                current,
+                parent_str,
             )
+            logger.error("%s%s", LOGS_INDENTATION + "\t\t\t", content_line)
 
     logger.success(
         "%sIndentation consistency verified.", LOGS_INDENTATION + "\t\t"
@@ -340,7 +343,11 @@ def check_attribute_order(body: str) -> None:
                 actual = [a for a in attrs if a in expected]
                 if actual != filtered:
                     logger.error(
-                        f"{LOGS_INDENTATION}\tAttribute order incorrect in <{tag}>: {attrs} (expected: {expected})"
+                        "%sAttribute order incorrect in <%s>: %s (expected: %s)",
+                        {LOGS_INDENTATION} + "\t",
+                        tag,
+                        attrs,
+                        expected,
                     )
 
-    logger.success(f"{LOGS_INDENTATION}\t\tAttribute order is correct.")
+    logger.success("%sAttribute order is correct.", LOGS_INDENTATION + "\t\t")

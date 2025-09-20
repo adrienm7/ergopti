@@ -1,10 +1,13 @@
+"""
+Keylayout Plus generation utilities for Ergopti: create a variant with extra dead key features and symbol modifications.
+"""
+
 import logging
 import re
 
 from keylayout_plus_mappings import plus_mappings
 from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
-from utilities.mappings_functions import escape_xml_characters
 
 logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
@@ -17,10 +20,21 @@ def create_keylayout_plus(content: str):
     logger.info("%s🔧 Starting keylayout plus creation…", LOGS_INDENTATION)
 
     content = append_plus_to_layout_name(content)
-    content = ergopti_plus_altgr_symbols(content)
-    content = ergopti_plus_shiftaltgr_symbols(content)
+
+    logger.info(
+        "%s➕ Modifying AltGr and ShiftAltGr symbols for Ergopti+…",
+        LOGS_INDENTATION,
+    )
+    content = ergopti_plus_altgr_modifications(content)
+    content = ergopti_plus_shiftaltgr_modifications(content)
 
     start_layer = get_last_used_layer(content) + 1
+    logger.info(
+        "%s➕ Adding dead key features for Ergopti+ starting at layer %d…",
+        LOGS_INDENTATION,
+        start_layer,
+    )
+
     for i, (feature, data) in enumerate(plus_mappings.items()):
         layer = start_layer + i
         trigger_key = data["trigger"]
@@ -35,29 +49,27 @@ def create_keylayout_plus(content: str):
         if not data["map"]:
             continue
 
-        # Assign trigger key to this layer
-        content = ensure_action_block(content, trigger_key)
-        content = assign_action_layer(content, trigger_key, layer)
-
-        # Add trigger key as dead key
+        # Create the new dead key
+        content = ensure_action_block_exists(content, trigger_key)
+        content = assign_layer_to_action_block_none(content, trigger_key, layer)
         content = add_terminator_state(content, layer, trigger_key)
 
-        # Add all feature actions
+        # Add all dead key outputs
         for action_id, output in data["map"]:
-            action_id = escape_xml_characters(action_id)
             logger.debug(
-                "%s— Adding action '%s' ➜ '%s'…",
+                "%s— Adding output '%s' + '%s' ➜ '%s'…",
                 LOGS_INDENTATION + "\t\t",
+                trigger_key,
                 action_id,
                 output,
             )
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
-            # This preserves key codes/modifiers and avoids having <key ... output="..."> which would break action linking
-            content = ensure_key_uses_action(content, action_id)
+            # This is necessary, otherwise the key will always have the same output, despite being in a dead key layer
+            content = ensure_key_uses_action_and_not_output(content, action_id)
 
-            # Now add the when state to the corresponding <action id="..."> (ensure_action_block is called inside)
-            content = add_action_state(content, action_id, layer, output)
+            # Add the new output on the key when in the dead key layer
+            content = add_action_when_state(content, action_id, layer, output)
 
     content = sort_keylayout(content)
     validate_keylayout(content)
@@ -66,11 +78,13 @@ def create_keylayout_plus(content: str):
     return content
 
 
-def append_plus_to_layout_name(content: str) -> str:
+def append_plus_to_layout_name(body: str) -> str:
     """
     Append ' Plus' to the keyboard name in the <keyboard> tag.
     """
-    pattern = r'(<keyboard\b[^>]*\bname=")([^"]+)(")'
+    logger.info(
+        "%sAppending ' Plus' to <keyboard> name…", LOGS_INDENTATION + "\t"
+    )
 
     def repl(match):
         prefix, name, suffix = match.groups()
@@ -78,10 +92,13 @@ def append_plus_to_layout_name(content: str) -> str:
             name += " Plus"
         return f"{prefix}{name}{suffix}"
 
-    return re.sub(pattern, repl, content)
+    pattern = r'(<keyboard\b[^>]*\bname=")([^"]+)(")'
+    body = re.sub(pattern, repl, body)
+
+    return body
 
 
-def ergopti_plus_altgr_symbols(content: str) -> str:
+def ergopti_plus_altgr_modifications(body: str) -> str:
     """
     In <keyMap index="5">:
       - If a <key ...> has output="ç" or action="ç", replace its output/action attributes
@@ -94,6 +111,10 @@ def ergopti_plus_altgr_symbols(content: str) -> str:
     After the keyMap modification, ensure <action id="!"> and <action id="%"> exist
     (inserted before the first </actions> if missing).
     """
+    logger.info(
+        "%sModifying AltGr symbols in <keyMap index=5>…",
+        LOGS_INDENTATION + "\t",
+    )
 
     def replace_in_keymap(match):
         header, body, footer = match.groups()
@@ -131,37 +152,17 @@ def ergopti_plus_altgr_symbols(content: str) -> str:
         return f"{header}{body_fixed}{footer}"
 
     pattern = r'(<keyMap index="5">)(.*?)(</keyMap>)'
-    fixed = re.sub(pattern, replace_in_keymap, content, flags=re.DOTALL)
-
-    fixed = ensure_action_block(fixed, "!")
-    fixed = ensure_action_block(fixed, "%")
+    fixed = re.sub(pattern, replace_in_keymap, body, flags=re.DOTALL)
 
     return fixed
 
 
-def ensure_action_block(doc: str, action_id: str) -> str:
-    """
-    Ensure an <action id="..."> block exists.
-    - Matches <action ... id="ID" ...> or <action ... id='ID' ...> wherever the id attribute is placed.
-    - If missing, inserts the block before the first </actions>, using the same indentation.
-    """
-    # Match <action ... id="action_id" ...> or with single quotes, id can be anywhere in the tag
-    pattern = rf'<action\b[^>]*\bid\s*=\s*(["\']){re.escape(action_id)}\1'
+def ergopti_plus_shiftaltgr_modifications(body):
+    logger.info(
+        "%sModifying Shift+AltGr symbols in <keyMap index=6,7>…",
+        LOGS_INDENTATION + "\t",
+    )
 
-    if not re.search(pattern, doc):
-        block = (
-            f'\t<action id="{action_id}">\n\t\t'
-            f'\t<when state="none" output="{action_id}"/>\n\t\t'
-            f"</action>\n\t"
-        )
-
-        # Insert the block right before the first </actions>
-        doc = re.sub(r"(</actions>)", block + r"\1", doc, count=1)
-
-    return doc
-
-
-def ergopti_plus_shiftaltgr_symbols(content):
     # This code replaces specific outputs in keymap index 6 = Shift + AltGr
     def replace_in_keymap(match):
         header, body, footer = match.groups()
@@ -172,41 +173,80 @@ def ergopti_plus_shiftaltgr_symbols(content):
         return f"{header}{body}{footer}"
 
     for idx in (6, 7):
-        content = re.sub(
+        body = re.sub(
             rf'(<keyMap index="{idx}">)(.*?)(</keyMap>)',
             replace_in_keymap,
-            content,
+            body,
             flags=re.DOTALL,
         )
 
-    return content
+    return body
 
 
-def get_last_used_layer(content: str) -> int:
+def ensure_action_block_exists(body: str, action_id: str) -> str:
     """
-    Scan the keylayout content to find the highest layer number in use.
+    Ensure an <action id="..."> block exists.
+    - Matches <action ... id="ID" ...> or <action ... id='ID' ...> wherever the id attribute is placed.
+    - If missing, inserts the block before the closing </actions>, using the same indentation.
+    """
+    logger.debug(
+        '%sEnsuring <action id="%s"> block exists…',
+        LOGS_INDENTATION + "\t",
+        action_id,
+    )
+
+    # Match <action ... id="action_id" ...> or with single quotes, id can be anywhere in the tag
+    pattern = rf'<action\b[^>]*\bid\s*=\s*(["\']){re.escape(action_id)}\1'
+
+    if not re.search(pattern, body):
+        indentation = "\n\t\t"
+        block = (
+            f'{indentation}<action id="{action_id}">{indentation}'
+            f'\t<when state="none" output="{action_id}"/>{indentation}'
+            f"</action>"
+        )
+
+        # Insert the <action> block just before the end of the <actions> block
+        body = re.sub(r"(\s*</actions>)", block + r"\1", body, count=1)
+
+    return body
+
+
+def get_last_used_layer(body: str) -> int:
+    """
+    Scan the keylayout body to find the highest layer number in use.
     Returns this number (not the next available one).
     Useful to get the last used layer, then add +1 if needed.
     """
+    logger.info("%sScanning for last used layer…", LOGS_INDENTATION)
+
     # Find all numbers in 'state="sX"' and 'next="sX"'
-    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', content)]
-    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', content)]
+    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', body)]
+    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', body)]
 
     if state_indices or next_indices:
         max_layer = max(state_indices + next_indices)
     else:
         max_layer = 0
+
     logger.info("%sLast used layer: s%d", LOGS_INDENTATION, max_layer)
     return max_layer
 
 
-def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
+def assign_layer_to_action_block_none(
+    body: str, action_id: str, layer_num: int
+) -> str:
     """
-    Assigns a next state (layer) to a single <action id="..."> in the content.
+    Assigns a next state (layer) to a single <action id="..."> in the body.
     Modifies the default <when state="none"/> line to include a 'next' state.
     Works even if action_id is encoded as &lt; or &#x003C; in the XML.
     """
-    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
+    logger.debug(
+        '%sAssigning next state s%d to <action id="%s">…',
+        LOGS_INDENTATION + "\t",
+        layer_num,
+        action_id,
+    )
 
     def repl(match):
         header, body, footer = match.groups()
@@ -217,15 +257,23 @@ def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
         )
         return f"{header}{body}{footer}"
 
-    return re.sub(pattern, repl, content, flags=re.DOTALL)
+    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
+    body = re.sub(pattern, repl, body, flags=re.DOTALL)
+
+    return body
 
 
-def add_terminator_state(content: str, state_number: int, output: str) -> str:
+def add_terminator_state(body: str, state_number: int, output: str) -> str:
     """
     Add a <when state="sX" output="..."/> line inside the <terminators> block.
     Raises ValueError if the state already exists.
     """
-    pattern = r"(<terminators>)(.*?)(</terminators>)"
+    logger.debug(
+        '%sAdding <when state="s%d" output="%s"/> to <terminators>…',
+        LOGS_INDENTATION + "\t",
+        state_number,
+        output,
+    )
 
     def repl(match):
         header, body, footer = match.groups()
@@ -237,10 +285,13 @@ def add_terminator_state(content: str, state_number: int, output: str) -> str:
         new_line = f'\t<when state="s{state_number}" output="{output}"/>'
         return f"{header}{body}{new_line}\n\t{footer}"
 
-    return re.sub(pattern, repl, content, flags=re.DOTALL)
+    pattern = r"(<terminators>)(.*?)(</terminators>)"
+    body = re.sub(pattern, repl, body, flags=re.DOTALL)
+
+    return body
 
 
-def ensure_key_uses_action(content: str, action_id: str) -> str:
+def ensure_key_uses_action_and_not_output(body: str, action_id: str) -> str:
     """
     Ensure that in <keyMap index="1|2|3|5"> blocks,
     any <key ... output="action_id" or action="action_id"> becomes
@@ -248,6 +299,11 @@ def ensure_key_uses_action(content: str, action_id: str) -> str:
     Only modifies <key> tags that actually reference the action_id;
     leaves other keyMaps untouched.
     """
+    logger.debug(
+        "%sEnsuring <key> uses action '%s' in keymaps 1,2,3,5…",
+        LOGS_INDENTATION + "\t",
+        action_id,
+    )
 
     literal = re.escape(action_id)
     hex_variants = []
@@ -292,18 +348,25 @@ def ensure_key_uses_action(content: str, action_id: str) -> str:
 
     # NON-CAPTURING group for the index alternation to ensure exactly 3 capture groups
     pattern = r'(<keyMap index="(?:1|2|3|5)">)(.*?)(</keyMap>)'
-    return re.sub(pattern, process_keymap, content, flags=re.DOTALL)
+    body = re.sub(pattern, process_keymap, body, flags=re.DOTALL)
+
+    return body
 
 
-def add_action_state(
-    content: str, action_id: str, state_number: int, output: str
+def add_action_when_state(
+    body: str, action_id: str, state_number: int, output: str
 ) -> str:
     """
     Insert a new <when state="sX" output="..."/> line inside the <action id="..."> block.
     Raises a ValueError if a <when> with the same state already exists.
     """
-    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
-    content = ensure_action_block(content, action_id)
+    logger.debug(
+        '%sAdding <when state="s%d" output="%s"/> to <action id="%s">…',
+        LOGS_INDENTATION + "\t",
+        state_number,
+        output,
+        action_id,
+    )
 
     def repl(match):
         header, body, footer = match.groups()
@@ -317,5 +380,8 @@ def add_action_state(
         new_line = f'\t<when state="s{state_number}" output="{output}"/>'
         return f"{header}{body}{new_line}\n\t\t{footer}"
 
-    content = re.sub(pattern, repl, content, flags=re.DOTALL)
-    return content
+    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
+    body = ensure_action_block_exists(body, action_id)
+    body = re.sub(pattern, repl, body, flags=re.DOTALL)
+
+    return body

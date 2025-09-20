@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 
 logger = logging.getLogger("ergopti")
-bundle_identifier = "com.apple.com.keyboardlayout.ergopti"
+BUNDLE_IDENTIFIER = "com.apple.com.keyboardlayout.ergopti"
 LOGS_INDENTATION = "\t"
 
 
@@ -88,7 +88,7 @@ def create_bundle(
 
         plist_key = f"KLInfo_{new_name}"
         input_source_id = (
-            f"{bundle_identifier}.plus" if is_plus else bundle_identifier
+            f"{BUNDLE_IDENTIFIER}.plus" if is_plus else BUNDLE_IDENTIFIER
         )
 
         info_plist_entries.append(f"""<key>{plist_key}</key>
@@ -131,7 +131,7 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>{bundle_identifier}</string>
+    <string>{BUNDLE_IDENTIFIER}</string>
     <key>CFBundleName</key>
     <string>Ergopti</string>
     <key>CFBundleVersion</key>

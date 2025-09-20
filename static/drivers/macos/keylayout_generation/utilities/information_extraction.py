@@ -1,3 +1,7 @@
+"""
+Utility for extracting information from keylayout files.
+"""
+
 import re
 
 

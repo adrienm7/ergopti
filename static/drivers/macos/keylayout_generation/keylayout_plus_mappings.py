@@ -1,3 +1,7 @@
+"""
+Mappings for the new dead keys of Ergopti Plus.
+"""
+
 import logging
 from pprint import pprint
 
