@@ -41,7 +41,12 @@ def process_mapping(
     trigger = data["trigger"]
     trigger_variants = get_trigger_variants(trigger)
     for trigger_val, is_trigger_upper in trigger_variants:
-        triggers_to_add = expand_special_trigger(trigger_val, is_trigger_upper)
+        special_upper_triggers = {",": [";", ":"], "'": ["?"]}
+        if is_trigger_upper and trigger_val in special_upper_triggers:
+            triggers_to_add = special_upper_triggers[trigger_val]
+        else:
+            triggers_to_add = [trigger_val]
+
         for actual_trigger in triggers_to_add:
             if actual_trigger in used_triggers:
                 continue  # Skip duplicate trigger
@@ -61,17 +66,6 @@ def process_mapping(
 def get_trigger_variants(trigger: str) -> list[tuple[str, bool]]:
     """Return trigger variants: lowercase and uppercase."""
     return [(trigger, False), (trigger.upper(), True)]
-
-
-def expand_special_trigger(trigger: str, is_upper: bool) -> list[str]:
-    """Return list of actual triggers for special uppercase triggers."""
-    special_upper_triggers = {",": [";", ":"], "'": ["?", "’"]}
-    # Always return both ; and : for comma in uppercase context
-    if is_upper and trigger == ",":
-        return [";", ":"]
-    if is_upper and trigger in special_upper_triggers:
-        return special_upper_triggers[trigger]
-    return [trigger]
 
 
 def build_case_map(
