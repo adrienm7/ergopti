@@ -242,11 +242,11 @@
 			<key code="2" action="E"/>
 			<key code="3" action="U"/>
 			<key code="4" action="V"/>
-			<key code="5" output=" :"/>
+			<key code="5" action=" :"/>
 			<key code="6" action="É"/>
 			<key code="7" action="À"/>
 			<key code="8" action="J"/>
-			<key code="9" output=" ;"/>
+			<key code="9" action=" ;"/>
 			<key code="10" output=" €"/>
 			<key code="11" action="K"/>
 			<key code="12" action="È"/>
@@ -281,7 +281,7 @@
 			<key code="41" action="R"/>
 			<key code="42" output=" !"/>
 			<key code="43" action="L"/>
-			<key code="44" output=" ?"/>
+			<key code="44" action=" ?"/>
 			<key code="45" action="M"/>
 			<key code="46" action="D"/>
 			<key code="47" action="P"/>
@@ -331,11 +331,11 @@
 			<key code="2" action="e"/>
 			<key code="3" action="u"/>
 			<key code="4" action="v"/>
-			<key code="5" output=" :"/>
+			<key code="5" action=" :"/>
 			<key code="6" action="é"/>
 			<key code="7" action="à"/>
 			<key code="8" action="j"/>
-			<key code="9" output=" ;"/>
+			<key code="9" action=" ;"/>
 			<key code="10" output=" €"/>
 			<key code="11" action="k"/>
 			<key code="12" action="è"/>
@@ -370,7 +370,7 @@
 			<key code="41" action="r"/>
 			<key code="42" output=" !"/>
 			<key code="43" action="l"/>
-			<key code="44" output=" ?"/>
+			<key code="44" action=" ?"/>
 			<key code="45" action="m"/>
 			<key code="46" action="d"/>
 			<key code="47" action="p"/>
