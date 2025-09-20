@@ -41,8 +41,7 @@ def process_mapping(
     trigger = data["trigger"]
     trigger_variants = get_trigger_variants(trigger)
     for trigger_val, is_trigger_upper in trigger_variants:
-        special_upper_triggers = {",": [";", " ;", " :"]}
-        special_upper_keys = {"'": ["?", " ?"]}
+        special_upper_triggers = {",": [";", " ;", " :"], "'": ["?", " ?"]}
         if is_trigger_upper and trigger_val in special_upper_triggers:
             triggers_to_add = special_upper_triggers[trigger_val]
         else:
@@ -85,16 +84,21 @@ def build_case_map(
     Generate all key case combinations for a given trigger case.
     Applies output capitalisation rules.
     """
+    special_upper_keys = {"'": ["?", " ?"]}
     new_map = []
     for key_char, value in mapping:
-        # Always add both lowercase and uppercase variants
         key_lower = key_char.lower()
         key_upper = key_char.upper()
         out_lower = get_output_for_case(is_trigger_upper, False, value)
         out_upper = get_output_for_case(is_trigger_upper, True, value)
         new_map.append((key_lower, out_lower))
         if key_upper != key_lower:
+            # i.e. is not a symbol, because symbols don’t have an uppercase version
             new_map.append((key_upper, out_upper))
+        elif key_char in special_upper_keys:
+            for special in special_upper_keys[key_char]:
+                new_map.append((special, out_upper))
+
     return new_map
 
 
