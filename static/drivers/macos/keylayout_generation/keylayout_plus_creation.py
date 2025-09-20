@@ -5,7 +5,7 @@ Keylayout Plus generation utilities for Ergopti: create a variant with extra dea
 import logging
 import re
 
-from keylayout_plus_mappings import plus_mappings
+from keylayout_plus_mappings import get_plus_mappings
 from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
 
@@ -28,12 +28,12 @@ def create_keylayout_plus(content: str):
     content = ergopti_plus_altgr_modifications(content)
     content = ergopti_plus_shiftaltgr_modifications(content)
 
-    start_layer = get_last_used_layer(content) + 1
     logger.info(
-        "%s➕ Adding dead key features for Ergopti+ starting at layer %d…",
+        "%s➕ Adding dead key features for Ergopti+…",
         LOGS_INDENTATION,
-        start_layer,
     )
+    plus_mappings = get_plus_mappings()
+    start_layer = get_last_used_layer(content) + 1
 
     for i, (feature, data) in enumerate(plus_mappings.items()):
         layer = start_layer + i
@@ -218,7 +218,7 @@ def get_last_used_layer(body: str) -> int:
     Returns this number (not the next available one).
     Useful to get the last used layer, then add +1 if needed.
     """
-    logger.info("%sScanning for last used layer…", LOGS_INDENTATION)
+    logger.info("%sScanning for last used layer…", LOGS_INDENTATION + "\t")
 
     # Find all numbers in 'state="sX"' and 'next="sX"'
     state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', body)]
@@ -229,7 +229,7 @@ def get_last_used_layer(body: str) -> int:
     else:
         max_layer = 0
 
-    logger.info("%sLast used layer: s%d", LOGS_INDENTATION, max_layer)
+    logger.info("%sLast used layer: s%d", LOGS_INDENTATION + "\t", max_layer)
     return max_layer
 
 

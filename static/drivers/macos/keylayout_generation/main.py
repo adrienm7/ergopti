@@ -75,7 +75,7 @@ def main(
                 kbdedit_file_path.name,
             )
             processed += 1
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("Error processing %s: %s", kbdedit_file_path.name, e)
             errors += 1
 

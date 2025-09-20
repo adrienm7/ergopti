@@ -45,7 +45,7 @@ def create_bundle(
         if not logo.exists():
             logger.info(
                 "%sLogo file not found: %s, continuing without it",
-                LOGS_INDENTATION + "\t",
+                LOGS_INDENTATION,
                 logo,
             )
             logo_path_to_use = None
@@ -81,7 +81,7 @@ def create_bundle(
             <string>{dest_logo.name}</string>"""
             logger.info(
                 "%sAdded logo %s as %s",
-                LOGS_INDENTATION + "\t",
+                LOGS_INDENTATION,
                 logo_path_to_use.name,
                 dest_logo.name,
             )
@@ -167,7 +167,7 @@ def generate_localizations(
         strings_path.write_text(strings_content, encoding="utf-16")
         logger.info(
             "%s🌍 Added localization mappings for %s: %s",
-            LOGS_INDENTATION + "\t",
+            LOGS_INDENTATION,
             lang,
             strings_path,
         )
@@ -201,4 +201,4 @@ def zip_bundle_folder(bundle_path: Path, zip_path: Path):
                 file_path = Path(root) / file
                 relative_path = file_path.relative_to(bundle_path.parent)
                 zipf.write(file_path, relative_path)
-    logger.info("%s📦 Zipped bundle at: %s", LOGS_INDENTATION + "\t", zip_path)
+    logger.info("%s📦 Zipped bundle at: %s", LOGS_INDENTATION, zip_path)

@@ -1,4 +1,4 @@
-"""Tests for validating a keylayout."""
+"""Tests for validating the structure and syntax of a keylayout."""
 
 import logging
 import re
@@ -24,7 +24,7 @@ def check_valid_xml_structure(body: str) -> None:
             logger.warning("%slxml is not installed.", LOGS_INDENTATION + "\t")
     except Exception as e:
         logger.error("%sInvalid XML structure: %s", LOGS_INDENTATION + "\t", e)
-        raise ValueError("XML structure is not valid.")
+        raise ValueError("XML structure is not valid.") from e
 
     logger.success("%sXML structure is valid.", LOGS_INDENTATION + "\t\t")
 
