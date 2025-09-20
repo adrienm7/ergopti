@@ -94,7 +94,7 @@ def check_each_action_has_id(body: str) -> None:
         logger.error(
             "%s<action> elements missing ID detected:", LOGS_INDENTATION + "\t"
         )
-        for block_name, tags in missing_id_found.items():
+        for _, tags in missing_id_found.items():
             for tag in tags:
                 logger.error("%s— %s", LOGS_INDENTATION + "\t\t", tag.strip())
         raise ValueError(
@@ -254,7 +254,8 @@ def check_unique_action_ids(body: str) -> None:
 
 def check_each_key_has_either_output_or_action(body: str) -> None:
     """
-    Ensure that each <key> element in all <keyMap> blocks has either an output or an action defined, but not both.
+    Ensure that each <key> element in all <keyMap> blocks has either
+    an output or an action defined, but not both.
     Raises ValueError if any <key> violates this rule.
     Displays all offending <key> elements.
     """

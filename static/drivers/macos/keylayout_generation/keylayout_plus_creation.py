@@ -1,5 +1,6 @@
 """
-Keylayout Plus generation utilities for Ergopti: create a variant with extra dead key features and symbol modifications.
+Keylayout Plus generation utilities for Ergopti:
+create a variant with extra dead key features and symbol modifications.
 """
 
 import logging
