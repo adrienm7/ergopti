@@ -109,7 +109,7 @@ def normalize_attribute_entities(body: str) -> str:
 
     def replace_attribute(match):
         attr_name = match.group(1)
-        quote = match.group(2)  # Either " or ', but we force it to become "
+        # quote = match.group(2)  # Either " or ', but we force it to become "
         value = match.group(3)
         return f'{attr_name}="{normalize_value(value)}"'
 

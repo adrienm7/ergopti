@@ -188,7 +188,7 @@ def check_xml_attribute_errors(body: str) -> None:
                 errors.append((i, line.strip(), "Missing '=' in attribute"))
                 continue
 
-            name, value = attr.split("=", 1)
+            _, value = attr.split("=", 1)
             value = value.strip()
 
             # Value must start and end with same quote

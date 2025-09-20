@@ -18,6 +18,7 @@ def main(
     output_directory: Path = None,
     overwrite: bool = False,
 ) -> None:
+    """Main function to generate keylayout files and bundle from kbdedit files."""
     # Determine output directory
     if output_directory:
         output_directory = Path(output_directory).resolve()
@@ -100,6 +101,7 @@ def log_section(title: str) -> None:
 def generate_keylayout(
     kbdedit_file_path: Path, output_directory: Path, overwrite: bool
 ) -> Path:
+    """Generate a corrected keylayout file from the given kbdedit file."""
     logger.launch("Creating corrected keylayout from: %s", kbdedit_file_path)
 
     base_file_path = output_directory / (
@@ -123,6 +125,7 @@ def generate_keylayout(
 def generate_keylayout_plus(
     base_file_path: Path, output_directory: Path, overwrite: bool
 ) -> Path:
+    """Generate the 'plus' version of a keylayout file."""
     plus_file_path = output_directory / (
         base_file_path.stem + "_plus" + base_file_path.suffix
     )
@@ -151,6 +154,7 @@ def generate_bundle(
     keylayout_paths: list[Path],
     logo_paths: list[Path] = None,
 ) -> Path:
+    """Generate a .bundle package containing the provided keylayout files."""
     logger.launch("Building bundle for version %s", version)
 
     match = re.search(r"(v\d+\.\d+\.\d+)", version)

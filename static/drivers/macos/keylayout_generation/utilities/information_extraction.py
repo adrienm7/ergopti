@@ -7,7 +7,8 @@ import re
 
 def extract_version_from_file(file_path) -> str:
     """
-    Extracts the version string (e.g. v1.2.3, v1.2.3 Beta 2) from the name attribute in the given file.
+    Extracts the version string (e.g. v1.2.3, v1.2.3 Beta 2)
+    from the name attribute in the given file.
     Returns 'vX.X.X' if not found.
     """
 
