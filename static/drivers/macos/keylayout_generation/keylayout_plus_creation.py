@@ -52,26 +52,27 @@ def create_keylayout_plus(content: str):
             continue
 
         # Create the new dead key
+        content = ensure_key_uses_action_and_not_output(content, trigger_key)
         content = ensure_action_block_exists(content, trigger_key)
         content = assign_layer_to_action_block_none(content, trigger_key, layer)
         content = add_terminator_state(content, layer, trigger_key)
 
         # Add all dead key outputs
-        for action_id, output in data["map"]:
+        for trigger, output in data["map"]:
             logger.debug(
                 "%s— Adding output '%s' + '%s' ➜ '%s'…",
                 LOGS_INDENTATION + "\t\t",
                 trigger_key,
-                action_id,
+                trigger,
                 output,
             )
 
-            # Ensure any <key ... output="action_id"> is converted to action="action_id"
+            # Ensure any <key ... output="trigger"> is converted to action="trigger"
             # This is necessary, otherwise the key will always have the same output, despite being in a dead key layer
-            content = ensure_key_uses_action_and_not_output(content, action_id)
+            content = ensure_key_uses_action_and_not_output(content, trigger)
 
             # Add the new output on the key when in the dead key layer
-            content = add_action_when_state(content, action_id, layer, output)
+            content = add_action_when_state(content, trigger, layer, output)
 
     content = sort_keylayout(content)
     validate_keylayout(content)
