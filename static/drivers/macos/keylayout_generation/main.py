@@ -110,13 +110,9 @@ def generate_keylayout(
     if not can_overwrite_file(base_file_path, overwrite):
         return base_file_path
 
-    with kbdedit_file_path.open("r", encoding="utf-8") as f:
-        content = f.read()
-
+    content = kbdedit_file_path.read_text(encoding="utf-8")
     content_corrected = correct_keylayout(content)
-
-    with base_file_path.open("w", encoding="utf-8") as f:
-        f.write(content_corrected)
+    base_file_path.write_text(content_corrected, encoding="utf-8")
 
     logger.success("Corrected keylayout saved at: %s", base_file_path)
     return base_file_path
@@ -135,13 +131,9 @@ def generate_keylayout_plus(
     if not can_overwrite_file(plus_file_path, overwrite):
         return plus_file_path
 
-    with base_file_path.open("r", encoding="utf-8") as f:
-        content = f.read()
-
+    content = base_file_path.read_text(encoding="utf-8")
     content_plus = create_keylayout_plus(content)
-
-    with plus_file_path.open("w", encoding="utf-8") as f:
-        f.write(content_plus)
+    plus_file_path.write_text(content_plus, encoding="utf-8")
 
     logger.success("Keylayout plus saved at: %s", plus_file_path)
     return plus_file_path

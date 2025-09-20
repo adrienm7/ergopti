@@ -52,24 +52,26 @@ def create_bundle(
         else:
             logo_path_to_use = logo
 
-        # read and patch keylayout content
+        # Read and patch keylayout content
         content = keylayout.read_text(encoding="utf-8")
         is_plus = "plus" in keylayout.stem.lower()
         new_name = "Ergopti Plus" if is_plus else "Ergopti"
+
+        # Necessary for the layout to be found in "French" layouts instead of "Others"
         content = re.sub(
             r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
             rf"\1{new_name}\3",
             content,
         )
 
-        # determine output file name
+        # Determine output file name
         dest_filename = f"{new_name}.keylayout"
         dest_layout = resources_path / dest_filename
         dest_layout.write_text(content, encoding="utf-8")
 
         layout_localization_infos.append((new_name, is_plus))
 
-        # copy logo file with matching base name
+        # Copy logo file with matching base name
         icon_tag = ""
         if logo_path_to_use:
             dest_logo = resources_path / f"{new_name}.icns"
@@ -159,7 +161,7 @@ def generate_localizations(
         lines = []
         for original_name, is_plus in layouts:
             localized = (
-                f"Ergopti+ v{version}" if is_plus else f"Ergopti v{version}"
+                f"Ergopti+ {version}" if is_plus else f"Ergopti {version}"
             )
             lines.append(f'"{original_name}" = "{localized}";')
 
@@ -181,11 +183,11 @@ def generate_version_plist(version: str) -> str:
 <plist version="1.0">
 <dict>
     <key>BuildVersion</key>
-    <string>{version}</string>
+    <string>{version.lstrip("v")}</string>
     <key>ProjectName</key>
     <string>Ergopti</string>
     <key>SourceVersion</key>
-    <string>{version}</string>
+    <string>{version.lstrip("v")}</string>
 </dict>
 </plist>
 """
