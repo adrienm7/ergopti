@@ -10,6 +10,7 @@ from keylayout_plus_mappings import get_plus_mappings
 from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
 
+EXTRA_KEYS = [27] + list(range(51, 150))
 logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
 
@@ -294,63 +295,43 @@ def add_terminator_state(body: str, state_number: int, output: str) -> str:
 
 def ensure_key_uses_action_and_not_output(body: str, action_id: str) -> str:
     """
-    Ensure that in <keyMap index="1|2|3|5"> blocks,
+    Ensure that in <keyMap index="0|1|2|3|5|6|7|8"> blocks,
     any <key ... output="action_id" or action="action_id"> becomes
-    <key ... action="action_id"> (preserving other attributes).
-    Only modifies <key> tags that actually reference the action_id;
-    leaves other keyMaps untouched.
+    <key ... action="action_id"> (preserving other attributes),
+    but only for keys whose code is NOT in EXTRA_KEYS.
     """
     logger.debug(
-        "%sEnsuring <key> uses action '%s' in keymaps 1,2,3,5…",
+        "%sEnsuring <key> uses action '%s' in keymaps 0, 1, 2, 3, 5, 6, 7, 8…",
         LOGS_INDENTATION + "\t",
         action_id,
     )
+    for idx in (0, 1, 2, 3, 5, 6, 7, 8):
+        pattern = rf'(<keyMap index="{idx}">)(.*?)(</keyMap>)'
 
-    literal = re.escape(action_id)
-    hex_variants = []
-    if len(action_id) == 1:
-        codepoint = ord(action_id)
-        hex_variants = [f"&#x{codepoint:04X};", f"&#x{codepoint:04x};"]
+        def repl_keymap(m):
+            header, content, footer = m.groups()
 
-    def process_keymap(match):
-        # use explicit group access to avoid unpacking issues
-        header = match.group(1)
-        body = match.group(2)
-        footer = match.group(3)
+            def key_repl(km):
+                tag = km.group(0)
+                code_match = re.search(r'code="(\d+)"', tag)
+                code = int(code_match.group(1)) if code_match else None
+                if re.search(rf'(output|action)="{re.escape(action_id)}"', tag):
+                    new_tag = re.sub(r'\s+(output|action)="[^"]*"', "", tag)
+                    if code in EXTRA_KEYS:
+                        new_tag = (
+                            new_tag[:-2].rstrip() + f' output="{action_id}"/>'
+                        )
+                    else:
+                        new_tag = (
+                            new_tag[:-2].rstrip() + f' action="{action_id}"/>'
+                        )
+                    return new_tag
+                return tag
 
-        def repl_key(tag_match):
-            tag = tag_match.group(0)
-            found = False
-            if re.search(rf'\b(?:output|action)="{literal}"', tag):
-                found = True
-            else:
-                for hv in hex_variants:
-                    if re.search(
-                        rf'\b(?:output|action)="{re.escape(hv)}"', tag
-                    ):
-                        found = True
-                        break
+            new_content = re.sub(r"<key\b[^>]*?/?>", key_repl, content)
+            return f"{header}{new_content}{footer}"
 
-            if not found:
-                return tag  # leave untouched
-
-            # remove only output="..." and action="..."
-            new_tag = re.sub(r'\s+(?:output|action)="[^"]*"', "", tag)
-
-            # insert the unified action="..."
-            if new_tag.endswith("/>"):
-                new_tag = new_tag[:-2].rstrip() + f' action="{action_id}"/>'
-            else:
-                new_tag = new_tag[:-1].rstrip() + f' action="{action_id}">'
-            return new_tag
-
-        body = re.sub(r"<key\b[^>]*\/?>", repl_key, body)
-        return f"{header}{body}{footer}"
-
-    # NON-CAPTURING group for the index alternation to ensure exactly 3 capture groups
-    pattern = r'(<keyMap index="(?:1|2|3|5)">)(.*?)(</keyMap>)'
-    body = re.sub(pattern, process_keymap, body, flags=re.DOTALL)
-
+        body = re.sub(pattern, repl_keymap, body, flags=re.DOTALL)
     return body
 
 
