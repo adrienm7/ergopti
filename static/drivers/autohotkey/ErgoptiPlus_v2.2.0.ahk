@@ -56,10 +56,9 @@ SendInstant(Text) {
 }
 
 ; Leave time to trigger hotstrings between sending a character and then another one
-HotstringsTriggerDelay := 30 ; in ms
 ActivateHotstrings() {
     SendNewResult(" ")
-    Sleep(HotstringsTriggerDelay)
+    Sleep(50) ; in ms
     SendFinalResult("{BackSpace}")
 }
 
@@ -122,14 +121,6 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
         return
     }
 
-    if WinActive("ahk_class Notepad") {
-        SleepDelay := 20
-        SleepDelayBackSpace := 30
-    } else {
-        SleepDelay := 0
-        SleepDelayBackSpace := 0
-    }
-
     ; We pass the abbreviation as argument to delete it manually, as we use the B0 flag
     ; This is to make it work everywhere, like in URL bar or in the code inspector inside navigators
     ; Otherwise, typing hc to get wh gives hwh for example when trying to type "white"
@@ -140,28 +131,29 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
         NumberOfCharactersToDelete := NumberOfCharactersToDelete + 1
     }
 
+    if WinActive("ahk_class Notepad") {
+        ; In Windows 11 Notepad, hotstrings don’t work properly, this is a Windows bug, not AutoHotkey one
+        ; This workaround makes it work, but we lose the ability to trigger another hotstring after this one
+        if (EndChar == "`t") {
+            SendFinalResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
+        }
+        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        SendInstant(Replacement . EndChar)
+        return
+    }
+
     if FinalResult {
         if (EndChar == "`t") {
             SendFinalResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
-        Sleep(SleepDelay)
-        loop NumberOfCharactersToDelete {
-            SendFinalResult("{BackSpace}", Map("OnlyText", False))
-            Sleep(SleepDelayBackSpace) ; Necessary for it to work in the Notepad with "," shortcuts
-        }
-        Sleep(SleepDelay)
+        SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
         SendFinalResult(Replacement, Map("OnlyText", OnlyText))
-        SendFinalResult(EndChar)
+        SendFinalResult(EndChar, Map("OnlyText", False))
     } else {
         if (EndChar == "`t") {
             SendNewResult("^{BackSpace}", Map("OnlyText", False)) ; To remove the tab
         }
-        Sleep(SleepDelay)
-        loop NumberOfCharactersToDelete {
-            SendNewResult("{BackSpace}", Map("OnlyText", False))
-            Sleep(SleepDelayBackSpace) ; Necessary for it to work in the Notepad with "," shortcuts
-        }
-        Sleep(SleepDelay)
+        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
         SendNewResult(Replacement, Map("OnlyText", OnlyText))
         SendNewResult(EndChar, Map("OnlyText", False))
     }
@@ -942,7 +934,7 @@ global Features := Map(
         "LCtrlPaste", {
             Enabled: True,
             Description: "`"LCtrl`" : Ctrl + V en tap, Ctrl en hold",
-            TimeActivationSeconds: 0.35,
+            TimeActivationSeconds: 0.2,
         },
         "LAlt", Map(
             "AltTabMonitor", {
@@ -1053,7 +1045,7 @@ global Features := Map(
 global PersonalInformation := Map(
     "FirstName", "Prénom",
     "LastName", "Nom",
-    "DateOfBirth", "01/01/2020",
+    "DateOfBirth", "01/01/2000",
     "EmailAddress", "prenom.nom@mail.fr",
     "WorkEmailAddress", "prenom.nom@mail.pro",
     "PhoneNumber", "0606060606",
@@ -1476,9 +1468,9 @@ NoAction(*) {
 }
 
 ToggleAllFeaturesOn(*) {
-    ; MsgBox(
-    ;     "⚠ ATTENTION : Toutes les fonctionnalités ont été activées. Cela inclut les différents raccourcis que l’on peut choisir d’avoir sur la même combinaison de touches. Par défaut, le premier raccourci actif d’une combinaison de touches sera celui utilisé, les autres raccourcis actifs sur cette même combinaison n’auront pas d’effet. Après cette opération, il est cependant très fortement recommandé de DÉSACTIVER MANUELLEMENT LES RACCOURCIS EN CONFLIT pour éviter de futurs potentiels problèmes."
-    ; )
+    MsgBox(
+        "⚠ ATTENTION : Toutes les fonctionnalités ont été activées, même quelques unes désactivées par défaut."
+    )
     ToggleAllFeatures(1)
 }
 ToggleAllFeaturesOff(*) {
@@ -1980,6 +1972,7 @@ global DeadkeyMappingSubscript := Map(
     "z", "", "Z", "ᴢ", ; There is no subscript z yet in Unicode
     "[", "˻", "]", "˼",
     "æ", "", "Æ", "ᴁ", ; There is no subscript æ yet in Unicode
+    "è", "ᵧ", "Y", "", ; There is no subscript capital ᵧ yet in Unicode
     "ê", "ᵩ", "Ê", "", ; There is no subscript capital ᵩ yet in Unicode
     "œ", "", "Œ", "ɶ", ; There is no subscript œ yet in Unicode
 )
@@ -2081,22 +2074,27 @@ global DeadkeyMappingCurrency := Map(
 ; ======= 3.1) Base =======
 ; =========================
 
-if Features["Layout"]["DirectAccessDigits"].Enabled {
-    ; === Number row ===
-    SC029:: SendNewResult("$") ; We need to do this, otherwise it may trigger and lock AltGr
-    RemapKey("SC002", "1")
-    RemapKey("SC003", "2")
-    RemapKey("SC004", "3")
-    RemapKey("SC005", "4")
-    RemapKey("SC006", "5")
-    RemapKey("SC007", "6")
-    RemapKey("SC008", "7")
-    RemapKey("SC009", "8")
-    RemapKey("SC00A", "9")
-    RemapKey("SC00B", "0")
-    SC00C:: SendNewResult("%") ; We need to do this, otherwise it may trigger and lock AltGr
-    SC00D:: SendNewResult("=") ; We need to do this, otherwise it may trigger and lock AltGr
-}
+#HotIf Features["Layout"]["DirectAccessDigits"].Enabled
+; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
+; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
+; Otherwise, there is a problem of digit password boxes that skips to the n+2 box instead of n+2 because two down key events are sent by key
+; One example is on the password box of https://github.com/login/device where they implemented an AutoShift in the boxes
+
+; === Number row ===
+SC029:: SendNewResult("$")
+SC002:: SendEvent("{1 Down}") UpdateLastSentCharacter("1")
+SC003:: SendEvent("{2 Down}") UpdateLastSentCharacter("2")
+SC004:: SendEvent("{3 Down}") UpdateLastSentCharacter("3")
+SC005:: SendEvent("{4 Down}") UpdateLastSentCharacter("4")
+SC006:: SendEvent("{5 Down}") UpdateLastSentCharacter("5")
+SC007:: SendEvent("{6 Down}") UpdateLastSentCharacter("6")
+SC008:: SendEvent("{7 Down}") UpdateLastSentCharacter("7")
+SC009:: SendEvent("{8 Down}") UpdateLastSentCharacter("8")
+SC00A:: SendEvent("{9 Down}") UpdateLastSentCharacter("9")
+SC00B:: SendEvent("{0 Down}") UpdateLastSentCharacter("0")
+SC00C:: SendNewResult("%")
+SC00D:: SendNewResult("=")
+#HotIf
 
 if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC039", " ")
@@ -2157,9 +2155,8 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
 
     ; === Number row ===
     +SC029:: {
-        SendNewResult(" ") ; Thin non-breaking space
-        Sleep(HotstringsTriggerDelay)
-        SendNewResult("€")
+        ActivateHotstrings()
+        SendFinalResult(" €") ; Thin non-breaking space
     }
     +SC002:: SendNewResult("1")
     +SC003:: SendNewResult("2")
@@ -2172,9 +2169,8 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC00A:: SendNewResult("9")
     +SC00B:: SendNewResult("0")
     +SC00C:: {
-        SendNewResult(" ") ; Thin non-breaking space
-        Sleep(HotstringsTriggerDelay)
-        SendNewResult("%")
+        ActivateHotstrings()
+        SendFinalResult(" %") ; Thin non-breaking space
     }
     +SC00D:: SendNewResult("º")
 
@@ -2198,9 +2194,8 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC020:: SendNewResult("E")
     +SC021:: SendNewResult("U")
     +SC022:: {
-        SendNewResult(" ") ; Non-breaking space
-        Sleep(HotstringsTriggerDelay)
-        SendNewResult(":")
+        ActivateHotstrings()
+        SendFinalResult(" :") ; Non-breaking space
     }
     +SC023:: SendNewResult("V")
     +SC024:: SendNewResult("S")
@@ -2209,9 +2204,8 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC027:: SendNewResult("R")
     +SC028:: SendNewResult("Q")
     +SC02B:: {
-        SendNewResult(" ") ; Thin non-breaking space
-        Sleep(HotstringsTriggerDelay)
-        SendNewResult("!")
+        ActivateHotstrings()
+        SendFinalResult(" !") ; Thin non-breaking space
     }
 
     ; === Bottom row ===
@@ -2220,9 +2214,8 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC02D:: SendNewResult("À")
     +SC02E:: SendNewResult("J")
     +SC02F:: {
-        SendNewResult(" ") ; Thin non-breaking space
-        Sleep(HotstringsTriggerDelay)
-        SendNewResult(";")
+        ActivateHotstrings()
+        SendFinalResult(" ;") ; Thin non-breaking space
     }
     +SC030:: SendNewResult("K")
     +SC031:: SendNewResult("M")
@@ -2230,9 +2223,8 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC033:: SendNewResult("L")
     +SC034:: SendNewResult("P")
     +SC035:: {
-        SendNewResult(" ") ; Thin non-breaking space
-        Sleep(HotstringsTriggerDelay)
-        SendNewResult("?")
+        ActivateHotstrings()
+        SendFinalResult(" ?") ; Thin non-breaking space
     }
 }
 
@@ -4908,6 +4900,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "chomage", "chômage")
     CreateCaseSensitiveHotstrings("", "chomer", "chômer")
     CreateCaseSensitiveHotstrings("*", "chomeu", "chômeu")
+    CreateCaseSensitiveHotstrings("*", "chomé", "chômé")
     CreateCaseSensitiveHotstrings("*", "cloture", "clôture")
     CreateCaseSensitiveHotstrings("*", "cloturé", "clôturé")
     CreateCaseSensitiveHotstrings("*", "coeur", "cœur")
@@ -5447,7 +5440,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "admin★", "administrateur")
     CreateCaseSensitiveHotstrings("*", "afr★", "à faire")
     CreateCaseSensitiveHotstrings("*", "ah★", "aujourd’hui")
-    CreateHotstring("*", "ahk★", "AutoHotkey")
+    CreateHotstring("*", "ahk★", "AutoHotkey", Map("FinalResult", True))
     CreateCaseSensitiveHotstrings("*", "ajd★", "aujourd’hui")
     CreateCaseSensitiveHotstrings("*", "algo★", "algorithme")
     CreateCaseSensitiveHotstrings("*", "alpha★", "alphabétique")
@@ -5893,6 +5886,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "sya★", "s’il y a")
     CreateCaseSensitiveHotstrings("*", "syn★", "synonyme")
     CreateCaseSensitiveHotstrings("*", "sync★", "synchronisation")
+    CreateCaseSensitiveHotstrings("*", "syncro★", "synchronisation")
     CreateCaseSensitiveHotstrings("*", "sys★", "système")
 
     ; === T ===
@@ -6366,9 +6360,9 @@ if Features["MagicKey"]["TextExpansionSymbols"].Enabled {
     CreateHotstring("*C", "(not equivalent)★", "⇎")
 
     ; === Arrows ===
-    CreateHotstring("*C", ">★", "➢")
     CreateHotstring("*C", " -> ★", "➜")
     CreateHotstring("*C", "-->★", "➜")
+    CreateHotstring("*C", ">★", "➢") ; ATtention, order matters, needs to be after -->
     CreateHotstring("*C", "==>★", "⇒")
     CreateHotstring("*C", "=/=>★", "⇏")
     CreateHotstring("*C", "<==★", "⇐")
@@ -6397,10 +6391,10 @@ if Features["MagicKey"]["TextExpansionSymbols"].Enabled {
     CreateHotstring("*C", "°C★", "℃")
     CreateHotstring("*C", "(b)★", "•")
     CreateHotstring("*C", "(c)★", "©")
-    CreateHotstring("*?", "eme★", "ᵉ")
-    CreateHotstring("*?", "ème★", "ᵉ")
-    CreateHotstring("*?", "ieme★", "ᵉ")
-    CreateHotstring("*?", "ième★", "ᵉ")
+    CreateHotstring("*", "eme★", "ᵉ")
+    CreateHotstring("*", "ème★", "ᵉ")
+    CreateHotstring("*", "ieme★", "ᵉ")
+    CreateHotstring("*", "ième★", "ᵉ")
     CreateHotstring("*C", "(o)★", "•")
     CreateHotstring("*C", "(r)★", "®")
     CreateHotstring("*C", "(tm)★", "™")
