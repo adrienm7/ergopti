@@ -1,4 +1,7 @@
-def add_case_sensitive_mappings(orig_mappings: dict) -> dict:
+import re
+
+
+def add_case_sensitive_mappings(mappings: dict) -> dict:
     """
     Generate mappings for all trigger/key case combinations.
     Special handling for triggers like ',' to produce multiple uppercase variants.
@@ -11,7 +14,7 @@ def add_case_sensitive_mappings(orig_mappings: dict) -> dict:
     """
     # First, ensure all original mappings have both lower/upper key variants
     new_mappings = {}
-    for key, data in orig_mappings.items():
+    for key, data in mappings.items():
         if not data.get("map"):
             new_mappings[key] = data.copy()
             continue
@@ -24,7 +27,7 @@ def add_case_sensitive_mappings(orig_mappings: dict) -> dict:
     used_triggers = set()
     for data in new_mappings.values():
         used_triggers.add(data["trigger"])
-    for key, data in orig_mappings.items():
+    for key, data in mappings.items():
         if not data.get("map"):
             continue
         process_mapping(new_mappings, key, data, used_triggers)
@@ -109,38 +112,64 @@ def get_output_for_case(
         return value
 
 
-def escape_symbols_in_mappings(orig_mappings: dict) -> dict:
+def escape_symbols_in_mappings(mappings: dict) -> dict:
     """
-    Go through all mappings and replace XML-breaking characters in the outputs
-    with their numeric character references, avoiding double escaping.
+    Go through all mappings and replace XML-breaking characters in the triggers and outputs.
     """
     new_mappings = {}
-    for key, data in orig_mappings.items():
-        trigger = data["trigger"]
+    for feature, data in mappings.items():
+        feature = escape_xml_characters(feature)
+        trigger = escape_xml_characters(data["trigger"])
+
         if not data["map"]:
-            new_mappings[key] = {"trigger": trigger, "map": []}
+            new_mappings[feature] = {"trigger": trigger, "map": []}
             continue
 
         fixed_map = []
-        for trig, out in data["map"]:
-            fixed_out = escape_xml_characters(out)
-            fixed_map.append((escape_xml_characters(trig), fixed_out))
+        for character, output in data["map"]:
+            fixed_map.append(
+                (
+                    escape_xml_characters(character),
+                    escape_xml_characters(output),
+                )
+            )
 
-        new_mappings[key] = {"trigger": trigger, "map": fixed_map}
+        new_mappings[feature] = {
+            "trigger": trigger,
+            "map": fixed_map,
+        }
 
     return new_mappings
 
 
 def escape_xml_characters(value: str) -> str:
     """
-    Escape &, <, >, " in value for XML, but leave already escaped sequences intact.
+    Escape &, <, >, " and ' in the given string for XML.
+    Already-escaped sequences like &#xNNNN; are preserved.
     """
-    if "&#x" in value:
+    if not value:
         return value
-    return (
-        value.replace("&", "&#x0026;")
+
+    # Regex to detect numeric XML entities like &#x0026;
+    numeric_entity_pattern = re.compile(r"&#x[0-9A-Fa-f]+;")
+
+    # Split by numeric entities, escape only non-entities
+    parts = numeric_entity_pattern.split(value)
+    entities = numeric_entity_pattern.findall(value)
+
+    escaped_parts = [
+        part.replace("&", "&#x0026;")
         .replace("<", "&#x003C;")
         .replace(">", "&#x003E;")
         .replace('"', "&#x0022;")
         .replace("'", "&#x0027;")
+        for part in parts
+    ]
+
+    # Reconstruct while preserving original entities
+    result = "".join(
+        p + (e if i < len(entities) else "")
+        for i, (p, e) in enumerate(zip(escaped_parts, entities + [""]))
     )
+
+    return result

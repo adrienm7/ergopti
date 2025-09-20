@@ -8,7 +8,7 @@ from utilities.mappings_functions import (
 
 logger = logging.getLogger("ergopti")
 
-mappings = {
+plus_mappings = {
     "comma_j_letters_sfbs": {
         "trigger": ",",
         "map": [
@@ -258,14 +258,14 @@ mappings = {
 }
 
 
-mappings = add_case_sensitive_mappings(mappings)
-mappings = escape_symbols_in_mappings(mappings)
+plus_mappings = add_case_sensitive_mappings(plus_mappings)
+plus_mappings = escape_symbols_in_mappings(plus_mappings)
 
 
-def check_duplicate_triggers(mappings_to_check: dict):
-    """Check for duplicate trigger characters in the mappings."""
+def check_duplicate_triggers(mappings: dict):
+    """Check for duplicate trigger characters in the plus_mappings."""
     triggers = {}
-    for key, data in mappings_to_check.items():
+    for key, data in mappings.items():
         trigger = data["trigger"]
         if trigger in triggers:
             logger.error(
@@ -278,7 +278,7 @@ def check_duplicate_triggers(mappings_to_check: dict):
             triggers[trigger] = key
 
 
-check_duplicate_triggers(mappings)
+check_duplicate_triggers(plus_mappings)
 
 if __name__ == "__main__":
-    pprint(mappings, indent=2, width=120)
+    pprint(plus_mappings, indent=2, width=120)
