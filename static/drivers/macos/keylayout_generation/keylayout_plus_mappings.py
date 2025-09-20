@@ -269,7 +269,10 @@ def check_duplicate_triggers(mappings_to_check: dict):
         trigger = data["trigger"]
         if trigger in triggers:
             logger.error(
-                f" Duplicate trigger '{trigger}' found in '{key}' and '{triggers[trigger]}'"
+                "Duplicate trigger '%s' found in '%s' and '%s'",
+                trigger,
+                key,
+                triggers[trigger],
             )
         else:
             triggers[trigger] = key

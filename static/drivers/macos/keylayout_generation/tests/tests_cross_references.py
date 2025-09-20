@@ -14,7 +14,8 @@ def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
     Displays all missing action references.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that all keyMap actions exist in <actions>…"
+        "%s🔹 Checking that all keyMap actions exist in <actions>…",
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract all action IDs defined in <actions>
@@ -23,7 +24,7 @@ def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
     )
     if not actions_match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <actions> block found, skipping."
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
         )
         return
 
@@ -55,16 +56,20 @@ def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
 
     if missing_actions_found:
         logger.info(
-            f"{LOGS_INDENTATION}\tKeyMap actions not defined in <actions> detected:"
+            "%sKeyMap actions not defined in <actions> detected:",
+            LOGS_INDENTATION + "\t",
         )
         for keymap_name, tags in missing_actions_found.items():
-            logger.info(f"{LOGS_INDENTATION}\t\t• KeyMap {keymap_name}:")
+            logger.info(
+                "%s• KeyMap %s:", LOGS_INDENTATION + "\t\t", keymap_name
+            )
             for tag in tags:
-                logger.info(f"{LOGS_INDENTATION}\t\t\t— {tag.strip()}")
+                logger.info("%s— %s", LOGS_INDENTATION + "\t\t\t", tag.strip())
         raise ValueError("Some keyMap actions are missing in <actions>.")
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tAll keyMap actions are defined in <actions>."
+        "%stAll keyMap actions are defined in <actions>.",
+        LOGS_INDENTATION + "\t\t",
     )
 
 
@@ -73,7 +78,8 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
     Ensure that every <action id="..."> in <actions> is referenced by at least one <key> in keyMaps.
     """
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Checking that all <actions> are used in keyMaps…"
+        "%s🔹 Checking that all <actions> are used in keyMaps…",
+        LOGS_INDENTATION + "\t",
     )
 
     # Extract the <actions> block
@@ -82,7 +88,7 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
     )
     if not actions_match:
         logger.warning(
-            f"{LOGS_INDENTATION}\t\t️  No <actions> block found, skipping."
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
         )
         return
 
@@ -107,12 +113,16 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
     unused_action_ids = set(defined_actions.keys()) - used_actions
 
     if unused_action_ids:
-        logger.error(f"{LOGS_INDENTATION}\tUnused <action> blocks detected:")
+        logger.error(
+            "%sUnused <action> blocks detected:", LOGS_INDENTATION + "\t"
+        )
         for action_id in unused_action_ids:
             logger.error(
-                f"{LOGS_INDENTATION}\t\t— {defined_actions[action_id].strip()}"
+                "%s— %s",
+                LOGS_INDENTATION + "\t\t",
+                defined_actions[action_id].strip(),
             )
 
     logger.success(
-        f"{LOGS_INDENTATION}\t\tAll <action> blocks are used in keyMaps."
+        "%sAll <action> blocks are used in keyMaps.", LOGS_INDENTATION + "\t\t"
     )

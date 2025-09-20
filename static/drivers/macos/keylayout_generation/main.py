@@ -64,7 +64,7 @@ def main(
                 base_file_path, output_directory, overwrite
             )
 
-            bundle_path = generate_bundle(
+            generate_bundle(
                 version,
                 output_directory,
                 overwrite,
