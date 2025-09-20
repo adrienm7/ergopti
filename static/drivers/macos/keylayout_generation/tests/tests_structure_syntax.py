@@ -6,16 +6,14 @@ import re
 from lxml import etree as lxml_etree
 
 logger = logging.getLogger("ergopti")
-LOGS_INDENTATION = "\t"
+LOGS_INDENTATION = "\t\t"
 
 
 def check_valid_xml_structure(body: str) -> None:
     """
     Checks that the XML is well-formed (all tags opened/closed, no illegal characters, etc.).
     """
-    logger.info(
-        "%s🔹 Checking XML structure validity…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking XML structure validity…", LOGS_INDENTATION)
     try:
         try:
             parser = lxml_etree.XMLParser(recover=True, resolve_entities=True)
@@ -26,16 +24,14 @@ def check_valid_xml_structure(body: str) -> None:
         logger.error("%sInvalid XML structure: %s", LOGS_INDENTATION + "\t", e)
         raise ValueError("XML structure is not valid.") from e
 
-    logger.success("%sXML structure is valid.", LOGS_INDENTATION + "\t\t")
+    logger.success("%sXML structure is valid.", LOGS_INDENTATION + "\t")
 
 
 def check_required_blocks_present(body: str) -> None:
     """
     Checks that all required blocks are present.
     """
-    logger.info(
-        "%s🔹 Checking required blocks presence…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking required blocks presence…", LOGS_INDENTATION)
 
     required = ["keyMapSet", "actions", "terminators"]
     for block in required:
@@ -46,7 +42,7 @@ def check_required_blocks_present(body: str) -> None:
             raise ValueError(f"Required block <{block}> missing.")
 
     logger.success(
-        "%sAll required blocks are present.", LOGS_INDENTATION + "\t\t"
+        "%sAll required blocks are present.", LOGS_INDENTATION + "\t"
     )
 
 
@@ -54,9 +50,7 @@ def check_forbidden_tags_or_attributes(body: str) -> None:
     """
     Checks that no forbidden tag or attribute is present.
     """
-    logger.info(
-        "%s🔹 Checking forbidden tags or attributes…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking forbidden tags or attributes…", LOGS_INDENTATION)
     allowed_tags = {
         "action",
         "actions",
@@ -107,7 +101,7 @@ def check_forbidden_tags_or_attributes(body: str) -> None:
             raise ValueError(f"Forbidden attribute: {attr}.")
 
     logger.success(
-        "%sNo forbidden tags or attributes.", LOGS_INDENTATION + "\t\t"
+        "%sNo forbidden tags or attributes.", LOGS_INDENTATION + "\t"
     )
 
 
@@ -117,7 +111,7 @@ def check_forbidden_empty_attribute_values(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking forbidden empty attribute values…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
     forbidden = ["id", "code", "action", "state"]
     for match in re.finditer(r"<(\w+)[^>]*>", body):
@@ -146,7 +140,7 @@ def check_forbidden_empty_attribute_values(body: str) -> None:
                     raise ValueError(f"Empty value for attribute {attr}.")
 
     logger.success(
-        "%sNo forbidden empty attribute values.", LOGS_INDENTATION + "\t\t"
+        "%sNo forbidden empty attribute values.", LOGS_INDENTATION + "\t"
     )
 
 
@@ -154,9 +148,7 @@ def check_consistent_attribute_quotes(body: str) -> None:
     """
     Check that all attributes use the same type of quotes (single or double) throughout the file.
     """
-    logger.info(
-        "%s🔹 Checking consistent attribute quotes…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking consistent attribute quotes…", LOGS_INDENTATION)
     # Extract all quote types used for attribute values
     quotes = re.findall(r'\w+=("|\')', body)
     if quotes:
@@ -167,7 +159,7 @@ def check_consistent_attribute_quotes(body: str) -> None:
             )
 
     logger.success(
-        "%sAttribute quotes are consistent.", LOGS_INDENTATION + "\t\t"
+        "%sAttribute quotes are consistent.", LOGS_INDENTATION + "\t"
     )
 
 
@@ -177,9 +169,7 @@ def check_xml_attribute_errors(body: str) -> None:
     Raises ValueError if malformed attributes are found.
     Displays the offending lines.
     """
-    logger.info(
-        "%s🔹 Checking for malformed XML attributes…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking for malformed XML attributes…", LOGS_INDENTATION)
 
     lines = body.splitlines()
     errors = []
@@ -220,28 +210,26 @@ def check_xml_attribute_errors(body: str) -> None:
             errors.append((i, line.strip(), "Unmatched single quote in line"))
 
     if errors:
-        logger.error(
-            "%sMalformed XML attributes detected:", LOGS_INDENTATION + "\t"
-        )
+        logger.error("%sMalformed XML attributes detected:", LOGS_INDENTATION)
         for line_num, content, reason in errors:
             logger.error(
-                "%s— Line %d: %s", LOGS_INDENTATION + "\t\t", line_num, reason
+                "%s— Line %d: %s", LOGS_INDENTATION + "\t", line_num, reason
             )
-            logger.error("%s%s", LOGS_INDENTATION + "\t\t\t", content)
+            logger.error("%s%s", LOGS_INDENTATION + "\t\t", content)
         raise ValueError("Malformed XML attributes found.")
-
-    logger.success(
-        "%sAll XML attributes appear well-formed.", LOGS_INDENTATION + "\t\t"
-    )
+    else:
+        logger.success(
+            "%sAll XML attributes appear well-formed.",
+            LOGS_INDENTATION + "\t",
+        )
 
 
 def check_max_min_code_state_values(body: str) -> None:
     """
     Checks that code and state numeric values are within reasonable bounds.
     """
-    logger.info(
-        "%s🔹 Checking code/state value ranges…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking code/state value ranges…", LOGS_INDENTATION)
+
     for code in re.findall(r'code=["\'](-?\d+)["\']', body):
         val = int(code)
         if val < 0 or val > 255:
@@ -249,14 +237,16 @@ def check_max_min_code_state_values(body: str) -> None:
                 "%sCode value out of range: %d", LOGS_INDENTATION + "\t", val
             )
             raise ValueError(f"Code value out of range: {val}")
+
     for state in re.findall(r'state=["\'](-?\d+)["\']', body):
         val = int(state)
         if val < 0 or val > 1000:
             logger.error(
                 "%sState value out of range: %d", LOGS_INDENTATION + "\t", val
             )
+            raise ValueError(f"State value out of range: {val}")
 
     logger.success(
         "%sAll code/state values are in allowed range.",
-        LOGS_INDENTATION + "\t\t",
+        LOGS_INDENTATION + "\t",
     )

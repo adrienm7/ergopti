@@ -5,7 +5,7 @@ import re
 import unicodedata
 
 logger = logging.getLogger("ergopti")
-LOGS_INDENTATION = "\t"
+LOGS_INDENTATION = "\t\t"
 
 
 def check_indentation_consistency(body: str) -> None:
@@ -19,7 +19,7 @@ def check_indentation_consistency(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking overall indentation consistency…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     lines = body.splitlines()
@@ -96,10 +96,10 @@ def check_indentation_consistency(body: str) -> None:
                 parent_str,
             )
             logger.error("%s%s", LOGS_INDENTATION + "\t\t\t", content_line)
-
-    logger.success(
-        "%sIndentation consistency verified.", LOGS_INDENTATION + "\t\t"
-    )
+    else:
+        logger.success(
+            "%sNo indentation inconsistencies found.", LOGS_INDENTATION + "\t"
+        )
 
 
 def check_no_empty_lines(body: str) -> None:
@@ -108,26 +108,11 @@ def check_no_empty_lines(body: str) -> None:
     Raises ValueError if empty lines are found.
     Displays the preceding line for context.
     """
-    logger.info("%s🔹 Checking for empty lines…", LOGS_INDENTATION + "\t")
+    logger.info("%s🔹 Checking for empty lines…", LOGS_INDENTATION)
 
     lines = body.splitlines()
-
-    # Find first and last non-empty lines
-    first_line_idx = next(
-        (idx for idx, line in enumerate(lines) if line.strip()), 0
-    )
-    last_line_idx = (
-        len(lines)
-        - 1
-        - next(
-            (idx for idx, line in enumerate(reversed(lines)) if line.strip()), 0
-        )
-    )
-    relevant_lines = lines[first_line_idx : last_line_idx + 1]
-
     empty_lines_info = []
-
-    for i, line in enumerate(relevant_lines, start=first_line_idx + 1):
+    for i, line in enumerate(lines, start=1):
         if not line.strip():
             prev_line_content = (
                 lines[i - 2].strip() if i - 2 >= 0 else "<start of file>"
@@ -143,8 +128,8 @@ def check_no_empty_lines(body: str) -> None:
                 line_number,
                 prev_content,
             )
-
-    logger.success("%sNo empty lines detected.", LOGS_INDENTATION + "\t\t")
+    else:
+        logger.success("%sNo empty lines detected.", LOGS_INDENTATION + "\t")
 
 
 def check_ascending_keymaps(body: str) -> None:
@@ -154,7 +139,7 @@ def check_ascending_keymaps(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking ascending order of <keyMap> indices…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     keymap_matches = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', body)
@@ -182,11 +167,11 @@ def check_ascending_keymaps(body: str) -> None:
                 current,
                 prev,
             )
-
-    logger.success(
-        "%sAll <keyMap> indices are in ascending order.",
-        LOGS_INDENTATION + "\t\t",
-    )
+    else:
+        logger.success(
+            "%sAll <keyMap> indices are in ascending order.",
+            LOGS_INDENTATION + "\t",
+        )
 
 
 def check_ascending_keys_in_keymaps(body: str) -> None:
@@ -196,7 +181,7 @@ def check_ascending_keys_in_keymaps(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking ascending order of <key> codes inside each <keyMap>…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     issues_found = {}
@@ -242,11 +227,11 @@ def check_ascending_keys_in_keymaps(body: str) -> None:
                     code,
                     prev,
                 )
-
-    logger.success(
-        "%sAll <key> codes are in ascending order inside each <keyMap>.",
-        LOGS_INDENTATION + "\t\t",
-    )
+    else:
+        logger.success(
+            "%sAll <key> codes are in ascending order inside each <keyMap>.",
+            LOGS_INDENTATION + "\t",
+        )
 
 
 def check_ascending_actions(body: str) -> None:
@@ -257,7 +242,7 @@ def check_ascending_actions(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking alphabetical order of <action> IDs…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     action_matches = re.findall(r'<action\s+id=["\']([^"\']+)["\']', body)
@@ -283,11 +268,11 @@ def check_ascending_actions(body: str) -> None:
                 current,
                 prev,
             )
-
-    logger.success(
-        "%sAll <action> IDs are in alphabetical order.",
-        LOGS_INDENTATION + "\t\t",
-    )
+    else:
+        logger.success(
+            "%sAll <action> IDs are in alphabetical order.",
+            LOGS_INDENTATION + "\t",
+        )
 
 
 def sort_key(id_str: str):
@@ -323,7 +308,7 @@ def check_attribute_order(body: str) -> None:
     """
     Checks that attributes always appear in the same order in <key>, <action>, <when>.
     """
-    logger.info("%s🔹 Checking attribute order…", LOGS_INDENTATION + "\t")
+    logger.info("%s🔹 Checking attribute order…", LOGS_INDENTATION)
 
     expected_orders = {
         "key": ["code", "output", "action"],
@@ -350,4 +335,4 @@ def check_attribute_order(body: str) -> None:
                         expected,
                     )
 
-    logger.success("%sAttribute order is correct.", LOGS_INDENTATION + "\t\t")
+    logger.success("%sAttribute order is correct.", LOGS_INDENTATION + "\t")

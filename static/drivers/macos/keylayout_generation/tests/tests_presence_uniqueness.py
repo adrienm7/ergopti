@@ -4,7 +4,7 @@ import logging
 import re
 
 logger = logging.getLogger("ergopti")
-LOGS_INDENTATION = "\t"
+LOGS_INDENTATION = "\t\t"
 
 
 def check_each_key_has_a_code(body: str) -> None:
@@ -13,9 +13,7 @@ def check_each_key_has_a_code(body: str) -> None:
     Raises ValueError if any <key> is missing its code.
     Displays all <key> elements without a code.
     """
-    logger.info(
-        "%s🔹 Checking that every <key> has a code…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking that every <key> has a code…", LOGS_INDENTATION)
 
     missing_code_found = {}
 
@@ -54,10 +52,10 @@ def check_each_key_has_a_code(body: str) -> None:
         raise ValueError(
             "Some <key> elements are missing their code attribute."
         )
-
-    logger.success(
-        "%sAll <key> elements have a code.", LOGS_INDENTATION + "\t\t"
-    )
+    else:
+        logger.success(
+            "%sAll <key> elements have a code.", LOGS_INDENTATION + "\t"
+        )
 
 
 def check_each_action_has_id(body: str) -> None:
@@ -67,7 +65,7 @@ def check_each_action_has_id(body: str) -> None:
     Displays all <action> elements without an ID.
     """
     logger.info(
-        "%s🔹 Checking that every <action> has an ID…", LOGS_INDENTATION + "\t"
+        "%s🔹 Checking that every <action> has an ID…", LOGS_INDENTATION
     )
 
     missing_id_found = {}
@@ -76,7 +74,7 @@ def check_each_action_has_id(body: str) -> None:
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
         logger.warning(
-            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t"
         )
         return
 
@@ -102,19 +100,17 @@ def check_each_action_has_id(body: str) -> None:
         raise ValueError(
             "Some <action> elements are missing their ID attribute."
         )
-
-    logger.success(
-        "%sAll <action> elements have an ID.", LOGS_INDENTATION + "\t\t"
-    )
+    else:
+        logger.success(
+            "%sAll <action> elements have an ID.", LOGS_INDENTATION + "\t"
+        )
 
 
 def check_unique_keymap_indices(body: str) -> None:
     """
     Checks that no <keyMap> index is duplicated.
     """
-    logger.info(
-        "%s🔹 Checking unique <keyMap> indices…", LOGS_INDENTATION + "\t"
-    )
+    logger.info("%s🔹 Checking unique <keyMap> indices…", LOGS_INDENTATION)
     indices = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', body)
     duplicates = set([x for x in indices if indices.count(x) > 1])
     if duplicates:
@@ -124,9 +120,10 @@ def check_unique_keymap_indices(body: str) -> None:
             ", ".join(duplicates),
         )
         raise ValueError("Duplicate <keyMap> indices found.")
-    logger.success(
-        "%sAll <keyMap> indices are unique.", LOGS_INDENTATION + "\t\t"
-    )
+    else:
+        logger.success(
+            "%sAll <keyMap> indices are unique.", LOGS_INDENTATION + "\t"
+        )
 
 
 def check_unique_codes_in_keymaps(body: str) -> None:
@@ -137,7 +134,7 @@ def check_unique_codes_in_keymaps(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking for duplicate key codes inside each keyMap…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     duplicates_found = {}
@@ -192,10 +189,11 @@ def check_unique_codes_in_keymaps(body: str) -> None:
                         "%s— %s", LOGS_INDENTATION + "\t\t\t", key_code_tag
                     )
         raise ValueError("Duplicate key codes found in <keyMap> blocks.")
-
-    logger.success(
-        "%sNo duplicate key codes in each keyMap.", LOGS_INDENTATION + "\t\t"
-    )
+    else:
+        logger.success(
+            "%sNo duplicate key codes in each keyMap.",
+            LOGS_INDENTATION + "\t",
+        )
 
 
 def check_unique_action_ids(body: str) -> None:
@@ -206,14 +204,14 @@ def check_unique_action_ids(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking for duplicate action IDs inside <actions>…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     # Extract the <actions> block
     match = re.search(r"(<actions.*?>)(.*?)(</actions>)", body, flags=re.DOTALL)
     if not match:
         logger.warning(
-            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t"
         )
         return body
 
@@ -250,8 +248,8 @@ def check_unique_action_ids(body: str) -> None:
                     "%s— %s", LOGS_INDENTATION + "\t\t\t", block.strip()
                 )
         raise ValueError("Duplicate action IDs found in <actions> block.")
-
-    logger.success("%sNo duplicate action IDs.", LOGS_INDENTATION + "\t\t")
+    else:
+        logger.success("%sNo duplicate action IDs.", LOGS_INDENTATION + "\t")
 
 
 def check_each_key_has_either_output_or_action(body: str) -> None:
@@ -262,7 +260,7 @@ def check_each_key_has_either_output_or_action(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking that each <key> has either output or action (exclusive)…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     violations = {}
@@ -308,8 +306,8 @@ def check_each_key_has_either_output_or_action(body: str) -> None:
         raise ValueError(
             "Some <key> elements have invalid output/action configuration."
         )
-
-    logger.success(
-        "%sAll <key> elements have valid output/action configuration.",
-        LOGS_INDENTATION + "\t\t",
-    )
+    else:
+        logger.success(
+            "%sAll <key> elements have valid output/action configuration.",
+            LOGS_INDENTATION + "\t",
+        )

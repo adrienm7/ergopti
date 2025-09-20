@@ -4,7 +4,7 @@ import logging
 import re
 
 logger = logging.getLogger("ergopti")
-LOGS_INDENTATION = "\t"
+LOGS_INDENTATION = "\t\t"
 
 
 def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
@@ -15,7 +15,7 @@ def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking that all keyMap actions exist in <actions>…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     # Extract all action IDs defined in <actions>
@@ -24,7 +24,7 @@ def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
     )
     if not actions_match:
         logger.warning(
-            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t"
         )
         return
 
@@ -66,11 +66,11 @@ def check_each_action_in_keymaps_defined_in_actions(body: str) -> None:
             for tag in tags:
                 logger.info("%s— %s", LOGS_INDENTATION + "\t\t\t", tag.strip())
         raise ValueError("Some keyMap actions are missing in <actions>.")
-
-    logger.success(
-        "%stAll keyMap actions are defined in <actions>.",
-        LOGS_INDENTATION + "\t\t",
-    )
+    else:
+        logger.success(
+            "%sAll keyMap actions are defined in <actions>.",
+            LOGS_INDENTATION + "\t",
+        )
 
 
 def check_each_action_in_keymaps_is_used(body: str) -> None:
@@ -79,7 +79,7 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
     """
     logger.info(
         "%s🔹 Checking that all <actions> are used in keyMaps…",
-        LOGS_INDENTATION + "\t",
+        LOGS_INDENTATION,
     )
 
     # Extract the <actions> block
@@ -88,7 +88,7 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
     )
     if not actions_match:
         logger.warning(
-            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t\t"
+            "%sNo <actions> block found, skipping.", LOGS_INDENTATION + "\t"
         )
         return
 
@@ -122,7 +122,8 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
                 LOGS_INDENTATION + "\t\t",
                 defined_actions[action_id].strip(),
             )
-
-    logger.success(
-        "%sAll <action> blocks are used in keyMaps.", LOGS_INDENTATION + "\t\t"
-    )
+    else:
+        logger.success(
+            "%sAll <action> blocks are used in keyMaps.",
+            LOGS_INDENTATION + "\t",
+        )
