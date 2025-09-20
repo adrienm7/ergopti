@@ -41,7 +41,7 @@ def process_mapping(
     trigger = data["trigger"]
     trigger_variants = get_trigger_variants(trigger)
     for trigger_val, is_trigger_upper in trigger_variants:
-        special_upper_triggers = {",": [";", ":"], "'": ["?"]}
+        special_upper_triggers = {",": [";", " ;", ":", " :"], "'": ["?", " ?"]}
         if is_trigger_upper and trigger_val in special_upper_triggers:
             triggers_to_add = special_upper_triggers[trigger_val]
         else:

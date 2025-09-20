@@ -8,6 +8,7 @@ from utilities.keylayout_sorting import sort_keylayout
 
 logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
+EXTRA_KEYS = list(range(51, 151)) + [27]
 
 
 def correct_keylayout(content: str) -> str:
@@ -38,7 +39,7 @@ def correct_keylayout(content: str) -> str:
     )  # Ctrl shortcuts can be directly set to output, as they don’t trigger other states
     content = replace_keymap(content, 4, keymap_4_content)
 
-    logger.info("%s➕ Adding keymap 9…", LOGS_INDENTATION)
+    logger.info("%s➕ Adding keymap 9 as a copy of keymap 4…", LOGS_INDENTATION)
     content = add_keymap_select_9(content)
     keymap_4_content = extract_keymap_body(content, 4)
     content = add_keymap(content, 9, keymap_4_content)
@@ -119,12 +120,11 @@ def normalize_attribute_entities(body: str) -> str:
 
 
 def replace_action_to_output_extra_keys(body: str) -> str:
-    """Replace action="..." to output="..." for extra keys (code >= 51)."""
+    """Replace action="..." to output="..." for extra keys."""
 
-    # Remplace action="..." by output="..." for all <key code="N" ... action="..."> where N >= 51
     def repl(match):
         code = int(match.group(1))
-        if code >= 51:
+        if code in EXTRA_KEYS:
             return match.group(0).replace('action="', 'output="')
         return match.group(0)
 
