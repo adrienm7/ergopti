@@ -26,6 +26,7 @@ def correct_keylayout(content: str) -> str:
     content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
 
     content = normalize_attribute_entities(content)
+    content = replace_action_to_output_extra_keys(content)
     content = swap_keys(content, 10, 50)
 
     logger.info("%s➕ Modifying keymap 4…", LOGS_INDENTATION)
@@ -115,6 +116,21 @@ def normalize_attribute_entities(body: str) -> str:
 
     # Match attributes like output="...", output='...', action="..."
     return re.sub(r'(\w+)\s*=\s*(["\'])(.*?)\2', replace_attribute, body)
+
+
+def replace_action_to_output_extra_keys(body: str) -> str:
+    """Replace action="..." to output="..." for extra keys (code >= 51)."""
+
+    # Remplace action="..." by output="..." for all <key code="N" ... action="..."> where N >= 51
+    def repl(match):
+        code = int(match.group(1))
+        if code >= 51:
+            return match.group(0).replace('action="', 'output="')
+        return match.group(0)
+
+    # On cible les balises <key code="N" ... action="...">
+    pattern = r'<key code="(\d+)"([^>]*)action="[^"]*"([^>]*)>'
+    return re.sub(pattern, repl, body)
 
 
 def swap_keys(body: str, key1: int, key2: int) -> str:
