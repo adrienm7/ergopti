@@ -17,10 +17,14 @@ def correct_keylayout(content: str) -> str:
     """
     logger.info("%s🔧 Starting keylayout corrections…", LOGS_INDENTATION)
 
-    # Remove XML comments (<!-- ... -->)
+    logger.info("%s🔹 Removing XML comments…", LOGS_INDENTATION + "\t")
     content = re.sub(r"<!--.*?-->\n", "", content, flags=re.DOTALL)
 
-    content = fix_invalid_symbols(content)
+    logger.info(
+        "%s🔹 Removing empty lines at start and end…", LOGS_INDENTATION + "\t"
+    )
+    content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
+
     content = normalize_attribute_entities(content)
     content = swap_keys(content, 10, 50)
 
