@@ -6,6 +6,7 @@ create a variant with extra dead key features and symbol modifications.
 import logging
 import re
 
+from keylayout_correction import replace_action_to_output_extra_keys
 from keylayout_plus_mappings import get_plus_mappings
 from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
@@ -74,6 +75,7 @@ def create_keylayout_plus(content: str):
             # Add the new output on the key when in the dead key layer
             content = add_action_when_state(content, trigger, layer, output)
 
+    content = replace_action_to_output_extra_keys(content)
     content = sort_keylayout(content)
     validate_keylayout(content)
 

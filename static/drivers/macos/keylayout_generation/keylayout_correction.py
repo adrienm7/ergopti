@@ -8,7 +8,7 @@ from utilities.keylayout_sorting import sort_keylayout
 
 logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
-EXTRA_KEYS = list(range(51, 151)) + [27]
+EXTRA_KEYS = list(range(51, 151)) + [24, 27]
 
 
 def correct_keylayout(content: str) -> str:
@@ -26,9 +26,9 @@ def correct_keylayout(content: str) -> str:
     )
     content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
 
+    content = swap_keys(content, 10, 50)
     content = normalize_attribute_entities(content)
     content = replace_action_to_output_extra_keys(content)
-    content = swap_keys(content, 10, 50)
 
     logger.info("%s➕ Modifying keymap 4…", LOGS_INDENTATION)
     keymap_0_content = extract_keymap_body(content, 0)
@@ -128,9 +128,17 @@ def replace_action_to_output_extra_keys(body: str) -> str:
             return match.group(0).replace('action="', 'output="')
         return match.group(0)
 
-    # On cible les balises <key code="N" ... action="...">
     pattern = r'<key code="(\d+)"([^>]*)action="[^"]*"([^>]*)>'
-    return re.sub(pattern, repl, body)
+    fixed_body = re.sub(pattern, repl, body)
+
+    # Special case: code=10 action="$" → output="$" (even if not in EXTRA_KEYS)
+    fixed_body = re.sub(
+        r'<key code="10"([^>]*)action="\$"([^>]*)>',
+        r'<key code="10"\1output="$"\2>',
+        fixed_body,
+    )
+
+    return fixed_body
 
 
 def swap_keys(body: str, key1: int, key2: int) -> str:
