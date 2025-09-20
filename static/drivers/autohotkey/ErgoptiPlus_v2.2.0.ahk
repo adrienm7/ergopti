@@ -2156,7 +2156,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     ; === Number row ===
     +SC029:: {
         ActivateHotstrings()
-        SendFinalResult(" €") ; Thin non-breaking space
+        SendNewResult(" €") ; Thin non-breaking space
     }
     +SC002:: SendNewResult("1")
     +SC003:: SendNewResult("2")
@@ -2170,7 +2170,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC00B:: SendNewResult("0")
     +SC00C:: {
         ActivateHotstrings()
-        SendFinalResult(" %") ; Thin non-breaking space
+        SendNewResult(" %") ; Thin non-breaking space
     }
     +SC00D:: SendNewResult("º")
 
@@ -2195,7 +2195,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC021:: SendNewResult("U")
     +SC022:: {
         ActivateHotstrings()
-        SendFinalResult(" :") ; Non-breaking space
+        SendNewResult(" :") ; Non-breaking space
     }
     +SC023:: SendNewResult("V")
     +SC024:: SendNewResult("S")
@@ -2205,7 +2205,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC028:: SendNewResult("Q")
     +SC02B:: {
         ActivateHotstrings()
-        SendFinalResult(" !") ; Thin non-breaking space
+        SendNewResult(" {!}") ; Thin non-breaking space
     }
 
     ; === Bottom row ===
@@ -2215,7 +2215,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC02E:: SendNewResult("J")
     +SC02F:: {
         ActivateHotstrings()
-        SendFinalResult(" ;") ; Thin non-breaking space
+        SendNewResult(" ;") ; Thin non-breaking space
     }
     +SC030:: SendNewResult("K")
     +SC031:: SendNewResult("M")
@@ -2224,7 +2224,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC034:: SendNewResult("P")
     +SC035:: {
         ActivateHotstrings()
-        SendFinalResult(" ?") ; Thin non-breaking space
+        SendNewResult(" ?") ; Thin non-breaking space
     }
 }
 
