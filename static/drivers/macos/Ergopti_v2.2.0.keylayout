@@ -49,7 +49,7 @@
 			<key code="7" action="à"/>
 			<key code="8" action="j"/>
 			<key code="9" action=","/>
-			<key code="10" action="$"/>
+			<key code="10" output="$"/>
 			<key code="11" action="k"/>
 			<key code="12" action="è"/>
 			<key code="13" action="y"/>
@@ -63,7 +63,7 @@
 			<key code="21" action="4"/>
 			<key code="22" action="6"/>
 			<key code="23" action="5"/>
-			<key code="24" action="="/>
+			<key code="24" output="="/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
 			<key code="27" output="%"/>
@@ -148,7 +148,7 @@
 			<key code="7" action="À"/>
 			<key code="8" action="J"/>
 			<key code="9" action=","/>
-			<key code="10" action="$"/>
+			<key code="10" output="$"/>
 			<key code="11" action="K"/>
 			<key code="12" action="È"/>
 			<key code="13" action="Y"/>
@@ -162,7 +162,7 @@
 			<key code="21" action="4"/>
 			<key code="22" action="6"/>
 			<key code="23" action="5"/>
-			<key code="24" action="="/>
+			<key code="24" output="="/>
 			<key code="25" action="9"/>
 			<key code="26" action="7"/>
 			<key code="27" output="%"/>
