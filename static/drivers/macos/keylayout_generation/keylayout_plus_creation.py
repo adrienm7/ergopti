@@ -1,7 +1,7 @@
 import logging
 import re
 
-from keylayout_plus_mappings import mappings
+from keylayout_plus_mappings import plus_mappings
 from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
 from utilities.mappings_functions import escape_xml_characters
@@ -21,23 +21,22 @@ def create_keylayout_plus(content: str):
     content = ergopti_plus_shiftaltgr_symbols(content)
 
     start_layer = get_last_used_layer(content) + 1
-    for i, (feature, data) in enumerate(mappings.items()):
+    for i, (feature, data) in enumerate(plus_mappings.items()):
         layer = start_layer + i
         trigger_key = data["trigger"]
-        trigger_key = escape_xml_characters(trigger_key)
         logger.info(
-            "%s\t🔹 Adding feature '%s' with trigger '%s' at layer s%d…",
-            LOGS_INDENTATION,
+            "%s🔹 Adding feature '%s' with trigger '%s' at layer s%d…",
+            LOGS_INDENTATION + "\t",
             feature,
             trigger_key,
             layer,
         )
 
-        if len(data["map"]) == 0:
+        if not data["map"]:
             continue
 
         # Assign trigger key to this layer
-        content = ensure_action_block(content, trigger_key, trigger_key)
+        content = ensure_action_block(content, trigger_key)
         content = assign_action_layer(content, trigger_key, layer)
 
         # Add trigger key as dead key
@@ -134,29 +133,25 @@ def ergopti_plus_altgr_symbols(content: str) -> str:
     pattern = r'(<keyMap index="5">)(.*?)(</keyMap>)'
     fixed = re.sub(pattern, replace_in_keymap, content, flags=re.DOTALL)
 
-    fixed = ensure_action_block(fixed, "!", "!")
-    fixed = ensure_action_block(fixed, "%", "%")
+    fixed = ensure_action_block(fixed, "!")
+    fixed = ensure_action_block(fixed, "%")
 
     return fixed
 
 
-def ensure_action_block(doc: str, action_id: str, output_value: str) -> str:
+def ensure_action_block(doc: str, action_id: str) -> str:
     """
     Ensure an <action id="..."> block exists.
     - Matches <action ... id="ID" ...> or <action ... id='ID' ...> wherever the id attribute is placed.
     - If missing, inserts the block before the first </actions>, using the same indentation.
     """
-    if action_id == "<":
-        action_id = "&lt;"
-    if action_id == ">":
-        action_id = "&gt;"
     # Match <action ... id="action_id" ...> or with single quotes, id can be anywhere in the tag
     pattern = rf'<action\b[^>]*\bid\s*=\s*(["\']){re.escape(action_id)}\1'
 
     if not re.search(pattern, doc):
         block = (
             f'\t<action id="{action_id}">\n\t\t'
-            f'\t<when state="none" output="{output_value}"/>\n\t\t'
+            f'\t<when state="none" output="{action_id}"/>\n\t\t'
             f"</action>\n\t"
         )
 
@@ -164,6 +159,85 @@ def ensure_action_block(doc: str, action_id: str, output_value: str) -> str:
         doc = re.sub(r"(</actions>)", block + r"\1", doc, count=1)
 
     return doc
+
+
+def ergopti_plus_shiftaltgr_symbols(content):
+    # This code replaces specific outputs in keymap index 6 = Shift + AltGr
+    def replace_in_keymap(match):
+        header, body, footer = match.groups()
+        # output="Ç" → " !" (fine non-breaking space + !)
+        body = re.sub(r'(<key[^>]*(output|action)=")Ç(")', r"\1 !\3", body)
+        # output="Ù" → "Où"
+        body = re.sub(r'(<key[^>]*(output|action)=")Ù(")', r"\1Où\3", body)
+        return f"{header}{body}{footer}"
+
+    for idx in (6, 7):
+        content = re.sub(
+            rf'(<keyMap index="{idx}">)(.*?)(</keyMap>)',
+            replace_in_keymap,
+            content,
+            flags=re.DOTALL,
+        )
+
+    return content
+
+
+def get_last_used_layer(content: str) -> int:
+    """
+    Scan the keylayout content to find the highest layer number in use.
+    Returns this number (not the next available one).
+    Useful to get the last used layer, then add +1 if needed.
+    """
+    # Find all numbers in 'state="sX"' and 'next="sX"'
+    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', content)]
+    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', content)]
+
+    if state_indices or next_indices:
+        max_layer = max(state_indices + next_indices)
+    else:
+        max_layer = 0
+    logger.info("%sLast used layer: s%d", LOGS_INDENTATION, max_layer)
+    return max_layer
+
+
+def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
+    """
+    Assigns a next state (layer) to a single <action id="..."> in the content.
+    Modifies the default <when state="none"/> line to include a 'next' state.
+    Works even if action_id is encoded as &lt; or &#x003C; in the XML.
+    """
+    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
+
+    def repl(match):
+        header, body, footer = match.groups()
+        body = re.sub(
+            r'<when state="none"[^>]*>',
+            f'<when state="none" next="s{layer_num}"/>',
+            body,
+        )
+        return f"{header}{body}{footer}"
+
+    return re.sub(pattern, repl, content, flags=re.DOTALL)
+
+
+def add_terminator_state(content: str, state_number: int, output: str) -> str:
+    """
+    Add a <when state="sX" output="..."/> line inside the <terminators> block.
+    Raises ValueError if the state already exists.
+    """
+    pattern = r"(<terminators>)(.*?)(</terminators>)"
+
+    def repl(match):
+        header, body, footer = match.groups()
+        # Check if state already exists
+        if re.search(rf'<when state="s{state_number}"', body):
+            raise ValueError(
+                f"State s{state_number} already exists in <terminators> block."
+            )
+        new_line = f'\t<when state="s{state_number}" output="{output}"/>'
+        return f"{header}{body}{new_line}\n\t{footer}"
+
+    return re.sub(pattern, repl, content, flags=re.DOTALL)
 
 
 def ensure_key_uses_action(content: str, action_id: str) -> str:
@@ -221,45 +295,6 @@ def ensure_key_uses_action(content: str, action_id: str) -> str:
     return re.sub(pattern, process_keymap, content, flags=re.DOTALL)
 
 
-def ergopti_plus_shiftaltgr_symbols(content):
-    # This code replaces specific outputs in keymap index 6 = Shift + AltGr
-    def replace_in_keymap(match):
-        header, body, footer = match.groups()
-        # output="Ç" → " !" (fine non-breaking space + !)
-        body = re.sub(r'(<key[^>]*(output|action)=")Ç(")', r"\1 !\3", body)
-        # output="Ù" → "Où"
-        body = re.sub(r'(<key[^>]*(output|action)=")Ù(")', r"\1Où\3", body)
-        return f"{header}{body}{footer}"
-
-    for idx in (6, 7):
-        content = re.sub(
-            rf'(<keyMap index="{idx}">)(.*?)(</keyMap>)',
-            replace_in_keymap,
-            content,
-            flags=re.DOTALL,
-        )
-
-    return content
-
-
-def get_last_used_layer(content: str) -> int:
-    """
-    Scan the keylayout content to find the highest layer number in use.
-    Returns this number (not the next available one).
-    Useful to get the last used layer, then add +1 if needed.
-    """
-    # Find all numbers in 'state="sX"' and 'next="sX"'
-    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', content)]
-    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', content)]
-
-    if state_indices or next_indices:
-        max_layer = max(state_indices + next_indices)
-    else:
-        max_layer = 0
-    logger.info("%sLast used layer: s%d", LOGS_INDENTATION, max_layer)
-    return max_layer
-
-
 def add_action_state(
     content: str, action_id: str, state_number: int, output: str
 ) -> str:
@@ -268,7 +303,7 @@ def add_action_state(
     Raises a ValueError if a <when> with the same state already exists.
     """
     pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
-    content = ensure_action_block(content, action_id, action_id)
+    content = ensure_action_block(content, action_id)
 
     def repl(match):
         header, body, footer = match.groups()
@@ -284,43 +319,3 @@ def add_action_state(
 
     content = re.sub(pattern, repl, content, flags=re.DOTALL)
     return content
-
-
-def add_terminator_state(content: str, state_number: int, output: str) -> str:
-    """
-    Add a <when state="sX" output="..."/> line inside the <terminators> block.
-    Raises ValueError if the state already exists.
-    """
-    pattern = r"(<terminators>)(.*?)(</terminators>)"
-
-    def repl(match):
-        header, body, footer = match.groups()
-        # Check if state already exists
-        if re.search(rf'<when state="s{state_number}"', body):
-            raise ValueError(
-                f"State s{state_number} already exists in <terminators> block."
-            )
-        new_line = f'\t<when state="s{state_number}" output="{output}"/>'
-        return f"{header}{body}{new_line}\n\t{footer}"
-
-    return re.sub(pattern, repl, content, flags=re.DOTALL)
-
-
-def assign_action_layer(content: str, action_id: str, layer_num: int) -> str:
-    """
-    Assigns a next state (layer) to a single <action id="..."> in the content.
-    Modifies the default <when state="none"/> line to include a 'next' state.
-    Works even if action_id is encoded as &lt; or &#x003C; in the XML.
-    """
-    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
-
-    def repl(match):
-        header, body, footer = match.groups()
-        body = re.sub(
-            r'<when state="none"[^>]*>',
-            f'<when state="none" next="s{layer_num}"/>',
-            body,
-        )
-        return f"{header}{body}{footer}"
-
-    return re.sub(pattern, repl, content, flags=re.DOTALL)
