@@ -47,13 +47,22 @@ def process_mapping(
         else:
             triggers_to_add = [trigger_val]
 
+        uppercase_count = 1
         for actual_trigger in triggers_to_add:
             if actual_trigger in used_triggers:
                 continue  # Skip duplicate trigger
             used_triggers.add(actual_trigger)
             # Use _uppercase for uppercase triggers, else _map
             if is_trigger_upper or (trigger_val != actual_trigger):
-                new_key_name = f"{key}_uppercase"
+                if len(triggers_to_add) > 1:
+                    # If multiple uppercase variants, add _2, _3, ...
+                    suffix = (
+                        f"_{uppercase_count}" if uppercase_count > 1 else ""
+                    )
+                    new_key_name = f"{key}_uppercase{suffix}"
+                    uppercase_count += 1
+                else:
+                    new_key_name = f"{key}_uppercase"
             else:
                 new_key_name = f"{key}_map"
             new_map = build_case_map(data["map"], is_trigger_upper)
