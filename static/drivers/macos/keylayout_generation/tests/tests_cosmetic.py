@@ -1,8 +1,10 @@
 """Tests for validating a keylayout."""
 
+import logging
 import re
 import unicodedata
 
+logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
 
 
@@ -15,7 +17,9 @@ def check_indentation_consistency(body: str) -> None:
     Top-level tags (opening or closing) may have zero indentation.
     Raises ValueError if inconsistencies are found.
     """
-    print(f"{LOGS_INDENTATION}\t➡️  Checking overall indentation consistency…")
+    logger.info(
+        f"{LOGS_INDENTATION}\t🔹 Checking overall indentation consistency…"
+    )
 
     lines = body.splitlines()
     stack = []  # Stack to track (tag, indentation)
@@ -78,17 +82,18 @@ def check_indentation_consistency(body: str) -> None:
             )
 
     if inconsistencies:
-        print(f"{LOGS_INDENTATION}\t❌ Indentation inconsistencies detected:")
+        logger.error(
+            f"{LOGS_INDENTATION}\tIndentation inconsistencies detected:"
+        )
         for line_number, parent, current, content_line in inconsistencies:
             parent_str = parent if parent is not None else 0
-            print(
+            logger.error(
                 f"{LOGS_INDENTATION}\t\t— Line {line_number}: Indentation {current} "
                 f"too shallow relative to parent {parent_str}:\n"
                 f"{LOGS_INDENTATION}\t\t\t{content_line}"
             )
-        raise ValueError("Indentation errors found in body.")
 
-    print(f"{LOGS_INDENTATION}\t✅ Indentation consistency verified.")
+    logger.success(f"{LOGS_INDENTATION}\t\tIndentation consistency verified.")
 
 
 def check_no_empty_lines(body: str) -> None:
@@ -97,7 +102,7 @@ def check_no_empty_lines(body: str) -> None:
     Raises ValueError if empty lines are found.
     Displays the preceding line for context.
     """
-    print(f"{LOGS_INDENTATION}\t➡️  Checking for empty lines…")
+    logger.info(f"{LOGS_INDENTATION}\t🔹 Checking for empty lines…")
 
     lines = body.splitlines()
 
@@ -124,14 +129,13 @@ def check_no_empty_lines(body: str) -> None:
             empty_lines_info.append((i, prev_line_content))
 
     if empty_lines_info:
-        print(f"{LOGS_INDENTATION}\t❌ Empty lines detected:")
+        logger.error(f"{LOGS_INDENTATION}\tEmpty lines detected:")
         for line_number, prev_content in empty_lines_info:
-            print(
+            logger.error(
                 f"{LOGS_INDENTATION}\t\t— Line {line_number} after: {prev_content}"
             )
-        raise ValueError("Empty lines found in body.")
 
-    print(f"{LOGS_INDENTATION}\t✅ No empty lines detected.")
+    logger.success(f"{LOGS_INDENTATION}\t\tNo empty lines detected.")
 
 
 def check_ascending_keymaps(body: str) -> None:
@@ -139,8 +143,8 @@ def check_ascending_keymaps(body: str) -> None:
     Ensure that all <keyMap> blocks are defined in ascending order by their index.
     Raises ValueError if any keyMap is out of order.
     """
-    print(
-        f"{LOGS_INDENTATION}\t➡️  Checking ascending order of <keyMap> indices…"
+    logger.info(
+        f"{LOGS_INDENTATION}\t🔹 Checking ascending order of <keyMap> indices…"
     )
 
     keymap_matches = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', body)
@@ -156,17 +160,16 @@ def check_ascending_keymaps(body: str) -> None:
         last_index = idx
 
     if out_of_order:
-        print(
-            f"{LOGS_INDENTATION}\t❌ KeyMap indices out of ascending order detected:"
+        logger.error(
+            f"{LOGS_INDENTATION}\tKeyMap indices out of ascending order detected:"
         )
         for pos, prev, current in out_of_order:
-            print(
+            logger.error(
                 f"{LOGS_INDENTATION}\t\t— Position {pos}: index {current} follows {prev}"
             )
-        raise ValueError("KeyMap indices are not in ascending order.")
 
-    print(
-        f"{LOGS_INDENTATION}\t✅ All <keyMap> indices are in ascending order."
+    logger.success(
+        f"{LOGS_INDENTATION}\t\tAll <keyMap> indices are in ascending order."
     )
 
 
@@ -175,8 +178,8 @@ def check_ascending_keys_in_keymaps(body: str) -> None:
     Ensure that all <key> elements inside each <keyMap> are in ascending order by code.
     Raises ValueError if any <key> is out of order.
     """
-    print(
-        f"{LOGS_INDENTATION}\t➡️  Checking ascending order of <key> codes inside each <keyMap>…"
+    logger.info(
+        f"{LOGS_INDENTATION}\t🔹 Checking ascending order of <key> codes inside each <keyMap>…"
     )
 
     issues_found = {}
@@ -207,19 +210,16 @@ def check_ascending_keys_in_keymaps(body: str) -> None:
             last_code = code
 
     if issues_found:
-        print(f"{LOGS_INDENTATION}\t❌ Out-of-order <key> codes detected:")
+        logger.error(f"{LOGS_INDENTATION}\tOut-of-order <key> codes detected:")
         for keymap_name, problems in issues_found.items():
-            print(f"{LOGS_INDENTATION}\t\t• KeyMap {keymap_name}:")
+            logger.error(f"{LOGS_INDENTATION}\t\t• KeyMap {keymap_name}:")
             for pos, code, prev in problems:
-                print(
+                logger.error(
                     f"{LOGS_INDENTATION}\t\t\t— Position {pos}: code {code} follows {prev}"
                 )
-        raise ValueError(
-            "Some <key> elements are not in ascending order by code."
-        )
 
-    print(
-        f"{LOGS_INDENTATION}\t✅ All <key> codes are in ascending order inside each <keyMap>."
+    logger.success(
+        f"{LOGS_INDENTATION}\t\tll <key> codes are in ascending order inside each <keyMap>."
     )
 
 
@@ -229,8 +229,8 @@ def check_ascending_actions(body: str) -> None:
     Uses the same sort_key logic as sort_actions.
     Raises ValueError if any action is out of order.
     """
-    print(
-        f"{LOGS_INDENTATION}\t➡️  Checking alphabetical order of <action> IDs…"
+    logger.info(
+        f"{LOGS_INDENTATION}\t🔹 Checking alphabetical order of <action> IDs…"
     )
 
     action_matches = re.findall(r'<action\s+id=["\']([^"\']+)["\']', body)
@@ -244,16 +244,17 @@ def check_ascending_actions(body: str) -> None:
         last_key = current_key
 
     if out_of_order:
-        print(
-            f"{LOGS_INDENTATION}\t❌ Action IDs out of alphabetical order detected:"
+        logger.error(
+            f"{LOGS_INDENTATION}\tAction IDs out of alphabetical order detected:"
         )
         for pos, prev, current in out_of_order:
-            print(
+            logger.error(
                 f"{LOGS_INDENTATION}\t\t— Position {pos}: ID « {current} » follows « {prev} »"
             )
-        raise ValueError("Action IDs are not in alphabetical order.")
 
-    print(f"{LOGS_INDENTATION}\t✅ All <action> IDs are in alphabetical order.")
+    logger.success(
+        f"{LOGS_INDENTATION}\t\tAll <action> IDs are in alphabetical order."
+    )
 
 
 def sort_key(id_str: str):
@@ -289,9 +290,7 @@ def check_attribute_order(body: str) -> None:
     """
     Checks that attributes always appear in the same order in <key>, <action>, <when>.
     """
-    print(f"{LOGS_INDENTATION}\t➡️  Checking attribute order…")
-
-    import re
+    logger.info(f"{LOGS_INDENTATION}\t🔹 Checking attribute order…")
 
     expected_orders = {
         "key": ["code", "output", "action"],
@@ -310,11 +309,8 @@ def check_attribute_order(body: str) -> None:
                 filtered = [a for a in expected if a in attrs]
                 actual = [a for a in attrs if a in expected]
                 if actual != filtered:
-                    print(
-                        f"{LOGS_INDENTATION}\t❌ Attribute order incorrect in <{tag}>: {attrs} (expected: {expected})"
-                    )
-                    raise ValueError(
-                        f"Attribute order incorrect in <{tag}>: {attrs}"
+                    logger.error(
+                        f"{LOGS_INDENTATION}\tAttribute order incorrect in <{tag}>: {attrs} (expected: {expected})"
                     )
 
-    print(f"{LOGS_INDENTATION}\t✅ Attribute order is correct.")
+    logger.success(f"{LOGS_INDENTATION}\t\tAttribute order is correct.")

@@ -1,8 +1,10 @@
 """Functions to reorder and sort various parts of a keylayout XML body for consistency and readability."""
 
+import logging
 import re
 import unicodedata
 
+logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
 
 
@@ -11,7 +13,7 @@ def sort_keylayout(content: str) -> str:
     Apply sorting functions to a keylayout content for consistency and readability.
     Returns the sorted content.
     """
-    print(f"{LOGS_INDENTATION}🎨 Starting keylayout sorting…")
+    logger.info(f"{LOGS_INDENTATION}🎨 Starting keylayout sorting…")
 
     content = reorder_modifiers_and_attributes(content)
     content = sort_keymaps(content)
@@ -19,13 +21,13 @@ def sort_keylayout(content: str) -> str:
     content = sort_actions(content)
     content = sort_terminators(content)
 
-    print(f"{LOGS_INDENTATION}✅ Keylayout sorting complete.")
+    logger.success(f"{LOGS_INDENTATION}\tKeylayout sorting complete.")
     return content
 
 
 def reorder_modifiers_and_attributes(body: str) -> str:
     """Standardize encoding, maxout, and key/modifier orders for cosmetic consistency."""
-    print(
+    logger.info(
         f"{LOGS_INDENTATION}\t🔹 Reordering modifiers and attributes inside modifierMap…"
     )
 
@@ -52,7 +54,7 @@ def reorder_modifiers_and_attributes(body: str) -> str:
 
 def sort_keymaps(body: str) -> str:
     """Sort all <keyMap> blocks numerically by their index inside <keyMapSet>."""
-    print(f"{LOGS_INDENTATION}\t🔹 Sorting keyMaps inside keyMapSet…")
+    logger.info(f"{LOGS_INDENTATION}\t🔹 Sorting keyMaps inside keyMapSet…")
 
     # Function to sort a single <keyMapSet> block
     def sort_block(match):
@@ -63,6 +65,9 @@ def sort_keymaps(body: str) -> str:
             r'(<keyMap index="(\d+)">.*?</keyMap>)', inner_body, flags=re.DOTALL
         )
         if not keymaps:
+            logger.warning(
+                f"{LOGS_INDENTATION}\tNo <keyMap> blocks found in <keyMapSet>."
+            )
             return match.group(0)  # Return original block if no keyMaps
 
         # Sort by index numerically
@@ -83,7 +88,9 @@ def sort_keymaps(body: str) -> str:
 
 def sort_keys(body: str) -> str:
     """Sort all <key> elements in each <keyMap> block by their code attribute."""
-    print(f"{LOGS_INDENTATION}\t🔹 Sorting keys by code inside each keyMap…")
+    logger.info(
+        f"{LOGS_INDENTATION}\t🔹 Sorting keys by code inside each keyMap…"
+    )
 
     def sort_block(match):
         header, body, footer = match.groups()
@@ -137,7 +144,7 @@ def sort_actions(body: str) -> str:
     """
     Sort all <action> blocks by their id attribute inside <actions> blocks.
     """
-    print(
+    logger.info(
         f"{LOGS_INDENTATION}\t🔹 Sorting actions by id inside <actions> blocks…"
     )
 
@@ -170,7 +177,7 @@ def sort_terminators(body: str) -> str:
     """
     Sort the <when .../> lines inside the <terminators> block by the numeric value of state.
     """
-    print(f"{LOGS_INDENTATION}\t🔹 Sorting terminators by state…")
+    logger.info(f"{LOGS_INDENTATION}\t🔹 Sorting terminators by state…")
 
     def state_key(line):
         m = re.search(r'state="s(\d+)"', line)

@@ -1,9 +1,12 @@
+import logging
 from pprint import pprint
 
 from utilities.mappings_functions import (
     add_case_sensitive_mappings,
     escape_symbols_in_mappings,
 )
+
+logger = logging.getLogger("ergopti")
 
 mappings = {
     "comma_j_letters_sfbs": {
@@ -265,8 +268,8 @@ def check_duplicate_triggers(mappings_to_check: dict):
     for key, data in mappings_to_check.items():
         trigger = data["trigger"]
         if trigger in triggers:
-            print(
-                f"❌ Duplicate trigger '{trigger}' found in '{key}' and '{triggers[trigger]}'"
+            logger.error(
+                f" Duplicate trigger '{trigger}' found in '{key}' and '{triggers[trigger]}'"
             )
         else:
             triggers[trigger] = key
