@@ -299,4 +299,7 @@ def check_duplicate_triggers(mappings_to_check: dict):
 
 
 if __name__ == "__main__":
-    pprint(get_plus_mappings(), indent=2, width=120)
+    mappings = PLUS_MAPPINGS.copy()
+    mappings = add_case_sensitive_mappings(mappings)
+    mappings = escape_symbols_in_mappings(mappings)
+    pprint(mappings, indent=2, width=120)
