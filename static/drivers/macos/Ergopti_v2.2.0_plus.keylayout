@@ -92,24 +92,24 @@
 			<key code="50" action="ê"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="53" output="&#x001B;"/>
-			<key code="65" action="."/>
+			<key code="65" output="."/>
 			<key code="67" output="*"/>
-			<key code="69" action="+"/>
+			<key code="69" output="+"/>
 			<key code="71" output="&#x001B;"/>
-			<key code="75" action="/"/>
+			<key code="75" output="/"/>
 			<key code="76" output="&#x000D;"/>
-			<key code="78" action="-"/>
+			<key code="78" output="-"/>
 			<key code="81" output="="/>
-			<key code="82" action="0"/>
-			<key code="83" action="1"/>
-			<key code="84" action="2"/>
-			<key code="85" action="3"/>
-			<key code="86" action="4"/>
-			<key code="87" action="5"/>
-			<key code="88" action="6"/>
-			<key code="89" action="7"/>
-			<key code="91" action="8"/>
-			<key code="92" action="9"/>
+			<key code="82" output="0"/>
+			<key code="83" output="1"/>
+			<key code="84" output="2"/>
+			<key code="85" output="3"/>
+			<key code="86" output="4"/>
+			<key code="87" output="5"/>
+			<key code="88" output="6"/>
+			<key code="89" output="7"/>
+			<key code="91" output="8"/>
+			<key code="92" output="9"/>
 			<key code="96" output="&#x0010;"/>
 			<key code="97" output="&#x0010;"/>
 			<key code="98" output="&#x0010;"/>
@@ -191,24 +191,24 @@
 			<key code="50" action="Ê"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="53" output="&#x001B;"/>
-			<key code="65" action="."/>
+			<key code="65" output="."/>
 			<key code="67" output="*"/>
 			<key code="69" action="+"/>
 			<key code="71" output="&#x001B;"/>
-			<key code="75" action="/"/>
+			<key code="75" output="/"/>
 			<key code="76" output="&#x000D;"/>
-			<key code="78" action="-"/>
+			<key code="78" output="-"/>
 			<key code="81" action="="/>
-			<key code="82" action="0"/>
-			<key code="83" action="1"/>
-			<key code="84" action="2"/>
-			<key code="85" action="3"/>
-			<key code="86" action="4"/>
-			<key code="87" action="5"/>
-			<key code="88" action="6"/>
-			<key code="89" action="7"/>
-			<key code="91" action="8"/>
-			<key code="92" action="9"/>
+			<key code="82" output="0"/>
+			<key code="83" output="1"/>
+			<key code="84" output="2"/>
+			<key code="85" output="3"/>
+			<key code="86" output="4"/>
+			<key code="87" output="5"/>
+			<key code="88" output="6"/>
+			<key code="89" output="7"/>
+			<key code="91" output="8"/>
+			<key code="92" output="9"/>
 			<key code="96" output="&#x0010;"/>
 			<key code="97" output="&#x0010;"/>
 			<key code="98" output="&#x0010;"/>
@@ -290,13 +290,13 @@
 			<key code="50" action="Ê"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="53" output="&#x001B;"/>
-			<key code="65" action="."/>
+			<key code="65" output="."/>
 			<key code="67" output="*"/>
 			<key code="69" action="+"/>
 			<key code="71" output="&#x001B;"/>
-			<key code="75" action="/"/>
+			<key code="75" output="/"/>
 			<key code="76" output="&#x000D;"/>
-			<key code="78" action="-"/>
+			<key code="78" output="-"/>
 			<key code="81" action="="/>
 			<key code="96" output="&#x0010;"/>
 			<key code="97" output="&#x0010;"/>
@@ -379,13 +379,13 @@
 			<key code="50" action="ê"/>
 			<key code="51" output="&#x0008;"/>
 			<key code="53" output="&#x001B;"/>
-			<key code="65" action="."/>
+			<key code="65" output="."/>
 			<key code="67" output="*"/>
 			<key code="69" action="+"/>
 			<key code="71" output="&#x001B;"/>
-			<key code="75" action="/"/>
+			<key code="75" output="/"/>
 			<key code="76" output="&#x000D;"/>
-			<key code="78" action="-"/>
+			<key code="78" output="-"/>
 			<key code="81" action="="/>
 			<key code="96" output="&#x0010;"/>
 			<key code="97" output="&#x0010;"/>
