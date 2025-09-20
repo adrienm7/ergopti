@@ -1,9 +1,11 @@
+import logging
 import os
 import re
 import shutil
 import zipfile
 from pathlib import Path
 
+logger = logging.getLogger("ergopti")
 bundle_identifier = "com.apple.com.keyboardlayout.ergopti"
 
 
@@ -38,7 +40,9 @@ def create_bundle(
         if not keylayout.exists():
             raise FileNotFoundError(f"Keylayout file not found: {keylayout}")
         if not logo.exists():
-            print(f"\t⚠️ Logo file not found: {logo}, continuing without it")
+            logger.info(
+                f"\t️ Logo file not found: {logo}, continuing without it"
+            )
             logo_path_to_use = None
         else:
             logo_path_to_use = logo
@@ -70,7 +74,9 @@ def create_bundle(
             <false/>
             <key>ICNS</key>
             <string>{dest_logo.name}</string>"""
-            print(f"\tAdded logo {logo_path_to_use.name} as {dest_logo.name}")
+            logger.info(
+                f"\tAdded logo {logo_path_to_use.name} as {dest_logo.name}"
+            )
 
         plist_key = f"KLInfo_{new_name}"
         input_source_id = (
@@ -151,7 +157,9 @@ def generate_localizations(
 
         strings_content = "\n".join(lines) + "\n"
         strings_path.write_text(strings_content, encoding="utf-16")
-        print(f"\t🌍 Added localization mappings for {lang}: {strings_path}")
+        logger.info(
+            f"\t🌍 Added localization mappings for {lang}: {strings_path}"
+        )
 
 
 def generate_version_plist(version: str) -> str:
@@ -182,4 +190,4 @@ def zip_bundle_folder(bundle_path: Path, zip_path: Path):
                 file_path = Path(root) / file
                 relative_path = file_path.relative_to(bundle_path.parent)
                 zipf.write(file_path, relative_path)
-    print(f"\t📦 Zipped bundle at: {zip_path}")
+    logger.info(f"\t📦 Zipped bundle at: {zip_path}")

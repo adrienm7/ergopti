@@ -1,5 +1,7 @@
 """Tests for validating a keylayout."""
 
+import logging
+
 from .tests_cosmetic import (
     check_ascending_actions,
     check_ascending_keymaps,
@@ -37,6 +39,7 @@ from .tests_structure_syntax import (
     check_xml_attribute_errors,
 )
 
+logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
 
 
@@ -45,9 +48,9 @@ def validate_keylayout(content: str) -> None:
     Run all validation checks on the provided keylayout content.
     Raises ValueError if any check fails.
     """
-    print(f"{LOGS_INDENTATION}🔎 Validating keylayout…")
+    logger.launch(f"{LOGS_INDENTATION}🔎 Validating keylayout…")
 
-    print(f"{LOGS_INDENTATION}--- [ XML structure & syntax checks ] ---")
+    logger.info(f"{LOGS_INDENTATION}=== XML structure & syntax checks ===")
     check_valid_xml_structure(content)
     check_required_blocks_present(content)
     check_forbidden_tags_or_attributes(content)
@@ -56,8 +59,8 @@ def validate_keylayout(content: str) -> None:
     check_xml_attribute_errors(content)
     check_max_min_code_state_values(content)
 
-    print(
-        f"{LOGS_INDENTATION}--- [ Key & Action presence/uniqueness checks ] ---"
+    logger.info(
+        f"{LOGS_INDENTATION}=== Key & Action presence/uniqueness checks ==="
     )
     check_each_key_has_a_code(content)
     check_each_action_has_id(content)
@@ -66,18 +69,20 @@ def validate_keylayout(content: str) -> None:
     check_unique_action_ids(content)
     check_each_key_has_either_output_or_action(content)
 
-    print(f"{LOGS_INDENTATION}--- [ Action & KeyMap cross-references ] ---")
+    logger.info(f"{LOGS_INDENTATION}=== Action & KeyMap cross-references ===")
     check_each_action_in_keymaps_defined_in_actions(content)
     check_each_action_in_keymaps_is_used(content)
 
-    print(f"{LOGS_INDENTATION}--- [ Action/When/Terminator logic checks ] ---")
+    logger.info(
+        f"{LOGS_INDENTATION}=== Action/When/Terminator logic checks ==="
+    )
     check_each_action_has_when_state_none(content)
     check_each_action_when_states_unique(content)
     check_terminators_when_states_unique(content)
     check_when_states_defined_in_terminators(content)
     check_each_when_has_output_or_next(content)
 
-    print(f"{LOGS_INDENTATION}--- [ Cosmetic & ordering checks ] ---")
+    logger.info(f"{LOGS_INDENTATION}=== Cosmetic & ordering checks ===")
     check_indentation_consistency(content)
     check_no_empty_lines(content)
     check_ascending_keymaps(content)
@@ -85,4 +90,4 @@ def validate_keylayout(content: str) -> None:
     check_ascending_actions(content)
     check_attribute_order(content)
 
-    print(f"{LOGS_INDENTATION}✅ Keylayout validation passed.")
+    logger.success(f"{LOGS_INDENTATION}Keylayout validation passed.")

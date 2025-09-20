@@ -1,3 +1,4 @@
+import logging
 import re
 
 from keylayout_plus_mappings import mappings
@@ -5,6 +6,7 @@ from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
 from utilities.mappings_functions import escape_xml_characters
 
+logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
 
 
@@ -12,7 +14,7 @@ def create_keylayout_plus(content: str):
     """
     Create a '_plus' variant of the corrected keylayout, with extra actions.
     """
-    print(f"{LOGS_INDENTATION}🔧 Starting keylayout plus creation…")
+    logger.info(f"{LOGS_INDENTATION}🔧 Starting keylayout plus creation…")
 
     content = append_plus_to_layout_name(content)
     content = ergopti_plus_altgr_symbols(content)
@@ -23,8 +25,8 @@ def create_keylayout_plus(content: str):
         layer = start_layer + i
         trigger_key = data["trigger"]
         trigger_key = escape_xml_characters(trigger_key)
-        print(
-            f"{LOGS_INDENTATION}🔹 Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}…"
+        logger.info(
+            f"{LOGS_INDENTATION}\t🔹 Adding feature '{feature}' with trigger '{trigger_key}' at layer s{layer}…"
         )
 
         if len(data["map"]) == 0:
@@ -40,8 +42,8 @@ def create_keylayout_plus(content: str):
         # Add all feature actions
         for action_id, output in data["map"]:
             action_id = escape_xml_characters(action_id)
-            print(
-                f"{LOGS_INDENTATION}\t— Adding action '{action_id}' ➜ '{output}'…"
+            logger.debug(
+                f"{LOGS_INDENTATION}\t\t— Adding action '{action_id}' ➜ '{output}'…"
             )
 
             # Ensure any <key ... output="action_id"> is converted to action="action_id"
@@ -54,7 +56,7 @@ def create_keylayout_plus(content: str):
     content = sort_keylayout(content)
     validate_keylayout(content)
 
-    print("✅ Keylayout plus creation complete.")
+    logger.success("Keylayout plus creation complete.")
     return content
 
 
@@ -247,7 +249,7 @@ def get_last_used_layer(content: str) -> int:
         max_layer = max(state_indices + next_indices)
     else:
         max_layer = 0
-    print(f"{LOGS_INDENTATION}Last used layer: s{max_layer}")
+    logger.info(f"{LOGS_INDENTATION}Last used layer: s{max_layer}")
     return max_layer
 
 
