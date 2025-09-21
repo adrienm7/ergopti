@@ -9,6 +9,9 @@ try:
 except ImportError:
     LET = None
 
+yaml_path = os.path.join(os.path.dirname(__file__), "key_sym.yaml")
+with open(yaml_path, encoding="utf-8") as f:
+    mappings = yaml.safe_load(f)
 
 def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     print(f"[INFO] Using keylayout: {keylayout_name}")
@@ -29,10 +32,7 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     print("[INFO] Reading base.xkb template...")
     xkb_content = read_xkb_template(xkb_path)
 
-    # Load unicode to Linux symbol mapping from YAML
-    yaml_path = os.path.join(os.path.dirname(__file__), "key_sym.yaml")
-    print("[INFO] Loading YAML mapping (not used directly)...")
-    load_yaml_mapping(yaml_path)
+
 
     # Extract keymaps for layers 0 to 4 (indexes 0 to 4)
     print("[INFO] Extracting keymaps for layers 0, 3, 5, 6, 4...")
@@ -208,17 +208,24 @@ linux_to_macos_keycodes = [
 
 
 def symbol_to_linux_name(symbol):
-    """Convert a symbol to its Unicode codepoint in Uxxxx format (e.g., U2076). If the symbol is empty or 'NoSymbol', return 'NoSymbol'. If the symbol is more than one character, return a space-separated list of Uxxxx for each character."""
+    """Convert a symbol to its XKB keysym name using direct character keys from the YAML mapping."""
     if not symbol or symbol == "NoSymbol":
         return "NoSymbol"
+
     decoded = html.unescape(symbol)
-    return " ".join(f"U{ord(c):04X}" for c in decoded)
+    result = []
 
+    for char in decoded:
+        if char in mappings:
+            # TODO: Send multiple characters at once instead of the first one
+            return mappings[char]
+            result.append(mappings[char])
+        else:
+            print(f"[WARNING] No mapping for {repr(char)} (U+{ord(char):04X})")
+            result.append("NoSymbol")
 
-def load_yaml_mapping(yaml_path):
-    """Load a YAML mapping file (not used directly)."""
-    with open(yaml_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    return " ".join(result)
+
 
 
 def read_keylayout_file(macos_dir, keylayout_name):
@@ -242,7 +249,7 @@ def generate_xkb_content(xkb_content, keymaps, deadkey_triggers):
         for layer, keymap_body in enumerate(keymaps):
             symbol = get_symbol(keymap_body, macos_code)
             if symbol in deadkey_triggers:
-                linux_name = f"<{deadkey_triggers[symbol]}>"
+                linux_name = f"{deadkey_triggers[symbol]}"
             else:
                 linux_name = symbol_to_linux_name(symbol)
             symbols.append(linux_name)
@@ -255,7 +262,7 @@ def generate_xkb_content(xkb_content, keymaps, deadkey_triggers):
             else:
                 comment_symbols.append("")
         pattern = rf"key {re.escape(xkb_key)}[^{chr(10)}]*;"
-        quoted_symbols = [f'"{s}"' for s in symbols]
+        quoted_symbols = [f'{s}' for s in symbols]
         comment = " // " + " ".join(comment_symbols)
         replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_content = re.sub(pattern, replacement, xkb_content)
