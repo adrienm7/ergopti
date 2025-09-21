@@ -41,63 +41,63 @@ xkb_keymap        {
         include "latin"
 
         // Space bar
-        key <SPCE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0020", "U002D", "U005F", "U005F", "U0020"] }; //   - _ _  
+        key <SPCE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [space, minus, underscore, underscore, space] }; //   - _ _  
 
         // Digits
-        key <TLDE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0024", "U202F U20AC", "U20AC", "<dead_2>", "U0024"] }; // $ " €" € ¤ $
-        key <AE01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0031", "U0031", "U00B9", "U2081", "U0031"] }; // 1 1 ¹ ₁ 1
-        key <AE02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0032", "U0032", "U00B2", "U2082", "U0032"] }; // 2 2 ² ₂ 2
-        key <AE03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0033", "U0033", "U00B3", "U2083", "U0033"] }; // 3 3 ³ ₃ 3
-        key <AE04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0034", "U0034", "U2074", "U2084", "U0034"] }; // 4 4 ⁴ ₄ 4
-        key <AE05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0035", "U0035", "U2075", "U2085", "U0035"] }; // 5 5 ⁵ ₅ 5
-        key <AE06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0036", "U0036", "U2076", "U2086", "U0036"] }; // 6 6 ⁶ ₆ 6
-        key <AE07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0037", "U0037", "U2077", "U2087", "U0037"] }; // 7 7 ⁷ ₇ 7
-        key <AE08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0038", "U0038", "U2078", "U2088", "U0038"] }; // 8 8 ⁸ ₈ 8
-        key <AE09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0039", "U0039", "U2079", "U2089", "U0039"] }; // 9 9 ⁹ ₉ 9
-        key <AE10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0030", "U0030", "U2070", "U2080", "U0030"] }; // 0 0 ⁰ ₀ 0
-        key <AE11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0025", "U202F U0025", "U2030", "U2031", "U002D"] }; // % " %" ‰ ‱ -
-        key <AE12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U003D", "U00BA", "U00B0", "U00AA", "U002B"] }; // = º ° ª +
+        key <TLDE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dollar, EuroSign, EuroSign, dead_2, dollar] }; // $ " €" € ¤ $
+        key <AE01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [1, 1, onesuperior, NoSymbol, 1] }; // 1 1 ¹ ₁ 1
+        key <AE02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [2, 2, twosuperior, NoSymbol, 2] }; // 2 2 ² ₂ 2
+        key <AE03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [3, 3, threesuperior, NoSymbol, 3] }; // 3 3 ³ ₃ 3
+        key <AE04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [4, 4, NoSymbol, NoSymbol, 4] }; // 4 4 ⁴ ₄ 4
+        key <AE05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [5, 5, NoSymbol, NoSymbol, 5] }; // 5 5 ⁵ ₅ 5
+        key <AE06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [6, 6, NoSymbol, NoSymbol, 6] }; // 6 6 ⁶ ₆ 6
+        key <AE07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [7, 7, NoSymbol, NoSymbol, 7] }; // 7 7 ⁷ ₇ 7
+        key <AE08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [8, 8, NoSymbol, NoSymbol, 8] }; // 8 8 ⁸ ₈ 8
+        key <AE09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [9, 9, NoSymbol, NoSymbol, 9] }; // 9 9 ⁹ ₉ 9
+        key <AE10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [0, 0, NoSymbol, NoSymbol, 0] }; // 0 0 ⁰ ₀ 0
+        key <AE11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [percent, percent, NoSymbol, NoSymbol, minus] }; // % " %" ‰ ‱ -
+        key <AE12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [equal, masculine, degree, ordfeminine, plus] }; // = º ° ª +
 
         // Letters — Row 1/3
-        key <AD01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U00E8", "U00E8", "U0060", "U201E", "U007A"] }; // è è ` „ z
-        key <AD02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0079", "U0079", "U0040", "U20AC", "U0079"] }; // y y @ € y
-        key <AD03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U006F", "U006F", "U0153", "U0152", "U006F"] }; // o o œ Œ o
-        key <AD04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0077", "U0077", "U00F9", "U00D9", "U0077"] }; // w w ù Ù w
-        key <AD05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0062", "U0062", "U00AB U00A0", "U201C", "U0062"] }; // b b "« " “ b
-        key <AD06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0066", "U0066", "U00A0 U00BB", "U201D", "U0066"] }; // f f " »" ” f
-        key <AD07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0067", "U0067", "U007E", "U2248", "U0067"] }; // g g ~ ≈ g
-        key <AD08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0068", "U0068", "U0023", "U0025", "U0068"] }; // h h # % h
-        key <AD09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0063", "U0063", "U00E7", "U00C7", "U0063"] }; // c c ç Ç c
-        key <AD10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0078", "U0078", "U002A", "U00D7", "U0078"] }; // x x * × x
-        key <AD11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U007A", "U007A", "U0025", "U2030", "U007A"] }; // z z % ‰ z
-        key <AD12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["<dead_3>", "U202F", "U00A0", "U00A0", "<dead_3>"] }; // ¨       ¨
+        key <AD01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [egrave, egrave, grave, doublelowquotemark, z] }; // è è ` „ z
+        key <AD02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [y, y, at, EuroSign, y] }; // y y @ € y
+        key <AD03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [o, o, oe, OE, o] }; // o o œ Œ o
+        key <AD04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [w, w, ugrave, Ugrave, w] }; // w w ù Ù w
+        key <AD05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [b, b, guillemotleft, leftdoublequotemark, b] }; // b b "« " “ b
+        key <AD06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [f, f, nobreakspace, rightdoublequotemark, f] }; // f f " »" ” f
+        key <AD07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [g, g, asciitilde, NoSymbol, g] }; // g g ~ ≈ g
+        key <AD08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [h, h, numbersign, percent, h] }; // h h # % h
+        key <AD09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [c, c, ccedilla, Ccedilla, c] }; // c c ç Ç c
+        key <AD10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [x, x, asterisk, multiply, x] }; // x x * × x
+        key <AD11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [z, z, percent, NoSymbol, z] }; // z z % ‰ z
+        key <AD12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_3, NoSymbol, nobreakspace, nobreakspace, dead_3] }; // ¨       ¨
 
         // Letters — Row 2/3
-        key <AC01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0061", "U0061", "U003C", "U2264", "U0061"] }; // a a < ≤ a
-        key <AC02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0069", "U0069", "U003E", "U2265", "U0069"] }; // i i > ≥ i
-        key <AC03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0065", "U0065", "U007B", "<dead_5>", "U0065"] }; // e e { ᵉ e
-        key <AC04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0075", "U0075", "U007D", "<dead_4>", "U0075"] }; // u u } µ u
-        key <AC05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U002E", "U00A0 U003A", "U003A", "U00B7", "U002E"] }; // . " :" : · .
-        key <AC06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0076", "U0076", "U007C", "U00A6", "U0076"] }; // v v | ¦ v
-        key <AC07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0073", "U0073", "U0028", "U2014", "U0073"] }; // s s ( — s
-        key <AC08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U006E", "U006E", "U0029", "U2013", "U006E"] }; // n n ) – n
-        key <AC09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0074", "U0074", "U005B", "<dead_3>", "U0074"] }; // t t [ ¨ t
-        key <AC10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0072", "U0072", "U005D", "<dead_7>", "U0072"] }; // r r ] ℝ r
-        key <AC11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0071", "U0071", "U2019", "<dead_2>", "U0071"] }; // q q ’ ¤ q
-        key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["<dead_1>", "U202F U0021", "U0021", "U00A1", "<dead_1>"] }; // ^ " !" ! ¡ ^
+        key <AC01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [a, a, less, lessthanequal, a] }; // a a < ≤ a
+        key <AC02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [i, i, greater, greaterthanequal, i] }; // i i > ≥ i
+        key <AC03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [e, e, braceleft, dead_5, e] }; // e e { ᵉ e
+        key <AC04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [u, u, braceright, dead_4, u] }; // u u } µ u
+        key <AC05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [period, nobreakspace, colon, periodcentered, period] }; // . " :" : · .
+        key <AC06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [v, v, bar, brokenbar, v] }; // v v | ¦ v
+        key <AC07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [s, s, parenleft, emdash, s] }; // s s ( — s
+        key <AC08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [n, n, parenright, endash, n] }; // n n ) – n
+        key <AC09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [t, t, bracketleft, dead_3, t] }; // t t [ ¨ t
+        key <AC10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [r, r, bracketright, dead_7, r] }; // r r ] ℝ r
+        key <AC11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [q, q, rightsinglequotemark, dead_2, q] }; // q q ’ ¤ q
+        key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_1, exclam, exclam, exclamdown, dead_1] }; // ^ " !" ! ¡ ^
 
         // Letters — Row 3/3
-        key <LSGT> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U00EA", "U00EA", "<dead_1>", "<dead_1>", "U0078"] }; // ê ê ^ ^ x
-        key <AB01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U00E9", "U00E9", "U002F", "U00F7", "U0063"] }; // é é / ÷ c
-        key <AB02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U00E0", "U00E0", "U005C", "<dead_6>", "U0076"] }; // à à \ ᵢ v
-        key <AB03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U006A", "U006A", "U0022", "U006A", "U006A"] }; // j j " j j
-        key <AB04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U002C", "U202F U003B", "U003B", "U2026", "U002C"] }; // , " ;" ; … ,
-        key <AB05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U006B", "U006B", "U2026", "NoSymbol", "U006B"] }; // k k …  k
-        key <AB06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U006D", "U006D", "U0026", "U2212", "U006D"] }; // m m & − m
-        key <AB07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0064", "U0064", "U0024", "U00A7", "U0064"] }; // d d $ § d
-        key <AB08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U006C", "U006C", "U003D", "U2260", "U006C"] }; // l l = ≠ l
-        key <AB09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0070", "U0070", "U002B", "U00B1", "U0070"] }; // p p + ± p
-        key <AB10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", ["U0027", "U202F U003F", "U003F", "U00BF", "U0027"] }; // ' " ?" ? ¿ '
+        key <LSGT> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [ecircumflex, ecircumflex, dead_1, dead_1, x] }; // ê ê ^ ^ x
+        key <AB01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [eacute, eacute, slash, division, c] }; // é é / ÷ c
+        key <AB02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [agrave, agrave, backslash, dead_6, v] }; // à à \ ᵢ v
+        key <AB03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [j, j, quotedbl, j, j] }; // j j " j j
+        key <AB04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [comma, semicolon, semicolon, ellipsis, comma] }; // , " ;" ; … ,
+        key <AB05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [k, k, ellipsis, NoSymbol, k] }; // k k …  k
+        key <AB06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [m, m, ampersand, NoSymbol, m] }; // m m & − m
+        key <AB07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [d, d, dollar, section, d] }; // d d $ § d
+        key <AB08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [l, l, equal, notequal, l] }; // l l = ≠ l
+        key <AB09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [p, p, plus, plusminus, p] }; // p p + ± p
+        key <AB10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [apostrophe, question, question, questiondown, apostrophe] }; // ' " ?" ? ¿ '
 
         include "level3(ralt_switch)"
     };
