@@ -1,7 +1,120 @@
+import html
 import os
 import re
 
 import yaml
+
+
+def unicode_repr(s):
+    if not s:
+        return '""'
+    return f'"{s}" ' + " ".join(f"U{ord(c):04X}" for c in s)
+
+
+def clean_invalid_xml_chars(xml_text):
+    def repl(match):
+        val = int(match.group(1), 16)
+        if val in (0x09, 0x0A, 0x0D):
+            return match.group(0)
+        if val < 0x20:
+            return ""
+        return match.group(0)
+
+    return re.sub(r"&#x([0-9A-Fa-f]{1,6});", repl, xml_text)
+
+
+def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
+    macos_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../macos")
+    )
+    if not os.path.isdir(macos_dir):
+        raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
+
+    # Read keylayout file
+    macos_data, keylayout_path = read_keylayout_file(macos_dir, keylayout_name)
+
+    # Check base.xkb file
+    xkb_path = os.path.join(os.path.dirname(__file__), "base.xkb")
+    if not os.path.isfile(xkb_path):
+        raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
+    xkb_content = read_xkb_template(xkb_path)
+
+    # Load unicode to Linux symbol mapping from YAML
+    yaml_path = os.path.join(os.path.dirname(__file__), "key_sym.yaml")
+    load_yaml_mapping(yaml_path)  # conservé pour compat future, non utilisé
+
+    # Extract keymaps for layers 0 to 4 (indexes 0 to 4)
+    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 3, 5, 6, 4]]
+
+    # Build deadkey trigger map
+    deadkey_triggers = extract_deadkey_triggers(keylayout_path)
+
+    # Génère le contenu XKB
+    xkb_out_content = generate_xkb_content(
+        xkb_content, keymaps, deadkey_triggers
+    )
+
+    # Détermine le nom de base pour la sortie
+    base_name = os.path.splitext(os.path.basename(keylayout_name))[0]
+    xkb_out_path = os.path.join(os.path.dirname(__file__), f"{base_name}.xkb")
+    xcompose_out_path = os.path.splitext(xkb_out_path)[0] + ".XCompose"
+
+    # Écrit le XKB
+    write_file(xkb_out_path, xkb_out_content)
+
+    # Écrit le XCompose
+    parse_actions_for_xcompose(keylayout_path, xcompose_out_path)
+
+
+try:
+    from lxml import etree as LET
+except ImportError:
+    LET = None
+
+
+def parse_actions_for_xcompose(keylayout_path, xcompose_path):
+    """Parse the <actions> block and write a .XCompose file, grouped by deadkey (sx renamed to dead_X)."""
+    if LET is None:
+        print(
+            "lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
+        )
+        return
+    # Preprocess to remove invalid char refs
+    with open(keylayout_path, encoding="utf-8") as f:
+        xml_text = f.read()
+    xml_text = clean_invalid_xml_chars(xml_text)
+    tree = LET.fromstring(xml_text.encode("utf-8"))
+    actions = tree.find(".//actions")
+    if actions is None:
+        print("No <actions> block found.")
+        return
+    lines = ['include "%L"']
+    by_deadkey = {}
+    for action in actions.findall("action"):
+        action_id = action.attrib.get("id")
+        for when in action.findall("when"):
+            state = when.attrib.get("state")
+            output = when.attrib.get("output")
+            if not output:
+                continue
+            # Rename sX to dead_X
+            if state and state.startswith("s") and state[1:].isdigit():
+                state = f"dead_{int(state[1:])}"
+            if state and state != "none":
+                by_deadkey.setdefault(state, []).append((action_id, output))
+            else:
+                by_deadkey.setdefault("", []).append((action_id, output))
+    for deadkey in sorted(by_deadkey.keys()):
+        for action_id, output in sorted(by_deadkey[deadkey]):
+            seq = []
+            if deadkey:
+                seq.append(f"<{deadkey}>")
+            if action_id:
+                seq.append(f"<{action_id}>")
+            out = unicode_repr(output)
+            lines.append(f"{' '.join(seq)}\t: {out} # {output}")
+    with open(xcompose_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def extract_keymap_body(body: str, index: int) -> str:
@@ -82,73 +195,91 @@ linux_to_macos_keycodes = [
 ]
 
 
-# Check ../macos directory and print its contents
-macos_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../macos"))
-if not os.path.isdir(macos_dir):
-    raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
-
-print("macos directory contents:")
-for fname in os.listdir(macos_dir):
-    print(" -", fname)
-
-# Read keylayout file
-with open(
-    os.path.join(macos_dir, "Ergopti_v2.2.0.keylayout"), encoding="utf-8"
-) as f:
-    macos_data = f.read()
-
-# Check base.xkb file
-xkb_path = os.path.join(os.path.dirname(__file__), "base.xkb")
-if not os.path.isfile(xkb_path):
-    raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
-
-with open(xkb_path, encoding="utf-8") as f:
-    xkb_content = f.read()
-
-# Load unicode to Linux symbol mapping from YAML
-with open(
-    os.path.join(os.path.dirname(__file__), "key_sym.yaml"), encoding="utf-8"
-) as f:
-    unicode_to_linux = yaml.safe_load(f)
-
-
 def symbol_to_linux_name(symbol):
     """
-    Convert a symbol to its Linux name using the YAML mapping.
-    If not found, return the original symbol.
+    Always convert a symbol to its Unicode codepoint in Uxxxx format (e.g., U2076).
+    If the symbol is empty or 'NoSymbol', return 'NoSymbol'.
+    If the symbol is more than one character, return a space-separated list of Uxxxx for each character.
     """
     if not symbol or symbol == "NoSymbol":
         return "NoSymbol"
-    if symbol in unicode_to_linux.values():
-        return symbol
-    if len(symbol) != 1:
-        return symbol
-    codepoint = ord(symbol)
-    key = f"\\u{codepoint:04x}"
-    return unicode_to_linux.get(key, symbol)
+    # Decode HTML entities (e.g. '&#x003C;') to their Unicode character
+    decoded = html.unescape(symbol)
+    # If the result is still multi-character, treat each char
+    return " ".join(f"U{ord(c):04X}" for c in decoded)
 
 
-# Extract keymaps for layers 0 to 4 (indexes 0 to 4)
-keymaps = [extract_keymap_body(macos_data, i) for i in [0, 3, 5, 6, 4]]
+def load_yaml_mapping(yaml_path):
+    with open(yaml_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
-# Generate mapping for each key
-for xkb_key, macos_code in linux_to_macos_keycodes:
-    symbols = []
-    original_symbols = []
-    for layer, keymap_body in enumerate(keymaps):
-        symbol = get_symbol(keymap_body, macos_code)
-        linux_name = symbol_to_linux_name(symbol)
-        symbols.append(linux_name)
-        original_symbols.append(symbol if symbol else "")
-    # Replace the line in xkb_content
-    pattern = rf"key {re.escape(xkb_key)}[^{chr(10)}]*;"
-    quoted_symbols = [f'"{s}"' for s in symbols]
-    # Add right-side comment with the actual symbols for each layer
-    comment = " // " + " ".join(original_symbols)
-    replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
-    xkb_content = re.sub(pattern, replacement, xkb_content)
 
-# Write the result to the script directory
-output_path = os.path.join(os.path.dirname(__file__), "ergopti.xkb")
-with open(output_path, "w", encoding="utf-8") as f:
-    f.write(xkb_content)
+def read_keylayout_file(macos_dir, keylayout_name):
+    keylayout_path = os.path.join(macos_dir, keylayout_name)
+    with open(keylayout_path, encoding="utf-8") as f:
+        return f.read(), keylayout_path
+
+
+def read_xkb_template(xkb_path):
+    with open(xkb_path, encoding="utf-8") as f:
+        return f.read()
+
+
+def generate_xkb_content(xkb_content, keymaps, deadkey_triggers):
+    for xkb_key, macos_code in linux_to_macos_keycodes:
+        symbols = []
+        comment_symbols = []
+        for layer, keymap_body in enumerate(keymaps):
+            symbol = get_symbol(keymap_body, macos_code)
+            if symbol in deadkey_triggers:
+                linux_name = f"<{deadkey_triggers[symbol]}>"
+            else:
+                linux_name = symbol_to_linux_name(symbol)
+            symbols.append(linux_name)
+            if symbol:
+                decoded = html.unescape(symbol)
+                if len(decoded) > 1:
+                    comment_symbols.append(f'"{decoded}"')
+                else:
+                    comment_symbols.append(decoded)
+            else:
+                comment_symbols.append("")
+        pattern = rf"key {re.escape(xkb_key)}[^{chr(10)}]*;"
+        quoted_symbols = [f'"{s}"' for s in symbols]
+        comment = " // " + " ".join(comment_symbols)
+        replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
+        xkb_content = re.sub(pattern, replacement, xkb_content)
+    return xkb_content
+
+
+def write_file(path, content):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def extract_deadkey_triggers(keylayout_path):
+    """Return a dict: macos action id -> deadkey name (dead_1, dead_2, ...) if next='sX' is present."""
+    if LET is None:
+        return {}
+    with open(keylayout_path, encoding="utf-8") as f:
+        xml_text = f.read()
+    xml_text = clean_invalid_xml_chars(xml_text)
+    tree = LET.fromstring(xml_text.encode("utf-8"))
+    actions = tree.find(".//actions")
+    deadkey_map = {}
+    if actions is not None:
+        for action in actions.findall("action"):
+            action_id = action.attrib.get("id")
+            for when in action.findall("when"):
+                next_attr = when.attrib.get("next")
+                if (
+                    next_attr
+                    and next_attr.startswith("s")
+                    and next_attr[1:].isdigit()
+                ):
+                    deadkey_map[action_id] = f"dead_{int(next_attr[1:])}"
+    return deadkey_map
+
+
+if __name__ == "__main__":
+    main()
