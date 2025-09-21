@@ -159,6 +159,9 @@ def ergopti_plus_altgr_modifications(body: str) -> str:
     pattern = r'(<keyMap index="5">)(.*?)(</keyMap>)'
     fixed = re.sub(pattern, replace_in_keymap, body, flags=re.DOTALL)
 
+    fixed = ensure_action_block_exists(fixed, "!")
+    fixed = ensure_action_block_exists(fixed, "%")
+
     return fixed
 
 
