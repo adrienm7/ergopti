@@ -8,7 +8,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 #Include *i UIA\Lib\UIA.ahk ; Can be downloaded here : https://github.com/Descolada/UIA-v2/tree/main
 ; *i = no error if the file isn't found, as this library is not mandatory to run this script
 
-#Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
+; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
 A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed in the interval
 
@@ -59,7 +59,7 @@ SendInstant(Text) {
 ActivateHotstrings() {
     SendNewResult(" ")
     Sleep(50) ; in ms
-    SendFinalResult("{BackSpace}")
+    SendNewResult("{BackSpace}", Map("OnlyText", False))
 }
 
 GetSelection() {
@@ -178,97 +178,92 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
     OptionPreferTitleCase := options.Has("PreferTitleCase") ? options["PreferTitleCase"] : True
     OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : True
     OptionFinalResult := options.Has("FinalResult") ? options["FinalResult"] : False
-    OptionTimeActivationSeconds := options.Has("TimeActivationSeconds") ? options[
-        "TimeActivationSeconds"] : 0
+    OptionTimeActivationSeconds := options.Has("TimeActivationSeconds") ? options["TimeActivationSeconds"] : 0
 
     HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
         "TimeActivationSeconds", OptionTimeActivationSeconds)
-
     FlagsPortion := ":" Flags "CB0:"
-    AbbreviationLowercase := StrLower(Abbreviation)
-    ReplacementLowercase := StrLower(Replacement)
-    AbbreviationTitleCase := StrTitle(Abbreviation)
-    ReplacementTitleCase := StrTitle(Replacement)
-    AbbreviationUppercase := StrUpper(Abbreviation)
-    ReplacementUppercase := StrUpper(Replacement)
 
-    ; Abbreviation lowercase
-    Hotstring(
-        FlagsPortion AbbreviationLowercase,
-        (*) => HotstringHandler(AbbreviationLowercase, ReplacementLowercase, A_EndChar, HotstringOptions)
+    UppercasedSymbols := Map(
+        ",", [" ;", " :"], ; Order matters, the nbsp abbreviations need to trigger first the engine, otherwise the nbsp won’t be deleted
+        "'", [" ?"]
     )
 
-    ; First letter of abbreviation uppercase and rest lowercase
-    if not OptionPreferTitleCase {
-        ; Special case of repeat key ("A★" must give AA)
-        Hotstring(
-            FlagsPortion AbbreviationTitleCase,
-            (*) => HotstringHandler(AbbreviationTitleCase, ReplacementUppercase, A_EndChar, HotstringOptions)
-        )
-        return
-    } else if (SubStr(Abbreviation, 1, 1) == ",") {
-        ; In case we are creating the abbreviations for the , key, we need to consider its shift version
-        AbbreviationTitleCaseV1 := " :" SubStr(AbbreviationLowercase, 2)
-        Hotstring(
-            FlagsPortion AbbreviationTitleCaseV1,
-            (*) => HotstringHandler(AbbreviationTitleCaseV1, ReplacementTitleCase, A_EndChar, HotstringOptions)
-        )
+    AbbreviationLowerCase := StrLower(Abbreviation)
+    AbbreviationTitleCase := StrTitle(Abbreviation)
+    AbbreviationInvertedTitleCase := StrLower(SubStr(Abbreviation, 1, -1)) . StrUpper(SubStr(Abbreviation, -1))
+    AbbreviationUpperCase := StrUpper(Abbreviation)
 
-        AbbreviationTitleCaseV2 := " ;" SubStr(AbbreviationLowercase, 2)
-        Hotstring(
-            FlagsPortion AbbreviationTitleCaseV2,
-            (*) => HotstringHandler(AbbreviationTitleCaseV2, ReplacementTitleCase, A_EndChar, HotstringOptions)
-        )
+    FirstChar := SubStr(Abbreviation, 1, 1)
+    LastChar := SubStr(Abbreviation, -1)
 
-        AbbreviationTitleCaseV3 := "," SubStr(AbbreviationUppercase, 2)
+    ReplacementLowerCase := StrLower(Replacement)
+    ReplacementTitleCase := StrTitle(Replacement)
+    ReplacementUpperCase := StrUpper(Replacement)
+
+    ; Lowercase
+    Hotstring(
+        FlagsPortion AbbreviationLowerCase,
+        (*) => HotstringHandler(AbbreviationLowerCase, ReplacementLowerCase, A_EndChar, HotstringOptions)
+    )
+
+    ; Uppercase
+    for _, variant in GenerateUppercaseVariants(AbbreviationUppercase, UppercasedSymbols) {
+        v := variant ; Capture the value for this iteration (otherwise there is an error)
         Hotstring(
-            FlagsPortion AbbreviationTitleCaseV3,
-            (*) => HotstringHandler(AbbreviationTitleCaseV3, ReplacementTitleCase, A_EndChar, HotstringOptions)
-        )
-    } else {
-        Hotstring(
-            FlagsPortion AbbreviationTitleCase,
-            (*) => HotstringHandler(AbbreviationTitleCase, ReplacementTitleCase, A_EndChar, HotstringOptions)
+            FlagsPortion v,
+            (*) => HotstringHandler(v, ReplacementUpperCase, A_EndChar, HotstringOptions)
         )
     }
 
-    ; Abbreviation uppercase
-    if StrLen(RTrim(Abbreviation, "★")) > 1 {
-        ; The abbreviation usually finishes with ★, so we remove it to get the real length
-        ; If this length is 1, that means Titlecase and Uppercase abbreviation will trigger the same result.
-        ; Thus, we need to make sure this result is in titlecase instead of uppercase because it is the most useful.
-        if (SubStr(Abbreviation, 1, 1) == ",") {
-            ; In case we are creating the abbreviations for the , key, we need to consider its shift version
-            AbbreviationUppercaseV1 := " :" SubStr(AbbreviationUppercase, 2)
-            Hotstring(
-                FlagsPortion AbbreviationUppercaseV1,
-                (*) => HotstringHandler(AbbreviationUppercaseV1, ReplacementUppercase, A_EndChar, HotstringOptions
-                )
-            )
+    ; When an abbreviation is only one character, titlecase = uppercase, so it should not be defined
+    if StrLen(RTrim(Abbreviation, "★")) == 1 {
+        return
+    }
 
-            AbbreviationUppercaseV2 := " ;" SubStr(AbbreviationUppercase, 2)
-            Hotstring(
-                FlagsPortion AbbreviationUppercaseV2,
-                (*) => HotstringHandler(AbbreviationUppercaseV2, ReplacementUppercase, A_EndChar, HotstringOptions
-                )
-            )
+    if (StrLen(Abbreviation) >= 2) {
 
-            if StrLen(LTrim(Abbreviation, ",")) > 1 {
+        ; Titlecase: first letter uppercase, rest lowercase
+        if !(StrLower(FirstChar) == StrUpper(FirstChar)) {
+            Hotstring(
+                FlagsPortion AbbreviationTitleCase,
+                (*) => HotstringHandler(AbbreviationTitleCase, ReplacementTitleCase, A_EndChar, HotstringOptions)
+            )
+        } else if UppercasedSymbols.Has(firstChar) {
+            for UppercasedSymbol in UppercasedSymbols[firstChar] {
+                AbbreviationTitleCaseVariant := UppercasedSymbol . SubStr(AbbreviationLowerCase, 2)
                 Hotstring(
-                    FlagsPortion AbbreviationUppercase,
-                    (*) => HotstringHandler(AbbreviationUppercase, ReplacementUppercase, A_EndChar, HotstringOptions)
+                    FlagsPortion AbbreviationTitleCaseVariant,
+                    (*) => HotstringHandler(AbbreviationTitleCaseVariant, ReplacementTitleCase, A_EndChar,
+                        HotstringOptions
+                    )
                 )
             }
-        } else if (SubStr(AbbreviationUppercase, -1, 1) == "'") {
-            AbbreviationUppercase := SubStr(AbbreviationUppercase, 1, StrLen(AbbreviationUppercase) - 1) " ?"
-            Hotstring(
-                FlagsPortion AbbreviationUppercase,
-                (*) => HotstringHandler(AbbreviationUppercase, ReplacementUppercase, A_EndChar, HotstringOptions)
-            )
+        }
+
+        ; Inverted titlecase: beginning lowercase, last letter uppercase
+        if OptionPreferTitleCase {
+            if !(StrLower(lastChar) == StrUpper(lastChar)) {
+                Hotstring(
+                    FlagsPortion AbbreviationInvertedTitleCase,
+                    (*) => HotstringHandler(AbbreviationInvertedTitleCase, ReplacementTitleCase, A_EndChar,
+                        HotstringOptions)
+                )
+            } else if UppercasedSymbols.Has(LastChar) {
+                for UppercasedSymbol in UppercasedSymbols[LastChar] {
+                    AbbreviationInvertedTitleCaseVariant := SubStr(AbbreviationLowerCase, 1, -1) . UppercasedSymbol
+                    Hotstring(
+                        FlagsPortion AbbreviationInvertedTitleCaseVariant,
+                        (*) => HotstringHandler(AbbreviationInvertedTitleCaseVariant, ReplacementTitleCase, A_EndChar,
+                            HotstringOptions)
+                    )
+                }
+            }
         } else {
             Hotstring(
-                FlagsPortion AbbreviationUppercase,
-                (*) => HotstringHandler(AbbreviationUppercase, ReplacementUppercase, A_EndChar, HotstringOptions)
+                FlagsPortion AbbreviationInvertedTitleCase,
+                (*) => HotstringHandler(AbbreviationInvertedTitleCase, ReplacementUpperCase, A_EndChar,
+                    HotstringOptions)
             )
         }
     }
@@ -280,6 +275,22 @@ StrTitle(Text) {
     } else {
         return Text
     }
+}
+
+GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
+    Variants := [AbbreviationUpperCase]
+    for i, Char in StrSplit(AbbreviationUpperCase) {
+        if UppercasedSymbols.Has(Char) {
+            for _, UpperSymbol in UppercasedSymbols[Char] {
+                AbbreviationUpperCaseVariant :=
+                    SubStr(AbbreviationUpperCase, 1, i - 1)
+                    . UpperSymbol
+                    . SubStr(AbbreviationUpperCase, i + 1)
+                Variants.Push(AbbreviationUpperCaseVariant)
+            }
+        }
+    }
+    return Variants
 }
 
 GetLastSentCharacterAt(Offset) {
@@ -417,7 +428,8 @@ global Features := Map(
         },
     ),
     "Rolls", Map(
-        "__Order", ["HC", "SX", "CX", "EnglishNegation", "EZ", "CT", "-", "CloseChevronTag", "ChevronEqual", "Assign",
+        "__Order", ["HC", "SX", "CX", "EnglishNegation", "EZ", "CT", "-", "CloseChevronTag", "ChevronEqual",
+            "Assign",
             "NotEqual", "HashtagQuote", "HashtagParenthesis", "HashtagBracket", "EqualString", "Comment",
             "AssignArrowEqualRight", "AssignArrowEqualLeft", "AssignArrowMinusRight", "AssignArrowMinusLeft"],
         "HC", {
@@ -1427,7 +1439,8 @@ ShortcutsEditor(*) {
 
     GuiToShow.Add("Button", "w100 Center", "OK").OnEvent(
         "Click",
-        (*) => ModifyValues(GuiToShow, NewEGraveValue.Text, NewECircValue.Text, NewEAcuteValue.Text, NewAGraveValue.Text
+        (*) => ModifyValues(GuiToShow, NewEGraveValue.Text, NewECircValue.Text, NewEAcuteValue.Text, NewAGraveValue
+            .Text
         )
     )
     GuiToShow.Show("Center")
@@ -4033,7 +4046,8 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
     }
 
     ShouldActivateDeadkey(Combination, MappedValue) {
-        if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Features["DistancesReduction"]["DeadKeyECircumflex"]
+        if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Features["DistancesReduction"][
+            "DeadKeyECircumflex"]
         .TimeActivationSeconds
         ) {
             ; We only activate the deadkey if it is the start of a new word, as symbols aren’t put in words
@@ -7708,35 +7722,35 @@ if Features["MagicKey"]["Repeat"].Enabled {
     ; ======= PRIORITY 3/3: Repeat last sent character =======
 
     ; === Letters ===
-    CreateCaseSensitiveHotstrings("*?", "a★", "aa", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "b★", "bb", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "c★", "cc", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "d★", "dd", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "e★", "ee", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "é★", "éé", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "è★", "èè", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "ê★", "êê", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "f★", "ff", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "g★", "gg", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "h★", "hh", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "i★", "ii", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "j★", "jj", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "k★", "kk", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "l★", "ll", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "m★", "mm", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "n★", "nn", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "o★", "oo", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "p★", "pp", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "q★", "qq", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "r★", "rr", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "s★", "ss", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "t★", "tt", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "u★", "uu", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "v★", "vv", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "w★", "ww", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "x★", "xx", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "y★", "yy", Map("PreferTitleCase", False))
-    CreateCaseSensitiveHotstrings("*?", "z★", "zz", Map("PreferTitleCase", False))
+    CreateCaseSensitiveHotstrings("*?", "a★", "aa")
+    CreateCaseSensitiveHotstrings("*?", "b★", "bb")
+    CreateCaseSensitiveHotstrings("*?", "c★", "cc")
+    CreateCaseSensitiveHotstrings("*?", "d★", "dd")
+    CreateCaseSensitiveHotstrings("*?", "e★", "ee")
+    CreateCaseSensitiveHotstrings("*?", "é★", "éé")
+    CreateCaseSensitiveHotstrings("*?", "è★", "èè")
+    CreateCaseSensitiveHotstrings("*?", "ê★", "êê")
+    CreateCaseSensitiveHotstrings("*?", "f★", "ff")
+    CreateCaseSensitiveHotstrings("*?", "g★", "gg")
+    CreateCaseSensitiveHotstrings("*?", "h★", "hh")
+    CreateCaseSensitiveHotstrings("*?", "i★", "ii")
+    CreateCaseSensitiveHotstrings("*?", "j★", "jj")
+    CreateCaseSensitiveHotstrings("*?", "k★", "kk")
+    CreateCaseSensitiveHotstrings("*?", "l★", "ll")
+    CreateCaseSensitiveHotstrings("*?", "m★", "mm")
+    CreateCaseSensitiveHotstrings("*?", "n★", "nn")
+    CreateCaseSensitiveHotstrings("*?", "o★", "oo")
+    CreateCaseSensitiveHotstrings("*?", "p★", "pp")
+    CreateCaseSensitiveHotstrings("*?", "q★", "qq")
+    CreateCaseSensitiveHotstrings("*?", "r★", "rr")
+    CreateCaseSensitiveHotstrings("*?", "s★", "ss")
+    CreateCaseSensitiveHotstrings("*?", "t★", "tt")
+    CreateCaseSensitiveHotstrings("*?", "u★", "uu")
+    CreateCaseSensitiveHotstrings("*?", "v★", "vv")
+    CreateCaseSensitiveHotstrings("*?", "w★", "ww")
+    CreateCaseSensitiveHotstrings("*?", "x★", "xx")
+    CreateCaseSensitiveHotstrings("*?", "y★", "yy")
+    CreateCaseSensitiveHotstrings("*?", "z★", "zz")
 
     ; === Numbers ===
     CreateHotstring("*?", "0★", "00")
