@@ -15,7 +15,7 @@ xkb_keymap        {
         key <SPCE> { [space, space, underscore, underscore] }; //     _ _
 
         // Digits
-        key <TLDE> { [dollar, dollar, EuroSign, dead_2] }; // $ $ € ¤
+        key <TLDE> { [dollar, dollar, EuroSign, U20B0] }; // $ $ € ¤
         key <AE01> { [1, 1, onesuperior, NoSymbol] }; // 1 1 ¹ ₁
         key <AE02> { [2, 2, twosuperior, NoSymbol] }; // 2 2 ² ₂
         key <AE03> { [3, 3, threesuperior, NoSymbol] }; // 3 3 ³ ₃
@@ -41,26 +41,26 @@ xkb_keymap        {
         key <AD09> { [c, C, ccedilla, Ccedilla] }; // c C ç Ç
         key <AD10> { [x, X, asterisk, multiply] }; // x X * ×
         key <AD11> { [z, Z, percent, NoSymbol] }; // z Z % ‰
-        key <AD12> { [dead_3, dead_3, nobreakspace, nobreakspace] }; // ¨ ¨    
+        key <AD12> { [U2792, U2792, nobreakspace, nobreakspace] }; // ¨ ¨    
 
         // Letters — Row 2/3
         key <AC01> { [a, A, less, lessthanequal] }; // a A < ≤
         key <AC02> { [i, I, greater, greaterthanequal] }; // i I > ≥
-        key <AC03> { [e, E, braceleft, dead_5] }; // e E { ᵉ
-        key <AC04> { [u, U, braceright, dead_4] }; // u U } µ
+        key <AC03> { [e, E, braceleft, U02FA] }; // e E { ᵉ
+        key <AC04> { [u, U, braceright, U2126] }; // u U } µ
         key <AC05> { [period, period, colon, periodcentered] }; // . . : ·
         key <AC06> { [v, V, bar, brokenbar] }; // v V | ¦
         key <AC07> { [s, S, parenleft, emdash] }; // s S ( —
         key <AC08> { [n, N, parenright, endash] }; // n N ) –
-        key <AC09> { [t, T, bracketleft, dead_3] }; // t T [ ¨
-        key <AC10> { [r, R, bracketright, dead_7] }; // r R ] ℝ
-        key <AC11> { [q, Q, rightsinglequotemark, dead_2] }; // q Q ’ ¤
-        key <BKSL> { [dead_1, dead_1, exclam, exclamdown] }; // ^ ^ ! ¡
+        key <AC09> { [t, T, bracketleft, U2792] }; // t T [ ¨
+        key <AC10> { [r, R, bracketright, U27E7] }; // r R ] ℝ
+        key <AC11> { [q, Q, rightsinglequotemark, U20B0] }; // q Q ’ ¤
+        key <BKSL> { [U005E, U005E, exclam, exclamdown] }; // ^ ^ ! ¡
 
         // Letters — Row 3/3
-        key <LSGT> { [ecircumflex, Ecircumflex, dead_1, dead_1] }; // ê Ê ^ ^
+        key <LSGT> { [ecircumflex, Ecircumflex, U005E, U005E] }; // ê Ê ^ ^
         key <AB01> { [eacute, Eacute, slash, division] }; // é É / ÷
-        key <AB02> { [agrave, Agrave, backslash, dead_6] }; // à À \ ᵢ
+        key <AB02> { [agrave, Agrave, backslash, U02FC] }; // à À \ ᵢ
         key <AB03> { [j, J, quotedbl, j] }; // j J " j
         key <AB04> { [comma, comma, semicolon, ellipsis] }; // , , ; …
         key <AB05> { [k, K, ellipsis, NoSymbol] }; // k K … 

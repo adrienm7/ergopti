@@ -13,6 +13,7 @@ yaml_path = os.path.join(os.path.dirname(__file__), "key_sym.yaml")
 with open(yaml_path, encoding="utf-8") as f:
     mappings = yaml.safe_load(f)
 
+
 def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     print(f"[INFO] Using keylayout: {keylayout_name}")
     macos_dir = os.path.abspath(
@@ -32,8 +33,6 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     print("[INFO] Reading base.xkb template...")
     xkb_content = read_xkb_template(xkb_path)
 
-
-
     # Extract keymaps for layers 0 to 4 (indexes 0 to 4)
     print("[INFO] Extracting keymaps for layers 0, 3, 5, 6, 4...")
     keymaps = [extract_keymap_body(macos_data, i) for i in [0, 1, 5, 6]]
@@ -42,10 +41,32 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     print("[INFO] Building deadkey trigger map...")
     deadkey_triggers = extract_deadkey_triggers(keylayout_path)
 
+    # Build deadkey_name -> unicode_symbol mapping (same as in XCompose)
+    print("[INFO] Building deadkey symbol map...")
+    deadkey_symbol = {}
+    if LET is not None:
+        with open(keylayout_path, encoding="utf-8") as f:
+            xml_text = f.read()
+        xml_text = clean_invalid_xml_chars(xml_text)
+        tree = LET.fromstring(xml_text.encode("utf-8"))
+        actions = tree.find(".//actions")
+        if actions is not None:
+            for action in actions.findall("action"):
+                action_id = action.attrib.get("id")
+                for when in action.findall("when"):
+                    state = when.attrib.get("state")
+                    output = when.attrib.get("output")
+                    if not output:
+                        continue
+                    if state and state.startswith("s") and state[1:].isdigit():
+                        deadkey_name = f"dead_{int(state[1:])}"
+                        if action_id and action_id not in deadkey_symbol:
+                            deadkey_symbol[deadkey_name] = output
+
     # Generate XKB content
     print("[INFO] Generating XKB content...")
     xkb_out_content = generate_xkb_content(
-        xkb_content, keymaps, deadkey_triggers
+        xkb_content, keymaps, deadkey_triggers, deadkey_symbol
     )
 
     # Determine output file names
@@ -84,7 +105,7 @@ def clean_invalid_xml_chars(xml_text):
 
 
 def parse_actions_for_xcompose(keylayout_path, xcompose_path):
-    """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups."""
+    """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol."""
     if LET is None:
         print(
             "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
@@ -101,6 +122,21 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
     if actions is None:
         print("[WARNING] No <actions> block found.")
         return
+    # Build deadkey_name -> unicode_symbol mapping
+    deadkey_symbol = {}
+    for action in actions.findall("action"):
+        action_id = action.attrib.get("id")
+        for when in action.findall("when"):
+            state = when.attrib.get("state")
+            output = when.attrib.get("output")
+            if not output:
+                continue
+            if state and state.startswith("s") and state[1:].isdigit():
+                deadkey_name = f"dead_{int(state[1:])}"
+                # The symbol that triggers the deadkey is the output of the action with next=sX
+                if action_id and action_id not in deadkey_symbol:
+                    deadkey_symbol[deadkey_name] = output
+    # Build Compose lines
     lines = []
     by_deadkey = {}
     for action in actions.findall("action"):
@@ -110,7 +146,6 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
             output = when.attrib.get("output")
             if not output:
                 continue
-            # Only keep deadkey states (not none)
             if state and state.startswith("s") and state[1:].isdigit():
                 state = f"dead_{int(state[1:])}"
             if state and state != "none":
@@ -122,13 +157,17 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
         first = False
         for action_id, output in sorted(by_deadkey[deadkey]):
             seq = []
-            if deadkey:
+            # Replace <dead_X> by its real Unicode symbol
+            if deadkey in deadkey_symbol:
+                symbol = deadkey_symbol[deadkey]
+                seq.append(f"<U{ord(symbol):04X}>")
+            else:
                 seq.append(f"<{deadkey}>")
             if action_id:
                 seq.append(f"<{action_id}>")
             out = unicode_repr(output)
             lines.append(f"{' '.join(seq)}\t: {out} # {output}")
-    content='include "%L"\n\n' + "\n".join(lines) + "\n"
+    content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
     with open(xcompose_path, "w", encoding="utf-8") as f:
         f.write(content)
 
@@ -228,7 +267,6 @@ def symbol_to_linux_name(symbol):
     return " ".join(result)
 
 
-
 def read_keylayout_file(macos_dir, keylayout_name):
     """Read the keylayout file and return its content and path."""
     keylayout_path = os.path.join(macos_dir, keylayout_name)
@@ -242,15 +280,22 @@ def read_xkb_template(xkb_path):
         return f.read()
 
 
-def generate_xkb_content(xkb_content, keymaps, deadkey_triggers):
-    """Generate the XKB output content from the keymaps and deadkey triggers."""
+def generate_xkb_content(
+    xkb_content, keymaps, deadkey_triggers, deadkey_symbol_map=None
+):
+    """Generate the XKB output content from the keymaps and deadkey triggers. Replace deadkey names by their Unicode symbol if mapping provided."""
     for xkb_key, macos_code in linux_to_macos_keycodes:
         symbols = []
         comment_symbols = []
         for layer, keymap_body in enumerate(keymaps):
             symbol = get_symbol(keymap_body, macos_code)
             if symbol in deadkey_triggers:
-                linux_name = f"{deadkey_triggers[symbol]}"
+                deadkey_name = deadkey_triggers[symbol]
+                if deadkey_symbol_map and deadkey_name in deadkey_symbol_map:
+                    unicode_sym = deadkey_symbol_map[deadkey_name]
+                    linux_name = f"U{ord(unicode_sym):04X}"
+                else:
+                    linux_name = deadkey_name
             else:
                 linux_name = symbol_to_linux_name(symbol)
             symbols.append(linux_name)
@@ -263,9 +308,11 @@ def generate_xkb_content(xkb_content, keymaps, deadkey_triggers):
             else:
                 comment_symbols.append("")
         pattern = rf"key {re.escape(xkb_key)}[^{chr(10)}]*;"
-        quoted_symbols = [f'{s}' for s in symbols]
+        quoted_symbols = [f"{s}" for s in symbols]
         comment = " // " + " ".join(comment_symbols)
-        replacement = f'key {xkb_key} {{ [{", ".join(quoted_symbols)}] }};{comment}'
+        replacement = (
+            f"key {xkb_key} {{ [{', '.join(quoted_symbols)}] }};{comment}"
+        )
         xkb_content = re.sub(pattern, replacement, xkb_content)
     return xkb_content
 
