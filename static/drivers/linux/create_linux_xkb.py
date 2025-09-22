@@ -36,7 +36,7 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
 
     # Extract keymaps for layers 0 to 4 (indexes 0 to 4)
     print("[INFO] Extracting keymaps for layers 0, 3, 5, 6, 4...")
-    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 3, 5, 6, 4]]
+    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 1, 5, 6]]
 
     # Build deadkey trigger map
     print("[INFO] Building deadkey trigger map...")
@@ -128,8 +128,9 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                 seq.append(f"<{action_id}>")
             out = unicode_repr(output)
             lines.append(f"{' '.join(seq)}\t: {out} # {output}")
+    content='include "%L"\n\n' + "\n".join(lines) + "\n"
     with open(xcompose_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+        f.write(content)
 
 
 def extract_keymap_body(body: str, index: int) -> str:
@@ -264,7 +265,7 @@ def generate_xkb_content(xkb_content, keymaps, deadkey_triggers):
         pattern = rf"key {re.escape(xkb_key)}[^{chr(10)}]*;"
         quoted_symbols = [f'{s}' for s in symbols]
         comment = " // " + " ".join(comment_symbols)
-        replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
+        replacement = f'key {xkb_key} {{ [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_content = re.sub(pattern, replacement, xkb_content)
     return xkb_content
 

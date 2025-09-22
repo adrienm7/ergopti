@@ -2,35 +2,6 @@ xkb_keymap        {
 
     xkb_keycodes      { include "evdev+aliases(azerty)" };
 
-    xkb_types         { 
-        include "complete"
-
-        type "FOUR_LEVEL_SEMIALPHABETIC_CONTROL" {
-            modifiers = Shift+Lock+LevelThree+Control;
-            
-            map[None] = Level1;
-            map[Shift] = Level2;
-            map[Lock]  = Level2;
-            map[LevelThree] = Level3;
-            map[Shift+LevelThree] = Level4;
-            map[Lock+LevelThree] =  Level3;
-            map[Lock+Shift+LevelThree] = Level4;
-            map[Control]  = Level5;
-            
-            preserve[Control] = Control;
-            preserve[Shift+Control] = Control;
-            preserve[Lock+LevelThree] = Lock;
-            preserve[Lock+Shift+LevelThree] = Lock;
-            
-            level_name[Level1] = "Base";
-            level_name[Level2] = "Shift";
-            level_name[Level3] = "Alt Base";
-            level_name[Level4] = "Shift Alt";
-            level_name[Level5] = "Control";
-        };
-                
-    };
-
     xkb_compatibility { include "complete" };
 
     partial alphanumeric_keys
@@ -41,63 +12,63 @@ xkb_keymap        {
         include "latin"
 
         // Space bar
-        key <SPCE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
+        key <SPCE> { [] };
 
         // Digits
-        key <TLDE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AE12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
+        key <TLDE> { [] };
+        key <AE01> { [] };
+        key <AE02> { [] };
+        key <AE03> { [] };
+        key <AE04> { [] };
+        key <AE05> { [] };
+        key <AE06> { [] };
+        key <AE07> { [] };
+        key <AE08> { [] };
+        key <AE09> { [] };
+        key <AE10> { [] };
+        key <AE11> { [] };
+        key <AE12> { [] };
 
         // Letters — Row 1/3
-        key <AD01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AD12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
+        key <AD01> { [] };
+        key <AD02> { [] };
+        key <AD03> { [] };
+        key <AD04> { [] };
+        key <AD05> { [] };
+        key <AD06> { [] };
+        key <AD07> { [] };
+        key <AD08> { [] };
+        key <AD09> { [] };
+        key <AD10> { [] };
+        key <AD11> { [] };
+        key <AD12> { [] };
 
         // Letters — Row 2/3
-        key <AC01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AC11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
+        key <AC01> { [] };
+        key <AC02> { [] };
+        key <AC03> { [] };
+        key <AC04> { [] };
+        key <AC05> { [] };
+        key <AC06> { [] };
+        key <AC07> { [] };
+        key <AC08> { [] };
+        key <AC09> { [] };
+        key <AC10> { [] };
+        key <AC11> { [] };
+        key <BKSL> { [] };
 
         // Letters — Row 3/3
-        key <LSGT> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
-        key <AB10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [] };
+        key <LSGT> { [] };
+        key <AB01> { [] };
+        key <AB02> { [] };
+        key <AB03> { [] };
+        key <AB04> { [] };
+        key <AB05> { [] };
+        key <AB06> { [] };
+        key <AB07> { [] };
+        key <AB08> { [] };
+        key <AB09> { [] };
+        key <AB10> { [] };
 
         include "level3(ralt_switch)"
     };
