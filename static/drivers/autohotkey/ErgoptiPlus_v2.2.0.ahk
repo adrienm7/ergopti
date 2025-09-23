@@ -4603,7 +4603,6 @@ if Features["Autocorrection"]["OU"].Enabled {
 }
 
 if Features["Autocorrection"]["PonctuationMarks"].Enabled {
-    CreateHotstring("*", " !", " !")
     CreateHotstring(
         "*", "  !", " !",
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
@@ -4617,7 +4616,6 @@ if Features["Autocorrection"]["PonctuationMarks"].Enabled {
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
 
-    CreateHotstring("*", " ?", " ?")
     CreateHotstring(
         "*", "  ?", " ?",
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
@@ -4631,31 +4629,12 @@ if Features["Autocorrection"]["PonctuationMarks"].Enabled {
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
 
-    CreateHotstring("*", " :", " :")
     CreateHotstring(
         "*", "  :", " :",
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
     CreateHotstring(
-        "*", ": :", "::",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
-    )
-    CreateHotstring(
-        "*", ": :", "::",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
-    )
-
-    CreateHotstring("*", " `;", " ;")
-    CreateHotstring(
         "*", "  ;", " ;",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
-    )
-    CreateHotstring(
-        "*", "; ;", ";;",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
-    )
-    CreateHotstring(
-        "*", "; `;", ";;",
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
 
