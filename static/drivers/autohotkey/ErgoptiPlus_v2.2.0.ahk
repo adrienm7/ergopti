@@ -4611,17 +4611,9 @@ if Features["Autocorrection"]["PonctuationMarks"].Enabled {
         "*", "! !", "!!",
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
-    CreateHotstring(
-        "*", "! !", "!!",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
-    )
 
     CreateHotstring(
         "*", "  ?", " ?",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
-    )
-    CreateHotstring(
-        "*", "? ?", "??",
         Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
     CreateHotstring(
