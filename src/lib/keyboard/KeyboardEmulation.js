@@ -354,20 +354,21 @@ export class KeyboardEmulation extends Keyboard {
 		regexReplaceCursor(/([cdjlmnst])'/gi, '$1’');
 
 		const replacementsSFBs = [
-			[/êé/g, 'aî'],
-			[/éê/g, 'â'],
-			[/eê/g, 'eo'],
+			[/èy/g, 'aî'],
+			[/yè/g, 'â'],
+			[/êé/g, 'oe'],
+			[/éê/g, 'eo'],
+			[/éà/g, 'ié'],
+			[/àé/g, 'éi'],
 			[/ê\./g, 'u.'],
 			[/ê,/g, 'u,']
 		];
 
 		const replacementsRolls = [
-			[/yè/g, 'éi'],
-			[/èy/g, 'ié'],
 			[/hc/g, 'wh'],
 			[/sx/g, 'sk'],
 			[/cx/g, 'ck'],
-			[/eé/g, 'eé'],
+			[/eé/g, 'ez'],
 			[/p'/g, 'ct'],
 			[/<@/g, '</'],
 			[/<%/g, '<='],
@@ -392,7 +393,8 @@ export class KeyboardEmulation extends Keyboard {
 			[/êa/g, 'â'],
 			[/êi/g, 'î'],
 			[/êo/g, 'ô'],
-			[/êu/g, 'û']
+			[/êu/g, 'û'],
+			[/êe/g, 'œ']
 		];
 
 		function* caseHandling(list) {

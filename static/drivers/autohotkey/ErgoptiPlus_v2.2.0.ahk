@@ -381,12 +381,17 @@ global Features := Map(
         },
         "DeadKeyECircumflex", {
             Enabled: True,
-            Description: "Ê suivi d’une voyelle agit comme une touche morte : êo = ô, êu = û, …",
+            Description: "Ê suivi d’une lettre agit comme une touche morte : êo = ô, êu = û, ês = ß…",
+            TimeActivationSeconds: 1,
+        },
+        "ECircumflexE", {
+            Enabled: True,
+            Description: "Ê suivi de E donne Œ",
             TimeActivationSeconds: 1,
         },
         "SuffixesA", {
             Enabled: True,
-            Description: "À + lettre donne un suffixe : às = ement, àn = ation, àé = ying, …",
+            Description: "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …",
             TimeActivationSeconds: 1,
         },
         "CommaJ", {
@@ -418,17 +423,22 @@ global Features := Map(
         },
         "ECirc", {
             Enabled: True,
-            Description: "Ê + touche sur la main gauche corrige des SFBs : êe = oe, eê = eo, ê. = u., êé = aî, …",
+            Description: "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u.",
             TimeActivationSeconds: 1,
         },
         "EGrave", {
             Enabled: True,
-            Description: "È + touche Y corrige 2 SFBs : èy = ié et yè = éi",
+            Description: "È + touche Y corrige 2 SFBs : èy = aî et yè = â",
             TimeActivationSeconds: 1,
         },
         "BU", {
             Enabled: True,
-            Description: "À corrige 2 SFBs : à★ = bu et àu = ub",
+            Description: "À + ★/B corrige 2 SFBs : à★ = bu et àu = ub",
+            TimeActivationSeconds: 1,
+        },
+        "IÉ", {
+            Enabled: True,
+            Description: "À + É corrige 2 SFBs : éà = ié et àé = éi",
             TimeActivationSeconds: 1,
         },
     ),
@@ -510,6 +520,11 @@ global Features := Map(
         "Comment", {
             Enabled: True,
             Description: "\`" = /*",
+            TimeActivationSeconds: 0.5,
+        },
+        "LeftArrow", {
+            Enabled: True,
+            Description: "=+ = ➜",
             TimeActivationSeconds: 0.5,
         },
         "AssignArrowEqualRight", {
@@ -1841,7 +1856,7 @@ global DeadkeyMappingCircumflex := Map(
     "g", "ĝ", "G", "Ĝ",
     "h", "ĥ", "H", "Ĥ",
     "i", "î", "I", "Î",
-    "j", "ĵ", "J", "Ĵ",
+    "j", "j", "J", "J",
     "k", "☺", "K", "☻",
     "l", "†", "L", "‡",
     "m", "⁂", "M", "⁂",
@@ -1858,9 +1873,9 @@ global DeadkeyMappingCircumflex := Map(
     "x", "✕", "X", "✖",
     "y", "ŷ", "Y", "Ŷ",
     "z", "ẑ", "Z", "Ẑ",
-    "à", "œ", "À", "Œ",
+    "à", "æ", "À", "Æ",
     "è", "ó", "È", "Ó",
-    "é", "æ", "É", "Æ",
+    "é", "œ", "É", "Œ",
     "ê", "á", "Ê", "Á",
 )
 
@@ -3995,47 +4010,20 @@ if Features["DistancesReduction"]["QU"].Enabled {
 ; ==========================================
 
 if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
-    ; We specify the result with the vowels first to be sure it will override any problems
-    CreateCaseSensitiveHotstrings(
-        "*?", "êa", "â",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êi", "î",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êo", "ô",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êu", "û",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-
-    CreateCaseSensitiveHotstrings(
-        "*?", "êé", "æ",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êà", "œ",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
-        )
-    )
-
-    ; The "Ê" key will enable to use the other symbols on the layer if we aren’t inside a word
     DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
-    for Vowel in ["a", "i", "o", "u", "é", "à"] {
-        ; Necessary for things to work, as we define them above alraedy
+    for Vowel in ["a", "à", "i", "o", "u", "s"] {
+        ; We specify the result with the vowels first to be sure it will override any problems
+        CreateCaseSensitiveHotstrings(
+            "*?", "ê" . Vowel, DeadkeyMappingCircumflex[Vowel],
+            Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds)
+        )
+        ; Necessary for things to work, as we define them already
         DeadkeyMappingCircumflexModified.Delete(Vowel)
     }
+    DeadkeyMappingCircumflexModified.Delete("e") ; For the rolling "êe" that gives "œ"
     DeadkeyMappingCircumflexModified.Delete("t") ; To be able to type "être"
 
+    ; The "Ê" key will enable to use the other symbols on the layer if we aren’t inside a word
     for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
         CreateDeadkeyHotstring(MapKey, MappedValue)
     }
@@ -4069,6 +4057,13 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
             }
         }
     }
+}
+
+if Features["DistancesReduction"]["ECircumflexE"].Enabled {
+    CreateCaseSensitiveHotstrings(
+        "*?", "êe", "œ",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["ECircumflexE"].TimeActivationSeconds)
+    )
 }
 
 ; ======================================================
@@ -4201,21 +4196,16 @@ if Features["SFBsReduction"]["Comma"].Enabled {
 
 if Features["SFBsReduction"]["ECirc"].Enabled {
     CreateCaseSensitiveHotstrings(
-        "*?", "êé", "aî",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+        "*?", "êé", "oe",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds
+        )
     )
     CreateCaseSensitiveHotstrings(
-        "*?", "éê", "â",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
+        "*?", "éê", "eo",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds
+        )
     )
-    CreateCaseSensitiveHotstrings(
-        "*?", "êe", "oe",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "eê", "eo",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
-    )
+
     CreateCaseSensitiveHotstrings(
         "*?", "ê.", "u.",
         Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
@@ -4232,11 +4222,11 @@ if Features["SFBsReduction"]["ECirc"].Enabled {
 
 if Features["SFBsReduction"]["EGrave"] {
     CreateCaseSensitiveHotstrings(
-        "*?", "yè", "éi",
+        "*?", "yè", "â",
         Map("TimeActivationSeconds", Features["SFBsReduction"]["EGrave"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
-        "*?", "èy", "ié",
+        "*?", "èy", "aî",
         Map("TimeActivationSeconds", Features["SFBsReduction"]["EGrave"].TimeActivationSeconds)
     )
 }
@@ -4266,6 +4256,16 @@ if Features["SFBsReduction"]["BU"].Enabled {
     CreateCaseSensitiveHotstrings(
         "*?", "àu", "ub",
         Map("TimeActivationSeconds", Features["SFBsReduction"]["BU"].TimeActivationSeconds)
+    )
+}
+if Features["SFBsReduction"]["IÉ"].Enabled {
+    CreateCaseSensitiveHotstrings(
+        "*?", "àé", "éi",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["IÉ"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "éà", "ié",
+        Map("TimeActivationSeconds", Features["SFBsReduction"]["IÉ"].TimeActivationSeconds)
     )
 }
 
@@ -4412,6 +4412,16 @@ if Features["Rolls"]["EnglishNegation"].Enabled and Features["Autocorrection"]["
 }
 
 ; === Bottom row ===
+if Features["Rolls"]["LeftArrow"].Enabled {
+    CreateHotstring(
+        "*?", " =+", SpaceAroundSymbols . "➜" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["LeftArrow"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*?", "=+", SpaceAroundSymbols . "➜" . SpaceAroundSymbols,
+        Map("TimeActivationSeconds", Features["Rolls"]["LeftArrow"].TimeActivationSeconds)
+    )
+}
 if Features["Rolls"]["AssignArrowEqualRight"].Enabled {
     CreateHotstring(
         "*?", " $=", SpaceAroundSymbols . "=>" . SpaceAroundSymbols,
@@ -5236,10 +5246,6 @@ if Features["DistancesReduction"]["SuffixesA"].Enabled {
     )
 
     CreateCaseSensitiveHotstrings(
-        "*?", "àé", "ying",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
         "*?", "àê", "able",
         Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
     )
@@ -5252,11 +5258,11 @@ if Features["DistancesReduction"]["SuffixesA"].Enabled {
         Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
-        "*?", "àh", "techn",
+        "*?", "àh", "ight",
         Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
-        "*?", "ài", "ight",
+        "*?", "ài", "ying",
         Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
@@ -5621,7 +5627,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "ém★", "écris-moi")
     CreateCaseSensitiveHotstrings("*", "éq★", "équation")
     CreateCaseSensitiveHotstrings("*", "ê★", "être")
-    CreateCaseSensitiveHotstrings("*", "êe★", "est-ce")
     CreateCaseSensitiveHotstrings("*", "êt★", "es-tu")
 
     ; === F ===
@@ -6381,8 +6386,8 @@ if Features["MagicKey"]["TextExpansionSymbols"].Enabled {
     CreateHotstring("*C", "(not equivalent)★", "⇎")
 
     ; === Arrows ===
-    CreateHotstring("*C", " -> ★", "➜")
-    CreateHotstring("*C", "-->★", "➜")
+    CreateHotstring("*C", " -> ★", " ➜ ")
+    CreateHotstring("*C", "-->★", " ➜ ")
     CreateHotstring("*C", ">★", "➢") ; ATtention, order matters, needs to be after -->
     CreateHotstring("*C", "==>★", "⇒")
     CreateHotstring("*C", "=/=>★", "⇏")
