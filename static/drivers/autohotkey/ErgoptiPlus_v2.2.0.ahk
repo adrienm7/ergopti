@@ -538,7 +538,7 @@ global Features := Map(
             "-",
             "Errors",
             "OU",
-            "MultiplePonctuationMarks",
+            "PonctuationMarks",
             "SuffixesAChaining",
             "-",
             "Minus",
@@ -584,9 +584,9 @@ global Features := Map(
             Description: "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant",
             TimeActivationSeconds: 1,
         },
-        "MultiplePonctuationMarks", {
+        "PonctuationMarks", {
             Enabled: True,
-            Description: "Taper `"!`" ou `"?`" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère",
+            Description: "Corrige les problèmes d’espaces, insécables ou non, autour de `":`", `";`", `"!`" ou `"?`" et de leurs enchaînements",
             TimeActivationSeconds: 1,
         },
     ),
@@ -4602,23 +4602,61 @@ if Features["Autocorrection"]["OU"].Enabled {
     )
 }
 
-if Features["Autocorrection"]["MultiplePonctuationMarks"].Enabled {
+if Features["Autocorrection"]["PonctuationMarks"].Enabled {
+    CreateHotstring("*", " !", " !")
     CreateHotstring(
-        "*", " ! !", " !!",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        "*", "  !", " !",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
     CreateHotstring(
         "*", "! !", "!!",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "! !", "!!",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
 
+    CreateHotstring("*", " ?", " ?")
     CreateHotstring(
-        "*", " ? ?", " ??",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        "*", "  ?", " ?",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
     CreateHotstring(
         "*", "? ?", "??",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "? ?", "??",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+
+    CreateHotstring("*", " :", " :")
+    CreateHotstring(
+        "*", "  :", " :",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", ": :", "::",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", ": :", "::",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+
+    CreateHotstring("*", " `;", " ;")
+    CreateHotstring(
+        "*", "  ;", " ;",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "; ;", ";;",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "; `;", ";;",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["PonctuationMarks"].TimeActivationSeconds)
     )
 
     ; We can’t use the TimeActivationSeconds here, as previous character = current character = "."
