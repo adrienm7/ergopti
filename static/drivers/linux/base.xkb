@@ -1,15 +1,92 @@
 xkb_keymap        {
 
-    xkb_keycodes      { include "evdev+aliases(azerty)" };
+xkb_keycodes      { include "evdev+aliases(azerty)" };
 
-    xkb_compatibility { include "complete" };
+xkb_types         { 
+    include "complete"
 
-    partial alphanumeric_keys
-    xkb_symbols "ergopti_iso_22" {
+// Key types for Ergopti layout
+    type "FOUR_LEVEL_CONTROL" {
+        modifiers = Shift+LevelThree+Control;
+        
+        map[None] = Level1;
+        map[Shift] = Level2;
+        map[LevelThree] = Level3;
+        map[Shift+LevelThree] = Level4;
+        map[Control]  = Level5;
+        map[Control+Shift] = Level6;
 
-        name[Group1]= "France - Ergopti ISO v2.2.0";
+        preserve[Control] = Control;
+        preserve[Shift+Control] = Control;
+        
+        level_name[Level1] = "Base";
+        level_name[Level2] = "Shift";
+        level_name[Level3] = "Alt Base";
+        level_name[Level4] = "Shift Alt";
+        level_name[Level5] = "Control";
+	    level_name[Level6] = "Shift Control";
+    };
 
-        include "latin"
+    type "FOUR_LEVEL_ALPHABETIC_CONTROL" {
+        modifiers = Shift+Lock+LevelThree+Control;
+        
+        map[None] = Level1;
+        map[Shift] = Level2;
+        map[Lock]  = Level2;
+        map[LevelThree] = Level3;
+        map[Shift+LevelThree] = Level4;
+        map[Lock+LevelThree] =  Level4;
+        map[Lock+Shift+LevelThree] =  Level3;
+        map[Control]  = Level5;
+        map[Control+Shift] = Level6;
+
+        preserve[Control] = Control;
+        preserve[Shift+Control] = Control;
+        
+        level_name[Level1] = "Base";
+        level_name[Level2] = "Shift";
+        level_name[Level3] = "Alt Base";
+        level_name[Level4] = "Shift Alt";
+        level_name[Level5] = "Control";
+        level_name[Level6] = "Shift Control";
+    };
+
+    type "FOUR_LEVEL_SEMIALPHABETIC_CONTROL" {
+        modifiers = Shift+Lock+LevelThree+Control;
+        
+        map[None] = Level1;
+        map[Shift] = Level2;
+        map[Lock]  = Level2;
+        map[LevelThree] = Level3;
+        map[Shift+LevelThree] = Level4;
+        map[Lock+LevelThree] =  Level3;
+        map[Lock+Shift+LevelThree] = Level4;
+        map[Control]  = Level5;
+        map[Control+Shift] = Level6;
+        
+        preserve[Control] = Control;
+        preserve[Shift+Control] = Control;
+        preserve[Lock+LevelThree] = Lock;
+        preserve[Lock+Shift+LevelThree] = Lock;
+        
+        level_name[Level1] = "Base";
+        level_name[Level2] = "Shift";
+        level_name[Level3] = "Alt Base";
+        level_name[Level4] = "Shift Alt";
+        level_name[Level5] = "Control";
+        level_name[Level6] = "Shift Control";
+    };
+            
+};
+
+xkb_compatibility { include "complete" };
+
+partial alphanumeric_keys
+xkb_symbols "ergopti_iso_18" {
+
+	name[Group1]= "France - Ergopti ISO v1.8.0";
+
+	include "latin"
 
         // Space bar
         key <SPCE> { [] };
@@ -70,9 +147,10 @@ xkb_keymap        {
         key <AB09> { [] };
         key <AB10> { [] };
 
-        include "level3(ralt_switch)"
-    };
+	include "level3(ralt_switch)"
+};
 
-    xkb_geometry { include "latin" };
+xkb_geometry { include "latin" };
 
 };
+
