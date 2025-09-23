@@ -475,7 +475,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 2:
         print(
-            "Mode automatique : recherche des fichiers .xkb et .XCompose dans le dossier courant..."
+            "Mode automatique : recherche du fichier .xkb le plus récent et du .XCompose dans le dossier courant..."
         )
         xkb_files = glob.glob(os.path.join(os.path.dirname(__file__), "*.xkb"))
         xcompose_files = glob.glob(
@@ -484,8 +484,9 @@ if __name__ == "__main__":
         if not xkb_files:
             print("Aucun fichier .xkb trouvé.")
             sys.exit(1)
-        xkb_file = xkb_files[0]
-        print(f"Fichier XKB trouvé : {xkb_file}")
+        # Sélectionne le .xkb le plus récent
+        xkb_file = max(xkb_files, key=os.path.getmtime)
+        print(f"Fichier XKB le plus récent trouvé : {xkb_file}")
         xcompose_file = xcompose_files[0] if xcompose_files else None
         if xcompose_file:
             print(f"Fichier XCompose trouvé : {xcompose_file}")
