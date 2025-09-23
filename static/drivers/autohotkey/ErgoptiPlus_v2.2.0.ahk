@@ -207,21 +207,26 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
         (*) => HotstringHandler(AbbreviationLowerCase, ReplacementLowerCase, A_EndChar, HotstringOptions)
     )
 
-    ; Uppercase
-    for _, variant in GenerateUppercaseVariants(AbbreviationUppercase, UppercasedSymbols) {
-        v := variant ; Capture the value for this iteration (otherwise there is an error)
-        Hotstring(
-            FlagsPortion v,
-            (*) => HotstringHandler(v, ReplacementUpperCase, A_EndChar, HotstringOptions)
-        )
-    }
-
-    ; When an abbreviation is only one character, titlecase = uppercase, so it should not be defined
+    ; When an abbreviation is only one character, titlecase = uppercase
     if StrLen(RTrim(Abbreviation, "★")) == 1 {
+        ; Uppercase/Titlecase
+        Hotstring(
+            FlagsPortion AbbreviationTitleCase,
+            (*) => HotstringHandler(AbbreviationTitleCase, ReplacementTitleCase, A_EndChar, HotstringOptions)
+        )
         return
     }
 
     if (StrLen(Abbreviation) >= 2) {
+
+        ; Uppercase
+        for _, variant in GenerateUppercaseVariants(AbbreviationUppercase, UppercasedSymbols) {
+            v := variant ; Capture the value for this iteration (otherwise there is an error)
+            Hotstring(
+                FlagsPortion v,
+                (*) => HotstringHandler(v, ReplacementUpperCase, A_EndChar, HotstringOptions)
+            )
+        }
 
         ; Titlecase: first letter uppercase, rest lowercase
         if !(StrLower(FirstChar) == StrUpper(FirstChar)) {
@@ -2218,7 +2223,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC028:: SendNewResult("Q")
     +SC02B:: {
         ActivateHotstrings()
-        SendNewResult(" {!}") ; Thin non-breaking space
+        SendNewResult(" !") ; Thin non-breaking space
     }
 
     ; === Bottom row ===
@@ -4856,10 +4861,11 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "anerie", "ânerie")
     CreateCaseSensitiveHotstrings("", "anes", "ânes")
     CreateCaseSensitiveHotstrings("", "angstrom", "ångström")
-    CreateCaseSensitiveHotstrings("", "apre", "âpre")
+    CreateCaseSensitiveHotstrings("*", "apotre", "apôtre")
     CreateCaseSensitiveHotstrings("*", "appat", "appât")
     CreateCaseSensitiveHotstrings("", "apprete", "apprête")
     CreateCaseSensitiveHotstrings("", "appreter", "apprêter")
+    CreateCaseSensitiveHotstrings("", "apre", "âpre")
     CreateCaseSensitiveHotstrings("*", "archaique", "archaïque")
     CreateCaseSensitiveHotstrings("*", "archaisme", "archaïsme")
     CreateCaseSensitiveHotstrings("", "archeveque", "archevêque")
@@ -5151,6 +5157,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "soule", "soûle")
     CreateCaseSensitiveHotstrings("*", "souler", "soûler")
     CreateCaseSensitiveHotstrings("", "soules", "soûles")
+    CreateCaseSensitiveHotstrings("*", "soulé", "soûlé")
     CreateCaseSensitiveHotstrings("*", "stoique", "stoïque")
     CreateCaseSensitiveHotstrings("*", "stoicisme", "stoïcisme")
     ; CreateCaseSensitiveHotstrings("", "sure", "sûre") ; Conflict with "to be sure"
