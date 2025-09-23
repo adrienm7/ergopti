@@ -260,6 +260,7 @@ PLUS_MAPPINGS = {
         "trigger": "=",
         "map": [
             ("$", " <= "),
+            ("+", " ➜ "),
         ],
     },
     "rolls_plus": {

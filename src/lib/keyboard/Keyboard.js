@@ -170,7 +170,7 @@ export class Keyboard {
 		// Fill the data attributes of the key
 		// This enables automatic styling of key groups with CSS
 		key.dataset['key'] = keyIdentifier['key'];
-		key.dataset['content'] = key.innerHTML;
+		key.dataset['content'] = key.querySelector('div').innerHTML;
 		key.dataset['finger'] = keyIdentifier['finger'];
 		key.dataset['hand'] = keyIdentifier['hand'];
 		key.dataset['type'] = keyContent['type'];

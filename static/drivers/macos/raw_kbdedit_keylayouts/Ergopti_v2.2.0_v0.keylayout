@@ -1,7 +1,7 @@
 <?xml version="1.1" encoding="utf-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-09-13 at 00:55 (GMT+0)-->
-<keyboard group="126" id="-20043" maxout="1" name="Ergopti v2.2.0 Beta 2">
+<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-09-23 at 14:46 (GMT+0)-->
+<keyboard group="126" id="-20043" maxout="1" name="Ergopti v2.2.0 Beta 3">
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
@@ -1009,7 +1009,7 @@
 		</action>
 		<action id="J">
 			<when state="none" output="J"/>
-			<when state="s1" output="Ĵ"/>
+			<when state="s1" output="J"/>
 			<when state="s4" output="Ξ"/>
 			<when state="s5" output="ᴶ"/>
 			<when state="s6" output="ᴊ"/>
@@ -1258,7 +1258,7 @@
 		</action>
 		<action id="j">
 			<when state="none" output="j"/>
-			<when state="s1" output="ĵ"/>
+			<when state="s1" output="j"/>
 			<when state="s4" output="ξ"/>
 			<when state="s5" output="ʲ"/>
 			<when state="s6" output="ⱼ"/>
@@ -1404,7 +1404,7 @@
 		</action>
 		<action id="À">
 			<when state="none" output="À"/>
-			<when state="s1" output="Œ"/>
+			<when state="s1" output="Æ"/>
 		</action>
 		<action id="È">
 			<when state="none" output="È"/>
@@ -1412,7 +1412,7 @@
 		</action>
 		<action id="É">
 			<when state="none" output="É"/>
-			<when state="s1" output="Æ"/>
+			<when state="s1" output="Œ"/>
 			<when state="s4" output="Η"/>
 		</action>
 		<action id="Ê">
@@ -1421,7 +1421,7 @@
 		</action>
 		<action id="à">
 			<when state="none" output="à"/>
-			<when state="s1" output="œ"/>
+			<when state="s1" output="æ"/>
 			<when state="s5" output="ᵡ"/>
 		</action>
 		<action id="è">
@@ -1432,7 +1432,7 @@
 		</action>
 		<action id="é">
 			<when state="none" output="é"/>
-			<when state="s1" output="æ"/>
+			<when state="s1" output="œ"/>
 			<when state="s4" output="η"/>
 			<when state="s5" output="ᵟ"/>
 		</action>

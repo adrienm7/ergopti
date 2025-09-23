@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-20043" maxout="3" name="Ergopti v2.2.0 Beta 2 Plus">
+<keyboard group="126" id="-20043" maxout="3" name="Ergopti v2.2.0 Beta 3 Plus">
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
@@ -961,7 +961,7 @@
 		</action>
 		<action id="à">
 			<when state="none" next="s9"/>
-			<when state="s1" output="œ"/>
+			<when state="s1" output="æ"/>
 			<when state="s5" output="ᵡ"/>
 			<when state="s8" output="j"/>
 			<when state="s14" output="æ"/>
@@ -1045,7 +1045,7 @@
 		</action>
 		<action id="é">
 			<when state="none" next="s12"/>
-			<when state="s1" output="æ"/>
+			<when state="s1" output="œ"/>
 			<when state="s4" output="η"/>
 			<when state="s5" output="ᵟ"/>
 			<when state="s8" output="jé"/>
@@ -1159,7 +1159,7 @@
 		</action>
 		<action id="j">
 			<when state="none" output="j"/>
-			<when state="s1" output="ĵ"/>
+			<when state="s1" output="j"/>
 			<when state="s4" output="ξ"/>
 			<when state="s5" output="ʲ"/>
 			<when state="s6" output="ⱼ"/>
@@ -1430,7 +1430,7 @@
 		</action>
 		<action id="À">
 			<when state="none" next="s37"/>
-			<when state="s1" output="Œ"/>
+			<when state="s1" output="Æ"/>
 			<when state="s8" output="J"/>
 			<when state="s14" output="Æ"/>
 			<when state="s34" output="J"/>
@@ -1515,7 +1515,7 @@
 		</action>
 		<action id="É">
 			<when state="none" next="s40"/>
-			<when state="s1" output="Æ"/>
+			<when state="s1" output="Œ"/>
 			<when state="s4" output="Η"/>
 			<when state="s8" output="Jé"/>
 			<when state="s9" output="Ying"/>
@@ -1621,7 +1621,7 @@
 		</action>
 		<action id="J">
 			<when state="none" output="J"/>
-			<when state="s1" output="Ĵ"/>
+			<when state="s1" output="J"/>
 			<when state="s4" output="Ξ"/>
 			<when state="s5" output="ᴶ"/>
 			<when state="s6" output="ᴊ"/>
