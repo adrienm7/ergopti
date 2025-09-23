@@ -66,20 +66,20 @@ PLUS_MAPPINGS = {
     "a_grave_suffixes": {
         "trigger": "à",
         "map": [
-            # SFBs with "bu" or "ub"
+            # SFBs with BU and IÉ
             ("j", "bu"),
             # ("★", "bu"),
             ("u", "ub"),
+            ("é", "éi"),
             # Common suffixes
             ("a", "aire"),
             ("c", "ction"),
             ("d", "would"),
-            ("é", "ying"),
             ("ê", "able"),
             ("f", "iste"),
             ("g", "ought"),
-            ("h", "techn"),
-            ("i", "ight"),
+            ("h", "ight"),
+            ("i", "ying"),
             ("k", "ique"),
             ("l", "elle"),
             ("p", "ence"),
@@ -106,19 +106,19 @@ PLUS_MAPPINGS = {
         "trigger": "e",
         "map": [
             ("é", "ez"),
-            ("ê", "eo"),
         ],
     },
     "e_acute_sfb": {
         "trigger": "é",
         "map": [
-            ("ê", "â"),
+            ("ê", "eo"),
+            ("à", "ié"),
         ],
     },
     "e_grave_y": {
         "trigger": "è",
         "map": [
-            ("y", "ié"),
+            ("y", "aî"),
         ],
     },
     "e_circumflex_deadkey": {
@@ -126,11 +126,9 @@ PLUS_MAPPINGS = {
         "map": [
             ("a", "â"),
             ("à", "æ"),
-            ("e", "oe"),
-            ("é", "aî"),
+            ("e", "œ"),
+            ("é", "oe"),
             ("i", "î"),
-            ("j", "œu"),  # Different than the AutoHotkey version
-            # ("★", "œu"),
             ("o", "ô"),
             ("u", "û"),
         ],
@@ -170,7 +168,7 @@ PLUS_MAPPINGS = {
     "y_e_grave": {
         "trigger": "y",
         "map": [
-            ("è", "éi"),
+            ("è", "â"),
         ],
     },
     "typographic_apostrophe": {
