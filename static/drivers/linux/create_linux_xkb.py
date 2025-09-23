@@ -1,3 +1,4 @@
+import datetime
 import html
 import os
 import re
@@ -22,6 +23,11 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     if not os.path.isdir(macos_dir):
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
 
+    # Génère le nom de disposition et de fichier selon la date/heure au format Ergopti_annee_mois_jour_heurehmin
+    now = datetime.datetime.now()
+    layout_id = f"Ergopti_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
+    layout_name = f"France - Ergopti {now.year}/{now.month:02d}/{now.day:02d} {now.hour:02d}:{now.minute:02d}"
+
     # Read keylayout file
     print("[INFO] Reading keylayout file...")
     macos_data, keylayout_path = read_keylayout_file(macos_dir, keylayout_name)
@@ -32,6 +38,16 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
         raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
     print("[INFO] Reading base.xkb template...")
     xkb_content = read_xkb_template(xkb_path)
+
+    # Remplace le nom de la disposition et le nom affiché dans le contenu XKB
+    xkb_content = re.sub(
+        r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_content
+    )
+    xkb_content = re.sub(
+        r'name\[Group1\]=\s*"[^"]+";',
+        f'name[Group1]= "{layout_name}";',
+        xkb_content,
+    )
 
     # Extraire les keymaps dans l’ordre 0, 2, 5, 6, 4
     print("[INFO] Extracting keymaps for layers 0, 2, 5, 6, 4, 4...")
@@ -72,8 +88,7 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     )
 
     # Determine output file names
-    base_name = os.path.splitext(os.path.basename(keylayout_name))[0]
-    xkb_out_path = os.path.join(os.path.dirname(__file__), f"{base_name}.xkb")
+    xkb_out_path = os.path.join(os.path.dirname(__file__), f"{layout_id}.xkb")
     xcompose_out_path = os.path.splitext(xkb_out_path)[0] + ".XCompose"
 
     # Write XKB file
@@ -164,7 +179,11 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                 symbol = deadkey_symbol[deadkey]
                 xkb_name = mappings.get(symbol)
                 if xkb_name:
-                    seq.append(f"<deadkey_{xkb_name}>")
+                    # Correction du nom deadkey_asciicircum -> dead_circumflex
+                    if xkb_name == "asciicircum":
+                        seq.append("<dead_circumflex>")
+                    else:
+                        seq.append(f"<deadkey_{xkb_name}>")
                 else:
                     seq.append(f"<U{ord(symbol):04X}>")
             else:
@@ -301,7 +320,11 @@ def generate_xkb_content(
                     unicode_sym = deadkey_symbol_map[deadkey_name]
                     xkb_name = mappings.get(unicode_sym)
                     if xkb_name:
-                        linux_name = f"deadkey_{xkb_name}"
+                        # Correction du nom deadkey_asciicircum -> dead_circumflex
+                        if xkb_name == "asciicircum":
+                            linux_name = "dead_circumflex"
+                        else:
+                            linux_name = f"deadkey_{xkb_name}"
                     else:
                         linux_name = f"U{ord(unicode_sym):04X}"
                 else:
