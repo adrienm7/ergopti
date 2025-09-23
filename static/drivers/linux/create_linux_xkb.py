@@ -33,9 +33,11 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     print("[INFO] Reading base.xkb template...")
     xkb_content = read_xkb_template(xkb_path)
 
-    # Extract keymaps for layers 0 to 4 (indexes 0 to 4)
-    print("[INFO] Extracting keymaps for layers 0, 3, 5, 6, 4...")
-    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 1, 5, 6]]
+    # Extraire les keymaps dans l’ordre 0, 2, 5, 6, 4
+    print("[INFO] Extracting keymaps for layers 0, 2, 5, 6, 4, 4...")
+    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 2, 5, 6, 4]]
+    # Ajoute une 6ème couche identique à la 4ème (index 4)
+    keymaps.append(keymaps[4])
 
     # Build deadkey trigger map
     print("[INFO] Building deadkey trigger map...")
@@ -105,7 +107,7 @@ def clean_invalid_xml_chars(xml_text):
 
 
 def parse_actions_for_xcompose(keylayout_path, xcompose_path):
-    """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol."""
+    """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol or deadkey_<name> if found in YAML mapping."""
     if LET is None:
         print(
             "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
@@ -157,10 +159,14 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
         first = False
         for action_id, output in sorted(by_deadkey[deadkey]):
             seq = []
-            # Replace <dead_X> by its real Unicode symbol
+            # Replace <dead_X> by its real Unicode symbol or deadkey_<name> if found in YAML
             if deadkey in deadkey_symbol:
                 symbol = deadkey_symbol[deadkey]
-                seq.append(f"<U{ord(symbol):04X}>")
+                xkb_name = mappings.get(symbol)
+                if xkb_name:
+                    seq.append(f"<deadkey_{xkb_name}>")
+                else:
+                    seq.append(f"<U{ord(symbol):04X}>")
             else:
                 seq.append(f"<{deadkey}>")
             if action_id:
@@ -283,7 +289,7 @@ def read_xkb_template(xkb_path):
 def generate_xkb_content(
     xkb_content, keymaps, deadkey_triggers, deadkey_symbol_map=None
 ):
-    """Generate the XKB output content from the keymaps and deadkey triggers. Replace deadkey names by their Unicode symbol if mapping provided."""
+    """Génère le contenu XKB avec le type FOUR_LEVEL_SEMIALPHABETIC_CONTROL pour chaque touche."""
     for xkb_key, macos_code in linux_to_macos_keycodes:
         symbols = []
         comment_symbols = []
@@ -293,7 +299,11 @@ def generate_xkb_content(
                 deadkey_name = deadkey_triggers[symbol]
                 if deadkey_symbol_map and deadkey_name in deadkey_symbol_map:
                     unicode_sym = deadkey_symbol_map[deadkey_name]
-                    linux_name = f"U{ord(unicode_sym):04X}"
+                    xkb_name = mappings.get(unicode_sym)
+                    if xkb_name:
+                        linux_name = f"deadkey_{xkb_name}"
+                    else:
+                        linux_name = f"U{ord(unicode_sym):04X}"
                 else:
                     linux_name = deadkey_name
             else:
@@ -307,12 +317,10 @@ def generate_xkb_content(
                     comment_symbols.append(decoded)
             else:
                 comment_symbols.append("")
-        pattern = rf"key {re.escape(xkb_key)}[^{chr(10)}]*;"
+        pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         quoted_symbols = [f"{s}" for s in symbols]
         comment = " // " + " ".join(comment_symbols)
-        replacement = (
-            f"key {xkb_key} {{ [{', '.join(quoted_symbols)}] }};{comment}"
-        )
+        replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_content = re.sub(pattern, replacement, xkb_content)
     return xkb_content
 
