@@ -21,34 +21,52 @@
 							{
 								"conditions": [
 									{
-										"bundle_identifiers": ["^com.apple.loginwindow$", "^com.apple.SecurityAgent$"],
+										"bundle_identifiers": [
+											"^com.apple.loginwindow$",
+											"^com.apple.SecurityAgent$"
+										],
 										"type": "frontmost_application_unless"
 									}
 								],
 								"from": { "key_code": "return_or_enter" },
-								"to": [{ "key_code": "keypad_comma" }, { "key_code": "return_or_enter" }],
+								"to": [
+									{ "key_code": "keypad_comma" },
+									{ "key_code": "return_or_enter" }
+								],
 								"type": "basic"
 							},
 							{
 								"conditions": [
 									{
-										"bundle_identifiers": ["^com.apple.loginwindow$", "^com.apple.SecurityAgent$"],
+										"bundle_identifiers": [
+											"^com.apple.loginwindow$",
+											"^com.apple.SecurityAgent$"
+										],
 										"type": "frontmost_application_unless"
 									}
 								],
 								"from": { "key_code": "left_arrow" },
-								"to": [{ "key_code": "keypad_comma" }, { "key_code": "left_arrow" }],
+								"to": [
+									{ "key_code": "keypad_comma" },
+									{ "key_code": "left_arrow" }
+								],
 								"type": "basic"
 							},
 							{
 								"conditions": [
 									{
-										"bundle_identifiers": ["^com.apple.loginwindow$", "^com.apple.SecurityAgent$"],
+										"bundle_identifiers": [
+											"^com.apple.loginwindow$",
+											"^com.apple.SecurityAgent$"
+										],
 										"type": "frontmost_application_unless"
 									}
 								],
 								"from": { "key_code": "right_arrow" },
-								"to": [{ "key_code": "keypad_comma" }, { "key_code": "right_arrow" }],
+								"to": [
+									{ "key_code": "keypad_comma" },
+									{ "key_code": "right_arrow" }
+								],
 								"type": "basic"
 							}
 						]
@@ -182,6 +200,84 @@
 								"to": [
 									{
 										"key_code": "right_option"
+									}
+								]
+							}
+						]
+					},
+					{
+						"description": "(# gives (\" if taped quickly",
+						"manipulators": [
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "j",
+									"modifiers": {
+										"mandatory": ["right_option"]
+									}
+								},
+								"to": [
+									{
+										"key_code": "j",
+										"modifiers": ["right_option"]
+									},
+									{
+										"set_variable": {
+											"name": "altgr_j_pressed",
+											"value": 1
+										}
+									}
+								],
+								"to_after_key_up": [
+									{
+										"set_variable": {
+											"name": "altgr_j_pressed",
+											"value": 0
+										}
+									}
+								]
+							},
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "i",
+									"modifiers": {
+										"mandatory": ["right_option"]
+									}
+								},
+								"conditions": [
+									{
+										"type": "variable_if",
+										"name": "altgr_j_pressed",
+										"value": 1
+									}
+								],
+								"to": [
+									{
+										"key_code": "c",
+										"modifiers": ["right_option"]
+									}
+								]
+							},
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "i",
+									"modifiers": {
+										"mandatory": ["right_option"]
+									}
+								},
+								"conditions": [
+									{
+										"type": "variable_unless",
+										"name": "altgr_j_pressed",
+										"value": 1
+									}
+								],
+								"to": [
+									{
+										"key_code": "i",
+										"modifiers": ["right_option"]
 									}
 								]
 							}
