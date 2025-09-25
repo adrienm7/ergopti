@@ -1,5 +1,8 @@
 include "%L"
 
+<guillemotleft> : "« "
+<guillemotright> : " »"
+
 <dead_circumflex> <space>	: "^" U005E # ^
 <dead_circumflex> <'>	: "⚠" U26A0 # ⚠
 <dead_circumflex> <,>	: "➜" U279C # ➜

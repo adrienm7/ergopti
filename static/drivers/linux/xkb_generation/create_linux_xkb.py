@@ -175,6 +175,10 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                     deadkey_symbol[deadkey_name] = output
     # Build Compose lines
     lines = []
+    # Ajout des règles simples pour guillemets avec espace normal
+    lines.append('<guillemotleft> : "« "')
+    lines.append('<guillemotright> : " »"')
+    lines.append("")
     by_deadkey = {}
     for action in actions.findall("action"):
         action_id = action.attrib.get("id")
@@ -306,6 +310,17 @@ def generate_xkb_content(
         comment_symbols = []
         for layer, keymap_body in enumerate(keymaps):
             symbol = get_symbol(keymap_body, macos_code)
+            # Correction : ne remplacer que la couche 5 si « ou »
+            if layer == 4 and symbol == "«":
+                linux_name = mappings.get("«", "guillemotleft")
+                symbols.append(linux_name)
+                comment_symbols.append("«")
+                continue
+            if layer == 4 and symbol == "»":
+                linux_name = mappings.get("»", "guillemotright")
+                symbols.append(linux_name)
+                comment_symbols.append("»")
+                continue
             # Gestion deadkey pour currency et asciicircum
             if symbol in deadkey_triggers:
                 deadkey_name = deadkey_triggers[symbol]
@@ -437,4 +452,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=True)
+    main(use_date_in_filename=False)
