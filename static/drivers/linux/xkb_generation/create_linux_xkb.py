@@ -1,4 +1,3 @@
-import datetime
 import html
 import json
 import os
@@ -26,70 +25,85 @@ with open(yaml_path, encoding="utf-8") as f:
 
 
 def main(keylayout_name="Ergopti_v2.2.0.keylayout", use_date_in_filename=False):
-    print(f"[INFO] Using keylayout: {keylayout_name}")
+    import datetime
+
     macos_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../../macos")
     )
     if not os.path.isdir(macos_dir):
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
 
-    if use_date_in_filename:
-        now = datetime.datetime.now()
-        layout_id = f"Ergopti_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
-        layout_name = f"France - Ergopti {now.year}/{now.month:02d}/{now.day:02d} {now.hour:02d}:{now.minute:02d}"
-    else:
-        layout_id = "Ergopti"
-        layout_name = "France - Ergopti"
+    # Déduire le préfixe de base (ex: Ergopti_v2.2.0)
+    base_prefix = os.path.splitext(keylayout_name)[0]
+    variants = [base_prefix, base_prefix + "_plus"]
 
-    # Lecture du keylayout et du template XKB
-    print("[INFO] Reading keylayout file...")
-    macos_data, keylayout_path = read_keylayout_file(macos_dir, keylayout_name)
-    xkb_path = os.path.join(os.path.dirname(__file__), "data", "base.xkb")
-    if not os.path.isfile(xkb_path):
-        raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
-    print("[INFO] Reading base.xkb template...")
-    xkb_content = read_xkb_template(xkb_path)
+    for variant in variants:
+        keylayout_file = variant + ".keylayout"
+        print(f"[INFO] Using keylayout: {keylayout_file}")
+        # Lecture du keylayout et du template XKB
+        print("[INFO] Reading keylayout file...")
+        macos_data, keylayout_path = read_keylayout_file(
+            macos_dir, keylayout_file
+        )
+        xkb_path = os.path.join(os.path.dirname(__file__), "data", "base.xkb")
+        if not os.path.isfile(xkb_path):
+            raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
+        print("[INFO] Reading base.xkb template...")
+        xkb_content = read_xkb_template(xkb_path)
 
-    # Remplacement du nom de la disposition et du nom affiché
-    xkb_content = re.sub(
-        r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_content
-    )
-    xkb_content = re.sub(
-        r'name\[Group1\]=\s*"[^"]+";',
-        f'name[Group1]= "{layout_name}";',
-        xkb_content,
-    )
+        # Gestion du nom de layout et affichage
+        if use_date_in_filename:
+            now = datetime.datetime.now()
+            layout_id = f"{variant}_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
+            layout_name = f"France - {variant.replace('_', ' ').title().replace('V', 'v')} {now.year}/{now.month:02d}/{now.day:02d} {now.hour:02d}:{now.minute:02d}"
+        else:
+            layout_id = variant
+            # Ergopti_v2.2.0_plus -> Ergopti v2.2.0 Plus
+            layout_name = "France - " + variant.replace(
+                "_", " "
+            ).title().replace("V", "v")
 
-    # Extraction des keymaps (0,2,5,6,4,4)
-    print("[INFO] Extracting keymaps for layers 0, 2, 5, 6, 4, 4...")
-    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 2, 5, 6, 4]]
-    keymaps.append(keymaps[4])
+        # Remplacement du nom de la disposition et du nom affiché
+        xkb_content = re.sub(
+            r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_content
+        )
+        xkb_content = re.sub(
+            r'name\[Group1\]=\s*"[^"]+";',
+            f'name[Group1]= "{layout_name}";',
+            xkb_content,
+        )
 
-    # Extraction des deadkeys
-    print("[INFO] Building deadkey trigger map...")
-    deadkey_triggers = extract_deadkey_triggers(keylayout_path)
+        # Extraction des keymaps (0,2,5,6,4,4)
+        print("[INFO] Extracting keymaps for layers 0, 2, 5, 6, 4, 4...")
+        keymaps = [extract_keymap_body(macos_data, i) for i in [0, 2, 5, 6, 4]]
+        keymaps.append(keymaps[4])
 
-    # deadkey_name -> unicode_symbol
-    print("[INFO] Building deadkey symbol map...")
-    deadkey_symbol = build_deadkey_symbol_map(keylayout_path)
+        # Extraction des deadkeys
+        print("[INFO] Building deadkey trigger map...")
+        deadkey_triggers = extract_deadkey_triggers(keylayout_path)
 
-    # Génération du XKB
-    print("[INFO] Generating XKB content...")
-    xkb_out_content = generate_xkb_content(
-        xkb_content, keymaps, deadkey_triggers, deadkey_symbol
-    )
+        # deadkey_name -> unicode_symbol
+        print("[INFO] Building deadkey symbol map...")
+        deadkey_symbol = build_deadkey_symbol_map(keylayout_path)
 
-    # Fichiers de sortie
-    xkb_out_path = os.path.join(
-        os.path.dirname(__file__), "..", f"{layout_id}.xkb"
-    )
-    xcompose_out_path = os.path.splitext(xkb_out_path)[0] + ".XCompose"
+        # Génération du XKB
+        print("[INFO] Generating XKB content...")
+        xkb_out_content = generate_xkb_content(
+            xkb_content, keymaps, deadkey_triggers, deadkey_symbol
+        )
 
-    # Écriture des fichiers
-    print(f"[INFO] Writing XKB output to {xkb_out_path}")
-    write_file(xkb_out_path, xkb_out_content)
-    print(f"[INFO] Writing XCompose output to {xcompose_out_path}")
-    parse_actions_for_xcompose(keylayout_path, xcompose_out_path)
+        # Fichiers de sortie : même nom que le keylayout d'entrée (sans extension)
+        base_name = variant
+        xkb_out_path = os.path.join(
+            os.path.dirname(__file__), "..", f"{base_name}.xkb"
+        )
+        xcompose_out_path = os.path.splitext(xkb_out_path)[0] + ".XCompose"
+
+        # Écriture des fichiers
+        print(f"[INFO] Writing XKB output to {xkb_out_path}")
+        write_file(xkb_out_path, xkb_out_content)
+        print(f"[INFO] Writing XCompose output to {xcompose_out_path}")
+        parse_actions_for_xcompose(keylayout_path, xcompose_out_path)
 
 
 def build_deadkey_symbol_map(keylayout_path):
@@ -207,22 +221,25 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                 symbol = deadkey_symbol[deadkey]
                 xkb_name = mappings.get(symbol)
                 # Forcer dead_currency si le symbole est U+20B0
-                if ord(symbol) == 0x20B0:
+                codepoint = (
+                    ord(symbol[0]) if symbol and len(symbol) > 0 else None
+                )
+                if codepoint == 0x20B0:
                     seq.append("<dead_currency>")
                 # Forcer dead_diaeresis si le symbole est U+2792 (ou U+00A8)
-                elif ord(symbol) == 0x2792 or ord(symbol) == 0x00A8:
+                elif codepoint == 0x2792 or codepoint == 0x00A8:
                     seq.append("<dead_diaeresis>")
                 # Forcer <mu> si le symbole est U+2126
-                elif ord(symbol) == 0x2126:
+                elif codepoint == 0x2126:
                     seq.append("<mu>")
                 # Forcer <uparrow> si le symbole est U+02FA
-                elif ord(symbol) == 0x02FA:
+                elif codepoint == 0x02FA:
                     seq.append("<uparrow>")
                 # Forcer <downarrow> si le symbole est U+02FC
-                elif ord(symbol) == 0x02FC:
+                elif codepoint == 0x02FC:
                     seq.append("<downarrow>")
                 # Forcer <infinity> si le symbole est U+27E7
-                elif ord(symbol) == 0x27E7:
+                elif codepoint == 0x27E7:
                     seq.append("<infinity>")
                 elif xkb_name:
                     # Correction du nom deadkey_asciicircum -> dead_circumflex
@@ -236,7 +253,10 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                         seq.append(f"<deadkey_{xkb_name}>")
                 else:
                     # Utiliser le mapping YAML si possible
-                    left = mappings.get(symbol, f"U{ord(symbol):04X}")
+                    left = mappings.get(
+                        symbol,
+                        f"U{ord(symbol[0]):04X}" if symbol else "NoSymbol",
+                    )
                     seq.append(f"<{left}>")
             else:
                 # Utiliser le mapping YAML si possible
@@ -379,7 +399,10 @@ def generate_xkb_content(
                     elif xkb_name:
                         linux_name = f"deadkey_{xkb_name}"
                     else:
-                        linux_name = f"U{ord(unicode_sym):04X}"
+                        if unicode_sym and len(unicode_sym) > 0:
+                            linux_name = f"U{ord(unicode_sym[0]):04X}"
+                        else:
+                            linux_name = "NoSymbol"
                 else:
                     linux_name = deadkey_name
             else:
