@@ -495,4 +495,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=True)
+    main(use_date_in_filename=False)
