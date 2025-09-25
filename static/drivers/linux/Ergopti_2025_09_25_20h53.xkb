@@ -82,9 +82,9 @@ xkb_types         {
 xkb_compatibility { include "complete" };
 
 partial alphanumeric_keys
-xkb_symbols "Ergopti" {
+xkb_symbols "Ergopti_2025_09_25_20h53" {
 
-	name[Group1]= "France - Ergopti";
+	name[Group1]= "France - Ergopti 2025/09/25 20:53";
 
 	include "latin"
 
@@ -135,7 +135,7 @@ xkb_symbols "Ergopti" {
         key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_circumflex, NoSymbol, exclam, exclamdown, asciicircum, asciicircum] }; // ^ " !" ! ¡ ^ ^
 
         // Letters — Row 3/3
-        key <LSGT> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [ecircumflex, Ecircumflex, dead_circumflex, dead_circumflex, x, x] }; // ê Ê ^ ^ x x
+        key <LSGT> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [ecircumflex, Ecircumflex, asciicircum, dead_circumflex, x, x] }; // ê Ê ^ ^ x x
         key <AB01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [eacute, Eacute, slash, division, c, c] }; // é É / ÷ c c
         key <AB02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [agrave, Agrave, backslash, downarrow, v, v] }; // à À \ ᵢ v v
         key <AB03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [j, J, quotedbl, j, j, j] }; // j J " j j j
