@@ -1,5 +1,6 @@
 import datetime
 import html
+import json
 import os
 import re
 
@@ -10,7 +11,16 @@ try:
 except ImportError:
     LET = None
 
-yaml_path = os.path.join(os.path.dirname(__file__), "key_sym.yaml")
+with open(
+    os.path.join(
+        os.path.dirname(__file__), "data", "linux_to_macos_keycodes.json"
+    ),
+    "r",
+    encoding="utf-8",
+) as f:
+    LINUX_TO_MACOS_KEYCODES = json.load(f)
+
+yaml_path = os.path.join(os.path.dirname(__file__), "data", "key_sym.yaml")
 with open(yaml_path, encoding="utf-8") as f:
     mappings = yaml.safe_load(f)
 
@@ -18,7 +28,7 @@ with open(yaml_path, encoding="utf-8") as f:
 def main(keylayout_name="Ergopti_v2.2.0.keylayout", use_date_in_filename=False):
     print(f"[INFO] Using keylayout: {keylayout_name}")
     macos_dir = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../macos")
+        os.path.join(os.path.dirname(__file__), "../../macos")
     )
     if not os.path.isdir(macos_dir):
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
@@ -31,89 +41,16 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout", use_date_in_filename=False):
         layout_id = "Ergopti"
         layout_name = "France - Ergopti"
 
-    # Read keylayout file
+    # Lecture du keylayout et du template XKB
     print("[INFO] Reading keylayout file...")
     macos_data, keylayout_path = read_keylayout_file(macos_dir, keylayout_name)
-
-    # Check base.xkb file
-    xkb_path = os.path.join(os.path.dirname(__file__), "base.xkb")
+    xkb_path = os.path.join(os.path.dirname(__file__), "data", "base.xkb")
     if not os.path.isfile(xkb_path):
         raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
     print("[INFO] Reading base.xkb template...")
     xkb_content = read_xkb_template(xkb_path)
 
-    # Remplace le nom de la disposition et le nom affiché dans le contenu XKB
-    xkb_content = re.sub(
-        r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_content
-    )
-    xkb_content = re.sub(
-        r'name\[Group1\]=\s+"[^"]+";',
-        f'name[Group1]= "{layout_name}";',
-        xkb_content,
-    )
-
-    # Extraire les keymaps dans l’ordre 0, 2, 5, 6, 4
-    print("[INFO] Extracting keymaps for layers 0, 2, 5, 6, 4, 4...")
-    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 2, 5, 6, 4]]
-    # Ajoute une 6ème couche identique à la 4ème (index 4)
-    keymaps.append(keymaps[4])
-
-    # Build deadkey trigger map
-    print("[INFO] Building deadkey trigger map...")
-    deadkey_triggers = extract_deadkey_triggers(keylayout_path)
-
-    # Build deadkey_name -> unicode_symbol mapping (same as in XCompose)
-    print("[INFO] Building deadkey symbol map...")
-    deadkey_symbol = {}
-    if LET is not None:
-        with open(keylayout_path, encoding="utf-8") as f:
-            xml_text = f.read()
-        xml_text = clean_invalid_xml_chars(xml_text)
-        tree = LET.fromstring(xml_text.encode("utf-8"))
-        actions = tree.find(".//actions")
-        if actions is not None:
-            for action in actions.findall("action"):
-                action_id = action.attrib.get("id")
-                for when in action.findall("when"):
-                    state = when.attrib.get("state")
-                    output = when.attrib.get("output")
-                    if not output:
-                        continue
-                    if state and state.startswith("s") and state[1:].isdigit():
-                        deadkey_name = f"dead_{int(state[1:])}"
-                        if action_id and action_id not in deadkey_symbol:
-                            deadkey_symbol[deadkey_name] = output
-
-    # Generate XKB content
-    print("[INFO] Generating XKB content...")
-    xkb_out_content = generate_xkb_content(
-        xkb_content, keymaps, deadkey_triggers, deadkey_symbol
-    )
-
-    # Determine output file names
-    xkb_out_path = os.path.join(os.path.dirname(__file__), f"{layout_id}.xkb")
-    xcompose_out_path = os.path.splitext(xkb_out_path)[0] + ".XCompose"
-
-    # Write XKB file
-    print(f"[INFO] Writing XKB output to {xkb_out_path}")
-    write_file(xkb_out_path, xkb_out_content)
-
-    # Write XCompose file
-    print(f"[INFO] Writing XCompose output to {xcompose_out_path}")
-    parse_actions_for_xcompose(keylayout_path, xcompose_out_path)
-
-    # Read keylayout file
-    print("[INFO] Reading keylayout file...")
-    macos_data, keylayout_path = read_keylayout_file(macos_dir, keylayout_name)
-
-    # Check base.xkb file
-    xkb_path = os.path.join(os.path.dirname(__file__), "base.xkb")
-    if not os.path.isfile(xkb_path):
-        raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
-    print("[INFO] Reading base.xkb template...")
-    xkb_content = read_xkb_template(xkb_path)
-
-    # Remplace le nom de la disposition et le nom affiché dans le contenu XKB
+    # Remplacement du nom de la disposition et du nom affiché
     xkb_content = re.sub(
         r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_content
     )
@@ -123,55 +60,64 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout", use_date_in_filename=False):
         xkb_content,
     )
 
-    # Extraire les keymaps dans l’ordre 0, 2, 5, 6, 4
+    # Extraction des keymaps (0,2,5,6,4,4)
     print("[INFO] Extracting keymaps for layers 0, 2, 5, 6, 4, 4...")
     keymaps = [extract_keymap_body(macos_data, i) for i in [0, 2, 5, 6, 4]]
-    # Ajoute une 6ème couche identique à la 4ème (index 4)
     keymaps.append(keymaps[4])
 
-    # Build deadkey trigger map
+    # Extraction des deadkeys
     print("[INFO] Building deadkey trigger map...")
     deadkey_triggers = extract_deadkey_triggers(keylayout_path)
 
-    # Build deadkey_name -> unicode_symbol mapping (same as in XCompose)
+    # deadkey_name -> unicode_symbol
     print("[INFO] Building deadkey symbol map...")
-    deadkey_symbol = {}
-    if LET is not None:
-        with open(keylayout_path, encoding="utf-8") as f:
-            xml_text = f.read()
-        xml_text = clean_invalid_xml_chars(xml_text)
-        tree = LET.fromstring(xml_text.encode("utf-8"))
-        actions = tree.find(".//actions")
-        if actions is not None:
-            for action in actions.findall("action"):
-                action_id = action.attrib.get("id")
-                for when in action.findall("when"):
-                    state = when.attrib.get("state")
-                    output = when.attrib.get("output")
-                    if not output:
-                        continue
-                    if state and state.startswith("s") and state[1:].isdigit():
-                        deadkey_name = f"dead_{int(state[1:])}"
-                        if action_id and action_id not in deadkey_symbol:
-                            deadkey_symbol[deadkey_name] = output
+    deadkey_symbol = build_deadkey_symbol_map(keylayout_path)
 
-    # Generate XKB content
+    # Génération du XKB
     print("[INFO] Generating XKB content...")
     xkb_out_content = generate_xkb_content(
         xkb_content, keymaps, deadkey_triggers, deadkey_symbol
     )
 
-    # Determine output file names
-    xkb_out_path = os.path.join(os.path.dirname(__file__), f"{layout_id}.xkb")
+    # Fichiers de sortie
+    xkb_out_path = os.path.join(
+        os.path.dirname(__file__), "..", f"{layout_id}.xkb"
+    )
     xcompose_out_path = os.path.splitext(xkb_out_path)[0] + ".XCompose"
 
-    # Write XKB file
+    # Écriture des fichiers
     print(f"[INFO] Writing XKB output to {xkb_out_path}")
     write_file(xkb_out_path, xkb_out_content)
-
-    # Write XCompose file
     print(f"[INFO] Writing XCompose output to {xcompose_out_path}")
     parse_actions_for_xcompose(keylayout_path, xcompose_out_path)
+
+
+def build_deadkey_symbol_map(keylayout_path):
+    """Construit la table deadkey_name -> unicode_symbol."""
+    if LET is None:
+        print(
+            "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
+        )
+        return {}
+    with open(keylayout_path, encoding="utf-8") as f:
+        xml_text = f.read()
+    xml_text = clean_invalid_xml_chars(xml_text)
+    tree = LET.fromstring(xml_text.encode("utf-8"))
+    actions = tree.find(".//actions")
+    deadkey_symbol = {}
+    if actions is not None:
+        for action in actions.findall("action"):
+            action_id = action.attrib.get("id")
+            for when in action.findall("when"):
+                state = when.attrib.get("state")
+                output = when.attrib.get("output")
+                if not output:
+                    continue
+                if state and state.startswith("s") and state[1:].isdigit():
+                    deadkey_name = f"dead_{int(state[1:])}"
+                    if action_id and action_id not in deadkey_symbol:
+                        deadkey_symbol[deadkey_name] = output
+    return deadkey_symbol
 
 
 def unicode_repr(s):
@@ -316,68 +262,12 @@ def get_symbol(keymap_body: str, macos_code: int) -> str:
     return match.group(2) if match else ""
 
 
-# Linux <-> macOS keycode mapping (XKB key, macOS code)
-linux_to_macos_keycodes = [
-    ("<SPCE>", 49),
-    ("<TLDE>", 10),
-    ("<AE01>", 18),
-    ("<AE02>", 19),
-    ("<AE03>", 20),
-    ("<AE04>", 21),
-    ("<AE05>", 23),
-    ("<AE06>", 22),
-    ("<AE07>", 26),
-    ("<AE08>", 28),
-    ("<AE09>", 25),
-    ("<AE10>", 29),
-    ("<AE11>", 27),
-    ("<AE12>", 24),
-    ("<AD01>", 12),
-    ("<AD02>", 13),
-    ("<AD03>", 14),
-    ("<AD04>", 15),
-    ("<AD05>", 17),
-    ("<AD06>", 16),
-    ("<AD07>", 32),
-    ("<AD08>", 34),
-    ("<AD09>", 31),
-    ("<AD10>", 35),
-    ("<AD11>", 33),
-    ("<AD12>", 30),
-    ("<AC01>", 0),
-    ("<AC02>", 1),
-    ("<AC03>", 2),
-    ("<AC04>", 3),
-    ("<AC05>", 5),
-    ("<AC06>", 4),
-    ("<AC07>", 38),
-    ("<AC08>", 40),
-    ("<AC09>", 37),
-    ("<AC10>", 41),
-    ("<AC11>", 39),
-    ("<BKSL>", 42),
-    ("<LSGT>", 50),
-    ("<AB01>", 6),
-    ("<AB02>", 7),
-    ("<AB03>", 8),
-    ("<AB04>", 9),
-    ("<AB05>", 11),
-    ("<AB06>", 45),
-    ("<AB07>", 46),
-    ("<AB08>", 43),
-    ("<AB09>", 47),
-    ("<AB10>", 44),
-]
-
-
 def symbol_to_linux_name(symbol):
     """Convert a symbol to its XKB keysym name using direct character keys from the YAML mapping."""
     if not symbol or symbol == "NoSymbol":
         return "NoSymbol"
 
     decoded = html.unescape(symbol)
-    result = []
-
     for char in decoded:
         # Forcer uparrow/downarrow pour ᵉ/ᵢ ou U+02FA/U+02FC
         if ord(char) in (0x02FA, 0x1D49):  # ᵉ
@@ -409,7 +299,7 @@ def generate_xkb_content(
     xkb_content, keymaps, deadkey_triggers, deadkey_symbol_map=None
 ):
     """Génère le contenu XKB avec le type FOUR_LEVEL_SEMIALPHABETIC_CONTROL pour chaque touche."""
-    for xkb_key, macos_code in linux_to_macos_keycodes:
+    for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
         symbols = []
         comment_symbols = []
         for layer, keymap_body in enumerate(keymaps):
@@ -496,18 +386,13 @@ def generate_xkb_content(
                 "dead_currency" if s == "U20B0" else s for s in quoted_symbols
             ]
         else:
-            quoted_symbols = [
-                "uparrow"
-                if s in ("U02FA", "U1D49", "ᵉ")
-                else "downarrow"
-                if s in ("U02FC", "U1D62", "ᵢ")
-                else "infinity"
-                if s in ("U27E7",)
-                else "dead_currency"
-                if s == "U20B0"
-                else s
-                for s in symbols
-            ]
+            symbol_map = {
+                "U02FA": "uparrow",
+                "U02FC": "downarrow",
+                "U27E7": "infinity",
+                "U20B0": "dead_currency",
+            }
+            quoted_symbols = [symbol_map.get(s, s) for s in symbols]
         comment = " // " + " ".join(comment_symbols)
         replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_content = re.sub(pattern, replacement, xkb_content)

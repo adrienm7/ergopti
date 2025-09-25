@@ -157,8 +157,8 @@ def generate_bundle(
     # Determine logo files
     script_dir = Path(__file__).resolve().parent
     default_logos = [
-        script_dir / "files" / "logo_ergopti.icns",
-        script_dir / "files" / "logo_ergopti_plus.icns",
+        script_dir / "data" / "logo_ergopti.icns",
+        script_dir / "data" / "logo_ergopti_plus.icns",
     ]
     logo_paths = adjust_logo_paths(logo_paths, keylayout_paths, default_logos)
 
