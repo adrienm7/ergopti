@@ -1,0 +1,156 @@
+xkb_keymap        {
+
+xkb_keycodes      { include "evdev+aliases(azerty)" };
+
+xkb_types         { 
+    include "complete"
+
+// Key types for Ergopti layout
+    type "FOUR_LEVEL_CONTROL" {
+        modifiers = Shift+LevelThree+Control;
+        
+        map[None] = Level1;
+        map[Shift] = Level2;
+        map[LevelThree] = Level3;
+        map[Shift+LevelThree] = Level4;
+        map[Control]  = Level5;
+        map[Control+Shift] = Level6;
+
+        preserve[Control] = Control;
+        preserve[Shift+Control] = Control;
+        
+        level_name[Level1] = "Base";
+        level_name[Level2] = "Shift";
+        level_name[Level3] = "Alt Base";
+        level_name[Level4] = "Shift Alt";
+        level_name[Level5] = "Control";
+	    level_name[Level6] = "Shift Control";
+    };
+
+    type "FOUR_LEVEL_ALPHABETIC_CONTROL" {
+        modifiers = Shift+Lock+LevelThree+Control;
+        
+        map[None] = Level1;
+        map[Shift] = Level2;
+        map[Lock]  = Level2;
+        map[LevelThree] = Level3;
+        map[Shift+LevelThree] = Level4;
+        map[Lock+LevelThree] =  Level4;
+        map[Lock+Shift+LevelThree] =  Level3;
+        map[Control]  = Level5;
+        map[Control+Shift] = Level6;
+
+        preserve[Control] = Control;
+        preserve[Shift+Control] = Control;
+        
+        level_name[Level1] = "Base";
+        level_name[Level2] = "Shift";
+        level_name[Level3] = "Alt Base";
+        level_name[Level4] = "Shift Alt";
+        level_name[Level5] = "Control";
+        level_name[Level6] = "Shift Control";
+    };
+
+    type "FOUR_LEVEL_SEMIALPHABETIC_CONTROL" {
+        modifiers = Shift+Lock+LevelThree+Control;
+        
+        map[None] = Level1;
+        map[Shift] = Level2;
+        map[Lock]  = Level2;
+        map[LevelThree] = Level3;
+        map[Shift+LevelThree] = Level4;
+        map[Lock+LevelThree] =  Level3;
+        map[Lock+Shift+LevelThree] = Level4;
+        map[Control]  = Level5;
+        map[Control+Shift] = Level6;
+        
+        preserve[Control] = Control;
+        preserve[Shift+Control] = Control;
+        preserve[Lock+LevelThree] = Lock;
+        preserve[Lock+Shift+LevelThree] = Lock;
+        
+        level_name[Level1] = "Base";
+        level_name[Level2] = "Shift";
+        level_name[Level3] = "Alt Base";
+        level_name[Level4] = "Shift Alt";
+        level_name[Level5] = "Control";
+        level_name[Level6] = "Shift Control";
+    };
+            
+};
+
+xkb_compatibility { include "complete" };
+
+partial alphanumeric_keys
+xkb_symbols "Ergopti_2025_09_26_00h53" {
+
+	name[Group1]= "France - Ergopti 2025/09/26 00:53";
+
+	include "latin"
+
+        // Space bar
+        key <SPCE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [space, minus, underscore, underscore, space, space] }; //   - _ _    
+
+        // Digits
+        key <TLDE> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dollar, onethird, EuroSign, dead_currency, dollar, dollar] }; // $ " €" € ¤ $ $
+        key <AE01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [1, 1, onesuperior, U2081, 1, 1] }; // 1 1 ¹ ₁ 1 1
+        key <AE02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [2, 2, twosuperior, U2082, 2, 2] }; // 2 2 ² ₂ 2 2
+        key <AE03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [3, 3, threesuperior, U2083, 3, 3] }; // 3 3 ³ ₃ 3 3
+        key <AE04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [4, 4, U2074, U2084, 4, 4] }; // 4 4 ⁴ ₄ 4 4
+        key <AE05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [5, 5, U2075, U2085, 5, 5] }; // 5 5 ⁵ ₅ 5 5
+        key <AE06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [6, 6, U2076, U2086, 6, 6] }; // 6 6 ⁶ ₆ 6 6
+        key <AE07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [7, 7, U2077, U2087, 7, 7] }; // 7 7 ⁷ ₇ 7 7
+        key <AE08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [8, 8, U2078, U2088, 8, 8] }; // 8 8 ⁸ ₈ 8 8
+        key <AE09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [9, 9, U2079, U2089, 9, 9] }; // 9 9 ⁹ ₉ 9 9
+        key <AE10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [0, 0, U2070, U2080, 0, 0] }; // 0 0 ⁰ ₀ 0 0
+        key <AE11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [percent, twothirds, U2030, U2031, minus, minus] }; // % " %" ‰ ‱ - -
+        key <AE12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [equal, masculine, degree, ordfeminine, plus, plus] }; // = º ° ª + +
+
+        // Letters — Row 1/3
+        key <AD01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [egrave, Egrave, grave, doublelowquotemark, z, z] }; // è È ` „ z z
+        key <AD02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [y, Y, at, EuroSign, y, y] }; // y Y @ € y y
+        key <AD03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [o, O, oe, OE, o, o] }; // o O œ Œ o o
+        key <AD04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [w, W, ugrave, Ugrave, w, w] }; // w W ù Ù w w
+        key <AD05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [b, B, onefifth, leftdoublequotemark, b, b] }; // b B "« " “ b b
+        key <AD06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [f, F, twofifths, rightdoublequotemark, f, f] }; // f F " »" ” f f
+        key <AD07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [g, G, asciitilde, U2248, g, g] }; // g G ~ ≈ g g
+        key <AD08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [h, H, numbersign, percent, h, h] }; // h H # % h h
+        key <AD09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [c, C, ccedilla, Ccedilla, c, c] }; // c C ç Ç c c
+        key <AD10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [x, X, asterisk, multiply, x, x] }; // x X * × x x
+        key <AD11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [z, Z, percent, U2030, z, z] }; // z Z % ‰ z z
+        key <AD12> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_diaeresis, U202F, nobreakspace, nobreakspace, U2792, U2792] }; // ¨       ¨ ¨
+
+        // Letters — Row 2/3
+        key <AC01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [a, A, less, lessthanequal, a, a] }; // a A < ≤ a a
+        key <AC02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [i, I, greater, greaterthanequal, i, i] }; // i I > ≥ i i
+        key <AC03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [e, E, braceleft, uparrow, e, e] }; // e E { ᵉ e e
+        key <AC04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [u, U, braceright, U2126, u, u] }; // u U } µ u u
+        key <AC05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [period, threefifths, colon, periodcentered, period, period] }; // . " :" : · . .
+        key <AC06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [v, V, bar, brokenbar, v, v] }; // v V | ¦ v v
+        key <AC07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [s, S, parenleft, emdash, s, s] }; // s S ( — s s
+        key <AC08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [n, N, parenright, endash, n, n] }; // n N ) – n n
+        key <AC09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [t, T, bracketleft, U2792, t, t] }; // t T [ ¨ t t
+        key <AC10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [r, R, bracketright, infinity, r, r] }; // r R ] ℝ r r
+        key <AC11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [q, Q, rightsinglequotemark, dead_currency, q, q] }; // q Q ’ ¤ q q
+        key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_circumflex, fourfifths, exclam, exclamdown, asciicircum, asciicircum] }; // ^ " !" ! ¡ ^ ^
+
+        // Letters — Row 3/3
+        key <LSGT> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [ecircumflex, Ecircumflex, asciicircum, dead_circumflex, x, x] }; // ê Ê ^ ^ x x
+        key <AB01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [eacute, Eacute, slash, division, c, c] }; // é É / ÷ c c
+        key <AB02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [agrave, Agrave, backslash, downarrow, v, v] }; // à À \ ᵢ v v
+        key <AB03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [j, J, quotedbl, j, j, j] }; // j J " j j j
+        key <AB04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [comma, onesixth, semicolon, ellipsis, comma, comma] }; // , " ;" ; … , ,
+        key <AB05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [k, K, ellipsis, NoSymbol, k, k] }; // k K …  k k
+        key <AB06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [m, M, ampersand, U2212, m, m] }; // m M & − m m
+        key <AB07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [d, D, dollar, section, d, d] }; // d D $ § d d
+        key <AB08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [l, L, equal, notequal, l, l] }; // l L = ≠ l l
+        key <AB09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [p, P, plus, plusminus, p, p] }; // p P + ± p p
+        key <AB10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [apostrophe, fivesixths, question, questiondown, apostrophe, apostrophe] }; // ' " ?" ? ¿ ' '
+
+	include "level3(ralt_switch)"
+};
+
+xkb_geometry { include "latin" };
+
+};
+

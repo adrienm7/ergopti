@@ -178,11 +178,10 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
     # Ajout des règles de fraction vers séquence multi-caractère
     if hasattr(generate_xkb_content, "fraction_map"):
         for frac, seq in generate_xkb_content.fraction_map.items():
-            lines.append(
-                f'<{mappings.get(frac, f"U{ord(frac):04X}")}> : "{seq}"'
-            )
-    lines.append('<guillemotleft> : "« "')
-    lines.append('<guillemotright> : " »"')
+            left = mappings.get(frac, f"U{ord(frac):04X}")
+            lines.append(f'<{left}> : "{seq}"')
+    lines.append(f'<{mappings.get("«", "guillemotleft")}> : "« "')
+    lines.append(f'<{mappings.get("»", "guillemotright")}> : " »"')
     lines.append("")
     by_deadkey = {}
     for action in actions.findall("action"):
@@ -236,15 +235,21 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                     else:
                         seq.append(f"<deadkey_{xkb_name}>")
                 else:
-                    seq.append(f"<U{ord(symbol):04X}>")
+                    # Utiliser le mapping YAML si possible
+                    left = mappings.get(symbol, f"U{ord(symbol):04X}")
+                    seq.append(f"<{left}>")
             else:
-                seq.append(f"<{deadkey}>")
+                # Utiliser le mapping YAML si possible
+                left = mappings.get(deadkey, deadkey)
+                seq.append(f"<{left}>")
             if action_id:
-                seq.append(f"<{action_id}>")
+                # Utiliser le mapping YAML si possible pour action_id
+                left_action = mappings.get(action_id, action_id)
+                seq.append(f"<{left_action}>")
             out = unicode_repr(output)
             # Remplacer < > par <space> dans la séquence
             seq = ["<space>" if s == "< >" else s for s in seq]
-            lines.append(f"{' '.join(seq)}\t: {out} # {output}")
+            lines.append(f"{' '.join(seq)}\t: {out}")
     content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
     with open(xcompose_path, "w", encoding="utf-8") as f:
         f.write(content)
@@ -489,4 +494,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=True)
+    main(use_date_in_filename=False)
