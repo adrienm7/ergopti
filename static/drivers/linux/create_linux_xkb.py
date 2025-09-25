@@ -267,6 +267,9 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                 # Forcer <downarrow> si le symbole est U+02FC
                 elif ord(symbol) == 0x02FC:
                     seq.append("<downarrow>")
+                # Forcer <infinity> si le symbole est U+27E7
+                elif ord(symbol) == 0x27E7:
+                    seq.append("<infinity>")
                 elif xkb_name:
                     # Correction du nom deadkey_asciicircum -> dead_circumflex
                     if xkb_name == "asciicircum":
@@ -461,14 +464,27 @@ def generate_xkb_content(
                 comment_symbols.append("")
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         # Remplacement final dans la ligne XKB : U02FA → uparrow, U02FC → downarrow
-        quoted_symbols = [
-            "uparrow"
-            if s in ("U02FA", "U1D49", "ᵉ")
-            else "downarrow"
-            if s in ("U02FC", "U1D62", "ᵢ")
-            else s
-            for s in symbols
-        ]
+        # Correction spéciale pour <BKSL> : deadkey uniquement en 1ère position, sinon asciicircum
+        if xkb_key == "<BKSL>":
+            quoted_symbols = [
+                "dead_circumflex"
+                if i == 0
+                else "asciicircum"
+                if s == "dead_circumflex"
+                else s
+                for i, s in enumerate(symbols)
+            ]
+        else:
+            quoted_symbols = [
+                "uparrow"
+                if s in ("U02FA", "U1D49", "ᵉ")
+                else "downarrow"
+                if s in ("U02FC", "U1D62", "ᵢ")
+                else "infinity"
+                if s in ("U27E7",)
+                else s
+                for s in symbols
+            ]
         comment = " // " + " ".join(comment_symbols)
         replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_content = re.sub(pattern, replacement, xkb_content)

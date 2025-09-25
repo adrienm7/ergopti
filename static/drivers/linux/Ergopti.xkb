@@ -130,9 +130,9 @@ xkb_symbols "Ergopti" {
         key <AC07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [s, S, parenleft, emdash, s, s] }; // s S ( — s s
         key <AC08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [n, N, parenright, endash, n, n] }; // n N ) – n n
         key <AC09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [t, T, bracketleft, U2792, t, t] }; // t T [ ¨ t t
-        key <AC10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [r, R, bracketright, U27E7, r, r] }; // r R ] ℝ r r
+        key <AC10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [r, R, bracketright, infinity, r, r] }; // r R ] ℝ r r
         key <AC11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [q, Q, rightsinglequotemark, U20B0, q, q] }; // q Q ’ ¤ q q
-        key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_circumflex, NoSymbol, exclam, exclamdown, asciicircum, dead_circumflex] }; // ^ " !" ! ¡ ^ ^
+        key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_circumflex, NoSymbol, exclam, exclamdown, asciicircum, asciicircum] }; // ^ " !" ! ¡ ^ ^
 
         // Letters — Row 3/3
         key <LSGT> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [ecircumflex, Ecircumflex, dead_circumflex, dead_circumflex, x, x] }; // ê Ê ^ ^ x x
