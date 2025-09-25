@@ -485,6 +485,16 @@ def generate_xkb_content(
                 else s
                 for i, s in enumerate(symbols)
             ]
+        elif xkb_key == "<AD12>":
+            quoted_symbols = [
+                "dead_diaeresis"
+                if i == 0 and s in ("U2792", "diaeresis")
+                else s
+                for i, s in enumerate(symbols)
+            ]
+            quoted_symbols = [
+                "dead_currency" if s == "U20B0" else s for s in quoted_symbols
+            ]
         else:
             quoted_symbols = [
                 "uparrow"
@@ -493,6 +503,8 @@ def generate_xkb_content(
                 if s in ("U02FC", "U1D62", "ᵢ")
                 else "infinity"
                 if s in ("U27E7",)
+                else "dead_currency"
+                if s == "U20B0"
                 else s
                 for s in symbols
             ]
@@ -538,4 +550,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=True)
+    main(use_date_in_filename=False)
