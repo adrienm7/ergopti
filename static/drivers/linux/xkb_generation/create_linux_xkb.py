@@ -175,7 +175,12 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                     deadkey_symbol[deadkey_name] = output
     # Build Compose lines
     lines = []
-    # Ajout des règles simples pour guillemets avec espace normal
+    # Ajout des règles de fraction vers séquence multi-caractère
+    if hasattr(generate_xkb_content, "fraction_map"):
+        for frac, seq in generate_xkb_content.fraction_map.items():
+            lines.append(
+                f'<{mappings.get(frac, f"U{ord(frac):04X}")}> : "{seq}"'
+            )
     lines.append('<guillemotleft> : "« "')
     lines.append('<guillemotright> : " »"')
     lines.append("")
@@ -258,12 +263,14 @@ def extract_keymap_body(body: str, index: int) -> str:
 
 
 def get_symbol(keymap_body: str, macos_code: int) -> str:
-    """Extract the symbol (output or action) for a given macOS key code in a keyMap body. Returns the value (e.g. 'a', 'A', etc) or '' if not found."""
+    """Extract the symbol (output or action) for a given macOS key code in a keyMap body. Returns the value (e.g. 'a', 'A', etc) or '' if not found. Décode les entités XML."""
     match = re.search(
         rf'<key[^>]*code="{macos_code}"[^>]*(output|action)="([^"]+)"',
         keymap_body,
     )
-    return match.group(2) if match else ""
+    if match:
+        return html.unescape(match.group(2))
+    return ""
 
 
 def symbol_to_linux_name(symbol):
@@ -305,12 +312,30 @@ def generate_xkb_content(
     xkb_content, keymaps, deadkey_triggers, deadkey_symbol_map=None
 ):
     """Génère le contenu XKB avec le type FOUR_LEVEL_SEMIALPHABETIC_CONTROL pour chaque touche."""
+    # Liste des fractions Unicode à utiliser pour les substitutions multi-caractères
+    fraction_symbols = [
+        "⅓",
+        "⅔",
+        "⅕",
+        "⅖",
+        "⅗",
+        "⅘",
+        "⅙",
+        "⅚",
+        "⅛",
+        "⅜",
+        "⅝",
+        "⅞",
+    ]
+    fraction_map = {}  # fraction_symbol -> original sequence
+    fraction_idx = 0
     for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
         symbols = []
         comment_symbols = []
         for layer, keymap_body in enumerate(keymaps):
             symbol = get_symbol(keymap_body, macos_code)
             # Correction : ne remplacer que la couche 5 si « ou »
+            # Cas particulier : forcer « et » sur la couche 5
             if layer == 4 and symbol == "«":
                 linux_name = mappings.get("«", "guillemotleft")
                 symbols.append(linux_name)
@@ -320,6 +345,16 @@ def generate_xkb_content(
                 linux_name = mappings.get("»", "guillemotright")
                 symbols.append(linux_name)
                 comment_symbols.append("»")
+                continue
+            # Substitution fraction généralisée pour tout symbole multi-caractère sauf « et »
+            if symbol and len(symbol) >= 2 and symbol not in ("«", "»"):
+                frac = fraction_symbols[fraction_idx % len(fraction_symbols)]
+                if frac not in fraction_map:
+                    fraction_map[frac] = symbol
+                linux_name = mappings.get(frac, f"U{ord(frac):04X}")
+                symbols.append(linux_name)
+                comment_symbols.append(f'"{symbol}"')
+                fraction_idx += 1
                 continue
             # Gestion deadkey pour currency et asciicircum
             if symbol in deadkey_triggers:
@@ -371,6 +406,8 @@ def generate_xkb_content(
                     comment_symbols.append(decoded)
             else:
                 comment_symbols.append("")
+        # Stocke le mapping pour XCompose (après la boucle sur les layers)
+        generate_xkb_content.fraction_map = fraction_map
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         # Remplacement final dans la ligne XKB : U02FA → uparrow, U02FC → downarrow
         # Correction spéciale pour <BKSL> : deadkey uniquement en 1ère position, sinon asciicircum
@@ -452,4 +489,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=False)
+    main(use_date_in_filename=True)

@@ -1,5 +1,13 @@
 include "%L"
 
+<onethird> : " €"
+<twothirds> : " %"
+<onefifth> : "« "
+<twofifths> : " »"
+<threefifths> : " :"
+<fourfifths> : " !"
+<onesixth> : " ;"
+<fivesixths> : " ?"
 <guillemotleft> : "« "
 <guillemotright> : " »"
 
