@@ -287,6 +287,8 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
             if action_id:
                 seq.append(f"<{action_id}>")
             out = unicode_repr(output)
+            # Remplacer < > par <space> dans la séquence
+            seq = ["<space>" if s == "< >" else s for s in seq]
             lines.append(f"{' '.join(seq)}\t: {out} # {output}")
     content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
     with open(xcompose_path, "w", encoding="utf-8") as f:
