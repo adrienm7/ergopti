@@ -269,7 +269,7 @@ def symbol_to_linux_name(symbol):
 
     decoded = html.unescape(symbol)
     for char in decoded:
-        # Forcer uparrow/downarrow pour ᵉ/ᵢ ou U+02FA/U+02FC
+        # Force uparrow/downarrow for ᵉ/ᵢ or U+02FA/U+02FC
         if ord(char) in (0x02FA, 0x1D49):  # ᵉ
             return "uparrow"
         if ord(char) in (0x02FC, 0x1D62):  # ᵢ
@@ -277,8 +277,10 @@ def symbol_to_linux_name(symbol):
         if char in mappings:
             return mappings[char]
         else:
-            print(f"[WARNING] No mapping for {repr(char)} (U+{ord(char):04X})")
-            return "NoSymbol"
+            print(
+                f"[WARNING] No mapping for {repr(char)} (U+{ord(char):04X}), using Unicode codepoint."
+            )
+            return f"U{ord(char):04X}"
     return "NoSymbol"
 
 
