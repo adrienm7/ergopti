@@ -82,9 +82,9 @@ xkb_types         {
 xkb_compatibility { include "complete" };
 
 partial alphanumeric_keys
-xkb_symbols "Ergopti" {
+xkb_symbols "Ergopti_2025_09_25_22h39" {
 
-	name[Group1]= "France - Ergopti";
+	name[Group1]= "France - Ergopti 2025/09/25 22:39";
 
 	include "latin"
 
