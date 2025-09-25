@@ -246,7 +246,8 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
                 # Utiliser le mapping YAML si possible pour action_id
                 left_action = mappings.get(action_id, action_id)
                 seq.append(f"<{left_action}>")
-            out = unicode_repr(output)
+            # On ne garde que le caractère entre guillemets pour la sortie XCompose
+            out = f'"{output}"'
             # Remplacer < > par <space> dans la séquence
             seq = ["<space>" if s == "< >" else s for s in seq]
             lines.append(f"{' '.join(seq)}\t: {out}")
@@ -494,4 +495,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=False)
+    main(use_date_in_filename=True)
