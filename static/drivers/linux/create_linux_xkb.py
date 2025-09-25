@@ -15,7 +15,7 @@ with open(yaml_path, encoding="utf-8") as f:
     mappings = yaml.safe_load(f)
 
 
-def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
+def main(keylayout_name="Ergopti_v2.2.0.keylayout", use_date_in_filename=False):
     print(f"[INFO] Using keylayout: {keylayout_name}")
     macos_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../macos")
@@ -23,10 +23,84 @@ def main(keylayout_name="Ergopti_v2.2.0.keylayout"):
     if not os.path.isdir(macos_dir):
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
 
-    # Génère le nom de disposition et de fichier selon la date/heure au format Ergopti_annee_mois_jour_heurehmin
-    now = datetime.datetime.now()
-    layout_id = f"Ergopti_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
-    layout_name = f"France - Ergopti {now.year}/{now.month:02d}/{now.day:02d} {now.hour:02d}:{now.minute:02d}"
+    if use_date_in_filename:
+        now = datetime.datetime.now()
+        layout_id = f"Ergopti_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
+        layout_name = f"France - Ergopti {now.year}/{now.month:02d}/{now.day:02d} {now.hour:02d}:{now.minute:02d}"
+    else:
+        layout_id = "Ergopti"
+        layout_name = "France - Ergopti"
+
+    # Read keylayout file
+    print("[INFO] Reading keylayout file...")
+    macos_data, keylayout_path = read_keylayout_file(macos_dir, keylayout_name)
+
+    # Check base.xkb file
+    xkb_path = os.path.join(os.path.dirname(__file__), "base.xkb")
+    if not os.path.isfile(xkb_path):
+        raise FileNotFoundError(f"base.xkb file not found: {xkb_path}")
+    print("[INFO] Reading base.xkb template...")
+    xkb_content = read_xkb_template(xkb_path)
+
+    # Remplace le nom de la disposition et le nom affiché dans le contenu XKB
+    xkb_content = re.sub(
+        r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_content
+    )
+    xkb_content = re.sub(
+        r'name\[Group1\]=\s+"[^"]+";',
+        f'name[Group1]= "{layout_name}";',
+        xkb_content,
+    )
+
+    # Extraire les keymaps dans l’ordre 0, 2, 5, 6, 4
+    print("[INFO] Extracting keymaps for layers 0, 2, 5, 6, 4, 4...")
+    keymaps = [extract_keymap_body(macos_data, i) for i in [0, 2, 5, 6, 4]]
+    # Ajoute une 6ème couche identique à la 4ème (index 4)
+    keymaps.append(keymaps[4])
+
+    # Build deadkey trigger map
+    print("[INFO] Building deadkey trigger map...")
+    deadkey_triggers = extract_deadkey_triggers(keylayout_path)
+
+    # Build deadkey_name -> unicode_symbol mapping (same as in XCompose)
+    print("[INFO] Building deadkey symbol map...")
+    deadkey_symbol = {}
+    if LET is not None:
+        with open(keylayout_path, encoding="utf-8") as f:
+            xml_text = f.read()
+        xml_text = clean_invalid_xml_chars(xml_text)
+        tree = LET.fromstring(xml_text.encode("utf-8"))
+        actions = tree.find(".//actions")
+        if actions is not None:
+            for action in actions.findall("action"):
+                action_id = action.attrib.get("id")
+                for when in action.findall("when"):
+                    state = when.attrib.get("state")
+                    output = when.attrib.get("output")
+                    if not output:
+                        continue
+                    if state and state.startswith("s") and state[1:].isdigit():
+                        deadkey_name = f"dead_{int(state[1:])}"
+                        if action_id and action_id not in deadkey_symbol:
+                            deadkey_symbol[deadkey_name] = output
+
+    # Generate XKB content
+    print("[INFO] Generating XKB content...")
+    xkb_out_content = generate_xkb_content(
+        xkb_content, keymaps, deadkey_triggers, deadkey_symbol
+    )
+
+    # Determine output file names
+    xkb_out_path = os.path.join(os.path.dirname(__file__), f"{layout_id}.xkb")
+    xcompose_out_path = os.path.splitext(xkb_out_path)[0] + ".XCompose"
+
+    # Write XKB file
+    print(f"[INFO] Writing XKB output to {xkb_out_path}")
+    write_file(xkb_out_path, xkb_out_content)
+
+    # Write XCompose file
+    print(f"[INFO] Writing XCompose output to {xcompose_out_path}")
+    parse_actions_for_xcompose(keylayout_path, xcompose_out_path)
 
     # Read keylayout file
     print("[INFO] Reading keylayout file...")
@@ -178,10 +252,29 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
             if deadkey in deadkey_symbol:
                 symbol = deadkey_symbol[deadkey]
                 xkb_name = mappings.get(symbol)
-                if xkb_name:
+                # Forcer dead_currency si le symbole est U+20B0
+                if ord(symbol) == 0x20B0:
+                    seq.append("<dead_currency>")
+                # Forcer dead_diaeresis si le symbole est U+2792 (ou U+00A8)
+                elif ord(symbol) == 0x2792 or ord(symbol) == 0x00A8:
+                    seq.append("<dead_diaeresis>")
+                # Forcer <mu> si le symbole est U+2126
+                elif ord(symbol) == 0x2126:
+                    seq.append("<mu>")
+                # Forcer <uparrow> si le symbole est U+02FA
+                elif ord(symbol) == 0x02FA:
+                    seq.append("<uparrow>")
+                # Forcer <downarrow> si le symbole est U+02FC
+                elif ord(symbol) == 0x02FC:
+                    seq.append("<downarrow>")
+                elif xkb_name:
                     # Correction du nom deadkey_asciicircum -> dead_circumflex
                     if xkb_name == "asciicircum":
                         seq.append("<dead_circumflex>")
+                    elif xkb_name == "currency":
+                        seq.append("<dead_currency>")
+                    elif xkb_name == "diaeresis":
+                        seq.append("<dead_diaeresis>")
                     else:
                         seq.append(f"<deadkey_{xkb_name}>")
                 else:
@@ -281,15 +374,17 @@ def symbol_to_linux_name(symbol):
     result = []
 
     for char in decoded:
+        # Forcer uparrow/downarrow pour ᵉ/ᵢ ou U+02FA/U+02FC
+        if ord(char) in (0x02FA, 0x1D49):  # ᵉ
+            return "uparrow"
+        if ord(char) in (0x02FC, 0x1D62):  # ᵢ
+            return "downarrow"
         if char in mappings:
-            # TODO: Send multiple characters at once instead of the first one
             return mappings[char]
-            result.append(mappings[char])
         else:
             print(f"[WARNING] No mapping for {repr(char)} (U+{ord(char):04X})")
-            result.append("NoSymbol")
-
-    return " ".join(result)
+            return "NoSymbol"
+    return "NoSymbol"
 
 
 def read_keylayout_file(macos_dir, keylayout_name):
@@ -314,25 +409,49 @@ def generate_xkb_content(
         comment_symbols = []
         for layer, keymap_body in enumerate(keymaps):
             symbol = get_symbol(keymap_body, macos_code)
+            # Gestion deadkey pour currency et asciicircum
             if symbol in deadkey_triggers:
                 deadkey_name = deadkey_triggers[symbol]
                 if deadkey_symbol_map and deadkey_name in deadkey_symbol_map:
                     unicode_sym = deadkey_symbol_map[deadkey_name]
                     xkb_name = mappings.get(unicode_sym)
-                    if xkb_name:
-                        # Correction du nom deadkey_asciicircum -> dead_circumflex
-                        if xkb_name == "asciicircum":
-                            linux_name = "dead_circumflex"
+                    if xkb_name == "currency":
+                        linux_name = "dead_currency"
+                    elif xkb_name == "asciicircum":
+                        # Couche 5 : forcer le ^ normal
+                        if layer == 4:
+                            linux_name = "asciicircum"
                         else:
-                            linux_name = f"deadkey_{xkb_name}"
+                            linux_name = "dead_circumflex"
+                    elif xkb_name:
+                        linux_name = f"deadkey_{xkb_name}"
                     else:
                         linux_name = f"U{ord(unicode_sym):04X}"
                 else:
                     linux_name = deadkey_name
             else:
-                linux_name = symbol_to_linux_name(symbol)
+                # Forcer uparrow/downarrow pour U+02FA/U+1D49 et U+02FC/U+1D62
+                comment_symbol = None
+                if symbol and (any(ord(c) in (0x02FA, 0x1D49) for c in symbol)):
+                    linux_name = "uparrow"
+                    comment_symbol = "ᵉ"
+                elif symbol and (
+                    any(ord(c) in (0x02FC, 0x1D62) for c in symbol)
+                ):
+                    linux_name = "downarrow"
+                    comment_symbol = "ᵢ"
+                else:
+                    linux_name = symbol_to_linux_name(symbol)
+                    if linux_name == "currency":
+                        linux_name = "dead_currency"
+                # Si le symbole est ^ (asciicircum) sur la couche 5, forcer le normal
+                if linux_name == "dead_circumflex" and layer == 4:
+                    linux_name = "asciicircum"
             symbols.append(linux_name)
-            if symbol:
+            # Remplacement du commentaire pour uparrow/downarrow
+            if comment_symbol:
+                comment_symbols.append(comment_symbol)
+            elif symbol:
                 decoded = html.unescape(symbol)
                 if len(decoded) > 1:
                     comment_symbols.append(f'"{decoded}"')
@@ -341,7 +460,15 @@ def generate_xkb_content(
             else:
                 comment_symbols.append("")
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
-        quoted_symbols = [f"{s}" for s in symbols]
+        # Remplacement final dans la ligne XKB : U02FA → uparrow, U02FC → downarrow
+        quoted_symbols = [
+            "uparrow"
+            if s in ("U02FA", "U1D49", "ᵉ")
+            else "downarrow"
+            if s in ("U02FC", "U1D62", "ᵢ")
+            else s
+            for s in symbols
+        ]
         comment = " // " + " ".join(comment_symbols)
         replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_content = re.sub(pattern, replacement, xkb_content)
@@ -384,4 +511,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main()
+    main(use_date_in_filename=False)
