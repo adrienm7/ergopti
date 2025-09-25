@@ -474,6 +474,15 @@ def generate_xkb_content(
                 else s
                 for i, s in enumerate(symbols)
             ]
+        elif xkb_key == "<LSGT>":
+            quoted_symbols = [
+                s
+                if i not in (2, 3)
+                else ("asciicircum" if i == 2 else "dead_circumflex")
+                if s == "dead_circumflex"
+                else s
+                for i, s in enumerate(symbols)
+            ]
         else:
             quoted_symbols = [
                 "uparrow"
@@ -527,4 +536,4 @@ def extract_deadkey_triggers(keylayout_path):
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=False)
+    main(use_date_in_filename=True)
