@@ -8,11 +8,11 @@ import re
 from keylayout_correction import replace_action_to_output_extra_keys
 from keylayout_plus_mappings import plus_mappings
 from tests.run_all_tests import validate_keylayout
+from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
-
-EXTRA_KEYS = [27] + list(range(51, 150))
 from utilities.logger import logger
 
+EXTRA_KEYS = [27] + list(range(51, 150))
 LOGS_INDENTATION = "\t"
 
 
@@ -76,6 +76,8 @@ def create_keylayout_plus(content: str):
 
     content = replace_action_to_output_extra_keys(content)
     content = sort_keylayout(content)
+    content = set_unique_keyboard_id(content)
+
     validate_keylayout(content)
 
     logger.success("Keylayout plus creation complete.")

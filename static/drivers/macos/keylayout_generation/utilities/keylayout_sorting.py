@@ -3,7 +3,7 @@
 import re
 import unicodedata
 
-from utilities.logger import logger
+from .logger import logger
 
 LOGS_INDENTATION = "\t"
 
