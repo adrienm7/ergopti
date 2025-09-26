@@ -11,15 +11,10 @@ def generate_compact_id() -> str:
     """
     Generate a compact unique id using the current timestamp in milliseconds, encoded in base36.
     """
-    ts = int(time.time() * 1000)
-    chars = "0123456789abcdefghijklmnopqrstuvwxyz"
-    base36 = ""
+    ts = str(int(time.time() * 1000))
+    compact_id = ts[-2:]  # Last 2 characters to save space
 
-    while ts:
-        ts, i = divmod(ts, 36)
-        base36 = chars[i] + base36
-
-    return base36[:2]  # First 2 characters to save space
+    return compact_id
 
 
 def set_unique_keyboard_id(content: str) -> str:
@@ -32,7 +27,9 @@ def set_unique_keyboard_id(content: str) -> str:
         "%s🔹 Generating a compact unique id for the <keyboard> tag…",
         LOGS_INDENTATION + "\t",
     )
-    unique_id = f"{datetime.now():%Y%m%d}{generate_compact_id()}"
+    unique_id = (
+        f"-{datetime.now():%y%m%d}{generate_compact_id()}"  # e.g. 250926xx
+    )
 
     def replace_id(match):
         before = match.group(1)

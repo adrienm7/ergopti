@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="20250926mg" maxout="3" name="Ergopti v2.2.0 Beta 3">
+<keyboard group="126" id="-25092622" maxout="3" name="Ergopti v2.2.0 Beta 3">
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
