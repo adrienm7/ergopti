@@ -1,23 +1,38 @@
-import datetime
 import re
+import time
+from datetime import datetime
 
 from .logger import logger
 
 LOGS_INDENTATION = "\t"
 
 
+def generate_compact_id() -> str:
+    """
+    Generate a compact unique id using the current timestamp in milliseconds, encoded in base36.
+    """
+    ts = int(time.time() * 1000)
+    chars = "0123456789abcdefghijklmnopqrstuvwxyz"
+    base36 = ""
+
+    while ts:
+        ts, i = divmod(ts, 36)
+        base36 = chars[i] + base36
+
+    return base36[:2]  # First 2 characters to save space
+
+
 def set_unique_keyboard_id(content: str) -> str:
     """
-    Replace the id attribute in the <keyboard ...> tag with a unique value based on the current timestamp.
-    Example: id="20250926153045123" (YYYYMMDDHHMMSSmmm)
-    Ensures that each generated keylayout has a unique id.
+    Replace the id attribute in the <keyboard ...> tag with a compact unique value (base36 timestamp).
+    Example: id="kq1z8w2" (base36 encoded milliseconds since epoch)
+    Ensures that each generated keylayout has a unique and short id.
     """
     logger.info(
-        "%s🔹 Generating a unique id for the <keyboard> tag…",
+        "%s🔹 Generating a compact unique id for the <keyboard> tag…",
         LOGS_INDENTATION + "\t",
     )
-    now = datetime.datetime.now()
-    unique_id = now.strftime("%Y%m%d%H%M%S%f")[:-3]  # Up to milliseconds
+    unique_id = f"{datetime.now():%Y%m%d}{generate_compact_id()}"
 
     def replace_id(match):
         before = match.group(1)
@@ -34,6 +49,8 @@ def set_unique_keyboard_id(content: str) -> str:
         )
         return content
     logger.success(
-        "%sUnique id set for <keyboard>: %s", LOGS_INDENTATION + "\t", unique_id
+        "%sUnique id set for <keyboard>: %s",
+        LOGS_INDENTATION + "\t",
+        unique_id,
     )
     return new_content
