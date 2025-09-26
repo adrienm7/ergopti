@@ -3,6 +3,7 @@
 import re
 
 from tests.run_all_tests import validate_keylayout
+from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
 from utilities.logger import logger
 
@@ -44,6 +45,8 @@ def correct_keylayout(content: str) -> str:
     content = add_keymap(content, 9, keymap_4_content)
 
     content = sort_keylayout(content)
+    content = set_unique_keyboard_id(content)
+
     validate_keylayout(content)
 
     logger.success("Keylayout corrections complete.")
