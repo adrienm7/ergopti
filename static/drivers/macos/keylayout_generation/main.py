@@ -80,14 +80,7 @@ def main(
             logger.error("Error processing %s: %s", kbdedit_file_path.name, e)
             errors += 1
 
-    logger.info("=" * 85)
-    logger.info(
-        "Processing complete. %d file(s) processed, %d error(s) (exceptions), %d error log(s).",
-        processed,
-        errors,
-        get_error_count(),
-    )
-    logger.info("=" * 85)
+    show_execution_summary(processed, errors)
 
 
 def log_section(title: str) -> None:
@@ -218,6 +211,33 @@ def can_overwrite_file(file_path: Path, overwrite: bool) -> bool:
             logger.warning("\t🚫 Skipping modification: %s", file_path)
             return False
     return True
+
+
+def show_execution_summary(processed: int, errors: int) -> None:
+    if errors == 0 and get_error_count() == 0:
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+        logger.success(
+            "======= All files processed successfully: %d file(s) processed, no errors! =======",
+            processed,
+        )
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+    else:
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error(
+            "======= Processing complete. %d file(s) processed, %d error(s) (exceptions), %d error log(s). =======",
+            processed,
+            errors,
+            get_error_count(),
+        )
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error("=" * 100)
 
 
 if __name__ == "__main__":
