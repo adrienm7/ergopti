@@ -2,32 +2,18 @@
 Mappings for the new dead keys of Ergopti+.
 """
 
-import logging
 from pprint import pprint
 
+from utilities.logger import logger
 from utilities.mappings_functions import (
     add_case_sensitive_mappings,
     escape_symbols_in_mappings,
 )
 
-logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t\t"
 
 
-def get_plus_mappings() -> dict:
-    """Return the Ergopti+ mappings dictionary."""
-    logger.launch("%s Preparing Ergopti+ mappings…", LOGS_INDENTATION)
-
-    mappings = PLUS_MAPPINGS.copy()
-    mappings = add_case_sensitive_mappings(mappings)
-    mappings = escape_symbols_in_mappings(mappings)
-
-    check_duplicate_triggers(mappings)
-
-    return mappings
-
-
-PLUS_MAPPINGS = {
+PLUS_MAPPINGS_CONFIG = {
     "comma_j_letters_sfbs": {
         "trigger": ",",
         "map": [
@@ -297,8 +283,12 @@ def check_duplicate_triggers(mappings_to_check: dict):
     )
 
 
+plus_mappings = PLUS_MAPPINGS_CONFIG.copy()
+plus_mappings = add_case_sensitive_mappings(plus_mappings)
+plus_mappings = escape_symbols_in_mappings(plus_mappings)
+
+check_duplicate_triggers(plus_mappings)
+
+
 if __name__ == "__main__":
-    mappings = PLUS_MAPPINGS.copy()
-    mappings = add_case_sensitive_mappings(mappings)
-    mappings = escape_symbols_in_mappings(mappings)
-    pprint(mappings, indent=2, width=120)
+    pprint(plus_mappings, indent=2, width=120)

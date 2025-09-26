@@ -1,3 +1,4 @@
+import datetime
 import html
 import json
 import os
@@ -16,17 +17,15 @@ with open(
     ),
     "r",
     encoding="utf-8",
-) as f:
-    LINUX_TO_MACOS_KEYCODES = json.load(f)
+) as keycodes_file:
+    LINUX_TO_MACOS_KEYCODES = json.load(keycodes_file)
 
 yaml_path = os.path.join(os.path.dirname(__file__), "data", "key_sym.yaml")
-with open(yaml_path, encoding="utf-8") as f:
-    mappings = yaml.safe_load(f)
+with open(yaml_path, encoding="utf-8") as yaml_file:
+    mappings = yaml.safe_load(yaml_file)
 
 
 def main(keylayout_name="Ergopti_v2.2.0.keylayout", use_date_in_filename=False):
-    import datetime
-
     macos_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../../macos")
     )
@@ -113,8 +112,8 @@ def build_deadkey_symbol_map(keylayout_path):
             "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
         )
         return {}
-    with open(keylayout_path, encoding="utf-8") as f:
-        xml_text = f.read()
+    with open(keylayout_path, encoding="utf-8") as file_in:
+        xml_text = file_in.read()
     xml_text = clean_invalid_xml_chars(xml_text)
     tree = LET.fromstring(xml_text.encode("utf-8"))
     actions = tree.find(".//actions")
@@ -165,8 +164,8 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
     print(
         f"[INFO] Parsing actions from {keylayout_path} and writing XCompose to {xcompose_path}"
     )
-    with open(keylayout_path, encoding="utf-8") as f:
-        xml_text = f.read()
+    with open(keylayout_path, encoding="utf-8") as file_in:
+        xml_text = file_in.read()
     xml_text = clean_invalid_xml_chars(xml_text)
     tree = LET.fromstring(xml_text.encode("utf-8"))
     actions = tree.find(".//actions")
@@ -272,8 +271,8 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
             seq = ["<space>" if s == "< >" else s for s in seq]
             lines.append(f"{' '.join(seq)}\t: {out}")
     content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
-    with open(xcompose_path, "w", encoding="utf-8") as f:
-        f.write(content)
+    with open(xcompose_path, "w", encoding="utf-8") as file_out:
+        file_out.write(content)
 
 
 def extract_keymap_body(body: str, index: int) -> str:
@@ -324,14 +323,14 @@ def symbol_to_linux_name(symbol):
 def read_keylayout_file(macos_dir, keylayout_name):
     """Read the keylayout file and return its content and path."""
     keylayout_path = os.path.join(macos_dir, keylayout_name)
-    with open(keylayout_path, encoding="utf-8") as f:
-        return f.read(), keylayout_path
+    with open(keylayout_path, encoding="utf-8") as file_in:
+        return file_in.read(), keylayout_path
 
 
 def read_xkb_template(xkb_path):
     """Read the base XKB template file."""
-    with open(xkb_path, encoding="utf-8") as f:
-        return f.read()
+    with open(xkb_path, encoding="utf-8") as file_in:
+        return file_in.read()
 
 
 def generate_xkb_content(
@@ -438,6 +437,7 @@ def generate_xkb_content(
         # Stocke le mapping pour XCompose (après la boucle sur les layers)
         generate_xkb_content.fraction_map = fraction_map
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
+
         # Remplacement final dans la ligne XKB : U02FA → uparrow, U02FC → downarrow
         # Correction spéciale pour <BKSL> : deadkey uniquement en 1ère position, sinon asciicircum
         if xkb_key == "<BKSL>":
@@ -476,6 +476,7 @@ def generate_xkb_content(
                 "U20B0": "dead_currency",
             }
             quoted_symbols = [symbol_map.get(s, s) for s in symbols]
+
         comment = " // " + " ".join(comment_symbols)
         replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_content = re.sub(pattern, replacement, xkb_content)
@@ -485,8 +486,8 @@ def generate_xkb_content(
 def write_file(path, content):
     """Write content to a file."""
     print(f"[INFO] Writing file: {path}")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
+    with open(path, "w", encoding="utf-8") as file_out:
+        file_out.write(content)
 
 
 def extract_deadkey_triggers(keylayout_path):
@@ -497,8 +498,8 @@ def extract_deadkey_triggers(keylayout_path):
         )
         return {}
     print(f"[INFO] Extracting deadkey triggers from {keylayout_path}")
-    with open(keylayout_path, encoding="utf-8") as f:
-        xml_text = f.read()
+    with open(keylayout_path, encoding="utf-8") as file_in:
+        xml_text = file_in.read()
     xml_text = clean_invalid_xml_chars(xml_text)
     tree = LET.fromstring(xml_text.encode("utf-8"))
     actions = tree.find(".//actions")

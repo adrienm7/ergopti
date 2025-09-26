@@ -1,10 +1,10 @@
 """Tests for validating cosmetic part of keylayout."""
 
-import logging
 import re
 import unicodedata
 
-logger = logging.getLogger("ergopti")
+from utilities.logger import logger
+
 LOGS_INDENTATION = "\t\t"
 
 

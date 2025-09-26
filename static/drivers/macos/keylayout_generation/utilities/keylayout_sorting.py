@@ -1,10 +1,10 @@
 """Functions to reorder and sort various parts of a keylayout XML body for consistency and readability."""
 
-import logging
 import re
 import unicodedata
 
-logger = logging.getLogger("ergopti")
+from utilities.logger import logger
+
 LOGS_INDENTATION = "\t"
 
 

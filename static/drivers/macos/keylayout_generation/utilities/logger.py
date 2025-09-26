@@ -69,7 +69,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelcustom)s%(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("ergopti")
+
 for handler in logging.getLogger().handlers:
     handler.setFormatter(
         EmojiColorFormatter(
@@ -98,7 +98,6 @@ class ErrorCountingHandler(logging.Handler):
 
 
 _error_counter = ErrorCountingHandler()
-logger.addHandler(_error_counter)
 
 
 # --- Public API for error counting ---
@@ -110,3 +109,7 @@ def get_error_count():
 def reset_error_count():
     """Reset the error count."""
     _error_counter.reset()
+
+
+logger = logging.getLogger("ergopti")
+logger.addHandler(_error_counter)

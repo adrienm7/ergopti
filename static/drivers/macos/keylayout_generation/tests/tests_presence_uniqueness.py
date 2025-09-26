@@ -1,9 +1,9 @@
 """Tests for validating presence and uniqueness in a keylayout."""
 
-import logging
 import re
 
-logger = logging.getLogger("ergopti")
+from utilities.logger import logger
+
 LOGS_INDENTATION = "\t\t"
 
 

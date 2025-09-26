@@ -1,11 +1,10 @@
 """Tests for validating the structure and syntax of a keylayout."""
 
-import logging
 import re
 
 from lxml import etree as lxml_etree
+from utilities.logger import logger
 
-logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t\t"
 
 

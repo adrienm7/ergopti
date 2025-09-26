@@ -1,6 +1,6 @@
 """Tests for validating a keylayout."""
 
-import logging
+from utilities.logger import logger
 
 from .tests_cosmetic import (
     check_ascending_actions,
@@ -39,7 +39,6 @@ from .tests_structure_syntax import (
     check_xml_attribute_errors,
 )
 
-logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
 
 

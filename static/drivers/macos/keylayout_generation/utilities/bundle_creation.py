@@ -1,13 +1,13 @@
 """Create a macOS bundle for Ergopti keylayouts."""
 
-import logging
 import os
 import re
 import shutil
 import zipfile
 from pathlib import Path
 
-logger = logging.getLogger("ergopti")
+from utilities.logger import logger
+
 BUNDLE_IDENTIFIER = "com.apple.com.keyboardlayout.ergopti"
 LOGS_INDENTATION = "\t"
 
