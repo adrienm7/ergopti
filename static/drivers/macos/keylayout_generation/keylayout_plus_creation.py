@@ -3,16 +3,16 @@ Keylayout Plus generation utilities for Ergopti:
 create a variant with extra dead key features and symbol modifications.
 """
 
-import logging
 import re
 
 from keylayout_correction import replace_action_to_output_extra_keys
-from keylayout_plus_mappings import get_plus_mappings
+from keylayout_plus_mappings import plus_mappings
 from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
 
 EXTRA_KEYS = [27] + list(range(51, 150))
-logger = logging.getLogger("ergopti")
+from utilities.logger import logger
+
 LOGS_INDENTATION = "\t"
 
 
@@ -35,7 +35,6 @@ def create_keylayout_plus(content: str):
         "%s➕ Adding dead key features for Ergopti+…",
         LOGS_INDENTATION,
     )
-    plus_mappings = get_plus_mappings()
     start_layer = get_last_used_layer(content) + 1
 
     for i, (feature, data) in enumerate(plus_mappings.items()):

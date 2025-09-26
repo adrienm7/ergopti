@@ -1,12 +1,11 @@
 """Functions to correct and modify a keylayout content."""
 
-import logging
 import re
 
 from tests.run_all_tests import validate_keylayout
 from utilities.keylayout_sorting import sort_keylayout
+from utilities.logger import logger
 
-logger = logging.getLogger("ergopti")
 LOGS_INDENTATION = "\t"
 EXTRA_KEYS = list(range(51, 151)) + [24, 27]
 
