@@ -38,14 +38,15 @@ def create_keylayout_plus(content: str):
     start_layer = get_last_used_layer(content) + 1
 
     for i, (feature, data) in enumerate(plus_mappings.items()):
-        layer = start_layer + i
+        layer_number = start_layer + i
         trigger_key = data["trigger"]
+        layer_name = create_layer_name(layer_number, trigger_key)
         logger.info(
-            "%s🔹 Adding feature '%s' with trigger '%s' at layer s%d…",
+            "%s🔹 Adding feature '%s' with trigger '%s' at layer %s…",
             LOGS_INDENTATION + "\t",
             feature,
             trigger_key,
-            layer,
+            layer_name,
         )
 
         if not data["map"]:
@@ -54,8 +55,10 @@ def create_keylayout_plus(content: str):
         # Create the new dead key
         content = ensure_key_uses_action_and_not_output(content, trigger_key)
         content = ensure_action_block_exists(content, trigger_key)
-        content = assign_layer_to_action_block_none(content, trigger_key, layer)
-        content = add_terminator_state(content, layer, trigger_key)
+        content = assign_layer_to_action_block_none(
+            content, trigger_key, layer_name
+        )
+        content = add_terminator_state(content, trigger_key, layer_name)
 
         # Add all dead key outputs
         for trigger, output in data["map"]:
@@ -72,7 +75,9 @@ def create_keylayout_plus(content: str):
             content = ensure_key_uses_action_and_not_output(content, trigger)
 
             # Add the new output on the key when in the dead key layer
-            content = add_action_when_state(content, trigger, layer, output)
+            content = add_action_when_state(
+                content, trigger, layer_name, output
+            )
 
     content = replace_action_to_output_extra_keys(content)
     content = sort_keylayout(content)
@@ -243,55 +248,55 @@ def get_last_used_layer(body: str) -> int:
 
 
 def assign_layer_to_action_block_none(
-    body: str, action_id: str, layer_num: int
+    body: str, trigger_key: str, layer_name: str
 ) -> str:
     """
     Assigns a next state (layer) to a single <action id="..."> in the body.
     Modifies the default <when state="none"/> line to include a 'next' state.
-    Works even if action_id is encoded as &lt; or &#x003C; in the XML.
+    Works even if trigger_key is encoded as &lt; or &#x003C; in the XML.
     """
     logger.debug(
-        '%sAssigning next state s%d to <action id="%s">…',
+        '%sAssigning next state %s to <action id="%s">…',
         LOGS_INDENTATION + "\t",
-        layer_num,
-        action_id,
+        layer_name,
+        trigger_key,
     )
 
     def repl(match):
         header, body, footer = match.groups()
         body = re.sub(
             r'<when state="none"[^>]*>',
-            f'<when state="none" next="s{layer_num}"/>',
+            f'<when state="none" next="{layer_name}"/>',
             body,
         )
         return f"{header}{body}{footer}"
 
-    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
+    pattern = rf'(<action id="{re.escape(trigger_key)}">)(.*?)(</action>)'
     body = re.sub(pattern, repl, body, flags=re.DOTALL)
 
     return body
 
 
-def add_terminator_state(body: str, state_number: int, output: str) -> str:
+def add_terminator_state(body: str, output: str, layer_name: int) -> str:
     """
     Add a <when state="sX" output="..."/> line inside the <terminators> block.
     Raises ValueError if the state already exists.
     """
     logger.debug(
-        '%sAdding <when state="s%d" output="%s"/> to <terminators>…',
+        '%sAdding <when state="%s" output="%s"/> to <terminators>…',
         LOGS_INDENTATION + "\t",
-        state_number,
+        layer_name,
         output,
     )
 
     def repl(match):
         header, body, footer = match.groups()
-        # Check if state already exists
-        if re.search(rf'<when state="s{state_number}"', body):
+        # Check if layer already exists
+        if re.search(rf'<when state="{re.escape(layer_name)}"', body):
             raise ValueError(
-                f"State s{state_number} already exists in <terminators> block."
+                f"Layer {layer_name} already exists in <terminators> block."
             )
-        new_line = f'\t<when state="s{state_number}" output="{output}"/>'
+        new_line = f'\t<when state="{layer_name}" output="{output}"/>'
         return f"{header}{body}{new_line}\n\t{footer}"
 
     pattern = r"(<terminators>)(.*?)(</terminators>)"
@@ -343,34 +348,43 @@ def ensure_key_uses_action_and_not_output(body: str, action_id: str) -> str:
 
 
 def add_action_when_state(
-    body: str, action_id: str, state_number: int, output: str
+    body: str, trigger: str, layer: int, output: str
 ) -> str:
     """
     Insert a new <when state="sX" output="..."/> line inside the <action id="..."> block.
     Raises a ValueError if a <when> with the same state already exists.
     """
     logger.debug(
-        '%sAdding <when state="s%d" output="%s"/> to <action id="%s">…',
+        '%sAdding <when state="%s" output="%s"/> to <action id="%s">…',
         LOGS_INDENTATION + "\t",
-        state_number,
+        layer,
         output,
-        action_id,
+        trigger,
     )
 
     def repl(match):
         header, body, footer = match.groups()
-
         # Check if the state already exists
-        if re.search(rf'state="s{state_number}"', body):
+        if re.search(rf'state="{re.escape(layer)}"', body):
             raise ValueError(
-                f'Action "{action_id}" already has state s{state_number} defined.'
+                f'Action "{trigger}" already has state {layer} defined.'
             )
-
-        new_line = f'\t<when state="s{state_number}" output="{output}"/>'
+        new_line = f'\t<when state="{layer}" output="{output}"/>'
         return f"{header}{body}{new_line}\n\t\t{footer}"
 
-    pattern = rf'(<action id="{re.escape(action_id)}">)(.*?)(</action>)'
-    body = ensure_action_block_exists(body, action_id)
+    pattern = rf'(<action id="{re.escape(trigger)}">)(.*?)(</action>)'
+    body = ensure_action_block_exists(body, trigger)
     body = re.sub(pattern, repl, body, flags=re.DOTALL)
 
     return body
+
+
+def create_layer_name(state_number: int, output: str) -> str:
+    """
+    Generate a state name of the form s{number}_{output}
+    if output contains only Unicode letters or digits.
+    """
+    if output and re.fullmatch(r"[\w]+", output, re.UNICODE):
+        return f"s{state_number}_{output}"
+    else:
+        return f"s{state_number}"

@@ -180,7 +180,7 @@ def sort_terminators(body: str) -> str:
     logger.info(f"{LOGS_INDENTATION}\t🔹 Sorting terminators by state…")
 
     def state_key(line):
-        m = re.search(r'state="s(\d+)"', line)
+        m = re.search(r'state="s(\d+)', line)
         return int(m.group(1)) if m else 0
 
     def sort_block(match):
