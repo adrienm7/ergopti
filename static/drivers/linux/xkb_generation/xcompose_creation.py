@@ -3,7 +3,7 @@ import os
 
 import yaml
 from utilities.cleaning import clean_invalid_xml_chars
-from xkb_creation import generate_xkb_content
+from xkb_creation import generate_xkb
 
 try:
     from lxml import etree as LET
@@ -24,17 +24,15 @@ with open(yaml_path, encoding="utf-8") as yaml_file:
     mappings = yaml.safe_load(yaml_file)
 
 
-def parse_actions_for_xcompose(keylayout_path):
+def generate_xcompose(keylayout_data):
     """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol or deadkey_<name> if found in YAML mapping."""
     if LET is None:
         print(
             "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
         )
         return
-    print(f"[INFO] Parsing actions from {keylayout_path}")
-    with open(keylayout_path, encoding="utf-8") as file_in:
-        xml_text = file_in.read()
-    xml_text = clean_invalid_xml_chars(xml_text)
+    print("[INFO] Parsing actions from keylayout data")
+    xml_text = clean_invalid_xml_chars(keylayout_data)
     tree = LET.fromstring(xml_text.encode("utf-8"))
     actions = tree.find(".//actions")
     if actions is None:
@@ -57,8 +55,8 @@ def parse_actions_for_xcompose(keylayout_path):
     # Build Compose lines
     lines = []
     # Ajout des règles de fraction vers séquence multi-caractère
-    if hasattr(generate_xkb_content, "fraction_map"):
-        for frac, seq in generate_xkb_content.fraction_map.items():
+    if hasattr(generate_xkb, "fraction_map"):
+        for frac, seq in generate_xkb.fraction_map.items():
             left = mappings.get(frac, f"U{ord(frac):04X}")
             lines.append(f'<{left}> : "{seq}"')
     lines.append(f'<{mappings.get("«", "guillemotleft")}> : "« "')
