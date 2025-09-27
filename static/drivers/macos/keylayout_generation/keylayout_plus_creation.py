@@ -3,6 +3,7 @@ Keylayout Plus generation utilities for Ergopti:
 create a variant with extra dead key features and symbol modifications.
 """
 
+import html
 import re
 
 from keylayout_correction import replace_action_to_output_extra_keys
@@ -359,12 +360,58 @@ def add_action_when_state(
     return body
 
 
+SYMBOL_TO_NAME = {
+    "˙": "abovedot",
+    "˚": "abovering",
+    "'": "apostrophe",
+    "\\": "backslash",
+    "˘": "breve",
+    "ˇ": "caron",
+    "^": "circumflex",
+    ":": "colon",
+    ",": "comma",
+    "¤": "currency",
+    "¨": "diaeresis",
+    "$": "dollar",
+    ".": "dot",
+    "=": "equal",
+    "!": "exclamation",
+    "µ": "greek",
+    "#": "hashtag",
+    "?": "interrogation",
+    "[": "left_bracket",
+    "(": "left_parenthesis",
+    "¯": "macron",
+    "-": "minus",
+    " ": "nnbsp",
+    " ": "nbsp",
+    " ": "nnbsp",
+    "˛": "ogonek",
+    "+": "plus",
+    "]": "right_bracket",
+    ")": "right_parenthesis",
+    "ℝ": "RR",
+    ";": "semicolon",
+    "/": "slash",
+    "ᵢ": "subscript",
+    "ᵉ": "superscript",
+    "~": "tilde",
+}
+
+
 def create_layer_name(state_number: int, output: str) -> str:
     """
-    Generate a state name of the form s{number}_{output}
-    if output contains only Unicode letters or digits.
+    Generate a state name of the form s{number}_{output} if output is alphanum,
+    or s{number}_{name} if output is a known symbol in SYMBOL_TO_NAME.
     """
-    if output and re.fullmatch(r"[\w]+", output, re.UNICODE):
-        return f"s{state_number}_{output}"
-
-    return f"s{state_number}"
+    output = html.unescape(output)  # e.g. &#x0027; becomes '
+    layer_name = f"s{state_number}"
+    if output:
+        for char in output:
+            # Use config mapping if symbol is present
+            if char in SYMBOL_TO_NAME:
+                layer_name = layer_name + f"_{SYMBOL_TO_NAME[char]}"
+            # Otherwise, use output if it's alphanum
+            if re.fullmatch(r"[\w]+", char, re.UNICODE):
+                layer_name = layer_name + f"_{char}"
+    return layer_name
