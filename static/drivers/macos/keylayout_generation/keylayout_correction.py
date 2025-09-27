@@ -2,6 +2,7 @@
 
 import re
 
+from data.symbol_names import ALIAS_TO_ENTITY
 from tests.run_all_tests import validate_keylayout
 from utilities.ansi_layout_fix import (
     add_ansi_keymapset_with_10_50,
@@ -12,6 +13,7 @@ from utilities.ansi_layout_fix import (
 from utilities.information_extraction import extract_keymap_body
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
+from utilities.layer_names import replace_layer_names_in_file
 from utilities.logger import logger
 
 LOGS_INDENTATION = "\t"
@@ -36,6 +38,7 @@ def correct_keylayout(content: str) -> str:
     content = swap_keys(content, 10, 50)
     content = normalize_attribute_entities(content)
     content = replace_action_to_output_extra_keys(content)
+    content = replace_layer_names_in_file(content)
 
     logger.info("%s➕ Modifying keymap 4…", LOGS_INDENTATION)
     keymap_0_content = extract_keymap_body(content, 0)
@@ -116,20 +119,6 @@ def normalize_attribute_entities(body: str) -> str:
     """
     logger.info("%s🔹 Normalizing attribute entities…", LOGS_INDENTATION + "\t")
 
-    entity_normalization_map = {
-        "&#x003C;": ["<", "&lt;"],
-        "&#x003E;": [">", "&gt;"],
-        "&#x0026;": ["&", "&amp;"],
-        "&#x0022;": ['"', "&quot;"],
-        "&#x0027;": ["'", "&apos;"],
-    }
-
-    alias_to_hex_entity = {
-        alias: hex_entity
-        for hex_entity, aliases in entity_normalization_map.items()
-        for alias in aliases
-    }
-
     def normalize_value(value: str) -> str:
         normalized_chars = []
         i = 0
@@ -142,19 +131,18 @@ def normalize_attribute_entities(body: str) -> str:
                         normalized_chars.append(entity)
                         i = semicolon_index + 1
                         continue
-                    if entity in alias_to_hex_entity:  # Known named entity
-                        normalized_chars.append(alias_to_hex_entity[entity])
+                    if entity in ALIAS_TO_ENTITY:  # Known named entity
+                        normalized_chars.append(ALIAS_TO_ENTITY[entity])
                         i = semicolon_index + 1
                         continue
             # Raw character
             char = value[i]
-            normalized_chars.append(alias_to_hex_entity.get(char, char))
+            normalized_chars.append(ALIAS_TO_ENTITY.get(char, char))
             i += 1
         return "".join(normalized_chars)
 
     def replace_attribute(match):
         attr_name = match.group(1)
-        # quote = match.group(2)  # Either " or ', but we force it to become "
         value = match.group(3)
         return f'{attr_name}="{normalize_value(value)}"'
 
