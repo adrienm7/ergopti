@@ -1,5 +1,8 @@
 """
 Main entry point for generating corrected and enhanced macOS keylayout files.
+
+Official documentation about keylayout files can be found at:
+https://developer.apple.com/library/archive/technotes/tn2056/_index.html
 """
 
 import re

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from utilities.logger import logger
 
-BUNDLE_IDENTIFIER = "com.apple.com.keyboardlayout.ergopti"
+BUNDLE_IDENTIFIER = "com.apple.keyboardlayout.ergopti"
 LOGS_INDENTATION = "\t"
 
 

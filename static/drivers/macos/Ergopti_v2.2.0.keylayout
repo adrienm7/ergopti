@@ -1,10 +1,24 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-25092622" maxout="3" name="Ergopti v2.2.0 Beta 3">
+<keyboard group="126" id="-25092720" maxout="3" name="Ergopti v2.2.0 Beta 3">
 	<layouts>
-		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
+    	<layout first="0" last="0" mapSet="ISO" modifiers="commonModifiers"/>
+    	<layout first="1" last="6" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="10" last="10" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="12" last="12" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="14" last="15" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="24" last="24" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="27" last="28" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="37" last="37" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="40" last="40" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="195" last="195" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="198" last="198" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="204" last="204" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="202" last="202" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="34" last="34" mapSet="ANSI" modifiers="commonModifiers"/>
+    	<layout first="31" last="31" mapSet="ANSI" modifiers="commonModifiers"/>
 	</layouts>
-	<modifierMap id="f4" defaultIndex="0">
+	<modifierMap id="commonModifiers" defaultIndex="0">
 		<keyMapSelect mapIndex="0">
 			<modifier keys=""/>
 		</keyMapSelect>
@@ -37,7 +51,49 @@
 			<modifier keys="caps? anyOption? anyControl"/>
 		</keyMapSelect>
 	</modifierMap>
-	<keyMapSet id="16c">
+	<keyMapSet id="ANSI">
+		<keyMap index="0" baseMapSet="ISO" baseIndex="0">
+			<key code="10" action="ê"/>
+			<key code="50" output="$"/>
+		</keyMap>
+		<keyMap index="1" baseMapSet="ISO" baseIndex="1">
+			<key code="10" action="Ê"/>
+			<key code="50" output="$"/>
+		</keyMap>
+		<keyMap index="2" baseMapSet="ISO" baseIndex="2">
+			<key code="10" action="Ê"/>
+			<key code="50" output=" €"/>
+		</keyMap>
+		<keyMap index="3" baseMapSet="ISO" baseIndex="3">
+			<key code="10" action="ê"/>
+			<key code="50" output=" €"/>
+		</keyMap>
+		<keyMap index="4" baseMapSet="ISO" baseIndex="4">
+			<key code="10" output="x"/>
+			<key code="50" output="$"/>
+		</keyMap>
+		<keyMap index="5" baseMapSet="ISO" baseIndex="5">
+			<key code="10" output="^"/>
+			<key code="50" output="€"/>
+		</keyMap>
+		<keyMap index="6" baseMapSet="ISO" baseIndex="6">
+			<key code="10" action="^"/>
+			<key code="50" action="¤"/>
+		</keyMap>
+		<keyMap index="7" baseMapSet="ISO" baseIndex="7">
+			<key code="10" action="^"/>
+			<key code="50" action="¤"/>
+		</keyMap>
+		<keyMap index="8" baseMapSet="ISO" baseIndex="8">
+			<key code="10" output="^"/>
+			<key code="50" output="€"/>
+		</keyMap>
+		<keyMap index="9" baseMapSet="ISO" baseIndex="9">
+			<key code="10" output="x"/>
+			<key code="50" output="$"/>
+		</keyMap>
+	</keyMapSet>
+	<keyMapSet id="ISO">
 		<keyMap index="0">
 			<key code="0" action="a"/>
 			<key code="1" action="i"/>
