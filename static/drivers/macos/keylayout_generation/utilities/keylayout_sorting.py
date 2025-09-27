@@ -89,23 +89,34 @@ def sort_keymaps(body: str) -> str:
 def sort_keys(body: str) -> str:
     """Sort all <key> elements in each <keyMap> block by their code attribute."""
     logger.info(
-        f"{LOGS_INDENTATION}\t🔹 Sorting keys by code inside each keyMap…"
+        f"{LOGS_INDENTATION}\t🔹 Sorting keys by code inside each <keyMap> of each <keyMapSet>..."
     )
 
-    def sort_block(match):
-        header, body, footer = match.groups()
+    def sort_keymap_block(match):
+        header, keymap_body, footer = match.groups()
         # Extract all <key .../> elements
-        keys = re.findall(r"(\s*<key[^>]+/>)", body)
+        keys = re.findall(r"(\s*<key[^>]+/>)", keymap_body)
         # Sort keys numerically by their code attribute
         keys_sorted = sorted(
             keys, key=lambda k: int(re.search(r'code="(\d+)"', k).group(1))
         )
-        # Reconstruct the block
+        # Rebuild the <keyMap> block
         return f"{header}{''.join(keys_sorted)}\n\t\t{footer}"
 
+    def sort_keymapset_block(match):
+        header, inner_body, footer = match.groups()
+        # Sort each <keyMap> individually
+        sorted_inner = re.sub(
+            r'(<keyMap index="\d+">)(.*?)(</keyMap>)',
+            sort_keymap_block,
+            inner_body,
+            flags=re.DOTALL,
+        )
+        return f"{header}{sorted_inner}{footer}"
+
     return re.sub(
-        r'(<keyMap index="\d+">)(.*?)(</keyMap>)',
-        sort_block,
+        r"(<keyMapSet.*?>)(.*?)(</keyMapSet>)",
+        sort_keymapset_block,
         body,
         flags=re.DOTALL,
     )
