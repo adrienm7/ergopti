@@ -24,16 +24,14 @@ with open(yaml_path, encoding="utf-8") as yaml_file:
     mappings = yaml.safe_load(yaml_file)
 
 
-def parse_actions_for_xcompose(keylayout_path, xcompose_path):
+def parse_actions_for_xcompose(keylayout_path):
     """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol or deadkey_<name> if found in YAML mapping."""
     if LET is None:
         print(
             "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
         )
         return
-    print(
-        f"[INFO] Parsing actions from {keylayout_path} and writing XCompose to {xcompose_path}"
-    )
+    print(f"[INFO] Parsing actions from {keylayout_path}")
     with open(keylayout_path, encoding="utf-8") as file_in:
         xml_text = file_in.read()
     xml_text = clean_invalid_xml_chars(xml_text)
@@ -157,5 +155,4 @@ def parse_actions_for_xcompose(keylayout_path, xcompose_path):
             seq = ["<space>" if s == "< >" else s for s in seq]
             lines.append(f"{' '.join(seq)}\t: {out}")
     content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
-    with open(xcompose_path, "w", encoding="utf-8") as file_out:
-        file_out.write(content)
+    return content
