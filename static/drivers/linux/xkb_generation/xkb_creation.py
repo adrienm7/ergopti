@@ -49,6 +49,7 @@ def generate_xkb_content(
     for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
         symbols = []
         comment_symbols = []
+        comment_symbol = None
         for layer, keymap_body in enumerate(keymaps):
             symbol = get_symbol(keymap_body, macos_code)
             # Correction : ne remplacer que la couche 5 si « ou »
