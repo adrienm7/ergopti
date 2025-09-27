@@ -2,6 +2,7 @@
 Mappings for the new dead keys of Ergopti+.
 """
 
+from collections import OrderedDict
 from pprint import pprint
 
 from utilities.mappings_functions import (
@@ -258,10 +259,24 @@ PLUS_MAPPINGS_CONFIG = {
     },
 }
 
-
 plus_mappings = PLUS_MAPPINGS_CONFIG.copy()
 plus_mappings = add_case_sensitive_mappings(plus_mappings)
 plus_mappings = escape_symbols_in_mappings(plus_mappings)
+
+
+# Custom sort: put mappings whose trigger is a single letter (a-zA-Z) last, others first.
+# For single-letter triggers, sort as a, A, b, B, ..., z, Z
+def _sort_key(item):
+    trigger = item[1].get("trigger", "")
+    is_single_alpha = len(trigger) == 1 and trigger.isalpha()
+    if is_single_alpha:
+        # Sort by (trigger.lower(), is_uppercase) for a, A, b, B, ...
+        # is_uppercase: False (minuscule) avant True (majuscule)
+        return (True, (trigger.lower(), trigger.isupper()))
+    return (False, trigger)
+
+
+plus_mappings = OrderedDict(sorted(plus_mappings.items(), key=_sort_key))
 
 check_duplicate_triggers(plus_mappings)
 
