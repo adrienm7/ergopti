@@ -67,6 +67,8 @@ def check_forbidden_tags_or_attributes(body: str) -> None:
     }
     allowed_attrs = {
         "action",
+        "baseIndex",
+        "baseMapSet",
         "code",
         "defaultIndex",
         "encoding",

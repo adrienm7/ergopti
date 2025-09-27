@@ -142,34 +142,43 @@ def check_ascending_keymaps(body: str) -> None:
         LOGS_INDENTATION,
     )
 
-    keymap_matches = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', body)
-    indices = [int(idx) for idx in keymap_matches]
-
-    last_index = -1
-    out_of_order = []
-
-    # Detect out-of-order keyMaps
-    for i, idx in enumerate(indices):
-        if idx <= last_index:
-            out_of_order.append((i, last_index, idx))
-        last_index = idx
-
-    if out_of_order:
-        logger.error(
-            "%sKeyMap indices out of ascending order detected:",
-            LOGS_INDENTATION + "\t",
+    keymapset_blocks = re.findall(
+        r"<keyMapSet[^>]*>(.*?)</keyMapSet>", body, flags=re.DOTALL
+    )
+    all_ok = True
+    for idx, keymapset_body in enumerate(keymapset_blocks):
+        keymap_matches = re.findall(
+            r'<keyMap\s+index=["\'](\d+)["\']', keymapset_body
         )
-        for pos, prev, current in out_of_order:
+        indices = [int(i) for i in keymap_matches]
+        last_index = -1
+        out_of_order = []
+        for pos, i in enumerate(indices):
+            if i <= last_index:
+                out_of_order.append((pos, last_index, i))
+            last_index = i
+        if out_of_order:
             logger.error(
-                "%s— Position %d: index %d follows %d",
-                LOGS_INDENTATION + "\t\t",
-                pos,
-                current,
-                prev,
+                "%sKeyMap indices out of ascending order detected in <keyMapSet> #%d:",
+                LOGS_INDENTATION + "\t",
+                idx + 1,
             )
-    else:
+            for pos, prev, current in out_of_order:
+                logger.error(
+                    "%s— Position %d: index %d follows %d",
+                    LOGS_INDENTATION + "\t\t",
+                    pos,
+                    current,
+                    prev,
+                )
+            all_ok = False
+    if not keymapset_blocks:
+        logger.warning(
+            "%sNo <keyMapSet> blocks found.", LOGS_INDENTATION + "\t"
+        )
+    if all_ok:
         logger.success(
-            "%sAll <keyMap> indices are in ascending order.",
+            "%sAll <keyMap> indices are in ascending order in each <keyMapSet>.",
             LOGS_INDENTATION + "\t",
         )
 

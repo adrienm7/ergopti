@@ -110,19 +110,37 @@ def check_unique_keymap_indices(body: str) -> None:
     """
     Checks that no <keyMap> index is duplicated.
     """
-    logger.info("%s🔹 Checking unique <keyMap> indices…", LOGS_INDENTATION)
-    indices = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', body)
-    duplicates = set([x for x in indices if indices.count(x) > 1])
-    if duplicates:
-        logger.error(
-            "%sDuplicate <keyMap> indices: %s",
-            LOGS_INDENTATION + "\t",
-            ", ".join(duplicates),
+    logger.info(
+        "%s🔹 Checking unique <keyMap> indices in each <keyMapSet>…",
+        LOGS_INDENTATION,
+    )
+    keymapset_blocks = re.findall(
+        r"<keyMapSet[^>]*>(.*?)</keyMapSet>", body, flags=re.DOTALL
+    )
+    all_ok = True
+    for idx, keymapset_body in enumerate(keymapset_blocks):
+        indices = re.findall(r'<keyMap\s+index=["\'](\d+)["\']', keymapset_body)
+        duplicates = set([x for x in indices if indices.count(x) > 1])
+        if duplicates:
+            logger.error(
+                "%sDuplicate <keyMap> indices in <keyMapSet> #%d: %s",
+                LOGS_INDENTATION + "\t",
+                idx + 1,
+                ", ".join(duplicates),
+            )
+            all_ok = False
+    if not keymapset_blocks:
+        logger.warning(
+            "%sNo <keyMapSet> blocks found.", LOGS_INDENTATION + "\t"
         )
-        raise ValueError("Duplicate <keyMap> indices found.")
+    if not all_ok:
+        raise ValueError(
+            "Duplicate <keyMap> indices found in one or more <keyMapSet> blocks."
+        )
     else:
         logger.success(
-            "%sAll <keyMap> indices are unique.", LOGS_INDENTATION + "\t"
+            "%sAll <keyMap> indices are unique in each <keyMapSet>.",
+            LOGS_INDENTATION + "\t",
         )
 
 
