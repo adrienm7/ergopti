@@ -3,7 +3,6 @@ Keylayout Plus generation utilities for Ergopti:
 create a variant with extra dead key features and symbol modifications.
 """
 
-import html
 import re
 
 from keylayout_correction import replace_action_to_output_extra_keys
@@ -12,6 +11,7 @@ from tests.run_all_tests import validate_keylayout
 from utilities.information_extraction import get_last_used_layer
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
+from utilities.layer_names import create_layer_name
 from utilities.logger import logger
 
 EXTRA_KEYS = [27] + list(range(51, 150))
@@ -358,60 +358,3 @@ def add_action_when_state(
     body = re.sub(pattern, repl, body, flags=re.DOTALL)
 
     return body
-
-
-SYMBOL_TO_NAME = {
-    "˙": "abovedot",
-    "˚": "abovering",
-    "'": "apostrophe",
-    "\\": "backslash",
-    "˘": "breve",
-    "ˇ": "caron",
-    "^": "circumflex",
-    ":": "colon",
-    ",": "comma",
-    "¤": "currency",
-    "¨": "diaeresis",
-    "$": "dollar",
-    ".": "dot",
-    "=": "equal",
-    "!": "exclamation",
-    "µ": "greek",
-    "#": "hashtag",
-    "?": "interrogation",
-    "[": "left_bracket",
-    "(": "left_parenthesis",
-    "¯": "macron",
-    "-": "minus",
-    " ": "nnbsp",
-    " ": "nbsp",
-    " ": "nnbsp",
-    "˛": "ogonek",
-    "+": "plus",
-    "]": "right_bracket",
-    ")": "right_parenthesis",
-    "ℝ": "RR",
-    ";": "semicolon",
-    "/": "slash",
-    "ᵢ": "subscript",
-    "ᵉ": "superscript",
-    "~": "tilde",
-}
-
-
-def create_layer_name(state_number: int, output: str) -> str:
-    """
-    Generate a state name of the form s{number}_{output} if output is alphanum,
-    or s{number}_{name} if output is a known symbol in SYMBOL_TO_NAME.
-    """
-    output = html.unescape(output)  # e.g. &#x0027; becomes '
-    layer_name = f"s{state_number}"
-    if output:
-        for char in output:
-            # Use config mapping if symbol is present
-            if char in SYMBOL_TO_NAME:
-                layer_name = layer_name + f"_{SYMBOL_TO_NAME[char]}"
-            # Otherwise, use output if it's alphanum
-            if re.fullmatch(r"[\w]+", char, re.UNICODE):
-                layer_name = layer_name + f"_{char}"
-    return layer_name

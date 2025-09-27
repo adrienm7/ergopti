@@ -57,8 +57,8 @@ def get_last_used_layer(body: str) -> int:
     logger.info("%sScanning for last used layer…", LOGS_INDENTATION + "\t")
 
     # Find all numbers in 'state="sX"' and 'next="sX"'
-    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', body)]
-    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', body)]
+    state_indices = [int(m) for m in re.findall(r'state="s(\d+)', body)]
+    next_indices = [int(m) for m in re.findall(r'next="s(\d+)', body)]
 
     if state_indices or next_indices:
         max_layer = max(state_indices + next_indices)
