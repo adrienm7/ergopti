@@ -26,7 +26,46 @@ def check_valid_xml_structure(body: str) -> None:
     logger.success("%sXML structure is valid.", LOGS_INDENTATION + "\t")
 
 
-def check_required_blocks_present(body: str) -> None:
+def check_keyboard_element_children(body: str) -> None:
+    """
+    Checks that <keyboard> contains exactly one <layouts>,
+    at least one <modifierMap> and <keyMapSet>,
+    and at most one <actions> and <terminators>.
+    """
+    logger.info(
+        "%s🔹 Checking <keyboard> element children structure…", LOGS_INDENTATION
+    )
+    match = re.search(r"<keyboard[^>]*>(.*)</keyboard>", body, flags=re.DOTALL)
+    if not match:
+        raise ValueError("No <keyboard> block found.")
+
+    inner = match.group(1)
+    # Count first-level child tags
+    layouts = re.findall(r"<layouts[ >]", inner)
+    modifiermaps = re.findall(r"<modifierMap[ >]", inner)
+    keymapsets = re.findall(r"<keyMapSet[ >]", inner)
+    actions = re.findall(r"<actions[ >]", inner)
+    terminators = re.findall(r"<terminators[ >]", inner)
+
+    if len(layouts) != 1:
+        raise ValueError(
+            f"<keyboard> must contain exactly one <layouts> (found {len(layouts)})"
+        )
+    if len(modifiermaps) < 1:
+        raise ValueError("<keyboard> must contain at least one <modifierMap>.")
+    if len(keymapsets) < 1:
+        raise ValueError("<keyboard> must contain at least one <keyMapSet>.")
+    if len(actions) > 1:
+        raise ValueError("<keyboard> must contain at most one <actions>.")
+    if len(terminators) > 1:
+        raise ValueError("<keyboard> must contain at most one <terminators>.")
+    logger.success(
+        "%s<keyboard> element children structure is valid.",
+        LOGS_INDENTATION + "\t",
+    )
+
+
+def check_required_blocks_presence(body: str) -> None:
     """
     Checks that all required blocks are present.
     """
@@ -143,6 +182,33 @@ def check_forbidden_empty_attribute_values(body: str) -> None:
     logger.success(
         "%sNo forbidden empty attribute values.", LOGS_INDENTATION + "\t"
     )
+
+
+def check_keyboard_id_format(body: str) -> None:
+    """
+    Check that the keylayout id starts with a minus sign and after that <=8 digits.
+    """
+    logger.info("%s🔹 Checking <keyboard> id format…", LOGS_INDENTATION)
+    match = re.search(r'<keyboard[^>]* id="([^"]+)"', body)
+    if not match:
+        raise ValueError("No <keyboard id=...> found.")
+
+    kid = match.group(1)
+    if not kid.startswith("-"):
+        raise ValueError(f"<keyboard> id does not start with '-': {kid}")
+    rest = kid[1:]
+
+    if len(rest) > 8:
+        raise ValueError(
+            f"<keyboard> id part after '-' is too long: {rest} of length {len(rest)} > 8"
+        )
+
+    if not rest.isdigit():
+        raise ValueError(
+            f"<keyboard> id part after '-' is not all digits: {rest}"
+        )
+
+    logger.success("%s<keyboard> id format is valid.", LOGS_INDENTATION + "\t")
 
 
 def check_consistent_attribute_quotes(body: str) -> None:

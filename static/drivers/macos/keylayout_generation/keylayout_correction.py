@@ -33,9 +33,7 @@ def correct_keylayout(content: str) -> str:
     )
     content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
 
-    content = replace_modifier_map_id(content)
     content = swap_keys(content, 10, 50)
-
     content = normalize_attribute_entities(content)
     content = replace_action_to_output_extra_keys(content)
 
@@ -55,6 +53,7 @@ def correct_keylayout(content: str) -> str:
 
     logger.info("%s🔹 Adding an ANSI keyMapSet…", LOGS_INDENTATION + "\t")
     content = replace_layouts_block(content)
+    content = replace_modifier_map_id(content)
     content = replace_keymapset_id_with_iso(content)
     content = add_ansi_keymapset_with_10_50(content)
 
@@ -175,10 +174,15 @@ def replace_action_to_output_extra_keys(body: str) -> str:
     pattern = r'<key code="(\d+)"([^>]*)action="[^"]*"([^>]*)>'
     fixed_body = re.sub(pattern, repl, body)
 
-    # Special case: code=10 action="$" → output="$" (even if not in EXTRA_KEYS)
+    # Special case: code=10/50 action="$" → output="$" (even if not in EXTRA_KEYS)
     fixed_body = re.sub(
         r'<key code="10"([^>]*)action="\$"([^>]*)>',
         r'<key code="10"\1output="$"\2>',
+        fixed_body,
+    )
+    fixed_body = re.sub(
+        r'<key code="50"([^>]*)action="\$"([^>]*)>',
+        r'<key code="50"\1output="$"\2>',
         fixed_body,
     )
 

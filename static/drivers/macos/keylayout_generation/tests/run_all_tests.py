@@ -33,8 +33,10 @@ from .tests_structure_syntax import (
     check_consistent_attribute_quotes,
     check_forbidden_empty_attribute_values,
     check_forbidden_tags_or_attributes,
+    check_keyboard_element_children,
+    check_keyboard_id_format,
     check_max_min_code_state_values,
-    check_required_blocks_present,
+    check_required_blocks_presence,
     check_valid_xml_structure,
     check_xml_attribute_errors,
 )
@@ -53,9 +55,11 @@ def validate_keylayout(content: str) -> None:
         "%s=== XML structure & syntax checks ===", LOGS_INDENTATION + "     "
     )
     check_valid_xml_structure(content)
-    check_required_blocks_present(content)
+    check_keyboard_element_children(content)
+    check_required_blocks_presence(content)
     check_forbidden_tags_or_attributes(content)
     check_forbidden_empty_attribute_values(content)
+    check_keyboard_id_format(content)
     check_consistent_attribute_quotes(content)
     check_xml_attribute_errors(content)
     check_max_min_code_state_values(content)

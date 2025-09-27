@@ -1,22 +1,9 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-25092739" maxout="3" name="Ergopti v2.2.0 Beta 3 Plus">
+<keyboard group="126" id="-25092733" maxout="3" name="Ergopti v2.2.0 Beta 3 Plus">
 	<layouts>
     	<layout first="0" last="0" mapSet="ISO" modifiers="commonModifiers"/>
-    	<layout first="1" last="6" mapSet="ANSI" modifiers="commonModifiers"/>
     	<layout first="10" last="10" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="12" last="12" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="14" last="15" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="24" last="24" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="27" last="28" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="37" last="37" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="40" last="40" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="195" last="195" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="198" last="198" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="204" last="204" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="202" last="202" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="34" last="34" mapSet="ANSI" modifiers="commonModifiers"/>
-    	<layout first="31" last="31" mapSet="ANSI" modifiers="commonModifiers"/>
 	</layouts>
 	<modifierMap id="commonModifiers" defaultIndex="0">
 		<keyMapSelect mapIndex="0">

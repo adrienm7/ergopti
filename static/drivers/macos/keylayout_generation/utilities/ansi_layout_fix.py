@@ -19,20 +19,7 @@ def replace_layouts_block(content: str) -> str:
     )
     new_layouts = """\t<layouts>
     \t<layout first="0" last="0" mapSet="ISO" modifiers="commonModifiers"/>
-    \t<layout first="1" last="6" mapSet="ANSI" modifiers="commonModifiers"/>
     \t<layout first="10" last="10" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="12" last="12" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="14" last="15" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="24" last="24" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="27" last="28" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="37" last="37" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="40" last="40" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="195" last="195" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="198" last="198" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="204" last="204" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="202" last="202" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="34" last="34" mapSet="ANSI" modifiers="commonModifiers"/>
-    \t<layout first="31" last="31" mapSet="ANSI" modifiers="commonModifiers"/>
 \t</layouts>"""
     content = re.sub(
         r"\t?<layouts>.*?</layouts>",
@@ -74,7 +61,7 @@ def add_ansi_keymapset_with_10_50(content: str) -> str:
     """
     2. Find the <keyMapSet id="ISO"> block and duplicate it as <keyMapSet id="ANSI">,
        but in the ANSI block, keep only <key> entries with code 10 or 50 in each <keyMap>.
-    3. Insert the new ANSI block just after the ISO block.
+    3. Insert the new ANSI block just before the ISO block.
     """
     logger.info(
         "%s🔹 Adding <keyMapSet id='ANSI'> with only key codes 10 and 50…",

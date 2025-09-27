@@ -45,9 +45,10 @@ def set_unique_keyboard_id(content: str) -> str:
             LOGS_INDENTATION + "\t",
         )
         return content
-    logger.success(
-        "%sUnique id set for <keyboard>: %s",
-        LOGS_INDENTATION + "\t",
-        unique_id,
-    )
+    old_id = re.search(r'<keyboard[^>]* id="([^"]+)"', content).group(1)
+    if unique_id == old_id:
+        logger.error(
+            f"New <keyboard> id is identical to the old one: {unique_id}. Running again the generation code should fix this."
+        )
+    logger.success(f"Unique id set for <keyboard>: {unique_id}")
     return new_content
