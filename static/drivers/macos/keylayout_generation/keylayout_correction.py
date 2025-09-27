@@ -7,8 +7,9 @@ from utilities.ansi_layout_fix import (
     add_ansi_keymapset_with_10_50,
     replace_keymapset_id_with_iso,
     replace_layouts_block,
+    swap_keys,
 )
-from utilities.information_extraction import extract_keymap_body, swap_keys
+from utilities.information_extraction import extract_keymap_body
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
 from utilities.logger import logger
@@ -33,9 +34,7 @@ def correct_keylayout(content: str) -> str:
     content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
 
     content = replace_modifier_map_id(content)
-    content = replace_keymapset_id_with_iso(content)
     content = swap_keys(content, 10, 50)
-    content = replace_layouts_block(content)
 
     content = normalize_attribute_entities(content)
     content = replace_action_to_output_extra_keys(content)
@@ -54,13 +53,45 @@ def correct_keylayout(content: str) -> str:
     keymap_4_content = extract_keymap_body(content, 4)
     content = add_keymap(content, 9, keymap_4_content)
 
+    logger.info("%s🔹 Adding an ANSI keyMapSet…", LOGS_INDENTATION + "\t")
+    content = replace_layouts_block(content)
+    content = replace_keymapset_id_with_iso(content)
     content = add_ansi_keymapset_with_10_50(content)
+
     content = sort_keylayout(content)
     content = set_unique_keyboard_id(content)
 
     validate_keylayout(content)
 
     logger.success("Keylayout corrections complete.")
+    return content
+
+
+def replace_modifier_map_id(content: str) -> str:
+    """
+    Replace all occurrences of the old modifierMap id (e.g., 'f4') with 'commonModifiers' in the XML content.
+    This includes <layouts ... commonModifiers="f4"/> and <modifierMap id="f4" ...>.
+    """
+    logger.info(
+        "%s🔹 Replacing all modifierMap id references with 'commonModifiers'…",
+        LOGS_INDENTATION + "\t",
+    )
+
+    # Find the id value in <modifierMap id="...">
+    match = re.search(r'\t?<modifierMap\s+id="([^"]+)"', content)
+    if not match:
+        logger.warning(
+            "%sNo <modifierMap id=...> found.", LOGS_INDENTATION + "\t"
+        )
+        return content
+    old_id = match.group(1)
+
+    # Replace all occurrences of the old id in the content (as attribute value)
+    content = re.sub(
+        rf'([\s"=]){re.escape(old_id)}([\s"/])',
+        r"\1commonModifiers\2",
+        content,
+    )
     return content
 
 
@@ -152,34 +183,6 @@ def replace_action_to_output_extra_keys(body: str) -> str:
     )
 
     return fixed_body
-
-
-def replace_modifier_map_id(content: str) -> str:
-    """
-    Replace all occurrences of the old modifierMap id (e.g., 'f4') with 'commonModifiers' in the XML content.
-    This includes <layouts ... commonModifiers="f4"/> and <modifierMap id="f4" ...>.
-    """
-    logger.info(
-        "%s🔹 Replacing all modifierMap id references with 'commonModifiers'…",
-        LOGS_INDENTATION + "\t",
-    )
-
-    # Find the id value in <modifierMap id="...">
-    match = re.search(r'\t?<modifierMap\s+id="([^"]+)"', content)
-    if not match:
-        logger.warning(
-            "%sNo <modifierMap id=...> found.", LOGS_INDENTATION + "\t"
-        )
-        return content
-    old_id = match.group(1)
-
-    # Replace all occurrences of the old id in the content (as attribute value)
-    content = re.sub(
-        rf'([\s"=]){re.escape(old_id)}([\s"/])',
-        r"\1commonModifiers\2",
-        content,
-    )
-    return content
 
 
 def modify_accented_letters_shortcuts(body: str) -> str:

@@ -33,20 +33,6 @@ def extract_version_from_file(file_path) -> str:
     return version
 
 
-def swap_keys(body: str, key1: int, key2: int) -> str:
-    """Swap key codes 10 and 50."""
-    logger.info(
-        "%s🔹 Swapping key codes %d and %d…",
-        LOGS_INDENTATION + "\t",
-        key1,
-        key2,
-    )
-    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
-    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
-    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
-    return body
-
-
 def extract_keymap_body(body: str, index: int) -> str:
     """Extract only the inner body of a keyMap by index."""
     logger.info(
@@ -60,3 +46,24 @@ def extract_keymap_body(body: str, index: int) -> str:
     if not match:
         raise ValueError(f'<keyMap index="{index}"> block not found.')
     return match.group(1)
+
+
+def get_last_used_layer(body: str) -> int:
+    """
+    Scan the keylayout body to find the highest layer number in use.
+    Returns this number (not the next available one).
+    Useful to get the last used layer, then add +1 if needed.
+    """
+    logger.info("%sScanning for last used layer…", LOGS_INDENTATION + "\t")
+
+    # Find all numbers in 'state="sX"' and 'next="sX"'
+    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', body)]
+    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', body)]
+
+    if state_indices or next_indices:
+        max_layer = max(state_indices + next_indices)
+    else:
+        max_layer = 0
+
+    logger.info("%sLast used layer: s%d", LOGS_INDENTATION + "\t", max_layer)
+    return max_layer
