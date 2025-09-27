@@ -124,12 +124,12 @@ xkb_symbols "Ergopti_v2.2.0" {
         key <AC01> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [a, A, less, lessthanequal, a, a] }; // a A < ≤ a a
         key <AC02> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [i, I, greater, greaterthanequal, i, i] }; // i I > ≥ i i
         key <AC03> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [e, E, braceleft, uparrow, e, e] }; // e E { ᵉ e e
-        key <AC04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [u, U, braceright, U2126, u, u] }; // u U } µ u u
+        key <AC04> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [u, U, braceright, mu, u, u] }; // u U } µ u u
         key <AC05> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [period, threefifths, colon, periodcentered, period, period] }; // . " :" : · . .
         key <AC06> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [v, V, bar, brokenbar, v, v] }; // v V | ¦ v v
         key <AC07> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [s, S, parenleft, emdash, s, s] }; // s S ( — s s
         key <AC08> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [n, N, parenright, endash, n, n] }; // n N ) – n n
-        key <AC09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [t, T, bracketleft, U2792, t, t] }; // t T [ ¨ t t
+        key <AC09> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [t, T, bracketleft, dead_diaeresis, t, t] }; // t T [ ¨ t t
         key <AC10> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [r, R, bracketright, infinity, r, r] }; // r R ] ℝ r r
         key <AC11> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [q, Q, rightsinglequotemark, dead_currency, q, q] }; // q Q ’ ¤ q q
         key <BKSL> { type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [dead_circumflex, fourfifths, exclam, exclamdown, asciicircum, asciicircum] }; // ^ " !" ! ¡ ^ ^
