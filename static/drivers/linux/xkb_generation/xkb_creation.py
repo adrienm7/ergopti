@@ -2,9 +2,15 @@ import html
 import json
 import os
 import re
+from logging import getLogger
 
 import yaml
-from utilities.information_extraction import get_symbol
+from utilities.information_extraction import (
+    build_deadkey_symbol_map,
+    extract_deadkey_triggers,
+    extract_keymap_body,
+    get_symbol,
+)
 
 try:
     from lxml import etree as LET
@@ -24,11 +30,28 @@ yaml_path = os.path.join(os.path.dirname(__file__), "data", "key_sym.yaml")
 with open(yaml_path, encoding="utf-8") as yaml_file:
     mappings = yaml.safe_load(yaml_file)
 
+logger = getLogger("ergopti.linux")
 
-def generate_xkb_content(
-    xkb_content, keymaps, deadkey_triggers, deadkey_symbol_map=None
-):
-    """Génère le contenu XKB avec le type FOUR_LEVEL_SEMIALPHABETIC_CONTROL pour chaque touche."""
+
+def generate_xkb(xkb_template, keylayout_data):
+    # Extract keymaps (0, 2, 5, 6, 4, 4) from the ISO keyMapSet
+    logger.info(
+        "Extracting keymaps for layers 0, 2, 5, 6, 4, 4 from <keyMapSet id='ISO'>..."
+    )
+    keymaps = [
+        extract_keymap_body(keylayout_data, i, keymapset_id="ISO")
+        for i in [0, 2, 5, 6, 4]
+    ]
+    keymaps.append(keymaps[4])
+
+    # Deadkey extraction
+    logger.info("Building deadkey trigger map...")
+    deadkey_triggers = extract_deadkey_triggers(keylayout_data)
+
+    # deadkey_name -> unicode_symbol
+    logger.info("Building deadkey symbol map...")
+    deadkey_symbol_map = build_deadkey_symbol_map(keylayout_data)
+
     # Liste des fractions Unicode à utiliser pour les substitutions multi-caractères
     fraction_symbols = [
         "⅓",
@@ -128,7 +151,7 @@ def generate_xkb_content(
             else:
                 comment_symbols.append("")
         # Stocke le mapping pour XCompose (après la boucle sur les layers)
-        generate_xkb_content.fraction_map = fraction_map
+        generate_xkb.fraction_map = fraction_map
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
 
         # Remplacement final dans la ligne XKB : U02FA → uparrow, U02FC → downarrow
@@ -177,8 +200,8 @@ def generate_xkb_content(
 
         comment = " // " + " ".join(comment_symbols)
         replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
-        xkb_content = re.sub(pattern, replacement, xkb_content)
-    return xkb_content
+        xkb_template = re.sub(pattern, replacement, xkb_template)
+    return xkb_template
 
 
 def symbol_to_linux_name(symbol):

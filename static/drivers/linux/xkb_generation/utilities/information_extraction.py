@@ -57,17 +57,15 @@ def get_symbol(keymap_body: str, macos_code: int) -> str:
     return ""
 
 
-def extract_deadkey_triggers(keylayout_path):
+def extract_deadkey_triggers(keylayout):
     """Return a dict: macOS action id -> deadkey name (dead_1, dead_2, ...) if next='sX' is present."""
     if LET is None:
         print(
             "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
         )
         return {}
-    print(f"[INFO] Extracting deadkey triggers from {keylayout_path}")
-    with open(keylayout_path, encoding="utf-8") as file_in:
-        xml_text = file_in.read()
-    xml_text = clean_invalid_xml_chars(xml_text)
+    print("[INFO] Extracting deadkey triggers from keylayout")
+    xml_text = clean_invalid_xml_chars(keylayout)
     tree = LET.fromstring(xml_text.encode("utf-8"))
     actions = tree.find(".//actions")
     deadkey_map = {}
@@ -85,16 +83,14 @@ def extract_deadkey_triggers(keylayout_path):
     return deadkey_map
 
 
-def build_deadkey_symbol_map(keylayout_path):
+def build_deadkey_symbol_map(keylayout):
     """Construit la table deadkey_name -> unicode_symbol."""
     if LET is None:
         print(
             "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
         )
         return {}
-    with open(keylayout_path, encoding="utf-8") as file_in:
-        xml_text = file_in.read()
-    xml_text = clean_invalid_xml_chars(xml_text)
+    xml_text = clean_invalid_xml_chars(keylayout)
     tree = LET.fromstring(xml_text.encode("utf-8"))
     actions = tree.find(".//actions")
     deadkey_symbol = {}
