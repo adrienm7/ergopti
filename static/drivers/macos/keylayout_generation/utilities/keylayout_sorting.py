@@ -35,7 +35,7 @@ def reorder_modifiers_and_attributes(body: str) -> str:
     body = body.replace('encoding="utf-8"', 'encoding="UTF-8"')
 
     # Increase maxout from 1 to 3
-    body = re.sub(r'maxout="1"', 'maxout="3"', body)
+    # body = re.sub(r'maxout="1"', 'maxout="3"', body)
 
     # Standardize key orders and specific modifier blocks
     key_replacements = {
