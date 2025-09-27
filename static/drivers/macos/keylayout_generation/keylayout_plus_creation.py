@@ -8,6 +8,7 @@ import re
 from keylayout_correction import replace_action_to_output_extra_keys
 from keylayout_plus_mappings import plus_mappings
 from tests.run_all_tests import validate_keylayout
+from utilities.information_extraction import get_last_used_layer
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
 from utilities.logger import logger
@@ -226,27 +227,6 @@ def ensure_action_block_exists(body: str, action_id: str) -> str:
     return body
 
 
-def get_last_used_layer(body: str) -> int:
-    """
-    Scan the keylayout body to find the highest layer number in use.
-    Returns this number (not the next available one).
-    Useful to get the last used layer, then add +1 if needed.
-    """
-    logger.info("%sScanning for last used layer…", LOGS_INDENTATION + "\t")
-
-    # Find all numbers in 'state="sX"' and 'next="sX"'
-    state_indices = [int(m) for m in re.findall(r'state="s(\d+)"', body)]
-    next_indices = [int(m) for m in re.findall(r'next="s(\d+)"', body)]
-
-    if state_indices or next_indices:
-        max_layer = max(state_indices + next_indices)
-    else:
-        max_layer = 0
-
-    logger.info("%sLast used layer: s%d", LOGS_INDENTATION + "\t", max_layer)
-    return max_layer
-
-
 def assign_layer_to_action_block_none(
     body: str, trigger_key: str, layer_name: str
 ) -> str:
@@ -386,5 +366,5 @@ def create_layer_name(state_number: int, output: str) -> str:
     """
     if output and re.fullmatch(r"[\w]+", output, re.UNICODE):
         return f"s{state_number}_{output}"
-    else:
-        return f"s{state_number}"
+
+    return f"s{state_number}"

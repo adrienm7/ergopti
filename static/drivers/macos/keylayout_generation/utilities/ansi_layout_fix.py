@@ -4,7 +4,6 @@ Utility for adding fixed ANSI/ISO layouts block to keylayout files.
 
 import re
 
-from .information_extraction import swap_keys
 from .logger import logger
 
 LOGS_INDENTATION = "\t"
@@ -117,3 +116,17 @@ def add_ansi_keymapset_with_10_50(content: str) -> str:
     insert_pos = iso_block_match.start()
     content = content[:insert_pos] + ansi_block + "\n\t" + content[insert_pos:]
     return content
+
+
+def swap_keys(body: str, key1: int, key2: int) -> str:
+    """Swap key codes 10 and 50."""
+    logger.info(
+        "%s🔹 Swapping key codes %d and %d…",
+        LOGS_INDENTATION + "\t",
+        key1,
+        key2,
+    )
+    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
+    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
+    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
+    return body
