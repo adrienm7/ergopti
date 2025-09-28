@@ -25,14 +25,14 @@ logger = getLogger("ergopti.linux")
 def generate_xkb(xkb_template, keylayout_data):
     """Génère le contenu XKB à partir du template et des données keylayout, en sous-fonctions."""
     keymaps = _extract_keymaps(keylayout_data)
-    used_symbols = {}
+    mapped_symbols = {"« ": "guillemotleft", " »": "guillemotright"}
     fraction_idx = 0
     for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
         symbols, comment_symbols, fraction_idx = _generate_symbols_and_comments(
             xkb_key,
             macos_code,
             keymaps,
-            used_symbols,
+            mapped_symbols,
             fraction_idx,
         )
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
@@ -40,7 +40,8 @@ def generate_xkb(xkb_template, keylayout_data):
         comment = " // " + " ".join(comment_symbols)
         replacement = f'key {xkb_key} {{ type[group1] = "SEVEN_LEVEL_KEYS", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_template = re.sub(pattern, replacement, xkb_template)
-    return xkb_template, used_symbols
+    return xkb_template, mapped_symbols
+
 
 def _extract_keymaps(keylayout_data):
     logger.info(
@@ -52,11 +53,12 @@ def _extract_keymaps(keylayout_data):
     ]
     return keymaps
 
+
 def _generate_symbols_and_comments(
     xkb_key,
     macos_code,
     keymaps,
-    used_symbols,
+    mapped_symbols,
     fraction_idx,
 ):
     logger.info("Generating for key %s", xkb_key)
@@ -67,7 +69,7 @@ def _generate_symbols_and_comments(
         linux_name, fraction_idx = _get_linux_name_and_comment(
             symbol,
             layer,
-            used_symbols,
+            mapped_symbols,
             fraction_idx,
         )
         symbols.append(linux_name)
@@ -81,18 +83,18 @@ def _generate_symbols_and_comments(
 def _get_linux_name_and_comment(
     symbol,
     layer,
-    used_symbols,
+    mapped_symbols,
     fraction_idx,
 ):
     """Convert a symbol to its XKB keysym name using direct character keys from the YAML mapping."""
 
     linux_name = "NoSymbol"
 
-    # Special cases
-    if symbol == "«" and layer == 6:
-        linux_name = "guillemotleft"
-    if symbol == "»" and layer == 6:
-        linux_name = "guillemotright"
+    # Special cases: always use mapped_symbols for guillemets
+    if symbol in ("« ", " »"):
+        if symbol in mapped_symbols:
+            return mapped_symbols[symbol], fraction_idx
+
     if symbol == "ᵉ":
         linux_name = "uparrow"
     if symbol == "ᵢ":
@@ -104,11 +106,15 @@ def _get_linux_name_and_comment(
         return linux_name, fraction_idx
 
     if len(symbol) >= 2:
-        frac = UNUSED_SYMBOLS[fraction_idx % len(UNUSED_SYMBOLS)]
-        if frac not in used_symbols:
-            used_symbols[frac] = symbol
+        # Always map the same symbol sequence to the same unused symbol
+        if symbol in mapped_symbols:
+            frac = mapped_symbols[symbol]
+        else:
+            frac = UNUSED_SYMBOLS[fraction_idx % len(UNUSED_SYMBOLS)]
+            mapped_symbols[symbol] = frac
+            fraction_idx += 1
         linux_name = mappings.get(frac, f"U{ord(frac):04X}")
-        return linux_name, fraction_idx + 1
+        return linux_name, fraction_idx
 
     # Default mapping with explicit unicode symbol handling
     decoded = html.unescape(symbol)
