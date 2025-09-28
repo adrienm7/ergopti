@@ -23,7 +23,7 @@ with open(yaml_path, encoding="utf-8") as yaml_file:
     mappings = yaml.safe_load(yaml_file)
 
 
-def generate_xcompose(keylayout_data, used_symbols):
+def generate_xcompose(keylayout_data, mapped_symbols):
     """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol or deadkey_<name> if found in YAML mapping."""
     if LET is None:
         print(
@@ -53,13 +53,17 @@ def generate_xcompose(keylayout_data, used_symbols):
                     deadkey_symbol[deadkey_name] = output
     # Build Compose lines
     lines = []
-    # Ajout des règles de fraction vers séquence multi-caractère
-    for frac, seq in used_symbols.items():
-        left = mappings.get(frac, f"U{ord(frac):04X}")
-        lines.append(f'<{left}> : "{seq}"')
-    lines.append(f'<{mappings.get("«", "guillemotleft")}> : "« "')
-    lines.append(f'<{mappings.get("»", "guillemotright")}> : " »"')
+    # Ajout des règles de trigger (clé XKB) vers séquence multi-caractère (output)
+
+    for trigger, output in mapped_symbols.items():
+        if output in mappings:
+            left = mappings[output]
+        else:
+            left = output
+        lines.append(f'<{left}> : "{trigger}"')
+
     lines.append("")
+
     by_deadkey = {}
     for action in actions.findall("action"):
         action_id = action.attrib.get("id")

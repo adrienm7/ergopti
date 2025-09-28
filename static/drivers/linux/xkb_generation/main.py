@@ -30,7 +30,7 @@ def main(
     if keylayout_name:
         # Process only the specified keylayout (and its _plus variant)
         base_prefix = Path(keylayout_name).stem
-        #variants = [base_prefix, base_prefix + "_plus"]
+        # variants = [base_prefix, base_prefix + "_plus"]
         variants = [base_prefix]
         keylayout_files = [macos_dir / f"{v}.keylayout" for v in variants]
     else:
@@ -44,7 +44,7 @@ def main(
         plus_files = [
             macos_dir / f"{f.stem}_plus.keylayout" for f in keylayout_files
         ]
-        #keylayout_files += [pf for pf in plus_files if pf.is_file()]
+        # keylayout_files += [pf for pf in plus_files if pf.is_file()]
 
     for keylayout_path in keylayout_files:
         if not keylayout_path.is_file():
@@ -77,12 +77,13 @@ def main(
         xcompose_out_path = out_dir / f"{base_name}.XCompose"
 
         logger.info("Generating XKB content for %s...", variant)
-        xkb_content, used_symbols = generate_xkb(xkb_template, keylayout)
+        xkb_content, mapped_symbols = generate_xkb(xkb_template, keylayout)
         save_file(xkb_out_path, xkb_content)
 
         logger.info("Generating XCompose content for %s...", variant)
-        xcompose_content = generate_xcompose(keylayout, used_symbols)
+        xcompose_content = generate_xcompose(keylayout, mapped_symbols)
         save_file(xcompose_out_path, xcompose_content)
+
 
 def get_macos_dir():
     """
@@ -154,8 +155,8 @@ def create_layout_name(
     Returns:
         tuple[str, str]: (layout_id, layout_name)
     """
-    base_name = "Ergopti" # variant.replace("_", " ").title().replace("V", "v")
-    variant= "Ergopti"
+    base_name = "Ergopti"  # variant.replace("_", " ").title().replace("V", "v")
+    variant = "Ergopti"
     layout_name = f"France - {base_name}"
     if use_date_in_filename:
         now = datetime.datetime.now()
@@ -167,4 +168,4 @@ def create_layout_name(
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=True)
+    main(use_date_in_filename=False)
