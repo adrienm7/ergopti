@@ -358,7 +358,7 @@ def update_xkb_types(source_file, system_file):
         sections_to_copy = [
             "FOUR_LEVEL_CONTROL",
             "FOUR_LEVEL_ALPHABETIC_CONTROL",
-            "FOUR_LEVEL_SEMIALPHABETIC_CONTROL",
+            "SEVEN_LEVEL_KEYS",
         ]
         collected_sections = {section: [] for section in sections_to_copy}
 

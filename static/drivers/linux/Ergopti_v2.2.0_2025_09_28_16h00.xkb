@@ -1,0 +1,108 @@
+xkb_keymap        {
+
+xkb_keycodes      { include "evdev+aliases(azerty)" };
+
+xkb_types         { 
+    include "complete"
+
+// Key types for Ergopti layout
+    type "SEVEN_LEVEL_KEYS" {
+        modifiers = Shift+Lock+LevelThree+Control;
+        
+        map[None] = Level1;
+        map[Control]  = Level2;
+        map[Control+Shift] = Level2;
+        map[Shift] = Level3;
+        map[Lock]  = Level4;
+        map[Lock+Shift] = Level5;
+        map[LevelThree] = Level6;
+        map[Lock+Shift+LevelThree] = Level6;
+        map[Shift+LevelThree] = Level7;
+        map[Lock+LevelThree] =  Level7;
+
+        level_name[Level1] = "Base";
+        level_name[Level2] = "Control";
+        level_name[Level3] = "Shift";
+        level_name[Level4] = "CapsLock";
+        level_name[Level5] = "CapsLock Shift";
+        level_name[Level6] = "AltGr";
+        level_name[Level7] = "Shift AltGr";
+    };
+            
+};
+
+xkb_compatibility { include "complete" };
+
+partial alphanumeric_keys
+xkb_symbols "Ergopti_v2.2.0_2025_09_28_16h00" {
+
+	name[Group1] = "France - Ergopti v2.2.0 2025/09/28 16:00";
+
+	include "latin"
+
+        // Space bar
+        key <SPCE> { type[group1] = "SEVEN_LEVEL_KEYS", [space, space, space, minus, minus, underscore, onethird] }; //       - - _ " - "
+
+        // Digits
+        key <TLDE> { type[group1] = "SEVEN_LEVEL_KEYS", [dollar, dollar, dollar, twothirds, onefifth, dead_currency, dead_currency] }; // $ $ $ " €" " €" ¤ ¤
+        key <AE01> { type[group1] = "SEVEN_LEVEL_KEYS", [1, 1, 1, 1, 1, U2081, U2081] }; // 1 1 1 1 1 ₁ ₁
+        key <AE02> { type[group1] = "SEVEN_LEVEL_KEYS", [2, 2, 2, 2, 2, U2082, U2082] }; // 2 2 2 2 2 ₂ ₂
+        key <AE03> { type[group1] = "SEVEN_LEVEL_KEYS", [3, 3, 3, 3, 3, U2083, U2083] }; // 3 3 3 3 3 ₃ ₃
+        key <AE04> { type[group1] = "SEVEN_LEVEL_KEYS", [4, 4, 4, 4, 4, U2084, U2084] }; // 4 4 4 4 4 ₄ ₄
+        key <AE05> { type[group1] = "SEVEN_LEVEL_KEYS", [5, 5, 5, 5, 5, U2085, U2085] }; // 5 5 5 5 5 ₅ ₅
+        key <AE06> { type[group1] = "SEVEN_LEVEL_KEYS", [6, 6, 6, 6, 6, U2086, U2086] }; // 6 6 6 6 6 ₆ ₆
+        key <AE07> { type[group1] = "SEVEN_LEVEL_KEYS", [7, 7, 7, 7, 7, U2087, U2087] }; // 7 7 7 7 7 ₇ ₇
+        key <AE08> { type[group1] = "SEVEN_LEVEL_KEYS", [8, 8, 8, 8, 8, U2088, U2088] }; // 8 8 8 8 8 ₈ ₈
+        key <AE09> { type[group1] = "SEVEN_LEVEL_KEYS", [9, 9, 9, 9, 9, U2089, U2089] }; // 9 9 9 9 9 ₉ ₉
+        key <AE10> { type[group1] = "SEVEN_LEVEL_KEYS", [0, 0, 0, 0, 0, U2080, U2080] }; // 0 0 0 0 0 ₀ ₀
+        key <AE11> { type[group1] = "SEVEN_LEVEL_KEYS", [percent, minus, percent, twofifths, threefifths, U2031, U2031] }; // % - % " %" " %" ‱ ‱
+        key <AE12> { type[group1] = "SEVEN_LEVEL_KEYS", [equal, plus, equal, masculine, masculine, ordfeminine, ordfeminine] }; // = + = º º ª ª
+
+        // Letters — Row 1/3
+        key <AD01> { type[group1] = "SEVEN_LEVEL_KEYS", [egrave, z, Egrave, Egrave, egrave, doublelowquotemark, doublelowquotemark] }; // è z È È è „ „
+        key <AD02> { type[group1] = "SEVEN_LEVEL_KEYS", [y, y, Y, Y, y, EuroSign, EuroSign] }; // y y Y Y y € €
+        key <AD03> { type[group1] = "SEVEN_LEVEL_KEYS", [o, o, O, O, o, OE, OE] }; // o o O O o Œ Œ
+        key <AD04> { type[group1] = "SEVEN_LEVEL_KEYS", [w, w, W, W, w, Ugrave, Ugrave] }; // w w W W w Ù Ù
+        key <AD05> { type[group1] = "SEVEN_LEVEL_KEYS", [b, b, B, B, b, leftdoublequotemark, leftdoublequotemark] }; // b b B B b “ “
+        key <AD06> { type[group1] = "SEVEN_LEVEL_KEYS", [f, f, F, F, f, rightdoublequotemark, rightdoublequotemark] }; // f f F F f ” ”
+        key <AD07> { type[group1] = "SEVEN_LEVEL_KEYS", [g, g, G, G, g, U2248, U2248] }; // g g G G g ≈ ≈
+        key <AD08> { type[group1] = "SEVEN_LEVEL_KEYS", [h, h, H, H, h, percent, percent] }; // h h H H h % %
+        key <AD09> { type[group1] = "SEVEN_LEVEL_KEYS", [c, c, C, C, c, Ccedilla, Ccedilla] }; // c c C C c Ç Ç
+        key <AD10> { type[group1] = "SEVEN_LEVEL_KEYS", [x, x, X, X, x, multiply, multiply] }; // x x X X x × ×
+        key <AD11> { type[group1] = "SEVEN_LEVEL_KEYS", [z, z, Z, Z, z, U2030, U2030] }; // z z Z Z z ‰ ‰
+        key <AD12> { type[group1] = "SEVEN_LEVEL_KEYS", [dead_diaeresis, dead_diaeresis, dead_diaeresis, U202F, U202F, U2792, U2792] }; // ¨ ¨ ¨       
+
+        // Letters — Row 2/3
+        key <AC01> { type[group1] = "SEVEN_LEVEL_KEYS", [a, a, A, A, a, lessthanequal, lessthanequal] }; // a a A A a ≤ ≤
+        key <AC02> { type[group1] = "SEVEN_LEVEL_KEYS", [i, i, I, I, i, greaterthanequal, greaterthanequal] }; // i i I I i ≥ ≥
+        key <AC03> { type[group1] = "SEVEN_LEVEL_KEYS", [e, e, E, E, e, uparrow, uparrow] }; // e e E E e ᵉ ᵉ
+        key <AC04> { type[group1] = "SEVEN_LEVEL_KEYS", [u, u, U, U, u, mu, mu] }; // u u U U u µ µ
+        key <AC05> { type[group1] = "SEVEN_LEVEL_KEYS", [period, period, period, fourfifths, onesixth, periodcentered, periodcentered] }; // . . . " :" " :" · ·
+        key <AC06> { type[group1] = "SEVEN_LEVEL_KEYS", [v, v, V, V, v, brokenbar, brokenbar] }; // v v V V v ¦ ¦
+        key <AC07> { type[group1] = "SEVEN_LEVEL_KEYS", [s, s, S, S, s, emdash, emdash] }; // s s S S s — —
+        key <AC08> { type[group1] = "SEVEN_LEVEL_KEYS", [n, n, N, N, n, endash, endash] }; // n n N N n – –
+        key <AC09> { type[group1] = "SEVEN_LEVEL_KEYS", [t, t, T, T, t, dead_diaeresis, dead_diaeresis] }; // t t T T t ¨ ¨
+        key <AC10> { type[group1] = "SEVEN_LEVEL_KEYS", [r, r, R, R, r, infinity, infinity] }; // r r R R r ℝ ℝ
+        key <AC11> { type[group1] = "SEVEN_LEVEL_KEYS", [q, q, Q, Q, q, dead_currency, dead_currency] }; // q q Q Q q ¤ ¤
+        key <BKSL> { type[group1] = "SEVEN_LEVEL_KEYS", [dead_circumflex, asciicircum, asciicircum, fivesixths, oneeighth, exclamdown, exclamdown] }; // ^ ^ ^ " !" " !" ¡ ¡
+
+        // Letters — Row 3/3
+        key <LSGT> { type[group1] = "SEVEN_LEVEL_KEYS", [ecircumflex, x, Ecircumflex, Ecircumflex, ecircumflex, dead_circumflex, asciicircum] }; // ê x Ê Ê ê ^ ^
+        key <AB01> { type[group1] = "SEVEN_LEVEL_KEYS", [eacute, c, Eacute, Eacute, eacute, division, division] }; // é c É É é ÷ ÷
+        key <AB02> { type[group1] = "SEVEN_LEVEL_KEYS", [agrave, v, Agrave, Agrave, agrave, downarrow, downarrow] }; // à v À À à ᵢ ᵢ
+        key <AB03> { type[group1] = "SEVEN_LEVEL_KEYS", [j, j, J, J, j, j, j] }; // j j J J j j j
+        key <AB04> { type[group1] = "SEVEN_LEVEL_KEYS", [comma, comma, comma, threeeighths, fiveeighths, ellipsis, ellipsis] }; // , , , " ;" " ;" … …
+        key <AB05> { type[group1] = "SEVEN_LEVEL_KEYS", [k, k, K, K, k, NoSymbol, NoSymbol] }; // k k K K k  
+        key <AB06> { type[group1] = "SEVEN_LEVEL_KEYS", [m, m, M, M, m, U2212, U2212] }; // m m M M m − −
+        key <AB07> { type[group1] = "SEVEN_LEVEL_KEYS", [d, d, D, D, d, section, section] }; // d d D D d § §
+        key <AB08> { type[group1] = "SEVEN_LEVEL_KEYS", [l, l, L, L, l, notequal, notequal] }; // l l L L l ≠ ≠
+        key <AB09> { type[group1] = "SEVEN_LEVEL_KEYS", [p, p, P, P, p, plusminus, plusminus] }; // p p P P p ± ±
+        key <AB10> { type[group1] = "SEVEN_LEVEL_KEYS", [apostrophe, apostrophe, apostrophe, seveneighths, onethird, questiondown, questiondown] }; // ' ' ' " ?" " ?" ¿ ¿
+
+	include "level3(ralt_switch)"
+};
+
+xkb_geometry { include "latin" };
+
+};
+
