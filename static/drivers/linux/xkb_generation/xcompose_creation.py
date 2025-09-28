@@ -3,7 +3,6 @@ import os
 
 import yaml
 from utilities.cleaning import clean_invalid_xml_chars
-from xkb_creation import generate_xkb
 
 try:
     from lxml import etree as LET
@@ -24,7 +23,7 @@ with open(yaml_path, encoding="utf-8") as yaml_file:
     mappings = yaml.safe_load(yaml_file)
 
 
-def generate_xcompose(keylayout_data):
+def generate_xcompose(keylayout_data, used_symbols):
     """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol or deadkey_<name> if found in YAML mapping."""
     if LET is None:
         print(
@@ -55,10 +54,9 @@ def generate_xcompose(keylayout_data):
     # Build Compose lines
     lines = []
     # Ajout des règles de fraction vers séquence multi-caractère
-    if hasattr(generate_xkb, "fraction_map"):
-        for frac, seq in generate_xkb.fraction_map.items():
-            left = mappings.get(frac, f"U{ord(frac):04X}")
-            lines.append(f'<{left}> : "{seq}"')
+    for frac, seq in used_symbols.items():
+        left = mappings.get(frac, f"U{ord(frac):04X}")
+        lines.append(f'<{left}> : "{seq}"')
     lines.append(f'<{mappings.get("«", "guillemotleft")}> : "« "')
     lines.append(f'<{mappings.get("»", "guillemotright")}> : " »"')
     lines.append("")
