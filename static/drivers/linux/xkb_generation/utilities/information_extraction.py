@@ -1,8 +1,6 @@
 import html
 import re
 
-from .cleaning import clean_invalid_xml_chars
-
 try:
     from lxml import etree as LET
 except ImportError:
@@ -55,55 +53,3 @@ def get_symbol(keymap_body: str, macos_code: int) -> str:
     if match:
         return html.unescape(match.group(2))
     return ""
-
-
-def extract_deadkey_triggers(keylayout):
-    """Return a dict: macOS action id -> deadkey name (dead_1, dead_2, ...) if next='sX' is present."""
-    if LET is None:
-        print(
-            "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
-        )
-        return {}
-    print("[INFO] Extracting deadkey triggers from keylayout")
-    xml_text = clean_invalid_xml_chars(keylayout)
-    tree = LET.fromstring(xml_text.encode("utf-8"))
-    actions = tree.find(".//actions")
-    deadkey_map = {}
-    if actions is not None:
-        for action in actions.findall("action"):
-            action_id = action.attrib.get("id")
-            for when in action.findall("when"):
-                next_attr = when.attrib.get("next")
-                if (
-                    next_attr
-                    and next_attr.startswith("s")
-                    and next_attr[1:].isdigit()
-                ):
-                    deadkey_map[action_id] = f"dead_{int(next_attr[1:])}"
-    return deadkey_map
-
-
-def build_deadkey_symbol_map(keylayout):
-    """Construit la table deadkey_name -> unicode_symbol."""
-    if LET is None:
-        print(
-            "[ERROR] lxml is required for robust XML parsing. Please install it with 'pip install lxml'."
-        )
-        return {}
-    xml_text = clean_invalid_xml_chars(keylayout)
-    tree = LET.fromstring(xml_text.encode("utf-8"))
-    actions = tree.find(".//actions")
-    deadkey_symbol = {}
-    if actions is not None:
-        for action in actions.findall("action"):
-            action_id = action.attrib.get("id")
-            for when in action.findall("when"):
-                state = when.attrib.get("state")
-                output = when.attrib.get("output")
-                if not output:
-                    continue
-                if state and state.startswith("s") and state[1:].isdigit():
-                    deadkey_name = f"dead_{int(state[1:])}"
-                    if action_id and action_id not in deadkey_symbol:
-                        deadkey_symbol[deadkey_name] = output
-    return deadkey_symbol

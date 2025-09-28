@@ -5,9 +5,8 @@ import re
 from logging import getLogger
 
 import yaml
+from data.unused_symbols import UNUSED_SYMBOLS
 from utilities.information_extraction import (
-    build_deadkey_symbol_map,
-    extract_deadkey_triggers,
     extract_keymap_body,
     get_symbol,
 )
@@ -34,7 +33,28 @@ logger = getLogger("ergopti.linux")
 
 
 def generate_xkb(xkb_template, keylayout_data):
-    # Extract keymaps (0, 2, 5, 6, 4, 4) from the ISO keyMapSet
+    """Génère le contenu XKB à partir du template et des données keylayout, en sous-fonctions."""
+    keymaps = _extract_keymaps(keylayout_data)
+    fraction_map = {}
+    fraction_idx = 0
+    for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
+        symbols, comment_symbols, fraction_idx = _generate_symbols_and_comments(
+            xkb_key,
+            macos_code,
+            keymaps,
+            fraction_map,
+            fraction_idx,
+        )
+        generate_xkb.fraction_map = fraction_map
+        pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
+        quoted_symbols = _apply_special_cases(xkb_key, symbols)
+        comment = " // " + " ".join(comment_symbols)
+        replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
+        xkb_template = re.sub(pattern, replacement, xkb_template)
+    return xkb_template
+
+
+def _extract_keymaps(keylayout_data):
     logger.info(
         "Extracting keymaps for layers 0, 2, 5, 6, 4, 4 from <keyMapSet id='ISO'>..."
     )
@@ -43,190 +63,156 @@ def generate_xkb(xkb_template, keylayout_data):
         for i in [0, 2, 5, 6, 4]
     ]
     keymaps.append(keymaps[4])
+    return keymaps
 
-    # Deadkey extraction
-    logger.info("Building deadkey trigger map...")
-    deadkey_triggers = extract_deadkey_triggers(keylayout_data)
 
-    # deadkey_name -> unicode_symbol
-    logger.info("Building deadkey symbol map...")
-    deadkey_symbol_map = build_deadkey_symbol_map(keylayout_data)
-
-    # Liste des fractions Unicode à utiliser pour les substitutions multi-caractères
-    fraction_symbols = [
-        "⅓",
-        "⅔",
-        "⅕",
-        "⅖",
-        "⅗",
-        "⅘",
-        "⅙",
-        "⅚",
-        "⅛",
-        "⅜",
-        "⅝",
-        "⅞",
-    ]
-    fraction_map = {}  # fraction_symbol -> original sequence
-    fraction_idx = 0
-    for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
-        symbols = []
-        comment_symbols = []
-        comment_symbol = None
-        for layer, keymap_body in enumerate(keymaps):
-            symbol = get_symbol(keymap_body, macos_code)
-            # Correction : ne remplacer que la couche 5 si « ou »
-            # Cas particulier : forcer « et » sur la couche 5
-            if layer == 4 and symbol == "«":
-                linux_name = mappings.get("«", "guillemotleft")
-                symbols.append(linux_name)
-                comment_symbols.append("«")
-                continue
-            if layer == 4 and symbol == "»":
-                linux_name = mappings.get("»", "guillemotright")
-                symbols.append(linux_name)
-                comment_symbols.append("»")
-                continue
-            # Substitution fraction généralisée pour tout symbole multi-caractère sauf « et »
-            if symbol and len(symbol) >= 2 and symbol not in ("«", "»"):
-                frac = fraction_symbols[fraction_idx % len(fraction_symbols)]
-                if frac not in fraction_map:
-                    fraction_map[frac] = symbol
-                linux_name = mappings.get(frac, f"U{ord(frac):04X}")
-                symbols.append(linux_name)
-                comment_symbols.append(f'"{symbol}"')
-                fraction_idx += 1
-                continue
-            # Gestion deadkey pour currency et asciicircum
-            if symbol in deadkey_triggers:
-                deadkey_name = deadkey_triggers[symbol]
-                if deadkey_symbol_map and deadkey_name in deadkey_symbol_map:
-                    unicode_sym = deadkey_symbol_map[deadkey_name]
-                    xkb_name = mappings.get(unicode_sym)
-                    if xkb_name == "currency":
-                        linux_name = "dead_currency"
-                    elif xkb_name == "asciicircum":
-                        # Couche 5 : forcer le ^ normal
-                        if layer == 4:
-                            linux_name = "asciicircum"
-                        else:
-                            linux_name = "dead_circumflex"
-                    elif xkb_name:
-                        linux_name = f"deadkey_{xkb_name}"
-                    else:
-                        if unicode_sym and len(unicode_sym) > 0:
-                            linux_name = f"U{ord(unicode_sym[0]):04X}"
-                        else:
-                            linux_name = "NoSymbol"
-                else:
-                    linux_name = deadkey_name
+def _generate_symbols_and_comments(
+    xkb_key,
+    macos_code,
+    keymaps,
+    fraction_map,
+    fraction_idx,
+):
+    symbols = []
+    comment_symbols = []
+    for layer, keymap_body in enumerate(keymaps):
+        symbol = get_symbol(keymap_body, macos_code)
+        linux_name, comment_symbol, fraction_idx = _get_linux_name_and_comment(
+            symbol,
+            layer,
+            fraction_map,
+            fraction_idx,
+        )
+        symbols.append(linux_name)
+        if comment_symbol is not None:
+            comment_symbols.append(comment_symbol)
+        elif symbol:
+            decoded = html.unescape(symbol)
+            if len(decoded) > 1:
+                comment_symbols.append(f'"{decoded}"')
             else:
-                # Forcer uparrow/downarrow pour U+02FA/U+1D49 et U+02FC/U+1D62
-                comment_symbol = None
-                if symbol and (any(ord(c) in (0x02FA, 0x1D49) for c in symbol)):
-                    linux_name = "uparrow"
-                    comment_symbol = "ᵉ"
-                elif symbol and (
-                    any(ord(c) in (0x02FC, 0x1D62) for c in symbol)
-                ):
-                    linux_name = "downarrow"
-                    comment_symbol = "ᵢ"
-                else:
-                    linux_name = symbol_to_linux_name(symbol)
-                    if linux_name == "currency":
-                        linux_name = "dead_currency"
-                # Si le symbole est ^ (asciicircum) sur la couche 5, forcer le normal
-                if linux_name == "dead_circumflex" and layer == 4:
-                    linux_name = "asciicircum"
-            symbols.append(linux_name)
-            # Remplacement du commentaire pour uparrow/downarrow
-            if comment_symbol:
-                comment_symbols.append(comment_symbol)
-            elif symbol:
-                decoded = html.unescape(symbol)
-                if len(decoded) > 1:
-                    comment_symbols.append(f'"{decoded}"')
-                else:
-                    comment_symbols.append(decoded)
-            else:
-                comment_symbols.append("")
-        # Stocke le mapping pour XCompose (après la boucle sur les layers)
-        generate_xkb.fraction_map = fraction_map
-        pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
-
-        # Remplacement final dans la ligne XKB : U02FA → uparrow, U02FC → downarrow
-        # Correction spéciale pour <BKSL> : deadkey uniquement en 1ère position, sinon asciicircum
-        if xkb_key == "<BKSL>":
-            quoted_symbols = [
-                "dead_circumflex"
-                if i == 0
-                else "asciicircum"
-                if s == "dead_circumflex"
-                else s
-                for i, s in enumerate(symbols)
-            ]
-        elif xkb_key == "<LSGT>":
-            quoted_symbols = [
-                s
-                if i not in (2, 3)
-                else ("asciicircum" if i == 2 else "dead_circumflex")
-                if s == "dead_circumflex"
-                else s
-                for i, s in enumerate(symbols)
-            ]
-        elif xkb_key == "<AD12>":
-            quoted_symbols = [
-                "dead_diaeresis"
-                if i == 0 and s in ("U2792", "diaeresis")
-                else s
-                for i, s in enumerate(symbols)
-            ]
-            quoted_symbols = [
-                "dead_currency" if s == "U20B0" else s for s in quoted_symbols
-            ]
-            # Correction : pour les deux dernières positions, forcer U2792
-            if len(quoted_symbols) >= 6:
-                quoted_symbols[-2] = "U2792"
-                quoted_symbols[-1] = "U2792"
+                comment_symbols.append(decoded)
         else:
-            symbol_map = {
-                "U02FA": "uparrow",
-                "U02FC": "downarrow",
-                "U27E7": "infinity",
-                "U20B0": "dead_currency",
-                "U211D": "infinity",
-            }
-            quoted_symbols = [symbol_map.get(s, s) for s in symbols]
-
-        comment = " // " + " ".join(comment_symbols)
-        replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
-        xkb_template = re.sub(pattern, replacement, xkb_template)
-    return xkb_template
+            comment_symbols.append("")
+    return symbols, comment_symbols, fraction_idx
 
 
-def symbol_to_linux_name(symbol):
+def _get_linux_name_and_comment(
+    symbol,
+    layer,
+    fraction_map,
+    fraction_idx,
+):
     """Convert a symbol to its XKB keysym name using direct character keys from the YAML mapping."""
-    if not symbol or symbol == "NoSymbol":
-        return "NoSymbol"
 
+    linux_name = "NoSymbol"
+    if not symbol or symbol == "NoSymbol":
+        return "NoSymbol", None, fraction_idx
+
+        # Cas spéciaux pour les guillemets
+    if symbol == "«" and layer == 4:
+        return "guillemotleft", None, fraction_idx
+    if symbol == "»" and layer == 4:
+        return "guillemotright", None, fraction_idx
+
+    if len(symbol) >= 2 and symbol not in ("«", "»"):
+        frac = UNUSED_SYMBOLS[fraction_idx % len(UNUSED_SYMBOLS)]
+        if frac not in fraction_map:
+            fraction_map[frac] = symbol
+        linux_name = mappings.get(frac, f"U{ord(frac):04X}")
+        return linux_name, f'"{symbol}"', fraction_idx + 1
+
+    # Default mapping with explicit unicode symbol handling
     decoded = html.unescape(symbol)
+    symbol_map = {
+        "U27E7": "infinity",
+        "U211D": "infinity",
+    }
     for char in decoded:
         # Force uparrow/downarrow for ᵉ/ᵢ or U+02FA/U+02FC
         if ord(char) in (0x02FA, 0x1D49):  # ᵉ
-            return "uparrow"
+            linux_name = "uparrow"
+            continue
         if ord(char) in (0x02FC, 0x1D62):  # ᵢ
-            return "downarrow"
+            linux_name = "downarrow"
+            continue
+        unicode_key = f"U{ord(char):04X}"
+        if unicode_key in symbol_map:
+            linux_name = symbol_map[unicode_key]
+            continue
         if char in mappings:
-            mapped = mappings[char]
-            # Correction : si c'est une touche morte, renvoyer dead_diaeresis ou dead_circumflex
-            if mapped == "diaeresis":
-                return "dead_diaeresis"
-            if mapped == "asciicircum":
-                return "dead_circumflex"
-            return mapped
+            linux_name = mappings[char]
+            # If it's a dead key, map accordingly
+            if linux_name == "diaeresis":
+                linux_name = "dead_diaeresis"
+            if linux_name == "asciicircum":
+                linux_name = "dead_circumflex"
         else:
             print(
                 f"[WARNING] No mapping for {repr(char)} (U+{ord(char):04X}), using Unicode codepoint."
             )
-            return f"U{ord(char):04X}"
-    return "NoSymbol"
+            linux_name = unicode_key
+
+    if linux_name == "currency":
+        linux_name = "dead_currency"
+    if linux_name == "dead_circumflex" and layer == 4:
+        linux_name = "asciicircum"
+
+    # uparrow/downarrow spéciaux
+    if symbol and (any(ord(c) in (0x02FA, 0x1D49) for c in symbol)):
+        linux_name = "uparrow"
+    if symbol and (any(ord(c) in (0x02FC, 0x1D62) for c in symbol)):
+        linux_name = "downarrow"
+
+    return linux_name, None, fraction_idx
+
+
+def _apply_special_cases(xkb_key, symbols):
+    """
+    Apply special substitution rules for certain XKB keys.
+    Always use 'U2792' for the last two positions of <AD12>.
+    """
+    # Special case for <BKSL>
+    if xkb_key == "<BKSL>":
+        result = []
+        for i, s in enumerate(symbols):
+            if i == 0:
+                result.append("dead_circumflex")
+            elif s == "dead_circumflex":
+                result.append("asciicircum")
+            else:
+                result.append(s)
+        return result
+
+    # Special case for <LSGT>
+    if xkb_key == "<LSGT>":
+        result = []
+        for i, s in enumerate(symbols):
+            if i == 2 and s == "dead_circumflex":
+                result.append("asciicircum")
+            elif i == 3 and s == "dead_circumflex":
+                result.append("dead_circumflex")
+            else:
+                result.append(s)
+        return result
+
+    # Special case for <AD12>
+    if xkb_key == "<AD12>":
+        quoted_symbols = []
+        for i, s in enumerate(symbols):
+            # First position: dead_diaeresis if U2792 or diaeresis
+            if i == 0 and s in ("U2792", "diaeresis"):
+                quoted_symbols.append("dead_diaeresis")
+            else:
+                quoted_symbols.append(s)
+        # Replace dead_currency if U20B0
+        quoted_symbols = [
+            "dead_currency" if s == "U20B0" else s for s in quoted_symbols
+        ]
+        # Always force U2792 for the last two positions
+        if len(quoted_symbols) >= 2:
+            quoted_symbols[-2] = "U2792"
+            quoted_symbols[-1] = "U2792"
+        return quoted_symbols
+
+    return symbols
