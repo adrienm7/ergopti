@@ -6,75 +6,27 @@ xkb_types         {
     include "complete"
 
 // Key types for Ergopti layout
-    type "FOUR_LEVEL_CONTROL" {
-        modifiers = Shift+LevelThree+Control;
-        
-        map[None] = Level1;
-        map[Shift] = Level2;
-        map[LevelThree] = Level3;
-        map[Shift+LevelThree] = Level4;
-        map[Control]  = Level5;
-        map[Control+Shift] = Level6;
-
-        preserve[Control] = Control;
-        preserve[Shift+Control] = Control;
-        
-        level_name[Level1] = "Base";
-        level_name[Level2] = "Shift";
-        level_name[Level3] = "Alt Base";
-        level_name[Level4] = "Shift Alt";
-        level_name[Level5] = "Control";
-	    level_name[Level6] = "Shift Control";
-    };
-
-    type "FOUR_LEVEL_ALPHABETIC_CONTROL" {
+    type "SEVEN_LEVEL_KEYS" {
         modifiers = Shift+Lock+LevelThree+Control;
         
         map[None] = Level1;
-        map[Shift] = Level2;
-        map[Lock]  = Level2;
-        map[LevelThree] = Level3;
-        map[Shift+LevelThree] = Level4;
-        map[Lock+LevelThree] =  Level4;
-        map[Lock+Shift+LevelThree] =  Level3;
-        map[Control]  = Level5;
-        map[Control+Shift] = Level6;
+        map[Control]  = Level2;
+        map[Control+Shift] = Level2;
+        map[Shift] = Level3;
+        map[Lock]  = Level4;
+        map[Lock+Shift] = Level5;
+        map[LevelThree] = Level6;
+        map[Lock+Shift+LevelThree] = Level6;
+        map[Shift+LevelThree] = Level7;
+        map[Lock+LevelThree] =  Level7;
 
-        preserve[Control] = Control;
-        preserve[Shift+Control] = Control;
-        
         level_name[Level1] = "Base";
-        level_name[Level2] = "Shift";
-        level_name[Level3] = "Alt Base";
-        level_name[Level4] = "Shift Alt";
-        level_name[Level5] = "Control";
-        level_name[Level6] = "Shift Control";
-    };
-
-    type "FOUR_LEVEL_SEMIALPHABETIC_CONTROL" {
-        modifiers = Shift+Lock+LevelThree+Control;
-        
-        map[None] = Level1;
-        map[Shift] = Level2;
-        map[Lock]  = Level2;
-        map[LevelThree] = Level3;
-        map[Shift+LevelThree] = Level4;
-        map[Lock+LevelThree] =  Level3;
-        map[Lock+Shift+LevelThree] = Level4;
-        map[Control]  = Level5;
-        map[Control+Shift] = Level6;
-        
-        preserve[Control] = Control;
-        preserve[Shift+Control] = Control;
-        preserve[Lock+LevelThree] = Lock;
-        preserve[Lock+Shift+LevelThree] = Lock;
-        
-        level_name[Level1] = "Base";
-        level_name[Level2] = "Shift";
-        level_name[Level3] = "Alt Base";
-        level_name[Level4] = "Shift Alt";
-        level_name[Level5] = "Control";
-        level_name[Level6] = "Shift Control";
+        level_name[Level2] = "Control";
+        level_name[Level3] = "Shift";
+        level_name[Level4] = "CapsLock";
+        level_name[Level5] = "CapsLock Shift";
+        level_name[Level6] = "AltGr";
+        level_name[Level7] = "Shift AltGr";
     };
             
 };

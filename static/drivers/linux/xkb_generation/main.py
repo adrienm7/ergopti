@@ -71,7 +71,7 @@ def main(
         )
 
         out_dir = Path(__file__).parent.parent.resolve()
-        base_name = f"{variant}"
+        base_name = f"{layout_id}"
         xkb_out_path = out_dir / f"{base_name}.xkb"
         xcompose_out_path = out_dir / f"{base_name}.XCompose"
 
@@ -166,4 +166,4 @@ def create_layout_name(
 
 
 if __name__ == "__main__":
-    main(use_date_in_filename=False)
+    main(use_date_in_filename=True)

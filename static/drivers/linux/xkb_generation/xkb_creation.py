@@ -38,18 +38,18 @@ def generate_xkb(xkb_template, keylayout_data):
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         quoted_symbols = _apply_special_cases(xkb_key, symbols)
         comment = " // " + " ".join(comment_symbols)
-        replacement = f'key {xkb_key} {{ type[group1] = "FOUR_LEVEL_SEMIALPHABETIC_CONTROL", [{", ".join(quoted_symbols)}] }};{comment}'
+        replacement = f'key {xkb_key} {{ type[group1] = "SEVEN_LEVEL_KEYS", [{", ".join(quoted_symbols)}] }};{comment}'
         xkb_template = re.sub(pattern, replacement, xkb_template)
     return xkb_template, used_symbols
 
 
 def _extract_keymaps(keylayout_data):
     logger.info(
-        "Extracting keymaps for layers 0, 2, 5, 6, 4, 4 from <keyMapSet id='ISO'>..."
+        "Extracting keymaps for layers 0, 4, 1, 2, 3, 6, 7 from <keyMapSet id='ISO'>..."
     )
     keymaps = [
         extract_keymap_body(keylayout_data, i, keymapset_id="ISO")
-        for i in [0, 2, 5, 6, 4, 4]
+        for i in [0, 4, 1, 2, 3, 6, 7]
     ]
     return keymaps
 
@@ -91,9 +91,9 @@ def _get_linux_name_and_comment(
     linux_name = "NoSymbol"
 
     # Special cases
-    if symbol == "«" and layer == 4:
+    if symbol == "«" and layer == 6:
         linux_name = "guillemotleft"
-    if symbol == "»" and layer == 4:
+    if symbol == "»" and layer == 6:
         linux_name = "guillemotright"
     if symbol == "ᵉ":
         linux_name = "uparrow"
@@ -119,7 +119,7 @@ def _get_linux_name_and_comment(
         if char in mappings:
             # If it's a dead key, map accordingly
             linux_name = mappings[char]
-            if linux_name == "asciicircum" and not layer == 4:
+            if linux_name == "asciicircum" and not layer == 6:
                 linux_name = "dead_circumflex"
             if linux_name == "diaeresis":
                 linux_name = "dead_diaeresis"
@@ -155,10 +155,10 @@ def _apply_special_cases(xkb_key, symbols):
     # Special case for <LSGT>
     if xkb_key == "<LSGT>":
         result = []
-        for i, s in enumerate(symbols):
-            if i == 2 and s == "dead_circumflex":
+        for layer, s in enumerate(symbols):
+            if layer == 6 and s == "dead_circumflex":
                 result.append("asciicircum")
-            elif i == 3 and s == "dead_circumflex":
+            elif layer == 7 and s == "dead_circumflex":
                 result.append("dead_circumflex")
             else:
                 result.append(s)
