@@ -26,14 +26,14 @@ def generate_xkb(xkb_template, keylayout_data):
     """Génère le contenu XKB à partir du template et des données keylayout, en sous-fonctions."""
     keymaps = _extract_keymaps(keylayout_data)
     mapped_symbols = {"« ": "guillemotleft", " »": "guillemotright"}
-    fraction_idx = 0
+    unused_symbols = UNUSED_SYMBOLS
     for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
-        symbols, comment_symbols, fraction_idx = _generate_symbols_and_comments(
+        symbols, comment_symbols = _generate_symbols_and_comments(
             xkb_key,
             macos_code,
             keymaps,
             mapped_symbols,
-            fraction_idx,
+            unused_symbols,
         )
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         quoted_symbols = _apply_special_cases(xkb_key, symbols)
@@ -59,32 +59,32 @@ def _generate_symbols_and_comments(
     macos_code,
     keymaps,
     mapped_symbols,
-    fraction_idx,
+    unused_symbols,
 ):
     logger.info("Generating for key %s", xkb_key)
     symbols = []
     comment_symbols = []
     for layer, keymap_body in enumerate(keymaps):
         symbol = get_symbol(keymap_body, macos_code)
-        linux_name, fraction_idx = _get_linux_name_and_comment(
+        linux_name = _get_linux_name_and_comment(
             symbol,
             layer,
             mapped_symbols,
-            fraction_idx,
+            unused_symbols,
         )
         symbols.append(linux_name)
         if len(symbol) >= 2:
             comment_symbols.append(f'"{symbol}"')
         else:
             comment_symbols.append(symbol)
-    return symbols, comment_symbols, fraction_idx
+    return symbols, comment_symbols
 
 
 def _get_linux_name_and_comment(
     symbol,
     layer,
     mapped_symbols,
-    fraction_idx,
+    unused_symbols,
 ):
     """Convert a symbol to its XKB keysym name using direct character keys from the YAML mapping."""
 
@@ -92,8 +92,7 @@ def _get_linux_name_and_comment(
 
     # Special cases: always use mapped_symbols for guillemets
     if symbol in ("« ", " »"):
-        if symbol in mapped_symbols:
-            return mapped_symbols[symbol], fraction_idx
+        return mapped_symbols[symbol]
 
     if symbol == "ᵉ":
         linux_name = "uparrow"
@@ -103,18 +102,24 @@ def _get_linux_name_and_comment(
         linux_name = "infinity"
 
     if linux_name != "NoSymbol":
-        return linux_name, fraction_idx
+        return linux_name
 
     if len(symbol) >= 2:
         # Always map the same symbol sequence to the same unused symbol
         if symbol in mapped_symbols:
             frac = mapped_symbols[symbol]
         else:
-            frac = UNUSED_SYMBOLS[fraction_idx % len(UNUSED_SYMBOLS)]
+            # Retirer les valeurs déjà utilisées de unused_symbols
+            used = set(mapped_symbols.values())
+            available = [s for s in unused_symbols if s not in used]
+            if not available:
+                raise RuntimeError(
+                    "Plus de symboles inutilisés disponibles pour le mapping."
+                )
+            frac = available[0]
             mapped_symbols[symbol] = frac
-            fraction_idx += 1
         linux_name = mappings.get(frac, f"U{ord(frac):04X}")
-        return linux_name, fraction_idx
+        return linux_name
 
     # Default mapping with explicit unicode symbol handling
     decoded = html.unescape(symbol)
@@ -136,7 +141,7 @@ def _get_linux_name_and_comment(
             )
             linux_name = unicode_key
 
-    return linux_name, fraction_idx
+    return linux_name
 
 
 def _apply_special_cases(xkb_key, symbols):
