@@ -84,7 +84,7 @@ xkb_compatibility { include "complete" };
 partial alphanumeric_keys
 xkb_symbols "ergopti_iso_18" {
 
-	name[Group1]= "France - Ergopti ISO v1.8.0";
+	name[Group1]= "France - Ergopti";
 
 	include "latin"
 
