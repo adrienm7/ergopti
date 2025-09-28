@@ -76,11 +76,11 @@ def main(
         xcompose_out_path = out_dir / f"{base_name}.XCompose"
 
         logger.info("Generating XKB content for %s...", variant)
-        xkb_content = generate_xkb(xkb_template, keylayout)
+        xkb_content, used_symbols = generate_xkb(xkb_template, keylayout)
         save_file(xkb_out_path, xkb_content)
 
         logger.info("Generating XCompose content for %s...", variant)
-        xcompose_content = generate_xcompose(keylayout)
+        xcompose_content = generate_xcompose(keylayout, used_symbols)
         save_file(xcompose_out_path, xcompose_content)
 
 
