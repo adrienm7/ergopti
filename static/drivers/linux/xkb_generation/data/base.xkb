@@ -5,30 +5,81 @@ xkb_keycodes      { include "evdev+aliases(azerty)" };
 xkb_types         { 
     include "complete"
 
-// Key types for Ergopti layout
     type "SEVEN_LEVEL_KEYS" {
-        modifiers = Shift+Lock+LevelThree+Control;
-        
-        map[None] = Level1;
-        map[Control]  = Level2;
-        map[Control+Shift] = Level2;
-        map[Shift] = Level3;
-        map[Lock]  = Level4;
-        map[Lock+Shift] = Level5;
-        map[LevelThree] = Level6;
-        map[Lock+Shift+LevelThree] = Level6;
-        map[Shift+LevelThree] = Level7;
-        map[Lock+LevelThree] =  Level7;
+        modifiers = Shift + Lock + LevelThree + Control + Alt + Mod4;
 
-        level_name[Level1] = "Base";
-        level_name[Level2] = "Control";
-        level_name[Level3] = "Shift";
-        level_name[Level4] = "CapsLock";
-        level_name[Level5] = "CapsLock Shift";
-        level_name[Level6] = "AltGr";
-        level_name[Level7] = "Shift AltGr";
+        // ==============================
+        // ======= Level mappings =======
+        // ==============================
+
+        map[None]                               = Level1;
+        
+        // Level 2: Other modifiers (Control, Alt, Super)
+        map[Alt]                                = Level2;
+        map[Control]                            = Level2;
+        map[Mod4]                               = Level2;
+        map[Control + Alt]                      = Level2;
+        map[Control + Mod4]                     = Level2;
+        map[Alt + Mod4]                         = Level2;
+        map[Control + Alt + Mod4]               = Level2;
+        map[Shift + Alt]                        = Level2;
+        map[Shift + Control]                    = Level2;
+        map[Shift + Mod4]                       = Level2;
+        map[Shift + Control + Alt]              = Level2;
+        map[Shift + Control + Mod4]             = Level2;
+        map[Shift + Alt + Mod4]                 = Level2;
+        map[Shift + Control + Alt + Mod4]       = Level2;
+
+        // Level 3: Shift only
+        map[Shift]                              = Level3;
+
+        // Level 4: CapsLock only
+        map[Lock]                               = Level4;
+
+        // Level 5: CapsLock + Shift
+        map[Lock + Shift]                       = Level5;
+
+        // Level 6: AltGr (LevelThree)
+        map[LevelThree]                         = Level6;
+        map[Lock + LevelThree]                  = Level6;
+
+        // Level 7: Shift + AltGr
+        map[Shift + LevelThree]                 = Level7;
+        map[Lock + Shift + LevelThree]          = Level7;
+
+        // =====================================
+        // ======= Modifier preservation =======
+        // =====================================
+
+        // Keep these modifiers active in the final key event
+        preserve[Alt]                           = Alt;
+        preserve[Control]                       = Control;
+        preserve[Mod4]                          = Mod4;
+        preserve[Control + Alt]                 = Control + Alt;
+        preserve[Control + Mod4]                = Control + Mod4;
+        preserve[Alt + Mod4]                    = Alt + Mod4;
+        preserve[Control + Alt + Mod4]          = Control + Alt + Mod4;
+        preserve[Shift + Alt]                   = Shift + Alt;
+        preserve[Shift + Control]               = Shift + Control;
+        preserve[Shift + Mod4]                  = Shift + Mod4;
+        preserve[Shift + Control + Alt]         = Shift + Control + Alt;
+        preserve[Shift + Control + Mod4]        = Shift + Control + Mod4;
+        preserve[Shift + Alt + Mod4]            = Shift + Alt + Mod4;
+        preserve[Shift + Control + Alt + Mod4]  = Shift + Control + Alt + Mod4;
+
+        // ===========================
+        // ======= Level names =======
+        // ===========================
+        
+        level_name[Level1]                      = "Base";
+        level_name[Level2]                      = "Other modifiers: Control, Alt, Super";
+        level_name[Level3]                      = "Shift";
+        level_name[Level4]                      = "CapsLock";
+        level_name[Level5]                      = "CapsLock + Shift";
+        level_name[Level6]                      = "AltGr";
+        level_name[Level7]                      = "Shift + AltGr";
     };
-            
+
 };
 
 xkb_compatibility { include "complete" };

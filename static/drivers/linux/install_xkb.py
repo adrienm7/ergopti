@@ -355,9 +355,8 @@ def update_xkb_types(source_file, system_file):
         with open(source_file, "r") as file:
             source_lines = file.readlines()
 
+        # TODO: auto discover of types to copy
         sections_to_copy = [
-            "FOUR_LEVEL_CONTROL",
-            "FOUR_LEVEL_ALPHABETIC_CONTROL",
             "SEVEN_LEVEL_KEYS",
         ]
         collected_sections = {section: [] for section in sections_to_copy}
@@ -388,6 +387,7 @@ def update_xkb_types(source_file, system_file):
         for section in sections_to_copy:
             if any(f'type "{section}"' in line for line in system_lines):
                 print(f"La section '{section}' existe déjà dans {system_file}.")
+                # TODO: replace content instead of exiting
                 return
 
         insertion_point = None
@@ -449,7 +449,7 @@ def main(args):
     xkb_symbols_file = f"{xkb_folder}/symbols/fr"
     update_xkb_symbols(xkb_file, symbols_line, xkb_symbols_file)
 
-    # Mise à jour des types XKBç
+    # Mise à jour des types XKB
     xkb_types_file = f"{xkb_folder}/types/extra"
     update_xkb_types(xkb_file, xkb_types_file)
 
@@ -465,7 +465,6 @@ def main(args):
     xcompose_file = args[2] if len(args) > 2 else None
     if xcompose_file:
         install_xcompose(xcompose_file)  # Install the XCompose file
-
 
 if __name__ == "__main__":
     if sys.platform == "win32":

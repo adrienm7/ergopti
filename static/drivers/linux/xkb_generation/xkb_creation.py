@@ -42,17 +42,15 @@ def generate_xkb(xkb_template, keylayout_data):
         xkb_template = re.sub(pattern, replacement, xkb_template)
     return xkb_template, used_symbols
 
-
 def _extract_keymaps(keylayout_data):
     logger.info(
         "Extracting keymaps for layers 0, 4, 1, 2, 3, 6, 7 from <keyMapSet id='ISO'>..."
     )
     keymaps = [
         extract_keymap_body(keylayout_data, i, keymapset_id="ISO")
-        for i in [0, 4, 1, 2, 3, 6, 7]
+        for i in [0, 4, 1, 2, 3, 5, 6]
     ]
     return keymaps
-
 
 def _generate_symbols_and_comments(
     xkb_key,
