@@ -49,9 +49,8 @@ def _extract_keymaps(keylayout_data):
     )
     keymaps = [
         extract_keymap_body(keylayout_data, i, keymapset_id="ISO")
-        for i in [0, 2, 5, 6, 4]
+        for i in [0, 2, 5, 6, 4, 4]
     ]
-    keymaps.append(keymaps[4])
     return keymaps
 
 
