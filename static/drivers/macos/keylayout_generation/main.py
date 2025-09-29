@@ -21,7 +21,7 @@ def main(
     output_directory: Path = None,
     overwrite: bool = False,
 ) -> None:
-    """Main function to generate keylayout files and bundle from kbdedit files."""
+    """Main function to generate keylayout files and bundle from KbdEdit files."""
     # Determine output directory
     if output_directory:
         output_directory = Path(output_directory).resolve()
@@ -98,7 +98,7 @@ def log_section(title: str) -> None:
 def generate_keylayout(
     kbdedit_file_path: Path, output_directory: Path, overwrite: bool
 ) -> Path:
-    """Generate a corrected keylayout file from the given kbdedit file."""
+    """Generate a corrected keylayout file from the given KbdEdit file."""
     logger.launch("Creating corrected keylayout from: %s", kbdedit_file_path)
 
     base_file_path = output_directory / (

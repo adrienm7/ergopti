@@ -8,7 +8,11 @@ import re
 from keylayout_correction import replace_action_to_output_extra_keys
 from keylayout_plus_mappings import plus_mappings
 from tests.run_all_tests import validate_keylayout
-from utilities.information_extraction import get_last_used_layer
+from utilities.information_extraction import (
+    extract_name_from_file,
+    get_last_used_layer,
+)
+from utilities.information_modification import modify_name_from_file
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
 from utilities.layer_names import create_layer_name
@@ -24,7 +28,8 @@ def create_keylayout_plus(content: str):
     """
     logger.info("%s🔧 Starting keylayout plus creation…", LOGS_INDENTATION)
 
-    content = append_plus_to_layout_name(content)
+    name = extract_name_from_file(content)
+    content = modify_name_from_file(content, f"{name} Plus")
 
     logger.info(
         "%s➕ Modifying AltGr and ShiftAltGr symbols for Ergopti+…",
@@ -89,26 +94,6 @@ def create_keylayout_plus(content: str):
 
     logger.success("Keylayout plus creation complete.")
     return content
-
-
-def append_plus_to_layout_name(body: str) -> str:
-    """
-    Append ' Plus' to the keyboard name in the <keyboard> tag.
-    """
-    logger.info(
-        "%sAppending ' Plus' to <keyboard> name…", LOGS_INDENTATION + "\t"
-    )
-
-    def repl(match):
-        prefix, name, suffix = match.groups()
-        if not name.endswith(" Plus"):
-            name += " Plus"
-        return f"{prefix}{name}{suffix}"
-
-    pattern = r'(<keyboard\b[^>]*\bname=")([^"]+)(")'
-    body = re.sub(pattern, repl, body)
-
-    return body
 
 
 def ergopti_plus_altgr_modifications(body: str) -> str:
