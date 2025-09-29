@@ -2,14 +2,22 @@
 Mappings for the new dead keys of Ergopti+.
 """
 
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
+
 from collections import OrderedDict
 from pprint import pprint
 
-from utilities.mappings_functions import (
+from utilities.logger import logger
+
+from .mappings_functions import (
     add_case_sensitive_mappings,
-    check_duplicate_triggers,
     escape_symbols_in_mappings,
 )
+
+LOGS_INDENTATION = "\t\t"
 
 PLUS_MAPPINGS_CONFIG = {
     "comma_j_letters_sfbs": {
@@ -277,6 +285,28 @@ def _sort_key(item):
 
 
 plus_mappings = OrderedDict(sorted(plus_mappings.items(), key=_sort_key))
+
+
+def check_duplicate_triggers(mappings_to_check: dict):
+    """Check for duplicate trigger characters in the plus_mappings."""
+    triggers = {}
+    for key, data in mappings_to_check.items():
+        trigger = data["trigger"]
+        if trigger in triggers:
+            logger.error(
+                "%sDuplicate trigger '%s' found in '%s' and '%s'",
+                LOGS_INDENTATION,
+                trigger,
+                key,
+                triggers[trigger],
+            )
+        else:
+            triggers[trigger] = key
+    logger.success(
+        "%sNo duplicate triggers found in the Ergopti+ mappings.",
+        LOGS_INDENTATION,
+    )
+
 
 check_duplicate_triggers(plus_mappings)
 
