@@ -37,17 +37,19 @@ def reorder_modifiers_and_attributes(body: str) -> str:
     # Increase maxout from 1 to 3
     # body = re.sub(r'maxout="1"', 'maxout="3"', body)
 
-    # Standardize key orders and specific modifier blocks
-    key_replacements = {
-        'keys="anyOption caps anyShift"': 'keys="anyShift caps anyOption"',
-        'keys="anyOption anyShift"': 'keys="anyShift anyOption"',
-        'keys="anyOption caps"': 'keys="caps anyOption"',
-        'keys="caps anyShift"': 'keys="anyShift caps"',
-        'keys="command caps? anyOption? control?"': 'keys="caps? anyOption? command anyControl?"',
-        'keys="control caps? anyOption?"': 'keys="caps? anyOption? anyControl"',
-    }
-    for old, new in key_replacements.items():
-        body = body.replace(old, new)
+    # Alphabetically sort the values of the keys attribute in each <modifier keys="..."/>
+    def sort_keys_attr(match):
+        before = match.group(1)
+        keys = match.group(2)
+        after = match.group(3)
+        # Sort the words in keys
+        sorted_keys = " ".join(sorted(keys.split(), key=str.casefold))
+        return f"{before}{sorted_keys}{after}"
+
+    # Replace each keys attribute with its sorted version
+    body = re.sub(
+        r'(<modifier\s+keys=")([^"]+)("[^>]*/?>)', sort_keys_attr, body
+    )
 
     return body
 
@@ -208,3 +210,20 @@ def sort_terminators(body: str) -> str:
         body,
         flags=re.DOTALL,
     )
+
+
+def replace_keymapselect_mapindex_4(xml: str) -> str:
+    """
+    Replace the <keyMapSelect mapIndex="4">...</keyMapSelect> block with a fixed content.
+    """
+    import re
+
+    replacement = (
+        '<keyMapSelect mapIndex="4">\n'
+        '        <modifier keys="caps? anyOption? command anyControl?"/>'
+        '\n        <modifier keys="caps? anyOption? anyControl"/>'
+        '\n    </keyMapSelect>'
+    )
+    # Regex to match the full <keyMapSelect mapIndex="4">...</keyMapSelect> block
+    pattern = r'<keyMapSelect mapIndex="4">.*?</keyMapSelect>'
+    return re.sub(pattern, replacement, xml, flags=re.DOTALL)

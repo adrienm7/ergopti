@@ -4,12 +4,6 @@ import re
 
 from data.symbol_names import ALIAS_TO_ENTITY
 from tests.run_all_tests import validate_keylayout
-from utilities.ansi_layout_fix import (
-    add_ansi_keymapset_with_10_50,
-    replace_keymapset_id_with_iso,
-    replace_layouts_block,
-    swap_keys,
-)
 from utilities.information_extraction import extract_keymap_body
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_sorting import sort_keylayout
@@ -35,6 +29,16 @@ def correct_keylayout(content: str) -> str:
     )
     content = re.sub(r"^(\s*\n)+|((\s*\n)+)$", "", content)
 
+    content = replace_keymapselect_mapindex_4(content)
+    content = replace_keymapselect_mapindex_5(content)
+    content = replace_keymapselect_mapindex_7(content)
+    content = delete_keymap(content, 6)
+    content = delete_keymap(content, 8)
+    content = change_keymap_id(content, 7, 6)
+
+    content = replace_modifier_map_id(content)
+    content = replace_keymapset_id_with_iso(content)
+
     content = swap_keys(content, 10, 50)
     content = normalize_attribute_entities(content)
     content = replace_action_to_output_extra_keys(content)
@@ -42,30 +46,19 @@ def correct_keylayout(content: str) -> str:
 
     logger.info("%s➕ Modifying keymap 4…", LOGS_INDENTATION)
     keymap_0_content = extract_keymap_body(content, 0)
-    keymap_4_content = modify_accented_letters_shortcuts(keymap_0_content)
-    keymap_4_content = fix_keymap_4_symbols(keymap_4_content)
-    keymap_4_content = convert_actions_to_outputs(
-        keymap_4_content
+    keymap_content = modify_accented_letters_shortcuts(keymap_0_content)
+    keymap_content = fix_ctrl_symbols(keymap_content)
+    keymap_content = convert_actions_to_outputs(
+        keymap_content
     )  # Ctrl shortcuts can be directly set to output, as they don’t trigger other states
-    content = replace_keymap(content, 4, keymap_4_content)
-
-    logger.info("%s➕ Adding keymap 9 as a copy of keymap 4…", LOGS_INDENTATION)
-    content = add_keymap_select_9(content)
-    keymap_4_content = extract_keymap_body(content, 4)
-    content = add_keymap(content, 9, keymap_4_content)
-
-    logger.info("%s🔹 Adding an ANSI keyMapSet…", LOGS_INDENTATION + "\t")
-    content = replace_layouts_block(content)
-    content = replace_modifier_map_id(content)
-    content = replace_keymapset_id_with_iso(content)
-    content = add_ansi_keymapset_with_10_50(content)
+    content = replace_keymap(content, 4, keymap_content)
 
     content = sort_keylayout(content)
     content = set_unique_keyboard_id(content)
 
     validate_keylayout(content)
 
-    logger.success("Keylayout corrections complete.")
+    logger.info("Keylayout corrections complete.")
     return content
 
 
@@ -97,6 +90,33 @@ def replace_modifier_map_id(content: str) -> str:
     return content
 
 
+def replace_keymapset_id_with_iso(content: str) -> str:
+    """
+    Replace the id attribute value in <keyMapSet id="..."> with 'ISO', regardless of its original value.
+    """
+    logger.info(
+        "%s🔹 Replacing <keyMapSet id=...> with id='ISO'…",
+        LOGS_INDENTATION + "\t",
+    )
+    # Find the id value in <keyMapSet id="...">
+    match = re.search(r'<keyMapSet\s+id="([^"]+)"', content)
+    if not match:
+        logger.warning(
+            "%sNo <keyMapSet id=...> found.", LOGS_INDENTATION + "\t"
+        )
+        return content
+    old_id = match.group(1)
+    # Replace the id in <keyMapSet ...>
+    content = re.sub(
+        r'(<keyMapSet\s+id=")[^"]+("[^>]*>)', r"\1ISO\2", content, count=1
+    )
+    # Replace all references to the old id (e.g. mapSet="16c")
+    content = re.sub(
+        rf'(mapSet=")({re.escape(old_id)})(")', r"\1ISO\3", content
+    )
+    return content
+
+
 def fix_invalid_symbols(body: str) -> str:
     """
     Fix invalid XML symbols for <, > and &.
@@ -108,6 +128,20 @@ def fix_invalid_symbols(body: str) -> str:
     body = body.replace("&lt;", "&#x003C;")  # <
     body = body.replace("&gt;", "&#x003E;")  # >
     body = body.replace("&amp;", "&#x0026;")  # &
+    return body
+
+
+def swap_keys(body: str, key1: int, key2: int) -> str:
+    """Swap key codes."""
+    logger.info(
+        "%s🔹 Swapping key codes %d and %d…",
+        LOGS_INDENTATION + "\t",
+        key1,
+        key2,
+    )
+    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
+    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
+    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
     return body
 
 
@@ -221,7 +255,7 @@ def replace_keymap(body: str, index: int, new_body: str) -> str:
     )
 
 
-def fix_keymap_4_symbols(body: str) -> str:
+def fix_ctrl_symbols(body: str) -> str:
     """Correct the symbols for Ctrl + and Ctrl - in a keyMap body."""
     logger.info(
         "%s🔹 Fixing keymap 4 symbols in body…", LOGS_INDENTATION + "\t"
@@ -235,41 +269,136 @@ def fix_keymap_4_symbols(body: str) -> str:
     return body
 
 
-def add_keymap_select_9(body: str) -> str:
-    """Add <keyMapSelect> entry for mapIndex 9."""
+def replace_keymapselect_mapindex_4(body: str) -> str:
+    """
+    Replace the <keyMapSelect mapIndex="4">...</keyMapSelect> block with a fixed content.
+    """
     logger.info(
-        "%s🔹 Adding keymapSelect for index 9…", LOGS_INDENTATION + "\t"
+        "%s🔹 Replacing keyMapSelect mapIndex=4…", LOGS_INDENTATION + "\t"
     )
-    key_map_select = """\t\t<keyMapSelect mapIndex="9">
-\t\t\t<modifier keys="command caps? anyOption? control?"/>
-\t\t\t<modifier keys="control caps? anyOption?"/>
-\t\t</keyMapSelect>"""
-    return re.sub(
-        r'(<keyMapSelect mapIndex="8">.*?</keyMapSelect>)',
-        r"\1\n" + key_map_select,
-        body,
-        flags=re.DOTALL,
+    replacement = (
+        '<keyMapSelect mapIndex="4">\n'
+        '\t\t\t<modifier keys="anyControl anyOption? anyShift? caps? command?"/>\n'
+        '\t\t\t<modifier keys="anyControl? anyOption? anyShift? caps? command"/>\n'
+        "\t\t</keyMapSelect>"
     )
 
+    pattern = r'<keyMapSelect mapIndex="4">.*?</keyMapSelect>'
+    body = re.sub(pattern, replacement, body, flags=re.DOTALL)
 
-def add_keymap(body: str, index: int, keymap_body: str) -> str:
+    return body
+
+
+def replace_keymapselect_mapindex_5(body: str) -> str:
     """
-    Add a keyMap with a given index just before the closing </keyMapSet> tag.
-    If a keyMap with the same index already exists, the new keyMap is not added.
+    Replace the <keyMapSelect mapIndex="5">...</keyMapSelect> block with a fixed content.
     """
-    logger.info("%s🔹 Adding keymap %d…", LOGS_INDENTATION + "\t", index)
-    if f'<keyMap index="{index}">' in body:
-        logger.warning(
-            "%sKeymap %d already exists, skipping.",
-            LOGS_INDENTATION + "\t\t",
-            index,
-        )
-        return body
-
-    insertion = f'\n\t\t<keyMap index="{index}">{keymap_body}</keyMap>\n'
-    # Insert just before the closing </keyMapSet> tag
-    new_body = re.sub(
-        r"(</keyMapSet>)", insertion + r"\1", body, flags=re.DOTALL
+    logger.info(
+        "%s🔹 Replacing keyMapSelect mapIndex=5…", LOGS_INDENTATION + "\t"
+    )
+    replacement = (
+        '<keyMapSelect mapIndex="5">\n'
+        '\t\t\t<modifier keys="anyOption caps?"/>\n'
+        "\t\t</keyMapSelect>"
     )
 
-    return new_body
+    pattern = r'<keyMapSelect mapIndex="5">.*?</keyMapSelect>'
+    body = re.sub(pattern, replacement, body, flags=re.DOTALL)
+
+    return body
+
+
+def replace_keymapselect_mapindex_7(body: str) -> str:
+    """
+    Replace the <keyMapSelect mapIndex="7">...</keyMapSelect> block with a fixed content.
+    """
+    logger.info(
+        "%s🔹 Replacing keyMapSelect mapIndex=7…", LOGS_INDENTATION + "\t"
+    )
+    replacement = (
+        '<keyMapSelect mapIndex="7">\n'
+        '\t\t\t<modifier keys="anyOption anyShift caps?"/>\n'
+        "\t\t</keyMapSelect>"
+    )
+
+    pattern = r'<keyMapSelect mapIndex="7">.*?</keyMapSelect>'
+    body = re.sub(pattern, replacement, body, flags=re.DOTALL)
+
+    return body
+
+
+def delete_keymap(body: str, keymap_index: int) -> str:
+    """
+    Remove the <keyMap index="{keymap_index}">...</keyMap> block from all <keyMapSet> sections
+    and the corresponding <keyMapSelect mapIndex="{keymap_index}">...</keyMapSelect> block from all <modifierMap> sections in the keylayout XML body.
+    Args:
+        body: The XML content as a string.
+        keymap_index: The index of the <keyMap> and <keyMapSelect> blocks to remove.
+    Returns:
+        The XML content with the specified blocks removed.
+    """
+    logger.info(
+        '%s🗑️ Deleting  <keyMapSelect mapIndex="%s"> and <keyMap index="%s"> blocks…',
+        LOGS_INDENTATION,
+        keymap_index,
+        keymap_index,
+    )
+
+    logger.info(
+        '%sRemoving <keyMapSelect mapIndex="%s"> blocks…',
+        LOGS_INDENTATION + "\n",
+        keymap_index,
+    )
+    keymapselect_pattern = (
+        rf'\n\t*<keyMapSelect mapIndex="{keymap_index}".*?</keyMapSelect>'
+    )
+    body, _ = re.subn(keymapselect_pattern, "", body, flags=re.DOTALL)
+
+    logger.info(
+        '%sRemoving <keyMap index="%s"> blocks…',
+        LOGS_INDENTATION + "\n",
+        keymap_index,
+    )
+    keymap_pattern = rf'<keyMap index="{keymap_index}".*?</keyMap>'
+    body, _ = re.subn(keymap_pattern, "", body, flags=re.DOTALL)
+
+    return body
+
+
+def change_keymap_id(body: str, old_index: int, new_index: int) -> str:
+    """
+    Change the id/index of a keymap in both <keyMap index="..."> and <keyMapSelect mapIndex="..."> blocks.
+    Args:
+        body: The XML content as a string.
+        old_index: The current index/id to replace.
+        new_index: The new index/id to set.
+    Returns:
+        The XML content with the updated keymap indices.
+    """
+
+    logger.info(
+        "%s🔹 Changing keymap id from %s to %s in <keyMap> and <keyMapSelect> blocks…",
+        LOGS_INDENTATION + "\t",
+        old_index,
+        new_index,
+    )
+
+    logger.info(
+        '%sUpdating <keyMap index="%s"> to <keyMap index="%s">…',
+        LOGS_INDENTATION + "\t\t",
+        old_index,
+        new_index,
+    )
+    body = re.sub(
+        f'<keyMap index="{old_index}"', f'<keyMap index="{new_index}"', body
+    )
+
+    logger.info(
+        '%sUpdating <keyMapSelect mapIndex="%s"> to <keyMapSelect mapIndex="%s">…',
+        LOGS_INDENTATION + "\t\t",
+        old_index,
+        new_index,
+    )
+    body = re.sub(f'mapIndex="{old_index}"', f'mapIndex="{new_index}"', body)
+
+    return body
