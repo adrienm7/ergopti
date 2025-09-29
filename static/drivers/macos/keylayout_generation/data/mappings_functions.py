@@ -7,10 +7,6 @@ Utility functions for processing key mappings:
 
 import re
 
-from .logger import logger
-
-LOGS_INDENTATION = "\t\t"
-
 
 def add_case_sensitive_mappings(mappings: dict) -> dict:
     """
@@ -192,24 +188,3 @@ def escape_xml_characters(value: str) -> str:
     )
 
     return result
-
-
-def check_duplicate_triggers(mappings_to_check: dict):
-    """Check for duplicate trigger characters in the plus_mappings."""
-    triggers = {}
-    for key, data in mappings_to_check.items():
-        trigger = data["trigger"]
-        if trigger in triggers:
-            logger.error(
-                "%sDuplicate trigger '%s' found in '%s' and '%s'",
-                LOGS_INDENTATION,
-                trigger,
-                key,
-                triggers[trigger],
-            )
-        else:
-            triggers[trigger] = key
-    logger.success(
-        "%sNo duplicate triggers found in the Ergopti+ mappings.",
-        LOGS_INDENTATION,
-    )

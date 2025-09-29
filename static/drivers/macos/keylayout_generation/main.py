@@ -5,13 +5,18 @@ Official documentation about keylayout files can be found at:
 https://developer.apple.com/library/archive/technotes/tn2056/_index.html
 """
 
-import re
+import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+
+
+import re
+
+from bundle_creation import create_bundle
 from keylayout_correction import correct_keylayout
 from keylayout_plus_creation import create_keylayout_plus
-from utilities.bundle_creation import create_bundle
-from utilities.information_extraction import extract_version_from_file
+from utilities.keylayout_extraction import extract_version_from_file
 from utilities.logger import get_error_count, logger, reset_error_count
 
 

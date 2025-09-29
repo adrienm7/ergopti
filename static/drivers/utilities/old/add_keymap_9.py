@@ -1,6 +1,6 @@
 import re
 
-from ..information_extraction import extract_keymap_body
+from ..keylayout_extraction import extract_keymap_body
 from ..logger import logger
 
 LOGS_INDENTATION = "\t\t"

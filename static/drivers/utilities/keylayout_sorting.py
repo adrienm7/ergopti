@@ -216,13 +216,11 @@ def replace_keymapselect_mapindex_4(xml: str) -> str:
     """
     Replace the <keyMapSelect mapIndex="4">...</keyMapSelect> block with a fixed content.
     """
-    import re
-
     replacement = (
         '<keyMapSelect mapIndex="4">\n'
         '        <modifier keys="caps? anyOption? command anyControl?"/>'
         '\n        <modifier keys="caps? anyOption? anyControl"/>'
-        '\n    </keyMapSelect>'
+        "\n    </keyMapSelect>"
     )
     # Regex to match the full <keyMapSelect mapIndex="4">...</keyMapSelect> block
     pattern = r'<keyMapSelect mapIndex="4">.*?</keyMapSelect>'
