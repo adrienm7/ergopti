@@ -64,6 +64,7 @@ def main(
             base_file_path = generate_keylayout(
                 kbdedit_file_path, output_directory, overwrite
             )
+
             plus_file_path = generate_keylayout_plus(
                 base_file_path, output_directory, overwrite
             )

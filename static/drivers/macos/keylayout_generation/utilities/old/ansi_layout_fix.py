@@ -4,9 +4,23 @@ Utility for adding fixed ANSI/ISO layouts block to keylayout files.
 
 import re
 
-from .logger import logger
+from keylayout_generation.keylayout_correction import swap_keys
+
+from ..logger import logger
 
 LOGS_INDENTATION = "\t"
+
+
+def add_ansi_fix(content: str) -> str:
+    """
+    Create a fixed ANSI keyMapSet.
+    """
+    logger.info("%s🔹 Adding an ANSI keyMapSet…", LOGS_INDENTATION + "\t")
+
+    content = replace_layouts_block(content)
+    content = add_ansi_keymapset_with_10_50(content)
+
+    return content
 
 
 def replace_layouts_block(content: str) -> str:
@@ -19,40 +33,13 @@ def replace_layouts_block(content: str) -> str:
     )
     new_layouts = """\t<layouts>
     \t<layout first="0" last="0" mapSet="ISO" modifiers="commonModifiers"/>
-    \t<layout first="10" last="10" mapSet="ANSI" modifiers="commonModifiers"/>
+    \t<layout first="50" last="50" mapSet="ANSI" modifiers="commonModifiers"/>
 \t</layouts>"""
     content = re.sub(
         r"\t?<layouts>.*?</layouts>",
         new_layouts,
         content,
         flags=re.DOTALL,
-    )
-    return content
-
-
-def replace_keymapset_id_with_iso(content: str) -> str:
-    """
-    Replace the id attribute value in <keyMapSet id="..."> with 'ISO', regardless of its original value.
-    """
-    logger.info(
-        "%s🔹 Replacing <keyMapSet id=...> with id='ISO'…",
-        LOGS_INDENTATION + "\t",
-    )
-    # Find the id value in <keyMapSet id="...">
-    match = re.search(r'<keyMapSet\s+id="([^"]+)"', content)
-    if not match:
-        logger.warning(
-            "%sNo <keyMapSet id=...> found.", LOGS_INDENTATION + "\t"
-        )
-        return content
-    old_id = match.group(1)
-    # Replace the id in <keyMapSet ...>
-    content = re.sub(
-        r'(<keyMapSet\s+id=")[^"]+("[^>]*>)', r"\1ISO\2", content, count=1
-    )
-    # Replace all references to the old id (e.g. mapSet="16c")
-    content = re.sub(
-        rf'(mapSet=")({re.escape(old_id)})(")', r"\1ISO\3", content
     )
     return content
 
@@ -84,7 +71,7 @@ def add_ansi_keymapset_with_10_50(content: str) -> str:
 
     # 3. For each <keyMap ...> in ISO, create <keyMap index="N" baseMapSet="ISO" baseIndex="N"> with only key codes 10 and 50
     keymaps = re.findall(
-        r'<keyMap index="(\d+)"[^>]*>(.*?)</keyMap>',
+        r'<keyMap\s*index="(\d+)"[^>]*>(.*?)</keyMap>',
         iso_body_swapped,
         re.DOTALL,
     )
@@ -103,17 +90,3 @@ def add_ansi_keymapset_with_10_50(content: str) -> str:
     insert_pos = iso_block_match.start()
     content = content[:insert_pos] + ansi_block + "\n\t" + content[insert_pos:]
     return content
-
-
-def swap_keys(body: str, key1: int, key2: int) -> str:
-    """Swap key codes 10 and 50."""
-    logger.info(
-        "%s🔹 Swapping key codes %d and %d…",
-        LOGS_INDENTATION + "\t",
-        key1,
-        key2,
-    )
-    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
-    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
-    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
-    return body
