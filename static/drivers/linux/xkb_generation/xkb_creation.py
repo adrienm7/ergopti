@@ -47,7 +47,7 @@ def _extract_keymaps(keylayout_data):
     logger.info("Extracting keymaps from <keyMapSet id='ISO'>...")
     keymaps = [
         extract_keymap_body(keylayout_data, i, keymapset_id="ISO")
-        for i in [0, 4, 2, 1, 3, 5, 6]
+        for i in [0, 1, 2, 3, 4, 5, 6]
     ]
     return keymaps
 

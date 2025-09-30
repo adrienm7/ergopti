@@ -13,31 +13,31 @@ xkb_types         {
         // ==============================
 
         map[None]                               = Level1;
-        
-        // Level 2: Other modifiers (Control, Alt, Super)
-        map[Alt]                                = Level2;
-        map[Control]                            = Level2;
-        map[Mod4]                               = Level2;
-        map[Control + Alt]                      = Level2;
-        map[Control + Mod4]                     = Level2;
-        map[Alt + Mod4]                         = Level2;
-        map[Control + Alt + Mod4]               = Level2;
-        map[Shift + Alt]                        = Level2;
-        map[Shift + Control]                    = Level2;
-        map[Shift + Mod4]                       = Level2;
-        map[Shift + Control + Alt]              = Level2;
-        map[Shift + Control + Mod4]             = Level2;
-        map[Shift + Alt + Mod4]                 = Level2;
-        map[Shift + Control + Alt + Mod4]       = Level2;
+
+        // Level 2: CapsLock only
+        map[Lock]                               = Level2;
 
         // Level 3: Shift only
         map[Shift]                              = Level3;
 
-        // Level 4: CapsLock only
-        map[Lock]                               = Level4;
+        // Level 4: CapsLock + Shift
+        map[Lock + Shift]                       = Level4;
 
-        // Level 5: CapsLock + Shift
-        map[Lock + Shift]                       = Level5;
+        // Level 5: Other modifiers (Control, Alt, Super)
+        map[Alt]                                = Level5;
+        map[Control]                            = Level5;
+        map[Mod4]                               = Level5;
+        map[Control + Alt]                      = Level5;
+        map[Control + Mod4]                     = Level5;
+        map[Alt + Mod4]                         = Level5;
+        map[Control + Alt + Mod4]               = Level5;
+        map[Shift + Alt]                        = Level5;
+        map[Shift + Control]                    = Level5;
+        map[Shift + Mod4]                       = Level5;
+        map[Shift + Control + Alt]              = Level5;
+        map[Shift + Control + Mod4]             = Level5;
+        map[Shift + Alt + Mod4]                 = Level5;
+        map[Shift + Control + Alt + Mod4]       = Level5;
 
         // Level 6: AltGr (LevelThree)
         map[LevelThree]                         = Level6;
@@ -72,10 +72,10 @@ xkb_types         {
         // ===========================
         
         level_name[Level1]                      = "Base";
-        level_name[Level2]                      = "Other modifiers: Control, Alt, Super";
+        level_name[Level2]                      = "CapsLock";
         level_name[Level3]                      = "Shift";
-        level_name[Level4]                      = "CapsLock";
-        level_name[Level5]                      = "CapsLock + Shift";
+        level_name[Level4]                      = "CapsLock + Shift";
+        level_name[Level5]                      = "Other modifiers: Control, Alt, Super";
         level_name[Level6]                      = "AltGr";
         level_name[Level7]                      = "Shift + AltGr";
     };

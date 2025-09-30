@@ -30,8 +30,7 @@ def main(
     if keylayout_name:
         # Process only the specified keylayout (and its _plus variant)
         base_prefix = Path(keylayout_name).stem
-        # variants = [base_prefix, base_prefix + "_plus"]
-        variants = [base_prefix]
+        variants = [base_prefix, base_prefix + "_plus"]
         keylayout_files = [macos_dir / f"{v}.keylayout" for v in variants]
     else:
         # Process all .keylayout files (excluding _plus) in the directory
@@ -44,7 +43,7 @@ def main(
         plus_files = [
             macos_dir / f"{f.stem}_plus.keylayout" for f in keylayout_files
         ]
-        # keylayout_files += [pf for pf in plus_files if pf.is_file()]
+        keylayout_files += [pf for pf in plus_files if pf.is_file()]
 
     for keylayout_path in keylayout_files:
         if not keylayout_path.is_file():
@@ -155,15 +154,14 @@ def create_layout_name(
     Returns:
         tuple[str, str]: (layout_id, layout_name)
     """
-    base_name = "Ergopti"  # variant.replace("_", " ").title().replace("V", "v")
-    variant = "Ergopti"
-    layout_name = f"France - {base_name}"
+    layout_id = variant
+    layout_name = f"France - {variant.replace('_', ' ')}"
+
     if use_date_in_filename:
         now = datetime.datetime.now()
         layout_id = f"{variant}_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
         layout_name += f" {now.year}/{now.month:02d}/{now.day:02d} {now.hour:02d}:{now.minute:02d}"
-    else:
-        layout_id = variant
+
     return layout_id, layout_name
 
 
