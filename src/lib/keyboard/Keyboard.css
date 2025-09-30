@@ -487,11 +487,17 @@ keyboard-key[data-style='morte'] {
 	font-family: sans-serif; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 }
 
-keyboard-key[data-key='j'] div {
-	/* J key seems lower than the others otherwise */
+/* J key seems lower than the others otherwise */
+keyboard-key[data-key='j'][data-content='j'] div,
+keyboard-key[data-key='j'][data-content='J'] div {
 	position: relative;
 	right: -0.05em;
-	top: -0.125em;
+	top: -0.1em;
+}
+/* ★ key seems lower than the others otherwise */
+keyboard-key[data-content='★'] div {
+	position: relative;
+	top: -0.05em;
 }
 
 /* Special keys with more than one character on them */
