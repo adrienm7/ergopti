@@ -54,6 +54,37 @@ def generate_xcompose(keylayout_data, mapped_symbols):
         if not first:
             lines.append("")
         first = False
+
+        if deadkey in deadkey_defined_names:
+            trigger = deadkey_defined_names[deadkey]
+        else:
+            trigger = trigger_to_id[deadkey]
+            trigger = mappings.get(trigger, trigger)
+
+        # Recherche l’output par défaut dans le bloc <terminators> pour state = deadkey
+        output = ""
+        terminators = actions.getparent().find("terminators")
+        if terminators is not None:
+            for when in terminators.findall("when"):
+                state = when.attrib.get("state")
+                out = when.attrib.get("output")
+                if state == deadkey and out:
+                    output = out
+                    break
+
+        # Don’t add deadkey like "nbsp ponctuation"
+        if any(char in trigger for char in [" ", " ", " "]):
+            continue
+
+        if '"' not in output:
+            output = f'"{output}"'
+        else:
+            output = f"'{output}'"
+
+        lines.append(
+            f"<{trigger}>\t: {output}"
+        )  # Add behavior when the key pressed next isn’t defined in the deadkey (default output)
+
         for action_id, output in sorted(by_deadkey[deadkey]):
             seq = []
             if deadkey in deadkey_defined_names:
