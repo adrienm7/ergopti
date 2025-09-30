@@ -30,9 +30,9 @@ def generate_xcompose(keylayout_data, mapped_symbols):
     if actions is None:
         print("[WARNING] No <actions> block found.")
         return
-    deadkey_symbol = build_deadkey_symbol(actions)
-    trigger_to_id = build_trigger_to_id(actions)
+
     by_deadkey = build_by_deadkey(actions)
+    trigger_to_id = build_trigger_to_id(actions)
 
     lines = []
     for trigger, output in mapped_symbols.items():
@@ -40,7 +40,7 @@ def generate_xcompose(keylayout_data, mapped_symbols):
         lines.append(f'<{symbol_name}> : "{trigger}"')
     lines.append("")
 
-    deadkey_linux_map = {
+    deadkey_defined_names = {
         "s1_circumflex": "dead_circumflex",
         "s2_currency": "dead_currency",
         "s3_diaeresis": "dead_diaeresis",
@@ -56,18 +56,30 @@ def generate_xcompose(keylayout_data, mapped_symbols):
         first = False
         for action_id, output in sorted(by_deadkey[deadkey]):
             seq = []
-            if deadkey in deadkey_linux_map:
-                seq.append(f"<{deadkey_linux_map[deadkey]}>")
-            else:
-                left = mappings.get(deadkey, deadkey)
-                seq.append(f"<{left}>")
+            if deadkey in deadkey_defined_names:
+                seq.append(f"<{deadkey_defined_names[deadkey]}>")
+            elif deadkey in trigger_to_id:
+                trigger = trigger_to_id[deadkey]
 
+                if len(trigger) >= 2:
+                    # Don’t add deadkey like "nbsp ponctuation"
+                    break
+
+                trigger = mappings.get(trigger, trigger)
+                seq.append(f"<{trigger}>")
+            else:
+                seq.append(f"<{deadkey}>")
+
+            # Add the key to be pressed after the deadkey
             if action_id:
-                # Add the key to be pressed after the deadkey
                 left_action = mappings.get(action_id, action_id)
                 seq.append(f"<{left_action}>")
 
-            out = f'"{output}"'
+            if '"' not in output:
+                out = f'"{output}"'
+            else:
+                out = f"'{output}'"
+
             lines.append(f"{' '.join(seq)}\t: {out}")
     content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
     return content
@@ -77,23 +89,6 @@ def parse_actions(xml_text):
     """Retourne la liste des actions à partir du XML nettoyé."""
     tree = LET.fromstring(xml_text.encode("utf-8"))
     return tree.find(".//actions")
-
-
-def build_deadkey_symbol(actions):
-    """Construit le mapping deadkey_name -> symbole unicode."""
-    deadkey_symbol = {}
-    for action in actions.findall("action"):
-        action_id = action.attrib.get("id")
-        for when in action.findall("when"):
-            state = when.attrib.get("state")
-            output = when.attrib.get("output")
-            if not output:
-                continue
-            if state and state.startswith("s") and state[1:].isdigit():
-                deadkey_name = f"dead_{int(state[1:])}"
-                if action_id and deadkey_name not in deadkey_symbol:
-                    deadkey_symbol[deadkey_name] = output
-    return deadkey_symbol
 
 
 def build_trigger_to_id(actions):
