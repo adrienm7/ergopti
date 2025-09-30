@@ -327,11 +327,11 @@
 			"numpad": -1
 		},
 		{
-			"primary": 118,
-			"shift": 86,
+			"primary": 109,
+			"shift": 77,
 			"finger": 7,
 			"id": 34,
-			"altGr": 124,
+			"altGr": 38,
 			"shiftAltGr": -1,
 			"numpad": -1
 		},
@@ -453,11 +453,11 @@
 			"numpad": -1
 		},
 		{
-			"primary": 109,
-			"shift": 77,
+			"primary": 118,
+			"shift": 86,
 			"finger": 7,
 			"id": 48,
-			"altGr": 38,
+			"altGr": 124,
 			"shiftAltGr": -1,
 			"numpad": -1
 		},
