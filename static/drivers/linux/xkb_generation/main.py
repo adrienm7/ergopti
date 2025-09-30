@@ -154,12 +154,12 @@ def create_layout_name(
     Returns:
         tuple[str, str]: (layout_id, layout_name)
     """
-    layout_id = variant
+    layout_id = variant.replace('.', '_') # If there are dots in the id (here in version number), the layout doesn't work
     layout_name = f"France - {variant.replace('_', ' ')}"
 
     if use_date_in_filename:
         now = datetime.datetime.now()
-        layout_id = f"{variant}_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
+        layout_id += f"_{now.year}_{now.month:02d}_{now.day:02d}_{now.hour:02d}h{now.minute:02d}"
         layout_name += f" {now.year}/{now.month:02d}/{now.day:02d} {now.hour:02d}:{now.minute:02d}"
 
     return layout_id, layout_name
