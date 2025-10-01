@@ -357,7 +357,7 @@ def update_xkb_types(source_file, system_file):
 
         # TODO: auto discover of types to copy
         sections_to_copy = [
-            "SEVEN_LEVEL_KEYS",
+            "SEVEN_LEVEL_KEY",
         ]
         collected_sections = {section: [] for section in sections_to_copy}
 
@@ -465,6 +465,7 @@ def main(args):
     xcompose_file = args[2] if len(args) > 2 else None
     if xcompose_file:
         install_xcompose(xcompose_file)  # Install the XCompose file
+
 
 if __name__ == "__main__":
     if sys.platform == "win32":

@@ -5,6 +5,7 @@ from logging import getLogger
 from pathlib import Path
 
 import yaml
+from data.levels import LEVELS
 from data.unused_symbols import UNUSED_SYMBOLS
 from utilities.information_extraction import (
     extract_keymap_body,
@@ -19,26 +20,31 @@ mappings = yaml.safe_load(
     (data_dir / "key_sym.yaml").read_text(encoding="utf-8")
 )
 
+mapped_symbols = {
+    "« ": "guillemotleft",
+    " »": "guillemotright",
+    "ᵉ": "uparrow",
+    "ᵢ": "downarrow",
+    "ℝ": "infinity",
+}
+available_symbols = UNUSED_SYMBOLS
+
 logger = getLogger("ergopti.linux")
 
 
 def generate_xkb(xkb_template, keylayout_data):
     """Génère le contenu XKB à partir du template et des données keylayout, en sous-fonctions."""
     keymaps = _extract_keymaps(keylayout_data)
-    mapped_symbols = {"« ": "guillemotleft", " »": "guillemotright"}
-    unused_symbols = UNUSED_SYMBOLS
+
     for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
         symbols, comment_symbols = _generate_symbols_and_comments(
             xkb_key,
             macos_code,
             keymaps,
-            mapped_symbols,
-            unused_symbols,
         )
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
-        quoted_symbols = _apply_special_cases(xkb_key, symbols)
         comment = " // " + " ".join(comment_symbols)
-        replacement = f'key {xkb_key} {{ type[group1] = "SEVEN_LEVEL_KEYS", [{", ".join(quoted_symbols)}] }};{comment}'
+        replacement = f'key {xkb_key} {{ type[group1] = "SEVEN_LEVEL_KEY", [{", ".join(symbols)}] }};{comment}'
         xkb_template = re.sub(pattern, replacement, xkb_template)
     return xkb_template, mapped_symbols
 
@@ -47,7 +53,15 @@ def _extract_keymaps(keylayout_data):
     logger.info("Extracting keymaps from <keyMapSet id='ISO'>...")
     keymaps = [
         extract_keymap_body(keylayout_data, i, keymapset_id="ISO")
-        for i in [0, 1, 2, 3, 4, 5, 6]
+        for i in [
+            LEVELS["Base"],
+            LEVELS["CapsLock"],
+            LEVELS["Shift"],
+            LEVELS["CapsLock + Shift"],
+            LEVELS["Modifiers"],
+            LEVELS["AltGr"],
+            LEVELS["Shift + AltGr"],
+        ]
     ]
     return keymaps
 
@@ -56,8 +70,6 @@ def _generate_symbols_and_comments(
     xkb_key,
     macos_code,
     keymaps,
-    mapped_symbols,
-    unused_symbols,
 ):
     logger.info("Generating for key %s", xkb_key)
     symbols = []
@@ -67,8 +79,6 @@ def _generate_symbols_and_comments(
         linux_name = _get_linux_name_and_comment(
             symbol,
             layer,
-            mapped_symbols,
-            unused_symbols,
         )
         symbols.append(linux_name)
         if len(symbol) >= 2:
@@ -81,56 +91,39 @@ def _generate_symbols_and_comments(
 def _get_linux_name_and_comment(
     symbol,
     layer,
-    mapped_symbols,
-    unused_symbols,
 ):
     """Convert a symbol to its XKB keysym name using direct character keys from the YAML mapping."""
-
-    linux_name = "NoSymbol"
-
-    # Special cases: always use mapped_symbols for guillemets
-    if symbol in ("« ", " »"):
+    # Already defined cases
+    if symbol in mapped_symbols:
         return mapped_symbols[symbol]
 
-    if symbol == "ᵉ":
-        linux_name = "uparrow"
-    if symbol == "ᵢ":
-        linux_name = "downarrow"
-    if symbol == "ℝ":
-        linux_name = "infinity"
-
-    if linux_name != "NoSymbol":
-        return linux_name
-
     if len(symbol) >= 2:
-        # Always map the same symbol sequence to the same unused symbol
-        if symbol in mapped_symbols:
-            frac = mapped_symbols[symbol]
-        else:
-            # Retirer les valeurs déjà utilisées de unused_symbols
-            used = set(mapped_symbols.values())
-            available = [s for s in unused_symbols if s not in used]
-            if not available:
-                raise RuntimeError(
-                    "Plus de symboles inutilisés disponibles pour le mapping."
-                )
-            frac = available[0]
-            mapped_symbols[symbol] = frac
-        linux_name = mappings.get(frac, f"U{ord(frac):04X}")
+        if not available_symbols:
+            raise RuntimeError(
+                "Plus de symboles inutilisés disponibles pour le mapping."
+            )
+        linux_name = sorted(available_symbols)[0]
+        mapped_symbols[symbol] = linux_name
+        available_symbols.remove(linux_name)
         return linux_name
 
     # Default mapping with explicit unicode symbol handling
     decoded = html.unescape(symbol)
+    linux_name = "NoSymbol"
     for char in decoded:
         unicode_key = f"U{ord(char):04X}"
         if char in mappings:
             # If it's a dead key, map accordingly
             linux_name = mappings[char]
-            if linux_name == "asciicircum" and not layer == 6:
+            if (
+                linux_name == "asciicircum"
+                and not layer == LEVELS["AltGr"]
+                and not layer == LEVELS["Modifiers"]
+            ):
                 linux_name = "dead_circumflex"
-            if linux_name == "diaeresis":
+            if linux_name == "diaeresis" and not layer == LEVELS["Modifiers"]:
                 linux_name = "dead_diaeresis"
-            if linux_name == "currency":
+            if linux_name == "currency" and not layer == LEVELS["Modifiers"]:
                 linux_name = "dead_currency"
 
         else:
@@ -140,54 +133,3 @@ def _get_linux_name_and_comment(
             linux_name = unicode_key
 
     return linux_name
-
-
-def _apply_special_cases(xkb_key, symbols):
-    """
-    Apply special substitution rules for certain XKB keys.
-    Always use 'U2792' for the last two positions of <AD12>.
-    """
-    # Special case for <BKSL>
-    if xkb_key == "<BKSL>":
-        result = []
-        for i, s in enumerate(symbols):
-            if i == 0:
-                result.append("dead_circumflex")
-            elif s == "dead_circumflex":
-                result.append("asciicircum")
-            else:
-                result.append(s)
-        return result
-
-    # Special case for <LSGT>
-    if xkb_key == "<LSGT>":
-        result = []
-        for layer, s in enumerate(symbols):
-            if layer == 6 and s == "dead_circumflex":
-                result.append("asciicircum")
-            elif layer == 7 and s == "dead_circumflex":
-                result.append("dead_circumflex")
-            else:
-                result.append(s)
-        return result
-
-    # Special case for <AD12>
-    if xkb_key == "<AD12>":
-        quoted_symbols = []
-        for i, s in enumerate(symbols):
-            # First position: dead_diaeresis if U2792 or diaeresis
-            if i == 0 and s in ("U2792", "diaeresis"):
-                quoted_symbols.append("dead_diaeresis")
-            else:
-                quoted_symbols.append(s)
-        # Replace dead_currency if U20B0
-        quoted_symbols = [
-            "dead_currency" if s == "U20B0" else s for s in quoted_symbols
-        ]
-        # Always force U2792 for the last two positions
-        if len(quoted_symbols) >= 2:
-            quoted_symbols[-2] = "U2792"
-            quoted_symbols[-1] = "U2792"
-        return quoted_symbols
-
-    return symbols
