@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Any
 
 import yaml
 from utilities.cleaning import clean_invalid_xml_chars
@@ -22,33 +23,45 @@ yaml_path = os.path.join(os.path.dirname(__file__), "data", "key_sym.yaml")
 with open(yaml_path, encoding="utf-8") as yaml_file:
     mappings = yaml.safe_load(yaml_file)
 
+deadkey_defined_names = {
+    "s1_circumflex": "dead_circumflex",
+    "s2_currency": "dead_currency",
+    "s3_diaeresis": "dead_diaeresis",
+    "s4_greek": "mu",
+    "s5_superscript": "uparrow",
+    "s6_subscript": "downarrow",
+    "s7_RR": "infinity",
+}
 
-def generate_xcompose(keylayout_data, mapped_symbols):
-    """Parse the <actions> block and write a .XCompose file, only for deadkey states (state != none), with blank lines between deadkey groups. Deadkey names are replaced by their real Unicode symbol or deadkey_<name> if found in YAML mapping."""
+
+def generate_xcompose(
+    keylayout_data: str, mapped_symbols: dict[str, str]
+) -> str:
+    """Parse <actions> and write a .XCompose file for deadkey states.
+
+    Args:
+        keylayout_data: XML keylayout data.
+        mapped_symbols: Mapping of triggers to output symbols.
+
+    Returns:
+        The generated XCompose file content as a string.
+    """
     xml_text = clean_invalid_xml_chars(keylayout_data)
     actions = parse_actions(xml_text)
     if actions is None:
         print("[WARNING] No <actions> block found.")
-        return
+        return ""
 
     by_deadkey = build_by_deadkey(actions)
     trigger_to_id = build_trigger_to_id(actions)
 
-    lines = []
+    lines: list[str] = []
     for trigger, output in mapped_symbols.items():
         symbol_name = mappings.get(output, output)
-        lines.append(f'<{symbol_name}> : "{trigger}"')
+        if symbol_name not in ["uparrow", "downarrow", "infinity"]:
+            lines.append(f'<{symbol_name}> : "{trigger}"')
     lines.append("")
 
-    deadkey_defined_names = {
-        "s1_circumflex": "dead_circumflex",
-        "s2_currency": "dead_currency",
-        "s3_diaeresis": "dead_diaeresis",
-        "s4_greek": "mu",
-        "s5_superscript": "uparrow",
-        "s6_subscript": "downarrow",
-        "s7_RR": "infinity",
-    }
     first = True
     for deadkey in sorted(by_deadkey.keys()):
         if not first:
@@ -61,7 +74,7 @@ def generate_xcompose(keylayout_data, mapped_symbols):
             trigger = trigger_to_id[deadkey]
             trigger = mappings.get(trigger, trigger)
 
-        # Recherche l’output par défaut dans le bloc <terminators> pour state = deadkey
+        # Get default output from <terminators> for state = deadkey
         output = ""
         terminators = actions.getparent().find("terminators")
         if terminators is not None:
@@ -72,59 +85,60 @@ def generate_xcompose(keylayout_data, mapped_symbols):
                     output = out
                     break
 
-        # Don’t add deadkey like "nbsp ponctuation"
+        # Skip deadkeys with space-like triggers
         if any(char in trigger for char in [" ", " ", " "]):
             continue
 
-        if '"' not in output:
-            output = f'"{output}"'
-        else:
-            output = f"'{output}'"
-
-        lines.append(
-            f"<{trigger}>\t: {output}"
-        )  # Add behavior when the key pressed next isn’t defined in the deadkey (default output)
+        output_str = f'"{output}"' if '"' not in output else f"'{output}'"
+        lines.append(f"<{trigger}>\t: {output_str}")
 
         for action_id, output in sorted(by_deadkey[deadkey]):
-            seq = []
+            seq: list[str] = []
             if deadkey in deadkey_defined_names:
                 seq.append(f"<{deadkey_defined_names[deadkey]}>")
             elif deadkey in trigger_to_id:
                 trigger = trigger_to_id[deadkey]
-
                 if len(trigger) >= 2:
-                    # Don’t add deadkey like "nbsp ponctuation"
                     break
-
                 trigger = mappings.get(trigger, trigger)
                 seq.append(f"<{trigger}>")
             else:
                 seq.append(f"<{deadkey}>")
 
-            # Add the key to be pressed after the deadkey
+            # Add key pressed after deadkey
             if action_id:
                 left_action = mappings.get(action_id, action_id)
                 seq.append(f"<{left_action}>")
 
-            if '"' not in output:
-                out = f'"{output}"'
-            else:
-                out = f"'{output}'"
-
-            lines.append(f"{' '.join(seq)}\t: {out}")
+            out_str = f'"{output}"' if '"' not in output else f"'{output}'"
+            lines.append(f"{' '.join(seq)}\t: {out_str}")
     content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
     return content
 
 
-def parse_actions(xml_text):
-    """Retourne la liste des actions à partir du XML nettoyé."""
+def parse_actions(xml_text: str) -> Any:
+    """Return the <actions> block from cleaned XML text.
+
+    Args:
+        xml_text: Cleaned XML string.
+
+    Returns:
+        The <actions> XML element or None.
+    """
     tree = LET.fromstring(xml_text.encode("utf-8"))
     return tree.find(".//actions")
 
 
-def build_trigger_to_id(actions):
-    """Construit le mapping trigger -> id d'action pour when state=none."""
-    trigger_to_id = {}
+def build_trigger_to_id(actions: Any) -> dict[str, str]:
+    """Build mapping: trigger -> action id for when state=none.
+
+    Args:
+        actions: XML <actions> element.
+
+    Returns:
+        Dictionary mapping trigger to action id.
+    """
+    trigger_to_id: dict[str, str] = {}
     for action in actions.findall("action"):
         action_id = action.attrib.get("id")
         for when in action.findall("when"):
@@ -135,9 +149,16 @@ def build_trigger_to_id(actions):
     return trigger_to_id
 
 
-def build_by_deadkey(actions):
-    """Construit le mapping deadkey -> liste (action_id, output) pour les états != none."""
-    by_deadkey = {}
+def build_by_deadkey(actions: Any) -> dict[str, list[tuple[str, str]]]:
+    """Build mapping: deadkey -> list of (action_id, output) for states != none.
+
+    Args:
+        actions: XML <actions> element.
+
+    Returns:
+        Dictionary mapping deadkey to list of (action_id, output).
+    """
+    by_deadkey: dict[str, list[tuple[str, str]]] = {}
     for action in actions.findall("action"):
         action_id = action.attrib.get("id")
         for when in action.findall("when"):
