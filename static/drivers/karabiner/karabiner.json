@@ -93,7 +93,7 @@
                         ]
                     },
                     {
-                        "description": "Tap-hold: left_control = paste, left_shift = copy",
+                        "description": "Tap-hold: left_shift = copy, left_control = paste",
                         "manipulators": [
                             {
                                 "from": {
@@ -112,7 +112,10 @@
                             {
                                 "from": {
                                     "key_code": "left_shift",
-                                    "modifiers": { "optional": ["any"] }
+                                    "modifiers": {
+                                        "mandatory": [],
+                                        "optional": []
+                                    }
                                 },
                                 "to_if_alone": [
                                     {
@@ -120,7 +123,7 @@
                                         "modifiers": ["left_command"]
                                     }
                                 ],
-                                "to_if_held_down": [{ "modifier_flag": "shift" }],
+                                "to_if_held_down": [{ "key_code": "left_shift" }],
                                 "type": "basic"
                             }
                         ]
@@ -236,7 +239,7 @@
             "selected": true,
             "virtual_hid_keyboard": {
                 "country_code": 0,
-                "keyboard_type_v2": "iso"
+                "keyboard_type_v2": "ansi"
             }
         }
     ]
