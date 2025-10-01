@@ -5,7 +5,7 @@ xkb_keycodes      { include "evdev+aliases(azerty)" };
 xkb_types         { 
     include "complete"
 
-    type "SEVEN_LEVEL_KEYS" {
+    type "SEVEN_LEVEL_KEY" {
         modifiers = Shift + Lock + LevelThree + Control + Alt + Mod4;
 
         // ==============================

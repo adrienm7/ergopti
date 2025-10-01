@@ -154,7 +154,9 @@ def create_layout_name(
     Returns:
         tuple[str, str]: (layout_id, layout_name)
     """
-    layout_id = variant.replace('.', '_') # If there are dots in the id (here in version number), the layout doesn't work
+    layout_id = variant.replace(
+        ".", "_"
+    )  # If there are dots in the id (here in version number), the layout doesn't work
     layout_name = f"France - {variant.replace('_', ' ')}"
 
     if use_date_in_filename:
