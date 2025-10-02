@@ -591,7 +591,7 @@ keyboard-key[data-content='Caps<br>word'] {
 
 /* Change font to avoid an ugly % glyph */
 keyboard-key[data-content='%'],
-keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
+keyboard-key[data-content='<nbsp></nbsp>%'] {
 	font-family:
 		system-ui,
 		-apple-system,
@@ -679,7 +679,7 @@ keyboard-key[data-content='<espace-insecable></espace-insecable>%'] {
 ==========================================
 */
 
-espace-insecable {
+nbsp {
 	background-color: white;
 	border-radius: 1px;
 	display: inline-block;
