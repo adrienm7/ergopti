@@ -5,7 +5,7 @@
 	import IntroductionDisposition from './accueil/introduction_ergopti.svelte';
 	import IntroductionDispositionPlus from './ergopti-plus/introduction_ergopti_plus.svelte';
 	import IntroductionBenchmarks from './benchmarks/introduction_benchmarks.svelte';
-	import IntroductionTelechargements from './telechargements/introduction_telechargements.svelte';
+	import IntroductionTelechargements from './utilisation/introduction_telechargements.svelte';
 	import IntroductionInformations from './informations/introduction_informations.svelte';
 	import DispositionPlus from './accueil/ergopti_plus.svelte';
 
@@ -95,7 +95,7 @@
 			{#if $page.url.pathname === '/benchmarks'}
 				<IntroductionBenchmarks></IntroductionBenchmarks>
 			{/if}
-			{#if $page.url.pathname === '/telechargements'}
+			{#if $page.url.pathname === '/utilisation'}
 				<IntroductionTelechargements></IntroductionTelechargements>
 			{/if}
 			{#if $page.url.pathname === '/informations'}

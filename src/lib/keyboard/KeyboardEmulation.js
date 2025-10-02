@@ -256,7 +256,7 @@ export class KeyboardEmulation extends Keyboard {
 		}
 
 		// Clean potential html code, added for visualisation reasons, that can’t be rendered in a plain text input box
-		resultToSend = resultToSend.replace(/<espace-insecable><\/espace-insecable>/g, ' ');
+		resultToSend = resultToSend.replace(/<nbsp><\/nbsp>/g, ' ');
 		resultToSend = resultToSend.replace(/<tap-hold>.*<\/tap-hold>/g, '');
 		resultToSend = resultToSend.replace('␣', ' ');
 

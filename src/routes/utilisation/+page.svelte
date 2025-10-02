@@ -3,8 +3,9 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 
-	import ComparateursDispositions from './comparateurs_dispositions.svelte';
-	import Installation from './installation.svelte';
+	import InstallationWindows from './installation_windows.svelte';
+	import InstallationMac from './installation_mac.svelte';
+	import InstallationLinux from './installation_linux.svelte';
 
 	import { version } from '$lib/stores_infos.js';
 
@@ -35,10 +36,9 @@
 	<meta name="description" content="Fichiers pour utiliser Ergopti" />
 </svelte:head>
 
-<Installation />
-{#if versionValue && compareVersions(versionValue, '1.1.0') >= 0}
-	<ComparateursDispositions />
-{/if}
+<InstallationWindows />
+<InstallationMac />
+<InstallationLinux />
 
 <!-- <h2>Installation</h2>
 	<h3>Instructions générales</h3>

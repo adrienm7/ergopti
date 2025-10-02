@@ -132,15 +132,15 @@
 				<span class="title" style="margin-top:3px;">Benchmarks</span>
 			</a>
 			<a
-				href="/telechargements"
+				href="/utilisation"
 				onclick={closeMenu}
-				aria-label="Accéder à la page Téléchargements"
-				aria-current={$page.url.pathname === '/telechargements' ? 'page' : undefined}
+				aria-label="Accéder à la page Utilisation"
+				aria-current={$page.url.pathname === '/utilisation' ? 'page' : undefined}
 			>
 				<i class="icon-download" style="margin-right:3px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
-				<span class="title">Téléchargements</span>
+				<span class="title">Utilisation</span>
 			</a>
 			<a
 				href="/informations"

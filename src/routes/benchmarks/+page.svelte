@@ -7,6 +7,7 @@
 	import AnalyseErgoptiPlus from './analyse_ergopti_plus.svelte';
 	import CommentComparer from './comment_comparer.svelte';
 	import Corpus from './corpus.svelte';
+	import ComparateursDispositions from './comparateurs_dispositions.svelte';
 
 	let versionValue;
 	version.subscribe((value) => {
@@ -187,4 +188,5 @@
 	/>
 
 	<AnalyseErgoptiPlus></AnalyseErgoptiPlus>
+	<ComparateursDispositions></ComparateursDispositions>
 </div>
