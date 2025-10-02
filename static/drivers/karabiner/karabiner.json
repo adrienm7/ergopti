@@ -112,18 +112,15 @@
                             {
                                 "from": {
                                     "key_code": "left_shift",
-                                    "modifiers": {
-                                        "mandatory": [],
-                                        "optional": []
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
+                                "to": [{ "key_code": "left_shift" }],
                                 "to_if_alone": [
                                     {
                                         "key_code": "o",
                                         "modifiers": ["left_command"]
                                     }
                                 ],
-                                "to_if_held_down": [{ "key_code": "left_shift" }],
                                 "type": "basic"
                             }
                         ]
