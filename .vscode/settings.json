@@ -1,15 +1,3 @@
 {
     "cSpell.words": ["ergopti", "kbdedit", "keylayout", "keylayouts", "keymap", "keymaps"],
-    "chat.promptFiles": true,
-    "chat.promptFilesLocations": {
-        ".vscode/prompts": true
-    },
-    "chat.instructionsFilesLocations": {
-        ".vscode/instructions": true
-    },
-    "github.copilot.chat.commitMessageGeneration.instructions": [
-        {
-            "file": ".vscode/instructions/commit-message.instructions.md"
-        }
-    ],
 }
