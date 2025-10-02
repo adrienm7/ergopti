@@ -24,15 +24,6 @@
 	background-color: var(--bg-white);
 	color: black;
 }
-.cards .card:nth-child(odd) .important {
-	background: none;
-	-webkit-background-clip: border-box;
-	background-clip: border-box;
-	font-weight: bold;
-	-webkit-text-fill-color: initial;
-	color: inherit;
-	text-decoration: none;
-}
 
 /* Adapt icons color to the background of the card */
 .cards .card:nth-child(odd) i .path1,
@@ -44,7 +35,20 @@
 	background-image: none;
 }
 
-/* Screen larger than 500px ➜ 2 column */
+/* 1 column */
+@media (max-width: 500px) {
+	.cards .card:nth-child(odd) .important {
+		background: none;
+		-webkit-background-clip: border-box;
+		background-clip: border-box;
+		font-weight: bold;
+		-webkit-text-fill-color: initial;
+		color: inherit;
+		text-decoration: none;
+	}
+}
+
+/* Screen larger than 500px ➜ 2 columns */
 @media (min-width: 500px) and (max-width: 900px) {
 	.cards {
 		grid-template-columns: repeat(2, 1fr);
@@ -108,5 +112,14 @@
 @media (min-width: 900px) {
 	.cards {
 		grid-template-columns: repeat(3, 1fr);
+	}
+	.cards .card:nth-child(odd) .important {
+		background: none;
+		-webkit-background-clip: border-box;
+		background-clip: border-box;
+		font-weight: bold;
+		-webkit-text-fill-color: initial;
+		color: inherit;
+		text-decoration: none;
 	}
 }

@@ -28,7 +28,7 @@ Ergopti est une disposition de clavier ergonomique et optimisée possédant les 
   - ajout de nouveaux roulements de confort (par exemple <kbd>hc</kbd> donne <kbd>wh</kbd>) ;
   - etc.
  
-➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/telechargements#clavier_emulation.
+➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/utilisation#clavier_emulation.
 
 ---
 

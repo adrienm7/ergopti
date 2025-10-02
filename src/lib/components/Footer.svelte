@@ -19,6 +19,7 @@
 	footer {
 		align-items: center;
 		background-color: rgba(0, 0, 0, 0.8);
+		border-top: 1px solid rgb(200, 200, 200);
 		box-shadow: 0 0 3px 2px var(--couleur-ombre);
 		color: white;
 		display: flex;

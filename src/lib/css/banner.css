@@ -1,4 +1,6 @@
-/* Was used when the banner "En construction" was set */
+:root {
+	--banner-height: 0em;
+}
 
 .banner {
 	align-items: center;
@@ -21,11 +23,29 @@
 	z-index: 90;
 }
 
-.banner p {
+@media (max-width: 800px) {
+	:root {
+		--banner-height: 3.5rem;
+	}
+
+	.banner {
+		border-width: 0;
+		border-bottom: 1px solid white;
+		border-top: 2px solid white;
+		height: var(--banner-height);
+		right: 0;
+		top: var(--header-height);
+		transform: none;
+	}
+}
+
+.banner p,
+.banner a {
 	color: white;
-	font-size: clamp(10px, 1.7vw, 18px);
+	font-size: 1rem;
+	font-variant-caps: small-caps;
 	font-weight: bold;
 	line-height: 1;
 	text-align: center;
-	text-transform: uppercase;
+	text-decoration: none;
 }

@@ -5,9 +5,9 @@
 </script>
 
 <section>
-	<h2>Changelog</h2>
+	<h2 id="changelog">Changelog</h2>
 
-	<h3>Version 2.2 (Septembre 2025)</h3>
+	<h3>Version 2.2 (Octobre 2025)</h3>
 	<p>
 		Le changement le plus visible d’<Ergopti></Ergopti> v2.2 est la permutation des touches
 		<kbd>€</kbd>, <kbd>%</kbd> et <kbd>=</kbd> sur la rangée des chiffres. Celle-ci a été réalisée
