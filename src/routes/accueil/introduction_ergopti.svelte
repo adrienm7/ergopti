@@ -77,7 +77,7 @@
 	<tiny-space></tiny-space>
 
 	<div style="text-align:center;">
-		<a href="/telechargements">
+		<a href="/utilisation">
 			<button class="bouton-telechargement">➜ Essayer en ligne / Installation</button>
 		</a>
 	</div>

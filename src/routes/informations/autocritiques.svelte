@@ -105,7 +105,7 @@
 	<p class="encadre">
 		<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
 		<a href="/benchmarks">page de benchmarks</a>
-		ainsi que sur la <a href="/telechargements">page de téléchargements</a>, par installation via
+		ainsi que sur la <a href="/utilisation">page de téléchargements</a>, par installation via
 		Kalamine. Elle utilise le fait qu’<Ergopti></Ergopti> ait été conçue de base pour utiliser de nouvelles
 		fonctionnalités grâce à l’emplacement réservé à la touche magique <kbd>★</kbd>. Cependant, les
 		gains apportés par cette version 1DFH sont faibles et il est donc recommandé de ne pas

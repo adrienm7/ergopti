@@ -16,8 +16,8 @@
 		version_mineure_kla_iso = getLatestVersion('kla_iso', versionValue);
 		version_mineure_kla_iso_plus = getLatestVersion('kla_iso_plus', versionValue);
 		version_mineure_kla_ergodox = getLatestVersion('kla_ergodox', versionValue);
-		version_mineure_kalamine_1dk = getLatestVersion('kalamine_1dk', versionValue);
-		version_mineure_kalamine_analyse = getLatestVersion('kalamine_analyse', versionValue);
+		version_mineure_kalamine_1dk = '2.1.2'; // getLatestVersion('kalamine_1dk', versionValue);
+		version_mineure_kalamine_analyse = '2.1.2'; // getLatestVersion('kalamine_analyse', versionValue);
 	});
 
 	let version_mineure_kalamine;
@@ -89,7 +89,7 @@
 		</div>
 		<tiny-space></tiny-space>
 		<span>Version pour l’analyseur Ergo-L :&nbsp;</span><a
-			href="/pilotes/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
+			href="/drivers/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
 			download
 			><button
 				>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</button

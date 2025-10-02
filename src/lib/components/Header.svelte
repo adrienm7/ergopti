@@ -178,7 +178,7 @@
 		</div>
 	</nav>
 </header>
-<div style="height: var(--header-height);"></div>
+<div style="height: calc(var(--header-height) + var(--banner-height));"></div>
 
 <style>
 	:root {
@@ -279,7 +279,7 @@
 	}
 
 	#version-selection {
-		border: 1px solid rgb(0, 129, 194);
+		border: 1px solid rgb(0, 76, 139);
 		border-radius: 5px;
 		color: white;
 		margin: 0;
@@ -394,8 +394,9 @@
 
 		header .menu-icon .navicon {
 			background: var(--couleur-icone-hamburger);
+			border-radius: 5px;
 			display: block;
-			height: 2px;
+			height: 1.7px;
 			position: relative;
 			transition: background 0.1s ease-out;
 			width: var(--longueur-traits-hamburger);
@@ -404,16 +405,17 @@
 		header .menu-icon .navicon:before,
 		header .menu-icon .navicon:after {
 			background: var(--couleur-icone-hamburger);
+			border-radius: 5px;
 			content: '';
 			display: block;
-			height: 100%;
+			height: 1.5px;
 			position: absolute;
 			transition: all 0.1s ease-out;
-			width: 100%;
+			width: var(--longueur-traits-hamburger);
 		}
 
 		header .menu-icon .navicon:before {
-			top: 5px; /* Écartement des barres du hamburger */
+			top: 6px; /* Écartement des barres du hamburger */
 		}
 
 		header .menu-icon .navicon:after {
