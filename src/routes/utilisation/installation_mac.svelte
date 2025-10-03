@@ -10,31 +10,36 @@
 	});
 </script>
 
-<h2>Installation macOS</h2>
+<h2 id="macos">
+	<i class="icon-appleinc purple" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+	></i>Installation macOS
+</h2>
 <tiny-space></tiny-space>
 <div>
 	{#if version_mineure_kbdedit_mac !== undefined}
 		<a href="/drivers/macos/Ergopti_v{version_mineure_kbdedit_mac}.bundle.zip" download>
-			<button class="bouton-telechargement">☛ Ergopti_v{version_mineure_kbdedit_mac}.bundle</button>
+			<button class="bouton-telechargement"
+				><i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
+				Ergopti_v{version_mineure_kbdedit_mac}.bundle</button
+			>
 		</a>
 	{/if}
 </div>
-<p>Ce bundle doit être dézippé puis placé dans le dossier des extensions de clavier de macOS :</p>
-<pre><code>/Library/Keyboard Layouts/</code></pre>
+<p>Ce bundle doit être dézippé puis placé dans le dossier des extensions de clavier de macOS :</p>
+<code>/Library/Keyboard Layouts/</code>
 
 <p>
 	Il est aussi possible de l’installer sans droits d’administrateur en plaçant le bundle dans le
-	dossier des utilisateurs :
+	dossier utilisateur :
 </p>
-<pre><code>~/Library/Keyboard Layouts/</code></pre>
+<code>~/Library/Keyboard Layouts/</code>
 
 <br />
 <p>
-	Après avoir placé le bundle dans le bon dossier, il faut redémarrer la session (ou l’ordinateur)
-	pour que macOS prenne en compte la nouvelle disposition. Ensuite, il faut aller dans les
-	Préférences Système → Clavier → Méthodes de saisie et ajouter la disposition Ergopti.
-	Généralement, la disposition se trouvera dans la section "Français", mais elle peut aussi se
-	trouver dans "Autres".
+	Après avoir placé le bundle dans le bon dossier, redémarrer la session (ou l’ordinateur) pour que
+	macOS prenne en compte la nouvelle disposition. Ensuite, aller dans Préférences Système ➜ Clavier
+	➜ Méthodes de saisie et ajouter la disposition Ergopti. Généralement, la disposition se trouvera
+	dans la section « Français », mais elle peut aussi parfois se trouver dans « Autres ».
 </p>
 
 <h3>Résolution de problèmes connus</h3>
@@ -58,5 +63,23 @@
 		d’un caractère d’un coup, comme <kbd><nbsp></nbsp>:</kbd>. Ce problème cause surtout des
 		difficultés avec ErgoptiPlus qui contient beaucoup de nouvelles touches mortes. Le keylayout
 		Ergopti standard ne présente pas ce problème n’ayant que des touches mortes simples.
+	</li>
+	<li>
+		Parfois, Ergopti peut ne pas s’afficher dans la liste des dispositions clavier. Pour résoudre ce
+		problème, extraire le fichier keylayout du bundle et le placer dans le même dossier que celui-ci
+		(en supprimant le bundle, pour ne pas avoir de doublon d’ids). Le bundle n’est qu’un moyen un
+		peu plus complexe d’installer des fichiers keylayouts, en permettant d’ajouter une traduction
+		des noms, installer plusieurs variantes d’un coup, etc. <br />Si, après redémarrage, Ergopti ne
+		s’affiche pas dans « Autres », alors c’est que le keylayout pose problème. C’est grâce au bundle
+		que la disposition peut s’afficher dans la catégorie « Français », ici il est certain que la
+		disposition sera dans « Autres » si elle est reconnue.
+		<br />
+		En dernier recours, on peut essayer d’ouvrir le keylayout avec le logiciel Ukulele, pour vérifier
+		sa validité. Il est aussi possible de le modifier directement avec un éditeur de texte, car il s’agit
+		d’un simple fichier XML.
+		<br />
+		Ce problème ne devrait cependant a priori jamais exister, car le fichier keylayout est toujours testé
+		avant d’être partagé. Ces tests sont à la fois manuels et automatisés par de nombreux tests unitaires
+		Python.
 	</li>
 </ul>

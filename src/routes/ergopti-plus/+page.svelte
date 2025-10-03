@@ -9,7 +9,6 @@
 	import Raccourcis from './raccourcis.svelte';
 	import Roulements from './roulements.svelte';
 	import Reduction_SFBs from './reduction_sfbs.svelte';
-	import IntroductionHypertextePlus from './introduction_ergopti_plus.svelte';
 </script>
 
 <svelte:head>

@@ -18,7 +18,7 @@
 	});
 </script>
 
-<h2 class="first-h2">Installation Windows</h2>
+<h2 id="windows"><i class="icon-windows8 purple"></i> Installation Windows</h2>
 <p>
 	Les fichiers de cette section ont été réalisés à l’aide de <a
 		class="link"
@@ -31,7 +31,9 @@
 <div>
 	{#if version_mineure_kbdedit_exe !== undefined}
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
-			<button class="bouton-telechargement">☛ Ergopti_v{version_mineure_kbdedit_exe}.exe</button>
+			<button class="bouton-telechargement"
+				><i class="icon-windows8"></i> Ergopti_v{version_mineure_kbdedit_exe}.exe</button
+			>
 		</a>
 	{/if}
 </div>
@@ -39,7 +41,9 @@
 <div>
 	{#if version_mineure_kbdedit_kbe !== undefined}
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
-			<button>Fichier source KbdEdit de Ergopti_v{version_mineure_kbdedit_kbe}</button>
+			<button
+				><i class="icon-windows8"></i> Fichier source KbdEdit d’Ergopti_v{version_mineure_kbdedit_kbe}</button
+			>
 		</a>
 	{/if}
 </div>
@@ -47,7 +51,10 @@
 <div>
 	{#if version_mineure_plus !== undefined}
 		<a href="/drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download>
-			<button class="bouton-telechargement">☛ ErgoptiPlus_v{version_mineure_plus}.ahk</button>
+			<button class="bouton-telechargement"
+				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
+				ErgoptiPlus_v{version_mineure_plus}.ahk</button
+			>
 		</a>
 	{/if}
 </div>
@@ -101,5 +108,18 @@
 		d’édition de la cellule : tout ce qui est tapé avant disparaît et le
 		<kbd-output>+</kbd-output> apparaît. Ce problème est résolu en utilisant le script ErgoptiPlus.ahk
 		pour émuler la disposition.
+	</li>
+	<li>
+		Un utilisateur de la version AutoHotkey avait des problèmes avec les remplacements de texte,
+		notamment pour l’autocorrection. Après de nombreuses recherches, il s’est avéré que la cause
+		était le logiciel de contrôle des LEDs de sa tour de pc, qui interférait avec AutoHotkey. Pour
+		résoudre ce genre de problèmes, il faut donc dans un premier temps fermer toutes ses
+		applications sauf AutoHotkey pour vérifier si le problème persiste. S’il persiste, c’est
+		peut-être un problème affectant tous les utilisateurs de la version AutoHotkey et vous êtes
+		invité à le signaler sur le GitHub ou le Discord. Le script AutoHotkey étant cependant utilisé
+		intensivement par plusieurs utilisateurs, la plupart des problèmes sont déjà résolus et il est
+		plus probable qu’il provienne d’un conflit avec une application. Cela peut être notamment si
+		vous utilisez un autre logiciel de remappage de clavier, ou un logiciel qui intercepte les
+		frappes clavier pour faire des raccourcis (Kanata, PowerToys, Espanso, etc.).
 	</li>
 </ul>
