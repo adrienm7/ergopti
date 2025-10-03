@@ -7,7 +7,10 @@ from typing import Any, Dict, List, Tuple
 import yaml
 from data.levels import LEVELS
 from data.unused_symbols import UNUSED_SYMBOLS
-from utilities.information_extraction import extract_keymap_body, get_symbol
+from utilities.information_extraction import (
+    extract_keymap_body,
+    get_symbol,
+)
 
 data_dir: Path = Path(__file__).parent / "data"
 LINUX_TO_MACOS_KEYCODES: list[Tuple[str, str]] = json.loads(
@@ -71,9 +74,9 @@ def extract_keymaps(keylayout_data: str) -> List[Any]:
     Returns:
         List of keymaps for each level.
     """
-    logger.info("Extracting keymaps from <keyMapSet id='ISO'>...")
+    logger.info("Extracting keymaps…")
     keymaps = [
-        extract_keymap_body(keylayout_data, i, keymapset_id="ISO")
+        extract_keymap_body(keylayout_data, i)
         for i in [
             LEVELS["Base"],
             LEVELS["CapsLock"],

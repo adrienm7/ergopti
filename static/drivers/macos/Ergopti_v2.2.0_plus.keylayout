@@ -1,8 +1,8 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-25093075" maxout="1" name="Ergopti v2.2.0 Beta 3 Plus">
+<keyboard group="126" id="-25100315" maxout="1" name="Ergopti v2.2.0 Beta 3 Plus">
 	<layouts>
-		<layout first="0" last="0" mapSet="ISO" modifiers="commonModifiers"/>
+		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
 	<modifierMap id="commonModifiers" defaultIndex="0">
 		<keyMapSelect mapIndex="0">
@@ -28,7 +28,7 @@
 			<modifier keys="anyOption anyShift caps?"/>
 		</keyMapSelect>
 	</modifierMap>
-	<keyMapSet id="ISO">
+	<keyMapSet id="layout">
 		<keyMap index="0">
 			<key code="0" action="a"/>
 			<key code="1" action="i"/>

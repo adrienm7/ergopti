@@ -231,7 +231,7 @@ def install_xcompose(xcompose_file):
     if validate_file(xcompose_file, ".XCompose"):  # Validate the XCompose file
         user_choice = (
             input(
-                "Le fichier existe déjà. Voulez-vous le remplacer ? (Oui/Non) "
+                "Le fichier XCompose existe déjà. Voulez-vous l’écraser ? (Oui/Non) "
             )
             .strip()
             .lower()

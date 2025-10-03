@@ -8,7 +8,7 @@ except ImportError:
 
 
 def extract_keymap_body(
-    xml_text: str, index: int, keymapset_id: str = "ISO"
+    xml_text: str, index: int, keymapset_id: str = "layout"
 ) -> str:
     """
     Extract the inner content of a <keyMap> by index from a specific <keyMapSet> block.
@@ -16,7 +16,7 @@ def extract_keymap_body(
     Args:
         xml_text (str): The full XML text containing the keyMapSet blocks.
         index (int): The index of the keyMap to extract.
-        keymapset_id (str, optional): The id of the keyMapSet to search in. Defaults to "ISO".
+        keymapset_id (str, optional): The id of the keyMapSet to search in. Defaults to "layout".
 
     Returns:
         str: The inner content of the <keyMap> block.
