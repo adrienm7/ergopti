@@ -11,7 +11,7 @@ from utilities.keylayout_modification import (
     delete_keymap,
     replace_keymap,
     replace_keymapselect,
-    replace_keymapset_id_with_iso,
+    replace_keymapset_id_with_layout,
     replace_modifier_map_id,
 )
 from utilities.keylayout_sorting import sort_keylayout
@@ -77,7 +77,7 @@ def correct_keylayout(content: str) -> str:
     content = change_keymap_id(content, 7, 6)
 
     content = replace_modifier_map_id(content)
-    content = replace_keymapset_id_with_iso(content)
+    content = replace_keymapset_id_with_layout(content)
 
     content = normalize_attribute_entities(content)
     content = replace_action_to_output_extra_keys(content, EXTRA_KEYS)

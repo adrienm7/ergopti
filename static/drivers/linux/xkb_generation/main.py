@@ -1,13 +1,14 @@
 import datetime
 import re
-from logging import getLogger
+import sys
 from pathlib import Path
 from typing import Optional, Union
 
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+from utilities.keylayout_extraction import extract_name_from_file
+from utilities.logger import logger
 from xcompose_creation import generate_xcompose
 from xkb_creation import generate_xkb
-
-logger = getLogger("ergopti.linux")
 
 
 def main(
@@ -59,7 +60,7 @@ def main(
 
         variant = keylayout_path.stem
         layout_id, layout_name = create_layout_name(
-            variant, use_date_in_filename
+            keylayout, variant, use_date_in_filename
         )
         xkb_template = re.sub(
             r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_template
@@ -75,11 +76,11 @@ def main(
         xkb_out_path = out_dir / f"{base_name}.xkb"
         xcompose_out_path = out_dir / f"{base_name}.XCompose"
 
-        logger.info("Generating XKB content for %s...", variant)
+        logger.info("Generating XKB content for %s…", variant)
         xkb_content, mapped_symbols = generate_xkb(xkb_template, keylayout)
         save_file(xkb_out_path, xkb_content)
 
-        logger.info("Generating XCompose content for %s...", variant)
+        logger.info("Generating XCompose content for %s…", variant)
         xcompose_content = generate_xcompose(keylayout, mapped_symbols)
         save_file(xcompose_out_path, xcompose_content)
 
@@ -142,7 +143,7 @@ def save_file(file_path: Union[str, Path], content: str) -> None:
 
 
 def create_layout_name(
-    variant: str, use_date_in_filename: bool
+    keylayout: str, variant: str, use_date_in_filename: bool
 ) -> tuple[str, str]:
     """
     Generate the layout id and display name from the variant and optionally the date.
@@ -157,7 +158,7 @@ def create_layout_name(
     layout_id = variant.replace(
         ".", "_"
     )  # If there are dots in the id (here in version number), the layout doesn't work
-    layout_name = f"France - {variant.replace('_', ' ')}"
+    layout_name = "France - " + extract_name_from_file(keylayout)
 
     if use_date_in_filename:
         now = datetime.datetime.now()

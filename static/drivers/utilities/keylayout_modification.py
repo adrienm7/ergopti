@@ -152,12 +152,12 @@ def replace_modifier_map_id(content: str) -> str:
     return content
 
 
-def replace_keymapset_id_with_iso(content: str) -> str:
+def replace_keymapset_id_with_layout(content: str) -> str:
     """
-    Replace the id attribute value in <keyMapSet id="..."> with 'ISO', regardless of its original value.
+    Replace the id attribute value in <keyMapSet id="..."> with 'layout', regardless of its original value.
     """
     logger.info(
-        "%s🔹 Replacing <keyMapSet id=...> with id='ISO'…",
+        "%s🔹 Replacing <keyMapSet id=...> with id='layout'…",
         LOGS_INDENTATION + "\t",
     )
     # Find the id value in <keyMapSet id="...">
@@ -170,10 +170,10 @@ def replace_keymapset_id_with_iso(content: str) -> str:
     old_id = match.group(1)
     # Replace the id in <keyMapSet ...>
     content = re.sub(
-        r'(<keyMapSet\s+id=")[^"]+("[^>]*>)', r"\1ISO\2", content, count=1
+        r'(<keyMapSet\s+id=")[^"]+("[^>]*>)', r"\1layout\2", content, count=1
     )
     # Replace all references to the old id (e.g. mapSet="16c")
     content = re.sub(
-        rf'(mapSet=")({re.escape(old_id)})(")', r"\1ISO\3", content
+        rf'(mapSet=")({re.escape(old_id)})(")', r"\1layout\3", content
     )
     return content

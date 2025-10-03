@@ -87,7 +87,7 @@ xkb_compatibility { include "complete" };
 partial alphanumeric_keys
 xkb_symbols "Ergopti_v2_2_0" {
 
-	name[Group1] = "France - Ergopti v2.2.0";
+	name[Group1] = "France - Ergopti v2.2.0 Beta 3";
 
 	include "latin"
 
