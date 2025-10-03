@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import glob
 import os
 import pwd
 import shutil
@@ -291,14 +290,7 @@ def update_xkb_symbols(source_file, symbols_line, system_file):
         print(f"Fichier non trouvé : {system_file}")
         return
 
-    # Check if the section already exists in the system file
-    with open(system_file, "r") as file:
-        if f'xkb_symbols "{symbols_line}"' in file.read():
-            print(
-                f"La section '{symbols_line}' existe déjà dans {system_file}."
-            )
-            return
-
+    # Récupère la section à copier depuis le fichier source
     with open(source_file, "r") as file:
         lines = file.readlines()
 
@@ -332,12 +324,39 @@ def update_xkb_symbols(source_file, symbols_line, system_file):
         )
         return
 
+    # Lit le fichier système pour voir si la section existe déjà
+    with open(system_file, "r") as file:
+        system_lines = file.readlines()
+
+    start_idx = None
+    end_idx = None
+    for i, line in enumerate(system_lines):
+        if f'xkb_symbols "{symbols_line}"' in line and "{" in line:
+            start_idx = i
+            brace_level = 0
+            for j in range(i, len(system_lines)):
+                brace_level += system_lines[j].count("{")
+                brace_level -= system_lines[j].count("}")
+                if brace_level == 0 and system_lines[j].strip().endswith("};"):
+                    end_idx = j
+                    break
+            break
+
     backup_file(system_file)
 
-    # Append the section to the system file
-    with open(system_file, "a") as file:
-        file.writelines(section_lines)
-        print(f"Section copiée avec succès dans {system_file}")
+    if start_idx is not None and end_idx is not None:
+        # Remplace la section existante
+        system_lines[start_idx : end_idx + 1] = section_lines
+        with open(system_file, "w") as file:
+            file.writelines(system_lines)
+        print(
+            f"Section '{symbols_line}' mise à jour avec succès dans {system_file}"
+        )
+    else:
+        # Ajoute la section à la fin si elle n'existe pas
+        with open(system_file, "a") as file:
+            file.writelines(section_lines)
+        print(f"Section '{symbols_line}' ajoutée avec succès à {system_file}")
 
 
 def update_xkb_types(source_file, system_file):
@@ -355,28 +374,23 @@ def update_xkb_types(source_file, system_file):
         with open(source_file, "r") as file:
             source_lines = file.readlines()
 
-        # TODO: auto discover of types to copy
-        sections_to_copy = [
-            "SEVEN_LEVEL_KEY",
-        ]
-        collected_sections = {section: [] for section in sections_to_copy}
-
+        # Découverte automatique des types à copier
+        sections_to_copy = []
+        collected_sections = {}
         current_section = None
         brace_level = 0
         for line in source_lines:
-            if any(f'type "{section}"' in line for section in sections_to_copy):
-                current_section = next(
-                    section
-                    for section in sections_to_copy
-                    if f'type "{section}"' in line
-                )
-                brace_level = 0
+            if line.strip().startswith('type "') and "{" in line:
+                current_section = line.split('type "')[1].split('"')[0]
+                sections_to_copy.append(current_section)
+                collected_sections[current_section] = [line]
+                brace_level = line.count("{") - line.count("}")
+                continue
 
             if current_section:
+                collected_sections[current_section].append(line)
                 brace_level += line.count("{")
                 brace_level -= line.count("}")
-
-                collected_sections[current_section].append(line)
                 if brace_level == 0:
                     current_section = None
 
@@ -385,10 +399,29 @@ def update_xkb_types(source_file, system_file):
 
         # Vérifier si les sections existent déjà dans le fichier système
         for section in sections_to_copy:
-            if any(f'type "{section}"' in line for line in system_lines):
-                print(f"La section '{section}' existe déjà dans {system_file}.")
-                # TODO: replace content instead of exiting
-                return
+            start_idx = None
+            end_idx = None
+            for i, line in enumerate(system_lines):
+                if f'type "{section}"' in line and "{" in line:
+                    start_idx = i
+                    brace_level = 0
+                    for j in range(i, len(system_lines)):
+                        brace_level += system_lines[j].count("{")
+                        brace_level -= system_lines[j].count("}")
+                        if brace_level == 0 and system_lines[
+                            j
+                        ].strip().endswith("};"):
+                            end_idx = j
+                            break
+                    break
+
+            if start_idx is not None and end_idx is not None:
+                system_lines[start_idx : end_idx + 1] = collected_sections[
+                    section
+                ]
+                print(
+                    f"Section '{section}' mise à jour avec succès dans {system_file}"
+                )
 
         insertion_point = None
         section_found = False
@@ -425,6 +458,361 @@ def update_xkb_types(source_file, system_file):
 
     except IOError as e:
         print(f"Erreur lors de la lecture/écriture des fichiers : {e}")
+
+
+def main(args):
+    check_sudo()
+
+    if len(args) < 2 or args[1] in ["-h", "--help"]:
+        show_help()
+        return
+
+    xkb_file = args[1]
+    if not validate_file(xkb_file, ".xkb"):  # Validation du fichier XKB
+        sys.exit(1)
+
+    # Extraction des informations nécessaires à partir du fichier XKB
+    symbols_line, name_line = extract_xkb_info(xkb_file)
+
+    # Copie du fichier XKB dans le répertoire approprié – NE FONCTIONNE PAS FORCÉMENT ; dépend de la version de X11 !
+    # xkb_dest_dir = f"{xkb_folder}/symbols/"
+    # install_file(xkb_file, xkb_dest_dir)
+
+    # Mise à jour des symbols XKB
+    xkb_symbols_file = f"{xkb_folder}/symbols/fr"
+    update_xkb_symbols(xkb_file, symbols_line, xkb_symbols_file)
+
+    # Mise à jour des types XKB
+    xkb_types_file = f"{xkb_folder}/types/extra"
+    update_xkb_types(xkb_file, xkb_types_file)
+
+    # Mise à jour du fichier LST
+    lst_file = f"{xkb_folder}/rules/evdev.lst"
+    update_lst(lst_file, symbols_line, name_line)
+
+    # Mise à jour du fichier XML
+    xml_file = f"{xkb_folder}/rules/evdev.xml"
+    update_xml(xml_file, symbols_line, name_line)
+
+    # Installation du fichier XCompose (optionnel)
+    xcompose_file = args[2] if len(args) > 2 else None
+    if xcompose_file:
+        install_xcompose(xcompose_file)  # Install the XCompose file
+
+
+if __name__ == "__main__":
+    if sys.platform == "win32":
+        raise RuntimeError(
+            "Ce script ne doit pas être lancé sous Windows : il est prévu pour Linux."
+        )
+
+    if len(sys.argv) < 2:
+        print(
+            "Mode automatique : recherche du fichier .xkb le plus récent et du .XCompose dans le dossier courant..."
+        )
+        xkb_files = glob.glob(os.path.join(os.path.dirname(__file__), "*.xkb"))
+        xcompose_files = glob.glob(
+            os.path.join(os.path.dirname(__file__), "*.XCompose")
+        )
+        if not xkb_files:
+            print("Aucun fichier .xkb trouvé.")
+            sys.exit(1)
+        # Sélectionne le .xkb le plus récent
+        xkb_file = max(xkb_files, key=os.path.getmtime)
+        print(f"Fichier XKB le plus récent trouvé : {xkb_file}")
+        xcompose_file = xcompose_files[0] if xcompose_files else None
+        if xcompose_file:
+            print(f"Fichier XCompose trouvé : {xcompose_file}")
+            args = [sys.argv[0], xkb_file, xcompose_file]
+        else:
+            args = [sys.argv[0], xkb_file]
+        main(args)
+    else:
+        main(sys.argv)
+
+
+def main(args):
+    check_sudo()
+
+    if len(args) < 2 or args[1] in ["-h", "--help"]:
+        show_help()
+        return
+
+    xkb_file = args[1]
+    if not validate_file(xkb_file, ".xkb"):  # Validation du fichier XKB
+        sys.exit(1)
+
+    # Extraction des informations nécessaires à partir du fichier XKB
+    symbols_line, name_line = extract_xkb_info(xkb_file)
+
+    # Copie du fichier XKB dans le répertoire approprié – NE FONCTIONNE PAS FORCÉMENT ; dépend de la version de X11 !
+    # xkb_dest_dir = f"{xkb_folder}/symbols/"
+    # install_file(xkb_file, xkb_dest_dir)
+
+    # Mise à jour des symbols XKB
+    xkb_symbols_file = f"{xkb_folder}/symbols/fr"
+    update_xkb_symbols(xkb_file, symbols_line, xkb_symbols_file)
+
+    # Mise à jour des types XKB
+    xkb_types_file = f"{xkb_folder}/types/extra"
+    update_xkb_types(xkb_file, xkb_types_file)
+
+    # Mise à jour du fichier LST
+    lst_file = f"{xkb_folder}/rules/evdev.lst"
+    update_lst(lst_file, symbols_line, name_line)
+
+    # Mise à jour du fichier XML
+    xml_file = f"{xkb_folder}/rules/evdev.xml"
+    update_xml(xml_file, symbols_line, name_line)
+
+    # Installation du fichier XCompose (optionnel)
+    xcompose_file = args[2] if len(args) > 2 else None
+    if xcompose_file:
+        install_xcompose(xcompose_file)  # Install the XCompose file
+
+
+if __name__ == "__main__":
+    if sys.platform == "win32":
+        raise RuntimeError(
+            "Ce script ne doit pas être lancé sous Windows : il est prévu pour Linux."
+        )
+
+    if len(sys.argv) < 2:
+        print(
+            "Mode automatique : recherche du fichier .xkb le plus récent et du .XCompose dans le dossier courant..."
+        )
+        xkb_files = glob.glob(os.path.join(os.path.dirname(__file__), "*.xkb"))
+        xcompose_files = glob.glob(
+            os.path.join(os.path.dirname(__file__), "*.XCompose")
+        )
+        if not xkb_files:
+            print("Aucun fichier .xkb trouvé.")
+            sys.exit(1)
+        # Sélectionne le .xkb le plus récent
+        xkb_file = max(xkb_files, key=os.path.getmtime)
+        print(f"Fichier XKB le plus récent trouvé : {xkb_file}")
+        xcompose_file = xcompose_files[0] if xcompose_files else None
+        if xcompose_file:
+            print(f"Fichier XCompose trouvé : {xcompose_file}")
+            args = [sys.argv[0], xkb_file, xcompose_file]
+        else:
+            args = [sys.argv[0], xkb_file]
+        main(args)
+    else:
+        main(sys.argv)
+
+
+def main(args):
+    check_sudo()
+
+    if len(args) < 2 or args[1] in ["-h", "--help"]:
+        show_help()
+        return
+
+    xkb_file = args[1]
+    if not validate_file(xkb_file, ".xkb"):  # Validation du fichier XKB
+        sys.exit(1)
+
+    # Extraction des informations nécessaires à partir du fichier XKB
+    symbols_line, name_line = extract_xkb_info(xkb_file)
+
+    # Copie du fichier XKB dans le répertoire approprié – NE FONCTIONNE PAS FORCÉMENT ; dépend de la version de X11 !
+    # xkb_dest_dir = f"{xkb_folder}/symbols/"
+    # install_file(xkb_file, xkb_dest_dir)
+
+    # Mise à jour des symbols XKB
+    xkb_symbols_file = f"{xkb_folder}/symbols/fr"
+    update_xkb_symbols(xkb_file, symbols_line, xkb_symbols_file)
+
+    # Mise à jour des types XKB
+    xkb_types_file = f"{xkb_folder}/types/extra"
+    update_xkb_types(xkb_file, xkb_types_file)
+
+    # Mise à jour du fichier LST
+    lst_file = f"{xkb_folder}/rules/evdev.lst"
+    update_lst(lst_file, symbols_line, name_line)
+
+    # Mise à jour du fichier XML
+    xml_file = f"{xkb_folder}/rules/evdev.xml"
+    update_xml(xml_file, symbols_line, name_line)
+
+    # Installation du fichier XCompose (optionnel)
+    xcompose_file = args[2] if len(args) > 2 else None
+    if xcompose_file:
+        install_xcompose(xcompose_file)  # Install the XCompose file
+
+
+if __name__ == "__main__":
+    if sys.platform == "win32":
+        raise RuntimeError(
+            "Ce script ne doit pas être lancé sous Windows : il est prévu pour Linux."
+        )
+
+    if len(sys.argv) < 2:
+        print(
+            "Mode automatique : recherche du fichier .xkb le plus récent et du .XCompose dans le dossier courant..."
+        )
+        xkb_files = glob.glob(os.path.join(os.path.dirname(__file__), "*.xkb"))
+        xcompose_files = glob.glob(
+            os.path.join(os.path.dirname(__file__), "*.XCompose")
+        )
+        if not xkb_files:
+            print("Aucun fichier .xkb trouvé.")
+            sys.exit(1)
+        # Sélectionne le .xkb le plus récent
+        xkb_file = max(xkb_files, key=os.path.getmtime)
+        print(f"Fichier XKB le plus récent trouvé : {xkb_file}")
+        xcompose_file = xcompose_files[0] if xcompose_files else None
+        if xcompose_file:
+            print(f"Fichier XCompose trouvé : {xcompose_file}")
+            args = [sys.argv[0], xkb_file, xcompose_file]
+        else:
+            args = [sys.argv[0], xkb_file]
+        main(args)
+    else:
+        main(sys.argv)
+
+
+def main(args):
+    check_sudo()
+
+    if len(args) < 2 or args[1] in ["-h", "--help"]:
+        show_help()
+        return
+
+    xkb_file = args[1]
+    if not validate_file(xkb_file, ".xkb"):  # Validation du fichier XKB
+        sys.exit(1)
+
+    # Extraction des informations nécessaires à partir du fichier XKB
+    symbols_line, name_line = extract_xkb_info(xkb_file)
+
+    # Copie du fichier XKB dans le répertoire approprié – NE FONCTIONNE PAS FORCÉMENT ; dépend de la version de X11 !
+    # xkb_dest_dir = f"{xkb_folder}/symbols/"
+    # install_file(xkb_file, xkb_dest_dir)
+
+    # Mise à jour des symbols XKB
+    xkb_symbols_file = f"{xkb_folder}/symbols/fr"
+    update_xkb_symbols(xkb_file, symbols_line, xkb_symbols_file)
+
+    # Mise à jour des types XKB
+    xkb_types_file = f"{xkb_folder}/types/extra"
+    update_xkb_types(xkb_file, xkb_types_file)
+
+    # Mise à jour du fichier LST
+    lst_file = f"{xkb_folder}/rules/evdev.lst"
+    update_lst(lst_file, symbols_line, name_line)
+
+    # Mise à jour du fichier XML
+    xml_file = f"{xkb_folder}/rules/evdev.xml"
+    update_xml(xml_file, symbols_line, name_line)
+
+    # Installation du fichier XCompose (optionnel)
+    xcompose_file = args[2] if len(args) > 2 else None
+    if xcompose_file:
+        install_xcompose(xcompose_file)  # Install the XCompose file
+
+
+if __name__ == "__main__":
+    if sys.platform == "win32":
+        raise RuntimeError(
+            "Ce script ne doit pas être lancé sous Windows : il est prévu pour Linux."
+        )
+
+    if len(sys.argv) < 2:
+        print(
+            "Mode automatique : recherche du fichier .xkb le plus récent et du .XCompose dans le dossier courant..."
+        )
+        xkb_files = glob.glob(os.path.join(os.path.dirname(__file__), "*.xkb"))
+        xcompose_files = glob.glob(
+            os.path.join(os.path.dirname(__file__), "*.XCompose")
+        )
+        if not xkb_files:
+            print("Aucun fichier .xkb trouvé.")
+            sys.exit(1)
+        # Sélectionne le .xkb le plus récent
+        xkb_file = max(xkb_files, key=os.path.getmtime)
+        print(f"Fichier XKB le plus récent trouvé : {xkb_file}")
+        xcompose_file = xcompose_files[0] if xcompose_files else None
+        if xcompose_file:
+            print(f"Fichier XCompose trouvé : {xcompose_file}")
+            args = [sys.argv[0], xkb_file, xcompose_file]
+        else:
+            args = [sys.argv[0], xkb_file]
+        main(args)
+    else:
+        main(sys.argv)
+
+
+def main(args):
+    check_sudo()
+
+    if len(args) < 2 or args[1] in ["-h", "--help"]:
+        show_help()
+        return
+
+    xkb_file = args[1]
+    if not validate_file(xkb_file, ".xkb"):  # Validation du fichier XKB
+        sys.exit(1)
+
+    # Extraction des informations nécessaires à partir du fichier XKB
+    symbols_line, name_line = extract_xkb_info(xkb_file)
+
+    # Copie du fichier XKB dans le répertoire approprié – NE FONCTIONNE PAS FORCÉMENT ; dépend de la version de X11 !
+    # xkb_dest_dir = f"{xkb_folder}/symbols/"
+    # install_file(xkb_file, xkb_dest_dir)
+
+    # Mise à jour des symbols XKB
+    xkb_symbols_file = f"{xkb_folder}/symbols/fr"
+    update_xkb_symbols(xkb_file, symbols_line, xkb_symbols_file)
+
+    # Mise à jour des types XKB
+    xkb_types_file = f"{xkb_folder}/types/extra"
+    update_xkb_types(xkb_file, xkb_types_file)
+
+    # Mise à jour du fichier LST
+    lst_file = f"{xkb_folder}/rules/evdev.lst"
+    update_lst(lst_file, symbols_line, name_line)
+
+    # Mise à jour du fichier XML
+    xml_file = f"{xkb_folder}/rules/evdev.xml"
+    update_xml(xml_file, symbols_line, name_line)
+
+    # Installation du fichier XCompose (optionnel)
+    xcompose_file = args[2] if len(args) > 2 else None
+    if xcompose_file:
+        install_xcompose(xcompose_file)  # Install the XCompose file
+
+
+if __name__ == "__main__":
+    if sys.platform == "win32":
+        raise RuntimeError(
+            "Ce script ne doit pas être lancé sous Windows : il est prévu pour Linux."
+        )
+
+    if len(sys.argv) < 2:
+        print(
+            "Mode automatique : recherche du fichier .xkb le plus récent et du .XCompose dans le dossier courant..."
+        )
+        xkb_files = glob.glob(os.path.join(os.path.dirname(__file__), "*.xkb"))
+        xcompose_files = glob.glob(
+            os.path.join(os.path.dirname(__file__), "*.XCompose")
+        )
+        if not xkb_files:
+            print("Aucun fichier .xkb trouvé.")
+            sys.exit(1)
+        # Sélectionne le .xkb le plus récent
+        xkb_file = max(xkb_files, key=os.path.getmtime)
+        print(f"Fichier XKB le plus récent trouvé : {xkb_file}")
+        xcompose_file = xcompose_files[0] if xcompose_files else None
+        if xcompose_file:
+            print(f"Fichier XCompose trouvé : {xcompose_file}")
+            args = [sys.argv[0], xkb_file, xcompose_file]
+        else:
+            args = [sys.argv[0], xkb_file]
+        main(args)
+    else:
+        main(sys.argv)
 
 
 def main(args):
