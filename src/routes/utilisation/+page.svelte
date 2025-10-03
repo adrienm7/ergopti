@@ -36,6 +36,18 @@
 	<meta name="description" content="Fichiers pour utiliser Ergopti" />
 </svelte:head>
 
+<div style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem">
+	<a href="#windows">
+		<button class="bouton-telechargement"><i class="icon-windows8"></i> Windows</button>
+	</a>
+	<a href="#macos">
+		<button class="bouton-telechargement"><i class="icon-appleinc"></i> macOS</button>
+	</a>
+	<a href="#linux">
+		<button class="bouton-telechargement"><i class="icon-linux"></i> Linux</button>
+	</a>
+</div>
+
 <InstallationWindows />
 <InstallationMac />
 <InstallationLinux />

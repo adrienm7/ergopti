@@ -55,6 +55,18 @@ em,
 	text-decoration: none;
 }
 
+.purple {
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-image: linear-gradient(to right, var(--gradient-purple));
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	color: transparent;
+	opacity: 1 !important;
+	text-decoration: none;
+}
+
 .link {
 	background: linear-gradient(to right, var(--gradient-blue));
 	-webkit-background-clip: text;
@@ -74,6 +86,16 @@ em,
 	left: 0;
 	position: absolute;
 	width: 100%;
+}
+
+code {
+	background-color: hsla(0, 0%, 11%, 0.9);
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 0.15em;
+	color: white;
+	font-family: 'Fira Code', 'Fira Mono', 'Courier New', Courier, monospace;
+	font-size: 0.9em;
+	padding: 0.1em 0.3em;
 }
 
 /* Icons */
