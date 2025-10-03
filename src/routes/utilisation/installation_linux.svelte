@@ -27,3 +27,16 @@
 		</a>
 	{/if}
 </div>
+
+<h3>Résolution de problèmes connus</h3>
+<p>Certains problèmes ont été rapportés avec le keylayout d’Ergopti dans quelques logiciels :</p>
+<ul>
+	<li>
+		Le raccourci <kbd-output>Ctrl+Z</kbd-output> en <kbd-output>Ctrl</kbd-output> + <kbd-output>È</kbd-output> semble ne pas fonctionner. Pourtant, tous les autres raccourcis sur les lettres accentuées fonctionnent. alors qu’ils sont définis de la même manière.
+	</li>
+    <li>
+        Sur Wayland, XCompose ne fonctionne pas dans certains programmes. C’est notamment le cas des applications Electron comme VSCode.
+        Ce problème implique que les touches mortes ne vont pas fonctionner, de même pour les output de plusieurs caractères comme les ponctuations avec espaces insécables automatiques.
+        Il existe peut-être des workarounds.
+    </li>
+</ul>
