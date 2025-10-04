@@ -18,7 +18,9 @@
 	});
 </script>
 
-<h2 id="windows"><i class="icon-windows purple"></i> Installation Windows</h2>
+<h2 id="windows">
+	<i class="icon-windows purple" style="vertical-align:-0.05em"></i> Installation Windows
+</h2>
 <p>
 	Les fichiers de cette section ont été réalisés à l’aide de <a
 		class="link"
@@ -32,7 +34,8 @@
 	{#if version_mineure_kbdedit_exe !== undefined}
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
 			<button class="bouton-telechargement"
-				><i class="icon-windows"></i> Ergopti_v{version_mineure_kbdedit_exe}.exe</button
+				><i class="icon-windows" style="vertical-align:-0.05em"></i>
+				Ergopti_v{version_mineure_kbdedit_exe}.exe</button
 			>
 		</a>
 	{/if}
@@ -42,7 +45,8 @@
 	{#if version_mineure_kbdedit_kbe !== undefined}
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
 			<button
-				><i class="icon-windows"></i> Fichier source KbdEdit d’Ergopti_v{version_mineure_kbdedit_kbe}</button
+				><i class="icon-windows" style="vertical-align:-0.05em"></i> Fichier source KbdEdit
+				d’Ergopti_v{version_mineure_kbdedit_kbe}</button
 			>
 		</a>
 	{/if}

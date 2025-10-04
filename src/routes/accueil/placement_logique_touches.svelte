@@ -134,7 +134,7 @@
 	<tiny-space></tiny-space>
 	<p class="encadre">
 		À noter que les touches sont aussi placées le plus possible par distance selon leur fréquence
-		d’utilisation. Ainsi, les paires de touches très utilisées telles que <kbd>()</kbd>,
+		d’utilisation. Ainsi, les paires de touches très utilisées <kbd>()</kbd>,
 		<kbd>{'{}'}</kbd>, <kbd>{'<>'}</kbd> et <kbd>[]</kbd> sont toutes sur la rangée du milieu.
 	</p>
 </section>

@@ -38,7 +38,9 @@
 
 <div style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem">
 	<a href="#windows">
-		<button class="bouton-telechargement"><i class="icon-windows"></i> Windows</button>
+		<button class="bouton-telechargement"
+			><i class="icon-windows" style="vertical-align:0"></i> Windows</button
+		>
 	</a>
 	<a href="#macos">
 		<button class="bouton-telechargement"
@@ -50,18 +52,15 @@
 		<button class="bouton-telechargement"><i class="icon-linux"></i> Linux</button>
 	</a>
 </div>
-
+<div style="height:1rem"></div>
+<div style="display: flex; gap: 1rem; justify-content:center;">
+	<a href="/documents/printable_layout_v2.2.pdf" download>
+		<button class="bouton-telechargement">Layout à imprimer</button>
+	</a>
+	<a href="/documents/printable_layout_v2.2_full.pdf" download>
+		<button class="bouton-telechargement">Layout à imprimer complet</button>
+	</a>
+</div>
 <InstallationWindows />
 <InstallationMac />
 <InstallationLinux />
-
-<!-- <h2>Installation</h2>
-	<h3>Instructions générales</h3>
-	<p>
-		Si vous pouvez installer la disposition, utilisez le .exe. Sinon, vous pouvez utiliser le script
-		AHK pour que le script convertisse toutes vos frappes quelque soit votre disposition. Vous aurez
-		alors automatiquement la meilleure version de la disposition : <ErgoptiPlus />
-	</p>
-	<small-space></small-space>
-	<h3>Comment installer la disposition sur Windows</h3>
-	<p>[À faire]</p> -->
