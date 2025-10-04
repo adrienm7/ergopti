@@ -36,7 +36,7 @@
 <tiny-space></tiny-space>
 <p>Installation d’<Ergopti></Ergopti> sur Linux (X11 et Wayland) :</p>
 <ol>
-	<li>Télécharger les 3 fichiers ci-dessus.</li>
+	<li>Télécharger les 3 fichiers ci-dessus (XKB, XCompose et script d’installation)</li>
 	<li>Exécuter le script d’installation XKB en sudo : <code>sudo python3 install_xkb.py</code></li>
 	<li>Redémarrer l’ordinateur pour que les changements prennent effet.</li>
 	<li>
