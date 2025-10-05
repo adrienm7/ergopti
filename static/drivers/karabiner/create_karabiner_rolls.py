@@ -4,55 +4,17 @@ import sys
 from pathlib import Path
 
 PLUS_MAPPINGS_CONFIG = {
-    "roll_ck": {
-        "trigger": "c",
-        "map": [
-            ("x", "ck"),
-        ],
-    },
     "roll_wh": {
         "trigger": "h",
         "map": [
             ("c", "Wh"),
         ],
     },
-    "roll_sk": {
-        "trigger": "s",
-        "map": [
-            ("x", "sK"),
-        ],
-    },
-    "roll_ct": {
-        "trigger": "p",
-        "map": [
-            ("'", "ct"),
-        ],
-    },
-    "q_with_u": {
-        "trigger": "q",
-        "map": [
-            ("a", "qua"),
-            ("e", "que"),
-            ("é", "qué"),
-            ("è", "què"),
-            ("ê", "quê"),
-            ("i", "qui"),
-            ("o", "quo"),
-            ("'", "qu’"),
-            ("’", "qu’"),
-        ],
-    },
-    "roll_Ck": {
-        "trigger": "C",
-        "map": [
-            ("x", "Ck"),
-        ],
-    },
 }
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    PLUS_MAPPINGS_CONFIG,
+    # PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
 )
 
@@ -123,10 +85,7 @@ for mapping_name, mapping in plus_mappings.items():
                     "modifiers": {"mandatory": ["shift"]},
                 },
                 "to": [
-                    {
-                        "key_code": trigger_name,
-                        "modifiers": {"mandatory": ["shift"]},
-                    },
+                    {"key_code": trigger_name, "modifiers": ["left_shift"]},
                     {
                         "set_variable": {
                             "name": f"{trigger}_pressed",
@@ -243,21 +202,50 @@ with open(output_path, "w", encoding="utf-8") as f:
         else:
             desc = f"Actions regroupées pour la touche [{key}]"
 
-        # Tri des manipulateurs : les blocs simples d'abord
-        def is_simple_block(manip):
-            return set(manip.keys()) == {
-                "from",
-                "to",
-                "to_after_key_up",
-                "type",
-            }
+        # Tri explicite des manipulateurs
+        def has_set_variable(manip):
+            def contains_set_variable(obj):
+                if isinstance(obj, dict):
+                    if "set_variable" in obj:
+                        return True
+                    return any(contains_set_variable(v) for v in obj.values())
+                if isinstance(obj, list):
+                    return any(contains_set_variable(v) for v in obj)
+                return False
 
-        simples = [m for m in manips if is_simple_block(m)]
-        others = [m for m in manips if not is_simple_block(m)]
+            return contains_set_variable(manip)
+
+        def has_shift(manip):
+            def contains_shift(obj):
+                if isinstance(obj, dict):
+                    if "modifiers" in obj and "shift" in str(obj["modifiers"]):
+                        return True
+                    return any(contains_shift(v) for v in obj.values())
+                if isinstance(obj, list):
+                    return any(contains_shift(v) for v in obj)
+                return False
+
+            return contains_shift(manip)
+
+        # Catégorisation
+        setvar_shift = []
+        setvar_noshift = []
+        others = []
+        for m in manips:
+            if has_set_variable(m) and has_shift(m):
+                setvar_shift.append(m)
+            elif has_set_variable(m):
+                setvar_noshift.append(m)
+            else:
+                others.append(m)
+
+        # Tri final : set_variable+shift, autres, set_variable sans shift
+        sorted_manips = setvar_shift + others + setvar_noshift
+
         grouped.append(
             {
                 "description": desc,
-                "manipulators": others + simples,
+                "manipulators": sorted_manips,
             }
         )
 
