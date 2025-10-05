@@ -1,0 +1,536 @@
+[
+  {
+    "description": "Actions regroupées pour la touche [o]",
+    "manipulators": [
+      {
+        "from": {
+          "key_code": "o"
+        },
+        "to": [
+          {
+            "key_code": "o"
+          },
+          {
+            "set_variable": {
+              "name": "c_pressed",
+              "value": 1
+            }
+          }
+        ],
+        "to_after_key_up": [
+          {
+            "set_variable": {
+              "name": "c_pressed",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "h_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "o"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "r"
+          },
+          {
+            "key_code": "i"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'c' (touche manipulée [p])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "c_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "p"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "b"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "s_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "p"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "j"
+          },
+          {
+            "key_code": "b"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [i]",
+    "manipulators": [
+      {
+        "from": {
+          "key_code": "i"
+        },
+        "to": [
+          {
+            "key_code": "i"
+          },
+          {
+            "set_variable": {
+              "name": "h_pressed",
+              "value": 1
+            }
+          }
+        ],
+        "to_after_key_up": [
+          {
+            "set_variable": {
+              "name": "h_pressed",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [j]",
+    "manipulators": [
+      {
+        "from": {
+          "key_code": "j"
+        },
+        "to": [
+          {
+            "key_code": "j"
+          },
+          {
+            "set_variable": {
+              "name": "s_pressed",
+              "value": 1
+            }
+          }
+        ],
+        "to_after_key_up": [
+          {
+            "set_variable": {
+              "name": "s_pressed",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [.]",
+    "manipulators": [
+      {
+        "from": {
+          "key_code": "."
+        },
+        "to": [
+          {
+            "key_code": "."
+          },
+          {
+            "set_variable": {
+              "name": "p_pressed",
+              "value": 1
+            }
+          }
+        ],
+        "to_after_key_up": [
+          {
+            "set_variable": {
+              "name": "p_pressed",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'p' (touche manipulée [None])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "p_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": null
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": null
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [']",
+    "manipulators": [
+      {
+        "from": {
+          "key_code": "'"
+        },
+        "to": [
+          {
+            "key_code": "'"
+          },
+          {
+            "set_variable": {
+              "name": "q_pressed",
+              "value": 1
+            }
+          }
+        ],
+        "to_after_key_up": [
+          {
+            "set_variable": {
+              "name": "q_pressed",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'q' (touche manipulée [a])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "a"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "a"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'q' (touche manipulée [d])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "d"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'q' (touche manipulée [z])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "z"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'q' (touche manipulée [q])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "q"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "q"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'q' (touche manipulée [`])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "`"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "`"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'q' (touche manipulée [s])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "s"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "s"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'q' (touche manipulée [e])",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "e"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "e"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  }
+]

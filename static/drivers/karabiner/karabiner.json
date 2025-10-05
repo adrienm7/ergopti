@@ -305,7 +305,7 @@
                         ]
                     },
                     {
-                        "description": "Roll mapping for trigger 'c' (roll_ck)",
+                        "description": "Actions regroupées pour la touche [o]",
                         "manipulators": [
                             {
                                 "from": {
@@ -326,60 +326,6 @@
                                     {
                                         "set_variable": {
                                             "name": "c_pressed",
-                                            "value": 0
-                                        }
-                                    }
-                                ],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [
-                                    {
-                                        "name": "c_pressed",
-                                        "type": "variable_if",
-                                        "value": 1
-                                    }
-                                ],
-                                "from": {
-                                    "key_code": "p"
-                                },
-                                "to": [
-                                    {
-                                        "key_code": "delete_or_backspace"
-                                    },
-                                    {
-                                        "key_code": "o"
-                                    },
-                                    {
-                                        "key_code": "b"
-                                    }
-                                ],
-                                "type": "basic"
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Roll mapping for trigger 'h' (roll_wh)",
-                        "manipulators": [
-                            {
-                                "from": {
-                                    "key_code": "i"
-                                },
-                                "to": [
-                                    {
-                                        "key_code": "i"
-                                    },
-                                    {
-                                        "set_variable": {
-                                            "name": "h_pressed",
-                                            "value": 1
-                                        }
-                                    }
-                                ],
-                                "to_after_key_up": [
-                                    {
-                                        "set_variable": {
-                                            "name": "h_pressed",
                                             "value": 0
                                         }
                                     }
@@ -413,29 +359,28 @@
                         ]
                     },
                     {
-                        "description": "Roll mapping for trigger 's' (roll_sk)",
+                        "description": "Actions pour trigger 'c' (touche manipulée [p])",
                         "manipulators": [
                             {
+                                "conditions": [
+                                    {
+                                        "name": "c_pressed",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
                                 "from": {
-                                    "key_code": "j"
+                                    "key_code": "p"
                                 },
                                 "to": [
                                     {
-                                        "key_code": "j"
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "set_variable": {
-                                            "name": "s_pressed",
-                                            "value": 1
-                                        }
-                                    }
-                                ],
-                                "to_after_key_up": [
+                                        "key_code": "o"
+                                    },
                                     {
-                                        "set_variable": {
-                                            "name": "s_pressed",
-                                            "value": 0
-                                        }
+                                        "key_code": "b"
                                     }
                                 ],
                                 "type": "basic"
@@ -467,7 +412,67 @@
                         ]
                     },
                     {
-                        "description": "Roll mapping for trigger 'p' (roll_ct)",
+                        "description": "Actions regroupées pour la touche [i]",
+                        "manipulators": [
+                            {
+                                "from": {
+                                    "key_code": "i"
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "i"
+                                    },
+                                    {
+                                        "set_variable": {
+                                            "name": "h_pressed",
+                                            "value": 1
+                                        }
+                                    }
+                                ],
+                                "to_after_key_up": [
+                                    {
+                                        "set_variable": {
+                                            "name": "h_pressed",
+                                            "value": 0
+                                        }
+                                    }
+                                ],
+                                "type": "basic"
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions regroupées pour la touche [j]",
+                        "manipulators": [
+                            {
+                                "from": {
+                                    "key_code": "j"
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "j"
+                                    },
+                                    {
+                                        "set_variable": {
+                                            "name": "s_pressed",
+                                            "value": 1
+                                        }
+                                    }
+                                ],
+                                "to_after_key_up": [
+                                    {
+                                        "set_variable": {
+                                            "name": "s_pressed",
+                                            "value": 0
+                                        }
+                                    }
+                                ],
+                                "type": "basic"
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions regroupées pour la touche [.]",
                         "manipulators": [
                             {
                                 "from": {
@@ -493,7 +498,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'p' (touche manipulée [None])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -517,11 +527,65 @@
                                     }
                                 ],
                                 "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "q_pressed",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": null
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
+                                        "key_code": "'"
+                                    },
+                                    {
+                                        "key_code": "f"
+                                    },
+                                    {
+                                        "key_code": null
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "q_pressed",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": null
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
+                                        "key_code": "'"
+                                    },
+                                    {
+                                        "key_code": "f"
+                                    },
+                                    {
+                                        "key_code": null
+                                    }
+                                ],
+                                "type": "basic"
                             }
                         ]
                     },
                     {
-                        "description": "Roll mapping for trigger 'q' (q_with_u)",
+                        "description": "Actions regroupées pour la touche [']",
                         "manipulators": [
                             {
                                 "from": {
@@ -547,7 +611,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'q' (touche manipulée [a])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -574,7 +643,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'q' (touche manipulée [d])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -601,7 +675,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'q' (touche manipulée [z])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -628,7 +707,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'q' (touche manipulée [q])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -655,7 +739,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'q' (touche manipulée [`])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -682,7 +771,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'q' (touche manipulée [s])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -709,7 +803,12 @@
                                     }
                                 ],
                                 "type": "basic"
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Actions pour trigger 'q' (touche manipulée [e])",
+                        "manipulators": [
                             {
                                 "conditions": [
                                     {
@@ -733,60 +832,6 @@
                                     },
                                     {
                                         "key_code": "e"
-                                    }
-                                ],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [
-                                    {
-                                        "name": "q_pressed",
-                                        "type": "variable_if",
-                                        "value": 1
-                                    }
-                                ],
-                                "from": {
-                                    "key_code": null
-                                },
-                                "to": [
-                                    {
-                                        "key_code": "delete_or_backspace"
-                                    },
-                                    {
-                                        "key_code": "'"
-                                    },
-                                    {
-                                        "key_code": "f"
-                                    },
-                                    {
-                                        "key_code": null
-                                    }
-                                ],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [
-                                    {
-                                        "name": "q_pressed",
-                                        "type": "variable_if",
-                                        "value": 1
-                                    }
-                                ],
-                                "from": {
-                                    "key_code": null
-                                },
-                                "to": [
-                                    {
-                                        "key_code": "delete_or_backspace"
-                                    },
-                                    {
-                                        "key_code": "'"
-                                    },
-                                    {
-                                        "key_code": "f"
-                                    },
-                                    {
-                                        "key_code": null
                                     }
                                 ],
                                 "type": "basic"

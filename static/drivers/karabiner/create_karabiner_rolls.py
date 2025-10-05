@@ -153,6 +153,46 @@ for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
 with open(output_path, "w", encoding="utf-8") as f:
     json.dump(rolls, f, ensure_ascii=False, indent=2)
 
+    # Regroupement des manipulateurs par touche dans rolls_grouped.json
+    rolls_grouped_path = Path(__file__).parent / "rolls_grouped.json"
+    manipulators_by_key = {}
+    for rule in rolls:
+        for manip in rule["manipulators"]:
+            key = manip["from"].get("key_code")
+            if key not in manipulators_by_key:
+                manipulators_by_key[key] = []
+            manipulators_by_key[key].append(manip)
+
+    grouped = []
+    for key, manips in manipulators_by_key.items():
+        # Récupère le trigger principal (premier trouvé dans les conditions du premier manipulator)
+        trigger = None
+        for cond in manips[0].get("conditions", []):
+            if cond.get("name") and cond["name"].endswith("_pressed"):
+                trigger = cond["name"].replace("_pressed", "")
+                break
+        # Recherche du keycode numérique
+        keycode_num = None
+        for k, v in keycode_map.items():
+            if keycode_to_name(v, macos_keycodes) == key:
+                keycode_num = v
+                break
+        if trigger:
+            desc = (
+                f"Actions pour trigger '{trigger}' (touche manipulée [{key}])"
+            )
+        else:
+            desc = f"Actions regroupées pour la touche [{key}]"
+        grouped.append(
+            {
+                "description": desc,
+                "manipulators": manips,
+            }
+        )
+
+    with open(rolls_grouped_path, "w", encoding="utf-8") as f:
+        json.dump(grouped, f, ensure_ascii=False, indent=2)
+
 
 def merge_rolls_into_karabiner(
     karabiner_path: str, rolls_path: str, output_path: str
@@ -190,6 +230,6 @@ def merge_rolls_into_karabiner(
 if __name__ == "__main__":
     merge_rolls_into_karabiner(
         karabiner_path="d:/Documents/GitHub/ergopti/static/drivers/karabiner/karabiner0.json",
-        rolls_path="d:/Documents/GitHub/ergopti/static/drivers/karabiner/rolls.json",
+        rolls_path="d:/Documents/GitHub/ergopti/static/drivers/karabiner/rolls_grouped.json",
         output_path="d:/Documents/GitHub/ergopti/static/drivers/karabiner/karabiner.json",
     )
