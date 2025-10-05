@@ -10,12 +10,6 @@ PLUS_MAPPINGS_CONFIG = {
             ("c", "wh"),
         ],
     },
-    "roll_WH": {
-        "trigger": "H",
-        "map": [
-            ("C", "WH"),
-        ],
-    },
 }
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -229,7 +223,21 @@ with open(output_path, "w", encoding="utf-8") as f:
                 return "shift" in str(mods.get("mandatory", []))
             return False
 
-        sorted_manips = sorted(manips, key=lambda m: not has_shift_from(m))
+        def pressed_is_upper(manip):
+            conds = manip.get("conditions", [])
+            for cond in conds:
+                if cond.get("type") == "variable_if" and cond.get(
+                    "name", ""
+                ).endswith("_pressed"):
+                    name = cond["name"]
+                    return name and name[0].isupper()
+            return False
+
+        # Tri principal : shift d'abord, puis majuscule/minuscule sur le nom de variable
+        sorted_manips = sorted(
+            manips,
+            key=lambda m: (not has_shift_from(m), not pressed_is_upper(m)),
+        )
 
         grouped.append(
             {
