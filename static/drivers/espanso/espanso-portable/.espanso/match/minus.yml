@@ -1,0 +1,154 @@
+matches:
+  - trigger: 'aije'
+    replace: 'ai-je'
+    propagate_case: true
+    word: true
+  - trigger: 'astu'
+    replace: 'as-tu'
+    propagate_case: true
+    word: true
+    # - trigger: "atelle"  # Conflict with the word "atelle" for when you are injured
+    #   replace: "a-t-elle"
+  - trigger: 'atil'
+    replace: 'a-t-il'
+    propagate_case: true
+    word: true
+  - trigger: 'aton'
+    replace: 'a-t-on'
+    propagate_case: true
+    word: true
+  - trigger: 'auratelle'
+    replace: 'aura-t-elle'
+    propagate_case: true
+    word: true
+  - trigger: 'auratil'
+    replace: 'aura-t-il'
+    propagate_case: true
+    word: true
+  - trigger: 'auraton'
+    replace: 'aura-t-on'
+    propagate_case: true
+    word: true
+  - trigger: 'dismoi'
+    replace: 'dis-moi'
+    propagate_case: true
+    word: true
+  - trigger: 'ditelle'
+    replace: 'dit-elle'
+    propagate_case: true
+    word: true
+  - trigger: 'ditil'
+    replace: 'dit-il'
+    propagate_case: true
+    word: true
+  - trigger: 'distu'
+    replace: 'dis-tu'
+    propagate_case: true
+    word: true
+  - trigger: 'diton'
+    replace: 'dit-on'
+    propagate_case: true
+    word: true
+  - trigger: 'doisje'
+    replace: 'dois-je'
+    propagate_case: true
+    word: true
+  - trigger: 'doitelle'
+    replace: 'doit-elle'
+    propagate_case: true
+    word: true
+  - trigger: 'doitil'
+    replace: 'doit-il'
+    propagate_case: true
+    word: true
+  - trigger: 'doiton'
+    replace: 'doit-on'
+    propagate_case: true
+    word: true
+  - trigger: 'estu'
+    replace: 'es-tu'
+    propagate_case: true
+    word: true
+    # - trigger: "estelle"  # Conflict with the name Estelle
+    #   replace: "est-elle"
+  - trigger: 'estil'
+    replace: 'est-il'
+    propagate_case: true
+    word: true
+  - trigger: 'eston'
+    replace: 'est-on'
+    propagate_case: true
+    word: true
+  - trigger: 'fautelle'
+    replace: 'faut-elle'
+    propagate_case: true
+    word: true
+  - trigger: 'fautil'
+    replace: 'faut-il'
+    propagate_case: true
+    word: true
+  - trigger: 'fauton'
+    replace: 'faut-on'
+    propagate_case: true
+    word: true
+  - trigger: 'peutil'
+    replace: 'peut-il'
+    propagate_case: true
+    word: true
+  - trigger: 'peutelle'
+    replace: 'peut-elle'
+    propagate_case: true
+    word: true
+  - trigger: 'peuton'
+    replace: 'peut-on'
+    propagate_case: true
+    word: true
+  - trigger: 'peuxtu'
+    replace: 'peux-tu'
+    propagate_case: true
+    word: true
+  - trigger: 'puisje'
+    replace: 'puis-je'
+    propagate_case: true
+    word: true
+  - trigger: 'vatelle'
+    replace: 'va-t-elle'
+    propagate_case: true
+    word: true
+  - trigger: 'vatil'
+    replace: 'va-t-il'
+    propagate_case: true
+    word: true
+  - trigger: 'vaton'
+    replace: 'va-t-on'
+    propagate_case: true
+    word: true
+  - trigger: 'veutelle'
+    replace: 'veut-elle'
+    propagate_case: true
+    word: true
+  - trigger: 'veutil'
+    replace: 'veut-il'
+    propagate_case: true
+    word: true
+  - trigger: 'veuton'
+    replace: 'veut-on'
+    propagate_case: true
+    word: true
+  - trigger: 'veuxtu'
+    replace: 'veux-tu'
+    propagate_case: true
+    word: true
+  - trigger: 'yatil'
+    replace: 'y a-t-il'
+    propagate_case: true
+    word: true
+
+  - trigger: 'vonsn'
+    replace: 'vons-n'
+    propagate_case: true
+    word: false
+  - trigger: 'vezv'
+    replace: 'vez-v'
+    propagate_case: true
+    word: false
