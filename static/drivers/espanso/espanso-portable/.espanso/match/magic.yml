@@ -1,1025 +1,1945 @@
 matches:
-    # === Alphabetic ligatures ===
-    - trigger: "ae★"
-      replace: "æ"
-    - trigger: "oe★"
-      replace: "œ"
+  # === Alphabetic ligatures ===
+  - trigger: 'ae★'
+    replace: 'æ'
+    propagate_case: true
+  - trigger: 'oe★'
+    replace: 'œ'
+    propagate_case: true
 
     # === Numbers and symbols ===
-    - trigger: "1er★"
-      replace: "premier"
-    - trigger: "1ere★"
-      replace: "première"
-    - trigger: "2e★"
-      replace: "deuxième"
-    - trigger: "3e★"
-      replace: "troisième"
-    - trigger: "4e★"
-      replace: "quatrième"
-    - trigger: "5e★"
-      replace: "cinquième"
-    - trigger: "6e★"
-      replace: "sixième"
-    - trigger: "7e★"
-      replace: "septième"
-    - trigger: "8e★"
-      replace: "huitième"
-    - trigger: "9e★"
-      replace: "neuvième"
-    - trigger: "10e★"
-      replace: "dixième"
-    - trigger: "11e★"
-      replace: "onzième"
-    - trigger: "12e★"
-      replace: "douzième"
-    - trigger: "20e★"
-      replace: "vingtième"
-    - trigger: "100e★"
-      replace: "centième"
-    - trigger: "1000e★"
-      replace: "millième"
-    - trigger: "2s★"
-      replace: "2 secondes"
-    - trigger: "//★"
-      replace: "rapport"
-    - trigger: "+m★"
-      replace: "meilleur"
+  - trigger: '1er★'
+    replace: 'premier'
+    propagate_case: true
+    word: true
+  - trigger: '1ere★'
+    replace: 'première'
+    propagate_case: true
+    word: true
+  - trigger: '2e★'
+    replace: 'deuxième'
+    propagate_case: true
+    word: true
+  - trigger: '3e★'
+    replace: 'troisième'
+    propagate_case: true
+    word: true
+  - trigger: '4e★'
+    replace: 'quatrième'
+    propagate_case: true
+    word: true
+  - trigger: '5e★'
+    replace: 'cinquième'
+    propagate_case: true
+    word: true
+  - trigger: '6e★'
+    replace: 'sixième'
+    propagate_case: true
+    word: true
+  - trigger: '7e★'
+    replace: 'septième'
+    propagate_case: true
+    word: true
+  - trigger: '8e★'
+    replace: 'huitième'
+    propagate_case: true
+    word: true
+  - trigger: '9e★'
+    replace: 'neuvième'
+    propagate_case: true
+    word: true
+  - trigger: '10e★'
+    replace: 'dixième'
+    propagate_case: true
+    word: true
+  - trigger: '11e★'
+    replace: 'onzième'
+    propagate_case: true
+    word: true
+  - trigger: '12e★'
+    replace: 'douzième'
+    propagate_case: true
+    word: true
+  - trigger: '20e★'
+    replace: 'vingtième'
+    propagate_case: true
+    word: true
+  - trigger: '100e★'
+    replace: 'centième'
+    propagate_case: true
+    word: true
+  - trigger: '1000e★'
+    replace: 'millième'
+    propagate_case: true
+    word: true
+  - trigger: '2s★'
+    replace: '2 secondes'
+    propagate_case: true
+    word: true
+  - trigger: '//★'
+    replace: 'rapport'
+    propagate_case: true
+    word: true
+  - trigger: '+m★'
+    replace: 'meilleur'
 
     # === A ===
-    - trigger: "a★"
-      replace: "ainsi"
-    - trigger: "abr★"
-      replace: "abréviation"
-    - trigger: "actu★"
-      replace: "actualité"
-    - trigger: "add★"
-      replace: "addresse"
-    - trigger: "admin★"
-      replace: "administrateur"
-    - trigger: "afr★"
-      replace: "à faire"
-    - trigger: "ah★"
-      replace: "aujourd’hui"
-    - trigger: "ajd★"
-      replace: "aujourd’hui"
-    - trigger: "algo★"
-      replace: "algorithme"
-    - trigger: "alpha★"
-      replace: "alphabétique"
-    - trigger: "amé★"
-      replace: "amélioration"
-    - trigger: "amélio★"
-      replace: "amélioration"
-    - trigger: "anc★"
-      replace: "ancien"
-    - trigger: "ano★"
-      replace: "anomalie"
-    - trigger: "anniv★"
-      replace: "anniversaire"
-    - trigger: "apm★"
-      replace: "après-midi"
-    - trigger: "apad★"
-      replace: "à partir de"
-    - trigger: "app★"
-      replace: "application"
-    - trigger: "appart★"
-      replace: "appartement"
-    - trigger: "appli★"
-      replace: "application"
-    - trigger: "approx★"
-      replace: "approximation"
-    - trigger: "archi★"
-      replace: "architecture"
-    - trigger: "asso★"
-      replace: "association"
-    - trigger: "asap★"
-      replace: "le plus rapidement possible"
-    - trigger: "atd★"
-      replace: "attend"
-    - trigger: "att★"
-      replace: "attention"
-    - trigger: "aud★"
-      replace: "aujourd’hui"
-    - trigger: "aug★"
-      replace: "augmentation"
-    - trigger: "auj★"
-      replace: "aujourd’hui"
-    - trigger: "auto★"
-      replace: "automatique"
-    - trigger: "av★"
-      replace: "avant"
-    - trigger: "avv★"
-      replace: "avez-vous"
-    - trigger: "avvd★"
-      replace: "avez-vous déjà"
+  - trigger: 'a★'
+    replace: 'ainsi'
+    propagate_case: true
+    word: true
+  - trigger: 'abr★'
+    replace: 'abréviation'
+    propagate_case: true
+    word: true
+  - trigger: 'actu★'
+    replace: 'actualité'
+    propagate_case: true
+    word: true
+  - trigger: 'add★'
+    replace: 'addresse'
+    propagate_case: true
+    word: true
+  - trigger: 'admin★'
+    replace: 'administrateur'
+    propagate_case: true
+    word: true
+  - trigger: 'afr★'
+    replace: 'à faire'
+    propagate_case: true
+    word: true
+  - trigger: 'ah★'
+    replace: 'aujourd’hui'
+    propagate_case: true
+    word: true
+  - trigger: 'ajd★'
+    replace: 'aujourd’hui'
+    propagate_case: true
+    word: true
+  - trigger: 'algo★'
+    replace: 'algorithme'
+    propagate_case: true
+    word: true
+  - trigger: 'alpha★'
+    replace: 'alphabétique'
+    propagate_case: true
+    word: true
+  - trigger: 'amé★'
+    replace: 'amélioration'
+    propagate_case: true
+    word: true
+  - trigger: 'amélio★'
+    replace: 'amélioration'
+    propagate_case: true
+    word: true
+  - trigger: 'anc★'
+    replace: 'ancien'
+    propagate_case: true
+    word: true
+  - trigger: 'ano★'
+    replace: 'anomalie'
+    propagate_case: true
+    word: true
+  - trigger: 'anniv★'
+    replace: 'anniversaire'
+    propagate_case: true
+    word: true
+  - trigger: 'apm★'
+    replace: 'après-midi'
+    propagate_case: true
+    word: true
+  - trigger: 'apad★'
+    replace: 'à partir de'
+    propagate_case: true
+    word: true
+  - trigger: 'app★'
+    replace: 'application'
+    propagate_case: true
+    word: true
+  - trigger: 'appart★'
+    replace: 'appartement'
+    propagate_case: true
+    word: true
+  - trigger: 'appli★'
+    replace: 'application'
+    propagate_case: true
+    word: true
+  - trigger: 'approx★'
+    replace: 'approximation'
+    propagate_case: true
+    word: true
+  - trigger: 'archi★'
+    replace: 'architecture'
+    propagate_case: true
+    word: true
+  - trigger: 'asso★'
+    replace: 'association'
+    propagate_case: true
+    word: true
+  - trigger: 'asap★'
+    replace: 'le plus rapidement possible'
+    propagate_case: true
+    word: true
+  - trigger: 'atd★'
+    replace: 'attend'
+    propagate_case: true
+    word: true
+  - trigger: 'att★'
+    replace: 'attention'
+    propagate_case: true
+    word: true
+  - trigger: 'aud★'
+    replace: 'aujourd’hui'
+    propagate_case: true
+    word: true
+  - trigger: 'aug★'
+    replace: 'augmentation'
+    propagate_case: true
+    word: true
+  - trigger: 'auj★'
+    replace: 'aujourd’hui'
+    propagate_case: true
+    word: true
+  - trigger: 'auto★'
+    replace: 'automatique'
+    propagate_case: true
+    word: true
+  - trigger: 'av★'
+    replace: 'avant'
+    propagate_case: true
+    word: true
+  - trigger: 'avv★'
+    replace: 'avez-vous'
+    propagate_case: true
+    word: true
+  - trigger: 'avvd★'
+    replace: 'avez-vous déjà'
 
     # === B ===
-    - trigger: "b★"
-      replace: "bonjour"
-    - trigger: "bc★"
-      replace: "because"
-    - trigger: "bcp★"
-      replace: "beaucoup"
-    - trigger: "bdd★"
-      replace: "base de données"
-    - trigger: "bdds★"
-      replace: "bases de données"
-    - trigger: "bea★"
-      replace: "beaucoup"
-    - trigger: "bec★"
-      replace: "because"
-    - trigger: "bib★"
-      replace: "bibliographie"
-    - trigger: "biblio★"
-      replace: "bibliographie"
-    - trigger: "bjr★"
-      replace: "bonjour"
-    - trigger: "brain★"
-      replace: "brainstorming"
-    - trigger: "br★"
-      replace: "bonjour"
-    - trigger: "bsr★"
-      replace: "bonsoir"
-    - trigger: "bv★"
-      replace: "bravo"
-    - trigger: "bvn★"
-      replace: "bienvenue"
-    - trigger: "bwe★"
-      replace: "bon week-end"
-    - trigger: "bwk★"
-      replace: "bon week-end"
+  - trigger: 'b★'
+    replace: 'bonjour'
+    propagate_case: true
+    word: true
+  - trigger: 'bc★'
+    replace: 'because'
+    propagate_case: true
+    word: true
+  - trigger: 'bcp★'
+    replace: 'beaucoup'
+    propagate_case: true
+    word: true
+  - trigger: 'bdd★'
+    replace: 'base de données'
+    propagate_case: true
+    word: true
+  - trigger: 'bdds★'
+    replace: 'bases de données'
+    propagate_case: true
+    word: true
+  - trigger: 'bea★'
+    replace: 'beaucoup'
+    propagate_case: true
+    word: true
+  - trigger: 'bec★'
+    replace: 'because'
+    propagate_case: true
+    word: true
+  - trigger: 'bib★'
+    replace: 'bibliographie'
+    propagate_case: true
+    word: true
+  - trigger: 'biblio★'
+    replace: 'bibliographie'
+    propagate_case: true
+    word: true
+  - trigger: 'bjr★'
+    replace: 'bonjour'
+    propagate_case: true
+    word: true
+  - trigger: 'brain★'
+    replace: 'brainstorming'
+    propagate_case: true
+    word: true
+  - trigger: 'br★'
+    replace: 'bonjour'
+    propagate_case: true
+    word: true
+  - trigger: 'bsr★'
+    replace: 'bonsoir'
+    propagate_case: true
+    word: true
+  - trigger: 'bv★'
+    replace: 'bravo'
+    propagate_case: true
+    word: true
+  - trigger: 'bvn★'
+    replace: 'bienvenue'
+    propagate_case: true
+    word: true
+  - trigger: 'bwe★'
+    replace: 'bon week-end'
+    propagate_case: true
+    word: true
+  - trigger: 'bwk★'
+    replace: 'bon week-end'
 
     # === C ===
-    - trigger: "c★"
-      replace: "c’est"
-    - trigger: "cad★"
-      replace: "c’est-à-dire"
-    - trigger: "camp★"
-      replace: "campagne"
-    - trigger: "carac★"
-      replace: "caractère"
-    - trigger: "caract★"
-      replace: "caractéristique"
-    - trigger: "cb★"
-      replace: "combien"
-    - trigger: "cc★"
-      replace: "copier-coller"
-    - trigger: "ccé★"
-      replace: "copié-collé"
-    - trigger: "ccl★"
-      replace: "conclusion"
-    - trigger: "cdg★"
-      replace: "Charles de Gaulle"
-    - trigger: "cdt★"
-      replace: "cordialement"
-    - trigger: "certif★"
-      replace: "certification"
-    - trigger: "chg★"
-      replace: "charge"
-    - trigger: "chap★"
-      replace: "chapitre"
-    - trigger: "chr★"
-      replace: "chercher"
-    - trigger: "ci★"
-      replace: "ci-joint"
-    - trigger: "cj★"
-      replace: "ci-joint"
-    - trigger: "coeff★"
-      replace: "coefficient"
-    - trigger: "cog★"
-      replace: "cognition"
-    - trigger: "cogv★"
-      replace: "cognitive"
-    - trigger: "comp★"
-      replace: "comprendre"
-    - trigger: "cond★"
-      replace: "condition"
-    - trigger: "conds★"
-      replace: "conditions"
-    - trigger: "config★"
-      replace: "configuration"
-    - trigger: "chgt★"
-      replace: "changement"
-    - trigger: "cnp★"
-      replace: "ce n’est pas"
-    - trigger: "contrib★"
-      replace: "contribution"
-    - trigger: "couv★"
-      replace: "couverture"
-    - trigger: "cpd★"
-      replace: "cependant"
-    - trigger: "cr★"
-      replace: "compte-rendu"
-    - trigger: "ct★"
-      replace: "c’était"
-    - trigger: "ctb★"
-      replace: "c’est très bien"
-    - trigger: "cv★"
-      replace: "ça va ?"
-    - trigger: "cvt★"
-      replace: "ça va toi ?"
-    - trigger: "ctc★"
-      replace: "Est-ce que cela te convient ?"
-    - trigger: "cvc★"
-      replace: "Est-ce que cela vous convient ?"
+  - trigger: 'c★'
+    replace: 'c’est'
+    propagate_case: true
+    word: true
+  - trigger: 'cad★'
+    replace: 'c’est-à-dire'
+    propagate_case: true
+    word: true
+  - trigger: 'camp★'
+    replace: 'campagne'
+    propagate_case: true
+    word: true
+  - trigger: 'carac★'
+    replace: 'caractère'
+    propagate_case: true
+    word: true
+  - trigger: 'caract★'
+    replace: 'caractéristique'
+    propagate_case: true
+    word: true
+  - trigger: 'cb★'
+    replace: 'combien'
+    propagate_case: true
+    word: true
+  - trigger: 'cc★'
+    replace: 'copier-coller'
+    propagate_case: true
+    word: true
+  - trigger: 'ccé★'
+    replace: 'copié-collé'
+    propagate_case: true
+    word: true
+  - trigger: 'ccl★'
+    replace: 'conclusion'
+    propagate_case: true
+    word: true
+  - trigger: 'cdg★'
+    replace: 'Charles de Gaulle'
+    propagate_case: true
+    word: true
+  - trigger: 'cdt★'
+    replace: 'cordialement'
+    propagate_case: true
+    word: true
+  - trigger: 'certif★'
+    replace: 'certification'
+    propagate_case: true
+    word: true
+  - trigger: 'chg★'
+    replace: 'charge'
+    propagate_case: true
+    word: true
+  - trigger: 'chap★'
+    replace: 'chapitre'
+    propagate_case: true
+    word: true
+  - trigger: 'chr★'
+    replace: 'chercher'
+    propagate_case: true
+    word: true
+  - trigger: 'ci★'
+    replace: 'ci-joint'
+    propagate_case: true
+    word: true
+  - trigger: 'cj★'
+    replace: 'ci-joint'
+    propagate_case: true
+    word: true
+  - trigger: 'coeff★'
+    replace: 'coefficient'
+    propagate_case: true
+    word: true
+  - trigger: 'cog★'
+    replace: 'cognition'
+    propagate_case: true
+    word: true
+  - trigger: 'cogv★'
+    replace: 'cognitive'
+    propagate_case: true
+    word: true
+  - trigger: 'comp★'
+    replace: 'comprendre'
+    propagate_case: true
+    word: true
+  - trigger: 'cond★'
+    replace: 'condition'
+    propagate_case: true
+    word: true
+  - trigger: 'conds★'
+    replace: 'conditions'
+    propagate_case: true
+    word: true
+  - trigger: 'config★'
+    replace: 'configuration'
+    propagate_case: true
+    word: true
+  - trigger: 'chgt★'
+    replace: 'changement'
+    propagate_case: true
+    word: true
+  - trigger: 'cnp★'
+    replace: 'ce n’est pas'
+    propagate_case: true
+    word: true
+  - trigger: 'contrib★'
+    replace: 'contribution'
+    propagate_case: true
+    word: true
+  - trigger: 'couv★'
+    replace: 'couverture'
+    propagate_case: true
+    word: true
+  - trigger: 'cpd★'
+    replace: 'cependant'
+    propagate_case: true
+    word: true
+  - trigger: 'cr★'
+    replace: 'compte-rendu'
+    propagate_case: true
+    word: true
+  - trigger: 'ct★'
+    replace: 'c’était'
+    propagate_case: true
+    word: true
+  - trigger: 'ctb★'
+    replace: 'c’est très bien'
+    propagate_case: true
+    word: true
+  - trigger: 'cv★'
+    replace: 'ça va ?'
+    propagate_case: true
+    word: true
+  - trigger: 'cvt★'
+    replace: 'ça va toi ?'
+    propagate_case: true
+    word: true
+  - trigger: 'ctc★'
+    replace: 'Est-ce que cela te convient ?'
+    propagate_case: true
+    word: true
+  - trigger: 'cvc★'
+    replace: 'Est-ce que cela vous convient ?'
 
     # === D ===
-    - trigger: "dac★"
-      replace: "d’accord"
-    - trigger: "ddl★"
-      replace: "download"
-    - trigger: "dé★"
-      replace: "déjà"
-    - trigger: "dê★"
-      replace: "d’être"
-    - trigger: "déc★"
-      replace: "décembre"
-    - trigger: "dec★"
-      replace: "décembre"
-    - trigger: "dedt★"
-      replace: "d’emploi du temps"
-    - trigger: "déf★"
-      replace: "définition"
-    - trigger: "def★"
-      replace: "définition"
-    - trigger: "défs★"
-      replace: "définitions"
-    - trigger: "démo★"
-      replace: "démonstration"
-    - trigger: "demo★"
-      replace: "démonstration"
-    - trigger: "dep★"
-      replace: "département"
-    - trigger: "deux★"
-      replace: "deuxième"
-    - trigger: "desc★"
-      replace: "description"
-    - trigger: "dev★"
-      replace: "développeur"
-    - trigger: "dév★"
-      replace: "développeur"
-    - trigger: "devt★"
-      replace: "développement"
-    - trigger: "dico★"
-      replace: "dictionnaire"
-    - trigger: "diff★"
-      replace: "différence"
-    - trigger: "difft★"
-      replace: "différent"
-    - trigger: "dim★"
-      replace: "dimension"
-    - trigger: "dimi★"
-      replace: "diminution"
-    - trigger: "la dispo★"
-      replace: "la disposition"
-    - trigger: "ta dispo★"
-      replace: "ta disposition"
-    - trigger: "une dispo★"
-      replace: "une disposition"
-    - trigger: "dispo★"
-      replace: "disponible"
-    - trigger: "distri★"
-      replace: "distributeur"
-    - trigger: "distrib★"
-      replace: "distributeur"
-    - trigger: "dj★"
-      replace: "déjà"
-    - trigger: "dm★"
-      replace: "donne-moi"
-    - trigger: "la doc★"
-      replace: "la documentation"
-    - trigger: "une doc★"
-      replace: "une documentation"
-    - trigger: "doc★"
-      replace: "document"
-    - trigger: "docs★"
-      replace: "documents"
-    - trigger: "dp★"
-      replace: "de plus"
-    - trigger: "dsl★"
-      replace: "désolé"
-    - trigger: "dtm★"
-      replace: "détermine"
-    - trigger: "dvlp★"
-      replace: "développe"
+  - trigger: 'dac★'
+    replace: 'd’accord'
+    propagate_case: true
+    word: true
+  - trigger: 'ddl★'
+    replace: 'download'
+    propagate_case: true
+    word: true
+  - trigger: 'dé★'
+    replace: 'déjà'
+    propagate_case: true
+    word: true
+  - trigger: 'dê★'
+    replace: 'd’être'
+    propagate_case: true
+    word: true
+  - trigger: 'déc★'
+    replace: 'décembre'
+    propagate_case: true
+    word: true
+  - trigger: 'dec★'
+    replace: 'décembre'
+    propagate_case: true
+    word: true
+  - trigger: 'dedt★'
+    replace: 'd’emploi du temps'
+    propagate_case: true
+    word: true
+  - trigger: 'déf★'
+    replace: 'définition'
+    propagate_case: true
+    word: true
+  - trigger: 'def★'
+    replace: 'définition'
+    propagate_case: true
+    word: true
+  - trigger: 'défs★'
+    replace: 'définitions'
+    propagate_case: true
+    word: true
+  - trigger: 'démo★'
+    replace: 'démonstration'
+    propagate_case: true
+    word: true
+  - trigger: 'demo★'
+    replace: 'démonstration'
+    propagate_case: true
+    word: true
+  - trigger: 'dep★'
+    replace: 'département'
+    propagate_case: true
+    word: true
+  - trigger: 'deux★'
+    replace: 'deuxième'
+    propagate_case: true
+    word: true
+  - trigger: 'desc★'
+    replace: 'description'
+    propagate_case: true
+    word: true
+  - trigger: 'dev★'
+    replace: 'développeur'
+    propagate_case: true
+    word: true
+  - trigger: 'dév★'
+    replace: 'développeur'
+    propagate_case: true
+    word: true
+  - trigger: 'devt★'
+    replace: 'développement'
+    propagate_case: true
+    word: true
+  - trigger: 'dico★'
+    replace: 'dictionnaire'
+    propagate_case: true
+    word: true
+  - trigger: 'diff★'
+    replace: 'différence'
+    propagate_case: true
+    word: true
+  - trigger: 'difft★'
+    replace: 'différent'
+    propagate_case: true
+    word: true
+  - trigger: 'dim★'
+    replace: 'dimension'
+    propagate_case: true
+    word: true
+  - trigger: 'dimi★'
+    replace: 'diminution'
+    propagate_case: true
+    word: true
+  - trigger: 'la dispo★'
+    replace: 'la disposition'
+    propagate_case: true
+    word: true
+  - trigger: 'ta dispo★'
+    replace: 'ta disposition'
+    propagate_case: true
+    word: true
+  - trigger: 'une dispo★'
+    replace: 'une disposition'
+    propagate_case: true
+    word: true
+  - trigger: 'dispo★'
+    replace: 'disponible'
+    propagate_case: true
+    word: true
+  - trigger: 'distri★'
+    replace: 'distributeur'
+    propagate_case: true
+    word: true
+  - trigger: 'distrib★'
+    replace: 'distributeur'
+    propagate_case: true
+    word: true
+  - trigger: 'dj★'
+    replace: 'déjà'
+    propagate_case: true
+    word: true
+  - trigger: 'dm★'
+    replace: 'donne-moi'
+    propagate_case: true
+    word: true
+  - trigger: 'la doc★'
+    replace: 'la documentation'
+    propagate_case: true
+    word: true
+  - trigger: 'une doc★'
+    replace: 'une documentation'
+    propagate_case: true
+    word: true
+  - trigger: 'doc★'
+    replace: 'document'
+    propagate_case: true
+    word: true
+  - trigger: 'docs★'
+    replace: 'documents'
+    propagate_case: true
+    word: true
+  - trigger: 'dp★'
+    replace: 'de plus'
+    propagate_case: true
+    word: true
+  - trigger: 'dsl★'
+    replace: 'désolé'
+    propagate_case: true
+    word: true
+  - trigger: 'dtm★'
+    replace: 'détermine'
+    propagate_case: true
+    word: true
+  - trigger: 'dvlp★'
+    replace: 'développe'
     # === E ===
-    - trigger: "e★"
-      replace: "est"
-    - trigger: "echant★"
-      replace: "échantillon"
-    - trigger: "echants★"
-      replace: "échantillons"
-    - trigger: "eco★"
-      replace: "économie"
-    - trigger: "ecq★"
-      replace: "est-ce que"
-    - trigger: "edt★"
-      replace: "emploi du temps"
-    - trigger: "eef★"
-      replace: "en effet"
-    - trigger: "elt★"
-      replace: "élément"
-    - trigger: "elts★"
-      replace: "éléments"
-    - trigger: "eo★"
-      replace: "en outre"
-    - trigger: "enc★"
-      replace: "encore"
-    - trigger: "eng★"
-      replace: "english"
-    - trigger: "enft★"
-      replace: "en fait"
-    - trigger: "ens★"
-      replace: "ensemble"
-    - trigger: "ent★"
-      replace: "entreprise"
-    - trigger: "env★"
-      replace: "environ"
-    - trigger: "ep★"
-      replace: "épisode"
-    - trigger: "eps★"
-      replace: "épisodes"
-    - trigger: "eq★"
-      replace: "équation"
-    - trigger: "ety★"
-      replace: "étymologie"
-    - trigger: "eve★"
-      replace: "événement"
-    - trigger: "evtl★"
-      replace: "éventuel"
-    - trigger: "evtle★"
-      replace: "éventuelle"
-    - trigger: "evtlt★"
-      replace: "éventuellement"
-    - trigger: "ex★"
-      replace: "exemple"
-    - trigger: "exo★"
-      replace: "exercice"
-    - trigger: "exp★"
-      replace: "expérience"
-    - trigger: "expo★"
-      replace: "exposition"
-    - trigger: "é★"
-      replace: "écart"
-    - trigger: "éco★"
-      replace: "économie"
-    - trigger: "ém★"
-      replace: "écris-moi"
-    - trigger: "éq★"
-      replace: "équation"
-    - trigger: "ê★"
-      replace: "être"
-    - trigger: "êt★"
-      replace: "es-tu"
+  - trigger: 'e★'
+    replace: 'est'
+    propagate_case: true
+    word: true
+  - trigger: 'echant★'
+    replace: 'échantillon'
+    propagate_case: true
+    word: true
+  - trigger: 'echants★'
+    replace: 'échantillons'
+    propagate_case: true
+    word: true
+  - trigger: 'eco★'
+    replace: 'économie'
+    propagate_case: true
+    word: true
+  - trigger: 'ecq★'
+    replace: 'est-ce que'
+    propagate_case: true
+    word: true
+  - trigger: 'edt★'
+    replace: 'emploi du temps'
+    propagate_case: true
+    word: true
+  - trigger: 'eef★'
+    replace: 'en effet'
+    propagate_case: true
+    word: true
+  - trigger: 'elt★'
+    replace: 'élément'
+    propagate_case: true
+    word: true
+  - trigger: 'elts★'
+    replace: 'éléments'
+    propagate_case: true
+    word: true
+  - trigger: 'eo★'
+    replace: 'en outre'
+    propagate_case: true
+    word: true
+  - trigger: 'enc★'
+    replace: 'encore'
+    propagate_case: true
+    word: true
+  - trigger: 'eng★'
+    replace: 'english'
+    propagate_case: true
+    word: true
+  - trigger: 'enft★'
+    replace: 'en fait'
+    propagate_case: true
+    word: true
+  - trigger: 'ens★'
+    replace: 'ensemble'
+    propagate_case: true
+    word: true
+  - trigger: 'ent★'
+    replace: 'entreprise'
+    propagate_case: true
+    word: true
+  - trigger: 'env★'
+    replace: 'environ'
+    propagate_case: true
+    word: true
+  - trigger: 'ep★'
+    replace: 'épisode'
+    propagate_case: true
+    word: true
+  - trigger: 'eps★'
+    replace: 'épisodes'
+    propagate_case: true
+    word: true
+  - trigger: 'eq★'
+    replace: 'équation'
+    propagate_case: true
+    word: true
+  - trigger: 'ety★'
+    replace: 'étymologie'
+    propagate_case: true
+    word: true
+  - trigger: 'eve★'
+    replace: 'événement'
+    propagate_case: true
+    word: true
+  - trigger: 'evtl★'
+    replace: 'éventuel'
+    propagate_case: true
+    word: true
+  - trigger: 'evtle★'
+    replace: 'éventuelle'
+    propagate_case: true
+    word: true
+  - trigger: 'evtlt★'
+    replace: 'éventuellement'
+    propagate_case: true
+    word: true
+  - trigger: 'ex★'
+    replace: 'exemple'
+    propagate_case: true
+    word: true
+  - trigger: 'exo★'
+    replace: 'exercice'
+    propagate_case: true
+    word: true
+  - trigger: 'exp★'
+    replace: 'expérience'
+    propagate_case: true
+    word: true
+  - trigger: 'expo★'
+    replace: 'exposition'
+    propagate_case: true
+    word: true
+  - trigger: 'é★'
+    replace: 'écart'
+    propagate_case: true
+    word: true
+  - trigger: 'éco★'
+    replace: 'économie'
+    propagate_case: true
+    word: true
+  - trigger: 'ém★'
+    replace: 'écris-moi'
+    propagate_case: true
+    word: true
+  - trigger: 'éq★'
+    replace: 'équation'
+    propagate_case: true
+    word: true
+  - trigger: 'ê★'
+    replace: 'être'
+    propagate_case: true
+    word: true
+  - trigger: 'êt★'
+    replace: 'es-tu'
 
     # === F ===
-    - trigger: "f★"
-      replace: "faire"
-    - trigger: "fam★"
-      replace: "famille"
-    - trigger: "fb★"
-      replace: "Facebook"
-    - trigger: "fc★"
-      replace: "fonction"
-    - trigger: "fct★"
-      replace: "fonction"
-    - trigger: "fea★"
-      replace: "feature"
-    - trigger: "feat★"
-      replace: "feature"
-    - trigger: "fev★"
-      replace: "février"
-    - trigger: "fi★"
-      replace: "financier"
-    - trigger: "fiè★"
-      replace: "financière"
-    - trigger: "ff★"
-      replace: "Firefox"
-    - trigger: "fig★"
-      replace: "figure"
-    - trigger: "fl★"
-      replace: "falloir"
-    - trigger: "freq★"
-      replace: "fréquence"
-    - trigger: "fr★"
-      replace: "France"
-    - trigger: "frs★"
-      replace: "français"
+  - trigger: 'f★'
+    replace: 'faire'
+    propagate_case: true
+    word: true
+  - trigger: 'fam★'
+    replace: 'famille'
+    propagate_case: true
+    word: true
+  - trigger: 'fb★'
+    replace: 'Facebook'
+    propagate_case: true
+    word: true
+  - trigger: 'fc★'
+    replace: 'fonction'
+    propagate_case: true
+    word: true
+  - trigger: 'fct★'
+    replace: 'fonction'
+    propagate_case: true
+    word: true
+  - trigger: 'fea★'
+    replace: 'feature'
+    propagate_case: true
+    word: true
+  - trigger: 'feat★'
+    replace: 'feature'
+    propagate_case: true
+    word: true
+  - trigger: 'fev★'
+    replace: 'février'
+    propagate_case: true
+    word: true
+  - trigger: 'fi★'
+    replace: 'financier'
+    propagate_case: true
+    word: true
+  - trigger: 'fiè★'
+    replace: 'financière'
+    propagate_case: true
+    word: true
+  - trigger: 'ff★'
+    replace: 'Firefox'
+    propagate_case: true
+    word: true
+  - trigger: 'fig★'
+    replace: 'figure'
+    propagate_case: true
+    word: true
+  - trigger: 'fl★'
+    replace: 'falloir'
+    propagate_case: true
+    word: true
+  - trigger: 'freq★'
+    replace: 'fréquence'
+    propagate_case: true
+    word: true
+  - trigger: 'fr★'
+    replace: 'France'
+    propagate_case: true
+    word: true
+  - trigger: 'frs★'
+    replace: 'français'
 
     # === G ===
-    - trigger: "g★"
-      replace: "j’ai"
-    - trigger: "g1r★"
-      replace: "j’ai une réunion"
-    - trigger: "gar★"
-      replace: "garantie"
-    - trigger: "gars★"
-      replace: "garanties"
-    - trigger: "gd★"
-      replace: "grand"
-    - trigger: "gg★"
-      replace: "Google"
-    - trigger: "ges★"
-      replace: "gestion"
-    - trigger: "gf★"
-      replace: "J’ai fait"
-    - trigger: "gmag★"
-      replace: "J’ai mis à jour"
-    - trigger: "gov★"
-      replace: "government"
-    - trigger: "gouv★"
-      replace: "gouvernement"
-    - trigger: "indiv★"
-      replace: "individuel"
-    - trigger: "gpa★"
-      replace: "je n’ai pas"
-    - trigger: "gt★"
-      replace: "j’étais"
-    - trigger: "gvt★"
-      replace: "gouvernement"
+  - trigger: 'g★'
+    replace: 'j’ai'
+    propagate_case: true
+    word: true
+  - trigger: 'g1r★'
+    replace: 'j’ai une réunion'
+    propagate_case: true
+    word: true
+  - trigger: 'gar★'
+    replace: 'garantie'
+    propagate_case: true
+    word: true
+  - trigger: 'gars★'
+    replace: 'garanties'
+    propagate_case: true
+    word: true
+  - trigger: 'gd★'
+    replace: 'grand'
+    propagate_case: true
+    word: true
+  - trigger: 'gg★'
+    replace: 'Google'
+    propagate_case: true
+    word: true
+  - trigger: 'ges★'
+    replace: 'gestion'
+    propagate_case: true
+    word: true
+  - trigger: 'gf★'
+    replace: 'J’ai fait'
+    propagate_case: true
+    word: true
+  - trigger: 'gmag★'
+    replace: 'J’ai mis à jour'
+    propagate_case: true
+    word: true
+  - trigger: 'gov★'
+    replace: 'government'
+    propagate_case: true
+    word: true
+  - trigger: 'gouv★'
+    replace: 'gouvernement'
+    propagate_case: true
+    word: true
+  - trigger: 'indiv★'
+    replace: 'individuel'
+    propagate_case: true
+    word: true
+  - trigger: 'gpa★'
+    replace: 'je n’ai pas'
+    propagate_case: true
+    word: true
+  - trigger: 'gt★'
+    replace: 'j’étais'
+    propagate_case: true
+    word: true
+  - trigger: 'gvt★'
+    replace: 'gouvernement'
 
     # === H ===
-    - trigger: "h★"
-      replace: "heure"
-    - trigger: "his★"
-      replace: "historique"
-    - trigger: "histo★"
-      replace: "historique"
-    - trigger: "hyp★"
-      replace: "hypothèse"
+  - trigger: 'h★'
+    replace: 'heure'
+    propagate_case: true
+    word: true
+  - trigger: 'his★'
+    replace: 'historique'
+    propagate_case: true
+    word: true
+  - trigger: 'histo★'
+    replace: 'historique'
+    propagate_case: true
+    word: true
+  - trigger: 'hyp★'
+    replace: 'hypothèse'
 
     # === I ===
-    - trigger: "ia★"
-      replace: "intelligence artificielle"
-    - trigger: "id★"
-      replace: "identifiant"
-    - trigger: "idf★"
-      replace: "Île-de-France"
-    - trigger: "idk★"
-      replace: "I don’t know"
-    - trigger: "ids★"
-      replace: "identifiants"
-    - trigger: "img★"
-      replace: "image"
-    - trigger: "imgs★"
-      replace: "images"
-    - trigger: "imm★"
-      replace: "immeuble"
-    - trigger: "imo★"
-      replace: "in my opinion"
-    - trigger: "imp★"
-      replace: "impossible"
-    - trigger: "inf★"
-      replace: "inférieur"
-    - trigger: "info★"
-      replace: "information"
-    - trigger: "infos★"
-      replace: "informations"
-    - trigger: "insta★"
-      replace: "Instagram"
-    - trigger: "intart★"
-      replace: "intelligence artificielle"
-    - trigger: "inter★"
-      replace: "international"
-    - trigger: "intro★"
-      replace: "introduction"
+  - trigger: 'ia★'
+    replace: 'intelligence artificielle'
+    propagate_case: true
+    word: true
+  - trigger: 'id★'
+    replace: 'identifiant'
+    propagate_case: true
+    word: true
+  - trigger: 'idf★'
+    replace: 'Île-de-France'
+    propagate_case: true
+    word: true
+  - trigger: 'idk★'
+    replace: 'I don’t know'
+    propagate_case: true
+    word: true
+  - trigger: 'ids★'
+    replace: 'identifiants'
+    propagate_case: true
+    word: true
+  - trigger: 'img★'
+    replace: 'image'
+    propagate_case: true
+    word: true
+  - trigger: 'imgs★'
+    replace: 'images'
+    propagate_case: true
+    word: true
+  - trigger: 'imm★'
+    replace: 'immeuble'
+    propagate_case: true
+    word: true
+  - trigger: 'imo★'
+    replace: 'in my opinion'
+    propagate_case: true
+    word: true
+  - trigger: 'imp★'
+    replace: 'impossible'
+    propagate_case: true
+    word: true
+  - trigger: 'inf★'
+    replace: 'inférieur'
+    propagate_case: true
+    word: true
+  - trigger: 'info★'
+    replace: 'information'
+    propagate_case: true
+    word: true
+  - trigger: 'infos★'
+    replace: 'informations'
+    propagate_case: true
+    word: true
+  - trigger: 'insta★'
+    replace: 'Instagram'
+    propagate_case: true
+    word: true
+  - trigger: 'intart★'
+    replace: 'intelligence artificielle'
+    propagate_case: true
+    word: true
+  - trigger: 'inter★'
+    replace: 'international'
+    propagate_case: true
+    word: true
+  - trigger: 'intro★'
+    replace: 'introduction'
 
     # === J ===
-    - trigger: "j★"
-      replace: "bonjour"
-    - trigger: "ja★"
-      replace: "jamais"
-    - trigger: "janv★"
-      replace: "janvier"
-    - trigger: "jm★"
-      replace: "j’aime"
-    - trigger: "jms★"
-      replace: "jamais"
-    - trigger: "jnsp★"
-      replace: "je ne sais pas"
-    - trigger: "js★"
-      replace: "je suis"
-    - trigger: "jsp★"
-      replace: "je ne sais pas"
-    - trigger: "jtm★"
-      replace: "je t’aime"
-    - trigger: "ju★"
-      replace: "jusque"
-    - trigger: "ju'★"
-      replace: "jusqu’"
-    - trigger: "jus★"
-      replace: "jusque"
-    - trigger: "jusq★"
-      replace: "jusqu’"
-    - trigger: "jus'★"
-      replace: "jusqu’"
-    - trigger: "jui★"
-      replace: "juillet"
+  - trigger: 'j★'
+    replace: 'bonjour'
+    propagate_case: true
+    word: true
+  - trigger: 'ja★'
+    replace: 'jamais'
+    propagate_case: true
+    word: true
+  - trigger: 'janv★'
+    replace: 'janvier'
+    propagate_case: true
+    word: true
+  - trigger: 'jm★'
+    replace: 'j’aime'
+    propagate_case: true
+    word: true
+  - trigger: 'jms★'
+    replace: 'jamais'
+    propagate_case: true
+    word: true
+  - trigger: 'jnsp★'
+    replace: 'je ne sais pas'
+    propagate_case: true
+    word: true
+  - trigger: 'js★'
+    replace: 'je suis'
+    propagate_case: true
+    word: true
+  - trigger: 'jsp★'
+    replace: 'je ne sais pas'
+    propagate_case: true
+    word: true
+  - trigger: 'jtm★'
+    replace: 'je t’aime'
+    propagate_case: true
+    word: true
+  - trigger: 'ju★'
+    replace: 'jusque'
+    propagate_case: true
+    word: true
+  - trigger: "ju'★"
+    replace: 'jusqu’'
+    propagate_case: true
+    word: true
+  - trigger: 'jus★'
+    replace: 'jusque'
+    propagate_case: true
+    word: true
+  - trigger: 'jusq★'
+    replace: 'jusqu’'
+    propagate_case: true
+    word: true
+  - trigger: "jus'★"
+    replace: 'jusqu’'
+    propagate_case: true
+    word: true
+  - trigger: 'jui★'
+    replace: 'juillet'
 
     # === K ===
-    - trigger: "k★"
-      replace: "contacter"
-    - trigger: "kb★"
-      replace: "keyboard"
-    - trigger: "kbd★"
-      replace: "keyboard"
-    - trigger: "kn★"
-      replace: "construction"
-    - trigger: "lê★"
-      replace: "l’être"
-    - trigger: "ledt★"
-      replace: "l’emploi du temps"
-    - trigger: "lex★"
-      replace: "l’exemple"
-    - trigger: "lim★"
-      replace: "limite"
+  - trigger: 'k★'
+    replace: 'contacter'
+    propagate_case: true
+    word: true
+  - trigger: 'kb★'
+    replace: 'keyboard'
+    propagate_case: true
+    word: true
+  - trigger: 'kbd★'
+    replace: 'keyboard'
+    propagate_case: true
+    word: true
+  - trigger: 'kn★'
+    replace: 'construction'
+    propagate_case: true
+    word: true
+  - trigger: 'lê★'
+    replace: 'l’être'
+    propagate_case: true
+    word: true
+  - trigger: 'ledt★'
+    replace: 'l’emploi du temps'
+    propagate_case: true
+    word: true
+  - trigger: 'lex★'
+    replace: 'l’exemple'
+    propagate_case: true
+    word: true
+  - trigger: 'lim★'
+    replace: 'limite'
 
     # === M ===
-    - trigger: "m★"
-      replace: "mais"
-    - trigger: "ma★"
-      replace: "madame"
-    - trigger: "maj★"
-      replace: "mise à jour"
-    - trigger: "màj★"
-      replace: "mise à jour"
-    - trigger: "math★"
-      replace: "mathématique"
-    - trigger: "manip★"
-      replace: "manipulation"
-    - trigger: "maths★"
-      replace: "mathématiques"
-    - trigger: "max★"
-      replace: "maximum"
-    - trigger: "md★"
-      replace: "milliard"
-    - trigger: "mds★"
-      replace: "milliards"
-    - trigger: "mdav★"
-      replace: "merci d’avance"
-    - trigger: "mdb★"
-      replace: "merci de bien vouloir"
-    - trigger: "mdl★"
-      replace: "modèle"
-    - trigger: "mdp★"
-      replace: "mot de passe"
-    - trigger: "mdps★"
-      replace: "mots de passe"
-    - trigger: "méthodo★"
-      replace: "méthodologie"
-    - trigger: "min★"
-      replace: "minimum"
-    - trigger: "mio★"
-      replace: "million"
-    - trigger: "mios★"
-      replace: "millions"
-    - trigger: "mjo★"
-      replace: "mettre à jour"
-    - trigger: "ml★"
-      replace: "machine learning"
-    - trigger: "mm★"
-      replace: "même"
-    - trigger: "mme★"
-      replace: "madame"
-    - trigger: "modif★"
-      replace: "modification"
-    - trigger: "mom★"
-      replace: "moi-même"
-    - trigger: "mrc★"
-      replace: "merci"
-    - trigger: "msg★"
-      replace: "message"
-    - trigger: "mt★"
-      replace: "montant"
-    - trigger: "mtn★"
-      replace: "maintenant"
-    - trigger: "moy★"
-      replace: "moyenne"
-    - trigger: "mq★"
-      replace: "montre que"
-    - trigger: "mr★"
-      replace: "monsieur"
-    - trigger: "mutu★"
-      replace: "mutualiser"
-    - trigger: "mvt★"
-      replace: "mouvement"
+  - trigger: 'm★'
+    replace: 'mais'
+    propagate_case: true
+    word: true
+  - trigger: 'ma★'
+    replace: 'madame'
+    propagate_case: true
+    word: true
+  - trigger: 'maj★'
+    replace: 'mise à jour'
+    propagate_case: true
+    word: true
+  - trigger: 'màj★'
+    replace: 'mise à jour'
+    propagate_case: true
+    word: true
+  - trigger: 'math★'
+    replace: 'mathématique'
+    propagate_case: true
+    word: true
+  - trigger: 'manip★'
+    replace: 'manipulation'
+    propagate_case: true
+    word: true
+  - trigger: 'maths★'
+    replace: 'mathématiques'
+    propagate_case: true
+    word: true
+  - trigger: 'max★'
+    replace: 'maximum'
+    propagate_case: true
+    word: true
+  - trigger: 'md★'
+    replace: 'milliard'
+    propagate_case: true
+    word: true
+  - trigger: 'mds★'
+    replace: 'milliards'
+    propagate_case: true
+    word: true
+  - trigger: 'mdav★'
+    replace: 'merci d’avance'
+    propagate_case: true
+    word: true
+  - trigger: 'mdb★'
+    replace: 'merci de bien vouloir'
+    propagate_case: true
+    word: true
+  - trigger: 'mdl★'
+    replace: 'modèle'
+    propagate_case: true
+    word: true
+  - trigger: 'mdp★'
+    replace: 'mot de passe'
+    propagate_case: true
+    word: true
+  - trigger: 'mdps★'
+    replace: 'mots de passe'
+    propagate_case: true
+    word: true
+  - trigger: 'méthodo★'
+    replace: 'méthodologie'
+    propagate_case: true
+    word: true
+  - trigger: 'min★'
+    replace: 'minimum'
+    propagate_case: true
+    word: true
+  - trigger: 'mio★'
+    replace: 'million'
+    propagate_case: true
+    word: true
+  - trigger: 'mios★'
+    replace: 'millions'
+    propagate_case: true
+    word: true
+  - trigger: 'mjo★'
+    replace: 'mettre à jour'
+    propagate_case: true
+    word: true
+  - trigger: 'ml★'
+    replace: 'machine learning'
+    propagate_case: true
+    word: true
+  - trigger: 'mm★'
+    replace: 'même'
+    propagate_case: true
+    word: true
+  - trigger: 'mme★'
+    replace: 'madame'
+    propagate_case: true
+    word: true
+  - trigger: 'modif★'
+    replace: 'modification'
+    propagate_case: true
+    word: true
+  - trigger: 'mom★'
+    replace: 'moi-même'
+    propagate_case: true
+    word: true
+  - trigger: 'mrc★'
+    replace: 'merci'
+    propagate_case: true
+    word: true
+  - trigger: 'msg★'
+    replace: 'message'
+    propagate_case: true
+    word: true
+  - trigger: 'mt★'
+    replace: 'montant'
+    propagate_case: true
+    word: true
+  - trigger: 'mtn★'
+    replace: 'maintenant'
+    propagate_case: true
+    word: true
+  - trigger: 'moy★'
+    replace: 'moyenne'
+    propagate_case: true
+    word: true
+  - trigger: 'mq★'
+    replace: 'montre que'
+    propagate_case: true
+    word: true
+  - trigger: 'mr★'
+    replace: 'monsieur'
+    propagate_case: true
+    word: true
+  - trigger: 'mutu★'
+    replace: 'mutualiser'
+    propagate_case: true
+    word: true
+  - trigger: 'mvt★'
+    replace: 'mouvement'
 
     # === N ===
-    - trigger: "n★"
-      replace: "nouveau"
-    - trigger: "nav★"
-      replace: "navigation"
-    - trigger: "nb★"
-      replace: "nombre"
-    - trigger: "nean★"
-      replace: "néanmoins"
-    - trigger: "new★"
-      replace: "nouveau"
-    - trigger: "newe★"
-      replace: "nouvelle"
-    - trigger: "nimp★"
-      replace: "n’importe"
-    - trigger: "niv★"
-      replace: "niveau"
-    - trigger: "norm★"
-      replace: "normalement"
-    - trigger: "nota★"
-      replace: "notamment"
-    - trigger: "notm★"
-      replace: "notamment"
-    - trigger: "nouv★"
-      replace: "nouvelle"
-    - trigger: "nov★"
-      replace: "novembre"
-    - trigger: "now★"
-      replace: "maintenant"
-    - trigger: "np★"
-      replace: "ne pas"
-    - trigger: "nrj★"
-      replace: "énergie"
-    - trigger: "ns★"
-      replace: "nous"
-    - trigger: "num★"
-      replace: "numéro"
+  - trigger: 'n★'
+    replace: 'nouveau'
+    propagate_case: true
+    word: true
+  - trigger: 'nav★'
+    replace: 'navigation'
+    propagate_case: true
+    word: true
+  - trigger: 'nb★'
+    replace: 'nombre'
+    propagate_case: true
+    word: true
+  - trigger: 'nean★'
+    replace: 'néanmoins'
+    propagate_case: true
+    word: true
+  - trigger: 'new★'
+    replace: 'nouveau'
+    propagate_case: true
+    word: true
+  - trigger: 'newe★'
+    replace: 'nouvelle'
+    propagate_case: true
+    word: true
+  - trigger: 'nimp★'
+    replace: 'n’importe'
+    propagate_case: true
+    word: true
+  - trigger: 'niv★'
+    replace: 'niveau'
+    propagate_case: true
+    word: true
+  - trigger: 'norm★'
+    replace: 'normalement'
+    propagate_case: true
+    word: true
+  - trigger: 'nota★'
+    replace: 'notamment'
+    propagate_case: true
+    word: true
+  - trigger: 'notm★'
+    replace: 'notamment'
+    propagate_case: true
+    word: true
+  - trigger: 'nouv★'
+    replace: 'nouvelle'
+    propagate_case: true
+    word: true
+  - trigger: 'nov★'
+    replace: 'novembre'
+    propagate_case: true
+    word: true
+  - trigger: 'now★'
+    replace: 'maintenant'
+    propagate_case: true
+    word: true
+  - trigger: 'np★'
+    replace: 'ne pas'
+    propagate_case: true
+    word: true
+  - trigger: 'nrj★'
+    replace: 'énergie'
+    propagate_case: true
+    word: true
+  - trigger: 'ns★'
+    replace: 'nous'
+    propagate_case: true
+    word: true
+  - trigger: 'num★'
+    replace: 'numéro'
 
     # === O ===
-    - trigger: "o-★"
-      replace: "au moins"
-    - trigger: "o+★"
-      replace: "au plus"
-    - trigger: "obj★"
-      replace: "objectif"
-    - trigger: "obs★"
-      replace: "observation"
-    - trigger: "oct★"
-      replace: "octobre"
-    - trigger: "odj★"
-      replace: "ordre du jour"
-    - trigger: "opé★"
-      replace: "opération"
-    - trigger: "oqp★"
-      replace: "occupé"
-    - trigger: "ordi★"
-      replace: "ordinateur"
-    - trigger: "org★"
-      replace: "organisation"
-    - trigger: "orga★"
-      replace: "organisation"
-    - trigger: "ortho★"
-      replace: "orthographe"
-    - trigger: "out★"
-      replace: "Où es-tu ?"
-    - trigger: "outv★"
-      replace: "Où êtes-vous ?"
-    - trigger: "ouv★"
-      replace: "ouverture"
+  - trigger: 'o-★'
+    replace: 'au moins'
+    propagate_case: true
+    word: true
+  - trigger: 'o+★'
+    replace: 'au plus'
+    propagate_case: true
+    word: true
+  - trigger: 'obj★'
+    replace: 'objectif'
+    propagate_case: true
+    word: true
+  - trigger: 'obs★'
+    replace: 'observation'
+    propagate_case: true
+    word: true
+  - trigger: 'oct★'
+    replace: 'octobre'
+    propagate_case: true
+    word: true
+  - trigger: 'odj★'
+    replace: 'ordre du jour'
+    propagate_case: true
+    word: true
+  - trigger: 'opé★'
+    replace: 'opération'
+    propagate_case: true
+    word: true
+  - trigger: 'oqp★'
+    replace: 'occupé'
+    propagate_case: true
+    word: true
+  - trigger: 'ordi★'
+    replace: 'ordinateur'
+    propagate_case: true
+    word: true
+  - trigger: 'org★'
+    replace: 'organisation'
+    propagate_case: true
+    word: true
+  - trigger: 'orga★'
+    replace: 'organisation'
+    propagate_case: true
+    word: true
+  - trigger: 'ortho★'
+    replace: 'orthographe'
+    propagate_case: true
+    word: true
+  - trigger: 'out★'
+    replace: 'Où es-tu ?'
+    propagate_case: true
+    word: true
+  - trigger: 'outv★'
+    replace: 'Où êtes-vous ?'
+    propagate_case: true
+    word: true
+  - trigger: 'ouv★'
+    replace: 'ouverture'
 
     # === P ===
-    - trigger: "p★"
-      replace: "prendre"
-    - trigger: "p//★"
-      replace: "par rapport"
-    - trigger: "par★"
-      replace: "paragraphe"
-    - trigger: "param★"
-      replace: "paramètre"
-    - trigger: "pb★"
-      replace: "problème"
-    - trigger: "pcq★"
-      replace: "parce que"
-    - trigger: "pck★"
-      replace: "parce que"
-    - trigger: "pckil★"
-      replace: "parce qu’il"
-    - trigger: "pcquil★"
-      replace: "parce qu’il"
-    - trigger: "pcquon★"
-      replace: "parce qu’on"
-    - trigger: "pckon★"
-      replace: "parce qu’on"
-    - trigger: "pd★"
-      replace: "pendant"
-    - trigger: "pdt★"
-      replace: "pendant"
-    - trigger: "pdv★"
-      replace: "point de vue"
-    - trigger: "pdvs★"
-      replace: "points de vue"
-    - trigger: "perf★"
-      replace: "performance"
-    - trigger: "perso★"
-      replace: "personne"
-    - trigger: "pê★"
-      replace: "peut-être"
-    - trigger: "péri★"
-      replace: "périmètre"
-    - trigger: "périm★"
-      replace: "périmètre"
-    - trigger: "peut-ê★"
-      replace: "peut-être"
-    - trigger: "pex★"
-      replace: "par exemple"
-    - trigger: "pf★"
-      replace: "portefeuille"
-    - trigger: "pg★"
-      replace: "pas grave"
-    - trigger: "pgm★"
-      replace: "programme"
-    - trigger: "pi★"
-      replace: "pour information"
-    - trigger: "pic★"
-      replace: "picture"
-    - trigger: "pics★"
-      replace: "pictures"
-    - trigger: "piè★"
-      replace: "pièce jointe"
-    - trigger: "pj★"
-      replace: "pièce jointe"
-    - trigger: "pjs★"
-      replace: "pièces jointes"
-    - trigger: "pk★"
-      replace: "pourquoi"
-    - trigger: "pls★"
-      replace: "please"
-    - trigger: "poum★"
-      replace: "plus ou moins"
-    - trigger: "poss★"
-      replace: "possible"
-    - trigger: "pourcent★"
-      replace: "pourcentage"
-    - trigger: "ppt★"
-      replace: "PowerPoint"
-    - trigger: "pq★"
-      replace: "pourquoi"
-    - trigger: "prd★"
-      replace: "produit"
-    - trigger: "prem★"
-      replace: "premier"
-    - trigger: "prez★"
-      replace: "présentation"
-    - trigger: "prg★"
-      replace: "programme"
-    - trigger: "pro★"
-      replace: "professionnel"
-    - trigger: "prob★"
-      replace: "problème"
-    - trigger: "proba★"
-      replace: "probabilité"
-    - trigger: "prod★"
-      replace: "production"
-    - trigger: "prof★"
-      replace: "professeur"
-    - trigger: "prog★"
-      replace: "programme"
-    - trigger: "prop★"
-      replace: "propriété"
-    - trigger: "propo★"
-      replace: "proposition"
-    - trigger: "props★"
-      replace: "propriétés"
-    - trigger: "pros★"
-      replace: "professionnels"
-    - trigger: "prot★"
-      replace: "professionnellement"
-    - trigger: "prov★"
-      replace: "provision"
-    - trigger: "psycha★"
-      replace: "psychanalyse"
-    - trigger: "psycho★"
-      replace: "psychologie"
-    - trigger: "psb★"
-      replace: "possible"
-    - trigger: "psy★"
-      replace: "psychologie"
-    - trigger: "pt★"
-      replace: "point"
-    - trigger: "ptf★"
-      replace: "portefeuille"
-    - trigger: "pts★"
-      replace: "points"
-    - trigger: "pub★"
-      replace: "publicité"
-    - trigger: "pvv★"
-      replace: "pouvez-vous"
-    - trigger: "py★"
-      replace: "python"
+  - trigger: 'p★'
+    replace: 'prendre'
+    propagate_case: true
+    word: true
+  - trigger: 'p//★'
+    replace: 'par rapport'
+    propagate_case: true
+    word: true
+  - trigger: 'par★'
+    replace: 'paragraphe'
+    propagate_case: true
+    word: true
+  - trigger: 'param★'
+    replace: 'paramètre'
+    propagate_case: true
+    word: true
+  - trigger: 'pb★'
+    replace: 'problème'
+    propagate_case: true
+    word: true
+  - trigger: 'pcq★'
+    replace: 'parce que'
+    propagate_case: true
+    word: true
+  - trigger: 'pck★'
+    replace: 'parce que'
+    propagate_case: true
+    word: true
+  - trigger: 'pckil★'
+    replace: 'parce qu’il'
+    propagate_case: true
+    word: true
+  - trigger: 'pcquil★'
+    replace: 'parce qu’il'
+    propagate_case: true
+    word: true
+  - trigger: 'pcquon★'
+    replace: 'parce qu’on'
+    propagate_case: true
+    word: true
+  - trigger: 'pckon★'
+    replace: 'parce qu’on'
+    propagate_case: true
+    word: true
+  - trigger: 'pd★'
+    replace: 'pendant'
+    propagate_case: true
+    word: true
+  - trigger: 'pdt★'
+    replace: 'pendant'
+    propagate_case: true
+    word: true
+  - trigger: 'pdv★'
+    replace: 'point de vue'
+    propagate_case: true
+    word: true
+  - trigger: 'pdvs★'
+    replace: 'points de vue'
+    propagate_case: true
+    word: true
+  - trigger: 'perf★'
+    replace: 'performance'
+    propagate_case: true
+    word: true
+  - trigger: 'perso★'
+    replace: 'personne'
+    propagate_case: true
+    word: true
+  - trigger: 'pê★'
+    replace: 'peut-être'
+    propagate_case: true
+    word: true
+  - trigger: 'péri★'
+    replace: 'périmètre'
+    propagate_case: true
+    word: true
+  - trigger: 'périm★'
+    replace: 'périmètre'
+    propagate_case: true
+    word: true
+  - trigger: 'peut-ê★'
+    replace: 'peut-être'
+    propagate_case: true
+    word: true
+  - trigger: 'pex★'
+    replace: 'par exemple'
+    propagate_case: true
+    word: true
+  - trigger: 'pf★'
+    replace: 'portefeuille'
+    propagate_case: true
+    word: true
+  - trigger: 'pg★'
+    replace: 'pas grave'
+    propagate_case: true
+    word: true
+  - trigger: 'pgm★'
+    replace: 'programme'
+    propagate_case: true
+    word: true
+  - trigger: 'pi★'
+    replace: 'pour information'
+    propagate_case: true
+    word: true
+  - trigger: 'pic★'
+    replace: 'picture'
+    propagate_case: true
+    word: true
+  - trigger: 'pics★'
+    replace: 'pictures'
+    propagate_case: true
+    word: true
+  - trigger: 'piè★'
+    replace: 'pièce jointe'
+    propagate_case: true
+    word: true
+  - trigger: 'pj★'
+    replace: 'pièce jointe'
+    propagate_case: true
+    word: true
+  - trigger: 'pjs★'
+    replace: 'pièces jointes'
+    propagate_case: true
+    word: true
+  - trigger: 'pk★'
+    replace: 'pourquoi'
+    propagate_case: true
+    word: true
+  - trigger: 'pls★'
+    replace: 'please'
+    propagate_case: true
+    word: true
+  - trigger: 'poum★'
+    replace: 'plus ou moins'
+    propagate_case: true
+    word: true
+  - trigger: 'poss★'
+    replace: 'possible'
+    propagate_case: true
+    word: true
+  - trigger: 'pourcent★'
+    replace: 'pourcentage'
+    propagate_case: true
+    word: true
+  - trigger: 'ppt★'
+    replace: 'PowerPoint'
+    propagate_case: true
+    word: true
+  - trigger: 'pq★'
+    replace: 'pourquoi'
+    propagate_case: true
+    word: true
+  - trigger: 'prd★'
+    replace: 'produit'
+    propagate_case: true
+    word: true
+  - trigger: 'prem★'
+    replace: 'premier'
+    propagate_case: true
+    word: true
+  - trigger: 'prez★'
+    replace: 'présentation'
+    propagate_case: true
+    word: true
+  - trigger: 'prg★'
+    replace: 'programme'
+    propagate_case: true
+    word: true
+  - trigger: 'pro★'
+    replace: 'professionnel'
+    propagate_case: true
+    word: true
+  - trigger: 'prob★'
+    replace: 'problème'
+    propagate_case: true
+    word: true
+  - trigger: 'proba★'
+    replace: 'probabilité'
+    propagate_case: true
+    word: true
+  - trigger: 'prod★'
+    replace: 'production'
+    propagate_case: true
+    word: true
+  - trigger: 'prof★'
+    replace: 'professeur'
+    propagate_case: true
+    word: true
+  - trigger: 'prog★'
+    replace: 'programme'
+    propagate_case: true
+    word: true
+  - trigger: 'prop★'
+    replace: 'propriété'
+    propagate_case: true
+    word: true
+  - trigger: 'propo★'
+    replace: 'proposition'
+    propagate_case: true
+    word: true
+  - trigger: 'props★'
+    replace: 'propriétés'
+    propagate_case: true
+    word: true
+  - trigger: 'pros★'
+    replace: 'professionnels'
+    propagate_case: true
+    word: true
+  - trigger: 'prot★'
+    replace: 'professionnellement'
+    propagate_case: true
+    word: true
+  - trigger: 'prov★'
+    replace: 'provision'
+    propagate_case: true
+    word: true
+  - trigger: 'psycha★'
+    replace: 'psychanalyse'
+    propagate_case: true
+    word: true
+  - trigger: 'psycho★'
+    replace: 'psychologie'
+    propagate_case: true
+    word: true
+  - trigger: 'psb★'
+    replace: 'possible'
+    propagate_case: true
+    word: true
+  - trigger: 'psy★'
+    replace: 'psychologie'
+    propagate_case: true
+    word: true
+  - trigger: 'pt★'
+    replace: 'point'
+    propagate_case: true
+    word: true
+  - trigger: 'ptf★'
+    replace: 'portefeuille'
+    propagate_case: true
+    word: true
+  - trigger: 'pts★'
+    replace: 'points'
+    propagate_case: true
+    word: true
+  - trigger: 'pub★'
+    replace: 'publicité'
+    propagate_case: true
+    word: true
+  - trigger: 'pvv★'
+    replace: 'pouvez-vous'
+    propagate_case: true
+    word: true
+  - trigger: 'py★'
+    replace: 'python'
 
     # === Q ===
-    - trigger: "q★"
-      replace: "question"
-    - trigger: "qc★"
-      replace: "qu’est-ce"
-    - trigger: "qcq★"
-      replace: "qu’est-ce que"
-    - trigger: "qcq'★"
-      replace: "qu’est-ce qu’"
-    - trigger: "qq★"
-      replace: "quelque"
-    - trigger: "qqch★"
-      replace: "quelque chose"
-    - trigger: "qqs★"
-      replace: "quelques"
-    - trigger: "qqn★"
-      replace: "quelqu’un"
-    - trigger: "quasi★"
-      replace: "quasiment"
-    - trigger: "ques★"
-      replace: "question"
-    - trigger: "quid★"
-      replace: "qu’en est-il de"
+  - trigger: 'q★'
+    replace: 'question'
+    propagate_case: true
+    word: true
+  - trigger: 'qc★'
+    replace: 'qu’est-ce'
+    propagate_case: true
+    word: true
+  - trigger: 'qcq★'
+    replace: 'qu’est-ce que'
+    propagate_case: true
+    word: true
+  - trigger: "qcq'★"
+    replace: 'qu’est-ce qu’'
+    propagate_case: true
+    word: true
+  - trigger: 'qq★'
+    replace: 'quelque'
+    propagate_case: true
+    word: true
+  - trigger: 'qqch★'
+    replace: 'quelque chose'
+    propagate_case: true
+    word: true
+  - trigger: 'qqs★'
+    replace: 'quelques'
+    propagate_case: true
+    word: true
+  - trigger: 'qqn★'
+    replace: 'quelqu’un'
+    propagate_case: true
+    word: true
+  - trigger: 'quasi★'
+    replace: 'quasiment'
+    propagate_case: true
+    word: true
+  - trigger: 'ques★'
+    replace: 'question'
+    propagate_case: true
+    word: true
+  - trigger: 'quid★'
+    replace: 'qu’en est-il de'
 
     # === R ===
-    - trigger: "r★"
-      replace: "rien"
-    - trigger: "rapidt★"
-      replace: "rapidement"
-    - trigger: "rdv★"
-      replace: "rendez-vous"
-    - trigger: "ré★"
-      replace: "réunion"
-    - trigger: "rés★"
-      replace: "réunions"
-    - trigger: "rép★"
-      replace: "répertoire"
-    - trigger: "résil★"
-      replace: "résiliation"
-    - trigger: "reco★"
-      replace: "recommandation"
-    - trigger: "ref★"
-      replace: "référence"
-    - trigger: "rep★"
-      replace: "répertoire"
-    - trigger: "rex★"
-      replace: "retour d’expérience"
-    - trigger: "rmq★"
-      replace: "remarque"
-    - trigger: "rpz★"
-      replace: "représente"
-    - trigger: "rs★"
-      replace: "résultat"
+  - trigger: 'r★'
+    replace: 'rien'
+    propagate_case: true
+    word: true
+  - trigger: 'rapidt★'
+    replace: 'rapidement'
+    propagate_case: true
+    word: true
+  - trigger: 'rdv★'
+    replace: 'rendez-vous'
+    propagate_case: true
+    word: true
+  - trigger: 'ré★'
+    replace: 'réunion'
+    propagate_case: true
+    word: true
+  - trigger: 'rés★'
+    replace: 'réunions'
+    propagate_case: true
+    word: true
+  - trigger: 'rép★'
+    replace: 'répertoire'
+    propagate_case: true
+    word: true
+  - trigger: 'résil★'
+    replace: 'résiliation'
+    propagate_case: true
+    word: true
+  - trigger: 'reco★'
+    replace: 'recommandation'
+    propagate_case: true
+    word: true
+  - trigger: 'ref★'
+    replace: 'référence'
+    propagate_case: true
+    word: true
+  - trigger: 'rep★'
+    replace: 'répertoire'
+    propagate_case: true
+    word: true
+  - trigger: 'rex★'
+    replace: 'retour d’expérience'
+    propagate_case: true
+    word: true
+  - trigger: 'rmq★'
+    replace: 'remarque'
+    propagate_case: true
+    word: true
+  - trigger: 'rpz★'
+    replace: 'représente'
+    propagate_case: true
+    word: true
+  - trigger: 'rs★'
+    replace: 'résultat'
 
     # === S ===
-    - trigger: "seg★"
-      replace: "segment"
-    - trigger: "segm★"
-      replace: "segment"
-    - trigger: "sep★"
-      replace: "septembre"
-    - trigger: "sept★"
-      replace: "septembre"
-    - trigger: "simpl★"
-      replace: "simplement"
-    - trigger: "situ★"
-      replace: "situation"
-    - trigger: "smth★"
-      replace: "something"
-    - trigger: "srx★"
-      replace: "sérieux"
-    - trigger: "sécu★"
-      replace: "sécurité"
-    - trigger: "st★"
-      replace: "s’était"
-    - trigger: "stat★"
-      replace: "statistique"
-    - trigger: "sth★"
-      replace: "something"
-    - trigger: "stp★"
-      replace: "s’il te plaît"
-    - trigger: "strat★"
-      replace: "stratégique"
-    - trigger: "stream★"
-      replace: "streaming"
-    - trigger: "suff★"
-      replace: "suffisant"
-    - trigger: "sufft★"
-      replace: "suffisament"
-    - trigger: "supé★"
-      replace: "supérieur"
-    - trigger: "surv★"
-      replace: "survenance"
-    - trigger: "svp★"
-      replace: "s’il vous plaît"
-    - trigger: "svt★"
-      replace: "souvent"
-    - trigger: "sya★"
-      replace: "s’il y a"
-    - trigger: "syn★"
-      replace: "synonyme"
-    - trigger: "sync★"
-      replace: "synchronisation"
-    - trigger: "syncro★"
-      replace: "synchronisation"
-    - trigger: "sys★"
-      replace: "système"
+  - trigger: 'seg★'
+    replace: 'segment'
+    propagate_case: true
+    word: true
+  - trigger: 'segm★'
+    replace: 'segment'
+    propagate_case: true
+    word: true
+  - trigger: 'sep★'
+    replace: 'septembre'
+    propagate_case: true
+    word: true
+  - trigger: 'sept★'
+    replace: 'septembre'
+    propagate_case: true
+    word: true
+  - trigger: 'simpl★'
+    replace: 'simplement'
+    propagate_case: true
+    word: true
+  - trigger: 'situ★'
+    replace: 'situation'
+    propagate_case: true
+    word: true
+  - trigger: 'smth★'
+    replace: 'something'
+    propagate_case: true
+    word: true
+  - trigger: 'srx★'
+    replace: 'sérieux'
+    propagate_case: true
+    word: true
+  - trigger: 'sécu★'
+    replace: 'sécurité'
+    propagate_case: true
+    word: true
+  - trigger: 'st★'
+    replace: 's’était'
+    propagate_case: true
+    word: true
+  - trigger: 'stat★'
+    replace: 'statistique'
+    propagate_case: true
+    word: true
+  - trigger: 'sth★'
+    replace: 'something'
+    propagate_case: true
+    word: true
+  - trigger: 'stp★'
+    replace: 's’il te plaît'
+    propagate_case: true
+    word: true
+  - trigger: 'strat★'
+    replace: 'stratégique'
+    propagate_case: true
+    word: true
+  - trigger: 'stream★'
+    replace: 'streaming'
+    propagate_case: true
+    word: true
+  - trigger: 'suff★'
+    replace: 'suffisant'
+    propagate_case: true
+    word: true
+  - trigger: 'sufft★'
+    replace: 'suffisament'
+    propagate_case: true
+    word: true
+  - trigger: 'supé★'
+    replace: 'supérieur'
+    propagate_case: true
+    word: true
+  - trigger: 'surv★'
+    replace: 'survenance'
+    propagate_case: true
+    word: true
+  - trigger: 'svp★'
+    replace: 's’il vous plaît'
+    propagate_case: true
+    word: true
+  - trigger: 'svt★'
+    replace: 'souvent'
+    propagate_case: true
+    word: true
+  - trigger: 'sya★'
+    replace: 's’il y a'
+    propagate_case: true
+    word: true
+  - trigger: 'syn★'
+    replace: 'synonyme'
+    propagate_case: true
+    word: true
+  - trigger: 'sync★'
+    replace: 'synchronisation'
+    propagate_case: true
+    word: true
+  - trigger: 'syncro★'
+    replace: 'synchronisation'
+    propagate_case: true
+    word: true
+  - trigger: 'sys★'
+    replace: 'système'
 
     # === T ===
-    - trigger: "t★"
-      replace: "très"
-    - trigger: "tb★"
-      replace: "très bien"
-    - trigger: "temp★"
-      replace: "temporaire"
-    - trigger: "tes★"
-      replace: "tu es"
-    - trigger: "tél★"
-      replace: "téléphone"
-    - trigger: "teq★"
-      replace: "telle que"
-    - trigger: "teqs★"
-      replace: "telles que"
-    - trigger: "tfk★"
-      replace: "qu’est-ce que tu fais ?"
-    - trigger: "tgh★"
-      replace: "together"
-    - trigger: "théo★"
-      replace: "théorie"
-    - trigger: "thm★"
-      replace: "théorème"
-    - trigger: "tj★"
-      replace: "toujours"
-    - trigger: "tjr★"
-      replace: "toujours"
-    - trigger: "tlm★"
-      replace: "tout le monde"
-    - trigger: "tq★"
-      replace: "tel que"
-    - trigger: "tqs★"
-      replace: "tels que"
-    - trigger: "tout★"
-      replace: "toutefois"
-    - trigger: "tra★"
-      replace: "travail"
-    - trigger: "trad★"
-      replace: "traduction"
-    - trigger: "trav★"
-      replace: "travail"
-    - trigger: "trkl★"
-      replace: "tranquille"
-    - trigger: "tt★"
-      replace: "télétravail"
-    - trigger: "tv★"
-      replace: "télévision"
-    - trigger: "ty★"
-      replace: "thank you"
-    - trigger: "typo★"
-      replace: "typographie"
+  - trigger: 't★'
+    replace: 'très'
+    propagate_case: true
+    word: true
+  - trigger: 'tb★'
+    replace: 'très bien'
+    propagate_case: true
+    word: true
+  - trigger: 'temp★'
+    replace: 'temporaire'
+    propagate_case: true
+    word: true
+  - trigger: 'tes★'
+    replace: 'tu es'
+    propagate_case: true
+    word: true
+  - trigger: 'tél★'
+    replace: 'téléphone'
+    propagate_case: true
+    word: true
+  - trigger: 'teq★'
+    replace: 'telle que'
+    propagate_case: true
+    word: true
+  - trigger: 'teqs★'
+    replace: 'telles que'
+    propagate_case: true
+    word: true
+  - trigger: 'tfk★'
+    replace: 'qu’est-ce que tu fais ?'
+    propagate_case: true
+    word: true
+  - trigger: 'tgh★'
+    replace: 'together'
+    propagate_case: true
+    word: true
+  - trigger: 'théo★'
+    replace: 'théorie'
+    propagate_case: true
+    word: true
+  - trigger: 'thm★'
+    replace: 'théorème'
+    propagate_case: true
+    word: true
+  - trigger: 'tj★'
+    replace: 'toujours'
+    propagate_case: true
+    word: true
+  - trigger: 'tjr★'
+    replace: 'toujours'
+    propagate_case: true
+    word: true
+  - trigger: 'tlm★'
+    replace: 'tout le monde'
+    propagate_case: true
+    word: true
+  - trigger: 'tq★'
+    replace: 'tel que'
+    propagate_case: true
+    word: true
+  - trigger: 'tqs★'
+    replace: 'tels que'
+    propagate_case: true
+    word: true
+  - trigger: 'tout★'
+    replace: 'toutefois'
+    propagate_case: true
+    word: true
+  - trigger: 'tra★'
+    replace: 'travail'
+    propagate_case: true
+    word: true
+  - trigger: 'trad★'
+    replace: 'traduction'
+    propagate_case: true
+    word: true
+  - trigger: 'trav★'
+    replace: 'travail'
+    propagate_case: true
+    word: true
+  - trigger: 'trkl★'
+    replace: 'tranquille'
+    propagate_case: true
+    word: true
+  - trigger: 'tt★'
+    replace: 'télétravail'
+    propagate_case: true
+    word: true
+  - trigger: 'tv★'
+    replace: 'télévision'
+    propagate_case: true
+    word: true
+  - trigger: 'ty★'
+    replace: 'thank you'
+    propagate_case: true
+    word: true
+  - trigger: 'typo★'
+    replace: 'typographie'
 
     # === U ===
-    - trigger: "une amé★"
-      replace: "une amélioration"
-    - trigger: "uniq★"
-      replace: "uniquement"
-    - trigger: "usa★"
-      replace: "États-Unis"
+  - trigger: 'une amé★'
+    replace: 'une amélioration'
+    propagate_case: true
+    word: true
+  - trigger: 'uniq★'
+    replace: 'uniquement'
+    propagate_case: true
+    word: true
+  - trigger: 'usa★'
+    replace: 'États-Unis'
 
     # === V ===
-    - trigger: "v★"
-      replace: "version"
-    - trigger: "var★"
-      replace: "variable"
-    - trigger: "vav★"
-      replace: "vis-à-vis"
-    - trigger: "verif★"
-      replace: "vérification"
-    - trigger: "vérif★"
-      replace: "vérification"
-    - trigger: "vocab★"
-      replace: "vocabulaire"
-    - trigger: "volat★"
-      replace: "volatilité"
-    - trigger: "vrm★"
-      replace: "vraiment"
-    - trigger: "vrmt★"
-      replace: "vraiment"
-    - trigger: "vs★"
-      replace: "vous êtes"
+  - trigger: 'v★'
+    replace: 'version'
+    propagate_case: true
+    word: true
+  - trigger: 'var★'
+    replace: 'variable'
+    propagate_case: true
+    word: true
+  - trigger: 'vav★'
+    replace: 'vis-à-vis'
+    propagate_case: true
+    word: true
+  - trigger: 'verif★'
+    replace: 'vérification'
+    propagate_case: true
+    word: true
+  - trigger: 'vérif★'
+    replace: 'vérification'
+    propagate_case: true
+    word: true
+  - trigger: 'vocab★'
+    replace: 'vocabulaire'
+    propagate_case: true
+    word: true
+  - trigger: 'volat★'
+    replace: 'volatilité'
+    propagate_case: true
+    word: true
+  - trigger: 'vrm★'
+    replace: 'vraiment'
+    propagate_case: true
+    word: true
+  - trigger: 'vrmt★'
+    replace: 'vraiment'
+    propagate_case: true
+    word: true
+  - trigger: 'vs★'
+    replace: 'vous êtes'
 
     # === W ===
-    - trigger: "w★"
-      replace: "with"
-    - trigger: "wd★"
-      replace: "Windows"
-    - trigger: "wk★"
-      replace: "week-end"
-    - trigger: "wknd★"
-      replace: "week-end"
-    - trigger: "wiki★"
-      replace: "Wikipédia"
+  - trigger: 'w★'
+    replace: 'with'
+    propagate_case: true
+    word: true
+  - trigger: 'wd★'
+    replace: 'Windows'
+    propagate_case: true
+    word: true
+  - trigger: 'wk★'
+    replace: 'week-end'
+    propagate_case: true
+    word: true
+  - trigger: 'wknd★'
+    replace: 'week-end'
+    propagate_case: true
+    word: true
+  - trigger: 'wiki★'
+    replace: 'Wikipédia'
 
     # === X ===
-    - trigger: "x★"
-      replace: "exemple"
+  - trigger: 'x★'
+    replace: 'exemple'
 
     # === Y ===
-    - trigger: "ya★"
-      replace: "il y a"
-    - trigger: "yapa★"
-      replace: "il n’y a pas"
-    - trigger: "yatil★"
-      replace: "y a-t-il"
-    - trigger: "yc★"
-      replace: "y compris"
-    - trigger: "yt★"
-      replace: "YouTube"
+  - trigger: 'ya★'
+    replace: 'il y a'
+    propagate_case: true
+    word: true
+  - trigger: 'yapa★'
+    replace: 'il n’y a pas'
+    propagate_case: true
+    word: true
+  - trigger: 'yatil★'
+    replace: 'y a-t-il'
+    propagate_case: true
+    word: true
+  - trigger: 'yc★'
+    replace: 'y compris'
+    propagate_case: true
+    word: true
+  - trigger: 'yt★'
+    replace: 'YouTube'
 
-    # === Z ===
+  # === Z ===
