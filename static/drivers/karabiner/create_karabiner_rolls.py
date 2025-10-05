@@ -9,6 +9,12 @@ from macos.keylayout_generation.data.keylayout_plus_mappings import (
 )
 
 
+def keycode_to_name(code, macos_keycodes):
+    if code is None:
+        return None
+    return macos_keycodes.get(str(code), code)
+
+
 def get_keycode_map(keylayout_path: str) -> dict:
     keycode_map = {}
     with open(keylayout_path, encoding="utf-8") as f:
@@ -62,17 +68,27 @@ PLUS_MAPPINGS_CONFIG = {
 output_path = Path(__file__).parent / "rolls.json"
 rolls = []
 
+
+with open(
+    str(Path(__file__).parent / "macos_keycodes.json"), encoding="utf-8"
+) as f:
+    macos_keycodes = json.load(f)
+
+output_path = Path(__file__).parent / "rolls.json"
+rolls = []
+
 for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
     trigger = mapping["trigger"]
     trigger_code = keycode_map.get(trigger)
+    trigger_name = keycode_to_name(trigger_code, macos_keycodes)
     manipulators = []
 
     # 1. When trigger is pressed, activate the variable
     manipulators.append(
         {
-            "from": {"key_code": trigger_code},
+            "from": {"key_code": trigger_name},
             "to": [
-                {"key_code": trigger_code},
+                {"key_code": trigger_name},
                 {"set_variable": {"name": f"{trigger}_pressed", "value": 1}},
             ],
             "to_after_key_up": [
@@ -86,6 +102,8 @@ for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
     for second_key, output in mapping["map"]:
         second_code = keycode_map.get(second_key)
         output_code = keycode_map.get(output)
+        second_name = keycode_to_name(second_code, macos_keycodes)
+        output_name = keycode_to_name(output_code, macos_keycodes)
         manipulators.append(
             {
                 "conditions": [
@@ -95,8 +113,8 @@ for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
                         "value": 1,
                     },
                 ],
-                "from": {"key_code": second_code},
-                "to": [{"key_code": output_code}],
+                "from": {"key_code": second_name},
+                "to": [{"key_code": output_name}],
                 "type": "basic",
             }
         )
@@ -107,7 +125,6 @@ for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
             "manipulators": manipulators,
         }
     )
-
 
 with open(output_path, "w", encoding="utf-8") as f:
     json.dump(rolls, f, ensure_ascii=False, indent=2)
