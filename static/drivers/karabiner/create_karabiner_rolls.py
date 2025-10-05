@@ -183,10 +183,22 @@ with open(output_path, "w", encoding="utf-8") as f:
             )
         else:
             desc = f"Actions regroupées pour la touche [{key}]"
+
+        # Tri des manipulateurs : les blocs simples d'abord
+        def is_simple_block(manip):
+            return set(manip.keys()) == {
+                "from",
+                "to",
+                "to_after_key_up",
+                "type",
+            }
+
+        simples = [m for m in manips if is_simple_block(m)]
+        others = [m for m in manips if not is_simple_block(m)]
         grouped.append(
             {
                 "description": desc,
-                "manipulators": manips,
+                "manipulators": others + simples,
             }
         )
 
