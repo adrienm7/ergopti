@@ -35,6 +35,123 @@
       {
         "conditions": [
           {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "a",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "semicolon",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "a",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "â",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "a",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
             "name": ",_pressed",
             "type": "variable_if",
             "value": 1
@@ -297,7 +414,7 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
+            "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
           }
@@ -315,28 +432,46 @@
             "key_code": "delete_or_backspace"
           },
           {
+            "key_code": "’",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "a"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "a"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
             "key_code": "a",
             "modifiers": [
               "left_shift"
             ]
           },
           {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "s"
           },
           {
-            "key_code": "semicolon",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "semicolon"
           },
           {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -350,12 +485,7 @@
           }
         ],
         "from": {
-          "key_code": "a",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "a"
         },
         "to": [
           {
@@ -379,12 +509,7 @@
           }
         ],
         "from": {
-          "key_code": "a",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "a"
         },
         "to": [
           {
@@ -397,45 +522,7 @@
             ]
           },
           {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ?_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "a",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "’",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "f"
           },
           {
             "key_code": "a"
@@ -644,93 +731,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "a"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "s"
-          },
-          {
-            "key_code": "semicolon"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "a"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "â",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "a"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "a"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -757,6 +757,70 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [x])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "É_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "x",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "z",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "x",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "æ",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -976,12 +1040,7 @@
           }
         ],
         "from": {
-          "key_code": "x",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "x"
         },
         "to": [
           {
@@ -994,10 +1053,7 @@
             ]
           },
           {
-            "key_code": "z",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "z"
           }
         ],
         "type": "basic"
@@ -1011,12 +1067,7 @@
           }
         ],
         "from": {
-          "key_code": "x",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "x"
         },
         "to": [
           {
@@ -1184,34 +1235,12 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "É_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "x"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "z"
-          }
-        ],
-        "type": "basic"
-      },
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger ',' (touche manipulée [d])",
+    "manipulators": [
       {
         "conditions": [
           {
@@ -1221,26 +1250,67 @@
           }
         ],
         "from": {
-          "key_code": "x"
+          "key_code": "d",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "æ",
+            "key_code": "œ",
             "modifiers": [
               "left_shift"
             ]
           }
         ],
         "type": "basic"
-      }
-    ]
-  },
-  {
-    "description": "Actions pour trigger ',' (touche manipulée [d])",
-    "manipulators": [
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "d",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -1501,7 +1571,7 @@
       {
         "conditions": [
           {
-            "name": "Ê_pressed",
+            "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
           }
@@ -1513,6 +1583,33 @@
               "shift"
             ]
           }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "’",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "d"
         },
         "to": [
           {
@@ -1536,12 +1633,7 @@
           }
         ],
         "from": {
-          "key_code": "d",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "d"
         },
         "to": [
           {
@@ -1554,45 +1646,7 @@
             ]
           },
           {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ?_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "d",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "’",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "f"
           },
           {
             "key_code": "d"
@@ -1796,60 +1850,6 @@
       {
         "conditions": [
           {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "d"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "œ",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "d"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -1876,6 +1876,152 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [z])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "z",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "E_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "open_bracket",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "z",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -2168,76 +2314,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "z",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "E_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "open_bracket",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": "z",
           "modifiers": {
@@ -2273,82 +2349,6 @@
       {
         "conditions": [
           {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "z",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -2371,6 +2371,117 @@
             "modifiers": [
               "left_shift"
             ]
+          },
+          {
+            "key_code": "z"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "z",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "s"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "E_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "open_bracket"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
           },
           {
             "key_code": "z"
@@ -2625,117 +2736,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "z",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "s"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "E_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "open_bracket"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "z"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "z"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -2762,6 +2762,129 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [non_us_backslash])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "t",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "É_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "non_us_backslash",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -3028,88 +3151,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "non_us_backslash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "t",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "comma",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "É_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "non_us_backslash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": "non_us_backslash",
           "modifiers": {
@@ -3145,47 +3186,6 @@
       {
         "conditions": [
           {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "non_us_backslash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "non_us_backslash",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -3208,6 +3208,96 @@
             "modifiers": [
               "left_shift"
             ]
+          },
+          {
+            "key_code": "non_us_backslash"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "non_us_backslash"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "t"
+          },
+          {
+            "key_code": "comma"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "É_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "non_us_backslash"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "e"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "non_us_backslash"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
           },
           {
             "key_code": "non_us_backslash"
@@ -3444,96 +3534,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "non_us_backslash"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "t"
-          },
-          {
-            "key_code": "comma"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "É_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "non_us_backslash"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "e"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "non_us_backslash"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "non_us_backslash"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -3560,6 +3560,123 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [s])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "s",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "w",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "u",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "s",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "î",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "s",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -3825,7 +3942,7 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
+            "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
           }
@@ -3843,28 +3960,46 @@
             "key_code": "delete_or_backspace"
           },
           {
+            "key_code": "’",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "s"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "s"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
             "key_code": "w",
             "modifiers": [
               "left_shift"
             ]
           },
           {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "s"
           },
           {
-            "key_code": "k",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "k"
           },
           {
-            "key_code": "u",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "u"
           }
         ],
         "type": "basic"
@@ -3878,12 +4013,7 @@
           }
         ],
         "from": {
-          "key_code": "s",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "s"
         },
         "to": [
           {
@@ -3907,12 +4037,7 @@
           }
         ],
         "from": {
-          "key_code": "s",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "s"
         },
         "to": [
           {
@@ -3925,45 +4050,7 @@
             ]
           },
           {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ?_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "s",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "’",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "f"
           },
           {
             "key_code": "s"
@@ -4172,93 +4259,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "s"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "w",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "s"
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "u"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "s"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "î",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "s"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "s"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -4285,6 +4285,76 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [e])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "e",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "ô",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "e",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -4512,7 +4582,7 @@
       {
         "conditions": [
           {
-            "name": "Ê_pressed",
+            "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
           }
@@ -4524,6 +4594,33 @@
               "shift"
             ]
           }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "’",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "e"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "e"
         },
         "to": [
           {
@@ -4547,12 +4644,7 @@
           }
         ],
         "from": {
-          "key_code": "e",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "e"
         },
         "to": [
           {
@@ -4565,45 +4657,7 @@
             ]
           },
           {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ?_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "e",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "’",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "f"
           },
           {
             "key_code": "e"
@@ -4782,60 +4836,6 @@
       {
         "conditions": [
           {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "e"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "ô",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "e"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "e"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -4862,6 +4862,70 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [f])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "f",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "t",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "f",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "û",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -5086,70 +5150,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "f",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "t",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "f",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "û",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -5175,6 +5175,57 @@
           },
           {
             "key_code": "f"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "f"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "t"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Ê_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "f"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "û",
+            "modifiers": [
+              "left_shift"
+            ]
           }
         ],
         "type": "basic"
@@ -5347,57 +5398,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "f"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "t"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Ê_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "f"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "û",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -5424,6 +5424,339 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [None])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "P_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "P_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "P_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "’"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "’"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "’"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "’"
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -6771,339 +7104,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "o"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "o"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "o"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "o"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "P_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "o",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "P_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "o",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "P_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "o",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "’"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "’"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "’"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": null
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "’"
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": null
         },
@@ -7133,6 +7133,94 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [o])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "o",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "H_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "o",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "r",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "i",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -7323,59 +7411,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "o",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "o",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "k",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": "o",
           "modifiers": {
@@ -7411,18 +7446,49 @@
       {
         "conditions": [
           {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "o"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l"
+          },
+          {
+            "key_code": "s"
+          },
+          {
+            "key_code": "e"
+          },
+          {
+            "key_code": "k"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
             "name": "H_pressed",
             "type": "variable_if",
             "value": 1
           }
         ],
         "from": {
-          "key_code": "o",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "o"
         },
         "to": [
           {
@@ -7435,10 +7501,7 @@
             ]
           },
           {
-            "key_code": "i",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "i"
           }
         ],
         "type": "basic"
@@ -7608,75 +7671,82 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "o"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "o",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l"
-          },
-          {
-            "key_code": "s"
-          },
-          {
-            "key_code": "e"
-          },
-          {
-            "key_code": "k"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "H_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "o"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "r",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "i"
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
   {
     "description": "Actions pour trigger ',' (touche manipulée [q])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "q",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "q",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Y_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "q",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "â",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -7925,76 +7995,6 @@
       {
         "conditions": [
           {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "q",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "q",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Y_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "q",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "â",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -8020,6 +8020,60 @@
           },
           {
             "key_code": "q"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "q"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "q"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "Y_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "q"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "â",
+            "modifiers": [
+              "left_shift"
+            ]
           }
         ],
         "type": "basic"
@@ -8208,60 +8262,6 @@
       {
         "conditions": [
           {
-            "name": "Q_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "q"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "q"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "Y_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "q"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "â",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -8288,6 +8288,59 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [j])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "j",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "n",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -8458,59 +8511,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "j",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "n",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "k",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": "j",
           "modifiers": {
@@ -8539,6 +8539,42 @@
               "name": "S_pressed",
               "value": 0
             }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "j"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "n"
+          },
+          {
+            "key_code": "d"
+          },
+          {
+            "key_code": "k"
+          },
+          {
+            "key_code": "l"
           }
         ],
         "type": "basic"
@@ -8696,7 +8732,12 @@
           }
         ],
         "type": "basic"
-      },
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger ',' (touche manipulée [p])",
+    "manipulators": [
       {
         "conditions": [
           {
@@ -8706,11 +8747,22 @@
           }
         ],
         "from": {
-          "key_code": "j"
+          "key_code": "p",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
             "key_code": "d",
@@ -8719,25 +8771,90 @@
             ]
           },
           {
-            "key_code": "n"
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "d"
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "l"
+            "key_code": "p",
+            "modifiers": [
+              "left_shift"
+            ]
           }
         ],
         "type": "basic"
-      }
-    ]
-  },
-  {
-    "description": "Actions pour trigger ',' (touche manipulée [p])",
-    "manipulators": [
+      },
+      {
+        "conditions": [
+          {
+            "name": "C_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "p",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "b",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "S_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "p",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "j",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "b",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -8977,12 +9094,7 @@
           }
         ],
         "from": {
-          "key_code": "p",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "p"
         },
         "to": [
           {
@@ -8995,22 +9107,13 @@
             ]
           },
           {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "d"
           },
           {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "f"
           },
           {
-            "key_code": "p",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "p"
           }
         ],
         "type": "basic"
@@ -9024,12 +9127,7 @@
           }
         ],
         "from": {
-          "key_code": "p",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "p"
         },
         "to": [
           {
@@ -9042,10 +9140,7 @@
             ]
           },
           {
-            "key_code": "b",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "b"
           }
         ],
         "type": "basic"
@@ -9059,12 +9154,7 @@
           }
         ],
         "from": {
-          "key_code": "p",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "p"
         },
         "to": [
           {
@@ -9077,10 +9167,7 @@
             ]
           },
           {
-            "key_code": "b",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "b"
           }
         ],
         "type": "basic"
@@ -9258,99 +9345,47 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "p"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d"
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "p"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "C_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "p"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "o",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "b"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "S_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "p"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "j",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "b"
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
   {
     "description": "Actions pour trigger ',' (touche manipulée [w])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "È_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "w",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "î",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -9532,41 +9567,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "È_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "w",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "î",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": "w",
           "modifiers": {
@@ -9627,6 +9627,33 @@
           },
           {
             "key_code": "w"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "È_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "w"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "î"
           }
         ],
         "type": "basic"
@@ -9791,33 +9818,6 @@
       {
         "conditions": [
           {
-            "name": "È_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "w"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "î"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -9844,6 +9844,59 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [m])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "m",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "r",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "m",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -10022,12 +10075,7 @@
           }
         ],
         "from": {
-          "key_code": "m",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "m"
         },
         "to": [
           {
@@ -10040,28 +10088,16 @@
             ]
           },
           {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "e"
           },
           {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "f"
           },
           {
-            "key_code": "comma",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "comma"
           },
           {
-            "key_code": "m",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "m"
           }
         ],
         "type": "basic"
@@ -10194,7 +10230,12 @@
           }
         ],
         "type": "basic"
-      },
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger ',' (touche manipulée [y])",
+    "manipulators": [
       {
         "conditions": [
           {
@@ -10204,38 +10245,44 @@
           }
         ],
         "from": {
-          "key_code": "m"
+          "key_code": "y",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "r",
+            "key_code": "s",
             "modifiers": [
               "left_shift"
             ]
           },
           {
-            "key_code": "e"
+            "key_code": "j",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "f"
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "comma"
-          },
-          {
-            "key_code": "m"
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
           }
         ],
         "type": "basic"
-      }
-    ]
-  },
-  {
-    "description": "Actions pour trigger ',' (touche manipulée [y])",
-    "manipulators": [
+      },
       {
         "conditions": [
           {
@@ -10411,12 +10458,7 @@
           }
         ],
         "from": {
-          "key_code": "y",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "y"
         },
         "to": [
           {
@@ -10429,22 +10471,13 @@
             ]
           },
           {
-            "key_code": "j",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "j"
           },
           {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "l"
           },
           {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -10574,214 +10607,12 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "y"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "j"
-          },
-          {
-            "key_code": "l"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
   {
     "description": "Actions pour trigger ',' (touche manipulée [u])",
     "manipulators": [
-      {
-        "conditions": [
-          {
-            "name": ",_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "u",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "u",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "comma"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "à_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "u",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "u"
-          },
-          {
-            "key_code": "i"
-          },
-          {
-            "key_code": "l"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": ";_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "u",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "u",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "comma"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ;_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "u",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "u",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "comma"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " :_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "u",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "u",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "comma"
-          }
-        ],
-        "type": "basic"
-      },
       {
         "conditions": [
           {
@@ -10844,6 +10675,211 @@
           }
         ],
         "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "u",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "à_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "u"
+          },
+          {
+            "key_code": "i"
+          },
+          {
+            "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": ";_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "u",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " ;_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "u",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " :_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "u",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "u"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "u"
+          },
+          {
+            "key_code": "i"
+          },
+          {
+            "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": ",_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
           "key_code": "u"
         },
         "to": [
@@ -10963,7 +10999,12 @@
           }
         ],
         "type": "basic"
-      },
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger ',' (touche manipulée [i])",
+    "manipulators": [
       {
         "conditions": [
           {
@@ -10973,38 +11014,44 @@
           }
         ],
         "from": {
-          "key_code": "u"
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "e",
+            "key_code": "s",
             "modifiers": [
               "left_shift"
             ]
           },
           {
-            "key_code": "f"
+            "key_code": "u",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "u"
+            "key_code": "i",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "i"
-          },
-          {
-            "key_code": "l"
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
           }
         ],
         "type": "basic"
-      }
-    ]
-  },
-  {
-    "description": "Actions pour trigger ',' (touche manipulée [i])",
-    "manipulators": [
+      },
       {
         "conditions": [
           {
@@ -11204,53 +11251,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "i",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "u",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "i",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": "i",
           "modifiers": {
@@ -11311,6 +11311,39 @@
           },
           {
             "key_code": "i"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "i"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "u"
+          },
+          {
+            "key_code": "i"
+          },
+          {
+            "key_code": "l"
           }
         ],
         "type": "basic"
@@ -11493,39 +11526,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "i"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "u"
-          },
-          {
-            "key_code": "i"
-          },
-          {
-            "key_code": "l"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -11555,6 +11555,53 @@
       {
         "conditions": [
           {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "comma",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "comma",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
             "name": ",_pressed",
             "type": "variable_if",
             "value": 1
@@ -11727,12 +11774,7 @@
           }
         ],
         "from": {
-          "key_code": "comma",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "comma"
         },
         "to": [
           {
@@ -11745,22 +11787,13 @@
             ]
           },
           {
-            "key_code": "comma",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "comma"
           },
           {
-            "key_code": "comma",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "comma"
           },
           {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -11887,39 +11920,6 @@
           },
           {
             "key_code": "comma"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "comma"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "comma"
-          },
-          {
-            "key_code": "comma"
-          },
-          {
-            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -11929,172 +11929,6 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [n])",
     "manipulators": [
-      {
-        "conditions": [
-          {
-            "name": ",_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "n",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "n",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "j"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "à_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "n",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "j"
-          },
-          {
-            "key_code": "n"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": ";_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "n",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "n",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "j"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ;_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "n",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "n",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "j"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " :_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "n",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "n",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "j"
-          }
-        ],
-        "type": "basic"
-      },
       {
         "conditions": [
           {
@@ -12151,6 +11985,205 @@
           }
         ],
         "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "n",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "j"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "à_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "j"
+          },
+          {
+            "key_code": "n"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": ";_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "n",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "j"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " ;_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "n",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "j"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " :_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "n",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "j"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "n"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "j"
+          },
+          {
+            "key_code": "n"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": ",_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
           "key_code": "n"
         },
         "to": [
@@ -12267,7 +12300,12 @@
           }
         ],
         "type": "basic"
-      },
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger ',' (touche manipulée [k])",
+    "manipulators": [
       {
         "conditions": [
           {
@@ -12277,11 +12315,28 @@
           }
         ],
         "from": {
-          "key_code": "n"
+          "key_code": "k",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
             "key_code": "s",
@@ -12290,22 +12345,20 @@
             ]
           },
           {
-            "key_code": "j"
+            "key_code": "e",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "n"
-          },
-          {
-            "key_code": "d"
+            "key_code": "k",
+            "modifiers": [
+              "left_shift"
+            ]
           }
         ],
         "type": "basic"
-      }
-    ]
-  },
-  {
-    "description": "Actions pour trigger ',' (touche manipulée [k])",
-    "manipulators": [
+      },
       {
         "conditions": [
           {
@@ -12484,12 +12537,7 @@
           }
         ],
         "from": {
-          "key_code": "k",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "k"
         },
         "to": [
           {
@@ -12502,28 +12550,16 @@
             ]
           },
           {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "l"
           },
           {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "s"
           },
           {
-            "key_code": "e",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "e"
           },
           {
-            "key_code": "k",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "k"
           }
         ],
         "type": "basic"
@@ -12656,214 +12692,12 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "k"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l"
-          },
-          {
-            "key_code": "s"
-          },
-          {
-            "key_code": "e"
-          },
-          {
-            "key_code": "k"
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
   {
     "description": "Actions pour trigger ',' (touche manipulée [period])",
     "manipulators": [
-      {
-        "conditions": [
-          {
-            "name": ",_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "period",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "p",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "period"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "à_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "period",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "o"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": ";_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "period",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "p",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "period"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ;_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "period",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "p",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "period"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " :_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "period",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "p",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "period"
-          }
-        ],
-        "type": "basic"
-      },
       {
         "conditions": [
           {
@@ -12912,6 +12746,172 @@
         "type": "basic"
       },
       {
+        "conditions": [
+          {
+            "name": ",_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "p",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "period"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "à_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": ";_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "p",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "period"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " ;_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "p",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "period"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " :_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "p",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "period"
+          }
+        ],
+        "type": "basic"
+      },
+      {
         "from": {
           "key_code": "period",
           "modifiers": {
@@ -12940,6 +12940,39 @@
               "name": "P_pressed",
               "value": 0
             }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "period"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -13094,7 +13127,12 @@
           }
         ],
         "type": "basic"
-      },
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger ',' (touche manipulée [quote])",
+    "manipulators": [
       {
         "conditions": [
           {
@@ -13104,35 +13142,44 @@
           }
         ],
         "from": {
-          "key_code": "period"
+          "key_code": "quote",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "d",
+            "key_code": "s",
             "modifiers": [
               "left_shift"
             ]
           },
           {
-            "key_code": "k"
+            "key_code": "quote",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "o"
+            "key_code": "f",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
-            "key_code": "d"
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
           }
         ],
         "type": "basic"
-      }
-    ]
-  },
-  {
-    "description": "Actions pour trigger ',' (touche manipulée [quote])",
-    "manipulators": [
+      },
       {
         "conditions": [
           {
@@ -13312,53 +13359,6 @@
         "type": "basic"
       },
       {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "quote",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
         "from": {
           "key_code": "quote",
           "modifiers": {
@@ -13387,6 +13387,39 @@
               "name": "Q_pressed",
               "value": 0
             }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "quote"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "quote"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -13553,39 +13586,6 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "quote"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "quote"
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "d"
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
@@ -13595,6 +13595,53 @@
       {
         "conditions": [
           {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "semicolon",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "semicolon",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "semicolon",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
             "name": ",_pressed",
             "type": "variable_if",
             "value": 1
@@ -13767,12 +13814,7 @@
           }
         ],
         "from": {
-          "key_code": "semicolon",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "semicolon"
         },
         "to": [
           {
@@ -13785,22 +13827,13 @@
             ]
           },
           {
-            "key_code": "semicolon",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "semicolon"
           },
           {
-            "key_code": "semicolon",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "semicolon"
           },
           {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -13927,39 +13960,6 @@
           },
           {
             "key_code": "quote"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "semicolon"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "semicolon"
-          },
-          {
-            "key_code": "semicolon"
-          },
-          {
-            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -13969,6 +13969,59 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [l])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "l",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "semicolon",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -14173,59 +14226,6 @@
       {
         "conditions": [
           {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "l",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "semicolon",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
             "name": " ?_pressed",
             "type": "variable_if",
             "value": 1
@@ -14251,6 +14251,42 @@
           },
           {
             "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "l"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l"
+          },
+          {
+            "key_code": "l"
+          },
+          {
+            "key_code": "semicolon"
+          },
+          {
+            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -14404,42 +14440,6 @@
           },
           {
             "key_code": "l"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "l"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "l"
-          },
-          {
-            "key_code": "l"
-          },
-          {
-            "key_code": "semicolon"
-          },
-          {
-            "key_code": "d"
           }
         ],
         "type": "basic"
@@ -14473,6 +14473,53 @@
   {
     "description": "Actions pour trigger ',' (touche manipulée [h])",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "h",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "n",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "k",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "l",
+            "modifiers": [
+              "left_shift"
+            ]
+          }
+        ],
+        "type": "basic"
+      },
       {
         "conditions": [
           {
@@ -14648,12 +14695,7 @@
           }
         ],
         "from": {
-          "key_code": "h",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "h"
         },
         "to": [
           {
@@ -14666,22 +14708,13 @@
             ]
           },
           {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "d"
           },
           {
-            "key_code": "k",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "k"
           },
           {
-            "key_code": "l",
-            "modifiers": [
-              "left_shift"
-            ]
+            "key_code": "l"
           }
         ],
         "type": "basic"
@@ -14811,220 +14844,12 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "h"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "n",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "d"
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "l"
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
   {
     "description": "Actions pour trigger ',' (touche manipulée [open_bracket])",
     "manipulators": [
-      {
-        "conditions": [
-          {
-            "name": ",_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "open_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "t",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "c"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "à_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "open_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "open_bracket"
-          },
-          {
-            "key_code": "keypad_minus"
-          },
-          {
-            "key_code": "h"
-          },
-          {
-            "key_code": "e"
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "j"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": ";_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "open_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "t",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "c"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " ;_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "open_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "t",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "c"
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": " :_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "open_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "t",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "c"
-          }
-        ],
-        "type": "basic"
-      },
       {
         "conditions": [
           {
@@ -15099,6 +14924,223 @@
           }
         ],
         "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "t",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "c"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "à_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "open_bracket"
+          },
+          {
+            "key_code": "keypad_minus"
+          },
+          {
+            "key_code": "h"
+          },
+          {
+            "key_code": "e"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "j"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": ";_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "t",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "c"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " ;_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "t",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "c"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": " :_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "t",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "c"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "À_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "open_bracket"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "d",
+            "modifiers": [
+              "left_shift"
+            ]
+          },
+          {
+            "key_code": "open_bracket"
+          },
+          {
+            "key_code": "keypad_minus"
+          },
+          {
+            "key_code": "h"
+          },
+          {
+            "key_code": "e"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "j"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": ",_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
           "key_code": "open_bracket"
         },
         "to": [
@@ -15224,86 +15266,12 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "À_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "open_bracket"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "d",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "open_bracket"
-          },
-          {
-            "key_code": "keypad_minus"
-          },
-          {
-            "key_code": "h"
-          },
-          {
-            "key_code": "e"
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "j"
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
   {
     "description": "Actions pour trigger 'à' (touche manipulée [c])",
     "manipulators": [
-      {
-        "conditions": [
-          {
-            "name": "à_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "c",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "t",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "f"
-          }
-        ],
-        "type": "basic"
-      },
       {
         "conditions": [
           {
@@ -15348,14 +15316,22 @@
           }
         ],
         "from": {
-          "key_code": "c"
+          "key_code": "c",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "t"
+            "key_code": "t",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
             "key_code": "f"
@@ -15389,12 +15365,7 @@
           }
         ],
         "type": "basic"
-      }
-    ]
-  },
-  {
-    "description": "Actions pour trigger 'à' (touche manipulée [b])",
-    "manipulators": [
+      },
       {
         "conditions": [
           {
@@ -15404,35 +15375,26 @@
           }
         ],
         "from": {
-          "key_code": "b",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
+          "key_code": "c"
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "s",
-            "modifiers": [
-              "left_shift"
-            ]
-          },
-          {
-            "key_code": "quote"
+            "key_code": "t"
           },
           {
             "key_code": "f"
-          },
-          {
-            "key_code": "d"
           }
         ],
         "type": "basic"
-      },
+      }
+    ]
+  },
+  {
+    "description": "Actions pour trigger 'à' (touche manipulée [b])",
+    "manipulators": [
       {
         "conditions": [
           {
@@ -15489,14 +15451,22 @@
           }
         ],
         "from": {
-          "key_code": "b"
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "s"
+            "key_code": "s",
+            "modifiers": [
+              "left_shift"
+            ]
           },
           {
             "key_code": "quote"
@@ -15530,6 +15500,36 @@
             "modifiers": [
               "left_shift"
             ]
+          },
+          {
+            "key_code": "quote"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "à_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "b"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s"
           },
           {
             "key_code": "quote"
