@@ -4,11 +4,11 @@
     "manipulators": [
       {
         "from": {
-          "key_code": 31
+          "key_code": "o"
         },
         "to": [
           {
-            "key_code": 31
+            "key_code": "o"
           },
           {
             "set_variable": {
@@ -36,7 +36,7 @@
           }
         ],
         "from": {
-          "key_code": 35
+          "key_code": "p"
         },
         "to": [
           {
@@ -52,11 +52,11 @@
     "manipulators": [
       {
         "from": {
-          "key_code": 34
+          "key_code": "i"
         },
         "to": [
           {
-            "key_code": 34
+            "key_code": "i"
           },
           {
             "set_variable": {
@@ -84,7 +84,7 @@
           }
         ],
         "from": {
-          "key_code": 31
+          "key_code": "o"
         },
         "to": [
           {
@@ -100,11 +100,11 @@
     "manipulators": [
       {
         "from": {
-          "key_code": 38
+          "key_code": "j"
         },
         "to": [
           {
-            "key_code": 38
+            "key_code": "j"
           },
           {
             "set_variable": {
@@ -132,7 +132,7 @@
           }
         ],
         "from": {
-          "key_code": 35
+          "key_code": "p"
         },
         "to": [
           {
