@@ -3,18 +3,18 @@ import re
 import sys
 from pathlib import Path
 
-PLUS_MAPPINGS_CONFIG = {
-    "roll_wh": {
-        "trigger": "h",
-        "map": [
-            ("c", "Wh"),
-        ],
-    },
-}
+# PLUS_MAPPINGS_CONFIG = {
+#     "roll_wh": {
+#         "trigger": "h",
+#         "map": [
+#             ("c", "wh"),
+#         ],
+#     },
+# }
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    # PLUS_MAPPINGS_CONFIG,
+    PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
 )
 
