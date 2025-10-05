@@ -472,15 +472,15 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [.]",
+                        "description": "Actions regroupées pour la touche [period]",
                         "manipulators": [
                             {
                                 "from": {
-                                    "key_code": "."
+                                    "key_code": "period"
                                 },
                                 "to": [
                                     {
-                                        "key_code": "."
+                                        "key_code": "period"
                                     },
                                     {
                                         "set_variable": {
@@ -544,7 +544,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
@@ -571,7 +571,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
@@ -585,15 +585,15 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [']",
+                        "description": "Actions regroupées pour la touche [quote]",
                         "manipulators": [
                             {
                                 "from": {
-                                    "key_code": "'"
+                                    "key_code": "quote"
                                 },
                                 "to": [
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "set_variable": {
@@ -633,7 +633,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
@@ -665,7 +665,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
@@ -697,7 +697,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
@@ -729,7 +729,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
@@ -743,7 +743,7 @@
                         ]
                     },
                     {
-                        "description": "Actions pour trigger 'q' (touche manipulée [`])",
+                        "description": "Actions pour trigger 'q' (touche manipulée [non_us_backslash])",
                         "manipulators": [
                             {
                                 "conditions": [
@@ -754,20 +754,20 @@
                                     }
                                 ],
                                 "from": {
-                                    "key_code": "`"
+                                    "key_code": "non_us_backslash"
                                 },
                                 "to": [
                                     {
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
                                     },
                                     {
-                                        "key_code": "`"
+                                        "key_code": "non_us_backslash"
                                     }
                                 ],
                                 "type": "basic"
@@ -793,7 +793,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
@@ -825,7 +825,7 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "'"
+                                        "key_code": "quote"
                                     },
                                     {
                                         "key_code": "f"
