@@ -52,7 +52,7 @@ PLUS_MAPPINGS_CONFIG = {
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    PLUS_MAPPINGS_CONFIG,
+    plus_mappings,
 )
 
 
@@ -104,19 +104,26 @@ with open(
 output_path = Path(__file__).parent / "rolls.json"
 rolls = []
 
-for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
+for mapping_name, mapping in plus_mappings.items():
     trigger = mapping["trigger"]
     trigger_code = keycode_map.get(trigger.lower())
     trigger_name = keycode_to_name(trigger_code, macos_keycodes)
+
     manipulators = []
 
     # 1. When trigger is pressed, activate the variable
     if trigger.isupper():
         manipulators.append(
             {
-                "from": {"key_code": trigger_name, "modifiers": ["left_shift"]},
+                "from": {
+                    "key_code": trigger_name,
+                    "modifiers": {"mandatory": ["shift"]},
+                },
                 "to": [
-                    {"key_code": trigger_name, "modifiers": ["left_shift"]},
+                    {
+                        "key_code": trigger_name,
+                        "modifiers": {"mandatory": ["shift"]},
+                    },
                     {
                         "set_variable": {
                             "name": f"{trigger}_pressed",
