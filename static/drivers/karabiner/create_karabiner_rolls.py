@@ -3,6 +3,53 @@ import re
 import sys
 from pathlib import Path
 
+PLUS_MAPPINGS_CONFIG = {
+    "roll_ck": {
+        "trigger": "c",
+        "map": [
+            ("x", "ck"),
+        ],
+    },
+    "roll_wh": {
+        "trigger": "h",
+        "map": [
+            ("c", "Wh"),
+        ],
+    },
+    "roll_sk": {
+        "trigger": "s",
+        "map": [
+            ("x", "sK"),
+        ],
+    },
+    "roll_ct": {
+        "trigger": "p",
+        "map": [
+            ("'", "ct"),
+        ],
+    },
+    "q_with_u": {
+        "trigger": "q",
+        "map": [
+            ("a", "qua"),
+            ("e", "que"),
+            ("é", "qué"),
+            ("è", "què"),
+            ("ê", "quê"),
+            ("i", "qui"),
+            ("o", "quo"),
+            ("'", "qu’"),
+            ("’", "qu’"),
+        ],
+    },
+    "roll_Ck": {
+        "trigger": "C",
+        "map": [
+            ("x", "Ck"),
+        ],
+    },
+}
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
     PLUS_MAPPINGS_CONFIG,
@@ -45,46 +92,6 @@ keylayout_path = str(
 keycode_map = get_keycode_map(keylayout_path)
 
 
-PLUS_MAPPINGS_CONFIG = {
-    "roll_ck": {
-        "trigger": "c",
-        "map": [
-            ("x", "ck"),
-        ],
-    },
-    "roll_wh": {
-        "trigger": "h",
-        "map": [
-            ("c", "wh"),
-        ],
-    },
-    "roll_sk": {
-        "trigger": "s",
-        "map": [
-            ("x", "sk"),
-        ],
-    },
-    "roll_ct": {
-        "trigger": "p",
-        "map": [
-            ("'", "ct"),
-        ],
-    },
-    "q_with_u": {
-        "trigger": "q",
-        "map": [
-            ("a", "qua"),
-            ("e", "que"),
-            ("é", "qué"),
-            ("è", "què"),
-            ("ê", "quê"),
-            ("i", "qui"),
-            ("o", "quo"),
-            ("'", "qu’"),
-            ("’", "qu’"),
-        ],
-    },
-}
 output_path = Path(__file__).parent / "rolls.json"
 rolls = []
 
@@ -99,24 +106,59 @@ rolls = []
 
 for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
     trigger = mapping["trigger"]
-    trigger_code = keycode_map.get(trigger)
+    trigger_code = keycode_map.get(trigger.lower())
     trigger_name = keycode_to_name(trigger_code, macos_keycodes)
     manipulators = []
 
     # 1. When trigger is pressed, activate the variable
-    manipulators.append(
-        {
-            "from": {"key_code": trigger_name},
-            "to": [
-                {"key_code": trigger_name},
-                {"set_variable": {"name": f"{trigger}_pressed", "value": 1}},
-            ],
-            "to_after_key_up": [
-                {"set_variable": {"name": f"{trigger}_pressed", "value": 0}},
-            ],
-            "type": "basic",
-        }
-    )
+    if trigger.isupper():
+        manipulators.append(
+            {
+                "from": {"key_code": trigger_name, "modifiers": ["left_shift"]},
+                "to": [
+                    {"key_code": trigger_name, "modifiers": ["left_shift"]},
+                    {
+                        "set_variable": {
+                            "name": f"{trigger}_pressed",
+                            "value": 1,
+                        }
+                    },
+                ],
+                "to_after_key_up": [
+                    {
+                        "set_variable": {
+                            "name": f"{trigger}_pressed",
+                            "value": 0,
+                        }
+                    },
+                ],
+                "type": "basic",
+            }
+        )
+    else:
+        manipulators.append(
+            {
+                "from": {"key_code": trigger_name},
+                "to": [
+                    {"key_code": trigger_name},
+                    {
+                        "set_variable": {
+                            "name": f"{trigger}_pressed",
+                            "value": 1,
+                        }
+                    },
+                ],
+                "to_after_key_up": [
+                    {
+                        "set_variable": {
+                            "name": f"{trigger}_pressed",
+                            "value": 0,
+                        }
+                    },
+                ],
+                "type": "basic",
+            }
+        )
 
     # 2. For each (second_key, output) pair
     for second_key, output in mapping["map"]:
@@ -125,9 +167,15 @@ for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
         # output est une chaîne, on itère sur chaque caractère
         to_list = [{"key_code": "delete_or_backspace"}]
         for char in output:
-            char_code = keycode_map.get(char)
+            char_base = char.lower() if char.isupper() else char
+            char_code = keycode_map.get(char_base)
             char_name = keycode_to_name(char_code, macos_keycodes)
-            to_list.append({"key_code": char_name})
+            if char.isupper():
+                to_list.append(
+                    {"key_code": char_name, "modifiers": ["left_shift"]}
+                )
+            else:
+                to_list.append({"key_code": char_name})
         manipulators.append(
             {
                 "conditions": [
