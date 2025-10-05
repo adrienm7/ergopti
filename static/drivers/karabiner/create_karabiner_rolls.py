@@ -64,6 +64,26 @@ PLUS_MAPPINGS_CONFIG = {
             ("x", "sk"),
         ],
     },
+    "roll_ct": {
+        "trigger": "p",
+        "map": [
+            ("'", "ct"),
+        ],
+    },
+    "q_with_u": {
+        "trigger": "q",
+        "map": [
+            ("a", "qua"),
+            ("e", "que"),
+            ("é", "qué"),
+            ("è", "què"),
+            ("ê", "quê"),
+            ("i", "qui"),
+            ("o", "quo"),
+            ("'", "qu’"),
+            ("’", "qu’"),
+        ],
+    },
 }
 output_path = Path(__file__).parent / "rolls.json"
 rolls = []
@@ -101,9 +121,13 @@ for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
     # 2. For each (second_key, output) pair
     for second_key, output in mapping["map"]:
         second_code = keycode_map.get(second_key)
-        output_code = keycode_map.get(output)
         second_name = keycode_to_name(second_code, macos_keycodes)
-        output_name = keycode_to_name(output_code, macos_keycodes)
+        # output est une chaîne, on itère sur chaque caractère
+        to_list = [{"key_code": "delete_or_backspace"}]
+        for char in output:
+            char_code = keycode_map.get(char)
+            char_name = keycode_to_name(char_code, macos_keycodes)
+            to_list.append({"key_code": char_name})
         manipulators.append(
             {
                 "conditions": [
@@ -114,7 +138,7 @@ for mapping_name, mapping in PLUS_MAPPINGS_CONFIG.items():
                     },
                 ],
                 "from": {"key_code": second_name},
-                "to": [{"key_code": output_name}],
+                "to": to_list,
                 "type": "basic",
             }
         )

@@ -40,7 +40,13 @@
         },
         "to": [
           {
-            "key_code": null
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "b"
           }
         ],
         "type": "basic"
@@ -88,7 +94,13 @@
         },
         "to": [
           {
-            "key_code": null
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "r"
+          },
+          {
+            "key_code": "i"
           }
         ],
         "type": "basic"
@@ -135,6 +147,339 @@
           "key_code": "p"
         },
         "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "j"
+          },
+          {
+            "key_code": "b"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Roll mapping for trigger 'p' (roll_ct)",
+    "manipulators": [
+      {
+        "from": {
+          "key_code": "."
+        },
+        "to": [
+          {
+            "key_code": "."
+          },
+          {
+            "set_variable": {
+              "name": "p_pressed",
+              "value": 1
+            }
+          }
+        ],
+        "to_after_key_up": [
+          {
+            "set_variable": {
+              "name": "p_pressed",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "p_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "o"
+          },
+          {
+            "key_code": "l"
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Roll mapping for trigger 'q' (q_with_u)",
+    "manipulators": [
+      {
+        "from": {
+          "key_code": "'"
+        },
+        "to": [
+          {
+            "key_code": "'"
+          },
+          {
+            "set_variable": {
+              "name": "q_pressed",
+              "value": 1
+            }
+          }
+        ],
+        "to_after_key_up": [
+          {
+            "set_variable": {
+              "name": "q_pressed",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "a"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "a"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "d"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "d"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "z"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "z"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "q"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "q"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "`"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "`"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "s"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "s"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "e"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "e"
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": null
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "q_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": null
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "'"
+          },
+          {
+            "key_code": "f"
+          },
           {
             "key_code": null
           }
