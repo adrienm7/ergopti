@@ -3,6 +3,30 @@
     "description": "Actions regroupées pour la touche [o]",
     "manipulators": [
       {
+        "conditions": [
+          {
+            "name": "h_pressed",
+            "type": "variable_if",
+            "value": 1
+          }
+        ],
+        "from": {
+          "key_code": "o"
+        },
+        "to": [
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "r"
+          },
+          {
+            "key_code": "i"
+          }
+        ],
+        "type": "basic"
+      },
+      {
         "from": {
           "key_code": "o"
         },
@@ -23,30 +47,6 @@
               "name": "c_pressed",
               "value": 0
             }
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "h_pressed",
-            "type": "variable_if",
-            "value": 1
-          }
-        ],
-        "from": {
-          "key_code": "o"
-        },
-        "to": [
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "r"
-          },
-          {
-            "key_code": "i"
           }
         ],
         "type": "basic"
