@@ -3,18 +3,24 @@ import re
 import sys
 from pathlib import Path
 
-# PLUS_MAPPINGS_CONFIG = {
-#     "roll_wh": {
-#         "trigger": "h",
-#         "map": [
-#             ("c", "wh"),
-#         ],
-#     },
-# }
+PLUS_MAPPINGS_CONFIG = {
+    "roll_wh": {
+        "trigger": "h",
+        "map": [
+            ("c", "wh"),
+        ],
+    },
+    "roll_WH": {
+        "trigger": "H",
+        "map": [
+            ("C", "WH"),
+        ],
+    },
+}
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    PLUS_MAPPINGS_CONFIG,
+    # PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
 )
 
@@ -133,19 +139,32 @@ for mapping_name, mapping in plus_mappings.items():
     for second_key, output in mapping["map"]:
         second_code = keycode_map.get(second_key.lower())
         second_name = keycode_to_name(second_code, macos_keycodes)
-        # output est une chaîne, on itère sur chaque caractère
         to_list = [{"key_code": "delete_or_backspace"}]
-        for char in output:
+
+        if second_key.isupper():
+            from_block = {
+                "key_code": second_name,
+                "modifiers": {"mandatory": ["shift"]},
+            }
+        else:
+            from_block = {"key_code": second_name}
+
+        for i, char in enumerate(output):
             char_base = char.lower()
             char_code = keycode_map.get(char_base)
             char_name = keycode_to_name(char_code, macos_keycodes)
             char_name = char_name or char_base
-            if char.isupper():
+            if trigger.isupper() and second_key.isupper():
+                to_list.append(
+                    {"key_code": char_name, "modifiers": ["left_shift"]}
+                )
+            elif i == 0 and (trigger.isupper() or second_key.isupper()):
                 to_list.append(
                     {"key_code": char_name, "modifiers": ["left_shift"]}
                 )
             else:
                 to_list.append({"key_code": char_name})
+
         manipulators.append(
             {
                 "conditions": [
@@ -153,9 +172,9 @@ for mapping_name, mapping in plus_mappings.items():
                         "name": f"{trigger}_pressed",
                         "type": "variable_if",
                         "value": 1,
-                    },
+                    }
                 ],
-                "from": {"key_code": second_name},
+                "from": from_block,
                 "to": to_list,
                 "type": "basic",
             }
