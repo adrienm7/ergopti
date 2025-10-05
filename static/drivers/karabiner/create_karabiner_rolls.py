@@ -52,8 +52,11 @@ PLUS_MAPPINGS_CONFIG = {
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    plus_mappings,
+    PLUS_MAPPINGS_CONFIG,
+    add_case_sensitive_mappings,
 )
+
+plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
 
 
 def keycode_to_name(code, macos_keycodes):
@@ -169,14 +172,15 @@ for mapping_name, mapping in plus_mappings.items():
 
     # 2. For each (second_key, output) pair
     for second_key, output in mapping["map"]:
-        second_code = keycode_map.get(second_key)
+        second_code = keycode_map.get(second_key.lower())
         second_name = keycode_to_name(second_code, macos_keycodes)
         # output est une chaîne, on itère sur chaque caractère
         to_list = [{"key_code": "delete_or_backspace"}]
         for char in output:
-            char_base = char.lower() if char.isupper() else char
+            char_base = char.lower()
             char_code = keycode_map.get(char_base)
             char_name = keycode_to_name(char_code, macos_keycodes)
+            char_name = char_name or char_base
             if char.isupper():
                 to_list.append(
                     {"key_code": char_name, "modifiers": ["left_shift"]}
