@@ -166,11 +166,11 @@
     "manipulators": [
       {
         "from": {
-          "key_code": "."
+          "key_code": "period"
         },
         "to": [
           {
-            "key_code": "."
+            "key_code": "period"
           },
           {
             "set_variable": {
@@ -220,11 +220,11 @@
     "manipulators": [
       {
         "from": {
-          "key_code": "'"
+          "key_code": "quote"
         },
         "to": [
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "set_variable": {
@@ -259,7 +259,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
@@ -286,7 +286,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
@@ -313,7 +313,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
@@ -340,7 +340,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
@@ -360,20 +360,20 @@
           }
         ],
         "from": {
-          "key_code": "`"
+          "key_code": "non_us_backslash"
         },
         "to": [
           {
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
           },
           {
-            "key_code": "`"
+            "key_code": "non_us_backslash"
           }
         ],
         "type": "basic"
@@ -394,7 +394,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
@@ -421,7 +421,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
@@ -448,7 +448,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
@@ -475,7 +475,7 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "'"
+            "key_code": "quote"
           },
           {
             "key_code": "f"
