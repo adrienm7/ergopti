@@ -20,7 +20,7 @@ PLUS_MAPPINGS_CONFIG = {
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    # PLUS_MAPPINGS_CONFIG,
+    PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
 )
 
@@ -221,45 +221,15 @@ with open(output_path, "w", encoding="utf-8") as f:
         else:
             desc = f"Actions regroupées pour la touche [{key}]"
 
-        # Tri explicite des manipulateurs
-        def has_set_variable(manip):
-            def contains_set_variable(obj):
-                if isinstance(obj, dict):
-                    if "set_variable" in obj:
-                        return True
-                    return any(contains_set_variable(v) for v in obj.values())
-                if isinstance(obj, list):
-                    return any(contains_set_variable(v) for v in obj)
-                return False
+        # Tri explicite des manipulateurs : les plus spécifiques (shift dans 'from') en premier
+        def has_shift_from(manip):
+            from_block = manip.get("from", {})
+            mods = from_block.get("modifiers", {})
+            if isinstance(mods, dict):
+                return "shift" in str(mods.get("mandatory", []))
+            return False
 
-            return contains_set_variable(manip)
-
-        def has_shift(manip):
-            def contains_shift(obj):
-                if isinstance(obj, dict):
-                    if "modifiers" in obj and "shift" in str(obj["modifiers"]):
-                        return True
-                    return any(contains_shift(v) for v in obj.values())
-                if isinstance(obj, list):
-                    return any(contains_shift(v) for v in obj)
-                return False
-
-            return contains_shift(manip)
-
-        # Catégorisation
-        setvar_shift = []
-        setvar_noshift = []
-        others = []
-        for m in manips:
-            if has_set_variable(m) and has_shift(m):
-                setvar_shift.append(m)
-            elif has_set_variable(m):
-                setvar_noshift.append(m)
-            else:
-                others.append(m)
-
-        # Tri final : set_variable+shift, autres, set_variable sans shift
-        sorted_manips = setvar_shift + others + setvar_noshift
+        sorted_manips = sorted(manips, key=lambda m: not has_shift_from(m))
 
         grouped.append(
             {
