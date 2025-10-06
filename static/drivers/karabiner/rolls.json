@@ -629,7 +629,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -4258,7 +4258,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -5439,7 +5439,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -6140,7 +6140,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -8712,7 +8712,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -10871,7 +10871,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -13030,7 +13030,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -16754,7 +16754,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -17959,7 +17959,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {
@@ -18684,7 +18684,7 @@
           }
         ],
         "from": {
-          "key_code": null
+          "key_code": "slash"
         },
         "to": [
           {

@@ -17,8 +17,13 @@ from macos.keylayout_generation.data.keylayout_plus_mappings import (
     PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
 )
+from macos.keylayout_generation.data.mappings_functions import (
+    unescape_xml_characters,
+)
 
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
+
+# TODO: handle retrieving keycode and modifier for all symbols in altgr. it will make everything work
 
 
 def keycode_to_name(code, macos_keycodes):
@@ -55,7 +60,10 @@ keylayout_path = (
     Path(__file__).parent.parent / "macos" / "Ergopti_v2.2.0.keylayout"
 )
 keycode_map = get_keycode_map(str(keylayout_path))
-num_to_letter = {v: k for k, v in keycode_map.items()}
+
+# Applique unescape_xml_characters sur toutes les clés et valeurs du keycode_map
+keycode_map = {unescape_xml_characters(k): v for k, v in keycode_map.items()}
+num_to_letter = {v: unescape_xml_characters(k) for k, v in keycode_map.items()}
 
 
 output_path = Path(__file__).parent / "rolls.json"
@@ -145,6 +153,8 @@ with open(output_path, "w", encoding="utf-8") as f:
 # Ajoute un manipulateur pour chaque lettre a-z qui met à jour previous_key
 letters_manipulators = []
 for keycode, name in macos_keycodes.items():
+    if int(keycode) > 50:
+        break
     trigger_name = keycode
 
     trigger_name = str(num_to_letter.get(int(keycode)))
