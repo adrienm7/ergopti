@@ -55,6 +55,7 @@ keylayout_path = (
     Path(__file__).parent.parent / "macos" / "Ergopti_v2.2.0.keylayout"
 )
 keycode_map = get_keycode_map(str(keylayout_path))
+num_to_letter = {v: k for k, v in keycode_map.items()}
 
 
 output_path = Path(__file__).parent / "rolls.json"
@@ -69,55 +70,6 @@ for mapping_name, mapping in plus_mappings.items():
     trigger_name = keycode_to_name(trigger_code, macos_keycodes)
 
     manipulators = []
-    delayed_action = {
-        "to_delayed_action": {
-            "to_if_invoked": [
-                {
-                    "set_variable": {
-                        "name": f"{trigger}_pressed",
-                        "value": 0,
-                    }
-                }
-            ],
-        },
-        # "parameters": {"basic.to_delayed_action_delay_milliseconds": 1000},
-        "type": "basic",
-    }
-
-    # 1. When trigger is pressed, activate the variable immédiatement, puis la désactive après 1s
-    if trigger.isupper():
-        manip = {
-            "from": {
-                "key_code": trigger_name,
-                "modifiers": {"mandatory": ["shift"]},
-            },
-            "to": [
-                {"key_code": trigger_name, "modifiers": ["left_shift"]},
-                {
-                    "set_variable": {
-                        "name": f"{trigger}_pressed",
-                        "value": 1,
-                    }
-                },
-            ],
-        }
-        manip.update(delayed_action)
-        manipulators.append(manip)
-    else:
-        manip = {
-            "from": {"key_code": trigger_name},
-            "to": [
-                {"key_code": trigger_name},
-                {
-                    "set_variable": {
-                        "name": f"{trigger}_pressed",
-                        "value": 1,
-                    }
-                },
-            ],
-        }
-        manip.update(delayed_action)
-        manipulators.append(manip)
 
     # 2. For each (second_key, output) pair
     for second_key, output in mapping["map"]:
@@ -128,8 +80,8 @@ for mapping_name, mapping in plus_mappings.items():
         to_list.append(
             {
                 "set_variable": {
-                    "name": f"{trigger}_pressed",
-                    "value": 0,
+                    "name": "previous_key",
+                    "value": "none",
                 }
             }
         )
@@ -155,13 +107,22 @@ for mapping_name, mapping in plus_mappings.items():
             else:
                 to_list.append({"key_code": char_name})
 
+        to_list.append(
+            {
+                "set_variable": {
+                    "name": "previous_key",
+                    "value": "none",
+                }
+            }
+        )
+
         manipulators.append(
             {
                 "conditions": [
                     {
-                        "name": f"{trigger}_pressed",
+                        "name": "previous_key",
                         "type": "variable_if",
-                        "value": 1,
+                        "value": trigger,
                     }
                 ],
                 "from": from_block,
@@ -180,70 +141,91 @@ for mapping_name, mapping in plus_mappings.items():
 with open(output_path, "w", encoding="utf-8") as f:
     json.dump(rolls, f, ensure_ascii=False, indent=2)
 
-    # Regroupement des manipulateurs par touche dans rolls_grouped.json
-    rolls_grouped_path = Path(__file__).parent / "rolls_grouped.json"
-    manipulators_by_key = {}
-    for rule in rolls:
-        for manip in rule["manipulators"]:
-            key = manip["from"].get("key_code")
-            if key not in manipulators_by_key:
-                manipulators_by_key[key] = []
-            manipulators_by_key[key].append(manip)
 
-    grouped = []
-    for key, manips in manipulators_by_key.items():
-        # Récupère le trigger principal (premier trouvé dans les conditions du premier manipulator)
-        trigger = None
-        for cond in manips[0].get("conditions", []):
-            if cond.get("name") and cond["name"].endswith("_pressed"):
-                trigger = cond["name"].replace("_pressed", "")
-                break
-        # Recherche du keycode numérique
-        keycode_num = None
-        for k, v in keycode_map.items():
-            if keycode_to_name(v, macos_keycodes) == key:
-                keycode_num = v
-                break
-        if trigger:
-            desc = (
-                f"Actions pour trigger '{trigger}' (touche manipulée [{key}])"
-            )
-        else:
-            desc = f"Actions regroupées pour la touche [{key}]"
+# Ajoute un manipulateur pour chaque lettre a-z qui met à jour previous_key
+letters_manipulators = []
+for keycode, name in macos_keycodes.items():
+    trigger_name = keycode
 
-        # Tri explicite des manipulateurs : les plus spécifiques (shift dans 'from') en premier
-        def has_shift_from(manip):
-            from_block = manip.get("from", {})
-            mods = from_block.get("modifiers", {})
-            if isinstance(mods, dict):
-                return "shift" in str(mods.get("mandatory", []))
-            return False
+    trigger_name = str(num_to_letter.get(int(keycode)))
 
-        def pressed_is_upper(manip):
-            conds = manip.get("conditions", [])
-            for cond in conds:
-                if cond.get("type") == "variable_if" and cond.get(
-                    "name", ""
-                ).endswith("_pressed"):
-                    name = cond["name"]
-                    return name and name[0].isupper()
-            return False
+    letters_manipulators.append(
+        {
+            "from": {
+                "key_code": name,
+                "modifiers": {"mandatory": ["shift"]},
+            },
+            "to": [
+                {"key_code": name, "modifiers": ["shift"]},
+                {
+                    "set_variable": {
+                        "name": "previous_key",
+                        "value": trigger_name.upper(),
+                    }
+                },
+            ],
+            "type": "basic",
+        }
+    )
+    letters_manipulators.append(
+        {
+            "from": {"key_code": name},
+            "to": [
+                {"key_code": name},
+                {
+                    "set_variable": {
+                        "name": "previous_key",
+                        "value": trigger_name,
+                    }
+                },
+            ],
+            "type": "basic",
+        }
+    )
+rolls.append(
+    {
+        "description": "Set previous_key for a-z",
+        "manipulators": letters_manipulators,
+    }
+)
 
-        # Tri principal : shift d'abord, puis majuscule/minuscule sur le nom de variable
-        sorted_manips = sorted(
-            manips,
-            key=lambda m: (not has_shift_from(m), not pressed_is_upper(m)),
-        )
+# Regroupement des manipulateurs par touche dans rolls_grouped.json
+rolls_grouped_path = Path(__file__).parent / "rolls_grouped.json"
+manipulators_by_key = {}
+for rule in rolls:
+    for manip in rule["manipulators"]:
+        key = manip["from"].get("key_code")
+        if key not in manipulators_by_key:
+            manipulators_by_key[key] = []
+        manipulators_by_key[key].append(manip)
 
-        grouped.append(
-            {
-                "description": desc,
-                "manipulators": sorted_manips,
-            }
-        )
+grouped = []
 
-    with open(rolls_grouped_path, "w", encoding="utf-8") as f:
-        json.dump(grouped, f, ensure_ascii=False, indent=2)
+
+for key, manips in manipulators_by_key.items():
+    desc = f"Actions regroupées pour la touche [{key}]"
+
+    # Tri explicite des manipulateurs : les plus spécifiques (shift dans 'from') en premier
+    def has_shift_from(manip):
+        from_block = manip.get("from", {})
+        mods = from_block.get("modifiers", {})
+        if isinstance(mods, dict):
+            return "shift" in str(mods.get("mandatory", []))
+        return False
+
+    sorted_manips = sorted(
+        manips,
+        key=lambda m: not has_shift_from(m),
+    )
+    grouped.append(
+        {
+            "description": desc,
+            "manipulators": sorted_manips,
+        }
+    )
+
+with open(rolls_grouped_path, "w", encoding="utf-8") as f:
+    json.dump(grouped, f, ensure_ascii=False, indent=2)
 
 
 def merge_rolls_into_karabiner(
@@ -281,6 +263,10 @@ def merge_rolls_into_karabiner(
 
 if __name__ == "__main__":
     base_dir = Path(__file__).parent
+
+    print(keycode_map)
+    print(num_to_letter)
+
     merge_rolls_into_karabiner(
         karabiner_path=str(base_dir / "karabiner0.json"),
         rolls_path=str(base_dir / "rolls_grouped.json"),
