@@ -12,7 +12,7 @@ PLUS_MAPPINGS_CONFIG = {
     },
 }
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.resolve()))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
     PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
@@ -51,23 +51,17 @@ def get_keycode_map(keylayout_path: str) -> dict:
     return keycode_map
 
 
-keylayout_path = str(
+keylayout_path = (
     Path(__file__).parent.parent / "macos" / "Ergopti_v2.2.0.keylayout"
 )
-keycode_map = get_keycode_map(keylayout_path)
+keycode_map = get_keycode_map(str(keylayout_path))
 
 
 output_path = Path(__file__).parent / "rolls.json"
 rolls = []
 
-
-with open(
-    str(Path(__file__).parent / "macos_keycodes.json"), encoding="utf-8"
-) as f:
+with open(Path(__file__).parent / "macos_keycodes.json", encoding="utf-8") as f:
     macos_keycodes = json.load(f)
-
-output_path = Path(__file__).parent / "rolls.json"
-rolls = []
 
 for mapping_name, mapping in plus_mappings.items():
     trigger = mapping["trigger"]
@@ -75,65 +69,71 @@ for mapping_name, mapping in plus_mappings.items():
     trigger_name = keycode_to_name(trigger_code, macos_keycodes)
 
     manipulators = []
+    delayed_action = {
+        "to_delayed_action": {
+            "to_if_invoked": [
+                {
+                    "set_variable": {
+                        "name": f"{trigger}_pressed",
+                        "value": 0,
+                    }
+                }
+            ],
+        },
+        # "parameters": {"basic.to_delayed_action_delay_milliseconds": 1000},
+        "type": "basic",
+    }
 
-    # 1. When trigger is pressed, activate the variable
+    # 1. When trigger is pressed, activate the variable immédiatement, puis la désactive après 1s
     if trigger.isupper():
-        manipulators.append(
-            {
-                "from": {
-                    "key_code": trigger_name,
-                    "modifiers": {"mandatory": ["shift"]},
+        manip = {
+            "from": {
+                "key_code": trigger_name,
+                "modifiers": {"mandatory": ["shift"]},
+            },
+            "to": [
+                {"key_code": trigger_name, "modifiers": ["left_shift"]},
+                {
+                    "set_variable": {
+                        "name": f"{trigger}_pressed",
+                        "value": 1,
+                    }
                 },
-                "to": [
-                    {"key_code": trigger_name, "modifiers": ["left_shift"]},
-                    {
-                        "set_variable": {
-                            "name": f"{trigger}_pressed",
-                            "value": 1,
-                        }
-                    },
-                ],
-                "to_after_key_up": [
-                    {
-                        "set_variable": {
-                            "name": f"{trigger}_pressed",
-                            "value": 0,
-                        }
-                    },
-                ],
-                "type": "basic",
-            }
-        )
+            ],
+        }
+        manip.update(delayed_action)
+        manipulators.append(manip)
     else:
-        manipulators.append(
-            {
-                "from": {"key_code": trigger_name},
-                "to": [
-                    {"key_code": trigger_name},
-                    {
-                        "set_variable": {
-                            "name": f"{trigger}_pressed",
-                            "value": 1,
-                        }
-                    },
-                ],
-                "to_after_key_up": [
-                    {
-                        "set_variable": {
-                            "name": f"{trigger}_pressed",
-                            "value": 0,
-                        }
-                    },
-                ],
-                "type": "basic",
-            }
-        )
+        manip = {
+            "from": {"key_code": trigger_name},
+            "to": [
+                {"key_code": trigger_name},
+                {
+                    "set_variable": {
+                        "name": f"{trigger}_pressed",
+                        "value": 1,
+                    }
+                },
+            ],
+        }
+        manip.update(delayed_action)
+        manipulators.append(manip)
 
     # 2. For each (second_key, output) pair
     for second_key, output in mapping["map"]:
         second_code = keycode_map.get(second_key.lower())
         second_name = keycode_to_name(second_code, macos_keycodes)
-        to_list = [{"key_code": "delete_or_backspace"}]
+
+        to_list = []
+        to_list.append(
+            {
+                "set_variable": {
+                    "name": f"{trigger}_pressed",
+                    "value": 0,
+                }
+            }
+        )
+        to_list.append({"key_code": "delete_or_backspace"})
 
         if second_key.isupper():
             from_block = {
@@ -149,13 +149,9 @@ for mapping_name, mapping in plus_mappings.items():
             char_name = keycode_to_name(char_code, macos_keycodes)
             char_name = char_name or char_base
             if trigger.isupper() and second_key.isupper():
-                to_list.append(
-                    {"key_code": char_name, "modifiers": ["left_shift"]}
-                )
+                to_list.append({"key_code": char_name, "modifiers": "shift"})
             elif i == 0 and (trigger.isupper() or second_key.isupper()):
-                to_list.append(
-                    {"key_code": char_name, "modifiers": ["left_shift"]}
-                )
+                to_list.append({"key_code": char_name, "modifiers": "shift"})
             else:
                 to_list.append({"key_code": char_name})
 
@@ -284,8 +280,9 @@ def merge_rolls_into_karabiner(
 
 
 if __name__ == "__main__":
+    base_dir = Path(__file__).parent
     merge_rolls_into_karabiner(
-        karabiner_path="d:/Documents/GitHub/ergopti/static/drivers/karabiner/karabiner0.json",
-        rolls_path="d:/Documents/GitHub/ergopti/static/drivers/karabiner/rolls_grouped.json",
-        output_path="d:/Documents/GitHub/ergopti/static/drivers/karabiner/karabiner.json",
+        karabiner_path=str(base_dir / "karabiner0.json"),
+        rolls_path=str(base_dir / "rolls_grouped.json"),
+        output_path=str(base_dir / "karabiner.json"),
     )
