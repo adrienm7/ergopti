@@ -2,8 +2,19 @@
 Utility functions for processing key mappings:
 - Add case sensitivity
 - Escape XML characters
+- Unescape XML characters
 - Validate uniqueness of triggers
 """
+
+# Table de remplacement XML <-> caractères normaux
+XML_ESCAPE_TABLE = {
+    "&": "&#x0026;",
+    "<": "&#x003C;",
+    ">": "&#x003E;",
+    '"': "&#x0022;",
+    "'": "&#x0027;",
+}
+XML_UNESCAPE_TABLE = {v: k for k, v in XML_ESCAPE_TABLE.items()}
 
 import re
 
@@ -172,14 +183,12 @@ def escape_xml_characters(value: str) -> str:
     parts = numeric_entity_pattern.split(value)
     entities = numeric_entity_pattern.findall(value)
 
-    escaped_parts = [
-        part.replace("&", "&#x0026;")
-        .replace("<", "&#x003C;")
-        .replace(">", "&#x003E;")
-        .replace('"', "&#x0022;")
-        .replace("'", "&#x0027;")
-        for part in parts
-    ]
+    def escape_part(part: str) -> str:
+        for char, esc in XML_ESCAPE_TABLE.items():
+            part = part.replace(char, esc)
+        return part
+
+    escaped_parts = [escape_part(part) for part in parts]
 
     # Reconstruct while preserving original entities
     result = "".join(
@@ -187,4 +196,31 @@ def escape_xml_characters(value: str) -> str:
         for i, (p, e) in enumerate(zip(escaped_parts, entities + [""]))
     )
 
+    return result
+
+
+# Fonction inverse : unescape_xml_characters
+def unescape_xml_characters(value: str) -> str:
+    """
+    Remplace les entités XML par leur caractère original.
+    Les séquences déjà échappées (&#xNNNN;) sont restaurées.
+    """
+    if not value:
+        return value
+
+    # Regex to detect numeric XML entities like &#x0026;
+    numeric_entity_pattern = re.compile(r"&#x[0-9A-Fa-f]+;")
+
+    # Split by numeric entities, unescape only entities
+    parts = numeric_entity_pattern.split(value)
+    entities = numeric_entity_pattern.findall(value)
+
+    def unescape_entity(entity: str) -> str:
+        return XML_UNESCAPE_TABLE.get(entity, entity)
+
+    # Reconstruct while replacing known entities
+    result = "".join(
+        p + (unescape_entity(e) if i < len(entities) else "")
+        for i, (p, e) in enumerate(zip(parts, entities + [""]))
+    )
     return result
