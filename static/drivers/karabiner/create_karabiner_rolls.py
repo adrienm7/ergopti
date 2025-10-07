@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 PLUS_MAPPINGS_CONFIG = {
@@ -26,46 +27,34 @@ from macos.keylayout_generation.data.keylayout_plus_mappings import (
 from macos.keylayout_generation.data.mappings_functions import (
     unescape_xml_characters,
 )
+from utilities.keylayout_extraction import extract_keymap_body
 
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
 
 
-def keycode_to_name(code, macos_keycodes):
-    if code is None:
-        return None
-    return macos_keycodes.get(str(code), code)
-
-
-def get_keycode_map(keylayout_path: str) -> dict:
-    keycode_map = {}
+def get_keycode_map(keylayout_path: str) -> dict[str, list[dict[str, int]]]:
+    keycode_map = defaultdict(list)
     with open(keylayout_path, encoding="utf-8") as f:
         content = f.read()
         # On ne prend que les couches utiles
         for layer_index in [0, 2, 5, 6]:
-            keymap_match = re.search(
-                rf'<keyMap index="{layer_index}">(.*?)</keyMap>',
-                content,
-                re.DOTALL,
-            )
-            if not keymap_match:
-                continue
-            keymap_content = keymap_match.group(1)
+            keymap_content = extract_keymap_body(content, layer_index)
             for m in re.finditer(
-                r'<key code="(\d+)"(?: action="([^"]+)")?(?: output="([^"]+)")?/?',
+                r'<key code="(\d+)" (action|output)="([^"]+)"',
                 keymap_content,
             ):
                 code = int(m.group(1))
                 if code > 50:
                     continue
-                action = m.group(2)
                 output = m.group(3)
-                symbol = action if action else output
-                if symbol:
-                    keycode_map[symbol] = {
-                        "keycode": code,
-                        "layer": layer_index,
-                    }
-    return keycode_map
+                if output:
+                    keycode_map[output].append(
+                        {
+                            "keycode": code,
+                            "layer": layer_index,
+                        }
+                    )
+    return dict(keycode_map)
 
 
 keylayout_path = (
@@ -74,118 +63,125 @@ keylayout_path = (
 keycode_map = get_keycode_map(str(keylayout_path))
 
 keycode_map = {unescape_xml_characters(k): v for k, v in keycode_map.items()}
-from collections import defaultdict
 
 letter_to_num = defaultdict(list)
-for k, v in keycode_map.items():
-    letter_to_num[k].append((v["keycode"], v["layer"]))
-num_to_letter = {(v["keycode"], v["layer"]): k for k, v in keycode_map.items()}
+num_to_letter = defaultdict(list)
+for k, positions in keycode_map.items():
+    for pos in positions:
+        letter_to_num[k].append((pos["keycode"], pos["layer"]))
+        num_to_letter[(pos["keycode"], pos["layer"])].append(k)
 
 
 output_path = Path(__file__).parent / "rolls.json"
 rolls = []
 
-with open(Path(__file__).parent / "macos_keycodes.json", encoding="utf-8") as f:
+with open(
+    Path(__file__).parent / "data" / "macos_keycodes.json", encoding="utf-8"
+) as f:
     macos_keycodes = json.load(f)
 
 for mapping_name, mapping in plus_mappings.items():
     trigger = mapping["trigger"]
-    trigger_code = keycode_map.get(trigger.lower())
-    trigger_name = keycode_to_name(trigger_code, macos_keycodes)
-
     manipulators = []
-
-    # 2. For each (second_key, output) pair
-    for second_key, output in mapping["map"]:
-        second_info = keycode_map.get(second_key.lower())
-        second_code = second_info["keycode"] if second_info else None
-        second_layer = second_info["layer"] if second_info else None
-        second_name = keycode_to_name(second_code, macos_keycodes)
-
-        to_list = []
-        to_list.append(
-            {
-                "set_variable": {
-                    "name": "previous_key",
-                    "value": "none",
-                }
-            }
-        )
-        to_list.append({"key_code": "delete_or_backspace"})
-
-        # Détermine les modificateurs selon la couche du second_key
-        modifiers = []
-        if second_layer == 2:
-            modifiers.append("shift")
-        elif second_layer == 5:
-            modifiers.append("option")
-        elif second_layer == 6:
-            modifiers.extend(["shift", "option"])
-        if second_key.isupper() and "shift" not in modifiers:
-            modifiers.append("shift")
-
-        if modifiers:
-            from_block = {
-                "key_code": second_name,
-                "modifiers": {"mandatory": modifiers},
-            }
-        else:
-            from_block = {"key_code": second_name}
-
-        for i, char in enumerate(output):
-            char_base = char.lower()
-            char_info = keycode_map.get(char_base)
-            char_code = char_info["keycode"] if char_info else None
-            char_layer = char_info["layer"] if char_info else None
-            char_name = keycode_to_name(char_code, macos_keycodes)
-            char_name = char_name or char_base
-
-            modifiers = []
-            # Détermine les modificateurs selon la couche
-            if char_layer == 2:
-                modifiers.append("shift")
-            elif char_layer == 5:
-                modifiers.append("option")
-            elif char_layer == 6:
-                modifiers.extend(["shift", "option"])
-
-            # Ajoute shift si trigger ou second_key sont majuscules (pour le premier caractère)
-            if (
-                i == 0
-                and (trigger.isupper() or second_key.isupper())
-                and "shift" not in modifiers
+    for trigger_code, trigger_layer in letter_to_num.get(trigger.lower(), []):
+        trigger_name = macos_keycodes.get(str(trigger_code), trigger_code)
+        # 2. For each (second_key, output) pair
+        for second_key, output in mapping["map"]:
+            for second_code, second_layer in letter_to_num.get(
+                second_key.lower(), []
             ):
-                modifiers.append("shift")
-
-            if modifiers:
-                to_list.append({"key_code": char_name, "modifiers": modifiers})
-            else:
-                to_list.append({"key_code": char_name})
-
-        to_list.append(
-            {
-                "set_variable": {
-                    "name": "previous_key",
-                    "value": "none",
-                }
-            }
-        )
-
-        manipulators.append(
-            {
-                "conditions": [
+                second_name = macos_keycodes.get(str(second_code), second_code)
+                to_list = []
+                to_list.append(
                     {
-                        "name": "previous_key",
-                        "type": "variable_if",
-                        "value": trigger,
+                        "set_variable": {
+                            "name": "previous_key",
+                            "value": "none",
+                        }
                     }
-                ],
-                "from": from_block,
-                "to": to_list,
-                "type": "basic",
-            }
-        )
+                )
+                to_list.append({"key_code": "delete_or_backspace"})
 
+                # Détermine les modificateurs selon la couche du second_key
+                modifiers = []
+                if second_layer == 2:
+                    modifiers.append("shift")
+                elif second_layer == 5:
+                    modifiers.append("option")
+                elif second_layer == 6:
+                    modifiers.extend(["shift", "option"])
+                if second_key.isupper() and "shift" not in modifiers:
+                    modifiers.append("shift")
+
+                if modifiers:
+                    from_block = {
+                        "key_code": second_name,
+                        "modifiers": {"mandatory": modifiers},
+                    }
+                else:
+                    from_block = {"key_code": second_name}
+
+                for i, char in enumerate(output):
+                    char_base = char.lower()
+                    char_positions = letter_to_num.get(char_base, [])
+                    if char_positions:
+                        char_code, char_layer = char_positions[0]
+                        char_name = macos_keycodes.get(
+                            str(char_code), char_code
+                        )
+                    else:
+                        char_code, char_layer, char_name = None, None, char_base
+
+                    char_modifiers = []
+                    if char_layer == 2:
+                        char_modifiers.append("shift")
+                    elif char_layer == 5:
+                        char_modifiers.append("option")
+                    elif char_layer == 6:
+                        char_modifiers.extend(["shift", "option"])
+
+                    # Si trigger ET second_key sont en majuscule, tout l'output doit être shifté
+                    if trigger.isupper() and second_key.isupper():
+                        if "shift" not in char_modifiers:
+                            char_modifiers.append("shift")
+                    # Sinon, pour le premier caractère, on ajoute shift si trigger OU second_key est majuscule
+                    elif (
+                        i == 0
+                        and (trigger.isupper() or second_key.isupper())
+                        and "shift" not in char_modifiers
+                    ):
+                        char_modifiers.append("shift")
+
+                    if char_modifiers:
+                        to_list.append(
+                            {"key_code": char_name, "modifiers": char_modifiers}
+                        )
+                    else:
+                        to_list.append({"key_code": char_name})
+
+                to_list.append(
+                    {
+                        "set_variable": {
+                            "name": "previous_key",
+                            "value": "none",
+                        }
+                    }
+                )
+
+                manipulators.append(
+                    {
+                        "conditions": [
+                            {
+                                "name": "previous_key",
+                                "type": "variable_if",
+                                "value": trigger,
+                            }
+                        ],
+                        "from": from_block,
+                        "to": to_list,
+                        "type": "basic",
+                    }
+                )
     rolls.append(
         {
             "description": f"Roll mapping for trigger '{trigger}' ({mapping_name})",
@@ -199,15 +195,13 @@ with open(output_path, "w", encoding="utf-8") as f:
 
 # Ajoute un manipulateur pour chaque lettre a-z qui met à jour previous_key
 letters_manipulators = []
-# Pour chaque lettre présente dans keycode_map, pour chaque couche
-for (keycode, layer), symbol in num_to_letter.items():
-    # On ne prend que les keycodes <= 50 (lettres)
+# Pour chaque (keycode, layer), on peut avoir plusieurs symboles
+for (keycode, layer), symbols in num_to_letter.items():
     if keycode > 50:
         continue
-    name = keycode_to_name(keycode, macos_keycodes)
+    name = macos_keycodes.get(str(keycode), keycode)
     if not name:
         continue
-
     # Détermine les modificateurs selon la couche
     modifiers = []
     if layer == 2:
@@ -216,49 +210,47 @@ for (keycode, layer), symbol in num_to_letter.items():
         modifiers.append("option")
     elif layer == 6:
         modifiers.extend(["shift", "option"])
-
-    # Manipulateur avec modificateurs
-    if modifiers:
-        letters_manipulators.append(
-            {
-                "type": "basic",
-                "from": {
-                    "key_code": name,
-                    "modifiers": {"mandatory": modifiers},
-                },
-                "to": [
-                    {"key_code": name, "modifiers": modifiers},
-                    {
-                        "set_variable": {
-                            "name": "previous_key",
-                            "value": symbol.upper()
-                            if "shift" in modifiers
-                            else symbol,
-                        }
+    for symbol in symbols:
+        if modifiers:
+            letters_manipulators.append(
+                {
+                    "type": "basic",
+                    "from": {
+                        "key_code": name,
+                        "modifiers": {"mandatory": modifiers},
                     },
-                ],
-            }
-        )
-    # Manipulateur sans modificateur
-    else:
-        letters_manipulators.append(
-            {
-                "type": "basic",
-                "from": {"key_code": name},
-                "to": [
-                    {"key_code": name},
-                    {
-                        "set_variable": {
-                            "name": "previous_key",
-                            "value": symbol,
-                        }
-                    },
-                ],
-            }
-        )
+                    "to": [
+                        {"key_code": name, "modifiers": modifiers},
+                        {
+                            "set_variable": {
+                                "name": "previous_key",
+                                "value": symbol.upper()
+                                if "shift" in modifiers
+                                else symbol,
+                            }
+                        },
+                    ],
+                }
+            )
+        else:
+            letters_manipulators.append(
+                {
+                    "type": "basic",
+                    "from": {"key_code": name},
+                    "to": [
+                        {"key_code": name},
+                        {
+                            "set_variable": {
+                                "name": "previous_key",
+                                "value": symbol,
+                            }
+                        },
+                    ],
+                }
+            )
 rolls.append(
     {
-        "description": "Set previous_key for a-z (toutes couches)",
+        "description": "Set previous_key for a-z (toutes couches, doublons inclus)",
         "manipulators": letters_manipulators,
     }
 )
@@ -357,12 +349,8 @@ def merge_rolls_into_karabiner(
 if __name__ == "__main__":
     base_dir = Path(__file__).parent
 
-    print(keycode_map)
-    print("------")
-    print(num_to_letter)
-
     merge_rolls_into_karabiner(
-        karabiner_path=str(base_dir / "karabiner0.json"),
+        karabiner_path=str(base_dir / "data" / "karabiner0.json"),
         rolls_path=str(base_dir / "rolls_grouped.json"),
         output_path=str(base_dir / "karabiner.json"),
     )

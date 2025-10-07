@@ -217,7 +217,10 @@
             ]
           },
           {
-            "key_code": "i"
+            "key_code": "i",
+            "modifiers": [
+              "shift"
+            ]
           },
           {
             "set_variable": {
