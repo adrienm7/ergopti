@@ -102,7 +102,7 @@ for mapping_name, mapping in plus_mappings.items():
                 )
                 to_list.append({"key_code": "delete_or_backspace"})
 
-                # Détermine les modificateurs selon la couche du second_key
+                # Détermine les modificateurs selon la couche de second_key
                 modifiers = []
                 if second_layer == 2:
                     modifiers.append("shift")
