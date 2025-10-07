@@ -221,6 +221,7 @@ for (keycode, layer), symbol in num_to_letter.items():
     if modifiers:
         letters_manipulators.append(
             {
+                "type": "basic",
                 "from": {
                     "key_code": name,
                     "modifiers": {"mandatory": modifiers},
@@ -236,13 +237,13 @@ for (keycode, layer), symbol in num_to_letter.items():
                         }
                     },
                 ],
-                "type": "basic",
             }
         )
     # Manipulateur sans modificateur
     else:
         letters_manipulators.append(
             {
+                "type": "basic",
                 "from": {"key_code": name},
                 "to": [
                     {"key_code": name},
@@ -253,7 +254,6 @@ for (keycode, layer), symbol in num_to_letter.items():
                         }
                     },
                 ],
-                "type": "basic",
             }
         )
 rolls.append(

@@ -3,6 +3,7 @@
     "description": "Actions regroupées pour la touche [o]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "o",
           "modifiers": {
@@ -26,10 +27,10 @@
               "value": "Ç"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "o",
           "modifiers": {
@@ -51,8 +52,7 @@
               "value": "ç"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
         "conditions": [
@@ -143,6 +143,7 @@
         "type": "basic"
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "o",
           "modifiers": {
@@ -164,8 +165,7 @@
               "value": "C"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
         "conditions": [
@@ -243,6 +243,7 @@
         "type": "basic"
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "o"
         },
@@ -256,8 +257,7 @@
               "value": "c"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -265,6 +265,7 @@
     "description": "Actions regroupées pour la touche [period]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "period",
           "modifiers": {
@@ -288,8 +289,7 @@
               "value": "±"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
         "conditions": [
@@ -345,6 +345,7 @@
         "type": "basic"
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "period",
           "modifiers": {
@@ -366,10 +367,10 @@
               "value": "+"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "period",
           "modifiers": {
@@ -391,10 +392,10 @@
               "value": "P"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "period"
         },
@@ -408,8 +409,7 @@
               "value": "p"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -417,6 +417,7 @@
     "description": "Actions regroupées pour la touche [a]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "a",
           "modifiers": {
@@ -440,10 +441,10 @@
               "value": "≤"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "a",
           "modifiers": {
@@ -465,10 +466,10 @@
               "value": "<"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "a",
           "modifiers": {
@@ -490,10 +491,10 @@
               "value": "A"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "a"
         },
@@ -507,8 +508,7 @@
               "value": "a"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -516,6 +516,7 @@
     "description": "Actions regroupées pour la touche [s]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "s",
           "modifiers": {
@@ -539,10 +540,10 @@
               "value": "≥"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "s",
           "modifiers": {
@@ -564,10 +565,10 @@
               "value": ">"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "s",
           "modifiers": {
@@ -589,10 +590,10 @@
               "value": "I"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "s"
         },
@@ -606,8 +607,7 @@
               "value": "i"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -615,6 +615,7 @@
     "description": "Actions regroupées pour la touche [d]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "d",
           "modifiers": {
@@ -638,10 +639,10 @@
               "value": "ᵉ"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "d",
           "modifiers": {
@@ -663,10 +664,10 @@
               "value": "{"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "d",
           "modifiers": {
@@ -688,10 +689,10 @@
               "value": "E"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "d"
         },
@@ -705,8 +706,7 @@
               "value": "e"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -714,6 +714,7 @@
     "description": "Actions regroupées pour la touche [f]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "f",
           "modifiers": {
@@ -737,10 +738,10 @@
               "value": "Μ"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "f",
           "modifiers": {
@@ -762,10 +763,10 @@
               "value": "}"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "f",
           "modifiers": {
@@ -787,10 +788,10 @@
               "value": "U"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "f"
         },
@@ -804,8 +805,7 @@
               "value": "u"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -813,6 +813,7 @@
     "description": "Actions regroupées pour la touche [h]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "h",
           "modifiers": {
@@ -836,10 +837,10 @@
               "value": "¦"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "h",
           "modifiers": {
@@ -861,10 +862,10 @@
               "value": "|"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "h",
           "modifiers": {
@@ -886,10 +887,10 @@
               "value": "V"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "h"
         },
@@ -903,8 +904,7 @@
               "value": "v"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -912,6 +912,7 @@
     "description": "Actions regroupées pour la touche [g]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "g",
           "modifiers": {
@@ -935,10 +936,10 @@
               "value": "·"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "g",
           "modifiers": {
@@ -960,10 +961,10 @@
               "value": ":"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "g",
           "modifiers": {
@@ -985,10 +986,10 @@
               "value": " :"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "g"
         },
@@ -1002,8 +1003,7 @@
               "value": "."
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1011,6 +1011,7 @@
     "description": "Actions regroupées pour la touche [z]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "z",
           "modifiers": {
@@ -1034,10 +1035,10 @@
               "value": "÷"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "z",
           "modifiers": {
@@ -1059,10 +1060,10 @@
               "value": "/"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "z",
           "modifiers": {
@@ -1084,10 +1085,10 @@
               "value": "É"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "z"
         },
@@ -1101,8 +1102,7 @@
               "value": "é"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1110,6 +1110,7 @@
     "description": "Actions regroupées pour la touche [x]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "x",
           "modifiers": {
@@ -1133,10 +1134,10 @@
               "value": "ᵢ"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "x",
           "modifiers": {
@@ -1158,10 +1159,10 @@
               "value": "\\"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "x",
           "modifiers": {
@@ -1183,10 +1184,10 @@
               "value": "À"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "x"
         },
@@ -1200,8 +1201,7 @@
               "value": "à"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1209,6 +1209,7 @@
     "description": "Actions regroupées pour la touche [c]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "c",
           "modifiers": {
@@ -1232,10 +1233,10 @@
               "value": "J"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "c",
           "modifiers": {
@@ -1257,10 +1258,10 @@
               "value": "\""
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "c",
           "modifiers": {
@@ -1282,8 +1283,7 @@
               "value": "J"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1291,6 +1291,7 @@
     "description": "Actions regroupées pour la touche [v]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "v",
           "modifiers": {
@@ -1314,10 +1315,10 @@
               "value": "…"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "v",
           "modifiers": {
@@ -1339,10 +1340,10 @@
               "value": ";"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "v",
           "modifiers": {
@@ -1364,10 +1365,10 @@
               "value": " ;"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "v"
         },
@@ -1381,8 +1382,7 @@
               "value": ","
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1390,6 +1390,7 @@
     "description": "Actions regroupées pour la touche [m]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "m",
           "modifiers": {
@@ -1413,10 +1414,10 @@
               "value": "§"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "m",
           "modifiers": {
@@ -1438,10 +1439,10 @@
               "value": "$"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "m",
           "modifiers": {
@@ -1463,10 +1464,10 @@
               "value": "D"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "m"
         },
@@ -1480,8 +1481,7 @@
               "value": "d"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1489,6 +1489,7 @@
     "description": "Actions regroupées pour la touche [b]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "b",
           "modifiers": {
@@ -1510,10 +1511,10 @@
               "value": "K"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "b"
         },
@@ -1527,8 +1528,7 @@
               "value": "k"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1536,6 +1536,7 @@
     "description": "Actions regroupées pour la touche [q]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "q",
           "modifiers": {
@@ -1559,10 +1560,10 @@
               "value": "„"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "q",
           "modifiers": {
@@ -1584,10 +1585,10 @@
               "value": "`"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "q",
           "modifiers": {
@@ -1609,10 +1610,10 @@
               "value": "È"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "q"
         },
@@ -1626,8 +1627,7 @@
               "value": "è"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1635,6 +1635,7 @@
     "description": "Actions regroupées pour la touche [w]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "w",
           "modifiers": {
@@ -1658,10 +1659,10 @@
               "value": "€"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "w",
           "modifiers": {
@@ -1683,10 +1684,10 @@
               "value": "@"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "w",
           "modifiers": {
@@ -1708,10 +1709,10 @@
               "value": "Y"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "w"
         },
@@ -1725,8 +1726,7 @@
               "value": "y"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1734,6 +1734,7 @@
     "description": "Actions regroupées pour la touche [e]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "e",
           "modifiers": {
@@ -1757,10 +1758,10 @@
               "value": "Œ"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "e",
           "modifiers": {
@@ -1782,10 +1783,10 @@
               "value": "œ"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "e",
           "modifiers": {
@@ -1807,10 +1808,10 @@
               "value": "O"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "e"
         },
@@ -1824,8 +1825,7 @@
               "value": "o"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1833,6 +1833,7 @@
     "description": "Actions regroupées pour la touche [r]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "r",
           "modifiers": {
@@ -1856,10 +1857,10 @@
               "value": "Ù"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "r",
           "modifiers": {
@@ -1881,10 +1882,10 @@
               "value": "ù"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "r",
           "modifiers": {
@@ -1906,10 +1907,10 @@
               "value": "W"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "r"
         },
@@ -1923,8 +1924,7 @@
               "value": "w"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -1932,6 +1932,7 @@
     "description": "Actions regroupées pour la touche [y]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "y",
           "modifiers": {
@@ -1955,10 +1956,10 @@
               "value": "”"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "y",
           "modifiers": {
@@ -1980,10 +1981,10 @@
               "value": " »"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "y",
           "modifiers": {
@@ -2005,10 +2006,10 @@
               "value": "F"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "y"
         },
@@ -2022,8 +2023,7 @@
               "value": "f"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2031,6 +2031,7 @@
     "description": "Actions regroupées pour la touche [t]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "t",
           "modifiers": {
@@ -2054,10 +2055,10 @@
               "value": "“"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "t",
           "modifiers": {
@@ -2079,10 +2080,10 @@
               "value": "« "
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "t",
           "modifiers": {
@@ -2104,10 +2105,10 @@
               "value": "B"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "t"
         },
@@ -2121,8 +2122,7 @@
               "value": "b"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2130,6 +2130,7 @@
     "description": "Actions regroupées pour la touche [1]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "1",
           "modifiers": {
@@ -2153,10 +2154,10 @@
               "value": "₁"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "1",
           "modifiers": {
@@ -2178,10 +2179,10 @@
               "value": "¹"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "1",
           "modifiers": {
@@ -2203,8 +2204,7 @@
               "value": "1"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2212,6 +2212,7 @@
     "description": "Actions regroupées pour la touche [2]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "2",
           "modifiers": {
@@ -2235,10 +2236,10 @@
               "value": "₂"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "2",
           "modifiers": {
@@ -2260,10 +2261,10 @@
               "value": "²"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "2",
           "modifiers": {
@@ -2285,8 +2286,7 @@
               "value": "2"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2294,6 +2294,7 @@
     "description": "Actions regroupées pour la touche [3]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "3",
           "modifiers": {
@@ -2317,10 +2318,10 @@
               "value": "₃"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "3",
           "modifiers": {
@@ -2342,10 +2343,10 @@
               "value": "³"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "3",
           "modifiers": {
@@ -2367,8 +2368,7 @@
               "value": "3"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2376,6 +2376,7 @@
     "description": "Actions regroupées pour la touche [4]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "4",
           "modifiers": {
@@ -2399,10 +2400,10 @@
               "value": "₄"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "4",
           "modifiers": {
@@ -2424,10 +2425,10 @@
               "value": "⁴"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "4",
           "modifiers": {
@@ -2449,8 +2450,7 @@
               "value": "4"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2458,6 +2458,7 @@
     "description": "Actions regroupées pour la touche [6]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "6",
           "modifiers": {
@@ -2481,10 +2482,10 @@
               "value": "₆"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "6",
           "modifiers": {
@@ -2506,10 +2507,10 @@
               "value": "⁶"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "6",
           "modifiers": {
@@ -2531,8 +2532,7 @@
               "value": "6"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2540,6 +2540,7 @@
     "description": "Actions regroupées pour la touche [5]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "5",
           "modifiers": {
@@ -2563,10 +2564,10 @@
               "value": "₅"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "5",
           "modifiers": {
@@ -2588,10 +2589,10 @@
               "value": "⁵"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "5",
           "modifiers": {
@@ -2613,8 +2614,7 @@
               "value": "5"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2622,6 +2622,7 @@
     "description": "Actions regroupées pour la touche [comma]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "comma",
           "modifiers": {
@@ -2645,10 +2646,10 @@
               "value": "≠"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "comma",
           "modifiers": {
@@ -2670,10 +2671,10 @@
               "value": "="
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "comma",
           "modifiers": {
@@ -2695,10 +2696,10 @@
               "value": "L"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "comma"
         },
@@ -2712,8 +2713,7 @@
               "value": "l"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2721,6 +2721,7 @@
     "description": "Actions regroupées pour la touche [9]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "9",
           "modifiers": {
@@ -2744,10 +2745,10 @@
               "value": "₉"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "9",
           "modifiers": {
@@ -2769,10 +2770,10 @@
               "value": "⁹"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "9",
           "modifiers": {
@@ -2794,8 +2795,7 @@
               "value": "9"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2803,6 +2803,7 @@
     "description": "Actions regroupées pour la touche [7]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "7",
           "modifiers": {
@@ -2826,10 +2827,10 @@
               "value": "₇"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "7",
           "modifiers": {
@@ -2851,10 +2852,10 @@
               "value": "⁷"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "7",
           "modifiers": {
@@ -2876,8 +2877,7 @@
               "value": "7"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2885,6 +2885,7 @@
     "description": "Actions regroupées pour la touche [i]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "i",
           "modifiers": {
@@ -2908,10 +2909,10 @@
               "value": "%"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "i",
           "modifiers": {
@@ -2933,10 +2934,10 @@
               "value": "#"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "i",
           "modifiers": {
@@ -2958,10 +2959,10 @@
               "value": "H"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "i"
         },
@@ -2975,8 +2976,7 @@
               "value": "h"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -2984,6 +2984,7 @@
     "description": "Actions regroupées pour la touche [8]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "8",
           "modifiers": {
@@ -3007,10 +3008,10 @@
               "value": "₈"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "8",
           "modifiers": {
@@ -3032,10 +3033,10 @@
               "value": "⁸"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "8",
           "modifiers": {
@@ -3057,8 +3058,7 @@
               "value": "8"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3066,6 +3066,7 @@
     "description": "Actions regroupées pour la touche [0]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "0",
           "modifiers": {
@@ -3089,10 +3090,10 @@
               "value": "₀"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "0",
           "modifiers": {
@@ -3114,10 +3115,10 @@
               "value": "⁰"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "0",
           "modifiers": {
@@ -3139,8 +3140,7 @@
               "value": "0"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3148,6 +3148,7 @@
     "description": "Actions regroupées pour la touche [l]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "l",
           "modifiers": {
@@ -3171,10 +3172,10 @@
               "value": "¨"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "l",
           "modifiers": {
@@ -3196,10 +3197,10 @@
               "value": "["
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "l",
           "modifiers": {
@@ -3221,10 +3222,10 @@
               "value": "T"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "l"
         },
@@ -3238,8 +3239,7 @@
               "value": "t"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3247,6 +3247,7 @@
     "description": "Actions regroupées pour la touche [u]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "u",
           "modifiers": {
@@ -3270,10 +3271,10 @@
               "value": "≈"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "u",
           "modifiers": {
@@ -3295,10 +3296,10 @@
               "value": "~"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "u",
           "modifiers": {
@@ -3320,10 +3321,10 @@
               "value": "G"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "u"
         },
@@ -3337,8 +3338,7 @@
               "value": "g"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3346,6 +3346,7 @@
     "description": "Actions regroupées pour la touche [open_bracket]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "open_bracket",
           "modifiers": {
@@ -3369,10 +3370,10 @@
               "value": "‰"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "open_bracket",
           "modifiers": {
@@ -3394,10 +3395,10 @@
               "value": "Z"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "open_bracket"
         },
@@ -3411,8 +3412,7 @@
               "value": "z"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3420,6 +3420,7 @@
     "description": "Actions regroupées pour la touche [p]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "p",
           "modifiers": {
@@ -3443,10 +3444,10 @@
               "value": "×"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "p",
           "modifiers": {
@@ -3468,10 +3469,10 @@
               "value": "*"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "p",
           "modifiers": {
@@ -3493,10 +3494,10 @@
               "value": "X"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "p"
         },
@@ -3510,8 +3511,7 @@
               "value": "x"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3519,6 +3519,7 @@
     "description": "Actions regroupées pour la touche [36]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": 36,
           "modifiers": {
@@ -3542,8 +3543,7 @@
               "value": "&#X000D;"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3551,6 +3551,7 @@
     "description": "Actions regroupées pour la touche [j]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "j",
           "modifiers": {
@@ -3574,10 +3575,10 @@
               "value": "—"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "j",
           "modifiers": {
@@ -3599,10 +3600,10 @@
               "value": "("
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "j",
           "modifiers": {
@@ -3624,10 +3625,10 @@
               "value": "S"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "j"
         },
@@ -3641,8 +3642,7 @@
               "value": "s"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3650,6 +3650,7 @@
     "description": "Actions regroupées pour la touche [quote]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "quote",
           "modifiers": {
@@ -3673,10 +3674,10 @@
               "value": "¤"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "quote",
           "modifiers": {
@@ -3698,10 +3699,10 @@
               "value": "’"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "quote",
           "modifiers": {
@@ -3723,10 +3724,10 @@
               "value": "Q"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "quote"
         },
@@ -3740,8 +3741,7 @@
               "value": "q"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3749,6 +3749,7 @@
     "description": "Actions regroupées pour la touche [k]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "k",
           "modifiers": {
@@ -3772,10 +3773,10 @@
               "value": "–"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "k",
           "modifiers": {
@@ -3797,10 +3798,10 @@
               "value": ")"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "k",
           "modifiers": {
@@ -3822,10 +3823,10 @@
               "value": "N"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "k"
         },
@@ -3839,8 +3840,7 @@
               "value": "n"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3848,6 +3848,7 @@
     "description": "Actions regroupées pour la touche [semicolon]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "semicolon",
           "modifiers": {
@@ -3871,10 +3872,10 @@
               "value": "ℝ"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "semicolon",
           "modifiers": {
@@ -3896,10 +3897,10 @@
               "value": "]"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "semicolon",
           "modifiers": {
@@ -3921,10 +3922,10 @@
               "value": "R"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "semicolon"
         },
@@ -3938,8 +3939,7 @@
               "value": "r"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -3947,6 +3947,7 @@
     "description": "Actions regroupées pour la touche [grave_accent_and_tilde]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "grave_accent_and_tilde",
           "modifiers": {
@@ -3970,10 +3971,10 @@
               "value": "^"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "grave_accent_and_tilde",
           "modifiers": {
@@ -3995,10 +3996,10 @@
               "value": "Ê"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "grave_accent_and_tilde"
         },
@@ -4012,8 +4013,7 @@
               "value": "ê"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4021,6 +4021,7 @@
     "description": "Actions regroupées pour la touche [slash]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "slash",
           "modifiers": {
@@ -4044,10 +4045,10 @@
               "value": "¿"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "slash",
           "modifiers": {
@@ -4069,10 +4070,10 @@
               "value": "?"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "slash",
           "modifiers": {
@@ -4094,10 +4095,10 @@
               "value": " ?"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "slash"
         },
@@ -4111,8 +4112,7 @@
               "value": "'"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4120,6 +4120,7 @@
     "description": "Actions regroupées pour la touche [n]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "n",
           "modifiers": {
@@ -4143,10 +4144,10 @@
               "value": "−"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "n",
           "modifiers": {
@@ -4168,10 +4169,10 @@
               "value": "&"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "n",
           "modifiers": {
@@ -4193,10 +4194,10 @@
               "value": "M"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "n"
         },
@@ -4210,8 +4211,7 @@
               "value": "m"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4219,6 +4219,7 @@
     "description": "Actions regroupées pour la touche [tab]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "tab",
           "modifiers": {
@@ -4240,8 +4241,7 @@
               "value": "&#X0009;"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4249,6 +4249,7 @@
     "description": "Actions regroupées pour la touche [space]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "space",
           "modifiers": {
@@ -4272,10 +4273,10 @@
               "value": " - "
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "space",
           "modifiers": {
@@ -4297,10 +4298,10 @@
               "value": "_"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "space",
           "modifiers": {
@@ -4322,10 +4323,10 @@
               "value": "-"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "space"
         },
@@ -4339,8 +4340,7 @@
               "value": " "
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4348,6 +4348,7 @@
     "description": "Actions regroupées pour la touche [non_us_backslash]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "non_us_backslash",
           "modifiers": {
@@ -4369,8 +4370,7 @@
               "value": " €"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4378,6 +4378,7 @@
     "description": "Actions regroupées pour la touche [equal_sign]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "equal_sign",
           "modifiers": {
@@ -4401,10 +4402,10 @@
               "value": "ª"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "equal_sign",
           "modifiers": {
@@ -4426,10 +4427,10 @@
               "value": "°"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "equal_sign",
           "modifiers": {
@@ -4451,8 +4452,7 @@
               "value": "º"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4460,6 +4460,7 @@
     "description": "Actions regroupées pour la touche [hyphen]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "hyphen",
           "modifiers": {
@@ -4483,10 +4484,10 @@
               "value": "‱"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "hyphen",
           "modifiers": {
@@ -4508,8 +4509,7 @@
               "value": " %"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4517,6 +4517,7 @@
     "description": "Actions regroupées pour la touche [close_bracket]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "close_bracket",
           "modifiers": {
@@ -4538,10 +4539,10 @@
               "value": " "
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "close_bracket",
           "modifiers": {
@@ -4563,8 +4564,7 @@
               "value": " "
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   },
@@ -4572,6 +4572,7 @@
     "description": "Actions regroupées pour la touche [backslash]",
     "manipulators": [
       {
+        "type": "basic",
         "from": {
           "key_code": "backslash",
           "modifiers": {
@@ -4595,10 +4596,10 @@
               "value": "¡"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "backslash",
           "modifiers": {
@@ -4620,10 +4621,10 @@
               "value": "!"
             }
           }
-        ],
-        "type": "basic"
+        ]
       },
       {
+        "type": "basic",
         "from": {
           "key_code": "backslash",
           "modifiers": {
@@ -4645,8 +4646,7 @@
               "value": " !"
             }
           }
-        ],
-        "type": "basic"
+        ]
       }
     ]
   }
