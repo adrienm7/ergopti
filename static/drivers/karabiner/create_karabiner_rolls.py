@@ -10,11 +10,17 @@ PLUS_MAPPINGS_CONFIG = {
             ("c", "wh"),
         ],
     },
+    "rolls_question_mark": {
+        "trigger": "?",
+        "map": [
+            ("+", " <- "),
+        ],
+    },
 }
 
 sys.path.append(str(Path(__file__).parent.parent.resolve()))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    PLUS_MAPPINGS_CONFIG,
+    # PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
 )
 from macos.keylayout_generation.data.mappings_functions import (
@@ -22,8 +28,6 @@ from macos.keylayout_generation.data.mappings_functions import (
 )
 
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
-
-# TODO: handle retrieving keycode and modifier for all symbols in altgr. it will make everything work
 
 
 def keycode_to_name(code, macos_keycodes):
@@ -51,6 +55,8 @@ def get_keycode_map(keylayout_path: str) -> dict:
                 keymap_content,
             ):
                 code = int(m.group(1))
+                if code > 50:
+                    continue
                 action = m.group(2)
                 output = m.group(3)
                 symbol = action if action else output
@@ -68,6 +74,11 @@ keylayout_path = (
 keycode_map = get_keycode_map(str(keylayout_path))
 
 keycode_map = {unescape_xml_characters(k): v for k, v in keycode_map.items()}
+from collections import defaultdict
+
+letter_to_num = defaultdict(list)
+for k, v in keycode_map.items():
+    letter_to_num[k].append((v["keycode"], v["layer"]))
 num_to_letter = {(v["keycode"], v["layer"]): k for k, v in keycode_map.items()}
 
 
@@ -274,17 +285,30 @@ grouped = []
 for key, manips in manipulators_by_key.items():
     desc = f"Actions regroupées pour la touche [{key}]"
 
-    # Tri explicite des manipulateurs : les plus spécifiques (shift dans 'from') en premier
-    def has_shift_from(manip):
+    # Tri explicite des manipulateurs :
+    # 1. shift+option
+    # 2. option
+    # 3. shift
+    # 4. aucun modificateur
+    def mod_priority(manip):
         from_block = manip.get("from", {})
         mods = from_block.get("modifiers", {})
         if isinstance(mods, dict):
-            return "shift" in str(mods.get("mandatory", []))
-        return False
+            mandatory = mods.get("mandatory", [])
+            # Peut être une chaîne ou une liste
+            if isinstance(mandatory, str):
+                mandatory = [mandatory]
+            if "shift" in mandatory and "option" in mandatory:
+                return 0
+            elif "option" in mandatory:
+                return 1
+            elif "shift" in mandatory:
+                return 2
+        return 3
 
     sorted_manips = sorted(
         manips,
-        key=lambda m: not has_shift_from(m),
+        key=mod_priority,
     )
     grouped.append(
         {
@@ -334,6 +358,7 @@ if __name__ == "__main__":
     base_dir = Path(__file__).parent
 
     print(keycode_map)
+    print("------")
     print(num_to_letter)
 
     merge_rolls_into_karabiner(
