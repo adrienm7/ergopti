@@ -131,7 +131,10 @@
             ]
           },
           {
-            "key_code": "i"
+            "key_code": "i",
+            "modifiers": [
+              "shift"
+            ]
           },
           {
             "set_variable": {
@@ -1284,6 +1287,23 @@
             }
           }
         ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "c"
+        },
+        "to": [
+          {
+            "key_code": "c"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "j"
+            }
+          }
+        ]
       }
     ]
   },
@@ -1380,6 +1400,105 @@
             "set_variable": {
               "name": "previous_key",
               "value": ","
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [non_us_backslash]",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¤"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "€"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " €"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash"
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "$"
             }
           }
         ]
@@ -1488,6 +1607,31 @@
   {
     "description": "Actions regroupées pour la touche [b]",
     "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "b",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "…"
+            }
+          }
+        ]
+      },
       {
         "type": "basic",
         "from": {
@@ -2205,6 +2349,23 @@
             }
           }
         ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "1"
+        },
+        "to": [
+          {
+            "key_code": "1"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "1"
+            }
+          }
+        ]
       }
     ]
   },
@@ -2279,6 +2440,23 @@
             "modifiers": [
               "shift"
             ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "2"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "2"
+        },
+        "to": [
+          {
+            "key_code": "2"
           },
           {
             "set_variable": {
@@ -2369,6 +2547,23 @@
             }
           }
         ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "3"
+        },
+        "to": [
+          {
+            "key_code": "3"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "3"
+            }
+          }
+        ]
       }
     ]
   },
@@ -2443,6 +2638,23 @@
             "modifiers": [
               "shift"
             ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "4"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "4"
+        },
+        "to": [
+          {
+            "key_code": "4"
           },
           {
             "set_variable": {
@@ -2533,6 +2745,23 @@
             }
           }
         ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "6"
+        },
+        "to": [
+          {
+            "key_code": "6"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "6"
+            }
+          }
+        ]
       }
     ]
   },
@@ -2612,6 +2841,122 @@
             "set_variable": {
               "name": "previous_key",
               "value": "5"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "5"
+        },
+        "to": [
+          {
+            "key_code": "5"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "5"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [equal_sign]",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "equal_sign",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ª"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "equal_sign",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "°"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "equal_sign",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "º"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign"
+        },
+        "to": [
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "="
             }
           }
         ]
@@ -2796,6 +3141,23 @@
             }
           }
         ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "9"
+        },
+        "to": [
+          {
+            "key_code": "9"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "9"
+            }
+          }
+        ]
       }
     ]
   },
@@ -2875,6 +3237,221 @@
             "set_variable": {
               "name": "previous_key",
               "value": "7"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "7"
+        },
+        "to": [
+          {
+            "key_code": "7"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "7"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [hyphen]",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "hyphen",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "‱"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "hyphen",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "‰"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "hyphen",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " %"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen"
+        },
+        "to": [
+          {
+            "key_code": "hyphen"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "%"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [open_bracket]",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "open_bracket",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "‰"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "open_bracket",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "%"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "open_bracket",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Z"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket"
+        },
+        "to": [
+          {
+            "key_code": "open_bracket"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "z"
             }
           }
         ]
@@ -3059,6 +3636,23 @@
             }
           }
         ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "8"
+        },
+        "to": [
+          {
+            "key_code": "8"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "8"
+            }
+          }
+        ]
       }
     ]
   },
@@ -3138,6 +3732,95 @@
             "set_variable": {
               "name": "previous_key",
               "value": "0"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "0"
+        },
+        "to": [
+          {
+            "key_code": "0"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Actions regroupées pour la touche [close_bracket]",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "close_bracket",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "close_bracket",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket"
+        },
+        "to": [
+          {
+            "key_code": "close_bracket"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¨"
             }
           }
         ]
@@ -3343,80 +4026,6 @@
     ]
   },
   {
-    "description": "Actions regroupées pour la touche [open_bracket]",
-    "manipulators": [
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "open_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift",
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "open_bracket",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "‰"
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "open_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "open_bracket",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "Z"
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "open_bracket"
-        },
-        "to": [
-          {
-            "key_code": "open_bracket"
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "z"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
     "description": "Actions regroupées pour la touche [p]",
     "manipulators": [
       {
@@ -3541,6 +4150,73 @@
             "set_variable": {
               "name": "previous_key",
               "value": "&#X000D;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": 36,
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": 36,
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#x000D;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": 36,
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": 36,
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#X000D;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": 36
+        },
+        "to": [
+          {
+            "key_code": 36
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#x000D;"
             }
           }
         ]
@@ -3944,6 +4620,105 @@
     ]
   },
   {
+    "description": "Actions regroupées pour la touche [backslash]",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "backslash",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¡"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "backslash",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "!"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "backslash",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " !"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash"
+        },
+        "to": [
+          {
+            "key_code": "backslash"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "^"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
     "description": "Actions regroupées pour la touche [grave_accent_and_tilde]",
     "manipulators": [
       {
@@ -3962,6 +4737,31 @@
             "key_code": "grave_accent_and_tilde",
             "modifiers": [
               "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "^"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "grave_accent_and_tilde",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "grave_accent_and_tilde",
+            "modifiers": [
               "option"
             ]
           },
@@ -4242,6 +5042,23 @@
             }
           }
         ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "tab"
+        },
+        "to": [
+          {
+            "key_code": "tab"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#x0009;"
+            }
+          }
+        ]
       }
     ]
   },
@@ -4338,312 +5155,6 @@
             "set_variable": {
               "name": "previous_key",
               "value": " "
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "description": "Actions regroupées pour la touche [non_us_backslash]",
-    "manipulators": [
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "non_us_backslash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "non_us_backslash",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": " €"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "description": "Actions regroupées pour la touche [equal_sign]",
-    "manipulators": [
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "equal_sign",
-          "modifiers": {
-            "mandatory": [
-              "shift",
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "equal_sign",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "ª"
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "equal_sign",
-          "modifiers": {
-            "mandatory": [
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "equal_sign",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "°"
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "equal_sign",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "equal_sign",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "º"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "description": "Actions regroupées pour la touche [hyphen]",
-    "manipulators": [
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "hyphen",
-          "modifiers": {
-            "mandatory": [
-              "shift",
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "hyphen",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "‱"
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "hyphen",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "hyphen",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": " %"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "description": "Actions regroupées pour la touche [close_bracket]",
-    "manipulators": [
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "close_bracket",
-          "modifiers": {
-            "mandatory": [
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "close_bracket",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": " "
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "close_bracket",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "close_bracket",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": " "
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "description": "Actions regroupées pour la touche [backslash]",
-    "manipulators": [
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "backslash",
-          "modifiers": {
-            "mandatory": [
-              "shift",
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "backslash",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "¡"
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "backslash",
-          "modifiers": {
-            "mandatory": [
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "backslash",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "!"
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "backslash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "backslash",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": " !"
             }
           }
         ]
