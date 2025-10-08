@@ -21,7 +21,7 @@ PLUS_MAPPINGS_CONFIG = {
 
 sys.path.append(str(Path(__file__).parent.parent.resolve()))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    # PLUS_MAPPINGS_CONFIG,
+    PLUS_MAPPINGS_CONFIG,
     add_case_sensitive_mappings,
 )
 from macos.keylayout_generation.data.mappings_functions import (
@@ -107,9 +107,9 @@ for mapping_name, mapping in plus_mappings.items():
                 if second_layer == 2:
                     modifiers.append("shift")
                 elif second_layer == 5:
-                    modifiers.append("option")
+                    modifiers.append("right_option")
                 elif second_layer == 6:
-                    modifiers.extend(["shift", "option"])
+                    modifiers.extend(["shift", "right_option"])
                 if second_key.isupper() and "shift" not in modifiers:
                     modifiers.append("shift")
 
@@ -136,9 +136,9 @@ for mapping_name, mapping in plus_mappings.items():
                     if char_layer == 2:
                         char_modifiers.append("shift")
                     elif char_layer == 5:
-                        char_modifiers.append("option")
+                        char_modifiers.append("right_option")
                     elif char_layer == 6:
-                        char_modifiers.extend(["shift", "option"])
+                        char_modifiers.extend(["shift", "right_option"])
 
                     # Si trigger ET second_key sont en majuscule, tout l'output doit être shifté
                     if trigger.isupper() and second_key.isupper():
@@ -207,9 +207,9 @@ for (keycode, layer), symbols in num_to_letter.items():
     if layer == 2:
         modifiers.append("shift")
     elif layer == 5:
-        modifiers.append("option")
+        modifiers.append("right_option")
     elif layer == 6:
-        modifiers.extend(["shift", "option"])
+        modifiers.extend(["shift", "right_option"])
     for symbol in symbols:
         if modifiers:
             letters_manipulators.append(
@@ -290,9 +290,9 @@ for key, manips in manipulators_by_key.items():
             # Peut être une chaîne ou une liste
             if isinstance(mandatory, str):
                 mandatory = [mandatory]
-            if "shift" in mandatory and "option" in mandatory:
+            if "shift" in mandatory and "right_option" in mandatory:
                 return 0
-            elif "option" in mandatory:
+            elif "right_option" in mandatory:
                 return 1
             elif "shift" in mandatory:
                 return 2
