@@ -160,7 +160,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [a]",
+                        "description": "Grouped actions for key [a]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -1275,7 +1275,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [x]",
+                        "description": "Grouped actions for key [x]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -2034,7 +2034,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [d]",
+                        "description": "Grouped actions for key [d]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -2959,7 +2959,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [z]",
+                        "description": "Grouped actions for key [z]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -4225,7 +4225,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [grave_accent_and_tilde]",
+                        "description": "Grouped actions for key [grave_accent_and_tilde]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -5355,7 +5355,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [s]",
+                        "description": "Grouped actions for key [s]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -6470,7 +6470,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [e]",
+                        "description": "Grouped actions for key [e]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -7389,7 +7389,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [f]",
+                        "description": "Grouped actions for key [f]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -8293,7 +8293,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [slash]",
+                        "description": "Grouped actions for key [slash]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -9760,7 +9760,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [quote]",
+                        "description": "Grouped actions for key [quote]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -10793,7 +10793,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [o]",
+                        "description": "Grouped actions for key [o]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -11581,7 +11581,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [q]",
+                        "description": "Grouped actions for key [q]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -12476,7 +12476,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [j]",
+                        "description": "Grouped actions for key [j]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -13153,7 +13153,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [p]",
+                        "description": "Grouped actions for key [p]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -14124,7 +14124,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [w]",
+                        "description": "Grouped actions for key [w]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -14900,7 +14900,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [m]",
+                        "description": "Grouped actions for key [m]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -15630,7 +15630,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [y]",
+                        "description": "Grouped actions for key [y]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -16245,7 +16245,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [u]",
+                        "description": "Grouped actions for key [u]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -16875,7 +16875,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [i]",
+                        "description": "Grouped actions for key [i]",
                         "manipulators": [
                             {
                                 "conditions": [
@@ -17951,7 +17951,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [comma]",
+                        "description": "Grouped actions for key [comma]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -18666,7 +18666,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [n]",
+                        "description": "Grouped actions for key [n]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -19281,7 +19281,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [k]",
+                        "description": "Grouped actions for key [k]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -19961,7 +19961,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [period]",
+                        "description": "Grouped actions for key [period]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -20020,7 +20020,10 @@
                                         "key_code": "spacebar"
                                     },
                                     {
-                                        "key_code": "➜"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "v"
                                     },
                                     {
                                         "key_code": "spacebar"
@@ -20064,7 +20067,10 @@
                                         "key_code": "spacebar"
                                     },
                                     {
-                                        "key_code": "➜"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "v"
                                     },
                                     {
                                         "key_code": "spacebar"
@@ -20717,7 +20723,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [semicolon]",
+                        "description": "Grouped actions for key [semicolon]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -21332,7 +21338,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [l]",
+                        "description": "Grouped actions for key [l]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -22177,7 +22183,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [h]",
+                        "description": "Grouped actions for key [h]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -22792,7 +22798,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [open_bracket]",
+                        "description": "Grouped actions for key [open_bracket]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -23561,7 +23567,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [c]",
+                        "description": "Grouped actions for key [c]",
                         "manipulators": [
                             {
                                 "conditions": [
@@ -24053,7 +24059,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [b]",
+                        "description": "Grouped actions for key [b]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -24321,7 +24327,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [backslash]",
+                        "description": "Grouped actions for key [backslash]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -24470,7 +24476,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [hyphen]",
+                        "description": "Grouped actions for key [hyphen]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -24659,7 +24665,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [equal_sign]",
+                        "description": "Grouped actions for key [equal_sign]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -24848,7 +24854,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [non_us_backslash]",
+                        "description": "Grouped actions for key [non_us_backslash]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25037,7 +25043,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [g]",
+                        "description": "Grouped actions for key [g]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25136,7 +25142,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [v]",
+                        "description": "Grouped actions for key [v]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25235,7 +25241,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [r]",
+                        "description": "Grouped actions for key [r]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25334,7 +25340,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [t]",
+                        "description": "Grouped actions for key [t]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25433,7 +25439,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [1]",
+                        "description": "Grouped actions for key [1]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25532,7 +25538,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [2]",
+                        "description": "Grouped actions for key [2]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25631,7 +25637,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [3]",
+                        "description": "Grouped actions for key [3]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25730,7 +25736,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [4]",
+                        "description": "Grouped actions for key [4]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25829,7 +25835,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [6]",
+                        "description": "Grouped actions for key [6]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -25928,7 +25934,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [5]",
+                        "description": "Grouped actions for key [5]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26027,7 +26033,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [9]",
+                        "description": "Grouped actions for key [9]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26126,7 +26132,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [7]",
+                        "description": "Grouped actions for key [7]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26225,7 +26231,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [8]",
+                        "description": "Grouped actions for key [8]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26324,7 +26330,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [0]",
+                        "description": "Grouped actions for key [0]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26423,7 +26429,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [close_bracket]",
+                        "description": "Grouped actions for key [close_bracket]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26495,7 +26501,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [36]",
+                        "description": "Grouped actions for key [36]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26594,7 +26600,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [tab]",
+                        "description": "Grouped actions for key [tab]",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -26641,7 +26647,7 @@
                         ]
                     },
                     {
-                        "description": "Actions regroupées pour la touche [spacebar]",
+                        "description": "Grouped actions for key [spacebar]",
                         "manipulators": [
                             {
                                 "type": "basic",
