@@ -8898,7 +8898,10 @@
             "key_code": "spacebar"
           },
           {
-            "key_code": "➜"
+            "key_code": "backslash"
+          },
+          {
+            "key_code": "v"
           },
           {
             "key_code": "spacebar"
@@ -9037,7 +9040,10 @@
             "key_code": "spacebar"
           },
           {
-            "key_code": "➜"
+            "key_code": "backslash"
+          },
+          {
+            "key_code": "v"
           },
           {
             "key_code": "spacebar"

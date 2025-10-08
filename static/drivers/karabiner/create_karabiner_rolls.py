@@ -1,23 +1,21 @@
+"""Generate Karabiner roll rules for Ergopti(+).
+
+Extract key positions from the macOS .keylayout file, build roll / dead-key
+manipulators based on the Ergopti+ mapping configuration, and export:
+    - rolls.json: raw list of rules grouped by trigger mapping
+    - rolls_grouped.json: rules regrouped by originating key
+    - karabiner.json: merged configuration (by adding those rules to base file)
+
+Multi-key output symbols (e.g. '➜') are represented as ordered sequences of
+key positions.
+"""
+
 import json
 import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-
-PLUS_MAPPINGS_CONFIG = {
-    "roll_wh": {
-        "trigger": "h",
-        "map": [
-            ("c", "wh"),
-        ],
-    },
-    "rolls_question_mark": {
-        "trigger": "?",
-        "map": [
-            ("+", " <- "),
-        ],
-    },
-}
+from typing import Dict, List, Union
 
 sys.path.append(str(Path(__file__).parent.parent.resolve()))
 from macos.keylayout_generation.data.keylayout_plus_mappings import (
@@ -32,28 +30,44 @@ from utilities.keylayout_extraction import extract_keymap_body
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
 
 
-def get_keycode_map(keylayout_path: str) -> dict[str, list[dict[str, int]]]:
-    keycode_map = defaultdict(list)
+# A key position is simply a dict: {"keycode": int, "layer": int}
+# A sequence is a list of such dicts
+KeySequence = List[dict]
+KeycodeMap = Dict[str, List[Union[dict, KeySequence]]]
+
+
+def get_keycode_map(keylayout_path: str) -> KeycodeMap:
+    """Build a map of symbol -> list of key positions (single or sequences).
+
+    Each entry value is a list because a symbol may exist at several physical
+    positions (different layers) and a position can itself be a multi-key
+    sequence (represented as a list) when needed.
+    """
+    keycode_map: KeycodeMap = defaultdict(list)
     with open(keylayout_path, encoding="utf-8") as f:
         content = f.read()
-        # On ne prend que les couches utiles
         for layer_index in [0, 2, 5, 6]:
             keymap_content = extract_keymap_body(content, layer_index)
-            for m in re.finditer(
+            for match in re.finditer(
                 r'<key code="(\d+)" (action|output)="([^"]+)"',
                 keymap_content,
             ):
-                code = int(m.group(1))
+                code = int(match.group(1))
                 if code > 50:
                     continue
-                output = m.group(3)
+                output = match.group(3)
                 if output:
                     keycode_map[output].append(
-                        {
-                            "keycode": code,
-                            "layer": layer_index,
-                        }
+                        {"keycode": code, "layer": layer_index}
                     )
+
+    # Manual multi-key entry for '➜'
+    keycode_map["➜"] = [
+        [
+            {"keycode": 42, "layer": 1},
+            {"keycode": 9, "layer": 1},
+        ]
+    ]
     return dict(keycode_map)
 
 
@@ -64,12 +78,18 @@ keycode_map = get_keycode_map(str(keylayout_path))
 
 keycode_map = {unescape_xml_characters(k): v for k, v in keycode_map.items()}
 
-letter_to_num = defaultdict(list)
-num_to_letter = defaultdict(list)
-for k, positions in keycode_map.items():
+letter_to_num: dict[str, List[tuple[int, int]]] = defaultdict(list)
+multi_sequences: dict[str, List[List[tuple[int, int]]]] = defaultdict(list)
+num_to_letter: dict[tuple[int, int], List[str]] = defaultdict(list)
+
+for symbol, positions in keycode_map.items():
     for pos in positions:
-        letter_to_num[k].append((pos["keycode"], pos["layer"]))
-        num_to_letter[(pos["keycode"], pos["layer"])].append(k)
+        if isinstance(pos, list):  # multi-key sequence
+            sequence = [(p["keycode"], p["layer"]) for p in pos]
+            multi_sequences[symbol].append(sequence)
+            continue
+        letter_to_num[symbol].append((pos["keycode"], pos["layer"]))
+        num_to_letter[(pos["keycode"], pos["layer"])].append(symbol)
 
 
 output_path = Path(__file__).parent / "rolls.json"
@@ -85,7 +105,7 @@ for mapping_name, mapping in plus_mappings.items():
     manipulators = []
     for trigger_code, trigger_layer in letter_to_num.get(trigger.lower(), []):
         trigger_name = macos_keycodes.get(str(trigger_code), trigger_code)
-        # 2. For each (second_key, output) pair
+        # For each (second_key, output) pair
         for second_key, output in mapping["map"]:
             for second_code, second_layer in letter_to_num.get(
                 second_key.lower(), []
@@ -102,7 +122,7 @@ for mapping_name, mapping in plus_mappings.items():
                 )
                 to_list.append({"key_code": "delete_or_backspace"})
 
-                # Détermine les modificateurs selon la couche de second_key
+                # Layer-based modifiers
                 modifiers = []
                 if second_layer == 2:
                     modifiers.append("shift")
@@ -123,6 +143,51 @@ for mapping_name, mapping in plus_mappings.items():
 
                 for i, char in enumerate(output):
                     char_base = char.lower()
+
+                    # Multi-key sequence
+                    if char_base in multi_sequences:
+                        sequences = multi_sequences[char_base]
+                        # Use first available sequence
+                        sequence = sequences[0]
+                        for j, (seq_code, seq_layer) in enumerate(sequence):
+                            seq_name = macos_keycodes.get(
+                                str(seq_code), seq_code
+                            )
+                            seq_modifiers: List[str] = []
+                            if seq_layer == 2:
+                                seq_modifiers.append("shift")
+                            elif seq_layer == 5:
+                                seq_modifiers.append("right_option")
+                            elif seq_layer == 6:
+                                seq_modifiers.extend(
+                                    [
+                                        "shift",
+                                        "right_option",
+                                    ]
+                                )
+                            # Apply shift to first key of sequence if needed
+                            if (
+                                (trigger.isupper() and second_key.isupper())
+                                or (
+                                    (trigger.isupper() or second_key.isupper())
+                                    and i == 0
+                                    and j == 0
+                                )
+                            ) and "shift" not in seq_modifiers:
+                                seq_modifiers.append("shift")
+
+                            if seq_modifiers:
+                                to_list.append(
+                                    {
+                                        "key_code": seq_name,
+                                        "modifiers": seq_modifiers,
+                                    }
+                                )
+                            else:
+                                to_list.append({"key_code": seq_name})
+                        continue
+
+                    # Single key
                     char_positions = letter_to_num.get(char_base, [])
                     if char_positions:
                         char_code, char_layer = char_positions[0]
@@ -132,7 +197,7 @@ for mapping_name, mapping in plus_mappings.items():
                     else:
                         char_code, char_layer, char_name = None, None, char_base
 
-                    char_modifiers = []
+                    char_modifiers: List[str] = []
                     if char_layer == 2:
                         char_modifiers.append("shift")
                     elif char_layer == 5:
@@ -140,11 +205,11 @@ for mapping_name, mapping in plus_mappings.items():
                     elif char_layer == 6:
                         char_modifiers.extend(["shift", "right_option"])
 
-                    # Si trigger ET second_key sont en majuscule, tout l'output doit être shifté
+                    # Shift entire output if both keys uppercase
                     if trigger.isupper() and second_key.isupper():
                         if "shift" not in char_modifiers:
                             char_modifiers.append("shift")
-                    # Sinon, pour le premier caractère, on ajoute shift si trigger OU second_key est majuscule
+                    # Else add shift only to first char if one is uppercase
                     elif (
                         i == 0
                         and (trigger.isupper() or second_key.isupper())
@@ -193,16 +258,16 @@ with open(output_path, "w", encoding="utf-8") as f:
     json.dump(rolls, f, ensure_ascii=False, indent=2)
 
 
-# Ajoute un manipulateur pour chaque lettre a-z qui met à jour previous_key
+# Manipulators to update previous_key
 letters_manipulators = []
-# Pour chaque (keycode, layer), on peut avoir plusieurs symboles
+# Multiple symbols may map to the same (keycode, layer)
 for (keycode, layer), symbols in num_to_letter.items():
     if keycode > 50:
         continue
     name = macos_keycodes.get(str(keycode), keycode)
     if not name:
         continue
-    # Détermine les modificateurs selon la couche
+    # Layer-based modifiers
     modifiers = []
     if layer == 2:
         modifiers.append("shift")
@@ -250,20 +315,20 @@ for (keycode, layer), symbols in num_to_letter.items():
             )
 rolls.append(
     {
-        "description": "Set previous_key for a-z (toutes couches, doublons inclus)",
+        "description": "Set previous_key for symbols (all layers, duplicates included)",
         "manipulators": letters_manipulators,
     }
 )
 
-# Regroupement des manipulateurs par touche dans rolls_grouped.json
+# Group manipulators by physical key into rolls_grouped.json
 rolls_grouped_path = Path(__file__).parent / "rolls_grouped.json"
 manipulators_by_key = {}
 for rule in rolls:
     for manip in rule["manipulators"]:
         key_code = manip.get("from", {}).get("key_code")
-        # Utilise la chaîne key_code comme clé, ignore les dicts
+        # Use string key_code for grouping
         if isinstance(key_code, dict):
-            # Si key_code est un dict (jamais le cas normalement), le convertir en str
+            # Defensive conversion if dict appears (should not happen)
             key = str(key_code)
         else:
             key = key_code
@@ -275,13 +340,9 @@ grouped = []
 
 
 for key, manips in manipulators_by_key.items():
-    desc = f"Actions regroupées pour la touche [{key}]"
+    desc = f"Grouped actions for key [{key}]"
 
-    # Tri explicite des manipulateurs :
-    # 1. shift+option
-    # 2. option
-    # 3. shift
-    # 4. aucun modificateur
+    # Sort priority: shift+option, option, shift, none
     def mod_priority(manip):
         from_block = manip.get("from", {})
         mods = from_block.get("modifiers", {})
