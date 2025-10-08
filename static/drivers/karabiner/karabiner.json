@@ -24046,13 +24046,839 @@
                                 },
                                 "to": [
                                     {
-                                        "key_code": "c"
-                                    },
-                                    {
+                                        "key_code": "__variable__",
                                         "set_variable": {
                                             "name": "previous_key",
                                             "value": "j"
                                         }
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "a"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "a"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "s"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "j"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "d"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "m"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "f"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "y"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "h"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "i"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "g"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "u"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "z"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "open_bracket"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "x"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "p"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "c"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "o"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "v"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "h"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "b"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "t"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "q"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "quote"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "w"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "r"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "e"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "d"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "r"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "semicolon"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "y"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "w"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "t"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "l"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "1"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "1"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "2"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "2"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "3"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "3"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "4"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "4"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "6"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "6"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "5"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "5"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "9"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "9"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "7"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "7"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "8"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "8"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "0"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "0"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "o"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "e"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "u"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "f"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "i"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "s"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "p"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "period"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "l"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "comma"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "j"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "c"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "k"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "b"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "n"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "k"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "c",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "m"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "n"
                                     }
                                 ]
                             }
@@ -26324,6 +27150,834 @@
                                             "name": "previous_key",
                                             "value": "8"
                                         }
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "a"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "a"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "s"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "j"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "d"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "m"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "f"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "y"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "h"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "i"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "g"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "u"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "z"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "open_bracket"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "x"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "p"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "c"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "o"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "v"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "h"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "b"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "t"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "q"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "quote"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "w"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "r"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "e"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "d"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "r"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "semicolon"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "y"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "w"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "t"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "l"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "1"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "1"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "2"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "2"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "3"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "3"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "4"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "4"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "6"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "6"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "5"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "5"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "9"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "9"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "7"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "7"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "8"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "8"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "0"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "0"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "o"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "e"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "u"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "f"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "i"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "s"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "p"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "period"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "l"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "comma"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "j"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "c"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "k"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "b"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "n"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "k"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "m"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "n"
                                     }
                                 ]
                             }
