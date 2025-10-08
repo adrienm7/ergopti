@@ -267,7 +267,6 @@ for (keycode, layer), symbols in num_to_letter.items():
     name = macos_keycodes.get(str(keycode), keycode)
     if not name:
         continue
-    # Layer-based modifiers
     modifiers = []
     if layer == 2:
         modifiers.append("shift")
@@ -276,7 +275,25 @@ for (keycode, layer), symbols in num_to_letter.items():
     elif layer == 6:
         modifiers.extend(["shift", "right_option"])
     for symbol in symbols:
-        if modifiers:
+        # Special case: keycode 8 (c) with no modifiers sends previous_key
+        if keycode == 8 and not modifiers:
+            letters_manipulators.append(
+                {
+                    "type": "basic",
+                    "from": {"key_code": name},
+                    "to": [
+                        {
+                            # Use Karabiner's variable substitution to send previous_key
+                            "key_code": "__variable__",
+                            "set_variable": {
+                                "name": "previous_key",
+                                "value": symbol,
+                            },
+                        }
+                    ],
+                }
+            )
+        elif modifiers:
             letters_manipulators.append(
                 {
                     "type": "basic",
@@ -317,6 +334,71 @@ rolls.append(
     {
         "description": "Set previous_key for symbols (all layers, duplicates included)",
         "manipulators": letters_manipulators,
+    }
+)
+
+
+def build_previous_key_repeat_manipulators(trigger_key: str) -> list:
+    """Return manipulators that replay previous_key when trigger_key is pressed.
+
+    For each possible symbol stored in previous_key (derived from macOS keycodes
+    0-50), find its Ergopti physical key (first occurrence in letter_to_num) and
+    send that key with proper layer-based modifiers.
+    """
+    manips: List[dict] = []
+    for keycode_id in range(0, 51):
+        prev_symbol = macos_keycodes.get(str(keycode_id))
+        if not prev_symbol:
+            continue
+        # Lookup Ergopti position(s) for this symbol
+        positions = letter_to_num.get(prev_symbol, [])
+        if not positions:
+            continue
+        erg_keycode, erg_layer = positions[0]
+        erg_key_name = macos_keycodes.get(str(erg_keycode), erg_keycode)
+        mods: List[str] = []
+        if erg_layer == 2:
+            mods.append("shift")
+        elif erg_layer == 5:
+            mods.append("right_option")
+        elif erg_layer == 6:
+            mods.extend(["shift", "right_option"])
+        to_event: dict = {"key_code": erg_key_name}
+        if mods:
+            to_event["modifiers"] = mods
+        manips.append(
+            {
+                "type": "basic",
+                "from": {
+                    "key_code": trigger_key,
+                    "modifiers": {"optional": ["any"]},
+                },
+                "conditions": [
+                    {
+                        "type": "variable_if",
+                        "name": "previous_key",
+                        "value": prev_symbol,
+                    }
+                ],
+                "to": [to_event],
+            }
+        )
+    return manips
+
+
+# Replay previous character with 'v' (keycode 9 / .j on Ergopti) and '8'
+repeat_v = build_previous_key_repeat_manipulators("c")
+repeat_8 = build_previous_key_repeat_manipulators("8")
+rolls.append(
+    {
+        "description": "Replay previous_key with v (.j)",
+        "manipulators": repeat_v,
+    }
+)
+rolls.append(
+    {
+        "description": "Replay previous_key with 8",  # top-row 8 used as repeat
+        "manipulators": repeat_8,
     }
 )
 
