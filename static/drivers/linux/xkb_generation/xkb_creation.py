@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 import yaml
 from data.levels import LEVELS
 from data.unused_symbols import UNUSED_SYMBOLS
-from utilities.information_extraction import (
+from utilities.keylayout_extraction import (
     extract_keymap_body,
     get_symbol,
 )
