@@ -10,12 +10,11 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from collections import OrderedDict
 from pprint import pprint
 
-from macos.keylayout_generation.data.mappings_functions import (
+from utilities.logger import logger
+from utilities.mappings_functions import (
     add_case_sensitive_mappings,
     escape_symbols_in_mappings,
 )
-
-from utilities.logger import logger
 
 LOGS_INDENTATION = "\t\t"
 

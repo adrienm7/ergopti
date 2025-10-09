@@ -2,8 +2,14 @@
 Utility for extracting information from keylayout files.
 """
 
+import html
 import re
 from pathlib import Path
+
+try:
+    from lxml import etree as LET
+except ImportError:
+    LET = None
 
 from .logger import logger
 
@@ -88,3 +94,14 @@ def get_last_used_layer(body: str) -> int:
 
     logger.info("%sLast used layer: s%d", LOGS_INDENTATION + "\t", max_layer)
     return max_layer
+
+
+def get_symbol(keymap_body: str, macos_code: int) -> str:
+    """Extract the symbol (output or action) for a given macOS key code in a keyMap body. Returns the value (e.g. 'a', 'A', etc) or '' if not found. Décode les entités XML."""
+    match = re.search(
+        rf'<key[^>]*code="{macos_code}"[^>]*(output|action)="([^"]+)"',
+        keymap_body,
+    )
+    if match:
+        return html.unescape(match.group(2))
+    return ""
