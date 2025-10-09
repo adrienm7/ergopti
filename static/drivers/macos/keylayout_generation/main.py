@@ -16,6 +16,7 @@ import re
 from bundle_creation import create_bundle
 from keylayout_correction import correct_keylayout
 from keylayout_plus_creation import create_keylayout_plus
+from keylayout_plus_plus_creation import create_keylayout_plus_plus
 from utilities.keylayout_extraction import extract_version_from_file
 from utilities.logger import get_error_count, logger, reset_error_count
 
@@ -74,11 +75,15 @@ def main(
                 base_file_path, output_directory, overwrite
             )
 
+            plus_plus_file_path = generate_keylayout_plus_plus(
+                plus_file_path, output_directory, overwrite
+            )
+
             generate_bundle(
                 version,
                 output_directory,
                 overwrite,
-                [base_file_path, plus_file_path],
+                [base_file_path, plus_file_path, plus_plus_file_path],
             )
             logger.success(
                 "All files generated successfully for: %s",
@@ -141,6 +146,27 @@ def generate_keylayout_plus(
     return plus_file_path
 
 
+def generate_keylayout_plus_plus(
+    plus_file_path: Path, output_directory: Path, overwrite: bool
+) -> Path:
+    """Generate the 'plus plus' version of a plus keylayout file."""
+    plus_plus_file_path = output_directory / (
+        plus_file_path.stem + "_plus" + plus_file_path.suffix
+    )
+
+    logger.launch("Creating plus version from: %s", plus_file_path)
+
+    if not can_overwrite_file(plus_file_path, overwrite):
+        return plus_file_path
+
+    content = plus_file_path.read_text(encoding="utf-8")
+    content_plus_plus = create_keylayout_plus_plus(content)
+    plus_plus_file_path.write_text(content_plus_plus, encoding="utf-8")
+
+    logger.success("Keylayout plus plus saved at: %s", plus_plus_file_path)
+    return plus_plus_file_path
+
+
 def generate_bundle(
     version: str,
     output_directory: Path,
@@ -160,6 +186,7 @@ def generate_bundle(
     script_dir = Path(__file__).resolve().parent
     default_logos = [
         script_dir / "data" / "logo_ergopti.icns",
+        script_dir / "data" / "logo_ergopti_plus.icns",
         script_dir / "data" / "logo_ergopti_plus.icns",
     ]
     logo_paths = adjust_logo_paths(logo_paths, keylayout_paths, default_logos)

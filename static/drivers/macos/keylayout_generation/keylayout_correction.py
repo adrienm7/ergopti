@@ -96,7 +96,7 @@ def correct_keylayout(content: str) -> str:
     content = replace_keymap(content, 4, keymap_content)
 
     content = sort_keylayout(content)
-    content = set_unique_keyboard_id(content)
+    content = set_unique_keyboard_id(content, 1)
     validate_keylayout(content)
 
     logger.info("Keylayout corrections complete.")

@@ -42,7 +42,7 @@ def create_bundle(
     for keylayout, logo in zip(keylayout_paths, logo_paths):
         if not keylayout.exists():
             raise FileNotFoundError(f"Keylayout file not found: {keylayout}")
-        if not logo.exists():
+        if not logo or not logo.exists():
             logger.info(
                 "%sLogo file not found: %s, continuing without it",
                 LOGS_INDENTATION,
@@ -54,8 +54,15 @@ def create_bundle(
 
         # Read and patch keylayout content
         content = keylayout.read_text(encoding="utf-8")
-        is_plus = "plus" in keylayout.stem.lower()
-        new_name = "Ergopti Plus" if is_plus else "Ergopti"
+        stem = keylayout.stem.lower()
+        is_plusplus = stem.endswith("plus_plus")
+        is_plus = "plus" in stem and not is_plusplus
+        if is_plusplus:
+            new_name = "Ergopti Plus Plus"
+        elif is_plus:
+            new_name = "Ergopti Plus"
+        else:
+            new_name = "Ergopti"
 
         # Necessary for the layout to be found in "French" layouts instead of "Others"
         content = re.sub(
@@ -69,7 +76,12 @@ def create_bundle(
         dest_layout = resources_path / dest_filename
         dest_layout.write_text(content, encoding="utf-8")
 
-        layout_localization_infos.append((new_name, is_plus))
+        if is_plusplus:
+            layout_localization_infos.append((new_name, "++"))
+        elif is_plus:
+            layout_localization_infos.append((new_name, "+"))
+        else:
+            layout_localization_infos.append((new_name, ""))
 
         # Copy logo file with matching base name
         icon_tag = ""
@@ -89,9 +101,12 @@ def create_bundle(
             )
 
         plist_key = f"KLInfo_{new_name}"
-        input_source_id = (
-            f"{BUNDLE_IDENTIFIER}.plus" if is_plus else BUNDLE_IDENTIFIER
-        )
+        if is_plusplus:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.plusplus"
+        elif is_plus:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.plus"
+        else:
+            input_source_id = BUNDLE_IDENTIFIER
 
         info_plist_entries.append(f"""<key>{plist_key}</key>
         <dict>
@@ -159,10 +174,13 @@ def generate_localizations(
         strings_path = lproj_dir / "InfoPlist.strings"
 
         lines = []
-        for original_name, is_plus in layouts:
-            localized = (
-                f"Ergopti+ {version}" if is_plus else f"Ergopti {version}"
-            )
+        for original_name, variant in layouts:
+            if variant == "++":
+                localized = f"Ergopti++ {version}"
+            elif variant == "+":
+                localized = f"Ergopti+ {version}"
+            else:
+                localized = f"Ergopti {version}"
             lines.append(f'"{original_name}" = "{localized}";')
 
         strings_content = "\n".join(lines) + "\n"

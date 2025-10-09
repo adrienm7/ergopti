@@ -5,17 +5,17 @@ Mappings for the new dead keys of Ergopti+.
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from collections import OrderedDict
 from pprint import pprint
 
-from utilities.logger import logger
-
-from .mappings_functions import (
+from macos.keylayout_generation.data.mappings_functions import (
     add_case_sensitive_mappings,
     escape_symbols_in_mappings,
 )
+
+from utilities.logger import logger
 
 LOGS_INDENTATION = "\t\t"
 
