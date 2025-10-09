@@ -18,14 +18,14 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 sys.path.append(str(Path(__file__).parent.parent.resolve()))
-from macos.keylayout_generation.data.keylayout_plus_mappings import (
-    PLUS_MAPPINGS_CONFIG,
-    add_case_sensitive_mappings,
-)
 from macos.keylayout_generation.data.mappings_functions import (
     unescape_xml_characters,
 )
 from utilities.keylayout_extraction import extract_keymap_body
+from utilities.keylayout_plus_mappings import (
+    PLUS_MAPPINGS_CONFIG,
+    add_case_sensitive_mappings,
+)
 
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
 

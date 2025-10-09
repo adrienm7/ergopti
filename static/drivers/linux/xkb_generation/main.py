@@ -29,22 +29,32 @@ def main(
     macos_dir = Path(input_directory) if input_directory else get_macos_dir()
 
     if keylayout_name:
-        # Process only the specified keylayout (and its _plus variant)
+        # Process only the specified keylayout (and its _plus variants)
         base_prefix = Path(keylayout_name).stem
-        variants = [base_prefix, base_prefix + "_plus"]
+        variants = [
+            base_prefix,
+            base_prefix + "_plus",
+            base_prefix + "_plus_plus",
+        ]
         keylayout_files = [macos_dir / f"{v}.keylayout" for v in variants]
     else:
         # Process all .keylayout files (excluding _plus) in the directory
         keylayout_files = sorted(
             f
             for f in macos_dir.glob("*.keylayout")
-            if not f.stem.endswith("_plus")
+            if not f.stem.endswith("_plus_plus")
+            and not f.stem.endswith("_plus")
         )
         # For each, add its _plus variant if it exists
         plus_files = [
             macos_dir / f"{f.stem}_plus.keylayout" for f in keylayout_files
         ]
-        keylayout_files += [pf for pf in plus_files if pf.is_file()]
+        plus_plus_files = [
+            macos_dir / f"{f.stem}_plus_plus.keylayout" for f in keylayout_files
+        ]
+        keylayout_files += [
+            pf for pf in plus_plus_files + plus_files if pf.is_file()
+        ]
 
     for keylayout_path in keylayout_files:
         if not keylayout_path.is_file():
