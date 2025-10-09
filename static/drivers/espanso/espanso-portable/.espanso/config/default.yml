@@ -41,5 +41,4 @@
 
 # For a list of all the available options, visit the official docs at: https://espanso.org/docs/
 
-# The default is true
-win32_exclude_orphan_events: false
+search_shortcut: off
