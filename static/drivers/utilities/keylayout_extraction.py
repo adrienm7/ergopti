@@ -3,6 +3,7 @@ Utility for extracting information from keylayout files.
 """
 
 import re
+from pathlib import Path
 
 from .logger import logger
 
@@ -21,28 +22,36 @@ def extract_name_from_file(content: str) -> str:
     return name
 
 
-def extract_version_from_file(file_path) -> str:
-    """
-    Extracts the version string (e.g. v1.2.3, v1.2.3 Beta 2)
-    from the name attribute in the given file.
-    Returns 'vX.X.X' if not found.
-    """
+def extract_version(content: str) -> str:
+    """Extract the version string from a keylayout file content.
 
-    with file_path.open("r", encoding="utf-8") as f:
-        content = f.read()
+    Args:
+        content: The content of the keylayout file as a string.
 
+    Returns:
+        The extracted version string, or an empty string if not found.
+    """
     name_match = re.search(r'name="([^"]+)"', content)
     if name_match:
         name_value = name_match.group(1)
-        # Look for v followed by digit or 'version', then capture up to space, quote or end
-        version_match = re.search(
-            r"((v\d|version).*)", name_value, re.IGNORECASE
-        )
-        version = version_match.group(1).strip() if version_match else "vX.X.X"
-    else:
-        version = "vX.X.X"
+        # Search for ' v' and extract everything after it until the end of the name tag
+        v_match = re.search(r"( v.+)$", name_value)
+        if v_match:
+            return v_match.group(1).strip()
+    return ""
 
-    return version
+
+def extract_version_from_file(file_path: Path) -> str:
+    """Read a file and extract the version string using extract_version.
+
+    Args:
+        file_path: Path to the keylayout file.
+
+    Returns:
+        The extracted version string, or an empty string if not found.
+    """
+    content = file_path.read_text(encoding="utf-8")
+    return extract_version(content)
 
 
 def extract_keymap_body(body: str, index: int) -> str:

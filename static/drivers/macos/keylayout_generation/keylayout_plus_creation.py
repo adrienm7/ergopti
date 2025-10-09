@@ -9,7 +9,7 @@ from data.lists import EXTRA_KEYS
 from tests.run_all_tests import validate_keylayout
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_extraction import (
-    extract_name_from_file,
+    extract_version,
 )
 from utilities.keylayout_modification import modify_name_from_file
 from utilities.keylayout_sorting import sort_keylayout
@@ -28,8 +28,8 @@ def create_keylayout_plus(content: str):
     """
     logger.info("%s🔧 Starting keylayout plus creation…", LOGS_INDENTATION)
 
-    name = extract_name_from_file(content)
-    content = modify_name_from_file(content, f"{name} Plus")
+    version = extract_version(content)
+    content = modify_name_from_file(content, f"Ergopti+ {version}")
 
     logger.info(
         "%s➕ Modifying AltGr and ShiftAltGr symbols for Ergopti+…",
