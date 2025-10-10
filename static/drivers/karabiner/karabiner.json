@@ -4230,6 +4230,24 @@
                             {
                                 "type": "basic",
                                 "from": {
+                                    "key_code": "grave_accent_and_tilde"
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "★"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "f"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
                                     "key_code": "grave_accent_and_tilde",
                                     "modifiers": {
                                         "mandatory": [

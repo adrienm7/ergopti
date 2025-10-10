@@ -21846,5 +21846,4724 @@
         "type": "basic"
       }
     ]
+  },
+  {
+    "description": "Set previous_key for symbols (all layers, duplicates included)",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "a"
+        },
+        "to": [
+          {
+            "key_code": "a"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "a"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "s"
+        },
+        "to": [
+          {
+            "key_code": "s"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "i"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "d"
+        },
+        "to": [
+          {
+            "key_code": "d"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "e"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "f"
+        },
+        "to": [
+          {
+            "key_code": "f"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "u"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "h"
+        },
+        "to": [
+          {
+            "key_code": "h"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "v"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "g"
+        },
+        "to": [
+          {
+            "key_code": "g"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "."
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "z"
+        },
+        "to": [
+          {
+            "key_code": "z"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "é"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "x"
+        },
+        "to": [
+          {
+            "key_code": "x"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "à"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "c"
+        },
+        "to": [
+          {
+            "key_code": "backslash"
+          },
+          {
+            "key_code": "m"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "★"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "c",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "J"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "v"
+        },
+        "to": [
+          {
+            "key_code": "v"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": ","
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash"
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "$"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "m",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "m",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "$"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "b"
+        },
+        "to": [
+          {
+            "key_code": "b"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "k"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "q"
+        },
+        "to": [
+          {
+            "key_code": "q"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "è"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "w"
+        },
+        "to": [
+          {
+            "key_code": "w"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "y"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "e"
+        },
+        "to": [
+          {
+            "key_code": "e"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "o"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "r"
+        },
+        "to": [
+          {
+            "key_code": "r"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "w"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "y"
+        },
+        "to": [
+          {
+            "key_code": "y"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "f"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "t"
+        },
+        "to": [
+          {
+            "key_code": "t"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "b"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "1"
+        },
+        "to": [
+          {
+            "key_code": "1"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "1"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "1",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "1",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "1"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "2"
+        },
+        "to": [
+          {
+            "key_code": "2"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "2"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "2",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "2",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "2"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "3"
+        },
+        "to": [
+          {
+            "key_code": "3"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "3"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "3",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "3",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "3"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "4"
+        },
+        "to": [
+          {
+            "key_code": "4"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "4"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "4",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "4",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "4"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "6"
+        },
+        "to": [
+          {
+            "key_code": "6"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "6"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "6",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "6",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "6"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "5"
+        },
+        "to": [
+          {
+            "key_code": "5"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "5"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "5",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "5",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "5"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign"
+        },
+        "to": [
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "="
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "comma",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "comma",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "="
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "9"
+        },
+        "to": [
+          {
+            "key_code": "9"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "9"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "9",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "9",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "9"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "7"
+        },
+        "to": [
+          {
+            "key_code": "7"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "7"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "7",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "7",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "7"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen"
+        },
+        "to": [
+          {
+            "key_code": "hyphen"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "%"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "open_bracket",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "%"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "i",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "%"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "8"
+        },
+        "to": [
+          {
+            "key_code": "8"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "8"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "8",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "8",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "8"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "0"
+        },
+        "to": [
+          {
+            "key_code": "0"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "0"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "0",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "0",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "0"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket"
+        },
+        "to": [
+          {
+            "key_code": "close_bracket"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¨"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "l",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "l",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¨"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "o"
+        },
+        "to": [
+          {
+            "key_code": "o"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "c"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "u"
+        },
+        "to": [
+          {
+            "key_code": "u"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "g"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket"
+        },
+        "to": [
+          {
+            "key_code": "open_bracket"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "z"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "i"
+        },
+        "to": [
+          {
+            "key_code": "i"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "h"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "p"
+        },
+        "to": [
+          {
+            "key_code": "p"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "x"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": 36
+        },
+        "to": [
+          {
+            "key_code": 36
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#x000D;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": 36,
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": 36,
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#X000D;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": 36,
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": 36,
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#x000D;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": 36,
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": 36,
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#X000D;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "l"
+        },
+        "to": [
+          {
+            "key_code": "l"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "t"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "j"
+        },
+        "to": [
+          {
+            "key_code": "j"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "s"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "quote"
+        },
+        "to": [
+          {
+            "key_code": "quote"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "q"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "k"
+        },
+        "to": [
+          {
+            "key_code": "k"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "n"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "semicolon"
+        },
+        "to": [
+          {
+            "key_code": "semicolon"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "r"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash"
+        },
+        "to": [
+          {
+            "key_code": "backslash"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "^"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "grave_accent_and_tilde",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "grave_accent_and_tilde",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "^"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "grave_accent_and_tilde",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "grave_accent_and_tilde",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "^"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "comma"
+        },
+        "to": [
+          {
+            "key_code": "comma"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "l"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "slash"
+        },
+        "to": [
+          {
+            "key_code": "slash"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "'"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "n"
+        },
+        "to": [
+          {
+            "key_code": "n"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "m"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "m"
+        },
+        "to": [
+          {
+            "key_code": "m"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "d"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "period"
+        },
+        "to": [
+          {
+            "key_code": "period"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "p"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "tab"
+        },
+        "to": [
+          {
+            "key_code": "tab"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#x0009;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "tab",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "tab",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&#X0009;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "spacebar"
+        },
+        "to": [
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "grave_accent_and_tilde"
+        },
+        "to": [
+          {
+            "key_code": "grave_accent_and_tilde"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ê"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "a",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "a",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "A"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "s",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "s",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "I"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "d",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "d",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "E"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "f",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "f",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "U"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "h",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "h",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "V"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "g",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "g",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " :"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "z",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "z",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "É"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "x",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "x",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "À"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "c",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "c",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "J"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "v",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "v",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " ;"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " €"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "b",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "K"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "q",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "q",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "È"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "w",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "w",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Y"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "e",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "e",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "O"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "r",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "r",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "W"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "y",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "y",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "F"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "t",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "t",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "B"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "equal_sign",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "º"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "hyphen",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " %"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "close_bracket",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "o",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "o",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "C"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "u",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "G"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "open_bracket",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Z"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "i",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "H"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "p",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "p",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "X"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "l",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "l",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "T"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "j",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "j",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "S"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "quote",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Q"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "k",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "k",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "N"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "semicolon",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "semicolon",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "R"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "backslash",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " !"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "comma",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "comma",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "L"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "slash",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "slash",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " ?"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "n",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "M"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "m",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "m",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "D"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "period",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "P"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "spacebar",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "spacebar",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "-"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "grave_accent_and_tilde",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "grave_accent_and_tilde",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Ê"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "a",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "a",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "<"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "s",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "s",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": ">"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "d",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "d",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "{"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "f",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "f",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "}"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "h",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "h",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "|"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "g",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "g",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": ":"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "z",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "z",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "/"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "x",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "x",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "\\"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "c",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "c",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "\""
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "v",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "v",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": ";"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "€"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "w",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "w",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "€"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "b",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "…"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "v",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "v",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "…"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "q",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "q",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "`"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "w",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "w",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "@"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "e",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "e",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "œ"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "r",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "r",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ù"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "y",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "y",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " »"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "t",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "t",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "« "
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "1",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "1",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¹"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "2",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "2",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "²"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "3",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "3",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "³"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "4",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "4",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "⁴"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "6",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "6",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "⁶"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "5",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "5",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "⁵"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "equal_sign",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "°"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "9",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "9",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "⁹"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "7",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "7",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "⁷"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "hyphen",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "‰"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "open_bracket",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "‰"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "8",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "8",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "⁸"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "0",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "0",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "⁰"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "close_bracket",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "o",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "o",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ç"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "u",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "~"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "i",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "#"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "p",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "p",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "*"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "l",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "l",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "["
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "j",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "j",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "("
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "quote",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "’"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "k",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "k",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": ")"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "semicolon",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "semicolon",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "]"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "backslash",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "!"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "slash",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "slash",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "?"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "n",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "&"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "period",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "+"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "spacebar",
+          "modifiers": {
+            "mandatory": [
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "spacebar",
+            "modifiers": [
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "_"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "a",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "a",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "≤"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "s",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "s",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "≥"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "d",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "d",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ᵉ"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "f",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "f",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Μ"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "h",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "h",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¦"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "g",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "g",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "·"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "z",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "z",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "÷"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "x",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "x",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ᵢ"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "non_us_backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "non_us_backslash",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¤"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "quote",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¤"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "q",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "q",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "„"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "e",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "e",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Œ"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "r",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "r",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Ù"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "y",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "y",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "”"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "t",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "t",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "“"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "1",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "1",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₁"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "2",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "2",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₂"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "3",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "3",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₃"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "4",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "4",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₄"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "6",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "6",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₆"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "5",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "5",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₅"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "equal_sign",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "equal_sign",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ª"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "9",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "9",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₉"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "7",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "7",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₇"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "hyphen",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "hyphen",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "‱"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "8",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "8",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₈"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "0",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "0",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "₀"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "o",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "o",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "Ç"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "u",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "u",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "≈"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "p",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "p",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "×"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "j",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "j",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "—"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "k",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "k",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "–"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "semicolon",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "semicolon",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ℝ"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "backslash",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "backslash",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¡"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "comma",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "comma",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "≠"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "slash",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "slash",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¿"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "n",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "n",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "−"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "m",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "m",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "§"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "period",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "period",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "±"
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "spacebar",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "right_option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "spacebar",
+            "modifiers": [
+              "shift",
+              "right_option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " - "
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Special mapping: previous_key ★ + ê => u",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "grave_accent_and_tilde"
+        },
+        "conditions": [
+          {
+            "type": "variable_if",
+            "name": "previous_key",
+            "value": "★"
+          }
+        ],
+        "to": [
+          {
+            "key_code": "f"
+          }
+        ]
+      }
+    ]
   }
 ]
