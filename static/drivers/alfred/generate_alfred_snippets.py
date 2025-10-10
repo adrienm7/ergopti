@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Generate Alfred snippets for Magic hotstrings and Repeat patterns.
 
