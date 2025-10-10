@@ -4568,7 +4568,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -4618,7 +4618,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -4716,7 +4716,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -4766,7 +4766,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -4869,7 +4869,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -4919,7 +4919,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5022,7 +5022,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5072,7 +5072,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5172,7 +5172,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5222,7 +5222,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5325,7 +5325,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5375,7 +5375,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5478,7 +5478,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5528,7 +5528,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5626,7 +5626,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5676,7 +5676,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5785,7 +5785,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5835,7 +5835,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5941,7 +5941,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -5991,7 +5991,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d",
+            "key_code": "z",
             "modifiers": [
               "shift"
             ]
@@ -6109,7 +6109,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6151,7 +6151,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6235,7 +6235,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6277,7 +6277,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6364,7 +6364,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6406,7 +6406,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6493,7 +6493,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6535,7 +6535,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6619,7 +6619,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6661,7 +6661,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6748,7 +6748,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6790,7 +6790,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6877,7 +6877,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -6919,7 +6919,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -7004,7 +7004,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -7046,7 +7046,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -7136,7 +7136,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -7178,7 +7178,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -7268,7 +7268,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {
@@ -7310,7 +7310,7 @@
             "key_code": "backslash"
           },
           {
-            "key_code": "d"
+            "key_code": "z"
           },
           {
             "set_variable": {

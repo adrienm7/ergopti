@@ -402,13 +402,65 @@ for mapping_name, mapping in plus_mappings.items():
                     # Send backslash (dead key ^)
                     special_to_list.append({"key_code": "backslash"})
 
-                    # Send the pressed key with its modifiers
-                    if modifiers:
-                        special_to_list.append(
-                            {"key_code": second_name, "modifiers": modifiers}
-                        )
+                    # Cas particulier: si second_key est 'e', envoyer 'é' au lieu de 'e'
+                    if second_key.lower() == "e":
+                        # Trouver la position de 'é' dans le layout Ergopti
+                        e_acute_positions = letter_to_num.get("é", [])
+                        if e_acute_positions:
+                            e_acute_code, e_acute_layer = e_acute_positions[0]
+                            e_acute_name = macos_keycodes.get(
+                                str(e_acute_code), e_acute_code
+                            )
+                            e_acute_modifiers: List[str] = []
+                            if e_acute_layer == 2:
+                                e_acute_modifiers.append("shift")
+                            elif e_acute_layer == 5:
+                                e_acute_modifiers.append("option")
+                            elif e_acute_layer == 6:
+                                e_acute_modifiers.extend(["shift", "option"])
+
+                            # Appliquer la casse selon second_key
+                            if (
+                                second_key.isupper()
+                                and "shift" not in e_acute_modifiers
+                            ):
+                                e_acute_modifiers.append("shift")
+
+                            if e_acute_modifiers:
+                                special_to_list.append(
+                                    {
+                                        "key_code": e_acute_name,
+                                        "modifiers": e_acute_modifiers,
+                                    }
+                                )
+                            else:
+                                special_to_list.append(
+                                    {"key_code": e_acute_name}
+                                )
+                        else:
+                            # Fallback: envoyer e normal si é non trouvé
+                            if modifiers:
+                                special_to_list.append(
+                                    {
+                                        "key_code": second_name,
+                                        "modifiers": modifiers,
+                                    }
+                                )
+                            else:
+                                special_to_list.append(
+                                    {"key_code": second_name}
+                                )
                     else:
-                        special_to_list.append({"key_code": second_name})
+                        # Send the pressed key with its modifiers (cas normal)
+                        if modifiers:
+                            special_to_list.append(
+                                {
+                                    "key_code": second_name,
+                                    "modifiers": modifiers,
+                                }
+                            )
+                        else:
+                            special_to_list.append({"key_code": second_name})
 
                     # Définir previous_key avec la touche tapée (second_key)
                     special_to_list.append(
