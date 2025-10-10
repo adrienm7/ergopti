@@ -255,8 +255,7 @@ for mapping_name, mapping in plus_mappings.items():
         }
     )
 
-with open(output_path, "w", encoding="utf-8") as f:
-    json.dump(rolls, f, ensure_ascii=False, indent=2)
+# Retardé: on écrira rolls.json après insertion des règles supplémentaires
 
 
 # Manipulators to update previous_key
@@ -357,6 +356,58 @@ rolls.append(
     }
 )
 
+# Spécial: si previous_key == ★ et on presse la touche qui produit ê, envoyer 'u'
+# On récupère la première position de ê et u (layer 0 ici) et on crée un manipulateur dédié.
+try:
+    e_positions = letter_to_num.get("ê", [])
+    u_positions = letter_to_num.get("u", [])
+    if e_positions and u_positions:
+        e_keycode, e_layer = e_positions[0]
+        u_keycode, u_layer = u_positions[0]
+        e_name = macos_keycodes.get(str(e_keycode), e_keycode)
+        u_name = macos_keycodes.get(str(u_keycode), u_keycode)
+        e_mods: List[str] = []
+        if e_layer == 2:
+            e_mods.append("shift")
+        elif e_layer == 5:
+            e_mods.append("right_option")
+        elif e_layer == 6:
+            e_mods.extend(["shift", "right_option"])
+        u_mods: List[str] = []
+        if u_layer == 2:
+            u_mods.append("shift")
+        elif u_layer == 5:
+            u_mods.append("right_option")
+        elif u_layer == 6:
+            u_mods.extend(["shift", "right_option"])
+        from_block: dict = {"key_code": e_name}
+        if e_mods:
+            from_block["modifiers"] = {"mandatory": e_mods}
+        to_event: dict = {"key_code": u_name}
+        if u_mods:
+            to_event["modifiers"] = u_mods
+        rolls.append(
+            {
+                "description": "Special mapping: previous_key ★ + ê => u",
+                "manipulators": [
+                    {
+                        "type": "basic",
+                        "from": from_block,
+                        "conditions": [
+                            {
+                                "type": "variable_if",
+                                "name": "previous_key",
+                                "value": "★",
+                            }
+                        ],
+                        "to": [to_event],
+                    }
+                ],
+            }
+        )
+except Exception:  # Défensif: ne pas casser la génération
+    pass
+
 
 def build_previous_key_repeat_manipulators(trigger_key: str) -> list:
     """Return manipulators that replay previous_key when trigger_key is pressed.
@@ -423,6 +474,10 @@ if REPEAT_KEY:
         }
     )
 
+# Écriture finale de rolls.json avec toutes les règles (y compris spéciales et repeat)
+with open(output_path, "w", encoding="utf-8") as f:
+    json.dump(rolls, f, ensure_ascii=False, indent=2)
+
 # Group manipulators by physical key into rolls_grouped.json
 rolls_grouped_path = Path(__file__).parent / "rolls_grouped.json"
 manipulators_by_key = {}
@@ -466,6 +521,21 @@ for key, manips in manipulators_by_key.items():
         manips,
         key=mod_priority,
     )
+    # Priorisation spécifique: pour la touche grave_accent_and_tilde, placer
+    # les manipulateurs avec condition previous_key == ★ avant ceux sans conditions
+    if key == "grave_accent_and_tilde":
+        special = []
+        others = []
+        for m in sorted_manips:
+            conds = m.get("conditions", [])
+            if any(
+                c.get("name") == "previous_key" and c.get("value") == "★"
+                for c in conds
+            ):
+                special.append(m)
+            else:
+                others.append(m)
+        sorted_manips = special + others
     grouped.append(
         {
             "description": desc,
