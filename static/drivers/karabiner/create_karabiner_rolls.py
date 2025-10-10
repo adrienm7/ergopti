@@ -225,20 +225,24 @@ for mapping_name, mapping in plus_mappings.items():
                                     ]
                                 )
                             # Logique corrigée pour sequences
-                            trigger_is_upper = trigger.isupper()
-                            second_is_upper = second_layer == 2
+                            trigger_first_upper = (
+                                len(trigger) > 0 and trigger[0].isupper()
+                            )
+                            second_is_upper = (
+                                second_layer == 2 or second_key.isupper()
+                            )
 
                             if (
-                                trigger_is_upper
+                                trigger_first_upper
                                 and second_is_upper
                                 and char.isalpha()
                             ):
-                                # Trigger ET second_key majuscules -> tout l'output
+                                # Trigger[0] ET second_key majuscules -> tout l'output
                                 if "shift" not in seq_modifiers:
                                     seq_modifiers.append("shift")
-                            elif (trigger_is_upper or second_is_upper) and not (
-                                trigger_is_upper and second_is_upper
-                            ):
+                            elif (
+                                trigger_first_upper or second_is_upper
+                            ) and not (trigger_first_upper and second_is_upper):
                                 # Soit trigger OU second_key majuscule -> première lettre seulement
                                 if (
                                     i == first_letter_index
@@ -277,23 +281,27 @@ for mapping_name, mapping in plus_mappings.items():
                     elif char_layer == 6:
                         char_modifiers.extend(["shift", "option"])
 
-                    # Logique corrigée:
-                    # - trigger majuscule ET second_key majuscule → tout en majuscules
-                    # - trigger majuscule OU second_key majuscule (mais pas les deux) → première lettre
-                    # - trigger minuscule ET second_key minuscule → rien
-                    trigger_is_upper = trigger.isupper()
-                    second_is_upper = (
-                        second_layer == 2
-                    )  # espace insécable + ? est sur layer 2 (majuscule de ')
+                    # Logique de casse corrigée:
+                    # - Si trigger[0] majuscule ET second_key majuscule → tout en majuscules
+                    # - Si trigger[0] majuscule OU second_key majuscule (mais pas les deux) → première lettre
+                    # - Si trigger[0] minuscule ET second_key minuscule → rien
+                    trigger_first_upper = (
+                        len(trigger) > 0 and trigger[0].isupper()
+                    )
+                    second_is_upper = second_layer == 2 or second_key.isupper()
 
-                    if trigger_is_upper and second_is_upper and char.isalpha():
-                        # Trigger ET second_key majuscules -> tout l'output en majuscule
+                    if (
+                        trigger_first_upper
+                        and second_is_upper
+                        and char.isalpha()
+                    ):
+                        # Trigger[0] ET second_key majuscules -> tout l'output en majuscule
                         if "shift" not in char_modifiers:
                             char_modifiers.append("shift")
-                    elif (trigger_is_upper or second_is_upper) and not (
-                        trigger_is_upper and second_is_upper
+                    elif (trigger_first_upper or second_is_upper) and not (
+                        trigger_first_upper and second_is_upper
                     ):
-                        # Soit trigger OU second_key majuscule (mais pas les deux) -> première lettre seulement
+                        # Soit trigger[0] OU second_key majuscule (mais pas les deux) -> première lettre seulement
                         if (
                             i == first_letter_index
                             and "shift" not in char_modifiers
