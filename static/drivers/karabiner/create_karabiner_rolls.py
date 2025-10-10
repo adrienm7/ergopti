@@ -268,6 +268,91 @@ for mapping_name, mapping in plus_mappings.items():
                         "type": "basic",
                     }
                 )
+
+        # Special case: if previous_key is ê or Ê, send backslash + the pressed key
+        # Generate once per trigger, not per second_key/output combination
+        # Only for vowels (a, e, i, o, u, y)
+        vowels = set("aeiouyAEIOUY")
+        for circumflex_char in ["ê", "Ê"]:
+            for second_key, output in mapping["map"]:
+                # Only process if second_key is a vowel
+                if second_key not in vowels:
+                    continue
+
+                for second_code, second_layer in letter_to_num.get(
+                    second_key.lower(), []
+                ):
+                    second_name = macos_keycodes.get(
+                        str(second_code), second_code
+                    )
+
+                    # Layer-based modifiers
+                    modifiers = []
+                    if second_layer == 2:
+                        modifiers.append("shift")
+                    elif second_layer == 5:
+                        modifiers.append("option")
+                    elif second_layer == 6:
+                        modifiers.extend(["shift", "option"])
+                    if second_key.isupper() and "shift" not in modifiers:
+                        modifiers.append("shift")
+
+                    if modifiers:
+                        from_block = {
+                            "key_code": second_name,
+                            "modifiers": {"mandatory": modifiers},
+                        }
+                    else:
+                        from_block = {"key_code": second_name}
+
+                    special_to_list = []
+                    special_to_list.append(
+                        {
+                            "set_variable": {
+                                "name": "previous_key",
+                                "value": "none",
+                            }
+                        }
+                    )
+                    for _ in range(len(circumflex_char)):
+                        special_to_list.append(
+                            {"key_code": "delete_or_backspace"}
+                        )
+
+                    # Send backslash (dead key ^)
+                    special_to_list.append({"key_code": "backslash"})
+
+                    # Send the pressed key with its modifiers
+                    if modifiers:
+                        special_to_list.append(
+                            {"key_code": second_name, "modifiers": modifiers}
+                        )
+                    else:
+                        special_to_list.append({"key_code": second_name})
+
+                    special_to_list.append(
+                        {
+                            "set_variable": {
+                                "name": "previous_key",
+                                "value": "none",
+                            }
+                        }
+                    )
+
+                    manipulators.append(
+                        {
+                            "conditions": [
+                                {
+                                    "name": "previous_key",
+                                    "type": "variable_if",
+                                    "value": circumflex_char,
+                                }
+                            ],
+                            "from": from_block,
+                            "to": special_to_list,
+                            "type": "basic",
+                        }
+                    )
     rolls.append(
         {
             "description": f"Roll mapping for trigger '{trigger}' ({mapping_name})",
