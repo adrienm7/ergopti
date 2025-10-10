@@ -31,6 +31,31 @@ REPEAT_KEY = False
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
 
 
+def is_trigger_shifted(trigger: str) -> bool:
+    """Detect if a trigger is a 'shifted' version (uppercase equivalent).
+
+    Special cases:
+    - Triggers with espace insécable ( ) + punctuation are considered shifted
+    - Triggers with espace fine insécable ( ) + punctuation are considered shifted
+    - Normal uppercase letters are considered shifted
+    """
+    if not trigger:
+        return False
+
+    # Check for espace insécable or espace fine insécable + punctuation patterns (these are "shifted" versions)
+    if len(trigger) >= 2 and trigger[0] in [
+        " ",
+        " ",
+    ]:  # espace insécable or espace fine insécable
+        return True
+
+    # Check for normal uppercase letters
+    if len(trigger) > 0 and trigger[0].isupper():
+        return True
+
+    return False
+
+
 # A key position is simply a dict: {"keycode": int, "layer": int}
 # A sequence is a list of such dicts
 KeySequence = List[dict]
@@ -188,7 +213,7 @@ for mapping_name, mapping in plus_mappings.items():
                             # Shift logic pour voyelles circonflexes
                             if (
                                 second_layer == 2
-                                or trigger.isupper()
+                                or is_trigger_shifted(trigger)
                                 or char.isupper()
                             ) and "shift" not in base_modifiers:
                                 base_modifiers.append("shift")
@@ -225,24 +250,22 @@ for mapping_name, mapping in plus_mappings.items():
                                     ]
                                 )
                             # Logique corrigée pour sequences
-                            trigger_first_upper = (
-                                len(trigger) > 0 and trigger[0].isupper()
-                            )
+                            trigger_is_shifted = is_trigger_shifted(trigger)
                             second_is_upper = (
                                 second_layer == 2 or second_key.isupper()
                             )
 
                             if (
-                                trigger_first_upper
+                                trigger_is_shifted
                                 and second_is_upper
                                 and char.isalpha()
                             ):
-                                # Trigger[0] ET second_key majuscules -> tout l'output
+                                # Trigger shifted ET second_key majuscules -> tout l'output
                                 if "shift" not in seq_modifiers:
                                     seq_modifiers.append("shift")
                             elif (
-                                trigger_first_upper or second_is_upper
-                            ) and not (trigger_first_upper and second_is_upper):
+                                trigger_is_shifted or second_is_upper
+                            ) and not (trigger_is_shifted and second_is_upper):
                                 # Soit trigger OU second_key majuscule -> première lettre seulement
                                 if (
                                     i == first_letter_index
@@ -282,26 +305,24 @@ for mapping_name, mapping in plus_mappings.items():
                         char_modifiers.extend(["shift", "option"])
 
                     # Logique de casse corrigée:
-                    # - Si trigger[0] majuscule ET second_key majuscule → tout en majuscules
-                    # - Si trigger[0] majuscule OU second_key majuscule (mais pas les deux) → première lettre
-                    # - Si trigger[0] minuscule ET second_key minuscule → rien
-                    trigger_first_upper = (
-                        len(trigger) > 0 and trigger[0].isupper()
-                    )
+                    # - Si trigger shifted ET second_key majuscule → tout en majuscules
+                    # - Si trigger shifted OU second_key majuscule (mais pas les deux) → première lettre
+                    # - Si trigger non-shifted ET second_key minuscule → rien
+                    trigger_is_shifted = is_trigger_shifted(trigger)
                     second_is_upper = second_layer == 2 or second_key.isupper()
 
                     if (
-                        trigger_first_upper
+                        trigger_is_shifted
                         and second_is_upper
                         and char.isalpha()
                     ):
-                        # Trigger[0] ET second_key majuscules -> tout l'output en majuscule
+                        # Trigger shifted ET second_key majuscules -> tout l'output en majuscule
                         if "shift" not in char_modifiers:
                             char_modifiers.append("shift")
-                    elif (trigger_first_upper or second_is_upper) and not (
-                        trigger_first_upper and second_is_upper
+                    elif (trigger_is_shifted or second_is_upper) and not (
+                        trigger_is_shifted and second_is_upper
                     ):
-                        # Soit trigger[0] OU second_key majuscule (mais pas les deux) -> première lettre seulement
+                        # Soit trigger OU second_key majuscule (mais pas les deux) -> première lettre seulement
                         if (
                             i == first_letter_index
                             and "shift" not in char_modifiers

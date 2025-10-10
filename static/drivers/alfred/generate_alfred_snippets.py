@@ -39,7 +39,10 @@ def apply_case_to_text(original_trigger: str, target_text: str) -> str:
     Returns:
         The target text with case applied based on the trigger pattern
     """
-    if original_trigger.isupper():
+    # Cas particulier : pour les triggers de longueur 1, la majuscule donne du title case
+    if len(original_trigger) == 1 and original_trigger.isupper():
+        return target_text.capitalize()
+    elif original_trigger.isupper():
         return target_text.upper()
     elif original_trigger.istitle():
         return target_text.capitalize()
