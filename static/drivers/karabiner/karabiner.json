@@ -512,6 +512,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -551,6 +554,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -748,6 +754,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -1043,6 +1052,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -1074,6 +1086,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -1233,6 +1248,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -1570,6 +1588,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -1606,6 +1627,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -1895,6 +1919,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -1923,6 +1950,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -2337,6 +2367,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -2376,6 +2409,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -2515,6 +2551,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -2771,6 +2810,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -2802,6 +2844,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -2917,6 +2962,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -3352,6 +3400,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -3391,6 +3442,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -3629,6 +3683,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -3957,6 +4014,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -3988,6 +4048,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -4183,6 +4246,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -4598,6 +4664,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -4637,6 +4706,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -4840,6 +4912,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -5138,6 +5213,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -5169,6 +5247,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -5331,6 +5412,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -5725,6 +5809,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -5764,6 +5851,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -5961,6 +6051,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -6256,6 +6349,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -6287,6 +6383,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -6446,6 +6545,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -6790,6 +6892,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -6829,6 +6934,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -6967,6 +7075,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -7220,6 +7331,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -7251,6 +7365,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -7365,6 +7482,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -7706,6 +7826,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c",
                                         "modifiers": [
                                             "shift"
@@ -7745,6 +7868,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -7877,6 +8003,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -8127,6 +8256,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -8158,6 +8290,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -8269,6 +8404,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -8643,6 +8781,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -8682,6 +8823,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -9123,6 +9267,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -9162,6 +9309,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -9573,6 +9723,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -9607,6 +9760,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -10016,6 +10172,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "c"
                                     },
                                     {
@@ -10055,6 +10214,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -10379,6 +10541,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "quote",
                                         "modifiers": [
                                             "shift"
@@ -10424,6 +10589,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -10684,6 +10852,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "quote"
                                     },
                                     {
@@ -10721,6 +10892,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -11073,6 +11247,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "o",
                                         "modifiers": [
                                             "right_option",
@@ -11110,6 +11287,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -11442,6 +11622,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "o",
                                         "modifiers": [
                                             "right_option"
@@ -11473,6 +11656,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -11895,6 +12081,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "open_bracket",
                                         "modifiers": [
                                             "shift"
@@ -11931,6 +12120,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -12066,6 +12258,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -12313,6 +12508,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "open_bracket"
                                     },
                                     {
@@ -12341,6 +12539,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -12452,6 +12653,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -12763,6 +12967,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "quote",
                                         "modifiers": [
                                             "shift"
@@ -12802,6 +13009,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -13053,6 +13263,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "quote"
                                     },
                                     {
@@ -13084,6 +13297,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -13484,6 +13700,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "e",
                                         "modifiers": [
                                             "shift"
@@ -13526,6 +13745,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -13943,6 +14165,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "e"
                                     },
                                     {
@@ -13977,6 +14202,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -14441,6 +14669,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "b",
                                         "modifiers": [
                                             "shift"
@@ -14477,6 +14708,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -14565,6 +14799,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -14776,6 +15013,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "b"
                                     },
                                     {
@@ -14804,6 +15044,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -14876,6 +15119,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -15240,6 +15486,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "m",
                                         "modifiers": [
                                             "shift"
@@ -15279,6 +15528,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -15530,6 +15782,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "m"
                                     },
                                     {
@@ -15561,6 +15816,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -15867,6 +16125,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "y",
                                         "modifiers": [
                                             "shift"
@@ -15906,6 +16167,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -16148,6 +16412,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "y"
                                     },
                                     {
@@ -16179,6 +16446,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -16485,6 +16755,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "u",
                                         "modifiers": [
                                             "shift"
@@ -16524,6 +16797,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -16775,6 +17051,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "u"
                                     },
                                     {
@@ -16806,6 +17085,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -17450,6 +17732,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "period",
                                         "modifiers": [
                                             "shift"
@@ -17489,6 +17774,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -17592,6 +17880,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -17815,6 +18106,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "period"
                                     },
                                     {
@@ -17846,6 +18140,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -17927,6 +18224,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -18288,6 +18588,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "o",
                                         "modifiers": [
                                             "shift"
@@ -18327,6 +18630,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -18569,6 +18875,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "o"
                                     },
                                     {
@@ -18600,6 +18909,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -18903,6 +19215,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "n",
                                         "modifiers": [
                                             "shift"
@@ -18942,6 +19257,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -19184,6 +19502,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "n"
                                     },
                                     {
@@ -19215,6 +19536,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -19571,6 +19895,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "k",
                                         "modifiers": [
                                             "shift"
@@ -19610,6 +19937,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -19861,6 +20191,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "k"
                                     },
                                     {
@@ -19892,6 +20225,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -20345,6 +20681,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "p",
                                         "modifiers": [
                                             "shift"
@@ -20384,6 +20723,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -20626,6 +20968,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "p"
                                     },
                                     {
@@ -20657,6 +21002,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -20960,6 +21308,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "semicolon",
                                         "modifiers": [
                                             "shift"
@@ -20999,6 +21350,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -21241,6 +21595,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "semicolon"
                                     },
                                     {
@@ -21272,6 +21629,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -21670,6 +22030,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "period",
                                         "modifiers": [
                                             "shift"
@@ -21709,6 +22072,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -21818,6 +22184,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -22044,6 +22413,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "period"
                                     },
                                     {
@@ -22075,6 +22447,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -22159,6 +22534,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -22420,6 +22798,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "m",
                                         "modifiers": [
                                             "shift"
@@ -22459,6 +22840,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -22701,6 +23085,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "m"
                                     },
                                     {
@@ -22732,6 +23119,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -23147,6 +23537,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "t",
                                         "modifiers": [
                                             "shift"
@@ -23186,6 +23579,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"
@@ -23458,6 +23854,9 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
+                                        "key_code": "delete_or_backspace"
+                                    },
+                                    {
                                         "key_code": "t"
                                     },
                                     {
@@ -23489,6 +23888,9 @@
                                             "name": "previous_key",
                                             "value": "none"
                                         }
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     },
                                     {
                                         "key_code": "delete_or_backspace"

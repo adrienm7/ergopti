@@ -121,7 +121,8 @@ for mapping_name, mapping in plus_mappings.items():
                         }
                     }
                 )
-                to_list.append({"key_code": "delete_or_backspace"})
+                for _ in range(len(trigger)):
+                    to_list.append({"key_code": "delete_or_backspace"})
 
                 # Layer-based modifiers
                 modifiers = []
