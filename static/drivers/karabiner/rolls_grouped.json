@@ -9,7 +9,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -18,7 +18,7 @@
             "key_code": "a",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -35,7 +35,7 @@
           "key_code": "a",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -43,7 +43,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -265,7 +265,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -604,7 +604,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -819,7 +819,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -1098,7 +1098,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -1142,7 +1142,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -1151,7 +1151,7 @@
             "key_code": "x",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -1174,7 +1174,7 @@
           "key_code": "x",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -1191,13 +1191,13 @@
           {
             "key_code": "p",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "z",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -1215,7 +1215,7 @@
           "key_code": "x",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -1223,7 +1223,7 @@
           {
             "key_code": "x",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -1913,7 +1913,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -1922,7 +1922,7 @@
             "key_code": "d",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -1939,7 +1939,7 @@
           "key_code": "d",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -1947,7 +1947,7 @@
           {
             "key_code": "d",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -2031,7 +2031,7 @@
           {
             "key_code": "e",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -2120,7 +2120,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -2303,7 +2303,7 @@
           {
             "key_code": "e",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -2401,7 +2401,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -2502,7 +2502,7 @@
           {
             "key_code": "e",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -2577,7 +2577,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -2730,7 +2730,7 @@
           {
             "key_code": "e",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -2812,7 +2812,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -2856,7 +2856,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -2865,7 +2865,7 @@
             "key_code": "z",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -2882,7 +2882,7 @@
           "key_code": "z",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -2890,7 +2890,7 @@
           {
             "key_code": "z",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -3153,7 +3153,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -3533,7 +3533,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -3781,7 +3781,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -4096,7 +4096,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -4158,7 +4158,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -4167,7 +4167,7 @@
             "key_code": "grave_accent_and_tilde",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -4184,7 +4184,7 @@
           "key_code": "grave_accent_and_tilde",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -4192,7 +4192,7 @@
           {
             "key_code": "grave_accent_and_tilde",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -4417,7 +4417,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -4762,7 +4762,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -4980,7 +4980,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -5262,7 +5262,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -5306,7 +5306,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -5315,7 +5315,7 @@
             "key_code": "s",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -5332,7 +5332,7 @@
           "key_code": "s",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -5340,7 +5340,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -5562,7 +5562,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -5901,7 +5901,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -6116,7 +6116,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -6395,7 +6395,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -6439,7 +6439,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -6448,7 +6448,7 @@
             "key_code": "e",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -6465,7 +6465,7 @@
           "key_code": "e",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -6473,7 +6473,7 @@
           {
             "key_code": "e",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -6645,7 +6645,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -6925,7 +6925,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -7098,7 +7098,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -7332,7 +7332,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -7376,7 +7376,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -7385,7 +7385,7 @@
             "key_code": "f",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -7402,7 +7402,7 @@
           "key_code": "f",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -7410,7 +7410,7 @@
           {
             "key_code": "f",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -7579,7 +7579,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -7853,7 +7853,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -8023,7 +8023,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8254,7 +8254,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8298,7 +8298,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8307,7 +8307,7 @@
             "key_code": "slash",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8330,7 +8330,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8350,7 +8350,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8374,7 +8374,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8421,7 +8421,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8462,7 +8462,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8485,7 +8485,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8509,7 +8509,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8535,7 +8535,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8562,7 +8562,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8582,7 +8582,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8606,7 +8606,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8629,7 +8629,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8653,7 +8653,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8676,7 +8676,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8700,7 +8700,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8750,7 +8750,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8794,7 +8794,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8820,7 +8820,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8838,7 +8838,7 @@
           "key_code": "slash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -8846,7 +8846,7 @@
           {
             "key_code": "slash",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -8889,7 +8889,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9024,7 +9024,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9068,7 +9068,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9115,7 +9115,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9162,7 +9162,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9306,7 +9306,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9370,7 +9370,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9490,7 +9490,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9529,7 +9529,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9571,7 +9571,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9613,7 +9613,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9742,7 +9742,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9783,7 +9783,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -9792,7 +9792,7 @@
             "key_code": "quote",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9815,7 +9815,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -9835,7 +9835,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9859,7 +9859,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -9906,7 +9906,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -9929,7 +9929,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9953,7 +9953,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -9973,7 +9973,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -9997,7 +9997,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -10020,7 +10020,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10044,7 +10044,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -10067,7 +10067,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10091,7 +10091,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -10141,7 +10141,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -10167,7 +10167,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10185,7 +10185,7 @@
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -10193,7 +10193,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10242,7 +10242,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10342,7 +10342,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10395,7 +10395,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10448,7 +10448,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10574,7 +10574,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10658,7 +10658,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10703,7 +10703,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10748,7 +10748,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10834,7 +10834,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -10843,7 +10843,7 @@
             "key_code": "o",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10860,7 +10860,7 @@
           "key_code": "o",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -10868,7 +10868,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -10908,7 +10908,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -11047,7 +11047,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -11092,7 +11092,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -11137,7 +11137,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -11311,7 +11311,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -11428,7 +11428,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -11467,7 +11467,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -11506,7 +11506,7 @@
           {
             "key_code": "o",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -11634,7 +11634,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -11643,7 +11643,7 @@
             "key_code": "q",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -11660,7 +11660,7 @@
           "key_code": "q",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -11668,7 +11668,7 @@
           {
             "key_code": "q",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -11837,7 +11837,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -12108,7 +12108,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -12278,7 +12278,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -12503,7 +12503,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -12547,7 +12547,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -12556,7 +12556,7 @@
             "key_code": "j",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -12579,7 +12579,7 @@
           "key_code": "j",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -12596,13 +12596,13 @@
           {
             "key_code": "c",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "k",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -12620,7 +12620,7 @@
           "key_code": "j",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -12628,7 +12628,7 @@
           {
             "key_code": "j",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13236,7 +13236,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -13245,7 +13245,7 @@
             "key_code": "p",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13262,7 +13262,7 @@
           "key_code": "p",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -13270,7 +13270,7 @@
           {
             "key_code": "p",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13316,7 +13316,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13501,7 +13501,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13551,7 +13551,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13601,7 +13601,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13818,7 +13818,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -13971,7 +13971,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -14013,7 +14013,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -14055,7 +14055,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -14219,7 +14219,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -14228,7 +14228,7 @@
             "key_code": "w",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -14251,7 +14251,7 @@
           "key_code": "w",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -14268,13 +14268,13 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "z",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -14292,7 +14292,7 @@
           "key_code": "w",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -14300,7 +14300,7 @@
           {
             "key_code": "w",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -14425,7 +14425,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -14649,7 +14649,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -14783,7 +14783,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -14969,7 +14969,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -15013,7 +15013,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -15022,7 +15022,7 @@
             "key_code": "m",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -15045,7 +15045,7 @@
           "key_code": "m",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -15065,7 +15065,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -15095,7 +15095,7 @@
           "key_code": "m",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -15115,7 +15115,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -15139,7 +15139,7 @@
           "key_code": "m",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -15147,7 +15147,7 @@
           {
             "key_code": "m",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -15755,7 +15755,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -15764,7 +15764,7 @@
             "key_code": "y",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -15781,7 +15781,7 @@
           "key_code": "y",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -15789,7 +15789,7 @@
           {
             "key_code": "y",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -16382,7 +16382,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -16391,7 +16391,7 @@
             "key_code": "u",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -16408,7 +16408,7 @@
           "key_code": "u",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -16416,7 +16416,7 @@
           {
             "key_code": "u",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17030,7 +17030,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17050,7 +17050,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17081,7 +17081,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17101,7 +17101,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17126,7 +17126,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17135,7 +17135,7 @@
             "key_code": "i",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17158,7 +17158,7 @@
           "key_code": "i",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17175,13 +17175,13 @@
           {
             "key_code": "j",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "c",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17205,7 +17205,7 @@
           "key_code": "i",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17222,13 +17222,13 @@
           {
             "key_code": "l",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "c",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17252,7 +17252,7 @@
           "key_code": "i",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17269,13 +17269,13 @@
           {
             "key_code": "c",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "semicolon",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17299,7 +17299,7 @@
           "key_code": "i",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17319,7 +17319,7 @@
           {
             "key_code": "backslash",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17343,7 +17343,7 @@
           "key_code": "i",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -17351,7 +17351,7 @@
           {
             "key_code": "i",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -17485,7 +17485,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -17730,7 +17730,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -17873,7 +17873,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -18074,7 +18074,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -18118,7 +18118,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -18127,7 +18127,7 @@
             "key_code": "comma",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -18150,7 +18150,7 @@
           "key_code": "comma",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -18173,7 +18173,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -18200,7 +18200,7 @@
           "key_code": "comma",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -18223,7 +18223,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -18244,7 +18244,7 @@
           "key_code": "comma",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -18252,7 +18252,7 @@
           {
             "key_code": "comma",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -18845,7 +18845,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -18854,7 +18854,7 @@
             "key_code": "n",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -18871,7 +18871,7 @@
           "key_code": "n",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -18879,7 +18879,7 @@
           {
             "key_code": "n",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -19472,7 +19472,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -19481,7 +19481,7 @@
             "key_code": "k",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -19504,7 +19504,7 @@
           "key_code": "k",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -19530,7 +19530,7 @@
           {
             "key_code": "c",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -19548,7 +19548,7 @@
           "key_code": "k",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -19556,7 +19556,7 @@
           {
             "key_code": "k",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -20164,7 +20164,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -20173,7 +20173,7 @@
             "key_code": "period",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -20196,7 +20196,7 @@
           "key_code": "period",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -20243,7 +20243,7 @@
           "key_code": "period",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -20290,7 +20290,7 @@
           "key_code": "period",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -20310,7 +20310,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -20337,7 +20337,7 @@
           "key_code": "period",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -20345,7 +20345,7 @@
           {
             "key_code": "period",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -20938,7 +20938,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -20947,7 +20947,7 @@
             "key_code": "semicolon",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -20964,7 +20964,7 @@
           "key_code": "semicolon",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -20972,7 +20972,7 @@
           {
             "key_code": "semicolon",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -21565,7 +21565,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -21574,7 +21574,7 @@
             "key_code": "l",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -21597,7 +21597,7 @@
           "key_code": "l",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -21614,13 +21614,13 @@
           {
             "key_code": "c",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "semicolon",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -21638,7 +21638,7 @@
           "key_code": "l",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -21646,7 +21646,7 @@
           {
             "key_code": "l",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -21783,7 +21783,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -22034,7 +22034,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option",
+              "option",
               "shift"
             ]
           },
@@ -22180,7 +22180,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -22384,7 +22384,7 @@
           {
             "key_code": "quote",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -22428,7 +22428,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -22437,7 +22437,7 @@
             "key_code": "h",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -22454,7 +22454,7 @@
           "key_code": "h",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -22462,7 +22462,7 @@
           {
             "key_code": "h",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -23055,7 +23055,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -23064,7 +23064,7 @@
             "key_code": "open_bracket",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -23087,7 +23087,7 @@
           "key_code": "open_bracket",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -23107,7 +23107,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -23137,7 +23137,7 @@
           "key_code": "open_bracket",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -23157,7 +23157,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -23181,7 +23181,7 @@
           "key_code": "open_bracket",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -23189,7 +23189,7 @@
           {
             "key_code": "open_bracket",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -23842,7 +23842,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -23884,7 +23884,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -23929,7 +23929,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -23974,7 +23974,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24016,7 +24016,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24025,7 +24025,7 @@
             "key_code": "c",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24048,7 +24048,7 @@
           "key_code": "c",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24065,13 +24065,13 @@
           {
             "key_code": "z",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
             "key_code": "p",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24089,7 +24089,7 @@
           "key_code": "c",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24097,7 +24097,7 @@
           {
             "key_code": "c",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24330,7 +24330,7 @@
           "key_code": "b",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24338,7 +24338,7 @@
           {
             "key_code": "b",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24599,7 +24599,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24608,7 +24608,7 @@
             "key_code": "backslash",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24631,7 +24631,7 @@
           "key_code": "backslash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24651,7 +24651,7 @@
           {
             "key_code": "g",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24675,7 +24675,7 @@
           "key_code": "backslash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24683,7 +24683,7 @@
           {
             "key_code": "backslash",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24748,7 +24748,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24757,7 +24757,7 @@
             "key_code": "hyphen",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24774,7 +24774,7 @@
           "key_code": "hyphen",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24782,7 +24782,7 @@
           {
             "key_code": "hyphen",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24845,7 +24845,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24890,7 +24890,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24937,7 +24937,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24946,7 +24946,7 @@
             "key_code": "equal_sign",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -24963,7 +24963,7 @@
           "key_code": "equal_sign",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -24971,7 +24971,7 @@
           {
             "key_code": "equal_sign",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25037,7 +25037,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25082,7 +25082,7 @@
           {
             "key_code": "s",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25126,7 +25126,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25135,7 +25135,7 @@
             "key_code": "non_us_backslash",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25152,7 +25152,7 @@
           "key_code": "non_us_backslash",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25160,7 +25160,7 @@
           {
             "key_code": "non_us_backslash",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25223,7 +25223,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25268,7 +25268,7 @@
           {
             "key_code": "a",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25315,7 +25315,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25324,7 +25324,7 @@
             "key_code": "g",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25341,7 +25341,7 @@
           "key_code": "g",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25349,7 +25349,7 @@
           {
             "key_code": "g",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25414,7 +25414,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25423,7 +25423,7 @@
             "key_code": "v",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25440,7 +25440,7 @@
           "key_code": "v",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25448,7 +25448,7 @@
           {
             "key_code": "v",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25513,7 +25513,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25522,7 +25522,7 @@
             "key_code": "r",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25539,7 +25539,7 @@
           "key_code": "r",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25547,7 +25547,7 @@
           {
             "key_code": "r",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25612,7 +25612,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25621,7 +25621,7 @@
             "key_code": "t",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25638,7 +25638,7 @@
           "key_code": "t",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25646,7 +25646,7 @@
           {
             "key_code": "t",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25711,7 +25711,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25720,7 +25720,7 @@
             "key_code": "1",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25737,7 +25737,7 @@
           "key_code": "1",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25745,7 +25745,7 @@
           {
             "key_code": "1",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25810,7 +25810,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25819,7 +25819,7 @@
             "key_code": "2",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25836,7 +25836,7 @@
           "key_code": "2",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25844,7 +25844,7 @@
           {
             "key_code": "2",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25909,7 +25909,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25918,7 +25918,7 @@
             "key_code": "3",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -25935,7 +25935,7 @@
           "key_code": "3",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -25943,7 +25943,7 @@
           {
             "key_code": "3",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26008,7 +26008,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26017,7 +26017,7 @@
             "key_code": "4",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26034,7 +26034,7 @@
           "key_code": "4",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26042,7 +26042,7 @@
           {
             "key_code": "4",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26107,7 +26107,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26116,7 +26116,7 @@
             "key_code": "6",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26133,7 +26133,7 @@
           "key_code": "6",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26141,7 +26141,7 @@
           {
             "key_code": "6",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26206,7 +26206,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26215,7 +26215,7 @@
             "key_code": "5",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26232,7 +26232,7 @@
           "key_code": "5",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26240,7 +26240,7 @@
           {
             "key_code": "5",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26305,7 +26305,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26314,7 +26314,7 @@
             "key_code": "9",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26331,7 +26331,7 @@
           "key_code": "9",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26339,7 +26339,7 @@
           {
             "key_code": "9",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26404,7 +26404,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26413,7 +26413,7 @@
             "key_code": "7",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26430,7 +26430,7 @@
           "key_code": "7",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26438,7 +26438,7 @@
           {
             "key_code": "7",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26503,7 +26503,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26512,7 +26512,7 @@
             "key_code": "8",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26529,7 +26529,7 @@
           "key_code": "8",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26537,7 +26537,7 @@
           {
             "key_code": "8",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26602,7 +26602,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26611,7 +26611,7 @@
             "key_code": "0",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26628,7 +26628,7 @@
           "key_code": "0",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26636,7 +26636,7 @@
           {
             "key_code": "0",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26700,7 +26700,7 @@
           "key_code": "close_bracket",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26708,7 +26708,7 @@
           {
             "key_code": "close_bracket",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26773,7 +26773,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26782,7 +26782,7 @@
             "key_code": 36,
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26799,7 +26799,7 @@
           "key_code": 36,
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26807,7 +26807,7 @@
           {
             "key_code": 36,
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26919,7 +26919,7 @@
           "modifiers": {
             "mandatory": [
               "shift",
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26928,7 +26928,7 @@
             "key_code": "spacebar",
             "modifiers": [
               "shift",
-              "right_option"
+              "option"
             ]
           },
           {
@@ -26945,7 +26945,7 @@
           "key_code": "spacebar",
           "modifiers": {
             "mandatory": [
-              "right_option"
+              "option"
             ]
           }
         },
@@ -26953,7 +26953,7 @@
           {
             "key_code": "spacebar",
             "modifiers": [
-              "right_option"
+              "option"
             ]
           },
           {
