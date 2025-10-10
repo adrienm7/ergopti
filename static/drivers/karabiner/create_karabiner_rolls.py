@@ -129,9 +129,9 @@ for mapping_name, mapping in plus_mappings.items():
                 if second_layer == 2:
                     modifiers.append("shift")
                 elif second_layer == 5:
-                    modifiers.append("right_option")
+                    modifiers.append("option")
                 elif second_layer == 6:
-                    modifiers.extend(["shift", "right_option"])
+                    modifiers.extend(["shift", "option"])
                 if second_key.isupper() and "shift" not in modifiers:
                     modifiers.append("shift")
 
@@ -159,12 +159,12 @@ for mapping_name, mapping in plus_mappings.items():
                             if seq_layer == 2:
                                 seq_modifiers.append("shift")
                             elif seq_layer == 5:
-                                seq_modifiers.append("right_option")
+                                seq_modifiers.append("option")
                             elif seq_layer == 6:
                                 seq_modifiers.extend(
                                     [
                                         "shift",
-                                        "right_option",
+                                        "option",
                                     ]
                                 )
                             # Apply shift to first key of sequence if needed
@@ -203,9 +203,9 @@ for mapping_name, mapping in plus_mappings.items():
                     if char_layer == 2:
                         char_modifiers.append("shift")
                     elif char_layer == 5:
-                        char_modifiers.append("right_option")
+                        char_modifiers.append("option")
                     elif char_layer == 6:
-                        char_modifiers.extend(["shift", "right_option"])
+                        char_modifiers.extend(["shift", "option"])
 
                     # Shift entire output if both keys uppercase
                     if trigger.isupper() and second_key.isupper():
@@ -272,9 +272,9 @@ for (keycode, layer), symbols in num_to_letter.items():
     if layer == 2:
         modifiers.append("shift")
     elif layer == 5:
-        modifiers.append("right_option")
+        modifiers.append("option")
     elif layer == 6:
-        modifiers.extend(["shift", "right_option"])
+        modifiers.extend(["shift", "option"])
     for symbol in symbols:
         # Special case: keycode 8 (c) with no modifiers sends previous_key
         if keycode == 8 and not modifiers:
@@ -371,16 +371,16 @@ try:
         if e_layer == 2:
             e_mods.append("shift")
         elif e_layer == 5:
-            e_mods.append("right_option")
+            e_mods.append("option")
         elif e_layer == 6:
-            e_mods.extend(["shift", "right_option"])
+            e_mods.extend(["shift", "option"])
         u_mods: List[str] = []
         if u_layer == 2:
             u_mods.append("shift")
         elif u_layer == 5:
-            u_mods.append("right_option")
+            u_mods.append("option")
         elif u_layer == 6:
-            u_mods.extend(["shift", "right_option"])
+            u_mods.extend(["shift", "option"])
         from_block: dict = {"key_code": e_name}
         if e_mods:
             from_block["modifiers"] = {"mandatory": e_mods}
@@ -432,9 +432,9 @@ def build_previous_key_repeat_manipulators(trigger_key: str) -> list:
         if erg_layer == 2:
             mods.append("shift")
         elif erg_layer == 5:
-            mods.append("right_option")
+            mods.append("option")
         elif erg_layer == 6:
-            mods.extend(["shift", "right_option"])
+            mods.extend(["shift", "option"])
         to_event: dict = {"key_code": erg_key_name}
         if mods:
             to_event["modifiers"] = mods
@@ -510,9 +510,9 @@ for key, manips in manipulators_by_key.items():
             # Peut être une chaîne ou une liste
             if isinstance(mandatory, str):
                 mandatory = [mandatory]
-            if "shift" in mandatory and "right_option" in mandatory:
+            if "shift" in mandatory and "option" in mandatory:
                 return 0
-            elif "right_option" in mandatory:
+            elif "option" in mandatory:
                 return 1
             elif "shift" in mandatory:
                 return 2
