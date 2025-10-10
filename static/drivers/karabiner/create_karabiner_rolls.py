@@ -143,6 +143,13 @@ for mapping_name, mapping in plus_mappings.items():
                 else:
                     from_block = {"key_code": second_name}
 
+                # Find the index of the first letter in output for shift application
+                first_letter_index = None
+                for idx, c in enumerate(output):
+                    if c.isalpha():
+                        first_letter_index = idx
+                        break
+
                 for i, char in enumerate(output):
                     char_base = char.lower()
 
@@ -167,15 +174,22 @@ for mapping_name, mapping in plus_mappings.items():
                                         "option",
                                     ]
                                 )
-                            # Apply shift to first key of sequence if needed
+                            # Apply shift to first letter of sequence if needed
                             if (
-                                (trigger.isupper() and second_key.isupper())
-                                or (
-                                    (trigger.isupper() or second_key.isupper())
-                                    and i == 0
-                                    and j == 0
+                                (
+                                    (trigger.isupper() and second_key.isupper())
+                                    or (
+                                        (
+                                            trigger.isupper()
+                                            or second_key.isupper()
+                                        )
+                                        and i == first_letter_index
+                                        and j == 0
+                                    )
                                 )
-                            ) and "shift" not in seq_modifiers:
+                                and "shift" not in seq_modifiers
+                                and char.isalpha()
+                            ):
                                 seq_modifiers.append("shift")
 
                             if seq_modifiers:
@@ -207,15 +221,20 @@ for mapping_name, mapping in plus_mappings.items():
                     elif char_layer == 6:
                         char_modifiers.extend(["shift", "option"])
 
-                    # Shift entire output if both keys uppercase
-                    if trigger.isupper() and second_key.isupper():
+                    # Shift entire output if both keys uppercase (only for letters)
+                    if (
+                        trigger.isupper()
+                        and second_key.isupper()
+                        and char.isalpha()
+                    ):
                         if "shift" not in char_modifiers:
                             char_modifiers.append("shift")
-                    # Else add shift only to first char if one is uppercase
+                    # Else add shift only to first letter if one is uppercase
                     elif (
-                        i == 0
+                        i == first_letter_index
                         and (trigger.isupper() or second_key.isupper())
                         and "shift" not in char_modifiers
+                        and char.isalpha()
                     ):
                         char_modifiers.append("shift")
 

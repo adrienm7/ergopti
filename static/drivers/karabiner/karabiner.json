@@ -425,12 +425,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "a"
+                                        "key_code": "a",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -764,12 +766,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "a"
+                                        "key_code": "a",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -2280,12 +2284,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "d"
+                                        "key_code": "d",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -2561,12 +2567,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "d"
+                                        "key_code": "d",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -3313,12 +3321,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "z"
+                                        "key_code": "z",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -3693,12 +3703,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "z"
+                                        "key_code": "z",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -4577,12 +4589,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "grave_accent_and_tilde"
+                                        "key_code": "grave_accent_and_tilde",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -4922,12 +4936,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "grave_accent_and_tilde"
+                                        "key_code": "grave_accent_and_tilde",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -5722,12 +5738,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "s"
+                                        "key_code": "s",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -6061,12 +6079,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "s"
+                                        "key_code": "s",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -6805,12 +6825,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "e"
+                                        "key_code": "e",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -7085,12 +7107,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "e"
+                                        "key_code": "e",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -7739,12 +7763,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -8013,12 +8039,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -11997,12 +12025,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "q"
+                                        "key_code": "q",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -12268,12 +12298,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "q"
+                                        "key_code": "q",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -14585,12 +14617,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "w"
+                                        "key_code": "w",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -14809,12 +14843,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "w"
+                                        "key_code": "w",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -17645,12 +17681,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "i"
+                                        "key_code": "i",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -17890,12 +17928,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "i"
+                                        "key_code": "i",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -21943,12 +21983,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "l"
+                                        "key_code": "l",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -22194,12 +22236,14 @@
                                     {
                                         "key_code": "quote",
                                         "modifiers": [
-                                            "option",
-                                            "shift"
+                                            "option"
                                         ]
                                     },
                                     {
-                                        "key_code": "l"
+                                        "key_code": "l",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
