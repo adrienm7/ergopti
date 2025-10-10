@@ -27,6 +27,7 @@ from utilities.mappings_functions import (
     unescape_xml_characters,
 )
 
+REPEAT_KEY = False
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
 
 
@@ -277,22 +278,41 @@ for (keycode, layer), symbols in num_to_letter.items():
     for symbol in symbols:
         # Special case: keycode 8 (c) with no modifiers sends previous_key
         if keycode == 8 and not modifiers:
-            letters_manipulators.append(
-                {
-                    "type": "basic",
-                    "from": {"key_code": name},
-                    "to": [
-                        {
-                            # Use Karabiner's variable substitution to send previous_key
-                            "key_code": "__variable__",
-                            "set_variable": {
-                                "name": "previous_key",
-                                "value": symbol,
+            if REPEAT_KEY:
+                letters_manipulators.append(
+                    {
+                        "type": "basic",
+                        "from": {"key_code": name},
+                        "to": [
+                            {
+                                # Use Karabiner's variable substitution to send previous_key
+                                "key_code": "__variable__",
+                                "set_variable": {
+                                    "name": "previous_key",
+                                    "value": symbol,
+                                },
+                            }
+                        ],
+                    }
+                )
+            else:
+                letters_manipulators.append(
+                    {
+                        "type": "basic",
+                        "from": {"key_code": name},
+                        "to": [
+                            {"key_code": "backslash"},
+                            {"key_code": "m"},
+                            {
+                                "set_variable": {
+                                    "name": "previous_key",
+                                    "value": "★",
+                                },
                             },
-                        }
-                    ],
-                }
-            )
+                        ],
+                    }
+                )
+
         elif modifiers:
             letters_manipulators.append(
                 {
@@ -386,21 +406,22 @@ def build_previous_key_repeat_manipulators(trigger_key: str) -> list:
     return manips
 
 
-# Replay previous character with 'v' (keycode 9 / .j on Ergopti) and '8'
-repeat_v = build_previous_key_repeat_manipulators("c")
-repeat_8 = build_previous_key_repeat_manipulators("8")
-rolls.append(
-    {
-        "description": "Replay previous_key with v (.j)",
-        "manipulators": repeat_v,
-    }
-)
-rolls.append(
-    {
-        "description": "Replay previous_key with 8",  # top-row 8 used as repeat
-        "manipulators": repeat_8,
-    }
-)
+if REPEAT_KEY:
+    # Replay previous character with 'v' (keycode 9 / .j on Ergopti) and '8'
+    repeat_v = build_previous_key_repeat_manipulators("c")
+    repeat_8 = build_previous_key_repeat_manipulators("8")
+    rolls.append(
+        {
+            "description": "Replay previous_key with v (.j)",
+            "manipulators": repeat_v,
+        }
+    )
+    rolls.append(
+        {
+            "description": "Replay previous_key with 8",  # top-row 8 used as repeat
+            "manipulators": repeat_8,
+        }
+    )
 
 # Group manipulators by physical key into rolls_grouped.json
 rolls_grouped_path = Path(__file__).parent / "rolls_grouped.json"
