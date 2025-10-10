@@ -1174,7 +1174,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "a"
+                                        "key_code": "a",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -1327,7 +1330,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "a"
+                                        "key_code": "a",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -2898,7 +2904,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "a"
@@ -3027,7 +3036,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "a"
@@ -3558,7 +3570,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "a"
+                                        "key_code": "a",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -4410,7 +4425,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -4452,7 +4470,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -5438,7 +5459,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "d"
+                                        "key_code": "d",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -5591,7 +5615,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "d"
+                                        "key_code": "d",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -6863,7 +6890,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "d"
@@ -6992,7 +7022,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "d"
@@ -7386,7 +7419,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "d"
+                                        "key_code": "d",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -7971,7 +8007,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "z"
+                                        "key_code": "z",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -8024,7 +8063,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "z"
+                                        "key_code": "z",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -8671,7 +8713,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "z"
@@ -8716,7 +8761,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "z"
@@ -8950,7 +8998,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "z"
+                                        "key_code": "z",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -9483,7 +9534,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -9536,7 +9590,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -10118,7 +10175,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -10163,7 +10223,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -11427,7 +11490,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "s"
+                                        "key_code": "s",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -11580,7 +11646,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "s"
+                                        "key_code": "s",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -13151,7 +13220,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "s"
@@ -13280,7 +13352,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "s"
@@ -13811,7 +13886,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "s"
+                                        "key_code": "s",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -14796,7 +14874,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "e"
+                                        "key_code": "e",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -14949,7 +15030,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "e"
+                                        "key_code": "e",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -16223,7 +16307,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "e"
@@ -16352,7 +16439,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "e"
@@ -16748,7 +16838,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "e"
+                                        "key_code": "e",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -17730,7 +17823,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -17883,7 +17979,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -19148,7 +19247,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -19277,7 +19379,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -19670,7 +19775,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -20174,7 +20282,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -20227,7 +20338,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -21284,7 +21398,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -21332,7 +21449,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -21799,7 +21919,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -21852,7 +21975,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -22222,7 +22348,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -22281,7 +22410,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote",
@@ -22569,7 +22701,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "quote"
+                                        "key_code": "quote",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -22620,7 +22755,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "quote"
+                                        "key_code": "quote",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -23455,7 +23593,8 @@
                                     {
                                         "key_code": "o",
                                         "modifiers": [
-                                            "option"
+                                            "option",
+                                            "shift"
                                         ]
                                     },
                                     {
@@ -23500,7 +23639,8 @@
                                     {
                                         "key_code": "o",
                                         "modifiers": [
-                                            "option"
+                                            "option",
+                                            "shift"
                                         ]
                                     },
                                     {
@@ -24490,7 +24630,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "open_bracket"
+                                        "key_code": "open_bracket",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -24532,7 +24675,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "open_bracket"
+                                        "key_code": "open_bracket",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -24673,7 +24819,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "q"
+                                        "key_code": "q",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -25030,7 +25179,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -25083,7 +25235,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "f"
+                                        "key_code": "f",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -25362,7 +25517,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "quote"
+                                        "key_code": "quote",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -25407,7 +25565,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "quote"
+                                        "key_code": "quote",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "f"
@@ -25873,7 +26034,8 @@
                                     {
                                         "key_code": "r",
                                         "modifiers": [
-                                            "option"
+                                            "option",
+                                            "shift"
                                         ]
                                     },
                                     {
@@ -25929,7 +26091,8 @@
                                     {
                                         "key_code": "r",
                                         "modifiers": [
-                                            "option"
+                                            "option",
+                                            "shift"
                                         ]
                                     },
                                     {
@@ -26396,7 +26559,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "e"
+                                        "key_code": "e",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "r",
@@ -26444,7 +26610,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "e"
+                                        "key_code": "e",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "r",
@@ -28525,7 +28694,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "b"
+                                        "key_code": "b",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -28651,7 +28823,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "b"
+                                        "key_code": "b",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -28918,7 +29093,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "w"
+                                        "key_code": "w",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -29418,7 +29596,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "j"
+                                        "key_code": "j",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -29471,7 +29652,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "j"
+                                        "key_code": "j",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -29750,7 +29934,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "m"
+                                        "key_code": "m",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "j"
@@ -29795,7 +29982,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "m"
+                                        "key_code": "m",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "j"
@@ -30153,7 +30343,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -30206,7 +30399,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -30476,7 +30672,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "y"
+                                        "key_code": "y",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -30521,7 +30720,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "y"
+                                        "key_code": "y",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -30879,7 +31081,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -30932,7 +31137,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -31211,7 +31419,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "u"
+                                        "key_code": "u",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -31256,7 +31467,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "u"
+                                        "key_code": "u",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -31996,7 +32210,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "i"
+                                        "key_code": "i",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -32049,7 +32266,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "i"
+                                        "key_code": "i",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -32420,7 +32640,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "period"
+                                        "key_code": "period",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "i"
@@ -32465,7 +32688,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "period"
+                                        "key_code": "period",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "i"
@@ -32567,7 +32793,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "i"
+                                        "key_code": "i",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -32980,7 +33209,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -33033,7 +33265,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -33303,7 +33538,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "o"
+                                        "key_code": "o",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -33348,7 +33586,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "o"
+                                        "key_code": "o",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -33703,7 +33944,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "j"
+                                        "key_code": "j",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -33756,7 +34000,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "j"
+                                        "key_code": "j",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -34026,7 +34273,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "n"
+                                        "key_code": "n",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "j"
@@ -34071,7 +34321,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "n"
+                                        "key_code": "n",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "j"
@@ -34485,7 +34738,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -34538,7 +34794,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "comma"
+                                        "key_code": "comma",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -34817,7 +35076,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "k"
+                                        "key_code": "k",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -34862,7 +35124,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "k"
+                                        "key_code": "k",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "comma"
@@ -35385,7 +35650,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "period"
+                                        "key_code": "period",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -35438,7 +35706,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "period"
+                                        "key_code": "period",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -35708,7 +35979,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "p"
+                                        "key_code": "p",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "period"
@@ -35753,7 +36027,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "p"
+                                        "key_code": "p",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "period"
@@ -36108,7 +36385,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "quote"
+                                        "key_code": "quote",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -36161,7 +36441,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "quote"
+                                        "key_code": "quote",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -36431,7 +36714,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "semicolon"
+                                        "key_code": "semicolon",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote"
@@ -36476,7 +36762,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "semicolon"
+                                        "key_code": "semicolon",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "quote"
@@ -36940,7 +37229,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "l"
+                                        "key_code": "l",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -36993,7 +37285,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "l"
+                                        "key_code": "l",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -37373,7 +37668,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "period"
+                                        "key_code": "period",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "l"
@@ -37418,7 +37716,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "period"
+                                        "key_code": "period",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "l"
@@ -37523,7 +37824,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "l"
+                                        "key_code": "l",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -37824,7 +38128,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "h"
+                                        "key_code": "h",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -37877,7 +38184,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "h"
+                                        "key_code": "h",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -38147,7 +38457,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "m"
+                                        "key_code": "m",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "h"
@@ -38192,7 +38505,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "m"
+                                        "key_code": "m",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "h"
@@ -38671,7 +38987,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -38724,7 +39043,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "c"
+                                        "key_code": "c",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -39024,7 +39346,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "t"
+                                        "key_code": "t",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "c"
@@ -39069,7 +39394,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "t"
+                                        "key_code": "t",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "key_code": "c"
