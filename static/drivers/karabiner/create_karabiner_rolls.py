@@ -317,6 +317,14 @@ for mapping_name, mapping in plus_mappings.items():
                         }
                     }
                 )
+                to_list.append(
+                    {
+                        "set_variable": {
+                            "name": "star_activated",
+                            "value": 0,
+                        }
+                    }
+                )
 
                 manipulators.append(
                     {
@@ -403,6 +411,14 @@ for mapping_name, mapping in plus_mappings.items():
                             }
                         }
                     )
+                    special_to_list.append(
+                        {
+                            "set_variable": {
+                                "name": "star_activated",
+                                "value": 0,
+                            }
+                        }
+                    )
 
                     manipulators.append(
                         {
@@ -474,8 +490,8 @@ for (keycode, layer), symbols in num_to_letter.items():
                             {"key_code": "m"},
                             {
                                 "set_variable": {
-                                    "name": "previous_key",
-                                    "value": "★",
+                                    "name": "star_activated",
+                                    "value": 1,
                                 },
                             },
                         ],
@@ -500,6 +516,12 @@ for (keycode, layer), symbols in num_to_letter.items():
                                 else symbol,
                             }
                         },
+                        {
+                            "set_variable": {
+                                "name": "star_activated",
+                                "value": 0,
+                            }
+                        },
                     ],
                 }
             )
@@ -516,6 +538,12 @@ for (keycode, layer), symbols in num_to_letter.items():
                                 "value": symbol,
                             }
                         },
+                        {
+                            "set_variable": {
+                                "name": "star_activated",
+                                "value": 0,
+                            }
+                        },
                     ],
                 }
             )
@@ -526,7 +554,8 @@ rolls.append(
     }
 )
 
-# Spécial: si previous_key == ★ et on presse la touche qui produit ê, envoyer 'u'
+# Spécial: si star_activated == 1 et on presse la touche qui produit ê, envoyer 'u'
+# sauf si previous_key == 'r' (arrêt), dans ce cas on laisse ê
 # On récupère la première position de ê et u (layer 0 ici) et on crée un manipulateur dédié.
 try:
     e_positions = letter_to_num.get("ê", [])
@@ -556,9 +585,11 @@ try:
         to_event: dict = {"key_code": u_name}
         if u_mods:
             to_event["modifiers"] = u_mods
+
+        # Cas 1: star_activated == 1 ET previous_key != 'r' => ê devient u
         rolls.append(
             {
-                "description": "Special mapping: previous_key ★ + ê => u",
+                "description": "Special mapping: star_activated + ê => u (except after r)",
                 "manipulators": [
                     {
                         "type": "basic",
@@ -566,11 +597,72 @@ try:
                         "conditions": [
                             {
                                 "type": "variable_if",
+                                "name": "star_activated",
+                                "value": 1,
+                            },
+                            {
+                                "type": "variable_unless",
                                 "name": "previous_key",
-                                "value": "★",
-                            }
+                                "value": "r",
+                            },
                         ],
-                        "to": [to_event],
+                        "to": [
+                            to_event,
+                            {
+                                "set_variable": {
+                                    "name": "star_activated",
+                                    "value": 0,
+                                },
+                            },
+                            {
+                                "set_variable": {
+                                    "name": "previous_key",
+                                    "value": "u",
+                                },
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+
+        # Cas 2: star_activated == 1 ET previous_key == 'r' => ê reste ê (arrêt)
+        rolls.append(
+            {
+                "description": "Special mapping: star_activated + r + ê => ê (stop)",
+                "manipulators": [
+                    {
+                        "type": "basic",
+                        "from": from_block,
+                        "conditions": [
+                            {
+                                "type": "variable_if",
+                                "name": "star_activated",
+                                "value": 1,
+                            },
+                            {
+                                "type": "variable_if",
+                                "name": "previous_key",
+                                "value": "r",
+                            },
+                        ],
+                        "to": [
+                            {"key_code": e_name}
+                            if not e_mods
+                            else {"key_code": e_name, "modifiers": e_mods},
+                            {
+                                "set_variable": {
+                                    "name": "star_activated",
+                                    "value": 0,
+                                },
+                            },
+                            {
+                                "set_variable": {
+                                    "name": "previous_key",
+                                    "value": "ê",
+                                },
+                            },
+                        ],
                     }
                 ],
             }
@@ -692,14 +784,14 @@ for key, manips in manipulators_by_key.items():
         key=mod_priority,
     )
     # Priorisation spécifique: pour la touche grave_accent_and_tilde, placer
-    # les manipulateurs avec condition previous_key == ★ avant ceux sans conditions
+    # les manipulateurs avec condition star_activated == 1 avant ceux sans conditions
     if key == "grave_accent_and_tilde":
         special = []
         others = []
         for m in sorted_manips:
             conds = m.get("conditions", [])
             if any(
-                c.get("name") == "previous_key" and c.get("value") == "★"
+                c.get("name") == "star_activated" and c.get("value") == 1
                 for c in conds
             ):
                 special.append(m)
