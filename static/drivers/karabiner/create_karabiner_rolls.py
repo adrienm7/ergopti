@@ -153,6 +153,52 @@ for mapping_name, mapping in plus_mappings.items():
                 for i, char in enumerate(output):
                     char_base = char.lower()
 
+                    # Cas général pour voyelles circonflexes : deadkey + voyelle de base
+                    circonflexes = {
+                        "â": "a",
+                        "ê": "e",
+                        "î": "i",
+                        "ô": "o",
+                        "û": "u",
+                        "Â": "a",
+                        "Ê": "e",
+                        "Î": "i",
+                        "Ô": "o",
+                        "Û": "u",
+                    }
+                    if char in circonflexes:
+                        # Envoyer backslash (touche morte ^) puis la voyelle de base
+                        to_list.append({"key_code": "backslash"})
+
+                        # Envoyer la touche de base (a, e, i, o, u) du layout Ergopti
+                        base_vowel = circonflexes[char]
+                        base_positions = letter_to_num.get(base_vowel, [])
+                        if base_positions:
+                            base_code, base_layer = base_positions[0]
+                            base_name = macos_keycodes.get(
+                                str(base_code), base_code
+                            )
+                            base_modifiers: List[str] = []
+                            if base_layer == 2:
+                                base_modifiers.append("shift")
+                            elif base_layer == 5:
+                                base_modifiers.append("option")
+                            elif base_layer == 6:
+                                base_modifiers.extend(["shift", "option"])
+                            # Appliquer shift si la voyelle circonflexe est majuscule
+                            if char.isupper() and "shift" not in base_modifiers:
+                                base_modifiers.append("shift")
+                            if base_modifiers:
+                                to_list.append(
+                                    {
+                                        "key_code": base_name,
+                                        "modifiers": base_modifiers,
+                                    }
+                                )
+                            else:
+                                to_list.append({"key_code": base_name})
+                        continue
+
                     # Multi-key sequence
                     if char_base in multi_sequences:
                         sequences = multi_sequences[char_base]
