@@ -307,12 +307,13 @@ for mapping_name, mapping in plus_mappings.items():
                         )
                     else:
                         to_list.append({"key_code": char_name})
-
+                # Définir previous_key avec la dernière lettre de l'output
+                last_char = output[-1] if output else "none"
                 to_list.append(
                     {
                         "set_variable": {
                             "name": "previous_key",
-                            "value": "none",
+                            "value": last_char,
                         }
                     }
                 )
@@ -393,11 +394,12 @@ for mapping_name, mapping in plus_mappings.items():
                     else:
                         special_to_list.append({"key_code": second_name})
 
+                    # Définir previous_key avec la touche tapée (second_key)
                     special_to_list.append(
                         {
                             "set_variable": {
                                 "name": "previous_key",
-                                "value": "none",
+                                "value": second_key,
                             }
                         }
                     )
