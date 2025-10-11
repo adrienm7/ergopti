@@ -76,10 +76,10 @@ def create_info_plist(prefix: str = "", suffix: str = "★") -> str:
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>snippetkeywordprefix</key>
-	<string>{prefix}</string>
-	<key>snippetkeywordsuffix</key>
-	<string>{suffix}</string>
+    <key>snippetkeywordprefix</key>
+    <string>{prefix}</string>
+    <key>snippetkeywordsuffix</key>
+    <string>{suffix}</string>
 </dict>
 </plist>"""
 
@@ -253,21 +253,37 @@ def main():
 
     REPEAT_CONFIG = {"prefix": "", "suffix": "★"}
 
-    magic_replacements_file = (
+    magic_toml_file = (
         script_dir.parent.parent.parent
         / "static"
         / "drivers"
         / "configuration"
-        / "magic.json"
+        / "magic.toml"
     )
 
-    # Load magic replacements
-    if not magic_replacements_file.exists():
-        print(f"Error: {magic_replacements_file} not found")
+    # Charger les remplacements magic depuis le fichier TOML
+    if not magic_toml_file.exists():
+        print(f"Error: {magic_toml_file} not found")
         return
 
-    with open(magic_replacements_file, "r", encoding="utf-8") as f:
-        magic_replacements = json.load(f)
+    try:
+            import toml
+    except ImportError:
+        print(
+            "Le module 'toml' est requis. Installez-le avec 'pip install toml'."
+        )
+        return
+
+    with open(magic_toml_file, "r", encoding="utf-8") as f:
+        toml_data = toml.load(f)
+
+    # Extraire les triggers et outputs de chaque section
+    magic_replacements = {}
+    for section in toml_data.values():
+        if isinstance(section, list):
+            for entry in section:
+                for trigger, output in entry.items():
+                    magic_replacements[trigger] = output
 
     # Clean up old directories if they exist
     old_magic_dir = output_dir / "Magic"
@@ -285,7 +301,7 @@ def main():
         shutil.rmtree(old_repeat_dir)
         print("Removed old Repeat directory")
 
-    # Generate snippets as .alfredsnippets files with custom configurations
+    # Générer les snippets comme précédemment
     generate_magic_snippets(
         output_dir,
         magic_replacements,

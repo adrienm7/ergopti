@@ -43079,7 +43079,7 @@
     ]
   },
   {
-    "description": "Special mapping: star_activated + ê => u (except after r)",
+    "description": "Special mapping: star_activated + ê => u (except after r or n)",
     "manipulators": [
       {
         "type": "basic",
@@ -43096,6 +43096,11 @@
             "type": "variable_unless",
             "name": "previous_key",
             "value": "r"
+          },
+          {
+            "type": "variable_unless",
+            "name": "previous_key",
+            "value": "n"
           }
         ],
         "to": [
@@ -43136,6 +43141,46 @@
             "type": "variable_if",
             "name": "previous_key",
             "value": "r"
+          }
+        ],
+        "to": [
+          {
+            "key_code": "grave_accent_and_tilde"
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "ê"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Special mapping: star_activated + n + ê => ê (honnête)",
+    "manipulators": [
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "grave_accent_and_tilde"
+        },
+        "conditions": [
+          {
+            "type": "variable_if",
+            "name": "star_activated",
+            "value": 1
+          },
+          {
+            "type": "variable_if",
+            "name": "previous_key",
+            "value": "n"
           }
         ],
         "to": [

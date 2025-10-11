@@ -18,13 +18,14 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 sys.path.append(str(Path(__file__).parent.parent.resolve()))
-from configuration.keylayout_plus_mappings import (
-    PLUS_MAPPINGS_CONFIG,
-    add_case_sensitive_mappings,
-)
 from utilities.keylayout_extraction import extract_keymap_body
 from utilities.mappings_functions import (
     unescape_xml_characters,
+)
+
+from configuration.keylayout_plus_mappings import (
+    PLUS_MAPPINGS_CONFIG,
+    add_case_sensitive_mappings,
 )
 
 REPEAT_KEY = False
@@ -667,10 +668,10 @@ try:
         if u_mods:
             to_event["modifiers"] = u_mods
 
-        # Cas 1: star_activated == 1 ET previous_key != 'r' => ê devient u
+        # Cas 1: star_activated == 1 ET previous_key != 'r' ET previous_key != 'n' => ê devient u
         rolls.append(
             {
-                "description": "Special mapping: star_activated + ê => u (except after r)",
+                "description": "Special mapping: star_activated + ê => u (except after r or n)",
                 "manipulators": [
                     {
                         "type": "basic",
@@ -686,6 +687,11 @@ try:
                                 "name": "previous_key",
                                 "value": "r",
                             },
+                            {
+                                "type": "variable_unless",
+                                "name": "previous_key",
+                                "value": "n",
+                            },
                         ],
                         "to": [
                             to_event,
@@ -693,13 +699,13 @@ try:
                                 "set_variable": {
                                     "name": "star_activated",
                                     "value": 0,
-                                },
+                                }
                             },
                             {
                                 "set_variable": {
                                     "name": "previous_key",
                                     "value": "u",
-                                },
+                                }
                             },
                         ],
                     }
@@ -735,13 +741,55 @@ try:
                                 "set_variable": {
                                     "name": "star_activated",
                                     "value": 0,
-                                },
+                                }
                             },
                             {
                                 "set_variable": {
                                     "name": "previous_key",
                                     "value": "ê",
-                                },
+                                }
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+
+        # Cas 3: star_activated == 1 ET previous_key == 'n' => ê reste ê (honnête)
+        rolls.append(
+            {
+                "description": "Special mapping: star_activated + n + ê => ê (honnête)",
+                "manipulators": [
+                    {
+                        "type": "basic",
+                        "from": from_block,
+                        "conditions": [
+                            {
+                                "type": "variable_if",
+                                "name": "star_activated",
+                                "value": 1,
+                            },
+                            {
+                                "type": "variable_if",
+                                "name": "previous_key",
+                                "value": "n",
+                            },
+                        ],
+                        "to": [
+                            {"key_code": e_name}
+                            if not e_mods
+                            else {"key_code": e_name, "modifiers": e_mods},
+                            {
+                                "set_variable": {
+                                    "name": "star_activated",
+                                    "value": 0,
+                                }
+                            },
+                            {
+                                "set_variable": {
+                                    "name": "previous_key",
+                                    "value": "ê",
+                                }
                             },
                         ],
                     }
