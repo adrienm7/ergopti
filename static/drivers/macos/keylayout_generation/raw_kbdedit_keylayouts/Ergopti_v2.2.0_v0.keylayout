@@ -1,7 +1,7 @@
 <?xml version="1.1" encoding="utf-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-09-23 at 14:46 (GMT+0)-->
-<keyboard group="126" id="-20043" maxout="1" name="Ergopti v2.2.0 Beta 3">
+<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-10-11 at 16:35 (GMT+0)-->
+<keyboard group="126" id="-20043" maxout="1" name="Ergopti v2.2.0 Beta 4">
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
 	</layouts>
@@ -264,7 +264,7 @@
 			<key code="27" output=" %"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" output=" "/>
+			<key code="30" action="-"/>
 			<key code="31" action="C"/>
 			<key code="32" action="G"/>
 			<key code="33" action="Z"/>
@@ -353,7 +353,7 @@
 			<key code="27" output=" %"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" output=" "/>
+			<key code="30" action="-"/>
 			<key code="31" action="c"/>
 			<key code="32" action="g"/>
 			<key code="33" action="z"/>
@@ -475,7 +475,7 @@
 			<key code="27" output="‰"/>
 			<key code="28" output="⁸"/>
 			<key code="29" output="⁰"/>
-			<key code="30" output=" "/>
+			<key code="30" action="_"/>
 			<key code="31" output="ç"/>
 			<key code="32" output="~"/>
 			<key code="33" output="%"/>
@@ -538,6 +538,7 @@
 			<key code="8" action="j"/>
 			<key code="9" output="…"/>
 			<key code="10" action="^"/>
+			<key code="11" action="+"/>
 			<key code="12" output="„"/>
 			<key code="13" output="€"/>
 			<key code="14" action="Œ"/>
@@ -556,7 +557,7 @@
 			<key code="27" output="‱"/>
 			<key code="28" output="₈"/>
 			<key code="29" output="₀"/>
-			<key code="30" output=" "/>
+			<key code="30" output="★"/>
 			<key code="31" output="Ç"/>
 			<key code="32" output="≈"/>
 			<key code="33" output="‰"/>
@@ -619,6 +620,7 @@
 			<key code="8" action="j"/>
 			<key code="9" output="…"/>
 			<key code="10" action="^"/>
+			<key code="11" action="+"/>
 			<key code="12" output="„"/>
 			<key code="13" output="€"/>
 			<key code="14" action="Œ"/>
@@ -637,6 +639,7 @@
 			<key code="27" output="‱"/>
 			<key code="28" output="₈"/>
 			<key code="29" output="₀"/>
+			<key code="30" output="★"/>
 			<key code="31" output="Ç"/>
 			<key code="32" output="≈"/>
 			<key code="33" output="‰"/>
@@ -718,6 +721,7 @@
 			<key code="27" output="‰"/>
 			<key code="28" output="⁸"/>
 			<key code="29" output="⁰"/>
+			<key code="30" action="_"/>
 			<key code="31" output="ç"/>
 			<key code="32" output="~"/>
 			<key code="33" output="%"/>
@@ -935,7 +939,7 @@
 		</action>
 		<action id="B">
 			<when state="none" output="B"/>
-			<when state="s1" output="⚑"/>
+			<when state="s1" output="°"/>
 			<when state="s2" output="฿"/>
 			<when state="s4" output="Β"/>
 			<when state="s5" output="ᴮ"/>
@@ -944,7 +948,7 @@
 		</action>
 		<action id="C">
 			<when state="none" output="C"/>
-			<when state="s1" output="°"/>
+			<when state="s1" output="Ç"/>
 			<when state="s2" output="₵"/>
 			<when state="s3" output="©"/>
 			<when state="s4" output="Ψ"/>
@@ -972,7 +976,7 @@
 		</action>
 		<action id="F">
 			<when state="none" output="F"/>
-			<when state="s1" output="☑"/>
+			<when state="s1" output="⚑"/>
 			<when state="s2" output="₣"/>
 			<when state="s4" output="Φ"/>
 			<when state="s5" output="ꟳ"/>
@@ -1034,7 +1038,7 @@
 		</action>
 		<action id="M">
 			<when state="none" output="M"/>
-			<when state="s1" output="⁂"/>
+			<when state="s1" output="☑"/>
 			<when state="s2" output="ℳ"/>
 			<when state="s4" output="Μ"/>
 			<when state="s5" output="ᴹ"/>
@@ -1062,7 +1066,7 @@
 		</action>
 		<action id="P">
 			<when state="none" output="P"/>
-			<when state="s1" output="¶"/>
+			<when state="s1" output="⁂"/>
 			<when state="s2" output="₧"/>
 			<when state="s4" output="Π"/>
 			<when state="s5" output="ᴾ"/>
@@ -1124,7 +1128,7 @@
 		</action>
 		<action id="W">
 			<when state="none" output="W"/>
-			<when state="s1" output="Ŵ"/>
+			<when state="s1" output="Ù"/>
 			<when state="s2" output="₩"/>
 			<when state="s3" output="Ẅ"/>
 			<when state="s4" output="Ω"/>
@@ -1190,7 +1194,7 @@
 		</action>
 		<action id="b">
 			<when state="none" output="b"/>
-			<when state="s1" output="⚐"/>
+			<when state="s1" output="º"/>
 			<when state="s2" output="₿"/>
 			<when state="s4" output="β"/>
 			<when state="s5" output="ᵇ"/>
@@ -1198,7 +1202,7 @@
 		</action>
 		<action id="c">
 			<when state="none" output="c"/>
-			<when state="s1" output="º"/>
+			<when state="s1" output="ç"/>
 			<when state="s2" output="¢"/>
 			<when state="s3" output="©"/>
 			<when state="s4" output="ψ"/>
@@ -1223,7 +1227,7 @@
 		</action>
 		<action id="f">
 			<when state="none" output="f"/>
-			<when state="s1" output="✅"/>
+			<when state="s1" output="⚐"/>
 			<when state="s2" output="ƒ"/>
 			<when state="s4" output="φ"/>
 			<when state="s5" output="ᶠ"/>
@@ -1282,7 +1286,7 @@
 		</action>
 		<action id="m">
 			<when state="none" output="m"/>
-			<when state="s1" output="⁂"/>
+			<when state="s1" output="✅"/>
 			<when state="s2" output="₥"/>
 			<when state="s4" output="μ"/>
 			<when state="s5" output="ᵐ"/>
@@ -1364,7 +1368,7 @@
 		</action>
 		<action id="w">
 			<when state="none" output="w"/>
-			<when state="s1" output="ŵ"/>
+			<when state="s1" output="ù"/>
 			<when state="s2" output="₩"/>
 			<when state="s3" output="ẅ"/>
 			<when state="s4" output="ω"/>

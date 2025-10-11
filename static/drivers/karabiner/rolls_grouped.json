@@ -20171,7 +20171,66 @@
             "key_code": "spacebar"
           },
           {
-            "key_code": "spacebar",
+            "key_code": "close_bracket",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "+"
+          }
+        ],
+        "from": {
+          "key_code": "slash",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "key_code": "close_bracket",
             "modifiers": [
               "shift"
             ]
@@ -35482,7 +35541,7 @@
             ]
           },
           {
-            "key_code": "spacebar",
+            "key_code": "close_bracket",
             "modifiers": [
               "shift"
             ]
@@ -38947,7 +39006,7 @@
             "key_code": "open_bracket"
           },
           {
-            "key_code": "spacebar",
+            "key_code": "close_bracket",
             "modifiers": [
               "shift"
             ]
@@ -39180,7 +39239,7 @@
             ]
           },
           {
-            "key_code": "spacebar",
+            "key_code": "close_bracket",
             "modifiers": [
               "shift"
             ]
@@ -39325,7 +39384,7 @@
             "key_code": "open_bracket"
           },
           {
-            "key_code": "spacebar",
+            "key_code": "close_bracket",
             "modifiers": [
               "shift"
             ]
@@ -39526,7 +39585,7 @@
             "key_code": "open_bracket"
           },
           {
-            "key_code": "spacebar",
+            "key_code": "close_bracket",
             "modifiers": [
               "shift"
             ]
@@ -40135,10 +40194,11 @@
         },
         "to": [
           {
-            "key_code": "backslash"
-          },
-          {
-            "key_code": "m"
+            "key_code": "close_bracket",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -40153,6 +40213,207 @@
   {
     "description": "Grouped actions for key [b]",
     "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "="
+          }
+        ],
+        "from": {
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "key_code": "backslash"
+          },
+          {
+            "key_code": "v"
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "="
+          }
+        ],
+        "from": {
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "key_code": "backslash"
+          },
+          {
+            "key_code": "v"
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "?"
+          }
+        ],
+        "from": {
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "close_bracket",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "key_code": "spacebar"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": " "
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "b",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "b",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "+"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ]
+      },
       {
         "type": "basic",
         "from": {
@@ -43045,6 +43306,39 @@
           "key_code": "close_bracket",
           "modifiers": {
             "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "close_bracket",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "★"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket",
+          "modifiers": {
+            "mandatory": [
               "option"
             ]
           }
@@ -43059,7 +43353,7 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": " "
+              "value": "_"
             }
           },
           {
@@ -43090,7 +43384,7 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": " "
+              "value": "-"
             }
           },
           {

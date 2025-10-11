@@ -630,7 +630,7 @@ for (keycode, layer), symbols in num_to_letter.items():
     elif layer == 6:
         modifiers.extend(["shift", "option"])
     for symbol in symbols:
-        # Special case: keycode 8 (c) with no modifiers sends previous_key
+        # Special case: keycode 8 [c] with no modifiers sends ★ on j
         if keycode == 8 and not modifiers:
             if REPEAT_KEY:
                 letters_manipulators.append(
@@ -655,8 +655,10 @@ for (keycode, layer), symbols in num_to_letter.items():
                         "type": "basic",
                         "from": {"key_code": name},
                         "to": [
-                            {"key_code": "backslash"},
-                            {"key_code": "m"},
+                            {
+                                "key_code": "close_bracket",
+                                "modifiers": ["shift", "option"],
+                            },
                             {
                                 "set_variable": {
                                     "name": "star_activated",
