@@ -1,45 +1,112 @@
+#!/usr/bin/env python3
 """
-Generate Alfred snippets for Magic hotstrings and Repeat patterns.
+Script to generate Alfred snippets from TOML configuration files.
 
-Creates .alfredsnippets files (ZIP archives):
-- Magic.alfredsnippets: hotstrings from magic.json with case handling
-- Repeat.alfredsnippets: letter combinations (ab -> abb) with case handling
+This script creates .alfredsnippets files (ZIP archives) for each TOML file
+in the configuration directory. It handles symbol extraction from triggers
+(★, $) and places them in the info.plist as prefix/suffix.
 
-Configuration:
-- Modify MAGIC_CONFIG and REPEAT_CONFIG in main() to customize prefix/suffix
-- prefix: text added before each snippet keyword (e.g., "magic_" -> "magic_hello")
-- suffix: text added after each snippet keyword (e.g., "★" -> "hello★")
-
-Examples of different configurations:
-- No prefix, star suffix: prefix="", suffix="★" -> "hello★"
-- Colon prefix, no suffix: prefix=":", suffix="" -> ":hello"
-- Magic prefix, exclamation suffix: prefix="m:", suffix="!" -> "m:hello!"
+Official Alfred documentation about snippets can be found at:
+https://www.alfredapp.com/help/features/snippets/
 """
 
 import json
+import re
+import sys
 import tempfile
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Optional, Tuple
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from utilities.logger import get_error_count, logger, reset_error_count
+
+
+def main(
+    input_directory: Optional[Path] = None,
+    output_directory: Optional[Path] = None,
+    overwrite: bool = False,
+) -> None:
+    """
+    Main function to generate Alfred snippets from TOML configuration files.
+
+    Args:
+            input_directory: Directory containing TOML files. If None, uses default config directory.
+            output_directory: Directory to save .alfredsnippets files. If None, uses current directory.
+            overwrite: Whether to overwrite existing files.
+    """
+    reset_error_count()
+
+    logger.info("=" * 80)
+    logger.info("🔮 Alfred Snippets Generator")
+    logger.info("=" * 80)
+
+    # Determine directories
+    if input_directory:
+        config_directory = Path(input_directory).resolve()
+    else:
+        config_directory = (
+            Path(__file__).resolve().parent.parent / "configuration"
+        )
+
+    if output_directory:
+        output_directory = Path(output_directory).resolve()
+    else:
+        output_directory = Path(__file__).resolve().parent
+
+    logger.info("Input directory: %s", config_directory)
+    logger.info("Output directory: %s", output_directory)
+
+    # Find all TOML files
+    toml_files = list(config_directory.glob("*.toml"))
+    if not toml_files:
+        logger.error("No TOML files found in: %s", config_directory)
+        return
+
+    logger.info("Found %d TOML file(s) to process", len(toml_files))
+
+    processed = 0
+    errors = 0
+
+    for toml_file in toml_files:
+        logger.launch("Processing: %s", toml_file.name)
+        try:
+            generate_alfred_snippets_from_toml(
+                toml_file, output_directory, overwrite
+            )
+            processed += 1
+            logger.success("Successfully processed: %s", toml_file.name)
+        except (OSError, ValueError, RuntimeError) as e:
+            logger.error("Error processing %s: %s", toml_file.name, e)
+            errors += 1
+
+    show_execution_summary(processed, errors)
 
 
 def generate_uuid() -> str:
-    """Generate a UUID in uppercase format matching Alfred's convention."""
+    """
+    Generate a UUID in uppercase format matching Alfred's convention.
+
+    Returns:
+            UUID string in uppercase format.
+    """
     return str(uuid.uuid4()).upper()
 
 
 def apply_case_to_text(original_trigger: str, target_text: str) -> str:
-    """Apply the case pattern from trigger to the target text.
+    """
+    Apply the case pattern from trigger to the target text.
 
     Args:
-        original_trigger: The trigger text that defines the case pattern
-        target_text: The text to apply the case pattern to
+            original_trigger: The trigger text that defines the case pattern
+            target_text: The text to apply the case pattern to
 
     Returns:
-        The target text with case applied based on the trigger pattern
+            The target text with case applied based on the trigger pattern
     """
-    # Cas particulier : pour les triggers de longueur 1, la majuscule donne du title case
+    # Special case: for single character triggers, uppercase gives title case
     if len(original_trigger) == 1 and original_trigger.isupper():
         return target_text.capitalize()
     elif original_trigger.isupper():
@@ -50,8 +117,95 @@ def apply_case_to_text(original_trigger: str, target_text: str) -> str:
         return target_text.lower()
 
 
+def parse_toml_simple(toml_content: str) -> Dict[str, str]:
+    """
+    Parse TOML content to extract trigger-replacement mappings.
+
+    Args:
+            toml_content: TOML file content as string
+
+    Returns:
+            Dictionary mapping triggers to replacements
+    """
+    result = {}
+    for line in toml_content.split("\n"):
+        line = line.strip()
+        if line.startswith("#") or not line or line.startswith("["):
+            continue
+        match = re.match(r'^"([^"]+)"\s*=\s*"([^"]+)"', line)
+        if match:
+            result[match.group(1)] = match.group(2)
+    return result
+
+
+def detect_trigger_symbols(triggers: List[str]) -> Tuple[str, str]:
+    """
+    Detect common prefix and suffix symbols in triggers.
+
+    Args:
+            triggers: List of trigger strings
+
+    Returns:
+            Tuple of (prefix, suffix) symbols to extract
+    """
+    if not triggers:
+        return "", ""
+
+    first_trigger = triggers[0]
+    prefix = ""
+    suffix = ""
+
+    # Detect common suffixes (★, $, etc.)
+    if first_trigger.endswith("★"):
+        suffix = "★"
+    elif first_trigger.endswith("$"):
+        suffix = "$"
+
+    # Detect common prefixes (could be extended)
+    # For now, focus on suffixes as mentioned in requirements
+
+    return prefix, suffix
+
+
+def clean_triggers(
+    triggers_dict: Dict[str, str],
+) -> Tuple[Dict[str, str], str, str]:
+    """
+    Clean triggers by removing detected symbols and return them.
+
+    Args:
+            triggers_dict: Dictionary of trigger -> replacement mappings
+
+    Returns:
+            Tuple of (cleaned_dict, prefix, suffix)
+    """
+    triggers_list = list(triggers_dict.keys())
+    prefix, suffix = detect_trigger_symbols(triggers_list)
+
+    cleaned_dict = {}
+    for trigger, replacement in triggers_dict.items():
+        clean_trigger = trigger
+        if prefix and clean_trigger.startswith(prefix):
+            clean_trigger = clean_trigger[len(prefix) :]
+        if suffix and clean_trigger.endswith(suffix):
+            clean_trigger = clean_trigger[: -len(suffix)]
+        cleaned_dict[clean_trigger] = replacement
+
+    return cleaned_dict, prefix, suffix
+
+
 def create_snippet_json(trigger: str, result: str, uid: str) -> Dict:
-    """Create a snippet JSON structure."""
+    """
+    Create a snippet JSON structure for Alfred.
+
+    Args:
+            trigger: The trigger keyword
+            result: The replacement text
+            uid: Unique identifier for the snippet
+
+    Returns:
+            Dictionary representing the snippet JSON structure
+    """
     return {
         "alfredsnippet": {
             "uid": uid,
@@ -62,45 +216,54 @@ def create_snippet_json(trigger: str, result: str, uid: str) -> Dict:
     }
 
 
-def create_info_plist(prefix: str = "", suffix: str = "★") -> str:
-    """Create the info.plist content for Alfred snippets.
+def create_info_plist(prefix: str = "", suffix: str = "") -> str:
+    """
+    Create the info.plist content for Alfred snippets.
 
     Args:
-        prefix: The prefix to add before snippet keywords
-        suffix: The suffix to add after snippet keywords
+            prefix: The prefix to add before snippet keywords
+            suffix: The suffix to add after snippet keywords
 
     Returns:
-        The XML content for info.plist
+            The XML content for info.plist
     """
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>snippetkeywordprefix</key>
-    <string>{prefix}</string>
-    <key>snippetkeywordsuffix</key>
-    <string>{suffix}</string>
+	<key>snippetkeywordprefix</key>
+	<string>{prefix}</string>
+	<key>snippetkeywordsuffix</key>
+	<string>{suffix}</string>
 </dict>
 </plist>"""
 
 
 def create_alfredsnippets_file(
     output_path: Path,
-    snippets_data: list,
+    snippets_data: List[Dict],
     collection_name: str,
     prefix: str = "",
-    suffix: str = "★",
+    suffix: str = "",
 ) -> None:
-    """Create a .alfredsnippets file (ZIP archive) from snippets data.
+    """
+    Create a .alfredsnippets file (ZIP archive) from snippets data.
 
     Args:
-        output_path: Directory where to create the .alfredsnippets file
-        snippets_data: List of snippet data dictionaries
-        collection_name: Name of the collection (used for filename)
-        prefix: Prefix for snippet keywords
-        suffix: Suffix for snippet keywords
+            output_path: Directory where to create the .alfredsnippets file
+            snippets_data: List of snippet data dictionaries
+            collection_name: Name of the collection (used for filename)
+            prefix: Prefix for snippet keywords
+            suffix: Suffix for snippet keywords
+
+    Raises:
+            OSError: If there's an error creating files or directories
     """
-    print(f"Creating {collection_name}.alfredsnippets...")
+    logger.info(
+        "Creating %s.alfredsnippets with %d snippets",
+        collection_name,
+        len(snippets_data),
+    )
 
     # Create a temporary directory
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -108,69 +271,118 @@ def create_alfredsnippets_file(
 
         # Create info.plist with custom prefix and suffix
         info_plist_path = temp_path / "info.plist"
-        with open(info_plist_path, "w", encoding="utf-8") as f:
-            f.write(create_info_plist(prefix, suffix))
+        try:
+            with open(info_plist_path, "w", encoding="utf-8") as f:
+                f.write(create_info_plist(prefix, suffix))
+        except OSError as e:
+            raise OSError(f"Error creating info.plist: {e}")
 
         # Create JSON files for each snippet
         for snippet_data in snippets_data:
             uid = snippet_data["alfredsnippet"]["uid"]
             json_file = temp_path / f"{uid}.json"
-            with open(json_file, "w", encoding="utf-8") as f:
-                json.dump(snippet_data, f, indent=2, ensure_ascii=False)
+            try:
+                with open(json_file, "w", encoding="utf-8") as f:
+                    json.dump(snippet_data, f, indent=2, ensure_ascii=False)
+            except OSError as e:
+                raise OSError(f"Error creating snippet file {uid}.json: {e}")
 
         # Create ZIP archive with .alfredsnippets extension
         archive_path = output_path / f"{collection_name}.alfredsnippets"
-        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            # Add all files from temp directory
-            for file_path in temp_path.rglob("*"):
-                if file_path.is_file():
-                    # Use relative path within the archive
-                    arcname = file_path.relative_to(temp_path)
-                    zipf.write(file_path, arcname)
+        try:
+            with zipfile.ZipFile(
+                archive_path, "w", zipfile.ZIP_DEFLATED
+            ) as zipf:
+                # Add all files from temp directory
+                for file_path in temp_path.rglob("*"):
+                    if file_path.is_file():
+                        # Use relative path within the archive
+                        arcname = file_path.relative_to(temp_path)
+                        zipf.write(file_path, arcname)
+        except OSError as e:
+            raise OSError(f"Error creating archive {archive_path}: {e}")
 
-    print(f"Created {archive_path} with {len(snippets_data)} snippets")
+    logger.info("Created %s with %d snippets", archive_path, len(snippets_data))
 
 
-def generate_magic_snippets(
-    output_dir: Path,
-    replacements: Dict[str, str],
-    prefix: str = "",
-    suffix: str = "★",
-) -> None:
-    """Generate Magic hotstring snippets with case sensitivity.
+def generate_case_variants(
+    trigger: str, replacement: str
+) -> List[Tuple[str, str]]:
+    """
+    Generate case variants for a trigger-replacement pair.
 
     Args:
-        output_dir: Directory where to create the .alfredsnippets file
-        replacements: Dictionary of trigger -> replacement mappings
-        prefix: Prefix for snippet keywords
-        suffix: Suffix for snippet keywords
+            trigger: Original trigger
+            replacement: Original replacement text
+
+    Returns:
+            List of (trigger, replacement) tuples with different case variants
     """
-    print("Generating Magic snippets...")
+    variants = []
 
+    # Original (lowercase)
+    variants.append((trigger.lower(), replacement.lower()))
+
+    # Title case (first letter uppercase)
+    if len(trigger) > 0:
+        title_trigger = trigger.capitalize()
+        title_replacement = apply_case_to_text(title_trigger, replacement)
+        variants.append((title_trigger, title_replacement))
+
+    # Uppercase (only for multi-character triggers)
+    if len(trigger) > 1:
+        upper_trigger = trigger.upper()
+        upper_replacement = apply_case_to_text(upper_trigger, replacement)
+        variants.append((upper_trigger, upper_replacement))
+
+    return variants
+
+
+def generate_alfred_snippets_from_toml(
+    toml_file: Path,
+    output_directory: Path,
+    overwrite: bool = False,
+) -> None:
+    """
+    Generate Alfred snippets from a single TOML file.
+
+    Args:
+            toml_file: Path to the TOML file to process
+            output_directory: Directory to save the .alfredsnippets file
+            overwrite: Whether to overwrite existing files
+
+    Raises:
+            FileNotFoundError: If the TOML file doesn't exist
+            ValueError: If the TOML file is empty or malformed
+            OSError: If there's an error reading the file or writing output
+    """
+    if not toml_file.exists():
+        raise FileNotFoundError(f"TOML file not found: {toml_file}")
+
+    # Read TOML file
+    try:
+        toml_content = toml_file.read_text(encoding="utf-8")
+    except OSError as e:
+        raise OSError(f"Error reading TOML file {toml_file}: {e}")
+
+    if not toml_content.strip():
+        raise ValueError(f"TOML file is empty: {toml_file}")
+
+    # Parse TOML content
+    triggers_dict = parse_toml_simple(toml_content)
+    if not triggers_dict:
+        raise ValueError(f"No valid triggers found in TOML file: {toml_file}")
+
+    # Clean triggers and detect symbols
+    cleaned_dict, prefix, suffix = clean_triggers(triggers_dict)
+    logger.info("Detected prefix: '%s', suffix: '%s'", prefix, suffix)
+
+    # Generate snippets data
     snippets_data = []
-
-    for trigger, replacement in replacements.items():
+    for trigger, replacement in cleaned_dict.items():
         # Generate case variants
-        variants = []
+        variants = generate_case_variants(trigger, replacement)
 
-        # Original (lowercase)
-        variants.append((trigger, replacement))
-
-        # Title case (first letter uppercase)
-        if (
-            trigger.lower() != trigger.upper()
-        ):  # Skip single letters that don't change
-            title_trigger = trigger.capitalize()
-            title_replacement = apply_case_to_text(title_trigger, replacement)
-            variants.append((title_trigger, title_replacement))
-
-        # Uppercase
-        if len(trigger) > 1:  # Only for multi-character triggers
-            upper_trigger = trigger.upper()
-            upper_replacement = apply_case_to_text(upper_trigger, replacement)
-            variants.append((upper_trigger, upper_replacement))
-
-        # Create snippet data for each variant
         for variant_trigger, variant_replacement in variants:
             uid = generate_uuid()
             snippet_data = create_snippet_json(
@@ -178,153 +390,76 @@ def generate_magic_snippets(
             )
             snippets_data.append(snippet_data)
 
-    # Create .alfredsnippets file with custom prefix and suffix
+    # Determine output file name
+    collection_name = toml_file.stem.capitalize()
+    output_file = output_directory / f"{collection_name}.alfredsnippets"
+
+    # Check if file exists and handle overwrite
+    if output_file.exists() and not overwrite:
+        logger.warning("Output file already exists, skipping: %s", output_file)
+        return
+
+    # Create Alfred snippets file
     create_alfredsnippets_file(
-        output_dir, snippets_data, "Magic", prefix, suffix
+        output_directory, snippets_data, collection_name, prefix, suffix
     )
-    print(f"Generated {len(snippets_data)} Magic snippets")
 
 
-def generate_repeat_snippets(
-    output_dir: Path, prefix: str = "", suffix: str = "★"
-) -> None:
-    """Generate Repeat snippets (ab -> abb) with case sensitivity.
+def can_overwrite_file(file_path: Path, overwrite: bool) -> bool:
+    """
+    Handle deciding what to do if a file already exists.
 
     Args:
-        output_dir: Directory where to create the .alfredsnippets file
-        prefix: Prefix for snippet keywords
-        suffix: Suffix for snippet keywords
+            file_path: Path to check for existence
+            overwrite: Whether overwriting is allowed
+
+    Returns:
+            True if we proceed with overwrite or file doesn't exist, False if we skip
     """
-    print("Generating Repeat snippets...")
-
-    snippets_data = []
-    alphabet = "abcdefghijklmnopqrstuvwxyz"
-
-    for first_letter in alphabet:
-        for second_letter in alphabet:
-            if first_letter == second_letter:
-                continue  # Skip same letters (aa -> aaa doesn't make sense)
-
-            # Generate case variants
-            variants = []
-
-            # lowercase: ab -> abb
-            trigger_lower = first_letter + second_letter
-            result_lower = first_letter + second_letter + second_letter
-            variants.append((trigger_lower, result_lower))
-
-            # Title case: Ab -> Abb
-            trigger_title = first_letter.upper() + second_letter
-            result_title = first_letter.upper() + second_letter + second_letter
-            variants.append((trigger_title, result_title))
-
-            # Uppercase: AB -> ABB
-            trigger_upper = first_letter.upper() + second_letter.upper()
-            result_upper = (
-                first_letter.upper()
-                + second_letter.upper()
-                + second_letter.upper()
-            )
-            variants.append((trigger_upper, result_upper))
-
-            # Create snippet data for each variant
-            for variant_trigger, variant_result in variants:
-                uid = generate_uuid()
-                snippet_data = create_snippet_json(
-                    variant_trigger, variant_result, uid
-                )
-                snippets_data.append(snippet_data)
-
-    # Create .alfredsnippets file with custom prefix and suffix
-    create_alfredsnippets_file(
-        output_dir, snippets_data, "Repeat", prefix, suffix
-    )
-    print(f"Generated {len(snippets_data)} Repeat snippets")
+    if file_path.exists():
+        logger.warning("Destination file already exists: %s", file_path)
+        if overwrite:
+            logger.warning("Overwriting: %s", file_path)
+            return True
+        else:
+            logger.warning("Skipping modification: %s", file_path)
+            return False
+    return True
 
 
-def main():
-    """Main function to generate Alfred snippets."""
-    script_dir = Path(__file__).parent
-    output_dir = script_dir
+def show_execution_summary(processed: int, errors: int) -> None:
+    """
+    Display a summary of the generation process.
 
-    # Configuration for snippet collections
-    # You can modify these values to customize prefix/suffix for each collection
-    MAGIC_CONFIG = {"prefix": "", "suffix": "★"}
-
-    REPEAT_CONFIG = {"prefix": "", "suffix": "★"}
-
-    magic_toml_file = (
-        script_dir.parent.parent.parent
-        / "static"
-        / "drivers"
-        / "configuration"
-        / "magic.toml"
-    )
-
-    # Charger les remplacements magic depuis le fichier TOML
-    if not magic_toml_file.exists():
-        print(f"Error: {magic_toml_file} not found")
-        return
-
-    try:
-            import toml
-    except ImportError:
-        print(
-            "Le module 'toml' est requis. Installez-le avec 'pip install toml'."
+    Args:
+            processed: Number of successfully processed files
+            errors: Number of errors encountered
+    """
+    if errors == 0 and get_error_count() == 0:
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+        logger.success(
+            "======= All files processed successfully: %d file(s) processed, no errors! =======",
+            processed,
         )
-        return
-
-    with open(magic_toml_file, "r", encoding="utf-8") as f:
-        toml_data = toml.load(f)
-
-    # Extraire les triggers et outputs de chaque section
-    magic_replacements = {}
-    for section in toml_data.values():
-        if isinstance(section, list):
-            for entry in section:
-                for trigger, output in entry.items():
-                    magic_replacements[trigger] = output
-
-    # Clean up old directories if they exist
-    old_magic_dir = output_dir / "Magic"
-    old_repeat_dir = output_dir / "Repeat"
-
-    if old_magic_dir.exists():
-        import shutil
-
-        shutil.rmtree(old_magic_dir)
-        print("Removed old Magic directory")
-
-    if old_repeat_dir.exists():
-        import shutil
-
-        shutil.rmtree(old_repeat_dir)
-        print("Removed old Repeat directory")
-
-    # Générer les snippets comme précédemment
-    generate_magic_snippets(
-        output_dir,
-        magic_replacements,
-        prefix=MAGIC_CONFIG["prefix"],
-        suffix=MAGIC_CONFIG["suffix"],
-    )
-    generate_repeat_snippets(
-        output_dir,
-        prefix=REPEAT_CONFIG["prefix"],
-        suffix=REPEAT_CONFIG["suffix"],
-    )
-
-    print("Alfred snippet generation complete!")
-    print(
-        "You can now import Magic.alfredsnippets and Repeat.alfredsnippets into Alfred"
-    )
-    print(
-        f"Magic snippets use: prefix='{MAGIC_CONFIG['prefix']}', suffix='{MAGIC_CONFIG['suffix']}'"
-    )
-    print(
-        f"Repeat snippets use: prefix='{REPEAT_CONFIG['prefix']}', suffix='{REPEAT_CONFIG['suffix']}'"
-    )
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+        logger.success("=" * 81)
+    else:
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error(
+            "======= Processing complete. %d file(s) processed, %d error(s) (exceptions), %d error log(s). =======",
+            processed,
+            errors,
+            get_error_count(),
+        )
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error("=" * 100)
 
 
 if __name__ == "__main__":
-    main()
+    main(overwrite=True)
