@@ -147,10 +147,10 @@ def clean_triggers(
     Clean triggers by removing detected symbols and return them.
 
     Args:
-            triggers_dict: Dictionary of trigger -> replacement mappings
+        triggers_dict: Dictionary of trigger -> replacement mappings
 
     Returns:
-            Tuple of (cleaned_dict, prefix, suffix)
+        Tuple of (cleaned_dict, prefix, suffix)
     """
     triggers_list = list(triggers_dict.keys())
     prefix, suffix = detect_trigger_symbols(triggers_list)
@@ -172,10 +172,10 @@ def escape_yaml_string(text: str) -> str:
     Escape special characters in a string for YAML format.
 
     Args:
-            text: The string to escape
+        text: The string to escape
 
     Returns:
-            Escaped string suitable for YAML
+        Escaped string suitable for YAML
     """
     # For YAML, we need to escape single quotes and handle special characters
     if "'" in text:
@@ -193,13 +193,13 @@ def create_espanso_match_entry(
     Create a single Espanso match entry in YAML format.
 
     Args:
-            trigger: The trigger keyword
-            replacement: The replacement text
-            suffix: The suffix symbol to add to trigger (e.g., "★")
-            use_propagate_case: Whether to add propagate_case: true
+        trigger: The trigger keyword
+        replacement: The replacement text
+        suffix: The suffix symbol to add to trigger (e.g., "★")
+        use_propagate_case: Whether to add propagate_case: true
 
     Returns:
-            YAML formatted match entry as string
+        YAML formatted match entry as string
     """
     full_trigger = trigger + suffix
     trigger_escaped = escape_yaml_string(full_trigger)
@@ -223,14 +223,14 @@ def generate_espanso_match_from_toml(
     Generate Espanso match file from a single TOML file.
 
     Args:
-            toml_file: Path to the TOML file to process
-            output_directory: Directory to save the .yml file
-            overwrite: Whether to overwrite existing files
+        toml_file: Path to the TOML file to process
+        output_directory: Directory to save the .yml file
+        overwrite: Whether to overwrite existing files
 
     Raises:
-            FileNotFoundError: If the TOML file doesn't exist
-            ValueError: If the TOML file is empty or malformed
-            OSError: If there's an error reading the file or writing output
+        FileNotFoundError: If the TOML file doesn't exist
+        ValueError: If the TOML file is empty or malformed
+        OSError: If there's an error reading the file or writing output
     """
     if not toml_file.exists():
         raise FileNotFoundError(f"TOML file not found: {toml_file}")
@@ -266,8 +266,9 @@ def generate_espanso_match_from_toml(
     use_propagate_case = file_stem in [
         "magic",
         "magic_sample",
-        "suffixes",
         "repeat",
+        "rolls",
+        "suffixes",
     ]
 
     # Generate YAML content
@@ -299,8 +300,8 @@ def show_execution_summary(processed: int, errors: int) -> None:
     Display a summary of the generation process.
 
     Args:
-            processed: Number of successfully processed files
-            errors: Number of errors encountered
+        processed: Number of successfully processed files
+        errors: Number of errors encountered
     """
     if errors == 0 and get_error_count() == 0:
         logger.success("=" * 81)
