@@ -23,6 +23,23 @@
 	z-index: 90;
 }
 
+.banner p,
+.banner a {
+	color: white;
+	font-size: 1rem;
+	font-variant-caps: small-caps;
+	font-weight: bold;
+	line-height: 1;
+	text-align: center;
+	text-decoration: none;
+}
+
+.banner .subtitle {
+	font-size: 0.5em;
+	margin-bottom: 1.1rem;
+	margin-top: -0.65rem;
+}
+
 @media (max-width: 800px) {
 	:root {
 		--banner-height: 3.5rem;
@@ -37,15 +54,20 @@
 		top: var(--header-height);
 		transform: none;
 	}
+
+	.banner .subtitle {
+		font-size: 0.6em;
+	}
 }
 
-.banner p,
-.banner a {
-	color: white;
-	font-size: 1rem;
-	font-variant-caps: small-caps;
-	font-weight: bold;
-	line-height: 1;
-	text-align: center;
-	text-decoration: none;
+@media (min-width: 1400px) {
+	.banner p,
+	.banner a {
+		font-size: 1.05rem;
+	}
+
+	.banner .subtitle {
+		font-size: 0.65em;
+		margin-top: -0.8rem;
+	}
 }
