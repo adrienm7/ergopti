@@ -269,13 +269,22 @@ def create_layout_name(
         # If no version found, use empty string
         display_version = ""
 
+    # Fallback: extract version from filename if not found in content
+    if not display_version:
+        import re
+
+        # Try to extract version from variant filename (e.g., "Ergopti_v2_2_0_plus_plus" -> "v2.2.0")
+        version_match = re.search(r"v(\d+)_(\d+)_(\d+)", variant.lower())
+        if version_match:
+            display_version = f"v{version_match.group(1)}.{version_match.group(2)}.{version_match.group(3)}"
+
     # Generate display name with proper variant formatting
     if is_plusplus:
-        layout_name = f"Ergopti++ {display_version}".strip()
+        layout_name = f"Français — Ergopti++ {display_version}".strip()
     elif is_plus:
-        layout_name = f"Ergopti+ {display_version}".strip()
+        layout_name = f"Français — Ergopti+ {display_version}".strip()
     else:
-        layout_name = f"Ergopti {display_version}".strip()
+        layout_name = f"Français — Ergopti {display_version}".strip()
 
     if use_date_in_filename:
         now = datetime.datetime.now()
