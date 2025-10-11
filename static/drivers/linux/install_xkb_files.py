@@ -158,90 +158,88 @@ def prettify_xml(element, indent="  ", level=0):
 
 
 def update_xml(file_path, symbols_line, name_line):
-    """Update the XML file by inserting a new variant element."""
+    """Update the XML file by inserting or replacing a variant element."""
     if not file_exists(file_path):
         print(f"Fichier non trouvé : {file_path}")
         return
-
     tree = ET.parse(file_path)
     root = tree.getroot()
-
     for layout in root.findall(".//layout"):
         name = layout.find("./configItem/name")
         if name is not None and name.text == "fr":
             variant_list = layout.find("variantList")
             if variant_list is not None:
-                # Verify if the section already exists
-                if any(
-                    variant.find("./configItem/name").text == symbols_line
-                    for variant in variant_list.findall("variant")
-                ):
-                    print(
-                        f"La variante '{symbols_line}' existe déjà dans le fichier XML."
-                    )
-                    return
-
+                # Cherche si la variante existe déjà
+                existing_variant = None
+                for variant in variant_list.findall("variant"):
+                    config_item = variant.find("./configItem")
+                    if config_item is not None:
+                        name_elem = config_item.find("name")
+                        if name_elem is not None and name_elem.text == symbols_line:
+                            existing_variant = variant
+                            break
                 backup_file(file_path)
-
-                new_variant = ET.Element("variant")
-                config_item = ET.SubElement(new_variant, "configItem")
-                name_elem = ET.SubElement(config_item, "name")
-                description_elem = ET.SubElement(config_item, "description")
-                name_elem.text = symbols_line
-                description_elem.text = name_line
-                variant_list.insert(0, new_variant)
-                root = prettify_xml(root)  # Prettify the XML before saving
+                if existing_variant is not None:
+                    # Remplace la variante existante
+                    config_item = existing_variant.find("configItem")
+                    name_elem = config_item.find("name")
+                    description_elem = config_item.find("description")
+                    name_elem.text = symbols_line
+                    description_elem.text = name_line
+                    print(f"Variante '{symbols_line}' mise à jour dans le fichier XML.")
+                else:
+                    # Ajoute une nouvelle variante
+                    new_variant = ET.Element("variant")
+                    config_item = ET.SubElement(new_variant, "configItem")
+                    name_elem = ET.SubElement(config_item, "name")
+                    description_elem = ET.SubElement(config_item, "description")
+                    name_elem.text = symbols_line
+                    description_elem.text = name_line
+                    variant_list.insert(0, new_variant)
+                    print(f"Variante '{symbols_line}' ajoutée dans le fichier XML.")
+                root = prettify_xml(root)
                 tree.write(file_path, encoding="utf-8", xml_declaration=True)
-                print("XML mis à jour avec succès.")
                 return
-
     print("Élément 'layout' avec 'name=fr' non trouvé.")
 
 
+
 def update_lst(file_path, symbols_line, name_line):
-    """Update the LST file by inserting a new line under the '! variant' section."""
+    """Update the LST file by inserting or replacing the line under the '! variant' section."""
     if not file_exists(file_path):
         print(f"Fichier non trouvé : {file_path}")
         return
-
     with open(file_path, "r") as file:
         lines = file.readlines()
-
     variant_section_found = False
     symbols_line_exists = False
+    symbols_line_index = -1
     for i, line in enumerate(lines):
         if line.startswith("! variant"):
             variant_section_found = True
-            continue  # Continue to check lines within this section
-
-        if variant_section_found:
-            if symbols_line in line:
-                symbols_line_exists = True
-                break  # symbols_line already exists, no need to update
-
+            continue
+        if variant_section_found and symbols_line in line.split()[0]:
+            symbols_line_exists = True
+            symbols_line_index = i
+            break
     if not variant_section_found:
         print("Section '! variant' non trouvée dans le fichier LST.")
         return
-
-    if symbols_line_exists:
-        print(
-            f"La ligne '{symbols_line}' existe déjà dans la section '! variant' du fichier LST."
-        )
-        return
-
     backup_file(file_path)
-
-    # Insert the new line under '! variant' section
-    for i, line in enumerate(lines):
-        if line.startswith("! variant"):
-            lst_line = f"  {symbols_line:<15} fr: {name_line}\n"
-            lines.insert(i + 1, lst_line)
-            break
-
+    if symbols_line_exists:
+        # Remplace la ligne existante
+        lst_line = f"  {symbols_line:<15} fr: {name_line}\n"
+        lines[symbols_line_index] = lst_line
+    else:
+        # Ajoute la nouvelle ligne sous '! variant' section
+        for i, line in enumerate(lines):
+            if line.startswith("! variant"):
+                lst_line = f"  {symbols_line:<15} fr: {name_line}\n"
+                lines.insert(i + 1, lst_line)
+                break
     with open(file_path, "w") as file:
         file.writelines(lines)
     print("Fichier LST mis à jour avec succès.")
-
 
 def validate_file(file_path, extension):
     """Check if the file exists and has the correct extension."""
