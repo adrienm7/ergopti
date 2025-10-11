@@ -87,7 +87,7 @@ xkb_compatibility { include "complete" };
 partial alphanumeric_keys
 xkb_symbols "Ergopti_v2_2_0" {
 
-	name[Group1] = "Ergopti v2.2.0";
+	name[Group1] = "Ergopti";
 
 	include "latin"
 
@@ -121,7 +121,7 @@ xkb_symbols "Ergopti_v2_2_0" {
         key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, ccedilla, Ccedilla] }; // c C C c c ç Ç
         key <AD10> { type[group1] = "SEVEN_LEVEL_KEY", [x, X, X, x, x, asterisk, multiply] }; // x X X x x * ×
         key <AD11> { type[group1] = "SEVEN_LEVEL_KEY", [z, Z, Z, z, z, percent, U2030] }; // z Z Z z z % ‰
-        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, U202F, U202F, diaeresis, nobreakspace, NoSymbol] }; // ¨ ¨     ¨   
+        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, minus, minus, diaeresis, underscore, U2605] }; // ¨ ¨ - - ¨ _ ★
 
         // Letters — Row 2/3
         key <AC01> { type[group1] = "SEVEN_LEVEL_KEY", [a, A, A, a, a, less, lessthanequal] }; // a A A a a < ≤
@@ -143,7 +143,7 @@ xkb_symbols "Ergopti_v2_2_0" {
         key <AB02> { type[group1] = "SEVEN_LEVEL_KEY", [agrave, Agrave, Agrave, agrave, v, backslash, downarrow] }; // à À À à v \ ᵢ
         key <AB03> { type[group1] = "SEVEN_LEVEL_KEY", [j, J, J, j, j, quotedbl, j] }; // j J J j j " j
         key <AB04> { type[group1] = "SEVEN_LEVEL_KEY", [comma, comma, onesixth, onesixth, comma, semicolon, ellipsis] }; // , , " ;" " ;" , ; …
-        key <AB05> { type[group1] = "SEVEN_LEVEL_KEY", [k, K, K, k, k, ellipsis, NoSymbol] }; // k K K k k … 
+        key <AB05> { type[group1] = "SEVEN_LEVEL_KEY", [k, K, K, k, k, ellipsis, plus] }; // k K K k k … +
         key <AB06> { type[group1] = "SEVEN_LEVEL_KEY", [m, M, M, m, m, ampersand, U2212] }; // m M M m m & −
         key <AB07> { type[group1] = "SEVEN_LEVEL_KEY", [d, D, D, d, d, dollar, section] }; // d D D d d $ §
         key <AB08> { type[group1] = "SEVEN_LEVEL_KEY", [l, L, L, l, l, equal, notequal] }; // l L L l l = ≠

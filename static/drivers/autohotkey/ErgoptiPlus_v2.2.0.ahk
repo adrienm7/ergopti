@@ -1881,28 +1881,28 @@ global DeadkeyMappingCircumflex := Map(
     ":", "▶",
     ";", "↪",
     "a", "â", "A", "Â",
-    "b", "⚐", "B", "⚑",
-    "c", "º", "C", "°",
+    "b", "º", "B", "°",
+    "c", "ç", "C", "Ç",
     "d", "★", "D", "☆",
     "e", "ê", "E", "Ê",
-    "f", "✅", "F", "☑",
+    "f", "⚐", "f", "⚑",
     "g", "ĝ", "G", "Ĝ",
     "h", "ĥ", "H", "Ĥ",
     "i", "î", "I", "Î",
     "j", "j", "J", "J",
     "k", "☺", "K", "☻",
     "l", "†", "L", "‡",
-    "m", "⁂", "M", "⁂",
+    "m", "✅", "M", "☑",
     "n", "ñ", "N", "Ñ",
     "o", "ô", "O", "Ô",
-    "p", "¶", "P", "¶",
+    "p", "¶", "P", "⁂",
     "q", "☒", "Q", "☐",
     "r", "/", "R", "\",
     "s", "ß", "S", "ẞ",
     "t", "!", "T", "¡",
     "u", "û", "U", "Û",
     "v", "✓", "V", "✔",
-    "w", "ŵ", "W", "Ŵ",
+    "w", "ù ", "W", "Ù",
     "x", "✕", "X", "✖",
     "y", "ŷ", "Y", "Ŷ",
     "z", "ẑ", "Z", "Ẑ",
@@ -2252,7 +2252,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     +SC018:: SendNewResult("C")
     +SC019:: SendNewResult("X")
     +SC01A:: SendNewResult("Z")
-    +SC01B:: SendNewResult(" ") ; Thin non-breaking space
+    +SC01B:: SendNewResult("-")
 
     ; === Middle row ===
     +SC01E:: SendNewResult("A")
@@ -2505,8 +2505,8 @@ SC138 & SC01A:: RemapAltGr(
     (*) => SendNewResult("‰")
 )
 SC138 & SC01B:: RemapAltGr(
-    (*) => SendNewResult(" "),
-    (*) => SendNewResult("£")
+    (*) => SendNewResult("_"),
+    (*) => SendNewResult("★")
 )
 
 ; === Middle row ===
@@ -2582,7 +2582,7 @@ SC138 & SC02F:: RemapAltGr(
 )
 SC138 & SC030:: RemapAltGr(
     (*) => SendNewResult("…"),
-    (*) =>
+    (*) => SendNewResult("+")
 )
 SC138 & SC031:: RemapAltGr(
     (*) => WrapTextIfSelected("&", "&", "&"),
