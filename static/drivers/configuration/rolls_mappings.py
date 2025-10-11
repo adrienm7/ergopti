@@ -21,15 +21,15 @@ LOGS_INDENTATION = "\t\t"
 
 def load_plus_mappings_config() -> dict:
     """
-    Load Ergopti+ mappings configuration from TOML file.
+    Load Ergopti+ mappings configuration from rolls.toml and suffixes.toml files.
 
     Returns:
-            Dictionary containing the mappings configuration
+        Dictionary containing the merged mappings configuration
 
     Raises:
-            ImportError: If tomllib/tomli is not available
-            FileNotFoundError: If the TOML file doesn't exist
-            OSError: If there's an error reading the file
+        ImportError: If tomllib/tomli is not available
+        FileNotFoundError: If any TOML file doesn't exist
+        OSError: If there's an error reading the files
     """
     # Try to import TOML parser (Python 3.11+ has tomllib built-in)
     try:
@@ -42,26 +42,53 @@ def load_plus_mappings_config() -> dict:
                 "TOML parser required. Install with 'pip install tomli' for Python < 3.11"
             )
 
-    # Load TOML configuration file
-    config_file = Path(__file__).parent / "rolls.toml"
+    # Load both TOML configuration files
+    config_files = [
+        Path(__file__).parent / "rolls.toml",
+        Path(__file__).parent / "suffixes.toml",
+    ]
 
-    if not config_file.exists():
-        raise FileNotFoundError(f"Configuration file not found: {config_file}")
+    merged_toml_data = {}
 
-    try:
-        with open(config_file, "rb") as f:
-            toml_data = tomllib.load(f)
-    except OSError as e:
-        raise OSError(f"Error reading configuration file {config_file}: {e}")
+    for config_file in config_files:
+        if not config_file.exists():
+            raise FileNotFoundError(
+                f"Configuration file not found: {config_file}"
+            )
+
+        try:
+            with open(config_file, "rb") as f:
+                toml_data = tomllib.load(f)
+                # Merge the data, with potential conflicts logged
+                for section_name, section_data in toml_data.items():
+                    if section_name in merged_toml_data:
+                        logger.warning(
+                            "Section '%s' found in multiple files, merging...",
+                            section_name,
+                        )
+                        # Merge section data
+                        merged_toml_data[section_name].update(section_data)
+                    else:
+                        merged_toml_data[section_name] = section_data
+
+                logger.info("Loaded configuration from: %s", config_file.name)
+        except OSError as e:
+            raise OSError(
+                f"Error reading configuration file {config_file}: {e}"
+            )
 
     # Convert TOML structure to the expected format
     config = {}
-    for section_name, section_data in toml_data.items():
+    for section_name, section_data in merged_toml_data.items():
         # Extract trigger from the first key and build mappings
         triggers = set()
         map_entries = []
 
         for key, value in section_data.items():
+            # Skip the entries we want to filter out
+            if key in ["càd", "shàd", "à★"]:
+                continue
+
             if len(key) >= 1:
                 trigger = key[0]  # First character is the trigger
                 remaining = key[1:]  # Rest is the mapping key
@@ -78,10 +105,12 @@ def load_plus_mappings_config() -> dict:
     return config
 
 
-# Load configuration from TOML file
+# Load configuration from TOML files
 try:
     PLUS_MAPPINGS_CONFIG = load_plus_mappings_config()
-    logger.info("Loaded Ergopti+ mappings configuration from TOML file")
+    logger.info(
+        "Loaded Ergopti+ mappings configuration from rolls.toml and suffixes.toml files"
+    )
 except (ImportError, FileNotFoundError, OSError) as e:
     logger.error("Error loading TOML configuration: %s", e)
     logger.info("Falling back to empty configuration")

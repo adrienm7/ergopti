@@ -59,8 +59,11 @@ def main(
     logger.info("Input directory: %s", config_directory)
     logger.info("Output directory: %s", output_directory)
 
-    # Find all TOML files
+    # Find all TOML files and filter out magic_sample
     toml_files = list(config_directory.glob("*.toml"))
+    # Exclude magic_sample from processing
+    toml_files = [f for f in toml_files if f.stem != "magic_sample"]
+
     if not toml_files:
         logger.error("No TOML files found in: %s", config_directory)
         return

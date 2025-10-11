@@ -29,6 +29,9 @@ matches:
   - trigger: 'ài'
     replace: 'ying'
     propagate_case: true
+  - trigger: 'àj'
+    replace: 'bu'
+    propagate_case: true
   - trigger: 'àk'
     replace: 'ique'
     propagate_case: true
@@ -56,6 +59,9 @@ matches:
   - trigger: 'àt'
     replace: 'ettre'
     propagate_case: true
+  - trigger: 'àu'
+    replace: 'ub'
+    propagate_case: true
   - trigger: 'àv'
     replace: 'ment'
     propagate_case: true
@@ -65,6 +71,15 @@ matches:
   - trigger: 'àz'
     replace: 'ez-vous'
     propagate_case: true
+  - trigger: 'àé'
+    replace: 'éi'
+    propagate_case: true
   - trigger: 'àê'
     replace: 'able'
+    propagate_case: true
+  - trigger: 'à’'
+    replace: 'ance'
+    propagate_case: true
+  - trigger: 'à★'
+    replace: 'bu'
     propagate_case: true

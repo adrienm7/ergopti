@@ -20,6 +20,32 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utilities.logger import get_error_count, logger, reset_error_count
 
 
+def sort_files_by_priority(
+    toml_files: List[Path], priority_order: List[str]
+) -> List[Path]:
+    """
+    Sort TOML files according to priority order.
+
+    Args:
+        toml_files: List of Path objects to TOML files
+        priority_order: List of file stems in priority order (highest to lowest)
+
+    Returns:
+        Sorted list of Path objects
+    """
+
+    def get_priority(file_path: Path) -> int:
+        """Get priority index for a file, higher number = lower priority."""
+        stem = file_path.stem
+        try:
+            return priority_order.index(stem)
+        except ValueError:
+            # Files not in priority list go to the end
+            return len(priority_order)
+
+    return sorted(toml_files, key=get_priority)
+
+
 def main(
     input_directory: Optional[Path] = None,
     output_directory: Optional[Path] = None,
@@ -64,22 +90,44 @@ def main(
         )
         return
 
-    # Find all TOML files
+    # Find all TOML files and filter out magic_sample
     toml_files = list(config_directory.glob("*.toml"))
+    # Exclude magic_sample from processing
+    toml_files = [f for f in toml_files if f.stem != "magic_sample"]
+
     if not toml_files:
         logger.error("No TOML files found in: %s", config_directory)
         return
 
-    logger.info("Found %d TOML file(s) to process", len(toml_files))
+    # Define priority order (highest to lowest priority)
+    priority_order = [
+        "rolls",
+        "magic",
+        "suffixes",
+        "symbols",
+        "symbols_typst",
+        "repeat",
+    ]
 
+    # Sort files by priority
+    toml_files_sorted = sort_files_by_priority(toml_files, priority_order)
+
+    logger.info("Found %d TOML file(s) to process", len(toml_files_sorted))
+    logger.info(
+        "Processing order (by priority): %s",
+        [f.stem for f in toml_files_sorted],
+    )
+
+    # Collect all triggers to avoid duplicates
+    used_triggers = set()
     processed = 0
     errors = 0
 
-    for toml_file in toml_files:
+    for toml_file in toml_files_sorted:
         logger.launch("Processing: %s", toml_file.name)
         try:
             generate_espanso_match_from_toml(
-                toml_file, output_directory, overwrite
+                toml_file, output_directory, overwrite, used_triggers
             )
             processed += 1
             logger.success("Successfully processed: %s", toml_file.name)
@@ -214,10 +262,37 @@ def create_espanso_match_entry(
     replace: {replacement_escaped}"""
 
 
+def remove_duplicate_triggers(
+    triggers_dict: Dict[str, str],
+    used_triggers: set,
+    suffix: str = "",
+) -> Dict[str, str]:
+    """
+    Remove triggers that are already used to avoid duplicates.
+
+    Args:
+        triggers_dict: Dictionary of trigger -> replacement mappings
+        used_triggers: Set of already used full triggers (with suffix)
+        suffix: The suffix to append to triggers
+
+    Returns:
+        Dictionary with duplicate triggers removed
+    """
+    filtered_dict = {}
+
+    for trigger, replacement in triggers_dict.items():
+        full_trigger = trigger + suffix
+        if full_trigger not in used_triggers:
+            filtered_dict[trigger] = replacement
+
+    return filtered_dict
+
+
 def generate_espanso_match_from_toml(
     toml_file: Path,
     output_directory: Path,
     overwrite: bool = False,
+    used_triggers: Optional[set] = None,
 ) -> None:
     """
     Generate Espanso match file from a single TOML file.
@@ -226,12 +301,16 @@ def generate_espanso_match_from_toml(
         toml_file: Path to the TOML file to process
         output_directory: Directory to save the .yml file
         overwrite: Whether to overwrite existing files
+        used_triggers: Set of already used triggers to avoid duplicates
 
     Raises:
         FileNotFoundError: If the TOML file doesn't exist
         ValueError: If the TOML file is empty or malformed
         OSError: If there's an error reading the file or writing output
     """
+    if used_triggers is None:
+        used_triggers = set()
+
     if not toml_file.exists():
         raise FileNotFoundError(f"TOML file not found: {toml_file}")
 
@@ -252,6 +331,33 @@ def generate_espanso_match_from_toml(
     # Clean triggers and detect symbols
     cleaned_dict, prefix, suffix = clean_triggers(triggers_dict)
     logger.info("Detected prefix: '%s', suffix: '%s'", prefix, suffix)
+
+    # Remove duplicates based on used_triggers
+    original_count = len(cleaned_dict)
+    cleaned_dict = remove_duplicate_triggers(
+        cleaned_dict, used_triggers, suffix
+    )
+    removed_count = original_count - len(cleaned_dict)
+
+    if removed_count > 0:
+        logger.info(
+            "Removed %d duplicate trigger(s) from %s",
+            removed_count,
+            toml_file.name,
+        )
+
+    # Update used_triggers with current triggers
+    for trigger in cleaned_dict.keys():
+        full_trigger = trigger + suffix
+        used_triggers.add(full_trigger)
+
+    # Skip file generation if no triggers remain after deduplication
+    if not cleaned_dict:
+        logger.warning(
+            "No triggers remaining after deduplication for %s, skipping file generation",
+            toml_file.name,
+        )
+        return
 
     # Determine output file name
     output_file = output_directory / f"{toml_file.stem}.yml"
