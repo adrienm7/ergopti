@@ -165,11 +165,7 @@
 <div class="banner">
 	<a href="/informations#changelog"
 		><p>NOUVEAU : Ergopti v2.2</p>
-		<p
-			style="font-size: 0.55em; margin-top:-0.65rem; margin-bottom:1.1rem; text-transform: uppercase"
-		>
-			Drivers Windows, macOS et Linux complets
-		</p></a
+		<p class="subtitle">drivers Windows, macOS et Linux complets</p></a
 	>
 </div>
 
