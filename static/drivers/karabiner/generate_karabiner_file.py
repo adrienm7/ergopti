@@ -97,9 +97,62 @@ def get_keycode_map(keylayout_path: str) -> KeycodeMap:
     return dict(keycode_map)
 
 
-keylayout_path = (
-    Path(__file__).parent.parent / "macos" / "Ergopti_v2.2.0.keylayout"
-)
+def get_macos_keylayout_path() -> Path:
+    """
+    Return the absolute path to the macOS keylayout file.
+    Find the most recent bundle and use the _plus variant.
+
+    Returns:
+        Path: Path to the macOS keylayout _plus file.
+
+    Raises:
+        FileNotFoundError: If no keylayout file is found.
+    """
+    macos_dir = Path(__file__).parent.parent / "macos"
+    if not macos_dir.is_dir():
+        raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
+
+    # Check for bundle directories
+    bundle_dirs = list(macos_dir.glob("*.bundle"))
+    if bundle_dirs:
+        # Sort bundles by version to get the most recent one
+        def extract_version(bundle_path: Path) -> tuple:
+            """Extract version numbers from bundle name for sorting."""
+            import re
+
+            match = re.search(r"v?(\d+)\.(\d+)\.(\d+)", bundle_path.name)
+            if match:
+                return tuple(int(x) for x in match.groups())
+            return (0, 0, 0)  # fallback for unversioned bundles
+
+        # Sort by version (highest first)
+        bundle_dirs.sort(key=extract_version, reverse=True)
+
+        for bundle_dir in bundle_dirs:
+            bundle_resources = bundle_dir / "Contents" / "Resources"
+            if bundle_resources.is_dir():
+                # Look specifically for _plus keylayout file (not plus_plus)
+                plus_files = [
+                    f
+                    for f in bundle_resources.glob("*_plus.keylayout")
+                    if not f.stem.endswith("_plus_plus")
+                ]
+                if plus_files:
+                    return plus_files[0]
+
+    # Fallback: look in main macos directory for _plus files
+    plus_files = [
+        f
+        for f in macos_dir.glob("*_plus.keylayout")
+        if not f.stem.endswith("_plus_plus")
+    ]
+    if plus_files:
+        return plus_files[0]
+
+    raise FileNotFoundError(f"No _plus keylayout file found in {macos_dir}")
+
+
+keylayout_path = get_macos_keylayout_path()
 keycode_map = get_keycode_map(str(keylayout_path))
 
 keycode_map = {unescape_xml_characters(k): v for k, v in keycode_map.items()}
@@ -226,6 +279,41 @@ for mapping_name, mapping in plus_mappings.items():
                                 )
                             else:
                                 to_list.append({"key_code": base_name})
+                        continue
+
+                    # Cas particulier pour œ/Œ : touche morte circonflexe + o/O
+                    if char in ["œ", "Œ"]:
+                        # Envoyer backslash (touche morte ^) puis la touche o
+                        to_list.append({"key_code": "backslash"})
+
+                        # Envoyer la touche 'o' du layout Ergopti
+                        o_positions = letter_to_num.get("o", [])
+                        if o_positions:
+                            o_code, o_layer = o_positions[0]
+                            o_name = macos_keycodes.get(str(o_code), o_code)
+                            o_modifiers: List[str] = []
+                            if o_layer == 2:
+                                o_modifiers.append("shift")
+                            elif o_layer == 5:
+                                o_modifiers.append("option")
+                            elif o_layer == 6:
+                                o_modifiers.extend(["shift", "option"])
+                            # Shift logic pour œ/Œ
+                            if (
+                                second_layer == 2
+                                or is_trigger_shifted(trigger)
+                                or char.isupper()
+                            ) and "shift" not in o_modifiers:
+                                o_modifiers.append("shift")
+                            if o_modifiers:
+                                to_list.append(
+                                    {
+                                        "key_code": o_name,
+                                        "modifiers": o_modifiers,
+                                    }
+                                )
+                            else:
+                                to_list.append({"key_code": o_name})
                         continue
 
                     # Multi-key sequence

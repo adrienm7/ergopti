@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-2510112" maxout="1" name="Ergopti Plus">
+<keyboard group="126" id="-2510111" maxout="1" name="Ergopti v2.2.0">
 	<layouts>
 		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
@@ -519,8 +519,8 @@
 			<key code="11" output="…"/>
 			<key code="12" action="`"/>
 			<key code="13" output="@"/>
-			<key code="14" action="%"/>
-			<key code="15" output="où"/>
+			<key code="14" action="œ"/>
+			<key code="15" output="ù"/>
 			<key code="16" output=" »"/>
 			<key code="17" output="« "/>
 			<key code="18" output="¹"/>
@@ -536,7 +536,7 @@
 			<key code="28" output="⁸"/>
 			<key code="29" output="⁰"/>
 			<key code="30" output=" "/>
-			<key code="31" action="!"/>
+			<key code="31" output="ç"/>
 			<key code="32" output="~"/>
 			<key code="33" output="%"/>
 			<key code="34" output="#"/>
@@ -601,7 +601,7 @@
 			<key code="12" output="„"/>
 			<key code="13" output="€"/>
 			<key code="14" action="Œ"/>
-			<key code="15" output="Où"/>
+			<key code="15" output="Ù"/>
 			<key code="16" output="”"/>
 			<key code="17" output="“"/>
 			<key code="18" output="₁"/>
@@ -616,7 +616,7 @@
 			<key code="27" output="‱"/>
 			<key code="28" output="₈"/>
 			<key code="29" output="₀"/>
-			<key code="31" output=" !"/>
+			<key code="31" output="Ç"/>
 			<key code="32" output="≈"/>
 			<key code="33" output="‰"/>
 			<key code="34" output="%"/>
@@ -1187,15 +1187,9 @@
 			<when state="none" next="s3_diaeresis"/>
 			<when state="s3_diaeresis" output="¨"/>
 		</action>
-		<action id="!">
-			<when state="none" output="!"/>
-		</action>
 		<action id="$">
 			<when state="none" output="$"/>
 			<when state="s2_currency" output="£"/>
-		</action>
-		<action id="%">
-			<when state="none" output="%"/>
 		</action>
 		<action id="&#x0026;">
 			<when state="none" output="&#x0026;"/>

@@ -10,7 +10,7 @@ script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir.parent))  # Add drivers directory to path
 
 # Import utilities
-from utilities.keylayout_extraction import extract_name_from_file
+from utilities.keylayout_extraction import extract_version
 from utilities.logger import logger
 
 # Import local modules using importlib
@@ -242,6 +242,7 @@ def create_layout_name(
     Generate the layout id and display name from the variant and optionally the date.
 
     Args:
+        keylayout (str): The keylayout file content.
         variant (str): The layout variant name.
         use_date_in_filename (bool): Whether to append the date to the output.
 
@@ -251,7 +252,30 @@ def create_layout_name(
     layout_id = variant.replace(
         ".", "_"
     )  # If there are dots in the id (here in version number), the layout doesn't work
-    layout_name = "France - " + extract_name_from_file(keylayout)
+
+    # Determine variant type based on filename
+    stem = variant.lower()
+    is_plusplus = stem.endswith("plus_plus")
+    is_plus = "plus" in stem and not is_plusplus
+
+    # Extract version from keylayout content
+    try:
+        version = extract_version(keylayout)
+        # Clean version: remove " Plus", " Plus Plus" suffixes
+        display_version = (
+            version.replace(" Plus Plus", "").replace(" Plus", "").strip()
+        )
+    except (ValueError, AttributeError):
+        # If no version found, use empty string
+        display_version = ""
+
+    # Generate display name with proper variant formatting
+    if is_plusplus:
+        layout_name = f"Ergopti++ {display_version}".strip()
+    elif is_plus:
+        layout_name = f"Ergopti+ {display_version}".strip()
+    else:
+        layout_name = f"Ergopti {display_version}".strip()
 
     if use_date_in_filename:
         now = datetime.datetime.now()
