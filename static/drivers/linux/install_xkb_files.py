@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+
 import glob
 import os
 import pwd
@@ -46,6 +47,57 @@ def show_help():
     print(
         "Ce script installe un fichier XKB spécifié et met à jour les fichiers LST et XML correspondants."
     )
+    print()
+    print(
+        "Mode automatique : lance le script sans arguments pour sélectionner une version"
+    )
+
+
+def select_version():
+    """Let user select between normal, plus, or plus_plus version."""
+    print("Sélectionnez la version d'Ergopti à installer :")
+    print("1. Ergopti (version normale)")
+    print("2. Ergopti+ (version plus)")
+    print("3. Ergopti++ (version plus plus)")
+
+    while True:
+        choice = input("Votre choix (1, 2 ou 3) : ").strip()
+        if choice == "1":
+            return "normal"
+        elif choice == "2":
+            return "plus"
+        elif choice == "3":
+            return "plus_plus"
+        else:
+            print("Choix invalide. Veuillez entrer 1, 2 ou 3.")
+
+
+def find_xkb_files_by_version(directory, version):
+    """Find XKB files matching the specified version."""
+    patterns = {
+        "normal": ["*Ergopti_v*[0-9].xkb", "*ergopti_v*[0-9].xkb"],
+        "plus": ["*Ergopti_v*plus.xkb", "*ergopti_v*plus.xkb"],
+        "plus_plus": ["*Ergopti_v*plus_plus.xkb", "*ergopti_v*plus_plus.xkb"],
+    }
+
+    import glob
+
+    files = []
+    for pattern in patterns.get(version, []):
+        files.extend(glob.glob(os.path.join(directory, pattern)))
+
+    # Filter out files that don't match the exact version
+    if version == "normal":
+        files = [f for f in files if "plus" not in os.path.basename(f).lower()]
+    elif version == "plus":
+        files = [
+            f
+            for f in files
+            if "plus" in os.path.basename(f).lower()
+            and "plus_plus" not in os.path.basename(f).lower()
+        ]
+
+    return files
 
 
 def file_exists(file_path):
@@ -281,6 +333,7 @@ def install_xcompose(xcompose_file):
 def update_xkb_symbols(source_file, symbols_line, system_file):
     """
     Copy a specific section from the XKB file to the end of a system file.
+    Improved to better handle existing sections.
 
     :param source_file: Path to the source XKB file.
     :param symbols_line: The key of the section to be copied (e.g., "optimot_ergo").
@@ -297,14 +350,10 @@ def update_xkb_symbols(source_file, symbols_line, system_file):
     section_found = False
     section_lines = []
     brace_level = 0
-    previous_line = ""
 
-    for line in lines:
+    for i, line in enumerate(lines):
         if f'xkb_symbols "{symbols_line}"' in line and "{" in line:
             section_found = True
-            section_lines.append(
-                previous_line
-            )  # Add the line before the section
             brace_level = 0
 
         if section_found:
@@ -316,8 +365,6 @@ def update_xkb_symbols(source_file, symbols_line, system_file):
             if brace_level == 0 and line.strip().endswith("};"):
                 break
 
-        previous_line = line
-
     if not section_found or brace_level != 0:
         print(
             f"Section correspondant à '{symbols_line}' non trouvée ou incomplète dans {source_file}."
@@ -328,25 +375,30 @@ def update_xkb_symbols(source_file, symbols_line, system_file):
     with open(system_file, "r") as file:
         system_lines = file.readlines()
 
-    start_idx = None
-    end_idx = None
+    # Recherche plus robuste de la section existante
+    existing_start_idx = None
+    existing_end_idx = None
+
     for i, line in enumerate(system_lines):
         if f'xkb_symbols "{symbols_line}"' in line and "{" in line:
-            start_idx = i
+            existing_start_idx = i
             brace_level = 0
             for j in range(i, len(system_lines)):
                 brace_level += system_lines[j].count("{")
                 brace_level -= system_lines[j].count("}")
                 if brace_level == 0 and system_lines[j].strip().endswith("};"):
-                    end_idx = j
+                    existing_end_idx = j
                     break
             break
 
     backup_file(system_file)
 
-    if start_idx is not None and end_idx is not None:
+    if existing_start_idx is not None and existing_end_idx is not None:
         # Remplace la section existante
-        system_lines[start_idx : end_idx + 1] = section_lines
+        print(
+            f"Section '{symbols_line}' trouvée aux lignes {existing_start_idx + 1}-{existing_end_idx + 1}, remplacement..."
+        )
+        system_lines[existing_start_idx : existing_end_idx + 1] = section_lines
         with open(system_file, "w") as file:
             file.writelines(system_lines)
         print(
@@ -354,7 +406,11 @@ def update_xkb_symbols(source_file, symbols_line, system_file):
         )
     else:
         # Ajoute la section à la fin si elle n'existe pas
+        print(
+            f"Section '{symbols_line}' non trouvée, ajout à la fin du fichier..."
+        )
         with open(system_file, "a") as file:
+            file.write("\n")  # Ensure newline before new section
             file.writelines(section_lines)
         print(f"Section '{symbols_line}' ajoutée avec succès à {system_file}")
 
@@ -368,17 +424,17 @@ def update_xkb_types(source_file, system_file):
     if not file_exists(system_file):
         print(f"Fichier non trouvé : {system_file}")
         return
-    
+
     try:
         with open(source_file, "r") as file:
             source_lines = file.readlines()
-        
+
         # Découverte automatique des types à copier
         sections_to_copy = []
         collected_sections = {}
         current_section = None
         brace_level = 0
-        
+
         for line in source_lines:
             if line.strip().startswith('type "') and "{" in line:
                 current_section = line.split('type "')[1].split('"')[0]
@@ -386,67 +442,75 @@ def update_xkb_types(source_file, system_file):
                 collected_sections[current_section] = [line]
                 brace_level = line.count("{") - line.count("}")
                 continue
-            
+
             if current_section:
                 collected_sections[current_section].append(line)
                 brace_level += line.count("{")
                 brace_level -= line.count("}")
                 if brace_level == 0:
                     current_section = None
-        
+
         with open(system_file, "r") as file:
             system_lines = file.readlines()
-        
+
         # Vérifier et remplacer les sections existantes
         sections_replaced = set()
         i = 0
         while i < len(system_lines):
             line = system_lines[i]
-            
+
             # Chercher si cette ligne correspond à une section à copier
             section_found = None
             for section in sections_to_copy:
                 if f'type "{section}"' in line and "{" in line:
                     section_found = section
                     break
-            
+
             if section_found:
                 # Trouver la fin de cette section
                 start_idx = i
                 brace_level = 0
                 end_idx = None
-                
+
                 for j in range(i, len(system_lines)):
                     brace_level += system_lines[j].count("{")
                     brace_level -= system_lines[j].count("}")
-                    if brace_level == 0 and system_lines[j].strip().endswith("};"):
+                    if brace_level == 0 and system_lines[j].strip().endswith(
+                        "};"
+                    ):
                         end_idx = j
                         break
-                
+
                 if end_idx is not None:
                     # Remplacer la section existante
-                    system_lines[start_idx:end_idx + 1] = collected_sections[section_found]
+                    system_lines[start_idx : end_idx + 1] = collected_sections[
+                        section_found
+                    ]
                     sections_replaced.add(section_found)
-                    print(f"Section '{section_found}' remplacée avec succès dans {system_file}")
+                    print(
+                        f"Section '{section_found}' remplacée avec succès dans {system_file}"
+                    )
                     # Ajuster l'index pour continuer après la section insérée
                     i = start_idx + len(collected_sections[section_found])
                     continue
-            
+
             i += 1
-        
+
         # Insérer les sections qui n'existaient pas
-        sections_to_insert = [s for s in sections_to_copy if s not in sections_replaced]
-        
+        sections_to_insert = [
+            s for s in sections_to_copy if s not in sections_replaced
+        ]
+
         if sections_to_insert:
             insertion_point = None
             section_found = False
             brace_level = 0
-            
+
             for i, line in enumerate(system_lines):
                 if 'default partial xkb_types "default"' in line:
                     section_found = True
                     brace_level = 0
-                
+
                 if section_found:
                     brace_level += line.count("{")
                     brace_level -= line.count("}")
@@ -454,31 +518,36 @@ def update_xkb_types(source_file, system_file):
                         section_found = False
                         insertion_point = i
                         break
-            
+
             if insertion_point is not None:
                 backup_file(system_file)
                 # Insérer les nouvelles sections avant l'accolade fermante
                 section_insertion = "\n"
                 for section in sections_to_insert:
                     if collected_sections[section]:
-                        section_insertion += "".join(collected_sections[section])
-                
+                        section_insertion += "".join(
+                            collected_sections[section]
+                        )
+
                 system_lines.insert(insertion_point, section_insertion)
-                print(f"Nouvelles sections insérées avec succès dans {system_file}")
+                print(
+                    f"Nouvelles sections insérées avec succès dans {system_file}"
+                )
             else:
                 print(f"Section cible non trouvée dans {system_file}.")
-        
+
         # Écrire le fichier modifié
         with open(system_file, "w") as file:
             file.writelines(system_lines)
-        
+
         if sections_replaced:
             print(f"Total de {len(sections_replaced)} section(s) remplacée(s)")
         if sections_to_insert:
             print(f"Total de {len(sections_to_insert)} section(s) insérée(s)")
-            
+
     except IOError as e:
         print(f"Erreur lors de la lecture/écriture des fichiers : {e}")
+
 
 def main(args):
     check_sudo()
@@ -528,19 +597,47 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 2:
         print(
-            "Mode automatique : recherche du fichier .xkb le plus récent et du .XCompose dans le dossier courant..."
+            "Mode automatique : sélection de la version d'Ergopti à installer..."
         )
-        xkb_files = glob.glob(os.path.join(os.path.dirname(__file__), "*.xkb"))
-        xcompose_files = glob.glob(
-            os.path.join(os.path.dirname(__file__), "*.XCompose")
-        )
+
+        # Let user select version
+        version = select_version()
+
+        # Find files based on version
+        script_dir = os.path.dirname(__file__)
+        xkb_files = find_xkb_files_by_version(script_dir, version)
+        xcompose_files = glob.glob(os.path.join(script_dir, "*.XCompose"))
+
         if not xkb_files:
-            print("Aucun fichier .xkb trouvé.")
+            print(f"Aucun fichier .xkb trouvé pour la version {version}.")
+            print("Recherche dans les sous-dossiers...")
+            # Search in subdirectories
+            for subdir in os.listdir(script_dir):
+                subdir_path = os.path.join(script_dir, subdir)
+                if os.path.isdir(subdir_path):
+                    xkb_files.extend(
+                        find_xkb_files_by_version(subdir_path, version)
+                    )
+
+        if not xkb_files:
+            print(f"Aucun fichier .xkb trouvé pour la version {version}.")
             sys.exit(1)
-        # Sélectionne le .xkb le plus récent
+
+        # Select the most recent XKB file
         xkb_file = max(xkb_files, key=os.path.getmtime)
-        print(f"Fichier XKB le plus récent trouvé : {xkb_file}")
-        xcompose_file = xcompose_files[0] if xcompose_files else None
+        print(f"Fichier XKB sélectionné : {xkb_file}")
+
+        # Find corresponding XCompose file
+        xkb_basename = os.path.basename(xkb_file).replace(".xkb", "")
+        xcompose_file = None
+        for xc_file in xcompose_files:
+            if xkb_basename in os.path.basename(xc_file):
+                xcompose_file = xc_file
+                break
+
+        if not xcompose_file and xcompose_files:
+            xcompose_file = xcompose_files[0]
+
         if xcompose_file:
             print(f"Fichier XCompose trouvé : {xcompose_file}")
             args = [sys.argv[0], xkb_file, xcompose_file]
