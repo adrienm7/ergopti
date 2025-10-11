@@ -23,7 +23,7 @@ def create_bundle(
     """
     Create a .bundle package for macOS keyboard layouts.
     keylayout_paths and logo_paths must be lists of the same length.
-    Each layout file is saved as Ergopti.keylayout or Ergopti Plus.keylayout,
+    Each layout file is saved as Ergopti_vx_x_x.keylayout format,
     and its internal <keyboard name="..."> attribute is also rewritten.
     """
     if len(keylayout_paths) != len(logo_paths):
@@ -38,7 +38,12 @@ def create_bundle(
     resources_path.mkdir(parents=True, exist_ok=True)
 
     info_plist_entries = []
-    layout_localization_infos: list[tuple[str, bool]] = []
+    layout_localization_infos: list[tuple[str, str]] = []
+
+    # Extract version for filename format
+    match = re.search(r"(v\d+\.\d+\.\d+)", version)
+    simple_version = match.group(1) if match else version
+    version_underscore = simple_version.replace(".", "_")
 
     for keylayout, logo in zip(keylayout_paths, logo_paths):
         if not keylayout.exists():
@@ -58,17 +63,22 @@ def create_bundle(
         stem = keylayout.stem.lower()
         is_plusplus = stem.endswith("plus_plus")
         is_plus = "plus" in stem and not is_plusplus
+
+        # Generate new name in the format Ergopti_vx_x_x
         if is_plusplus:
-            new_name = "Ergopti Plus Plus"
+            new_name = f"Ergopti_{version_underscore}_plus_plus"
+            display_name = f"Ergopti {simple_version} Plus Plus"
         elif is_plus:
-            new_name = "Ergopti Plus"
+            new_name = f"Ergopti_{version_underscore}_plus"
+            display_name = f"Ergopti {simple_version} Plus"
         else:
-            new_name = "Ergopti"
+            new_name = f"Ergopti_{version_underscore}"
+            display_name = f"Ergopti {simple_version}"
 
         # Necessary for the layout to be found in "French" layouts instead of "Others"
         content = re.sub(
             r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
-            rf"\1{new_name}\3",
+            rf"\1{display_name}\3",
             content,
         )
 
@@ -103,11 +113,13 @@ def create_bundle(
 
         plist_key = f"KLInfo_{new_name}"
         if is_plusplus:
-            input_source_id = f"{BUNDLE_IDENTIFIER}.plusplus"
+            input_source_id = (
+                f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus_plus"
+            )
         elif is_plus:
-            input_source_id = f"{BUNDLE_IDENTIFIER}.plus"
+            input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus"
         else:
-            input_source_id = BUNDLE_IDENTIFIER
+            input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}"
 
         info_plist_entries.append(f"""<key>{plist_key}</key>
         <dict>
@@ -164,13 +176,14 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
 
 
 def generate_localizations(
-    bundle_path: Path, version: str, layouts: list[tuple[str, bool]]
+    bundle_path: Path, version: str, layouts: list[tuple[str, str]]
 ):
     """
     Generate localized InfoPlist.strings files (en and fr).
     Each layout name is mapped to either:
       - "Ergopti v{version}"  (standard)
       - "Ergopti+ v{version}" (plus)
+      - "Ergopti++ v{version}" (plus plus)
     """
     for lang in ("en", "fr"):
         lproj_dir = bundle_path / "Contents" / "Resources" / f"{lang}.lproj"

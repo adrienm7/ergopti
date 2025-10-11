@@ -119,9 +119,14 @@ def generate_bundle_with_all_temp_files(
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
+        # Extract version number for filename format
+        match = re.search(r"(v\d+\.\d+\.\d+)", version)
+        simple_version = match.group(1) if match else version
+        version_underscore = simple_version.replace(".", "_")
+
         # Create base keylayout in temp directory
         base_temp_path = temp_path / (
-            kbdedit_file_path.stem.replace("_v0", "") + kbdedit_file_path.suffix
+            f"Ergopti_{version_underscore}" + kbdedit_file_path.suffix
         )
         content = kbdedit_file_path.read_text(encoding="utf-8")
         content_corrected = correct_keylayout(content)
@@ -129,14 +134,14 @@ def generate_bundle_with_all_temp_files(
 
         # Create Plus variant in temp directory
         plus_temp_path = temp_path / (
-            base_temp_path.stem + "_plus" + base_temp_path.suffix
+            f"Ergopti_{version_underscore}_plus" + kbdedit_file_path.suffix
         )
         content_plus = create_keylayout_plus(content_corrected)
         plus_temp_path.write_text(content_plus, encoding="utf-8")
 
         # Create Plus Plus variant in temp directory
         plus_plus_temp_path = temp_path / (
-            base_temp_path.stem + "_plus_plus" + base_temp_path.suffix
+            f"Ergopti_{version_underscore}_plus_plus" + kbdedit_file_path.suffix
         )
         content_plus_plus = create_keylayout_plus_plus(content_plus)
         plus_plus_temp_path.write_text(content_plus_plus, encoding="utf-8")
