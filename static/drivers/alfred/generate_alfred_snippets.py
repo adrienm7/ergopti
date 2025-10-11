@@ -134,7 +134,15 @@ def parse_toml_simple(toml_content: str) -> Dict[str, str]:
             continue
         match = re.match(r'^"([^"]+)"\s*=\s*"([^"]+)"', line)
         if match:
-            result[match.group(1)] = match.group(2)
+            trigger = match.group(1)
+            replacement = match.group(2)
+            # Only add if trigger doesn't already exist (keep first occurrence)
+            if trigger not in result:
+                result[trigger] = replacement
+            else:
+                logger.warning(
+                    "Duplicate trigger found and ignored: '%s'", trigger
+                )
     return result
 
 
@@ -316,24 +324,33 @@ def generate_case_variants(
         replacement: Original replacement text
 
     Returns:
-        List of (trigger, replacement) tuples with different case variants
+        List of (trigger, replacement) tuples with different case variants (no duplicates)
     """
     variants = []
+    seen_triggers = set()
 
     # Original (lowercase)
-    variants.append((trigger.lower(), replacement.lower()))
+    lower_trigger = trigger.lower()
+    lower_replacement = replacement.lower()
+    if lower_trigger not in seen_triggers:
+        variants.append((lower_trigger, lower_replacement))
+        seen_triggers.add(lower_trigger)
 
     # Title case (first letter uppercase)
     if len(trigger) > 0:
         title_trigger = trigger.capitalize()
         title_replacement = apply_case_to_text(title_trigger, replacement)
-        variants.append((title_trigger, title_replacement))
+        if title_trigger not in seen_triggers:
+            variants.append((title_trigger, title_replacement))
+            seen_triggers.add(title_trigger)
 
     # Uppercase (only for multi-character triggers)
     if len(trigger) > 1:
         upper_trigger = trigger.upper()
         upper_replacement = apply_case_to_text(upper_trigger, replacement)
-        variants.append((upper_trigger, upper_replacement))
+        if upper_trigger not in seen_triggers:
+            variants.append((upper_trigger, upper_replacement))
+            seen_triggers.add(upper_trigger)
 
     return variants
 
@@ -379,16 +396,26 @@ def generate_alfred_snippets_from_toml(
 
     # Generate snippets data
     snippets_data = []
+    all_triggers_seen = set()  # Track all triggers across all variants
+
     for trigger, replacement in cleaned_dict.items():
         # Generate case variants
         variants = generate_case_variants(trigger, replacement)
 
         for variant_trigger, variant_replacement in variants:
-            uid = generate_uuid()
-            snippet_data = create_snippet_json(
-                variant_trigger, variant_replacement, uid
-            )
-            snippets_data.append(snippet_data)
+            # Check for duplicates across all snippets
+            if variant_trigger not in all_triggers_seen:
+                uid = generate_uuid()
+                snippet_data = create_snippet_json(
+                    variant_trigger, variant_replacement, uid
+                )
+                snippets_data.append(snippet_data)
+                all_triggers_seen.add(variant_trigger)
+            else:
+                logger.warning(
+                    "Duplicate trigger across variants found and ignored: '%s'",
+                    variant_trigger,
+                )
 
     # Determine output file name
     collection_name = toml_file.stem.capitalize()
