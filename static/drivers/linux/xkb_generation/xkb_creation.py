@@ -1,12 +1,19 @@
 import json
 import re
+import sys
 from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import yaml
-from data.levels import LEVELS
-from data.unused_symbols import UNUSED_SYMBOLS
+
+# Load data modules directly
+script_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(script_dir / "data"))
+sys.path.insert(0, str(script_dir.parent))
+
+from levels import LEVELS
+from unused_symbols import UNUSED_SYMBOLS
 from utilities.keylayout_extraction import (
     extract_keymap_body,
     get_symbol,

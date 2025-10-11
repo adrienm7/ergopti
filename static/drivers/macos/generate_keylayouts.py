@@ -5,13 +5,17 @@ Official documentation about keylayout files can be found at:
 https://developer.apple.com/library/archive/technotes/tn2056/_index.html
 """
 
+import re
 import sys
+import tempfile
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
-
-
-import re
+# Add paths to import directories
+script_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(script_dir / "keylayout_generation"))
+sys.path.insert(
+    0, str(script_dir.parent)
+)  # Add drivers directory for utilities
 
 from bundle_creation import create_bundle
 from keylayout_correction import correct_keylayout
@@ -32,16 +36,18 @@ def main(
     if output_directory:
         output_directory = Path(output_directory).resolve()
     else:
-        # If no path is provided, use the parent directory of this file
-        output_directory = Path(__file__).resolve().parent.parent
+        # If no path is provided, use the macos directory (current file's parent)
+        output_directory = Path(__file__).resolve().parent
 
     # Determine input directory
     if input_directory:
         kbdedit_files_directory = Path(input_directory).resolve()
     else:
-        # If no path is provided, use the "../raw_kbdedit_keylayouts" folder
-        kbdedit_files_directory = (
-            Path(__file__).resolve().parent.parent / "raw_kbdedit_keylayouts"
+        # If no path is provided, use the "raw_kbdedit_keylayouts" folder
+        kbdedit_files_directory = Path(
+            Path(__file__).parent.resolve()
+            / "keylayout_generation"
+            / "raw_kbdedit_keylayouts"
         )
 
     # Find files to process
@@ -67,26 +73,17 @@ def main(
             version = extract_version_from_file(kbdedit_file_path)
             logger.info("Layout version: %s", version)
 
-            base_file_path = generate_keylayout(
-                kbdedit_file_path, output_directory, overwrite
+            # Generate bundle using ALL temporary files (base, plus, plus plus)
+            # This creates only the bundle and zip, no individual keylayout files at all
+            generate_bundle_with_all_temp_files(
+                kbdedit_file_path=kbdedit_file_path,
+                version=version,
+                output_directory=output_directory,
+                overwrite=overwrite,
             )
 
-            plus_file_path = generate_keylayout_plus(
-                base_file_path, output_directory, overwrite
-            )
-
-            plus_plus_file_path = generate_keylayout_plus_plus(
-                plus_file_path, output_directory, overwrite
-            )
-
-            generate_bundle(
-                version,
-                output_directory,
-                overwrite,
-                [base_file_path, plus_file_path, plus_plus_file_path],
-            )
             logger.success(
-                "All files generated successfully for: %s",
+                "Bundle generated successfully for: %s",
                 kbdedit_file_path.name,
             )
             processed += 1
@@ -95,6 +92,181 @@ def main(
             errors += 1
 
     show_execution_summary(processed, errors)
+
+
+def generate_bundle_with_all_temp_files(
+    kbdedit_file_path: Path,
+    version: str,
+    output_directory: Path,
+    overwrite: bool,
+) -> Path:
+    """
+    Generate a bundle using ALL temporary files (base, plus, plus plus).
+    Only the bundle and its zip will be created, no individual keylayout files.
+
+    Args:
+        kbdedit_file_path: Path to the source KbdEdit file
+        version: Version string for the bundle
+        output_directory: Directory where bundle will be created
+        overwrite: Whether to overwrite existing files
+
+    Returns:
+        Path to the created bundle zip file
+    """
+    logger.launch("Creating bundle with ALL temporary keylayout files")
+
+    # Create temporary directory for ALL keylayout files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create base keylayout in temp directory
+        base_temp_path = temp_path / (
+            kbdedit_file_path.stem.replace("_v0", "") + kbdedit_file_path.suffix
+        )
+        content = kbdedit_file_path.read_text(encoding="utf-8")
+        content_corrected = correct_keylayout(content)
+        base_temp_path.write_text(content_corrected, encoding="utf-8")
+
+        # Create Plus variant in temp directory
+        plus_temp_path = temp_path / (
+            base_temp_path.stem + "_plus" + base_temp_path.suffix
+        )
+        content_plus = create_keylayout_plus(content_corrected)
+        plus_temp_path.write_text(content_plus, encoding="utf-8")
+
+        # Create Plus Plus variant in temp directory
+        plus_plus_temp_path = temp_path / (
+            base_temp_path.stem + "_plus_plus" + base_temp_path.suffix
+        )
+        content_plus_plus = create_keylayout_plus_plus(content_plus)
+        plus_plus_temp_path.write_text(content_plus_plus, encoding="utf-8")
+
+        logger.info("Created ALL temporary keylayout files:")
+        logger.info("\t📄 %s", base_temp_path.name)
+        logger.info("\t📄 %s", plus_temp_path.name)
+        logger.info("\t📄 %s", plus_plus_temp_path.name)
+
+        # Prepare bundle path
+        match = re.search(r"(v\d+\.\d+\.\d+)", version)
+        simple_version = match.group(1) if match else version
+        bundle_path = output_directory / f"Ergopti_{simple_version}.bundle"
+
+        # Create zipped_bundles directory for the zip file
+        zipped_bundles_dir = output_directory / "zipped_bundles"
+        zipped_bundles_dir.mkdir(exist_ok=True)
+
+        # Determine logo files
+        script_dir = Path(__file__).resolve().parent
+        logo_paths = [
+            script_dir / "keylayout_generation" / "data" / "logo_ergopti.icns",
+            script_dir
+            / "keylayout_generation"
+            / "data"
+            / "logo_ergopti_plus.icns",
+            script_dir
+            / "keylayout_generation"
+            / "data"
+            / "logo_ergopti_plus.icns",
+        ]
+
+        # Create bundle with all three temporary files (keep both bundle folder and zip)
+        keylayout_paths = [base_temp_path, plus_temp_path, plus_plus_temp_path]
+        bundle_dir, zip_path = create_bundle(
+            bundle_path=bundle_path,
+            version=version,
+            keylayout_paths=keylayout_paths,
+            logo_paths=logo_paths,
+            cleanup=False,  # Keep the bundle directory
+            zip_destination_dir=zipped_bundles_dir,
+        )
+
+        logger.success("Bundle directory created at: %s", bundle_dir)
+        logger.success("Bundle zip created at: %s", zip_path)
+
+        # Temporary directory with ALL keylayout files is automatically cleaned up here
+
+    return zip_path
+
+
+def generate_bundle_with_temp_files(
+    base_file_path: Path,
+    version: str,
+    output_directory: Path,
+    overwrite: bool,
+) -> Path:
+    """
+    Generate a bundle using temporary Plus/Plus Plus files.
+    Only the bundle and its zip will be created, no individual files.
+
+    Args:
+        base_file_path: Path to the base keylayout file
+        version: Version string for the bundle
+        output_directory: Directory where bundle will be created
+        overwrite: Whether to overwrite existing files
+
+    Returns:
+        Path to the created bundle zip file
+    """
+    logger.launch("Creating bundle with temporary Plus/Plus Plus variants")
+
+    # Create temporary directory for Plus/Plus Plus files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create Plus variant in temp directory
+        plus_temp_path = temp_path / (
+            base_file_path.stem + "_plus" + base_file_path.suffix
+        )
+        content = base_file_path.read_text(encoding="utf-8")
+        content_plus = create_keylayout_plus(content)
+        plus_temp_path.write_text(content_plus, encoding="utf-8")
+
+        # Create Plus Plus variant in temp directory
+        plus_plus_temp_path = temp_path / (
+            base_file_path.stem + "_plus_plus" + base_file_path.suffix
+        )
+        content_plus_plus = create_keylayout_plus_plus(content_plus)
+        plus_plus_temp_path.write_text(content_plus_plus, encoding="utf-8")
+
+        logger.info("Created temporary files:")
+        logger.info("\t📄 %s", plus_temp_path.name)
+        logger.info("\t📄 %s", plus_plus_temp_path.name)
+
+        # Prepare bundle path
+        match = re.search(r"(v\d+\.\d+\.\d+)", version)
+        simple_version = match.group(1) if match else version
+        bundle_path = output_directory / f"Ergopti_{simple_version}.bundle"
+
+        # Determine logo files
+        script_dir = Path(__file__).resolve().parent
+        logo_paths = [
+            script_dir / "keylayout_generation" / "data" / "logo_ergopti.icns",
+            script_dir
+            / "keylayout_generation"
+            / "data"
+            / "logo_ergopti_plus.icns",
+            script_dir
+            / "keylayout_generation"
+            / "data"
+            / "logo_ergopti_plus.icns",
+        ]
+
+        # Create bundle with all three files (keep both bundle folder and zip)
+        keylayout_paths = [base_file_path, plus_temp_path, plus_plus_temp_path]
+        bundle_dir, zip_path = create_bundle(
+            bundle_path=bundle_path,
+            version=version,
+            keylayout_paths=keylayout_paths,
+            logo_paths=logo_paths,
+            cleanup=False,  # Keep the bundle directory
+        )
+
+        logger.success("Bundle created at: %s", bundle_dir)
+        logger.success("Zip created at: %s", zip_path)
+
+        # Temporary directory is automatically cleaned up here
+
+    return zip_path
 
 
 def log_section(title: str) -> None:
@@ -185,9 +357,9 @@ def generate_bundle(
     # Determine logo files
     script_dir = Path(__file__).resolve().parent
     default_logos = [
-        script_dir / "data" / "logo_ergopti.icns",
-        script_dir / "data" / "logo_ergopti_plus.icns",
-        script_dir / "data" / "logo_ergopti_plus.icns",
+        script_dir / "keylayout_generation" / "data" / "logo_ergopti.icns",
+        script_dir / "keylayout_generation" / "data" / "logo_ergopti_plus.icns",
+        script_dir / "keylayout_generation" / "data" / "logo_ergopti_plus.icns",
     ]
     logo_paths = adjust_logo_paths(logo_paths, keylayout_paths, default_logos)
 

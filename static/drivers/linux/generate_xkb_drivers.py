@@ -1,14 +1,32 @@
 import datetime
+import importlib.util
 import re
 import sys
 from pathlib import Path
 from typing import Optional, Union
 
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+# Setup paths
+script_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(script_dir.parent))  # Add drivers directory to path
+
+# Import utilities
 from utilities.keylayout_extraction import extract_name_from_file
 from utilities.logger import logger
-from xcompose_creation import generate_xcompose
-from xkb_creation import generate_xkb
+
+# Import local modules using importlib
+xcompose_spec = importlib.util.spec_from_file_location(
+    "xcompose_creation", script_dir / "xkb_generation" / "xcompose_creation.py"
+)
+xcompose_module = importlib.util.module_from_spec(xcompose_spec)
+xcompose_spec.loader.exec_module(xcompose_module)
+generate_xcompose = xcompose_module.generate_xcompose
+
+xkb_spec = importlib.util.spec_from_file_location(
+    "xkb_creation", script_dir / "xkb_generation" / "xkb_creation.py"
+)
+xkb_module = importlib.util.module_from_spec(xkb_spec)
+xkb_spec.loader.exec_module(xkb_module)
+generate_xkb = xkb_module.generate_xkb
 
 
 def main(
@@ -62,7 +80,9 @@ def main(
             continue
         keylayout = read_file(keylayout_path)
 
-        xkb_template_path = Path(__file__).parent / "data" / "base.xkb"
+        xkb_template_path = (
+            Path(__file__).parent / "xkb_generation" / "data" / "base.xkb"
+        )
         if not xkb_template_path.is_file():
             logger.error("XKB template file not found: %s", xkb_template_path)
             continue
@@ -81,7 +101,30 @@ def main(
             xkb_template,
         )
 
-        out_dir = Path(__file__).parent.parent.resolve()
+        # Create output directory with version name
+        # Extract version from keylayout path or bundle name
+        if "v2.2.0" in str(keylayout_path) or "v2_2_0" in str(keylayout_path):
+            version_name = "v2_2_0"
+        elif "v2.1" in str(keylayout_path) or "v2_1" in str(keylayout_path):
+            version_name = "v2_1_0"
+        elif "v2.0" in str(keylayout_path) or "v2_0" in str(keylayout_path):
+            version_name = "v2_0_0"
+        else:
+            # Fallback: extract from bundle directory name
+            bundle_name = ""
+            for parent in keylayout_path.parents:
+                if parent.name.endswith(".bundle"):
+                    bundle_name = parent.name
+                    break
+            if "v2.2.0" in bundle_name or "v2_2_0" in bundle_name:
+                version_name = "v2_2_0"
+            else:
+                version_name = "unknown_version"
+
+        linux_dir = Path(__file__).parent
+        out_dir = linux_dir / version_name
+        out_dir.mkdir(exist_ok=True)
+
         base_name = f"{layout_id}"
         xkb_out_path = out_dir / f"{base_name}.xkb"
         xcompose_out_path = out_dir / f"{base_name}.XCompose"
@@ -98,17 +141,29 @@ def main(
 def get_macos_dir():
     """
     Return the absolute path to the macOS keylayout directory.
+    Try bundle first, then fallback to main directory.
 
     Returns:
-        Path: Path to the macOS keylayout directory.
+            Path: Path to the macOS keylayout directory.
 
     Raises:
-        FileNotFoundError: If the directory does not exist.
+            FileNotFoundError: If the directory does not exist.
     """
-    macos_dir = Path(__file__).parent.parent.parent / "macos"
+    macos_dir = Path(__file__).parent.parent.parent / "drivers" / "macos"
     if not macos_dir.is_dir():
         logger.error("macos directory does not exist: %s", macos_dir)
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
+
+    # Check for bundle directory first
+    bundle_dirs = list(macos_dir.glob("*.bundle"))
+    if bundle_dirs:
+        bundle_resources = bundle_dirs[0] / "Contents" / "Resources"
+        if bundle_resources.is_dir():
+            logger.info(
+                "Using keylayout files from bundle: %s", bundle_resources
+            )
+            return bundle_resources
+
     logger.info("macos directory found: %s", macos_dir)
     return macos_dir
 
@@ -150,6 +205,34 @@ def save_file(file_path: Union[str, Path], content: str) -> None:
     file_path = Path(file_path)
     with open(file_path, "w", encoding="utf-8") as file:
         file.write(content)
+
+
+def extract_version_from_layout_name(layout_name: str) -> str:
+    """
+    Extract version from layout name to create directory name.
+
+    Args:
+            layout_name: The layout display name
+
+    Returns:
+            Version string for directory name
+    """
+    # Extract version from bundle or keylayout name
+    if "v2.2.0" in layout_name.lower() or "v2_2_0" in layout_name.lower():
+        return "v2_2_0"
+    elif "v2.1" in layout_name.lower() or "v2_1" in layout_name.lower():
+        return "v2_1_0"
+    elif "v2.0" in layout_name.lower() or "v2_0" in layout_name.lower():
+        return "v2_0_0"
+    else:
+        # Fallback: try to extract version from the layout name
+        import re
+
+        match = re.search(r"v(\d+)\.(\d+)\.(\d+)", layout_name.lower())
+        if match:
+            return f"v{match.group(1)}_{match.group(2)}_{match.group(3)}"
+        else:
+            return "unknown_version"
 
 
 def create_layout_name(
