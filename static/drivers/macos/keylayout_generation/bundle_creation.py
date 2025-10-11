@@ -18,6 +18,7 @@ def create_bundle(
     keylayout_paths: list[Path],
     logo_paths: list[Path],
     cleanup: bool = True,
+    zip_destination_dir: Path = None,
 ):
     """
     Create a .bundle package for macOS keyboard layouts.
@@ -132,7 +133,10 @@ def create_bundle(
     version_plist_path.write_text(version_plist_content, encoding="utf-8")
 
     # Zip the bundle
-    zip_path = bundle_path.with_suffix(".bundle.zip")
+    if zip_destination_dir:
+        zip_path = zip_destination_dir / f"{bundle_path.name}.zip"
+    else:
+        zip_path = bundle_path.with_suffix(".bundle.zip")
     zip_bundle_folder(bundle_path, zip_path)
     if cleanup:
         shutil.rmtree(bundle_path)
