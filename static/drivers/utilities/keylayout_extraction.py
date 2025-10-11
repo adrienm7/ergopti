@@ -47,6 +47,110 @@ def extract_version(content: str) -> str:
     return ""
 
 
+def extract_version_enhanced(content: str, keylayout_path: Path = None) -> str:
+    """Extract the version string from a keylayout file content or associated version.plist.
+
+    Args:
+        content: The content of the keylayout file as a string.
+        keylayout_path: Optional path to the keylayout file for version.plist lookup.
+
+    Returns:
+        The extracted version string, or an empty string if not found.
+    """
+    # First try to get version from version.plist if keylayout_path is provided
+    if keylayout_path:
+        version_from_plist = _extract_version_from_plist(keylayout_path)
+        if version_from_plist:
+            return version_from_plist
+
+    # Fallback to extracting from keylayout content
+    name_match = re.search(r'name="([^"]+)"', content)
+    if name_match:
+        name_value = name_match.group(1)
+
+        # Try multiple patterns for version extraction:
+        # 1. Pattern like "Ergopti v2.1.3", "Ergopti v2.2.0 Beta 4"
+        v_match = re.search(r"\bv(.+)$", name_value)
+        if v_match:
+            version_part = v_match.group(1).strip()
+            # Remove " Plus", " Plus Plus" suffixes if present
+            version_part = re.sub(r"\s+Plus(?:\s+Plus)?$", "", version_part)
+            return f"v{version_part}"
+
+        # 2. Pattern like "Ergopti_v2_2_0", "Ergopti_v2_2_0_plus"
+        v_underscore_match = re.search(r"_v(\d+(?:_\d+)*)", name_value)
+        if v_underscore_match:
+            version_part = v_underscore_match.group(1)
+            # Convert underscores to dots for display
+            version_part = version_part.replace("_", ".")
+            return f"v{version_part}"
+
+    return ""
+
+
+def _extract_version_from_plist(keylayout_path: Path) -> str:
+    """Extract version from version.plist file in bundle structure.
+
+    Args:
+        keylayout_path: Path to the keylayout file.
+
+    Returns:
+        Version string with 'v' prefix, or empty string if not found.
+    """
+    try:
+        # Look for version.plist in bundle structure
+        # keylayout_path should be like: .../Ergopti_v2.2.0.bundle/Contents/Resources/file.keylayout
+        current_path = keylayout_path.parent
+        version_plist_path = None
+
+        # Search upward for version.plist in bundle structure
+        for _ in range(3):  # Limit search depth
+            potential_plist = current_path / "version.plist"
+            if potential_plist.exists():
+                version_plist_path = potential_plist
+                break
+            current_path = current_path.parent
+            if current_path.name.endswith(".bundle"):
+                # Try Contents/ directory in bundle
+                bundle_version_plist = (
+                    current_path / "Contents" / "version.plist"
+                )
+                if bundle_version_plist.exists():
+                    version_plist_path = bundle_version_plist
+                    break
+
+        if not version_plist_path:
+            return ""
+
+        # Parse the plist file
+        import xml.etree.ElementTree as ET
+
+        tree = ET.parse(version_plist_path)
+        root = tree.getroot()
+
+        # Find the BuildVersion or SourceVersion key
+        dict_elem = root.find(".//dict")
+        if dict_elem is not None:
+            keys = dict_elem.findall("key")
+            strings = dict_elem.findall("string")
+
+            for i, key in enumerate(keys):
+                if key.text in ["BuildVersion", "SourceVersion"] and i < len(
+                    strings
+                ):
+                    version = strings[i].text.strip()
+                    if version:
+                        # Add 'v' prefix if not present
+                        if not version.startswith("v"):
+                            version = f"v{version}"
+                        return version
+
+    except Exception as e:
+        logger.debug("Could not extract version from plist: %s", e)
+
+    return ""
+
+
 def extract_version_from_file(file_path: Path) -> str:
     """Read a file and extract the version string using extract_version.
 
@@ -58,6 +162,19 @@ def extract_version_from_file(file_path: Path) -> str:
     """
     content = file_path.read_text(encoding="utf-8")
     return extract_version(content)
+
+
+def extract_version_from_file_enhanced(file_path: Path) -> str:
+    """Read a file and extract the version string using extract_version_enhanced.
+
+    Args:
+        file_path: Path to the keylayout file.
+
+    Returns:
+        The extracted version string, or an empty string if not found.
+    """
+    content = file_path.read_text(encoding="utf-8")
+    return extract_version_enhanced(content, file_path)
 
 
 def extract_keymap_body(body: str, index: int) -> str:

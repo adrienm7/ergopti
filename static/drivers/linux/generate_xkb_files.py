@@ -10,7 +10,7 @@ script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir.parent))  # Add drivers directory to path
 
 # Import utilities
-from utilities.keylayout_extraction import extract_version
+from utilities.keylayout_extraction import extract_version_enhanced
 from utilities.logger import logger
 
 # Import local modules using importlib
@@ -90,7 +90,7 @@ def main(
 
         variant = keylayout_path.stem
         layout_id, layout_name = create_layout_name(
-            keylayout, variant, use_date_in_filename
+            keylayout, variant, use_date_in_filename, keylayout_path
         )
         xkb_template = re.sub(
             r'xkb_symbols\s+"[^"]+"', f'xkb_symbols "{layout_id}"', xkb_template
@@ -236,7 +236,10 @@ def extract_version_from_layout_name(layout_name: str) -> str:
 
 
 def create_layout_name(
-    keylayout: str, variant: str, use_date_in_filename: bool
+    keylayout: str,
+    variant: str,
+    use_date_in_filename: bool,
+    keylayout_path: Path = None,
 ) -> tuple[str, str]:
     """
     Generate the layout id and display name from the variant and optionally the date.
@@ -245,6 +248,7 @@ def create_layout_name(
         keylayout (str): The keylayout file content.
         variant (str): The layout variant name.
         use_date_in_filename (bool): Whether to append the date to the output.
+        keylayout_path (Path): Optional path to the keylayout file for version extraction.
 
     Returns:
         tuple[str, str]: (layout_id, layout_name)
@@ -260,7 +264,7 @@ def create_layout_name(
 
     # Extract version from keylayout content
     try:
-        version = extract_version(keylayout)
+        version = extract_version_enhanced(keylayout, keylayout_path)
         # Clean version: remove " Plus", " Plus Plus" suffixes
         display_version = (
             version.replace(" Plus Plus", "").replace(" Plus", "").strip()
