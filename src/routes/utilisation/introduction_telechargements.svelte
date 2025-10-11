@@ -62,14 +62,14 @@
 		<table>
 			<thead>
 				<tr>
-					<th>Abréviation (sample)</th>
+					<th>Abréviation (extrait)</th>
 					<th>Remplacement</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each Object.entries(remplacementsSample) as [key, value]}
 					<tr>
-						<td>{key}★</td>
+						<td>{key}</td>
 						<td>{value}</td>
 					</tr>
 				{/each}
@@ -88,7 +88,7 @@
 			<tbody>
 				{#each Object.entries(remplacements) as [key, value]}
 					<tr>
-						<td>{key}★</td>
+						<td>{key}</td>
 						<td>{value}</td>
 					</tr>
 				{/each}
