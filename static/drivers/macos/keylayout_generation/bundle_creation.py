@@ -67,15 +67,15 @@ def create_bundle(
         # Generate new name in the format Ergopti_vx_x_x
         if is_plusplus:
             new_name = f"Ergopti_{version_underscore}_plus_plus"
-            display_name = f"Ergopti {simple_version} Plus Plus"
+            display_name = f"Ergopti_{version_underscore}_plus_plus"
         elif is_plus:
             new_name = f"Ergopti_{version_underscore}_plus"
-            display_name = f"Ergopti {simple_version} Plus"
+            display_name = f"Ergopti_{version_underscore}_plus"
         else:
             new_name = f"Ergopti_{version_underscore}"
-            display_name = f"Ergopti {simple_version}"
+            display_name = f"Ergopti_{version_underscore}"
 
-        # Necessary for the layout to be found in "French" layouts instead of "Others"
+        # Use the same name for both filename and internal name attribute
         content = re.sub(
             r'(<keyboard\b[^>]*\bname=")([^"]+)(")',
             rf"\1{display_name}\3",
