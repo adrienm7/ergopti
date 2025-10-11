@@ -4,10 +4,25 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import KeyboardEmulation from '$lib/keyboard/KeyboardEmulation.svelte';
-	import remplacements from '$lib/keyboard/data/magicReplacements.json';
+	let remplacements = {};
+	let remplacementsSample = {};
+
+	if (typeof window !== 'undefined') {
+		fetch('/drivers/configuration/magic.json')
+			.then((response) => response.json())
+			.then((data) => {
+				remplacements = data;
+			});
+		fetch('/drivers/configuration/magic_sample.json')
+			.then((response) => response.json())
+			.then((data) => {
+				remplacementsSample = data;
+			});
+	}
 
 	// Variable pour contrôler l'affichage du tableau d’abréviations
 	let isCollapsed = true;
+	let isSampleCollapsed = true;
 </script>
 
 <div class="main">
@@ -18,15 +33,38 @@
 <!-- <h2 class="first-h2">Tester la disposition en ligne</h2> -->
 <KeyboardEmulation />
 <div class="main">
-	{#if isCollapsed}
-		<button onclick={() => (isCollapsed = !isCollapsed)}>
-			Afficher les abréviations implémentées sur cette démo
+	<div style="display: flex; gap: 1em; align-items: center;">
+		<button onclick={() => (isSampleCollapsed = !isSampleCollapsed)}>
+			{isSampleCollapsed
+				? 'Afficher une sélection des meilleures abréviations'
+				: 'Masquer la sélection des meilleures abréviations'}
 		</button>
+		<button onclick={() => (isCollapsed = !isCollapsed)}>
+			{isCollapsed
+				? 'Afficher l’intégralité des abréviations'
+				: 'Masquer l’intégralité des abréviations'}
+		</button>
+	</div>
+	{#if !isSampleCollapsed}
+		<tiny-space></tiny-space>
+		<table>
+			<thead>
+				<tr>
+					<th>Abréviation (sample)</th>
+					<th>Remplacement</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each Object.entries(remplacementsSample) as [key, value]}
+					<tr>
+						<td>{key}★</td>
+						<td>{value}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
 	{/if}
 	{#if !isCollapsed}
-		<button onclick={() => (isCollapsed = !isCollapsed)}>
-			Masquer les abréviations implémentées sur cette démo
-		</button>
 		<tiny-space></tiny-space>
 		<table>
 			<thead>

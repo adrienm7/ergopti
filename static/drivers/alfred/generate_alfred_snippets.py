@@ -2,7 +2,7 @@
 Generate Alfred snippets for Magic hotstrings and Repeat patterns.
 
 Creates .alfredsnippets files (ZIP archives):
-- Magic.alfredsnippets: hotstrings from magicReplacements.json with case handling
+- Magic.alfredsnippets: hotstrings from magic.json with case handling
 - Repeat.alfredsnippets: letter combinations (ab -> abb) with case handling
 
 Configuration:
@@ -255,11 +255,10 @@ def main():
 
     magic_replacements_file = (
         script_dir.parent.parent.parent
-        / "src"
-        / "lib"
-        / "keyboard"
-        / "data"
-        / "magicReplacements.json"
+        / "static"
+        / "drivers"
+        / "configuration"
+        / "magic.json"
     )
 
     # Load magic replacements

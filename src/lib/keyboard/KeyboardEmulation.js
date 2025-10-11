@@ -1,7 +1,16 @@
 import * as stores_infos from '$lib/stores_infos.js';
 import { get } from 'svelte/store';
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
-import magicReplacements from '$lib/keyboard/data/magicReplacements.json';
+let magic = {};
+
+// Load magic dynamically via HTTP request (public static directory)
+if (typeof window !== 'undefined') {
+	fetch('/drivers/configuration/magic.json')
+		.then((response) => response.json())
+		.then((data) => {
+			magic = data;
+		});
+}
 
 export class KeyboardEmulation extends Keyboard {
 	constructor(id) {
@@ -289,8 +298,8 @@ export class KeyboardEmulation extends Keyboard {
 			newTextAreaValue = textBeforeCursor + '\t' + textAfterCursor;
 		} else if (resultToSend === '★') {
 			const currentWord = textBeforeCursor.split(/\s+/).slice(-1)[0];
-			if (currentWord.toLowerCase() in magicReplacements) {
-				let replacement = magicReplacements[currentWord.toLowerCase()];
+			if (currentWord.toLowerCase() in magic) {
+				let replacement = magic[currentWord.toLowerCase()];
 
 				if (currentWord === currentWord.toUpperCase() && currentWord.length > 1) {
 					replacement = replacement.toUpperCase();
