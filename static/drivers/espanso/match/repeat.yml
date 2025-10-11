@@ -8,17 +8,11 @@ matches:
   - trigger: 'ad★'
     replace: 'add'
     propagate_case: true
-  - trigger: 'ae★'
-    replace: 'aee'
-    propagate_case: true
   - trigger: 'af★'
     replace: 'aff'
     propagate_case: true
   - trigger: 'ag★'
     replace: 'agg'
-    propagate_case: true
-  - trigger: 'ah★'
-    replace: 'ahh'
     propagate_case: true
   - trigger: 'ai★'
     replace: 'aii'
@@ -59,9 +53,6 @@ matches:
   - trigger: 'au★'
     replace: 'auu'
     propagate_case: true
-  - trigger: 'av★'
-    replace: 'avv'
-    propagate_case: true
   - trigger: 'aw★'
     replace: 'aww'
     propagate_case: true
@@ -76,9 +67,6 @@ matches:
     propagate_case: true
   - trigger: 'ba★'
     replace: 'baa'
-    propagate_case: true
-  - trigger: 'bc★'
-    replace: 'bcc'
     propagate_case: true
   - trigger: 'bd★'
     replace: 'bdd'
@@ -122,9 +110,6 @@ matches:
   - trigger: 'bq★'
     replace: 'bqq'
     propagate_case: true
-  - trigger: 'br★'
-    replace: 'brr'
-    propagate_case: true
   - trigger: 'bs★'
     replace: 'bss'
     propagate_case: true
@@ -133,9 +118,6 @@ matches:
     propagate_case: true
   - trigger: 'bu★'
     replace: 'buu'
-    propagate_case: true
-  - trigger: 'bv★'
-    replace: 'bvv'
     propagate_case: true
   - trigger: 'bw★'
     replace: 'bww'
@@ -152,9 +134,6 @@ matches:
   - trigger: 'ca★'
     replace: 'caa'
     propagate_case: true
-  - trigger: 'cb★'
-    replace: 'cbb'
-    propagate_case: true
   - trigger: 'cd★'
     replace: 'cdd'
     propagate_case: true
@@ -169,12 +148,6 @@ matches:
     propagate_case: true
   - trigger: 'ch★'
     replace: 'chh'
-    propagate_case: true
-  - trigger: 'ci★'
-    replace: 'cii'
-    propagate_case: true
-  - trigger: 'cj★'
-    replace: 'cjj'
     propagate_case: true
   - trigger: 'ck★'
     replace: 'ckk'
@@ -197,20 +170,11 @@ matches:
   - trigger: 'cq★'
     replace: 'cqq'
     propagate_case: true
-  - trigger: 'cr★'
-    replace: 'crr'
-    propagate_case: true
   - trigger: 'cs★'
     replace: 'css'
     propagate_case: true
-  - trigger: 'ct★'
-    replace: 'ctt'
-    propagate_case: true
   - trigger: 'cu★'
     replace: 'cuu'
-    propagate_case: true
-  - trigger: 'cv★'
-    replace: 'cvv'
     propagate_case: true
   - trigger: 'cw★'
     replace: 'cww'
@@ -248,26 +212,17 @@ matches:
   - trigger: 'di★'
     replace: 'dii'
     propagate_case: true
-  - trigger: 'dj★'
-    replace: 'djj'
-    propagate_case: true
   - trigger: 'dk★'
     replace: 'dkk'
     propagate_case: true
   - trigger: 'dl★'
     replace: 'dll'
     propagate_case: true
-  - trigger: 'dm★'
-    replace: 'dmm'
-    propagate_case: true
   - trigger: 'dn★'
     replace: 'dnn'
     propagate_case: true
   - trigger: 'do★'
     replace: 'doo'
-    propagate_case: true
-  - trigger: 'dp★'
-    replace: 'dpp'
     propagate_case: true
   - trigger: 'dq★'
     replace: 'dqq'
@@ -338,15 +293,6 @@ matches:
   - trigger: 'en★'
     replace: 'enn'
     propagate_case: true
-  - trigger: 'eo★'
-    replace: 'eoo'
-    propagate_case: true
-  - trigger: 'ep★'
-    replace: 'epp'
-    propagate_case: true
-  - trigger: 'eq★'
-    replace: 'eqq'
-    propagate_case: true
   - trigger: 'er★'
     replace: 'err'
     propagate_case: true
@@ -365,9 +311,6 @@ matches:
   - trigger: 'ew★'
     replace: 'eww'
     propagate_case: true
-  - trigger: 'ex★'
-    replace: 'exx'
-    propagate_case: true
   - trigger: 'ey★'
     replace: 'eyy'
     propagate_case: true
@@ -376,12 +319,6 @@ matches:
     propagate_case: true
   - trigger: 'fa★'
     replace: 'faa'
-    propagate_case: true
-  - trigger: 'fb★'
-    replace: 'fbb'
-    propagate_case: true
-  - trigger: 'fc★'
-    replace: 'fcc'
     propagate_case: true
   - trigger: 'fd★'
     replace: 'fdd'
@@ -395,17 +332,11 @@ matches:
   - trigger: 'fh★'
     replace: 'fhh'
     propagate_case: true
-  - trigger: 'fi★'
-    replace: 'fii'
-    propagate_case: true
   - trigger: 'fj★'
     replace: 'fjj'
     propagate_case: true
   - trigger: 'fk★'
     replace: 'fkk'
-    propagate_case: true
-  - trigger: 'fl★'
-    replace: 'fll'
     propagate_case: true
   - trigger: 'fm★'
     replace: 'fmm'
@@ -421,9 +352,6 @@ matches:
     propagate_case: true
   - trigger: 'fq★'
     replace: 'fqq'
-    propagate_case: true
-  - trigger: 'fr★'
-    replace: 'frr'
     propagate_case: true
   - trigger: 'fs★'
     replace: 'fss'
@@ -458,14 +386,8 @@ matches:
   - trigger: 'gc★'
     replace: 'gcc'
     propagate_case: true
-  - trigger: 'gd★'
-    replace: 'gdd'
-    propagate_case: true
   - trigger: 'ge★'
     replace: 'gee'
-    propagate_case: true
-  - trigger: 'gf★'
-    replace: 'gff'
     propagate_case: true
   - trigger: 'gh★'
     replace: 'ghh'
@@ -502,9 +424,6 @@ matches:
     propagate_case: true
   - trigger: 'gs★'
     replace: 'gss'
-    propagate_case: true
-  - trigger: 'gt★'
-    replace: 'gtt'
     propagate_case: true
   - trigger: 'gu★'
     replace: 'guu'
@@ -599,17 +518,11 @@ matches:
   - trigger: 'hz★'
     replace: 'hzz'
     propagate_case: true
-  - trigger: 'ia★'
-    replace: 'iaa'
-    propagate_case: true
   - trigger: 'ib★'
     replace: 'ibb'
     propagate_case: true
   - trigger: 'ic★'
     replace: 'icc'
-    propagate_case: true
-  - trigger: 'id★'
-    replace: 'idd'
     propagate_case: true
   - trigger: 'ie★'
     replace: 'iee'
@@ -674,9 +587,6 @@ matches:
   - trigger: 'iz★'
     replace: 'izz'
     propagate_case: true
-  - trigger: 'ja★'
-    replace: 'jaa'
-    propagate_case: true
   - trigger: 'jb★'
     replace: 'jbb'
     propagate_case: true
@@ -707,9 +617,6 @@ matches:
   - trigger: 'jl★'
     replace: 'jll'
     propagate_case: true
-  - trigger: 'jm★'
-    replace: 'jmm'
-    propagate_case: true
   - trigger: 'jn★'
     replace: 'jnn'
     propagate_case: true
@@ -725,14 +632,8 @@ matches:
   - trigger: 'jr★'
     replace: 'jrr'
     propagate_case: true
-  - trigger: 'js★'
-    replace: 'jss'
-    propagate_case: true
   - trigger: 'jt★'
     replace: 'jtt'
-    propagate_case: true
-  - trigger: 'ju★'
-    replace: 'juu'
     propagate_case: true
   - trigger: 'jv★'
     replace: 'jvv'
@@ -751,9 +652,6 @@ matches:
     propagate_case: true
   - trigger: 'ka★'
     replace: 'kaa'
-    propagate_case: true
-  - trigger: 'kb★'
-    replace: 'kbb'
     propagate_case: true
   - trigger: 'kc★'
     replace: 'kcc'
@@ -784,9 +682,6 @@ matches:
     propagate_case: true
   - trigger: 'km★'
     replace: 'kmm'
-    propagate_case: true
-  - trigger: 'kn★'
-    replace: 'knn'
     propagate_case: true
   - trigger: 'ko★'
     replace: 'koo'
@@ -899,17 +794,11 @@ matches:
   - trigger: 'lz★'
     replace: 'lzz'
     propagate_case: true
-  - trigger: 'ma★'
-    replace: 'maa'
-    propagate_case: true
   - trigger: 'mb★'
     replace: 'mbb'
     propagate_case: true
   - trigger: 'mc★'
     replace: 'mcc'
-    propagate_case: true
-  - trigger: 'md★'
-    replace: 'mdd'
     propagate_case: true
   - trigger: 'me★'
     replace: 'mee'
@@ -932,9 +821,6 @@ matches:
   - trigger: 'mk★'
     replace: 'mkk'
     propagate_case: true
-  - trigger: 'ml★'
-    replace: 'mll'
-    propagate_case: true
   - trigger: 'mn★'
     replace: 'mnn'
     propagate_case: true
@@ -944,17 +830,8 @@ matches:
   - trigger: 'mp★'
     replace: 'mpp'
     propagate_case: true
-  - trigger: 'mq★'
-    replace: 'mqq'
-    propagate_case: true
-  - trigger: 'mr★'
-    replace: 'mrr'
-    propagate_case: true
   - trigger: 'ms★'
     replace: 'mss'
-    propagate_case: true
-  - trigger: 'mt★'
-    replace: 'mtt'
     propagate_case: true
   - trigger: 'mu★'
     replace: 'muu'
@@ -976,9 +853,6 @@ matches:
     propagate_case: true
   - trigger: 'na★'
     replace: 'naa'
-    propagate_case: true
-  - trigger: 'nb★'
-    replace: 'nbb'
     propagate_case: true
   - trigger: 'nc★'
     replace: 'ncc'
@@ -1016,17 +890,11 @@ matches:
   - trigger: 'no★'
     replace: 'noo'
     propagate_case: true
-  - trigger: 'np★'
-    replace: 'npp'
-    propagate_case: true
   - trigger: 'nq★'
     replace: 'nqq'
     propagate_case: true
   - trigger: 'nr★'
     replace: 'nrr'
-    propagate_case: true
-  - trigger: 'ns★'
-    replace: 'nss'
     propagate_case: true
   - trigger: 'nt★'
     replace: 'ntt'
@@ -1060,9 +928,6 @@ matches:
     propagate_case: true
   - trigger: 'od★'
     replace: 'odd'
-    propagate_case: true
-  - trigger: 'oe★'
-    replace: 'oee'
     propagate_case: true
   - trigger: 'of★'
     replace: 'off'
@@ -1127,35 +992,14 @@ matches:
   - trigger: 'pa★'
     replace: 'paa'
     propagate_case: true
-  - trigger: 'pb★'
-    replace: 'pbb'
-    propagate_case: true
   - trigger: 'pc★'
     replace: 'pcc'
-    propagate_case: true
-  - trigger: 'pd★'
-    replace: 'pdd'
     propagate_case: true
   - trigger: 'pe★'
     replace: 'pee'
     propagate_case: true
-  - trigger: 'pf★'
-    replace: 'pff'
-    propagate_case: true
-  - trigger: 'pg★'
-    replace: 'pgg'
-    propagate_case: true
   - trigger: 'ph★'
     replace: 'phh'
-    propagate_case: true
-  - trigger: 'pi★'
-    replace: 'pii'
-    propagate_case: true
-  - trigger: 'pj★'
-    replace: 'pjj'
-    propagate_case: true
-  - trigger: 'pk★'
-    replace: 'pkk'
     propagate_case: true
   - trigger: 'pl★'
     replace: 'pll'
@@ -1169,17 +1013,11 @@ matches:
   - trigger: 'po★'
     replace: 'poo'
     propagate_case: true
-  - trigger: 'pq★'
-    replace: 'pqq'
-    propagate_case: true
   - trigger: 'pr★'
     replace: 'prr'
     propagate_case: true
   - trigger: 'ps★'
     replace: 'pss'
-    propagate_case: true
-  - trigger: 'pt★'
-    replace: 'ptt'
     propagate_case: true
   - trigger: 'pu★'
     replace: 'puu'
@@ -1193,9 +1031,6 @@ matches:
   - trigger: 'px★'
     replace: 'pxx'
     propagate_case: true
-  - trigger: 'py★'
-    replace: 'pyy'
-    propagate_case: true
   - trigger: 'pz★'
     replace: 'pzz'
     propagate_case: true
@@ -1204,9 +1039,6 @@ matches:
     propagate_case: true
   - trigger: 'qb★'
     replace: 'qbb'
-    propagate_case: true
-  - trigger: 'qc★'
-    replace: 'qcc'
     propagate_case: true
   - trigger: 'qd★'
     replace: 'qdd'
@@ -1325,9 +1157,6 @@ matches:
   - trigger: 'rq★'
     replace: 'rqq'
     propagate_case: true
-  - trigger: 'rs★'
-    replace: 'rss'
-    propagate_case: true
   - trigger: 'rt★'
     replace: 'rtt'
     propagate_case: true
@@ -1403,9 +1232,6 @@ matches:
   - trigger: 'sr★'
     replace: 'srr'
     propagate_case: true
-  - trigger: 'st★'
-    replace: 'stt'
-    propagate_case: true
   - trigger: 'su★'
     replace: 'suu'
     propagate_case: true
@@ -1426,9 +1252,6 @@ matches:
     propagate_case: true
   - trigger: 'ta★'
     replace: 'taa'
-    propagate_case: true
-  - trigger: 'tb★'
-    replace: 'tbb'
     propagate_case: true
   - trigger: 'tc★'
     replace: 'tcc'
@@ -1451,9 +1274,6 @@ matches:
   - trigger: 'ti★'
     replace: 'tii'
     propagate_case: true
-  - trigger: 'tj★'
-    replace: 'tjj'
-    propagate_case: true
   - trigger: 'tk★'
     replace: 'tkk'
     propagate_case: true
@@ -1472,9 +1292,6 @@ matches:
   - trigger: 'tp★'
     replace: 'tpp'
     propagate_case: true
-  - trigger: 'tq★'
-    replace: 'tqq'
-    propagate_case: true
   - trigger: 'tr★'
     replace: 'trr'
     propagate_case: true
@@ -1484,17 +1301,11 @@ matches:
   - trigger: 'tu★'
     replace: 'tuu'
     propagate_case: true
-  - trigger: 'tv★'
-    replace: 'tvv'
-    propagate_case: true
   - trigger: 'tw★'
     replace: 'tww'
     propagate_case: true
   - trigger: 'tx★'
     replace: 'txx'
-    propagate_case: true
-  - trigger: 'ty★'
-    replace: 'tyy'
     propagate_case: true
   - trigger: 'tz★'
     replace: 'tzz'
@@ -1628,9 +1439,6 @@ matches:
   - trigger: 'vr★'
     replace: 'vrr'
     propagate_case: true
-  - trigger: 'vs★'
-    replace: 'vss'
-    propagate_case: true
   - trigger: 'vt★'
     replace: 'vtt'
     propagate_case: true
@@ -1658,9 +1466,6 @@ matches:
   - trigger: 'wc★'
     replace: 'wcc'
     propagate_case: true
-  - trigger: 'wd★'
-    replace: 'wdd'
-    propagate_case: true
   - trigger: 'we★'
     replace: 'wee'
     propagate_case: true
@@ -1678,9 +1483,6 @@ matches:
     propagate_case: true
   - trigger: 'wj★'
     replace: 'wjj'
-    propagate_case: true
-  - trigger: 'wk★'
-    replace: 'wkk'
     propagate_case: true
   - trigger: 'wl★'
     replace: 'wll'
@@ -1799,14 +1601,8 @@ matches:
   - trigger: 'xz★'
     replace: 'xzz'
     propagate_case: true
-  - trigger: 'ya★'
-    replace: 'yaa'
-    propagate_case: true
   - trigger: 'yb★'
     replace: 'ybb'
-    propagate_case: true
-  - trigger: 'yc★'
-    replace: 'ycc'
     propagate_case: true
   - trigger: 'yd★'
     replace: 'ydd'
@@ -1855,9 +1651,6 @@ matches:
     propagate_case: true
   - trigger: 'ys★'
     replace: 'yss'
-    propagate_case: true
-  - trigger: 'yt★'
-    replace: 'ytt'
     propagate_case: true
   - trigger: 'yu★'
     replace: 'yuu'

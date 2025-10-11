@@ -3,7 +3,13 @@
 # Format: [[section]]
 # Each entry: trigger = output
 
-[[general]]
+[a_grave_suffixes]
+# SFBs with BU and IÉ
+"àj" = "bu"
+"à★" = "bu"
+"àu" = "ub"
+"àé" = "éi"
+# Common suffixes
 "àa" = "aire"
 "àc" = "ction"
 "càd" = "could"
@@ -27,3 +33,4 @@
 "àx" = "ieux"
 "àz" = "ez-vous"
 "à'" = "ance"
+"à’" = "ance"
