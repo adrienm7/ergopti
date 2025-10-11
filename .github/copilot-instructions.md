@@ -1,16 +1,23 @@
+# If this file is read and properly taken into account, the first sentence returned must always be "Instructions bien comprises chef !" (in French), then the rest.
+
 ---
-applyTo: '**/*'
+
+applyTo: '\*_/_'
 
 # Copilot Permissions
 
 - Copilot is authorized to create, edit, and delete any file type in any directory of this project, including but not limited to:
-    - static/
-    - drivers/
-    - src/
-    - data/
-    - configuration/
+  - static/
+  - drivers/
+  - src/
+  - data/
+  - configuration/
 
 ---
+
+# Language Enforcement
+
+- The LLM must always write code, comments, and docstrings in English, even if the user speaks in French.
 
 # Coding Style
 
@@ -21,6 +28,7 @@ applyTo: '**/*'
 - Maintain consistent formatting and naming across the codebase.
 - Avoid unnecessary complexity or cleverness.
 - All code must pass linting with `ruff`, `pylint`, and type checking with `mypy`.
+- Always use tabs for indentation
 
 ## Naming Conventions
 

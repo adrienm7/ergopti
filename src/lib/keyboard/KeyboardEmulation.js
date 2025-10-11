@@ -19,7 +19,13 @@ if (typeof window !== 'undefined') {
 	fetch('/drivers/configuration/magic.toml')
 		.then((response) => response.text())
 		.then((text) => {
-			magic = parseTomlSimple(text);
+			const parsedMagic = parseTomlSimple(text);
+			// Remove ★ from each key
+			magic = {};
+			for (const [key, value] of Object.entries(parsedMagic)) {
+				const cleanKey = key.replace(/★/g, '');
+				magic[cleanKey] = value;
+			}
 		});
 }
 

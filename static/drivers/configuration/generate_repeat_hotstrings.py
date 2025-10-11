@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""
+Script to automatically generate repeat keys TOML file with conflict detection.
+
+This script creates a repeat.toml file with the format:
+- Previous letter + current letter + ★ → previous letter + current letter repeated
+
+It automatically scans other TOML files in the same directory to prevent conflicts.
+"""
+
+import re
+import sys
+from pathlib import Path
+from typing import List, Set, Tuple
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from utilities.logger import get_error_count, logger, reset_error_count
+
+
+def main() -> None:
+    """
+    Main function to generate repeat keys TOML file with conflict detection.
+    """
+    reset_error_count()
+
+    logger.info("=" * 80)
+    logger.info("🔄 Repeat Keys Generator")
+    logger.info("=" * 80)
+
+    try:
+        # Get output directory
+        output_dir = Path(__file__).parent
+        output_file = output_dir / "repeat.toml"
+
+        # Scan existing TOML files for conflicts
+        existing_triggers = scan_existing_toml_files(output_dir)
+        logger.info(
+            "Found %d existing triggers in TOML files", len(existing_triggers)
+        )
+
+        # Generate repeat keys
+        repeat_keys = generate_repeat_keys(existing_triggers)
+        logger.info("Generated %d repeat key combinations", len(repeat_keys))
+
+        # Convert to TOML format
+        toml_content = convert_repeat_keys_to_toml(repeat_keys)
+
+        # Write the TOML file
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(toml_content)
+
+        logger.success(
+            "Repeat keys file created: %s (%d entries)",
+            output_file.name,
+            len(repeat_keys),
+        )
+        show_execution_summary(len(repeat_keys), 0)
+
+    except Exception as e:
+        logger.error("Error generating repeat keys: %s", e)
+        show_execution_summary(0, 1)
+
+
+def scan_existing_toml_files(directory: Path) -> Set[str]:
+    """
+    Scan all TOML files in the directory to extract existing triggers.
+
+    Args:
+        directory: Directory containing TOML files to scan
+
+    Returns:
+        Set of existing trigger strings found in TOML files
+    """
+    existing_triggers: Set[str] = set()
+
+    # Find all TOML files except the one we're generating
+    toml_files = [
+        f for f in directory.glob("*.toml") if f.name != "repeat_keys.toml"
+    ]
+
+    logger.info("Scanning %d TOML files for existing triggers", len(toml_files))
+
+    for toml_file in toml_files:
+        try:
+            with open(toml_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Extract triggers using regex pattern: "trigger" = "output"
+            trigger_pattern = r'"([^"]+)"\s*=\s*"[^"]*"'
+            matches = re.findall(trigger_pattern, content)
+
+            file_triggers = set(matches)
+            existing_triggers.update(file_triggers)
+
+            logger.info(
+                "File %s: found %d triggers", toml_file.name, len(file_triggers)
+            )
+
+        except OSError as e:
+            logger.warning("Could not read file %s: %s", toml_file.name, e)
+
+    return existing_triggers
+
+
+def generate_repeat_keys(existing_triggers: Set[str]) -> List[Tuple[str, str]]:
+    """
+    Generate repeat key combinations with conflict detection.
+
+    Args:
+        existing_triggers: Set of existing triggers to avoid conflicts
+
+    Returns:
+        List of (trigger, output) tuples for repeat keys
+    """
+    # Define letters to use for repeat keys
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    repeat_keys: List[Tuple[str, str]] = []
+    conflicts_found = 0
+
+    logger.info("Generating repeat keys for %d letters", len(letters))
+
+    for prev_letter in letters:
+        for curr_letter in letters:
+            if prev_letter == curr_letter:
+                continue  # Skip same letter combinations
+
+            # Create trigger: previous_letter + current_letter + ★
+            trigger = f"{prev_letter}{curr_letter}★"
+            output = (
+                prev_letter + curr_letter + curr_letter
+            )  # Keep first letter + repeat second letter
+
+            # Check for conflicts
+            if trigger in existing_triggers:
+                conflicts_found += 1
+                logger.warning(
+                    "Conflict detected for trigger '%s' - skipping", trigger
+                )
+                continue
+
+            repeat_keys.append((trigger, output))
+
+    if conflicts_found > 0:
+        logger.warning("Found %d conflicts that were skipped", conflicts_found)
+
+    # Sort by trigger for consistent output
+    repeat_keys.sort(key=lambda x: x[0])
+
+    return repeat_keys
+
+
+def convert_repeat_keys_to_toml(repeat_keys: List[Tuple[str, str]]) -> str:
+    """
+    Convert repeat keys list to TOML format.
+
+    Args:
+        repeat_keys: List of (trigger, output) tuples
+
+    Returns:
+        Formatted TOML content as string
+    """
+    toml_lines = [
+        "# DO NOT EDIT THIS FILE DIRECTLY.",
+        "# This file is automatically generated. Any manual changes will be overwritten.",
+        "# Format: [[section]]",
+        "# Each entry: trigger = output",
+        "# Pattern: previous_letter + current_letter + ★ → previous_letter + current_letter repeated",
+        "",
+    ]
+
+    # Group by first letter of trigger for better organization
+    current_prefix = ""
+
+    for trigger, output in repeat_keys:
+        prefix = trigger[0]  # First letter of trigger
+
+        # Create new section for each starting letter
+        if prefix != current_prefix:
+            if current_prefix:  # Add empty line between sections
+                toml_lines.append("")
+
+            current_prefix = prefix
+            section_name = f"repeat_from_{prefix}"
+            toml_lines.append(f"[[{section_name}]]")
+
+        # Escape special characters for TOML
+        trigger_escaped = escape_toml_string(trigger)
+        output_escaped = escape_toml_string(output)
+
+        toml_lines.append(f'"{trigger_escaped}" = "{output_escaped}"')
+
+    toml_lines.append("")  # Final empty line
+
+    return "\n".join(toml_lines)
+
+
+def escape_toml_string(text: str) -> str:
+    """
+    Escape special characters in a string for TOML format.
+
+    Args:
+        text: The string to escape
+
+    Returns:
+        Escaped string suitable for TOML
+    """
+    # For repeat keys, we only need to escape quotes and backslashes
+    text = text.replace("\\", "\\\\")
+    text = text.replace('"', '\\"')
+    return text
+
+
+def show_execution_summary(processed: int, errors: int) -> None:
+    """
+    Display a summary of the generation process.
+
+    Args:
+        processed: Number of successfully processed repeat keys
+        errors: Number of errors encountered
+    """
+    if errors == 0 and get_error_count() == 0:
+        logger.success("=" * 83)
+        logger.success("=" * 83)
+        logger.success("=" * 83)
+        logger.success(
+            "======= Repeat keys generated successfully: %d key(s) processed, no errors! =======",
+            processed,
+        )
+        logger.success("=" * 83)
+        logger.success("=" * 83)
+        logger.success("=" * 83)
+    else:
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error(
+            "======= Generation complete. %d key(s) processed, %d error(s) (exceptions), %d error log(s). =======",
+            processed,
+            errors,
+            get_error_count(),
+        )
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+        logger.error("=" * 100)
+
+
+if __name__ == "__main__":
+    main()
