@@ -7,16 +7,28 @@
 	let remplacements = {};
 	let remplacementsSample = {};
 
+	// Fonction simple pour parser le TOML plat (clé = valeur)
+	function parseTomlSimple(toml) {
+		const result = {};
+		for (const line of toml.split('\n')) {
+			const match = line.match(/^"([^"]+)"\s*=\s*"([^"]+)"/);
+			if (match) {
+				result[match[1]] = match[2];
+			}
+		}
+		return result;
+	}
+
 	if (typeof window !== 'undefined') {
-		fetch('/drivers/configuration/magic.json')
-			.then((response) => response.json())
-			.then((data) => {
-				remplacements = data;
+		fetch('/drivers/configuration/magic.toml')
+			.then((response) => response.text())
+			.then((text) => {
+				remplacements = parseTomlSimple(text);
 			});
-		fetch('/drivers/configuration/magic_sample.json')
-			.then((response) => response.json())
-			.then((data) => {
-				remplacementsSample = data;
+		fetch('/drivers/configuration/magic_sample.toml')
+			.then((response) => response.text())
+			.then((text) => {
+				remplacementsSample = parseTomlSimple(text);
 			});
 	}
 

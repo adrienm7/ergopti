@@ -3,12 +3,23 @@ import { get } from 'svelte/store';
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
 let magic = {};
 
+function parseTomlSimple(toml) {
+	const result = {};
+	for (const line of toml.split('\n')) {
+		const match = line.match(/^"([^"]+)"\s*=\s*"([^"]+)"/);
+		if (match) {
+			result[match[1]] = match[2];
+		}
+	}
+	return result;
+}
+
 // Load magic dynamically via HTTP request (public static directory)
 if (typeof window !== 'undefined') {
-	fetch('/drivers/configuration/magic.json')
-		.then((response) => response.json())
-		.then((data) => {
-			magic = data;
+	fetch('/drivers/configuration/magic.toml')
+		.then((response) => response.text())
+		.then((text) => {
+			magic = parseTomlSimple(text);
 		});
 }
 

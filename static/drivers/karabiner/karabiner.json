@@ -9061,6 +9061,11 @@
                                         "type": "variable_unless",
                                         "name": "previous_key",
                                         "value": "r"
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "previous_key",
+                                        "value": "n"
                                     }
                                 ],
                                 "to": [
@@ -9096,6 +9101,41 @@
                                         "type": "variable_if",
                                         "name": "previous_key",
                                         "value": "r"
+                                    }
+                                ],
+                                "to": [
+                                    {
+                                        "key_code": "grave_accent_and_tilde"
+                                    },
+                                    {
+                                        "set_variable": {
+                                            "name": "star_activated",
+                                            "value": 0
+                                        }
+                                    },
+                                    {
+                                        "set_variable": {
+                                            "name": "previous_key",
+                                            "value": "ê"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde"
+                                },
+                                "conditions": [
+                                    {
+                                        "type": "variable_if",
+                                        "name": "star_activated",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "previous_key",
+                                        "value": "n"
                                     }
                                 ],
                                 "to": [
