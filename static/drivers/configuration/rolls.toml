@@ -1,0 +1,170 @@
+# Ergopti+ Keylayout Mappings Configuration
+# This file defines the mappings for dead keys and special combinations in Ergopti+
+
+[comma_j_letters_sfbs]
+",a" = "ja"
+",à" = "j"
+",e" = "je"
+",é" = "jé"
+",ê" = "ju"
+",i" = "ji"
+",o" = "jo"
+",u" = "ju"
+",'" = "j’"
+",’" = "j’"
+# Far letters
+",c" = "ç"
+",è" = "z"
+",s" = "qu"
+",x" = "où"
+",y" = "k"
+# SFBs
+",d" = "ds"
+",f" = "fl"
+",g" = "gl"
+",h" = "ph"
+",l" = "cl"
+",m" = "ms"
+",n" = "nl"
+",p" = "xp"
+",q" = "qu’"
+",r" = "rq"
+",t" = "pt"
+",v" = "dv"
+",z" = "bj"
+
+[a_grave_suffixes]
+# SFBs with BU and IÉ
+"àj" = "bu"
+# "à★" = "bu"
+"àu" = "ub"
+"àé" = "éi"
+# Common suffixes
+"àa" = "aire"
+"àc" = "ction"
+"àd" = "would"
+"àê" = "able"
+"àf" = "iste"
+"àg" = "ought"
+"àh" = "ight"
+"ài" = "ying"
+"àk" = "ique"
+"àl" = "elle"
+"àp" = "ence"
+"àm" = "isme"
+"àn" = "ation"
+"àq" = "ique"
+"àr" = "erre"
+"às" = "ement"
+"àt" = "ettre"
+"àv" = "ment"
+"àx" = "ieux"
+"àz" = "ez-vous"
+"à'" = "ance"
+"à’" = "ance"
+
+[roll_ck]
+"cx" = "ck"
+
+[e]
+"eé" = "ez"
+
+[e_acute_sfb]
+"éê" = "eo"
+"éà" = "ié"
+
+[e_grave_y]
+"èy" = "aî"
+
+[e_circumflex_deadkey]
+"êa" = "â"
+"êà" = "æ"
+"êe" = "œ"
+"êé" = "oe"
+"êi" = "î"
+"êo" = "ô"
+"êu" = "û"
+
+[roll_wh]
+"hc" = "wh"
+
+[roll_ct]
+"p'" = "ct"
+
+[q_with_u]
+"qa" = "qua"
+"qe" = "que"
+"qé" = "qué"
+"qè" = "què"
+"qê" = "quê"
+"qi" = "qui"
+"qo" = "quo"
+"q'" = "qu’"
+"q’" = "qu’"
+
+[roll_sk]
+"sx" = "sk"
+
+[y_e_grave]
+"yè" = "â"
+
+[typographic_apostrophe]
+"'a" = "’a"
+"'e" = "’e"
+"'é" = "’é"
+"'è" = "’è"
+"'ê" = "’ê"
+"'h" = "’h"
+"'i" = "’i"
+"'o" = "’o"
+"'t" = "’t"
+"'u" = "’u"
+"'y" = "’y"
+
+# ===============================
+# === Symbols and punctuation ===
+# ===============================
+
+[rolls_hashtag]
+"#!" = " := "
+"#(" = '")'
+"#[" = '"]'
+
+[rolls_chevron_left]
+"<@" = "</"
+"<%" = " <= "
+
+[rolls_chevron_right]
+">%" = " >= "
+
+[rolls_parenthesis_left]
+"(#" = '("'
+
+[rolls_bracket_left]
+"[#" = '["'
+"[)" = ' = "'
+
+[rolls_bracket_right]
+"]#" = '"]'
+
+[rolls_exclamation_mark]
+"!#" = " != "
+
+[rolls_backslash]
+'\"' = "/*"
+
+[rolls_quote]
+'"\' = "*/"
+
+[rolls_dollar]
+"$=" = " => "
+
+[rolls_equal]
+"=$" = " <= "
+"=+" = " ➜ "
+
+[rolls_plus]
+"+?" = " -> "
+
+[rolls_question_mark]
+"?+" = " <- "

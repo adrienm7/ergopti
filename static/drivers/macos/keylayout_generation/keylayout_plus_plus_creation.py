@@ -3,7 +3,7 @@ Keylayout Plus generation utilities for Ergopti:
 create a variant with extra dead key features and symbol modifications.
 """
 
-from configuration.keylayout_plus_mappings import plus_mappings
+from configuration.rolls_mappings import plus_mappings
 from data.lists import EXTRA_KEYS
 from tests.run_all_tests import validate_keylayout
 from utilities.keyboard_id import set_unique_keyboard_id

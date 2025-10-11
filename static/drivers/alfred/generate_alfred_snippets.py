@@ -33,9 +33,9 @@ def main(
     Main function to generate Alfred snippets from TOML configuration files.
 
     Args:
-            input_directory: Directory containing TOML files. If None, uses default config directory.
-            output_directory: Directory to save .alfredsnippets files. If None, uses current directory.
-            overwrite: Whether to overwrite existing files.
+        input_directory: Directory containing TOML files. If None, uses default config directory.
+        output_directory: Directory to save .alfredsnippets files. If None, uses current directory.
+        overwrite: Whether to overwrite existing files.
     """
     reset_error_count()
 
@@ -90,7 +90,7 @@ def generate_uuid() -> str:
     Generate a UUID in uppercase format matching Alfred's convention.
 
     Returns:
-            UUID string in uppercase format.
+        UUID string in uppercase format.
     """
     return str(uuid.uuid4()).upper()
 
@@ -100,11 +100,11 @@ def apply_case_to_text(original_trigger: str, target_text: str) -> str:
     Apply the case pattern from trigger to the target text.
 
     Args:
-            original_trigger: The trigger text that defines the case pattern
-            target_text: The text to apply the case pattern to
+        original_trigger: The trigger text that defines the case pattern
+        target_text: The text to apply the case pattern to
 
     Returns:
-            The target text with case applied based on the trigger pattern
+        The target text with case applied based on the trigger pattern
     """
     # Special case: for single character triggers, uppercase gives title case
     if len(original_trigger) == 1 and original_trigger.isupper():
@@ -122,10 +122,10 @@ def parse_toml_simple(toml_content: str) -> Dict[str, str]:
     Parse TOML content to extract trigger-replacement mappings.
 
     Args:
-            toml_content: TOML file content as string
+        toml_content: TOML file content as string
 
     Returns:
-            Dictionary mapping triggers to replacements
+        Dictionary mapping triggers to replacements
     """
     result = {}
     for line in toml_content.split("\n"):
@@ -143,10 +143,10 @@ def detect_trigger_symbols(triggers: List[str]) -> Tuple[str, str]:
     Detect common prefix and suffix symbols in triggers.
 
     Args:
-            triggers: List of trigger strings
+        triggers: List of trigger strings
 
     Returns:
-            Tuple of (prefix, suffix) symbols to extract
+        Tuple of (prefix, suffix) symbols to extract
     """
     if not triggers:
         return "", ""
@@ -174,10 +174,10 @@ def clean_triggers(
     Clean triggers by removing detected symbols and return them.
 
     Args:
-            triggers_dict: Dictionary of trigger -> replacement mappings
+        triggers_dict: Dictionary of trigger -> replacement mappings
 
     Returns:
-            Tuple of (cleaned_dict, prefix, suffix)
+        Tuple of (cleaned_dict, prefix, suffix)
     """
     triggers_list = list(triggers_dict.keys())
     prefix, suffix = detect_trigger_symbols(triggers_list)
@@ -199,12 +199,12 @@ def create_snippet_json(trigger: str, result: str, uid: str) -> Dict:
     Create a snippet JSON structure for Alfred.
 
     Args:
-            trigger: The trigger keyword
-            result: The replacement text
-            uid: Unique identifier for the snippet
+        trigger: The trigger keyword
+        result: The replacement text
+        uid: Unique identifier for the snippet
 
     Returns:
-            Dictionary representing the snippet JSON structure
+        Dictionary representing the snippet JSON structure
     """
     return {
         "alfredsnippet": {
@@ -221,8 +221,8 @@ def create_info_plist(prefix: str = "", suffix: str = "") -> str:
     Create the info.plist content for Alfred snippets.
 
     Args:
-            prefix: The prefix to add before snippet keywords
-            suffix: The suffix to add after snippet keywords
+        prefix: The prefix to add before snippet keywords
+        suffix: The suffix to add after snippet keywords
 
     Returns:
             The XML content for info.plist
@@ -250,11 +250,11 @@ def create_alfredsnippets_file(
     Create a .alfredsnippets file (ZIP archive) from snippets data.
 
     Args:
-            output_path: Directory where to create the .alfredsnippets file
-            snippets_data: List of snippet data dictionaries
-            collection_name: Name of the collection (used for filename)
-            prefix: Prefix for snippet keywords
-            suffix: Suffix for snippet keywords
+        output_path: Directory where to create the .alfredsnippets file
+        snippets_data: List of snippet data dictionaries
+        collection_name: Name of the collection (used for filename)
+        prefix: Prefix for snippet keywords
+        suffix: Suffix for snippet keywords
 
     Raises:
             OSError: If there's an error creating files or directories
@@ -312,11 +312,11 @@ def generate_case_variants(
     Generate case variants for a trigger-replacement pair.
 
     Args:
-            trigger: Original trigger
-            replacement: Original replacement text
+        trigger: Original trigger
+        replacement: Original replacement text
 
     Returns:
-            List of (trigger, replacement) tuples with different case variants
+        List of (trigger, replacement) tuples with different case variants
     """
     variants = []
 
@@ -347,14 +347,14 @@ def generate_alfred_snippets_from_toml(
     Generate Alfred snippets from a single TOML file.
 
     Args:
-            toml_file: Path to the TOML file to process
-            output_directory: Directory to save the .alfredsnippets file
-            overwrite: Whether to overwrite existing files
+        toml_file: Path to the TOML file to process
+        output_directory: Directory to save the .alfredsnippets file
+        overwrite: Whether to overwrite existing files
 
     Raises:
-            FileNotFoundError: If the TOML file doesn't exist
-            ValueError: If the TOML file is empty or malformed
-            OSError: If there's an error reading the file or writing output
+        FileNotFoundError: If the TOML file doesn't exist
+        ValueError: If the TOML file is empty or malformed
+        OSError: If there's an error reading the file or writing output
     """
     if not toml_file.exists():
         raise FileNotFoundError(f"TOML file not found: {toml_file}")
@@ -410,11 +410,11 @@ def can_overwrite_file(file_path: Path, overwrite: bool) -> bool:
     Handle deciding what to do if a file already exists.
 
     Args:
-            file_path: Path to check for existence
-            overwrite: Whether overwriting is allowed
+        file_path: Path to check for existence
+        overwrite: Whether overwriting is allowed
 
     Returns:
-            True if we proceed with overwrite or file doesn't exist, False if we skip
+        True if we proceed with overwrite or file doesn't exist, False if we skip
     """
     if file_path.exists():
         logger.warning("Destination file already exists: %s", file_path)
@@ -432,8 +432,8 @@ def show_execution_summary(processed: int, errors: int) -> None:
     Display a summary of the generation process.
 
     Args:
-            processed: Number of successfully processed files
-            errors: Number of errors encountered
+        processed: Number of successfully processed files
+        errors: Number of errors encountered
     """
     if errors == 0 and get_error_count() == 0:
         logger.success("=" * 81)
