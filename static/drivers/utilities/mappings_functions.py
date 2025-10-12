@@ -4,7 +4,11 @@ Utility functions for processing key mappings:
 - Escape XML characters
 - Unescape XML characters
 - Validate uniqueness of triggers
+- Generate case variants for trigger-replacement pairs
 """
+
+import re
+from typing import List, Tuple
 
 # Table de remplacement XML <-> caractères normaux
 XML_ESCAPE_TABLE = {
@@ -16,7 +20,223 @@ XML_ESCAPE_TABLE = {
 }
 XML_UNESCAPE_TABLE = {v: k for k, v in XML_ESCAPE_TABLE.items()}
 
-import re
+# Special character mappings for "uppercase" equivalents
+SPECIAL_UPPERCASE_CHARS = {
+    "'": "\u202f?",  # apostrophe -> espace insécable + question mark
+    ",": "\u202f;",  # comma -> espace insécable + semicolon
+}
+
+
+def get_special_uppercase_variants(char: str) -> List[str]:
+    """
+    Get special uppercase variants for characters that don't have standard uppercase.
+
+    Args:
+        char: The character to get variants for
+
+    Returns:
+        List of special uppercase variants (only one variant per character)
+    """
+    if char in SPECIAL_UPPERCASE_CHARS:
+        return [SPECIAL_UPPERCASE_CHARS[char]]
+    return []
+
+
+def generate_mixed_case_variants(trigger: str) -> List[str]:
+    """
+    Generate mixed case variants like aB, Ab, AB for multi-character triggers.
+
+    Args:
+        trigger: The original trigger
+
+    Returns:
+        List of mixed case trigger variants
+    """
+    if len(trigger) < 2:
+        return []
+
+    variants = []
+    # For 2-character triggers, generate: aB, Ab, AB
+    if len(trigger) == 2:
+        a, b = trigger[0], trigger[1]
+        # aB (first lower, second upper)
+        if a.lower() != a.upper() and b.lower() != b.upper():
+            mixed1 = a.lower() + b.upper()
+            if mixed1 not in [
+                trigger.lower(),
+                trigger.upper(),
+                trigger.capitalize(),
+            ]:
+                variants.append(mixed1)
+
+    return variants
+
+
+def generate_case_variants_for_trigger_replacement(
+    trigger: str, replacement: str
+) -> List[Tuple[str, str]]:
+    """
+    Generate case variants for a trigger-replacement pair.
+    Follows the same logic as Alfred snippets generation:
+    - Lowercase trigger -> lowercase replacement
+    - Title case trigger -> title case replacement
+    - Uppercase trigger -> uppercase replacement (only for multi-character triggers)
+    - Mixed case triggers like aB -> Mixed case outputs like Cd
+    - Special character mappings like ' -> ? and , -> ;
+
+    Special rule: if uppercase trigger equals title case trigger (e.g., single char),
+    only generate one entry with title case output.
+
+    Args:
+        trigger: Original trigger
+        replacement: Original replacement text
+
+    Returns:
+        List of (trigger, replacement) tuples with different case variants (no duplicates)
+    """
+    variants = []
+    seen_triggers = set()
+
+    # Original (lowercase)
+    lower_trigger = trigger.lower()
+    lower_replacement = replacement.lower()
+    if lower_trigger not in seen_triggers:
+        variants.append((lower_trigger, lower_replacement))
+        seen_triggers.add(lower_trigger)
+
+    # Title case (first letter uppercase)
+    if len(trigger) > 0:
+        title_trigger = trigger.capitalize()
+        upper_trigger = trigger.upper()
+
+        # Check if title case and uppercase are the same
+        if title_trigger == upper_trigger:
+            # For single character or cases where title == upper, use title case output
+            title_replacement = apply_case_to_replacement_text(
+                title_trigger, replacement
+            )
+            if title_trigger not in seen_triggers:
+                variants.append((title_trigger, title_replacement))
+                seen_triggers.add(title_trigger)
+        else:
+            # Generate both title and uppercase variants
+            title_replacement = apply_case_to_replacement_text(
+                title_trigger, replacement
+            )
+            if title_trigger not in seen_triggers:
+                variants.append((title_trigger, title_replacement))
+                seen_triggers.add(title_trigger)
+
+            # Uppercase (only for multi-character triggers where upper != title)
+            if len(trigger) > 1:
+                upper_replacement = apply_case_to_replacement_text(
+                    upper_trigger, replacement
+                )
+                if upper_trigger not in seen_triggers:
+                    variants.append((upper_trigger, upper_replacement))
+                    seen_triggers.add(upper_trigger)
+
+    # Generate mixed case variants (aB -> Cd)
+    mixed_variants = generate_mixed_case_variants(trigger)
+    for mixed_trigger in mixed_variants:
+        if mixed_trigger not in seen_triggers:
+            mixed_replacement = apply_mixed_case_to_replacement(
+                mixed_trigger, replacement
+            )
+            variants.append((mixed_trigger, mixed_replacement))
+            seen_triggers.add(mixed_trigger)
+
+    # Generate special character variants for all existing variants
+    existing_variants = variants.copy()
+    for variant_trigger, variant_replacement in existing_variants:
+        for i, char in enumerate(variant_trigger):
+            special_variants = get_special_uppercase_variants(char)
+            for special_char in special_variants:
+                special_trigger = (
+                    variant_trigger[:i]
+                    + special_char
+                    + variant_trigger[i + 1 :]
+                )
+                if special_trigger not in seen_triggers:
+                    # To determine case for special chars: replace special chars with letters
+                    # and check if result equals its uppercase version
+                    test_trigger = special_trigger
+                    for special, letter in [("?", "A"), (";", "A")]:
+                        test_trigger = test_trigger.replace(special, letter)
+
+                    # If test_trigger.upper() == test_trigger, it's uppercase
+                    if test_trigger.upper() == test_trigger:
+                        special_replacement = apply_case_to_replacement_text(
+                            test_trigger.upper(), replacement
+                        )
+                    else:
+                        special_replacement = apply_case_to_replacement_text(
+                            test_trigger.capitalize(), replacement
+                        )
+                    variants.append((special_trigger, special_replacement))
+                    seen_triggers.add(special_trigger)
+
+    return variants
+
+
+def apply_mixed_case_to_replacement(
+    mixed_trigger: str, target_text: str
+) -> str:
+    """
+    Apply mixed case pattern from trigger to replacement text.
+    For patterns like aB -> Cd (first lower, second upper -> first upper, second lower)
+
+    Args:
+        mixed_trigger: The mixed case trigger
+        target_text: The text to apply case to
+
+    Returns:
+        The target text with mixed case applied
+    """
+    if len(mixed_trigger) == 2 and len(target_text) >= 2:
+        # Pattern aB -> Cd
+        if mixed_trigger[0].islower() and mixed_trigger[1].isupper():
+            return target_text[0].upper() + target_text[1:].lower()
+
+    # Fallback to title case
+    return target_text.capitalize()
+
+
+def apply_case_to_replacement_text(
+    original_trigger: str, target_text: str
+) -> str:
+    """
+    Apply the case pattern from trigger to the target text.
+
+    Args:
+        original_trigger: The trigger text that defines the case pattern
+        target_text: The text to apply the case pattern to
+
+    Returns:
+        The target text with case applied based on the trigger pattern
+    """
+    # Extract only alphabetic characters to determine case pattern
+    alphabetic_chars = [char for char in original_trigger if char.isalpha()]
+
+    if not alphabetic_chars:
+        # No alphabetic characters, return original
+        return target_text
+
+    # Special case: for single alphabetic character, uppercase gives title case
+    if len(alphabetic_chars) == 1 and alphabetic_chars[0].isupper():
+        return target_text.capitalize()
+
+    # Check if all alphabetic characters are uppercase
+    all_alphabetic_uppercase = all(char.isupper() for char in alphabetic_chars)
+
+    if all_alphabetic_uppercase and len(alphabetic_chars) > 1:
+        return target_text.upper()
+    # Check if it follows title case pattern (first alphabetic char uppercase)
+    elif alphabetic_chars[0].isupper():
+        return target_text.capitalize()
+    # All lowercase alphabetic characters
+    else:
+        return target_text.lower()
 
 
 def add_case_sensitive_mappings(mappings: dict) -> dict:

@@ -1,79 +1,105 @@
 matches:
   - trigger: ' !#'
     replace: ' != '
-    propagate_case: true
   - trigger: ' #!'
     replace: ' := '
-    propagate_case: true
   - trigger: ' #ç'
     replace: ' := '
-    propagate_case: true
+  - trigger: ' #Ç'
+    replace: ' := '
   - trigger: ' $='
     replace: ' => '
-    propagate_case: true
   - trigger: ' +?'
     replace: ' -> '
-    propagate_case: true
   - trigger: ' =$'
     replace: ' <= '
-    propagate_case: true
   - trigger: ' =+'
     replace: ' ➜ '
-    propagate_case: true
   - trigger: ' ?+'
     replace: ' <- '
-    propagate_case: true
   - trigger: ' ç#'
     replace: ' != '
-    propagate_case: true
+  - trigger: ' Ç#'
+    replace: ' != '
   - trigger: '!#'
     replace: ' != '
-    propagate_case: true
   - trigger: '#!'
     replace: ' := '
-    propagate_case: true
   - trigger: '#ç'
     replace: ' := '
-    propagate_case: true
+  - trigger: '#Ç'
+    replace: ' := '
   - trigger: '$='
     replace: ' => '
-    propagate_case: true
   - trigger: '+?'
     replace: ' -> '
-    propagate_case: true
   - trigger: '<@'
     replace: '</'
-    propagate_case: true
   - trigger: '=$'
     replace: ' <= '
-    propagate_case: true
   - trigger: '=+'
     replace: ' ➜ '
-    propagate_case: true
   - trigger: '?+'
     replace: ' <- '
-    propagate_case: true
   - trigger: 'cx'
     replace: 'ck'
-    propagate_case: true
+  - trigger: 'Cx'
+    replace: 'Ck'
+  - trigger: 'CX'
+    replace: 'CK'
+  - trigger: 'cX'
+    replace: 'Ck'
   - trigger: 'eé'
     replace: 'ez'
-    propagate_case: true
+  - trigger: 'Eé'
+    replace: 'Ez'
+  - trigger: 'EÉ'
+    replace: 'EZ'
+  - trigger: 'eÉ'
+    replace: 'Ez'
   - trigger: 'hc'
     replace: 'wh'
-    propagate_case: true
+  - trigger: 'Hc'
+    replace: 'Wh'
+  - trigger: 'HC'
+    replace: 'WH'
+  - trigger: 'hC'
+    replace: 'Wh'
   - trigger: "nt'"
     replace: "n't"
-    propagate_case: true
+  - trigger: "Nt'"
+    replace: "N't"
+  - trigger: "NT'"
+    replace: "N'T"
+  - trigger: 'nt ?'
+    replace: "N't"
+  - trigger: 'Nt ?'
+    replace: "N't"
+  - trigger: 'NT ?'
+    replace: "N'T"
   - trigger: "p'"
     replace: 'ct'
-    propagate_case: true
+  - trigger: "P'"
+    replace: 'Ct'
+  - trigger: 'p ?'
+    replace: 'Ct'
+  - trigger: 'P ?'
+    replace: 'CT'
   - trigger: 'sx'
     replace: 'sk'
-    propagate_case: true
+  - trigger: 'Sx'
+    replace: 'Sk'
+  - trigger: 'SX'
+    replace: 'SK'
+  - trigger: 'sX'
+    replace: 'Sk'
   - trigger: 'xlsx'
     replace: 'xlsx'
-    propagate_case: true
+  - trigger: 'Xlsx'
+    replace: 'Xlsx'
+  - trigger: 'XLSX'
+    replace: 'XLSX'
   - trigger: 'ç#'
     replace: ' != '
-    propagate_case: true
+  - trigger: 'Ç#'
+    replace: ' != '

@@ -18,6 +18,9 @@ from typing import Dict, List, Optional, Tuple
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from utilities.logger import get_error_count, logger, reset_error_count
+from utilities.mappings_functions import (
+    generate_case_variants_for_trigger_replacement,
+)
 
 
 def sort_files_by_priority(
@@ -394,14 +397,29 @@ def generate_espanso_match_from_toml(
         logger.warning("Output file already exists, skipping: %s", output_file)
         return
 
-    # Determine if this file should use propagate_case
+    # Determine the case handling strategy for this file
     file_stem = toml_file.stem.lower()
-    use_propagate_case = file_stem not in [
+
+    # Files that should NOT have any case handling (use original triggers only)
+    no_case_handling = file_stem in [
         "brands",
         "emojis",
         "punctuation",
         "symbols_typst",
         "symbols",
+    ]
+
+    # Files that should use propagate_case (automatic case handling by Espanso)
+    use_propagate_case = file_stem in [
+        "accents",
+        "apostrophe",
+        "errors",
+        "e_deadkey",
+        "minus",
+        "names",
+        "qu",
+        "sfb_reduction",
+        "repeat",
     ]
 
     # Generate YAML content
@@ -412,10 +430,29 @@ def generate_espanso_match_from_toml(
         metadata = cleaned_dict[trigger]
         replacement = metadata["output"]
         is_word = metadata["is_word"]
-        match_entry = create_espanso_match_entry(
-            trigger, replacement, suffix, use_propagate_case, is_word
-        )
-        yaml_lines.append(match_entry)
+
+        if no_case_handling:
+            # For brands, emojis, etc.: just use the original trigger without case variants
+            match_entry = create_espanso_match_entry(
+                trigger, replacement, suffix, False, is_word
+            )
+            yaml_lines.append(match_entry)
+        elif use_propagate_case:
+            # Use propagate_case for automatic case handling
+            match_entry = create_espanso_match_entry(
+                trigger, replacement, suffix, True, is_word
+            )
+            yaml_lines.append(match_entry)
+        else:
+            # Generate explicit case variants for files like rolls, magic, suffixes, repeat
+            case_variants = generate_case_variants_for_trigger_replacement(
+                trigger, replacement
+            )
+            for variant_trigger, variant_replacement in case_variants:
+                match_entry = create_espanso_match_entry(
+                    variant_trigger, variant_replacement, suffix, False, is_word
+                )
+                yaml_lines.append(match_entry)
 
     yaml_content = "\n".join(yaml_lines) + "\n"
 
@@ -439,16 +476,16 @@ def show_execution_summary(processed: int, errors: int) -> None:
         errors: Number of errors encountered
     """
     if errors == 0 and get_error_count() == 0:
-        logger.success("=" * 81)
-        logger.success("=" * 81)
-        logger.success("=" * 81)
+        logger.success("=" * 82)
+        logger.success("=" * 82)
+        logger.success("=" * 82)
         logger.success(
             "======= All files processed successfully: %d file(s) processed, no errors! =======",
             processed,
         )
-        logger.success("=" * 81)
-        logger.success("=" * 81)
-        logger.success("=" * 81)
+        logger.success("=" * 82)
+        logger.success("=" * 82)
+        logger.success("=" * 82)
     else:
         logger.error("=" * 100)
         logger.error("=" * 100)
