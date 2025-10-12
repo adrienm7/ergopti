@@ -6,12 +6,32 @@
 [[general]]
 "<@" = { output = "</", is_word = false, auto_expand = true }
 "eé" = { output = "ez", is_word = false, auto_expand = true }
-"#(" = { output = "`", is_word = false, auto_expand = true }
-"#[" = { output = "`", is_word = false, auto_expand = true }
-"#]" = { output = "`", is_word = false, auto_expand = true }
+"#(" = { output = "\")", is_word = false, auto_expand = true }
+"#[" = { output = "\"]", is_word = false, auto_expand = true }
+"#]" = { output = "\"]", is_word = false, auto_expand = true }
 "hc" = { output = "wh", is_word = false, auto_expand = true }
+" #ç" = { output = " := ", is_word = false, auto_expand = true }
+" #!" = { output = " := ", is_word = false, auto_expand = true }
+"#ç" = { output = " := ", is_word = false, auto_expand = true }
+"#!" = { output = " := ", is_word = false, auto_expand = true }
+" ç#" = { output = " != ", is_word = false, auto_expand = true }
+" !#" = { output = " != ", is_word = false, auto_expand = true }
+"ç#" = { output = " != ", is_word = false, auto_expand = true }
+"!#" = { output = " != ", is_word = false, auto_expand = true }
 "xlsx" = { output = "xlsx", is_word = false, auto_expand = true }
 "sx" = { output = "sk", is_word = false, auto_expand = true }
 "cx" = { output = "ck", is_word = false, auto_expand = true }
+" [)" = { output = " = \"\"{Left}", is_word = false, auto_expand = true }
+"[)" = { output = " = \"\"{Left}", is_word = false, auto_expand = true }
 "nt'" = { output = "n't", is_word = false, auto_expand = true }
+" =+" = { output = " ➜ ", is_word = false, auto_expand = true }
+"=+" = { output = " ➜ ", is_word = false, auto_expand = true }
+" $=" = { output = " => ", is_word = false, auto_expand = true }
+"$=" = { output = " => ", is_word = false, auto_expand = true }
+" =$" = { output = " <= ", is_word = false, auto_expand = true }
+"=$" = { output = " <= ", is_word = false, auto_expand = true }
+" +?" = { output = " -> ", is_word = false, auto_expand = true }
+"+?" = { output = " -> ", is_word = false, auto_expand = true }
+" ?+" = { output = " <- ", is_word = false, auto_expand = true }
+"?+" = { output = " <- ", is_word = false, auto_expand = true }
 "p'" = { output = "ct", is_word = false, auto_expand = true }

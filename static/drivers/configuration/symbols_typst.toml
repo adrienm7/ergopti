@@ -219,7 +219,7 @@
 "$diaer$" = { output = "¨", is_word = true, auto_expand = true }
 "$grave$" = { output = "`", is_word = true, auto_expand = true }
 "$macron$" = { output = "¯", is_word = true, auto_expand = true }
-"$quote.double$" = { output = "`", is_word = true, auto_expand = true }
+"$quote.double$" = { output = "\"", is_word = true, auto_expand = true }
 "$quote.single$" = { output = "'", is_word = true, auto_expand = true }
 "$quote.l.double$" = { output = "“", is_word = true, auto_expand = true }
 "$quote.l.single$" = { output = "‘", is_word = true, auto_expand = true }
