@@ -4036,6 +4036,10 @@ if Features["DistancesReduction"]["QU"].Enabled {
         "*?", "q'", "qu’",
         Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
     )
+    CreateCaseSensitiveHotstrings(
+        "*?", "q’", "qu’",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
+    )
 }
 
 ; ==========================================
@@ -4614,10 +4618,6 @@ if Features["Autocorrection"]["Errors"].Enabled {
     )
     CreateHotstring(
         "*", "*_", "* ",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
-    )
-    CreateHotstring(
-        "*", "=_", "= ",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
 
@@ -5797,14 +5797,13 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "mme" . ScriptInformation["MagicKey"], "madame")
     CreateCaseSensitiveHotstrings("*", "modif" . ScriptInformation["MagicKey"], "modification")
     CreateCaseSensitiveHotstrings("*", "mom" . ScriptInformation["MagicKey"], "moi-même")
+    CreateCaseSensitiveHotstrings("*", "mq" . ScriptInformation["MagicKey"], "montre que")
+    CreateCaseSensitiveHotstrings("*", "mr" . ScriptInformation["MagicKey"], "monsieur")
     CreateCaseSensitiveHotstrings("*", "mrc" . ScriptInformation["MagicKey"], "merci")
     CreateCaseSensitiveHotstrings("*", "msg" . ScriptInformation["MagicKey"], "message")
     CreateCaseSensitiveHotstrings("*", "mt" . ScriptInformation["MagicKey"], "montant")
     CreateCaseSensitiveHotstrings("*", "mtn" . ScriptInformation["MagicKey"], "maintenant")
     CreateCaseSensitiveHotstrings("*", "moy" . ScriptInformation["MagicKey"], "moyenne")
-    CreateCaseSensitiveHotstrings("*", "mq" . ScriptInformation["MagicKey"], "montre que")
-    CreateCaseSensitiveHotstrings("*", "mr" . ScriptInformation["MagicKey"], "monsieur")
-    CreateCaseSensitiveHotstrings("*", "mtn" . ScriptInformation["MagicKey"], "maintenant")
     CreateCaseSensitiveHotstrings("*", "mutu" . ScriptInformation["MagicKey"], "mutualiser")
     CreateCaseSensitiveHotstrings("*", "mvt" . ScriptInformation["MagicKey"], "mouvement")
 

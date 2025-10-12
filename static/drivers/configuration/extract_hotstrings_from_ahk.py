@@ -6,12 +6,82 @@ and convert them to TOML format.
 
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Optional
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from utilities.logger import get_error_count, logger, reset_error_count
+
+
+def normalize_section_name(name: str) -> str:
+    """
+    Normalize section name by removing accents and converting to TOML-compatible format.
+
+    Args:
+        name: The original section name
+
+    Returns:
+        Normalized section name without accents and special characters
+    """
+    # Convert to lowercase
+    name = name.lower()
+
+    # Remove accents using unicodedata
+    name = unicodedata.normalize("NFD", name)
+    name = "".join(char for char in name if unicodedata.category(char) != "Mn")
+
+    # Replace non-alphanumeric characters with underscores
+    name = re.sub(r"[^a-z0-9_]", "_", name)
+
+    # Remove multiple underscores and strip leading/trailing underscores
+    name = re.sub(r"_+", "_", name).strip("_")
+
+    return name
+
+
+def deduplicate_hotstrings(
+    hotstrings: dict[str, list[tuple[str, str, bool, bool]]],
+) -> dict[str, list[tuple[str, str, bool, bool]]]:
+    """
+    Remove duplicate triggers within each section, keeping only the first occurrence.
+
+    Args:
+        hotstrings: Dictionary mapping section names to lists of (trigger, output, is_word, auto_expand) tuples
+
+    Returns:
+        Dictionary with duplicates removed, maintaining the order of first occurrences
+    """
+    deduplicated: dict[str, list[tuple[str, str, bool, bool]]] = {}
+
+    for section_name, entries in hotstrings.items():
+        seen_triggers: set[str] = set()
+        unique_entries: list[tuple[str, str, bool, bool]] = []
+
+        for trigger, output, is_word, auto_expand in entries:
+            if trigger not in seen_triggers:
+                seen_triggers.add(trigger)
+                unique_entries.append((trigger, output, is_word, auto_expand))
+            else:
+                logger.debug(
+                    "Skipping duplicate trigger '%s' in section '%s'",
+                    trigger,
+                    section_name,
+                )
+
+        deduplicated[section_name] = unique_entries
+
+        # Log deduplication stats if any duplicates were found
+        duplicates_removed = len(entries) - len(unique_entries)
+        if duplicates_removed > 0:
+            logger.info(
+                "Removed %d duplicate trigger(s) from section '%s'",
+                duplicates_removed,
+                section_name,
+            )
+
+    return deduplicated
 
 
 def main(ahk_file_path: Optional[Path] = None) -> None:
@@ -38,40 +108,157 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
     logger.info("=" * 80)
     logger.info("Source file: %s", source_file)
 
-    # Define extraction tasks
-    extractions = [
-        ("TextExpansionEmojis", "emojis"),
-        ("TextExpansion", "magic"),
-        ("TextExpansionSymbols", "symbols"),
-        ("TextExpansionSymbolsTypst", "symbols_typst"),
-        ("SuffixesA", "suffixes"),
-        ("Accents", "accents"),
-        ("Names", "names"),
-        ("Brands", "brands"),
-        ("Minus", "minus"),
-        ("MultiplePunctuationMarks", "punctuation"),
-        ("Errors", "errors"),
-        ("TypographicApostrophe", "apostrophe"),
-    ]
+    # Define extraction tasks with support for multiple blocks per file
+    # Format: {output_filename: [list_of_block_patterns]}
+    extractions = {
+        "emojis": ["TextExpansionEmojis"],
+        "magic": ["TextExpansion"],
+        "symbols": ["TextExpansionSymbols"],
+        "symbols_typst": ["TextExpansionSymbolsTypst"],
+        "suffixes": ["SuffixesA"],
+        "accents": ["Accents"],
+        "names": ["Names"],
+        "brands": ["Brands"],
+        "minus": ["Minus"],
+        "punctuation": ["MultiplePunctuationMarks"],
+        "errors": ["Errors"],
+        "apostrophe": ["TypographicApostrophe"],
+        "qu": ["QU"],
+        "comma": [
+            "Comma",
+            "CommaJ",
+            "CommaFarLetters",
+        ],  # Multiple blocks in same file
+        "sfb_reduction": ["EGrave", "BU", "IÉ"],  # Multiple blocks in same file
+    }
 
     processed = 0
     errors = 0
 
-    for block_pattern, output_name in extractions:
+    for output_name, block_patterns in extractions.items():
         logger.launch(
-            "Extracting block '%s' to '%s.toml'", block_pattern, output_name
+            "Extracting blocks %s to '%s.toml'", block_patterns, output_name
         )
         try:
-            extract_ahk_block_to_toml(
-                str(source_file), block_pattern, output_name
+            extract_multiple_ahk_blocks_to_toml(
+                str(source_file), block_patterns, output_name
             )
             processed += 1
-            logger.success("Successfully extracted '%s' block", block_pattern)
+            logger.success(
+                "Successfully extracted blocks %s to '%s.toml'",
+                block_patterns,
+                output_name,
+            )
         except (OSError, ValueError, RuntimeError) as e:
-            logger.error("Error extracting block '%s': %s", block_pattern, e)
+            logger.error("Error extracting blocks %s: %s", block_patterns, e)
             errors += 1
 
     show_execution_summary(processed, errors)
+
+    # Generate additional TOML files
+    logger.info("Generating additional TOML files...")
+    try:
+        generate_e_deadkey_toml(str(source_file))
+        logger.success("Successfully generated e_deadkey.toml")
+    except (OSError, ValueError) as e:
+        logger.error("Error generating e_deadkey.toml: %s", e)
+        errors += 1
+
+    try:
+        generate_rolls_toml(str(source_file))
+        logger.success("Successfully generated rolls.toml")
+    except (OSError, ValueError) as e:
+        logger.error("Error generating rolls.toml: %s", e)
+        errors += 1
+
+
+def extract_multiple_ahk_blocks_to_toml(
+    ahk_file_path: str, block_patterns: list[str], output_name: str
+) -> None:
+    """
+    Extract multiple blocks from an AutoHotkey file and merge them into a single TOML file.
+
+    Args:
+        ahk_file_path: Path to the source .ahk file
+        block_patterns: List of block patterns to extract (e.g., ['Comma', 'CommaJ', 'CommaFarLetters'])
+        output_name: Output filename without extension (e.g., 'comma')
+
+    Raises:
+        FileNotFoundError: If the source file doesn't exist
+        ValueError: If none of the block patterns are found
+        OSError: If there's an error writing the output file
+    """
+    # Determine output file path
+    output_dir = Path(__file__).parent
+    output_file = output_dir / f"{output_name}.toml"
+
+    # Read the AutoHotkey file
+    try:
+        with open(ahk_file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Source file not found: {ahk_file_path}")
+    except OSError as e:
+        raise OSError(f"Error reading file {ahk_file_path}: {e}")
+
+    # Extract and merge hotstrings from all specified blocks
+    merged_hotstrings: dict[str, list[tuple[str, str, bool, bool]]] = {}
+    found_blocks = []
+
+    for block_pattern in block_patterns:
+        block_content = extract_block_content(content, block_pattern)
+        if block_content:
+            found_blocks.append(block_pattern)
+            hotstrings = extract_hotstrings(block_content)
+
+            # Merge hotstrings from this block
+            for section_name, entries in hotstrings.items():
+                # Create a unique section name to avoid conflicts
+                if len(block_patterns) > 1:
+                    unique_section_name = f"{normalize_section_name(block_pattern)}_{section_name}"
+                else:
+                    unique_section_name = section_name
+
+                if unique_section_name not in merged_hotstrings:
+                    merged_hotstrings[unique_section_name] = []
+                merged_hotstrings[unique_section_name].extend(entries)
+        else:
+            logger.warning(
+                "Block '%s' not found in %s", block_pattern, ahk_file_path
+            )
+
+    if not found_blocks:
+        raise ValueError(
+            f"None of the blocks {block_patterns} found in {ahk_file_path}"
+        )
+
+    if not merged_hotstrings:
+        logger.warning("No hotstrings found in blocks %s", block_patterns)
+
+    # Remove duplicates: keep only the first occurrence of each trigger within each section
+    deduplicated_hotstrings = deduplicate_hotstrings(merged_hotstrings)
+
+    # Convert to TOML format using the first found block as block_name for compatibility
+    toml_content = convert_to_toml(deduplicated_hotstrings, found_blocks[0])
+
+    # Write the TOML file
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(toml_content)
+
+        total_entries = sum(
+            len(entries) for entries in merged_hotstrings.values()
+        )
+        logger.info(
+            "TOML file created: %s (%d entries from %d blocks: %s)",
+            output_file.name,
+            total_entries,
+            len(found_blocks),
+            found_blocks,
+        )
+
+    except OSError as e:
+        raise OSError(f"Error writing file {output_file}: {e}")
 
 
 def get_latest_ahk_file() -> Path:
@@ -159,15 +346,20 @@ def extract_ahk_block_to_toml(
     if not hotstrings:
         logger.warning("No hotstrings found in block '%s'", block_pattern)
 
+    # Remove duplicates: keep only the first occurrence of each trigger within each section
+    deduplicated_hotstrings = deduplicate_hotstrings(hotstrings)
+
     # Convert to TOML format
-    toml_content = convert_to_toml(hotstrings, block_pattern)
+    toml_content = convert_to_toml(deduplicated_hotstrings, block_pattern)
 
     # Write the TOML file
     try:
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(toml_content)
 
-        total_entries = sum(len(entries) for entries in hotstrings.values())
+        total_entries = sum(
+            len(entries) for entries in deduplicated_hotstrings.values()
+        )
         logger.info(
             "TOML file created: %s (%d entries)",
             output_file.name,
@@ -237,11 +429,9 @@ def extract_hotstrings(
         # Detect section headers (comments === Section ===)
         section_match = re.match(r";\s*===\s*(.+?)\s*===", line)
         if section_match:
-            section_name = section_match.group(1).lower()
-            # Clean section name for TOML compatibility
-            section_name = re.sub(r"[^a-z0-9_]", "_", section_name)
-            section_name = re.sub(r"_+", "_", section_name).strip("_")
-            current_section = section_name
+            section_name = section_match.group(1)
+            # Normalize section name for TOML compatibility (removes accents and special chars)
+            current_section = normalize_section_name(section_name)
             if current_section not in hotstrings:
                 hotstrings[current_section] = []
             i += 1
@@ -553,6 +743,176 @@ def show_execution_summary(processed: int, errors: int) -> None:
         logger.error("=" * 100)
         logger.error("=" * 100)
         logger.error("=" * 100)
+
+
+def generate_e_deadkey_toml(ahk_file_path: str = None) -> None:
+    """
+    Generate e_deadkey.toml file with ê + vowel = vowel with ^ mappings.
+    Also includes content from ECirc block and ê + e = œ.
+
+    Args:
+        ahk_file_path: Optional path to AHK file. If None, uses latest version.
+    """
+    output_dir = Path(__file__).parent
+    output_file = output_dir / "e_deadkey.toml"
+
+    # Define the basic deadkey mappings: ê + vowel = vowel with circumflex
+    deadkey_mappings = [
+        ("êa", "â"),
+        ("êe", "œ"),  # Special case: ê + e = œ
+        ("êi", "î"),
+        ("êo", "ô"),
+        ("êu", "û"),
+        ("êy", "ŷ"),
+        ("êA", "Â"),
+        ("êE", "Œ"),  # Special case: ê + E = Œ
+        ("êI", "Î"),
+        ("êO", "Ô"),
+        ("êU", "Û"),
+        ("êY", "Ŷ"),
+    ]
+
+    # Extract additional mappings from ECirc block if AHK file is provided
+    ecirc_mappings = []
+    if ahk_file_path:
+        try:
+            with open(ahk_file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Extract ECirc block content
+            ecirc_content = extract_block_content(content, "ECirc")
+            if ecirc_content:
+                ecirc_hotstrings = extract_hotstrings(ecirc_content)
+                # Flatten all sections into a single list
+                for section_entries in ecirc_hotstrings.values():
+                    for (
+                        trigger,
+                        output,
+                        is_word,
+                        auto_expand,
+                    ) in section_entries:
+                        ecirc_mappings.append(
+                            (trigger, output, is_word, auto_expand)
+                        )
+
+                logger.debug("Found %d ECirc mappings", len(ecirc_mappings))
+        except (OSError, ValueError) as e:
+            logger.warning("Could not extract ECirc mappings: %s", e)
+
+    header_lines = [
+        "# DO NOT EDIT THIS FILE DIRECTLY.",
+        "# This file is automatically generated. Any manual changes will be overwritten.",
+        "# Format: [[section]]",
+        '# All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }',
+        "",
+        "[[e_deadkey]]",
+        "# ê + vowel = vowel with circumflex accent",
+        "# Special case: ê + e = œ",
+        "",
+    ]
+
+    toml_lines = header_lines.copy()
+
+    # Add basic deadkey mappings
+    for trigger, output in deadkey_mappings:
+        toml_lines.append(
+            f'"{trigger}" = {{ output = "{output}", is_word = false, auto_expand = true }}'
+        )
+
+    # Add ECirc mappings if any
+    if ecirc_mappings:
+        toml_lines.append("")
+        toml_lines.append("# Additional mappings from ECirc block")
+        for trigger, output, is_word, auto_expand in ecirc_mappings:
+            trigger_escaped = escape_toml_string(
+                trigger, escape_backslashes=False
+            )
+            output_escaped = escape_toml_string(output, escape_backslashes=True)
+            toml_lines.append(
+                f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()} }}'
+            )
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(toml_lines))
+
+    total_mappings = len(deadkey_mappings) + len(ecirc_mappings)
+    logger.info(
+        "Generated e_deadkey.toml with %d entries (%d deadkey + %d ECirc)",
+        total_mappings,
+        len(deadkey_mappings),
+        len(ecirc_mappings),
+    )
+
+
+def generate_rolls_toml(ahk_file_path: str) -> None:
+    """
+    Generate rolls.toml file by extracting content from Features["Rolls"] blocks.
+
+    Args:
+        ahk_file_path: Path to the source .ahk file
+    """
+    output_dir = Path(__file__).parent
+    output_file = output_dir / "rolls.toml"
+
+    # Read the AutoHotkey file
+    try:
+        with open(ahk_file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Source file not found: {ahk_file_path}")
+    except OSError as e:
+        raise OSError(f"Error reading file {ahk_file_path}: {e}")
+
+    # Find all Features["Rolls"] blocks
+    rolls_pattern = r'if Features\["[^"]+"\]\["Rolls"\]\.Enabled\s*\{'
+    rolls_matches = list(re.finditer(rolls_pattern, content))
+
+    if not rolls_matches:
+        logger.warning('No Features["Rolls"] blocks found in %s', ahk_file_path)
+        return
+
+    all_hotstrings: dict[str, list[tuple[str, str, bool, bool]]] = {}
+
+    for match in rolls_matches:
+        # Extract block content using brace matching
+        start_idx = match.end()
+        brace_count = 1
+        end_idx = start_idx
+
+        while end_idx < len(content) and brace_count > 0:
+            if content[end_idx] == "{":
+                brace_count += 1
+            elif content[end_idx] == "}":
+                brace_count -= 1
+            end_idx += 1
+
+        if brace_count == 0:
+            block_content = content[start_idx : end_idx - 1]
+            hotstrings = extract_hotstrings(block_content)
+
+            # Merge all hotstrings
+            for section_name, entries in hotstrings.items():
+                if section_name not in all_hotstrings:
+                    all_hotstrings[section_name] = []
+                all_hotstrings[section_name].extend(entries)
+
+    if not all_hotstrings:
+        logger.warning('No hotstrings found in Features["Rolls"] blocks')
+        return
+
+    # Convert to TOML format
+    toml_content = convert_to_toml(all_hotstrings, "Rolls")
+
+    # Write the TOML file
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(toml_content)
+
+    total_entries = sum(len(entries) for entries in all_hotstrings.values())
+    logger.info(
+        "Generated rolls.toml with %d entries from %d sections",
+        total_entries,
+        len(all_hotstrings),
+    )
 
 
 if __name__ == "__main__":

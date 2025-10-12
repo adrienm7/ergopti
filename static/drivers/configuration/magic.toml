@@ -311,14 +311,13 @@
 "mme★" = { output = "madame", is_word = true, auto_expand = true }
 "modif★" = { output = "modification", is_word = true, auto_expand = true }
 "mom★" = { output = "moi-même", is_word = true, auto_expand = true }
+"mq★" = { output = "montre que", is_word = true, auto_expand = true }
+"mr★" = { output = "monsieur", is_word = true, auto_expand = true }
 "mrc★" = { output = "merci", is_word = true, auto_expand = true }
 "msg★" = { output = "message", is_word = true, auto_expand = true }
 "mt★" = { output = "montant", is_word = true, auto_expand = true }
 "mtn★" = { output = "maintenant", is_word = true, auto_expand = true }
 "moy★" = { output = "moyenne", is_word = true, auto_expand = true }
-"mq★" = { output = "montre que", is_word = true, auto_expand = true }
-"mr★" = { output = "monsieur", is_word = true, auto_expand = true }
-"mtn★" = { output = "maintenant", is_word = true, auto_expand = true }
 "mutu★" = { output = "mutualiser", is_word = true, auto_expand = true }
 "mvt★" = { output = "mouvement", is_word = true, auto_expand = true }
 
@@ -418,7 +417,6 @@
 "psycho★" = { output = "psychologie", is_word = true, auto_expand = true }
 "psb★" = { output = "possible", is_word = true, auto_expand = true }
 "psy★" = { output = "psychologie", is_word = true, auto_expand = true }
-"psycho★" = { output = "psychologie", is_word = true, auto_expand = true }
 "pt★" = { output = "point", is_word = true, auto_expand = true }
 "ptf★" = { output = "portefeuille", is_word = true, auto_expand = true }
 "pts★" = { output = "points", is_word = true, auto_expand = true }

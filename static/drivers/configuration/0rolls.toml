@@ -1,38 +1,6 @@
 # Ergopti+ Keylayout Mappings Configuration
 # This file defines the mappings for dead keys and special combinations in Ergopti+
 
-[comma_j_letters_sfbs]
-",a" = "ja"
-",à" = "j"
-",e" = "je"
-",é" = "jé"
-",ê" = "ju"
-",i" = "ji"
-",o" = "jo"
-",u" = "ju"
-",'" = "j’"
-",’" = "j’"
-# Far letters
-",c" = "ç"
-",è" = "z"
-",s" = "qu"
-",x" = "où"
-",y" = "k"
-# SFBs
-",d" = "ds"
-",f" = "fl"
-",g" = "gl"
-",h" = "ph"
-",l" = "cl"
-",m" = "ms"
-",n" = "nl"
-",p" = "xp"
-",q" = "qu’"
-",r" = "rq"
-",t" = "pt"
-",v" = "dv"
-",z" = "bj"
-
 [roll_ck]
 "cx" = "ck"
 
@@ -60,17 +28,6 @@
 
 [roll_ct]
 "p'" = "ct"
-
-[q_with_u]
-"qa" = "qua"
-"qe" = "que"
-"qé" = "qué"
-"qè" = "què"
-"qê" = "quê"
-"qi" = "qui"
-"qo" = "quo"
-"q'" = "qu’"
-"q’" = "qu’"
 
 [roll_sk]
 "sx" = "sk"

@@ -14,7 +14,6 @@
 "]_" = { output = "] ", is_word = true, auto_expand = true }
 "~_" = { output = "~ ", is_word = true, auto_expand = true }
 "*_" = { output = "* ", is_word = true, auto_expand = true }
-"=_" = { output = "= ", is_word = true, auto_expand = true }
 
 [[caps_correction]]
 "OUi" = { output = "Oui", is_word = false, auto_expand = false }
