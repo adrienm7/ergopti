@@ -22,6 +22,9 @@ from typing import Dict, List, Optional, Tuple
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from utilities.logger import get_error_count, logger, reset_error_count
+from utilities.mappings_functions import (
+    generate_case_variants_for_trigger_replacement,
+)
 
 
 def main(
@@ -95,28 +98,6 @@ def generate_uuid() -> str:
         UUID string in uppercase format.
     """
     return str(uuid.uuid4()).upper()
-
-
-def apply_case_to_text(original_trigger: str, target_text: str) -> str:
-    """
-    Apply the case pattern from trigger to the target text.
-
-    Args:
-        original_trigger: The trigger text that defines the case pattern
-        target_text: The text to apply the case pattern to
-
-    Returns:
-        The target text with case applied based on the trigger pattern
-    """
-    # Special case: for single character triggers, uppercase gives title case
-    if len(original_trigger) == 1 and original_trigger.isupper():
-        return target_text.capitalize()
-    elif original_trigger.isupper():
-        return target_text.upper()
-    elif original_trigger.istitle():
-        return target_text.capitalize()
-    else:
-        return target_text.lower()
 
 
 def parse_toml_simple(toml_content: str) -> Dict[str, Dict[str, any]]:
@@ -350,48 +331,6 @@ def create_alfredsnippets_file(
     logger.info("Created %s with %d snippets", archive_path, len(snippets_data))
 
 
-def generate_case_variants(
-    trigger: str, replacement: str
-) -> List[Tuple[str, str]]:
-    """
-    Generate case variants for a trigger-replacement pair.
-
-    Args:
-        trigger: Original trigger
-        replacement: Original replacement text
-
-    Returns:
-        List of (trigger, replacement) tuples with different case variants (no duplicates)
-    """
-    variants = []
-    seen_triggers = set()
-
-    # Original (lowercase)
-    lower_trigger = trigger.lower()
-    lower_replacement = replacement.lower()
-    if lower_trigger not in seen_triggers:
-        variants.append((lower_trigger, lower_replacement))
-        seen_triggers.add(lower_trigger)
-
-    # Title case (first letter uppercase)
-    if len(trigger) > 0:
-        title_trigger = trigger.capitalize()
-        title_replacement = apply_case_to_text(title_trigger, replacement)
-        if title_trigger not in seen_triggers:
-            variants.append((title_trigger, title_replacement))
-            seen_triggers.add(title_trigger)
-
-    # Uppercase (only for multi-character triggers)
-    if len(trigger) > 1:
-        upper_trigger = trigger.upper()
-        upper_replacement = apply_case_to_text(upper_trigger, replacement)
-        if upper_trigger not in seen_triggers:
-            variants.append((upper_trigger, upper_replacement))
-            seen_triggers.add(upper_trigger)
-
-    return variants
-
-
 def generate_alfred_snippets_from_toml(
     toml_file: Path,
     output_directory: Path,
@@ -440,7 +379,9 @@ def generate_alfred_snippets_from_toml(
         auto_expand = metadata["auto_expand"]
 
         # Generate case variants
-        variants = generate_case_variants(trigger, replacement)
+        variants = generate_case_variants_for_trigger_replacement(
+            trigger, replacement
+        )
 
         for variant_trigger, variant_replacement in variants:
             # Check for duplicates across all snippets
