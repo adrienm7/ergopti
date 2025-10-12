@@ -3,6 +3,12 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[[ecirc_general]]
+"êé" = { output = "oe", is_word = false, auto_expand = true }
+"éê" = { output = "eo", is_word = false, auto_expand = true }
+"ê." = { output = "u.", is_word = false, auto_expand = true }
+"ê," = { output = "u,", is_word = false, auto_expand = true }
+
 [[bu_general]]
 "à★" = { output = "bu", is_word = false, auto_expand = true }
 "àu" = { output = "ub", is_word = false, auto_expand = true }

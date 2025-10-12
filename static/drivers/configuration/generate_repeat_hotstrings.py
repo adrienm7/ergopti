@@ -74,9 +74,9 @@ def scan_existing_toml_files(directory: Path) -> Set[str]:
     """
     existing_triggers: Set[str] = set()
 
-    # Find all TOML files except the one we're generating
+    # Find all TOML files except the output file (repeat.toml)
     toml_files = [
-        f for f in directory.glob("*.toml") if f.name != "repeat_keys.toml"
+        f for f in directory.glob("*.toml") if f.name != "repeat.toml"
     ]
 
     logger.info("Scanning %d TOML files for existing triggers", len(toml_files))
