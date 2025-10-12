@@ -1,17 +1,25 @@
 matches:
   - trigger: 'yè'
     replace: 'â'
+    propagate_case: true
   - trigger: 'àé'
     replace: 'éi'
+    propagate_case: true
   - trigger: 'èy'
     replace: 'aî'
+    propagate_case: true
   - trigger: 'éà'
     replace: 'ié'
+    propagate_case: true
   - trigger: 'éê'
     replace: 'eo'
+    propagate_case: true
   - trigger: 'ê,'
     replace: 'u,'
+    propagate_case: true
   - trigger: 'ê.'
     replace: 'u.'
+    propagate_case: true
   - trigger: 'êé'
     replace: 'oe'
+    propagate_case: true
