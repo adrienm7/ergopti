@@ -285,8 +285,8 @@ def create_espanso_match_entry(
     if use_propagate_case:
         lines.append("    propagate_case: true")
 
-    if is_word:
-        lines.append("    word: true")
+    # if is_word:
+    #     lines.append("    word: true")
 
     return "\n".join(lines)
 
@@ -400,7 +400,6 @@ def generate_espanso_match_from_toml(
     file_stem = toml_file.stem.lower()
     use_propagate_case = file_stem in [
         "magic",
-        "magic_sample",
         "repeat",
         "rolls",
         "suffixes",
