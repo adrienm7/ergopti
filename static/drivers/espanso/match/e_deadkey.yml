@@ -1,0 +1,13 @@
+matches:
+  - trigger: 'êa'
+    replace: 'â'
+  - trigger: 'êe'
+    replace: 'œ'
+  - trigger: 'êi'
+    replace: 'î'
+  - trigger: 'êo'
+    replace: 'ô'
+  - trigger: 'êu'
+    replace: 'û'
+  - trigger: 'êy'
+    replace: 'ŷ'
