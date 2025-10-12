@@ -1,55 +1,82 @@
 matches:
   - trigger: ",'"
     replace: 'j’'
+    propagate_case: true
   - trigger: ',a'
     replace: 'ja'
+    propagate_case: true
   - trigger: ',c'
     replace: 'ç'
+    propagate_case: true
   - trigger: ',d'
     replace: 'ds'
+    propagate_case: true
   - trigger: ',e'
     replace: 'je'
+    propagate_case: true
   - trigger: ',f'
     replace: 'fl'
+    propagate_case: true
   - trigger: ',g'
     replace: 'gl'
+    propagate_case: true
   - trigger: ',h'
     replace: 'ph'
+    propagate_case: true
   - trigger: ',i'
     replace: 'ji'
+    propagate_case: true
   - trigger: ',l'
     replace: 'cl'
+    propagate_case: true
   - trigger: ',m'
     replace: 'ms'
+    propagate_case: true
   - trigger: ',n'
     replace: 'nl'
+    propagate_case: true
   - trigger: ',o'
     replace: 'jo'
+    propagate_case: true
   - trigger: ',p'
     replace: 'xp'
+    propagate_case: true
   - trigger: ',q'
     replace: 'qu’'
+    propagate_case: true
   - trigger: ',r'
     replace: 'rq'
+    propagate_case: true
   - trigger: ',s'
     replace: 'q'
+    propagate_case: true
   - trigger: ',t'
     replace: 'pt'
+    propagate_case: true
   - trigger: ',u'
     replace: 'ju'
+    propagate_case: true
   - trigger: ',v'
     replace: 'dv'
+    propagate_case: true
   - trigger: ',x'
     replace: 'où'
+    propagate_case: true
   - trigger: ',y'
     replace: 'k'
+    propagate_case: true
   - trigger: ',z'
     replace: 'bj'
+    propagate_case: true
   - trigger: ',à'
     replace: 'j'
+    propagate_case: true
   - trigger: ',è'
     replace: 'z'
+    propagate_case: true
   - trigger: ',é'
     replace: 'jé'
+    propagate_case: true
   - trigger: ',ê'
     replace: 'ju'
+    propagate_case: true

@@ -1,31 +1,46 @@
 matches:
   - trigger: '#_'
     replace: '# '
+    propagate_case: true
   - trigger: '$_'
     replace: '$ '
+    propagate_case: true
   - trigger: '(_'
     replace: '( '
+    propagate_case: true
   - trigger: ')_'
     replace: ') '
+    propagate_case: true
   - trigger: '*_'
     replace: '* '
+    propagate_case: true
   - trigger: '+_'
     replace: '+ '
+    propagate_case: true
   - trigger: '=_'
     replace: '= '
+    propagate_case: true
   - trigger: 'OUi'
     replace: 'Oui'
+    propagate_case: true
   - trigger: '[_'
     replace: '[ '
+    propagate_case: true
   - trigger: ']_'
     replace: '] '
+    propagate_case: true
   - trigger: 'aeu'
     replace: 'eau'
+    propagate_case: true
   - trigger: 'eua'
     replace: 'eau'
+    propagate_case: true
   - trigger: 'oiu'
     replace: 'oui'
+    propagate_case: true
   - trigger: 'poru'
     replace: 'pour'
+    propagate_case: true
   - trigger: '~_'
     replace: '~ '
+    propagate_case: true

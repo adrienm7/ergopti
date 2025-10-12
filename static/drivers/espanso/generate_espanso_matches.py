@@ -398,11 +398,12 @@ def generate_espanso_match_from_toml(
 
     # Determine if this file should use propagate_case
     file_stem = toml_file.stem.lower()
-    use_propagate_case = file_stem in [
-        "magic",
-        "repeat",
-        "rolls",
-        "suffixes",
+    use_propagate_case = file_stem not in [
+        "brands",
+        "emojis",
+        "punctuation",
+        "symbols_typst",
+        "symbols",
     ]
 
     # Generate YAML content
