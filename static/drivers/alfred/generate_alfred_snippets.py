@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Script to generate Alfred snippets from TOML configuration files.
+Script to generate Alfred snippets from TOML hotstrings files.
 
 This script creates .alfredsnippets files (ZIP archives) for each TOML file
-in the configuration directory. It handles symbol extraction from triggers
+in the hotstrings directory. It handles symbol extraction from triggers
 (★, $) and places them in the info.plist as prefix/suffix.
 
 Official Alfred documentation about snippets can be found at:
@@ -30,7 +30,7 @@ def main(
     overwrite: bool = False,
 ) -> None:
     """
-    Main function to generate Alfred snippets from TOML configuration files.
+    Main function to generate Alfred snippets from TOML hotstrings files.
 
     Args:
         input_directory: Directory containing TOML files. If None, uses default config directory.
@@ -47,14 +47,13 @@ def main(
     if input_directory:
         config_directory = Path(input_directory).resolve()
     else:
-        config_directory = (
-            Path(__file__).resolve().parent.parent / "configuration"
-        )
+        config_directory = Path(__file__).resolve().parent.parent / "hotstrings"
 
     if output_directory:
         output_directory = Path(output_directory).resolve()
     else:
-        output_directory = Path(__file__).resolve().parent
+        output_directory = Path(__file__).resolve().parent / "snippets"
+        output_directory.mkdir(parents=True, exist_ok=True)
 
     logger.info("Input directory: %s", config_directory)
     logger.info("Output directory: %s", output_directory)
