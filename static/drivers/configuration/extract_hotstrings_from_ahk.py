@@ -974,35 +974,6 @@ def convert_to_toml(
         "",
     ]
 
-    # Special case for suffixes.toml: format [a_grave_suffixes] avec entrées fixes
-    if block_name == "SuffixesA":
-        toml_lines = header_lines + [
-            "[a_grave_suffixes]",
-            "# SFBs with BU and IÉ",
-            '"àj" = "bu"',
-            '"à★" = "bu"',
-            '"àu" = "ub"',
-            '"àé" = "éi"',
-            "# Common suffixes",
-        ]
-        triggers_fixes = {"àj", "à★", "àu", "àé"}
-        for section_name, entries in hotstrings.items():
-            for trigger, output, is_word, auto_expand in entries:
-                if trigger in triggers_fixes:
-                    continue
-                trigger_escaped = escape_toml_string(
-                    trigger, escape_backslashes=False
-                )
-                output_escaped = escape_toml_string(
-                    output, escape_backslashes=True
-                )
-
-                # Always use complex format for suffixes to include all options
-                toml_lines.append(
-                    f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()} }}'
-                )
-        return "\n".join(toml_lines)
-
     # Cas général
     toml_lines = header_lines.copy()
     for section_name, entries in hotstrings.items():

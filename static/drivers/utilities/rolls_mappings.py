@@ -9,7 +9,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from collections import OrderedDict, defaultdict
-from pprint import pprint
 
 from utilities.logger import logger
 from utilities.mappings_functions import (
@@ -106,25 +105,6 @@ def _process_section_data(section_data):
     return section_data
 
 
-def _should_skip_entry(key: str) -> bool:
-    """Check if entry should be skipped."""
-    return key in ["càd", "shàd", "à★"]
-
-
-def _get_trigger_and_remaining(key: str, section_name: str) -> tuple[str, str]:
-    """Extract trigger and remaining characters from key."""
-    if section_name == "a_grave_suffixes":
-        return "à", key
-
-    trigger = key[0]
-    if key.startswith(trigger) and len(key) > 1:
-        remaining = key[1:]
-    else:
-        remaining = key
-
-    return trigger, remaining
-
-
 def _process_mappings(merged_toml_data: dict) -> dict:
     """Process TOML data and convert to trigger groups."""
     trigger_groups = defaultdict(list)
@@ -133,24 +113,14 @@ def _process_mappings(merged_toml_data: dict) -> dict:
         section_data = _process_section_data(section_data)
 
         for key, value_obj in section_data.items():
-            if _should_skip_entry(key):
+            if len(key) > 2 or key in ["càd", "shàd", "à★"]:
                 continue
+            trigger = key[0]
+            remaining = key[1:]
+            print(f"trigger {trigger} and {remaining}")
 
-            trigger, remaining = _get_trigger_and_remaining(key, section_name)
-
-            # Only process triggers with length <= 2 and remaining with length <= 1
-            if len(trigger) <= 2 and len(remaining) <= 1:
-                output_value = _extract_output_value(value_obj)
-                trigger_groups[trigger].append((remaining, output_value))
-            else:
-                output_value = _extract_output_value(value_obj)
-                logger.debug(
-                    "Skipping entry '%s' -> '%s' (trigger: '%s', remaining: '%s')",
-                    key,
-                    output_value,
-                    trigger,
-                    remaining,
-                )
+            output_value = _extract_output_value(value_obj)
+            trigger_groups[trigger].append((remaining, output_value))
 
     # Convert to config format
     return {
@@ -193,17 +163,10 @@ plus_mappings = add_case_sensitive_mappings(plus_mappings)
 plus_mappings = escape_symbols_in_mappings(plus_mappings)
 
 
-def _sort_key(item):
-    """Sort key: alphabetic triggers last (a, A, b, B, ...), others first."""
-    trigger = item[0]
-    is_single_alpha = len(trigger) == 1 and trigger.isalpha()
-
-    if is_single_alpha:
-        return (True, trigger.lower(), trigger.isupper())
-    return (False, trigger)
-
-
-plus_mappings = OrderedDict(sorted(plus_mappings.items(), key=_sort_key))
+# Sort mappings by trigger key in simple alphabetical order
+plus_mappings = OrderedDict(
+    sorted(plus_mappings.items(), key=lambda item: item[0])
+)
 
 
 def check_duplicate_triggers(mappings_to_check: dict):
@@ -232,4 +195,9 @@ check_duplicate_triggers(plus_mappings)
 
 
 if __name__ == "__main__":
-    pprint(plus_mappings, indent=2, width=120)
+    import json
+
+    output_path = Path(__file__).with_suffix(".json")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(plus_mappings, f, ensure_ascii=False, indent=2)
+    logger.success(f"Mappings exported to {output_path}")

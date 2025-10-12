@@ -3,13 +3,7 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
-[a_grave_suffixes]
-# SFBs with BU and IÉ
-"àj" = "bu"
-"à★" = "bu"
-"àu" = "ub"
-"àé" = "éi"
-# Common suffixes
+[[general]]
 "àa" = { output = "aire", is_word = false, auto_expand = true }
 "àc" = { output = "ction", is_word = false, auto_expand = true }
 "càd" = { output = "could", is_word = false, auto_expand = true }
