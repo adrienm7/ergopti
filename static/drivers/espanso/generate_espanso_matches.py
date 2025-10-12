@@ -407,6 +407,7 @@ def generate_espanso_match_from_toml(
         "punctuation",
         "symbols_typst",
         "symbols",
+        "errors",
     ]
 
     # Files that should use propagate_case (automatic case handling by Espanso)
