@@ -8,39 +8,6 @@ matches:
   - trigger: '$='
     replace: ' => '
     propagate_case: true
-  - trigger: "'a"
-    replace: '’a'
-    propagate_case: true
-  - trigger: "'e"
-    replace: '’e'
-    propagate_case: true
-  - trigger: "'h"
-    replace: '’h'
-    propagate_case: true
-  - trigger: "'i"
-    replace: '’i'
-    propagate_case: true
-  - trigger: "'o"
-    replace: '’o'
-    propagate_case: true
-  - trigger: "'t"
-    replace: '’t'
-    propagate_case: true
-  - trigger: "'u"
-    replace: '’u'
-    propagate_case: true
-  - trigger: "'y"
-    replace: '’y'
-    propagate_case: true
-  - trigger: "'è"
-    replace: '’è'
-    propagate_case: true
-  - trigger: "'é"
-    replace: '’é'
-    propagate_case: true
-  - trigger: "'ê"
-    replace: '’ê'
-    propagate_case: true
   - trigger: '+?'
     replace: ' -> '
     propagate_case: true

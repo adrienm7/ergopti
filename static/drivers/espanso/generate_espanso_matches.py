@@ -138,24 +138,48 @@ def main(
     show_execution_summary(processed, errors)
 
 
-def parse_toml_simple(toml_content: str) -> Dict[str, str]:
+def parse_toml_simple(toml_content: str) -> Dict[str, Dict[str, any]]:
     """
-    Parse TOML content to extract trigger-replacement mappings.
+    Parse TOML content to extract trigger-replacement mappings with metadata.
 
     Args:
             toml_content: TOML file content as string
 
     Returns:
-            Dictionary mapping triggers to replacements
+            Dictionary mapping triggers to dictionaries containing output, is_word, auto_expand
     """
     result = {}
     for line in toml_content.split("\n"):
         line = line.strip()
         if line.startswith("#") or not line or line.startswith("["):
             continue
-        match = re.match(r'^"([^"]+)"\s*=\s*"([^"]+)"', line)
+
+        # New format: "trigger" = { output = "replacement", is_word = true/false, auto_expand = true/false }
+        match = re.match(
+            r'^"([^"]+)"\s*=\s*\{\s*output\s*=\s*"([^"]+)",\s*is_word\s*=\s*(true|false),\s*auto_expand\s*=\s*(true|false)\s*\}',
+            line,
+        )
         if match:
-            result[match.group(1)] = match.group(2)
+            trigger = match.group(1)
+            output = match.group(2)
+            is_word = match.group(3) == "true"
+            auto_expand = match.group(4) == "true"
+            result[trigger] = {
+                "output": output,
+                "is_word": is_word,
+                "auto_expand": auto_expand,
+            }
+        else:
+            # Fallback for old format: "trigger" = "replacement"
+            old_match = re.match(r'^"([^"]+)"\s*=\s*"([^"]+)"', line)
+            if old_match:
+                trigger = old_match.group(1)
+                output = old_match.group(2)
+                result[trigger] = {
+                    "output": output,
+                    "is_word": False,
+                    "auto_expand": True,
+                }
     return result
 
 
@@ -189,13 +213,13 @@ def detect_trigger_symbols(triggers: List[str]) -> Tuple[str, str]:
 
 
 def clean_triggers(
-    triggers_dict: Dict[str, str],
-) -> Tuple[Dict[str, str], str, str]:
+    triggers_dict: Dict[str, Dict[str, any]],
+) -> Tuple[Dict[str, Dict[str, any]], str, str]:
     """
     Clean triggers by removing detected symbols and return them.
 
     Args:
-        triggers_dict: Dictionary of trigger -> replacement mappings
+        triggers_dict: Dictionary of trigger -> metadata mappings
 
     Returns:
         Tuple of (cleaned_dict, prefix, suffix)
@@ -204,13 +228,13 @@ def clean_triggers(
     prefix, suffix = detect_trigger_symbols(triggers_list)
 
     cleaned_dict = {}
-    for trigger, replacement in triggers_dict.items():
+    for trigger, metadata in triggers_dict.items():
         clean_trigger = trigger
         if prefix and clean_trigger.startswith(prefix):
             clean_trigger = clean_trigger[len(prefix) :]
         if suffix and clean_trigger.endswith(suffix):
             clean_trigger = clean_trigger[: -len(suffix)]
-        cleaned_dict[clean_trigger] = replacement
+        cleaned_dict[clean_trigger] = metadata
 
     return cleaned_dict, prefix, suffix
 
@@ -236,6 +260,7 @@ def create_espanso_match_entry(
     replacement: str,
     suffix: str = "",
     use_propagate_case: bool = False,
+    is_word: bool = False,
 ) -> str:
     """
     Create a single Espanso match entry in YAML format.
@@ -245,6 +270,7 @@ def create_espanso_match_entry(
         replacement: The replacement text
         suffix: The suffix symbol to add to trigger (e.g., "★")
         use_propagate_case: Whether to add propagate_case: true
+        is_word: Whether to add word: true
 
     Returns:
         YAML formatted match entry as string
@@ -253,25 +279,28 @@ def create_espanso_match_entry(
     trigger_escaped = escape_yaml_string(full_trigger)
     replacement_escaped = escape_yaml_string(replacement)
 
+    lines = [f"  - trigger: {trigger_escaped}"]
+    lines.append(f"    replace: {replacement_escaped}")
+
     if use_propagate_case:
-        return f"""  - trigger: {trigger_escaped}
-    replace: {replacement_escaped}
-    propagate_case: true"""
-    else:
-        return f"""  - trigger: {trigger_escaped}
-    replace: {replacement_escaped}"""
+        lines.append("    propagate_case: true")
+
+    if is_word:
+        lines.append("    word: true")
+
+    return "\n".join(lines)
 
 
 def remove_duplicate_triggers(
-    triggers_dict: Dict[str, str],
+    triggers_dict: Dict[str, Dict[str, any]],
     used_triggers: set,
     suffix: str = "",
-) -> Dict[str, str]:
+) -> Dict[str, Dict[str, any]]:
     """
     Remove triggers that are already used to avoid duplicates.
 
     Args:
-        triggers_dict: Dictionary of trigger -> replacement mappings
+        triggers_dict: Dictionary of trigger -> metadata mappings
         used_triggers: Set of already used full triggers (with suffix)
         suffix: The suffix to append to triggers
 
@@ -280,10 +309,10 @@ def remove_duplicate_triggers(
     """
     filtered_dict = {}
 
-    for trigger, replacement in triggers_dict.items():
+    for trigger, metadata in triggers_dict.items():
         full_trigger = trigger + suffix
         if full_trigger not in used_triggers:
-            filtered_dict[trigger] = replacement
+            filtered_dict[trigger] = metadata
 
     return filtered_dict
 
@@ -382,9 +411,11 @@ def generate_espanso_match_from_toml(
 
     # Sort triggers for consistent output
     for trigger in sorted(cleaned_dict.keys()):
-        replacement = cleaned_dict[trigger]
+        metadata = cleaned_dict[trigger]
+        replacement = metadata["output"]
+        is_word = metadata["is_word"]
         match_entry = create_espanso_match_entry(
-            trigger, replacement, suffix, use_propagate_case
+            trigger, replacement, suffix, use_propagate_case, is_word
         )
         yaml_lines.append(match_entry)
 

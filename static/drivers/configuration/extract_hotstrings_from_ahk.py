@@ -213,7 +213,9 @@ def extract_block_content(content: str, block_pattern: str) -> str:
     return content[start_idx : end_idx - 1] if brace_count == 0 else ""
 
 
-def extract_hotstrings(block_content: str) -> dict[str, list[tuple[str, str]]]:
+def extract_hotstrings(
+    block_content: str,
+) -> dict[str, list[tuple[str, str, bool, bool]]]:
     """
     Extract hotstrings from an AutoHotkey block content.
 
@@ -221,9 +223,9 @@ def extract_hotstrings(block_content: str) -> dict[str, list[tuple[str, str]]]:
         block_content: The AutoHotkey block content to parse
 
     Returns:
-        Dictionary mapping section names to lists of (trigger, output) tuples
+        Dictionary mapping section names to lists of (trigger, output, is_word, auto_expand) tuples
     """
-    hotstrings: dict[str, list[tuple[str, str]]] = {}
+    hotstrings: dict[str, list[tuple[str, str, bool, bool]]] = {}
     current_section = "general"
 
     lines = block_content.split("\n")
@@ -250,33 +252,69 @@ def extract_hotstrings(block_content: str) -> dict[str, list[tuple[str, str]]]:
             i += 1
             continue
 
-        # Check if this is the start of a multi-line CreateCaseSensitiveHotstrings call
-        if "CreateCaseSensitiveHotstrings(" in line and not line.endswith(")"):
+        # Check if this is the start of a multi-line CreateCaseSensitiveHotstrings or CreateHotstring call
+        is_multiline = False
+        if (
+            (
+                "CreateCaseSensitiveHotstrings(" in line
+                or "CreateHotstring(" in line
+            )
+            and not line.rstrip().endswith(")")
+            and not line.split(";")[0].rstrip().endswith(")")
+        ):
             # Collect multi-line statement
             full_line = line
             j = i + 1
-            while j < len(lines) and not full_line.endswith(")"):
+            while (
+                j < len(lines)
+                and not full_line.rstrip().endswith(")")
+                and not full_line.split(";")[0].rstrip().endswith(")")
+            ):
                 full_line += " " + lines[j].strip()
                 j += 1
             i = j  # Skip processed lines
             line = full_line
-        else:
-            i += 1
+            is_multiline = True
 
         # Extract hotstrings using multiple patterns to cover all cases
-        trigger, output = extract_hotstring_from_line(line)
+        trigger, output, is_word, auto_expand = extract_hotstring_from_line(
+            line
+        )
         if trigger and output:
             # Initialize section if it doesn't exist
             if current_section not in hotstrings:
                 hotstrings[current_section] = []
-            hotstrings[current_section].append((trigger, output))
+            hotstrings[current_section].append(
+                (trigger, output, is_word, auto_expand)
+            )
+            logger.debug(
+                "Extracted: section='%s', trigger='%s', output='%s'",
+                current_section,
+                trigger,
+                output,
+            )
+        else:
+            # Log lines that weren't extracted
+            if (
+                "CreateCaseSensitiveHotstrings(" in line
+                or "CreateHotstring(" in line
+                or "Hotstring" in line
+            ):
+                logger.warning(
+                    "Failed to extract from line: %s",
+                    line[:100] + "..." if len(line) > 100 else line,
+                )
+
+        # Move to next line (only if we didn't already do it in multi-line processing)
+        if not is_multiline:
+            i += 1
 
     return hotstrings
 
 
 def extract_hotstring_from_line(
     line: str,
-) -> tuple[Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str], bool, bool]:
     """
     Extract trigger and output from a single AutoHotkey line.
 
@@ -284,31 +322,125 @@ def extract_hotstring_from_line(
             line: The AutoHotkey line to parse
 
     Returns:
-            Tuple of (trigger, output) or (None, None) if no match found
+            Tuple of (trigger, output, is_word, auto_expand) or (None, None, False, False) if no match
     """
-    # Single regex covering all cases: trigger and output
-    pattern = (
-        r"(?:Create)?(?:CaseSensitive)?Hotstring[s]?"
-        r'\s*\((?:\s*"[^"]*",)?\s*"([^"]+?)"(?:\s*\.\s*ScriptInformation\["MagicKey"\])?\s*,\s*"([^"]+?)"'
+    # First, try to match new CreateHotstring format
+    # Updated regex to handle escaped quotes in output like "`"" and trigger concatenation
+    create_hotstring_pattern = (
+        r"CreateHotstring\s*\(\s*"
+        r'"([^"]*)",\s*'  # Options group 1
+        r'"([^"]+)"(?:\s*\.\s*ScriptInformation\["MagicKey"\])?,\s*'  # Trigger group 2 - handles concatenation with MagicKey
+        r'"((?:[^"\\]|\\.|`")*)"'  # Output group 3 - handles escaped quotes and backtick-quote combinations
+        r".*?"  # Match anything after the output (including Map parameters)
+        r"\)"
     )
-    match = re.search(pattern, line, re.DOTALL)
-    if match:
-        trigger = match.group(1)
-        output = match.group(2)
+
+    create_hotstring_match = re.search(
+        create_hotstring_pattern, line, re.DOTALL
+    )
+
+    if create_hotstring_match:
+        options, trigger, output = create_hotstring_match.groups()
+
+        # Determine auto_expand and is_word based on options
+        auto_expand = "*" in options
+        is_word = "?" not in options
+
+        # Handle special case where trigger contains ScriptInformation["MagicKey"]
         if 'ScriptInformation["MagicKey"]' in line:
             trigger += "★"
-        return trigger, output
-    return None, None
+
+        logger.debug(
+            "Found CreateHotstring: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
+            trigger,
+            options,
+            auto_expand,
+            is_word,
+        )
+
+        return trigger, output, is_word, auto_expand
+
+    # Second, try to match CreateCaseSensitiveHotstrings format
+    create_pattern = (
+        r"CreateCaseSensitiveHotstrings\s*\(\s*"
+        r'"([^"]*)",\s*'  # Options group 1
+        r'"([^"]+)"(?:\s*\.\s*ScriptInformation\["MagicKey"\])?,\s*'  # Trigger group 2 - handles concatenation with MagicKey
+        r'"([^"]+)"'  # Output group 3
+        r".*?"  # Match anything after the output (including Map parameters)
+        r"\)"
+    )
+
+    create_match = re.search(create_pattern, line, re.DOTALL)
+
+    if create_match:
+        options, trigger, output = create_match.groups()
+
+        # Determine auto_expand and is_word based on options
+        auto_expand = "*" in options
+        is_word = "?" not in options
+
+        # Handle special case where trigger contains ScriptInformation["MagicKey"]
+        if 'ScriptInformation["MagicKey"]' in line:
+            trigger += "★"
+
+        logger.debug(
+            "Found CreateCaseSensitiveHotstrings: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
+            trigger,
+            options,
+            auto_expand,
+            is_word,
+        )
+
+        return trigger, output, is_word, auto_expand
+
+    # Fallback to original Hotstring format
+    hotstring_pattern = (
+        r"Hotstring[s]?\s*\("
+        r'(?:\s*"([^"]+)",)?'  # Optional options group 1
+        r'\s*"([^"]+?)"'  # Trigger group 2
+        r'(?:\s*\.\s*ScriptInformation\["MagicKey"\])?'
+        r'\s*,\s*"([^"]+?)"'  # Output group 3
+        r"\s*\)"
+    )
+
+    hotstring_match = re.search(hotstring_pattern, line, re.DOTALL)
+
+    if hotstring_match:
+        options, trigger, output = hotstring_match.groups()
+
+        is_word = True  # Default to True, meaning it's a whole word trigger
+        auto_expand = False  # Default for Hotstring format
+
+        if options and "?" in options:
+            is_word = False  # Set to False if it can be triggered inside a word
+
+        if options and "*" in options:
+            auto_expand = True
+
+        if 'ScriptInformation["MagicKey"]' in line:
+            trigger += "★"
+
+        logger.debug(
+            "Found Hotstring: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
+            trigger,
+            options,
+            auto_expand,
+            is_word,
+        )
+
+        return trigger, output, is_word, auto_expand
+
+    return None, None, False, False
 
 
 def convert_to_toml(
-    hotstrings: dict[str, list[tuple[str, str]]], block_name: str
+    hotstrings: dict[str, list[tuple[str, str, bool, bool]]], block_name: str
 ) -> str:
     """
     Convert hotstrings dictionary to TOML format.
 
     Args:
-        hotstrings: Dictionary mapping section names to lists of (trigger, output) tuples
+        hotstrings: Dictionary mapping section names to lists of (trigger, output, is_word, auto_expand) tuples
         block_name: Name of the original block (used for header comment)
 
     Returns:
@@ -319,7 +451,7 @@ def convert_to_toml(
         "# DO NOT EDIT THIS FILE DIRECTLY.",
         "# This file is automatically generated. Any manual changes will be overwritten.",
         "# Format: [[section]]",
-        "# Each entry: trigger = output",
+        '# All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }',
         "",
     ]
 
@@ -336,7 +468,7 @@ def convert_to_toml(
         ]
         triggers_fixes = {"àj", "à★", "àu", "àé"}
         for section_name, entries in hotstrings.items():
-            for trigger, output in entries:
+            for trigger, output, is_word, auto_expand in entries:
                 if trigger in triggers_fixes:
                     continue
                 trigger_escaped = escape_toml_string(
@@ -345,7 +477,11 @@ def convert_to_toml(
                 output_escaped = escape_toml_string(
                     output, escape_backslashes=True
                 )
-                toml_lines.append(f'"{trigger_escaped}" = "{output_escaped}"')
+
+                # Always use complex format for suffixes to include all options
+                toml_lines.append(
+                    f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()} }}'
+                )
         return "\n".join(toml_lines)
 
     # Cas général
@@ -354,12 +490,16 @@ def convert_to_toml(
         if not entries:
             continue
         toml_lines.append(f"[[{section_name}]]")
-        for trigger, output in entries:
+        for trigger, output, is_word, auto_expand in entries:
             trigger_escaped = escape_toml_string(
                 trigger, escape_backslashes=False
             )
             output_escaped = escape_toml_string(output, escape_backslashes=True)
-            toml_lines.append(f'"{trigger_escaped}" = "{output_escaped}"')
+
+            # Always use complex format for all entries
+            toml_lines.append(
+                f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()} }}'
+            )
         toml_lines.append("")
     return "\n".join(toml_lines)
 
