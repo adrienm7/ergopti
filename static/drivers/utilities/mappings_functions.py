@@ -158,21 +158,42 @@ def generate_case_variants_for_trigger_replacement(
                     + variant_trigger[i + 1 :]
                 )
                 if special_trigger not in seen_triggers:
-                    # To determine case for special chars: replace special chars with letters
-                    # and check if result equals its uppercase version
+                    # For special characters like ; and ?, they always force at least title case
+                    # Replace special chars with letters to determine if it's all-uppercase pattern
                     test_trigger = special_trigger
                     for special, letter in [("?", "A"), (";", "A")]:
                         test_trigger = test_trigger.replace(special, letter)
 
-                    # If test_trigger.upper() == test_trigger, it's uppercase
+                    # If test_trigger.upper() == test_trigger, it's uppercase pattern
                     if test_trigger.upper() == test_trigger:
                         special_replacement = apply_case_to_replacement_text(
-                            test_trigger.upper(), replacement
+                            test_trigger, replacement
                         )
                     else:
-                        special_replacement = apply_case_to_replacement_text(
-                            test_trigger.capitalize(), replacement
-                        )
+                        # For mixed case with special chars, force title case by creating
+                        # a trigger that has the first alphabetic char as uppercase
+                        alphabetic_chars = [
+                            c for c in test_trigger if c.isalpha()
+                        ]
+                        if alphabetic_chars:
+                            # Create a version where first alphabetic char is uppercase
+                            title_trigger = ""
+                            first_alpha_done = False
+                            for c in test_trigger:
+                                if c.isalpha() and not first_alpha_done:
+                                    title_trigger += c.upper()
+                                    first_alpha_done = True
+                                else:
+                                    title_trigger += (
+                                        c.lower() if c.isalpha() else c
+                                    )
+                            special_replacement = (
+                                apply_case_to_replacement_text(
+                                    title_trigger, replacement
+                                )
+                            )
+                        else:
+                            special_replacement = replacement
                     variants.append((special_trigger, special_replacement))
                     seen_triggers.add(special_trigger)
 
@@ -218,6 +239,9 @@ def apply_case_to_replacement_text(
     # Extract only alphabetic characters to determine case pattern
     alphabetic_chars = [char for char in original_trigger if char.isalpha()]
 
+    # Check for special "uppercase" characters like ; and ?
+    has_special_uppercase = any(char in [";", "?"] for char in original_trigger)
+
     if not alphabetic_chars:
         # No alphabetic characters, return original
         return target_text
@@ -233,6 +257,9 @@ def apply_case_to_replacement_text(
         return target_text.upper()
     # Check if it follows title case pattern (first alphabetic char uppercase)
     elif alphabetic_chars[0].isupper():
+        return target_text.capitalize()
+    # If has special uppercase chars (like ;), force at least title case
+    elif has_special_uppercase:
         return target_text.capitalize()
     # All lowercase alphabetic characters
     else:
