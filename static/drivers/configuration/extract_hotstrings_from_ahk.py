@@ -110,26 +110,32 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
 
     # Define extraction tasks with support for multiple blocks per file
     # Format: {output_filename: [list_of_block_patterns]}
+    # Each block pattern is a tuple: (category, block_name)
     extractions = {
-        "emojis": ["TextExpansionEmojis"],
-        "magic": ["TextExpansion"],
-        "symbols": ["TextExpansionSymbols"],
-        "symbols_typst": ["TextExpansionSymbolsTypst"],
-        "suffixes": ["SuffixesA"],
-        "accents": ["Accents"],
-        "names": ["Names"],
-        "brands": ["Brands"],
-        "minus": ["Minus"],
-        "punctuation": ["MultiplePunctuationMarks"],
-        "errors": ["Errors"],
-        "apostrophe": ["TypographicApostrophe"],
-        "qu": ["QU"],
+        "emojis": [("MagicKey", "TextExpansionEmojis")],
+        "magic": [("MagicKey", "TextExpansion")],
+        "symbols": [("MagicKey", "TextExpansionSymbols")],
+        "symbols_typst": [("MagicKey", "TextExpansionSymbolsTypst")],
+        "suffixes": [("DistancesReduction", "SuffixesA")],
+        "accents": [("Autocorrection", "Accents")],
+        "names": [("Autocorrection", "Names")],
+        "brands": [("Autocorrection", "Brands")],
+        "minus": [("Autocorrection", "Minus")],
+        "punctuation": [("Autocorrection", "MultiplePunctuationMarks")],
+        "errors": [("Autocorrection", "Errors")],
+        "apostrophe": [("Autocorrection", "TypographicApostrophe")],
+        "qu": [("DistancesReduction", "QU")],
         "comma": [
-            "Comma",
-            "CommaJ",
-            "CommaFarLetters",
-        ],  # Multiple blocks in same file
-        "sfb_reduction": ["EGrave", "BU", "IÉ"],  # Multiple blocks in same file
+            ("SFBsReduction", "Comma"),
+            ("DistancesReduction", "CommaJ"),
+            ("DistancesReduction", "CommaFarLetters"),
+        ],
+        "sfb_reduction": [
+            ("SFBsReduction", "ECirc"),
+            ("SFBsReduction", "BU"),
+            ("SFBsReduction", "IÉ"),
+        ],
+        "rolls": ["Rolls"],  # Special case: extract all Rolls blocks
     }
 
     processed = 0
@@ -164,23 +170,19 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
         logger.error("Error generating e_deadkey.toml: %s", e)
         errors += 1
 
-    try:
-        generate_rolls_toml(str(source_file))
-        logger.success("Successfully generated rolls.toml")
-    except (OSError, ValueError) as e:
-        logger.error("Error generating rolls.toml: %s", e)
-        errors += 1
-
 
 def extract_multiple_ahk_blocks_to_toml(
-    ahk_file_path: str, block_patterns: list[str], output_name: str
+    ahk_file_path: str,
+    block_patterns: list[tuple[str, str] | str],
+    output_name: str,
 ) -> None:
     """
     Extract multiple blocks from an AutoHotkey file and merge them into a single TOML file.
 
     Args:
         ahk_file_path: Path to the source .ahk file
-        block_patterns: List of block patterns to extract (e.g., ['Comma', 'CommaJ', 'CommaFarLetters'])
+        block_patterns: List of block patterns to extract. Can be tuples (category, block_name)
+                       or strings (category) for extracting all blocks from a category
         output_name: Output filename without extension (e.g., 'comma')
 
     Raises:
@@ -206,7 +208,14 @@ def extract_multiple_ahk_blocks_to_toml(
     found_blocks = []
 
     for block_pattern in block_patterns:
-        block_content = extract_block_content(content, block_pattern)
+        # Handle special case where block_pattern is a category string (e.g., "Rolls")
+        if isinstance(block_pattern, str):
+            block_content = extract_all_blocks_from_category(
+                content, block_pattern
+            )
+        else:
+            block_content = extract_block_content(content, block_pattern)
+
         if block_content:
             found_blocks.append(block_pattern)
             hotstrings = extract_hotstrings(block_content)
@@ -215,7 +224,11 @@ def extract_multiple_ahk_blocks_to_toml(
             for section_name, entries in hotstrings.items():
                 # Create a unique section name to avoid conflicts
                 if len(block_patterns) > 1:
-                    unique_section_name = f"{normalize_section_name(block_pattern)}_{section_name}"
+                    if isinstance(block_pattern, tuple):
+                        category, block_name = block_pattern
+                        unique_section_name = f"{normalize_section_name(block_name)}_{section_name}"
+                    else:
+                        unique_section_name = f"{normalize_section_name(block_pattern)}_{section_name}"
                 else:
                     unique_section_name = section_name
 
@@ -239,7 +252,13 @@ def extract_multiple_ahk_blocks_to_toml(
     deduplicated_hotstrings = deduplicate_hotstrings(merged_hotstrings)
 
     # Convert to TOML format using the first found block as block_name for compatibility
-    toml_content = convert_to_toml(deduplicated_hotstrings, found_blocks[0])
+    first_block = found_blocks[0]
+    if isinstance(first_block, tuple):
+        block_name_for_toml = first_block[1]  # Use the block name part
+    else:
+        block_name_for_toml = first_block
+
+    toml_content = convert_to_toml(deduplicated_hotstrings, block_name_for_toml)
 
     # Write the TOML file
     try:
@@ -370,21 +389,32 @@ def extract_ahk_block_to_toml(
         raise OSError(f"Error writing file {output_file}: {e}")
 
 
-def extract_block_content(content: str, block_pattern: str) -> str:
+def extract_block_content(
+    content: str, block_pattern: tuple[str, str] | str
+) -> str:
     """
     Extract block content using robust brace matching to handle nested braces.
 
     Args:
         content: The full AutoHotkey file content
-        block_pattern: The block pattern to search for
+        block_pattern: Either a tuple (category, block_name) for precise targeting,
+                      or a string block_name for backward compatibility
 
     Returns:
         The extracted block content, or empty string if not found
     """
-    # General pattern to match any Features[...][block_pattern].Enabled block
-    start_pattern = (
-        rf'if Features\["[^"]+"\]\["{block_pattern}"\]\.Enabled\s*\{{'
-    )
+    if isinstance(block_pattern, tuple):
+        category, block_name = block_pattern
+        # Precise pattern to match Features["category"]["block_name"].Enabled block
+        start_pattern = (
+            rf'if Features\["{category}"\]\["{block_name}"\]\.Enabled\s*\{{'
+        )
+    else:
+        # Backward compatibility: general pattern to match any Features[...][block_pattern].Enabled block
+        start_pattern = (
+            rf'if Features\["[^"]+"\]\["{block_pattern}"\]\.Enabled\s*\{{'
+        )
+
     start_match = re.search(start_pattern, content)
 
     if not start_match:
@@ -403,6 +433,46 @@ def extract_block_content(content: str, block_pattern: str) -> str:
         end_idx += 1
 
     return content[start_idx : end_idx - 1] if brace_count == 0 else ""
+
+
+def extract_all_blocks_from_category(content: str, category: str) -> str:
+    """
+    Extract all blocks from a specific category and merge their content.
+
+    Args:
+        content: The full AutoHotkey file content
+        category: The category name (e.g., "Rolls")
+
+    Returns:
+        The merged content of all blocks in the category
+    """
+    # Find all Features["category"]["..."].Enabled blocks
+    pattern = rf'if Features\["{category}"\]\["[^"]+"\]\.Enabled\s*\{{'
+    matches = list(re.finditer(pattern, content))
+
+    if not matches:
+        return ""
+
+    merged_content = []
+
+    for match in matches:
+        # Find the matching closing brace using brace counting
+        start_idx = match.end()
+        brace_count = 1
+        end_idx = start_idx
+
+        while end_idx < len(content) and brace_count > 0:
+            if content[end_idx] == "{":
+                brace_count += 1
+            elif content[end_idx] == "}":
+                brace_count -= 1
+            end_idx += 1
+
+        if brace_count == 0:
+            block_content = content[start_idx : end_idx - 1]
+            merged_content.append(block_content)
+
+    return "\n".join(merged_content)
 
 
 def extract_hotstrings(
@@ -502,6 +572,29 @@ def extract_hotstrings(
     return hotstrings
 
 
+def process_autohotkey_escapes(text: str) -> str:
+    """
+    Process AutoHotkey escape sequences in text.
+    
+    Args:
+        text: The text containing AutoHotkey escape sequences
+    
+    Returns:
+        Text with escape sequences converted to actual characters
+    """
+    # Convert `" to "
+    text = text.replace('`"', '"')
+    # Convert `` to `
+    text = text.replace('``', '`')
+    # Convert `n to newline
+    text = text.replace('`n', '\n')
+    # Convert `t to tab
+    text = text.replace('`t', '\t')
+    # Convert `r to carriage return
+    text = text.replace('`r', '\r')
+    return text
+
+
 def extract_hotstring_from_line(
     line: str,
 ) -> tuple[Optional[str], Optional[str], bool, bool]:
@@ -540,6 +633,9 @@ def extract_hotstring_from_line(
         if 'ScriptInformation["MagicKey"]' in line:
             trigger += "★"
 
+        # Convert AutoHotkey escaped quotes (`") to regular quotes (")
+        output = output.replace('`"', '"')
+
         logger.debug(
             "Found CreateHotstring: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
             trigger,
@@ -572,6 +668,9 @@ def extract_hotstring_from_line(
         # Handle special case where trigger contains ScriptInformation["MagicKey"]
         if 'ScriptInformation["MagicKey"]' in line:
             trigger += "★"
+
+        # Convert AutoHotkey escaped quotes (`") to regular quotes (")
+        output = output.replace('`"', '"')
 
         logger.debug(
             "Found CreateCaseSensitiveHotstrings: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
@@ -609,6 +708,9 @@ def extract_hotstring_from_line(
 
         if 'ScriptInformation["MagicKey"]' in line:
             trigger += "★"
+
+        # Convert AutoHotkey escaped quotes (`") to regular quotes (")
+        output = output.replace('`"', '"')
 
         logger.debug(
             "Found Hotstring: trigger='%s', options='%s', auto_expand=%s, is_word=%s",

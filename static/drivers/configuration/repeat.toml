@@ -60,7 +60,6 @@
 
 [[repeat_from_c]]
 "ca★" = "caa"
-"cb★" = "cbb"
 "cd★" = "cdd"
 "ce★" = "cee"
 "cf★" = "cff"
@@ -77,7 +76,6 @@
 "cq★" = "cqq"
 "cr★" = "crr"
 "cs★" = "css"
-"ct★" = "ctt"
 "cu★" = "cuu"
 "cv★" = "cvv"
 "cw★" = "cww"
@@ -135,7 +133,6 @@
 "eu★" = "euu"
 "ev★" = "evv"
 "ew★" = "eww"
-"ex★" = "exx"
 "ey★" = "eyy"
 "ez★" = "ezz"
 
@@ -172,7 +169,6 @@
 "gc★" = "gcc"
 "gd★" = "gdd"
 "ge★" = "gee"
-"gf★" = "gff"
 "gh★" = "ghh"
 "gi★" = "gii"
 "gj★" = "gjj"
@@ -185,7 +181,6 @@
 "gq★" = "gqq"
 "gr★" = "grr"
 "gs★" = "gss"
-"gt★" = "gtt"
 "gu★" = "guu"
 "gv★" = "gvv"
 "gw★" = "gww"
@@ -221,7 +216,6 @@
 "hz★" = "hzz"
 
 [[repeat_from_i]]
-"ia★" = "iaa"
 "ib★" = "ibb"
 "ic★" = "icc"
 "id★" = "idd"
@@ -345,7 +339,6 @@
 "mo★" = "moo"
 "mp★" = "mpp"
 "mq★" = "mqq"
-"mr★" = "mrr"
 "ms★" = "mss"
 "mt★" = "mtt"
 "mu★" = "muu"
@@ -357,7 +350,6 @@
 
 [[repeat_from_n]]
 "na★" = "naa"
-"nb★" = "nbb"
 "nc★" = "ncc"
 "nd★" = "ndd"
 "ne★" = "nee"
@@ -411,12 +403,9 @@
 
 [[repeat_from_p]]
 "pa★" = "paa"
-"pb★" = "pbb"
 "pc★" = "pcc"
-"pd★" = "pdd"
 "pe★" = "pee"
 "pf★" = "pff"
-"pg★" = "pgg"
 "ph★" = "phh"
 "pi★" = "pii"
 "pj★" = "pjj"
@@ -481,7 +470,6 @@
 "ro★" = "roo"
 "rp★" = "rpp"
 "rq★" = "rqq"
-"rs★" = "rss"
 "rt★" = "rtt"
 "ru★" = "ruu"
 "rv★" = "rvv"
@@ -519,7 +507,6 @@
 
 [[repeat_from_t]]
 "ta★" = "taa"
-"tb★" = "tbb"
 "tc★" = "tcc"
 "td★" = "tdd"
 "te★" = "tee"
@@ -538,7 +525,6 @@
 "tr★" = "trr"
 "ts★" = "tss"
 "tu★" = "tuu"
-"tv★" = "tvv"
 "tw★" = "tww"
 "tx★" = "txx"
 "ty★" = "tyy"
@@ -609,7 +595,6 @@
 "wh★" = "whh"
 "wi★" = "wii"
 "wj★" = "wjj"
-"wk★" = "wkk"
 "wl★" = "wll"
 "wm★" = "wmm"
 "wn★" = "wnn"
@@ -655,7 +640,6 @@
 [[repeat_from_y]]
 "ya★" = "yaa"
 "yb★" = "ybb"
-"yc★" = "ycc"
 "yd★" = "ydd"
 "ye★" = "yee"
 "yf★" = "yff"
@@ -672,7 +656,6 @@
 "yq★" = "yqq"
 "yr★" = "yrr"
 "ys★" = "yss"
-"yt★" = "ytt"
 "yu★" = "yuu"
 "yv★" = "yvv"
 "yw★" = "yww"

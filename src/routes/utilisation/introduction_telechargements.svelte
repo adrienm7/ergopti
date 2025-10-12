@@ -4,14 +4,15 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import KeyboardEmulation from '$lib/keyboard/KeyboardEmulation.svelte';
+
+	import magicSampleToml from './magic_sample.toml?raw';
 	let remplacements = {};
 	let remplacementsSample = {};
 
-	// Fonction simple pour parser le TOML plat (clé = valeur)
 	function parseTomlSimple(toml) {
 		const result = {};
 		for (const line of toml.split('\n')) {
-			const match = line.match(/^"([^"]+)"\s*=\s*"([^"]+)"/);
+			const match = line.match(/^"([^"]+)"\s*=\s*\{\s*output\s*=\s*"([^"]+)"/);
 			if (match) {
 				result[match[1]] = match[2];
 			}
@@ -19,16 +20,13 @@
 		return result;
 	}
 
+	remplacementsSample = parseTomlSimple(magicSampleToml);
+
 	if (typeof window !== 'undefined') {
 		fetch('/drivers/configuration/magic.toml')
 			.then((response) => response.text())
 			.then((text) => {
 				remplacements = parseTomlSimple(text);
-			});
-		fetch('/drivers/configuration/magic_sample.toml')
-			.then((response) => response.text())
-			.then((text) => {
-				remplacementsSample = parseTomlSimple(text);
 			});
 	}
 

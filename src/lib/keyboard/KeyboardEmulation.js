@@ -6,7 +6,8 @@ let magic = {};
 function parseTomlSimple(toml) {
 	const result = {};
 	for (const line of toml.split('\n')) {
-		const match = line.match(/^"([^"]+)"\s*=\s*"([^"]+)"/);
+		// Only match new format: "key" = { output = "value", ... }
+		const match = line.match(/^"([^"]+)"\s*=\s*\{\s*output\s*=\s*"([^"]+)"/);
 		if (match) {
 			result[match[1]] = match[2];
 		}
