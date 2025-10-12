@@ -13,15 +13,3 @@
 "êo" = { output = "ô", is_word = false, auto_expand = true }
 "êu" = { output = "û", is_word = false, auto_expand = true }
 "êy" = { output = "ŷ", is_word = false, auto_expand = true }
-"êA" = { output = "Â", is_word = false, auto_expand = true }
-"êE" = { output = "Œ", is_word = false, auto_expand = true }
-"êI" = { output = "Î", is_word = false, auto_expand = true }
-"êO" = { output = "Ô", is_word = false, auto_expand = true }
-"êU" = { output = "Û", is_word = false, auto_expand = true }
-"êY" = { output = "Ŷ", is_word = false, auto_expand = true }
-
-# Additional mappings from ECirc block
-"êé" = { output = "oe", is_word = false, auto_expand = true }
-"éê" = { output = "eo", is_word = false, auto_expand = true }
-"ê." = { output = "u.", is_word = false, auto_expand = true }
-"ê," = { output = "u,", is_word = false, auto_expand = true }

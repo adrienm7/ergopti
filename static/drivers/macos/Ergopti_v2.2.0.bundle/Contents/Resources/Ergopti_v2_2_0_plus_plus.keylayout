@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-2510113" maxout="1" name="Ergopti_v2_2_0_plus_plus">
+<keyboard group="126" id="-2510123" maxout="1" name="Ergopti_v2_2_0_plus_plus">
 	<layouts>
 		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
@@ -512,8 +512,8 @@
 			<key code="4" output="|"/>
 			<key code="5" action=":"/>
 			<key code="6" action="/"/>
-			<key code="7" action="\"/>
-			<key code="8" action="&#x0022;"/>
+			<key code="7" output="\"/>
+			<key code="8" output="&#x0022;"/>
 			<key code="9" action=";"/>
 			<key code="10" output="€"/>
 			<key code="11" output="…"/>
@@ -538,7 +538,7 @@
 			<key code="30" action="_"/>
 			<key code="31" action="!"/>
 			<key code="32" output="~"/>
-			<key code="33" action="%"/>
+			<key code="33" output="%"/>
 			<key code="34" action="#"/>
 			<key code="35" output="*"/>
 			<key code="36" output="&#x000D;"/>
@@ -621,7 +621,7 @@
 			<key code="31" output=" !"/>
 			<key code="32" output="≈"/>
 			<key code="33" output="‰"/>
-			<key code="34" action="%"/>
+			<key code="34" output="%"/>
 			<key code="35" output="×"/>
 			<key code="36" output="&#x000D;"/>
 			<key code="37" action="¨"/>
@@ -678,31 +678,27 @@
 			<when state="s4_greek" output="α"/>
 			<when state="s5_superscript" output="ᵃ"/>
 			<when state="s6_subscript" output="ₐ"/>
-			<when state="s12_apostrophe" output="’a"/>
-			<when state="s17_comma" output="ja"/>
-			<when state="s18_semicolon" output="Ja"/>
-			<when state="s24_nbsp_colon" output="Ja"/>
-			<when state="s25_nnbsp_semicolon" output="Ja"/>
-			<when state="s26_nnbsp_interrogation" output="’A"/>
-			<when state="s35_q" output="qua"/>
-			<when state="s36_Q" output="Qua"/>
-			<when state="s41_à" output="aire"/>
-			<when state="s42_À" output="Aire"/>
-			<when state="s47_ê" output="â"/>
-			<when state="s48_Ê" output="Â"/>
+			<when state="s13_comma" output="ja"/>
+			<when state="s14_semicolon" output="Ja"/>
+			<when state="s15_nnbsp_semicolon" output="Ja"/>
+			<when state="s16_nbsp_colon" output="Ja"/>
+			<when state="s29_Q" output="Qua"/>
+			<when state="s37_Ê" output="Â"/>
+			<when state="s47_q" output="qua"/>
+			<when state="s55_ê" output="â"/>
 		</action>
 		<action id="à">
-			<when state="none" next="s41_à"/>
+			<when state="none" next="s51_à"/>
 			<when state="s1_circumflex" output="æ"/>
 			<when state="s5_superscript" output="ᵡ"/>
-			<when state="s17_comma" output="j"/>
-			<when state="s18_semicolon" output="J"/>
-			<when state="s24_nbsp_colon" output="J"/>
-			<when state="s25_nnbsp_semicolon" output="J"/>
-			<when state="s45_é" output="ié"/>
-			<when state="s46_É" output="Ié"/>
-			<when state="s47_ê" output="æ"/>
-			<when state="s48_Ê" output="Æ"/>
+			<when state="s13_comma" output="j"/>
+			<when state="s14_semicolon" output="J"/>
+			<when state="s15_nnbsp_semicolon" output="J"/>
+			<when state="s16_nbsp_colon" output="J"/>
+			<when state="s29_Q" output="Quà"/>
+			<when state="s36_É" output="Ié"/>
+			<when state="s47_q" output="quà"/>
+			<when state="s54_é" output="ié"/>
 		</action>
 		<action id="b">
 			<when state="none" output="b"/>
@@ -713,108 +709,98 @@
 			<when state="s6_subscript" output="ᵦ"/>
 		</action>
 		<action id="c">
-			<when state="none" next="s27_c"/>
+			<when state="none" next="s38_c"/>
 			<when state="s1_circumflex" output="ç"/>
 			<when state="s2_currency" output="¢"/>
 			<when state="s3_diaeresis" output="©"/>
 			<when state="s4_greek" output="ψ"/>
 			<when state="s5_superscript" output="ᶜ"/>
-			<when state="s17_comma" output="ç"/>
-			<when state="s18_semicolon" output="Ç"/>
-			<when state="s24_nbsp_colon" output="Ç"/>
-			<when state="s25_nnbsp_semicolon" output="Ç"/>
-			<when state="s31_h" output="wh"/>
-			<when state="s32_H" output="Wh"/>
-			<when state="s41_à" output="ction"/>
-			<when state="s42_À" output="Ction"/>
+			<when state="s13_comma" output="ç"/>
+			<when state="s14_semicolon" output="Ç"/>
+			<when state="s15_nnbsp_semicolon" output="Ç"/>
+			<when state="s16_nbsp_colon" output="Ç"/>
+			<when state="s23_H" output="Wh"/>
+			<when state="s41_h" output="wh"/>
+		</action>
+		<action id="ç">
+			<when state="none" next="s52_ç"/>
+			<when state="s9_hashtag" output=" := "/>
 		</action>
 		<action id="d">
-			<when state="none" output="d"/>
+			<when state="none" next="s39_d"/>
 			<when state="s1_circumflex" output="★"/>
 			<when state="s2_currency" output="₫"/>
 			<when state="s4_greek" output="δ"/>
 			<when state="s5_superscript" output="ᵈ"/>
 			<when state="s6_subscript" output="ᴅ"/>
-			<when state="s17_comma" output="ds"/>
-			<when state="s18_semicolon" output="Ds"/>
-			<when state="s24_nbsp_colon" output="Ds"/>
-			<when state="s25_nnbsp_semicolon" output="Ds"/>
-			<when state="s41_à" output="would"/>
-			<when state="s42_À" output="Would"/>
+			<when state="s13_comma" output="ds"/>
+			<when state="s14_semicolon" output="Ds"/>
+			<when state="s15_nnbsp_semicolon" output="Ds"/>
+			<when state="s16_nbsp_colon" output="Ds"/>
 		</action>
 		<action id="e">
-			<when state="none" next="s29_e"/>
+			<when state="none" next="s40_e"/>
 			<when state="s1_circumflex" output="ê"/>
 			<when state="s2_currency" output="€"/>
 			<when state="s3_diaeresis" output="ë"/>
 			<when state="s4_greek" output="ε"/>
 			<when state="s5_superscript" output="ᵉ"/>
 			<when state="s6_subscript" output="ₑ"/>
-			<when state="s12_apostrophe" output="’e"/>
-			<when state="s17_comma" output="je"/>
-			<when state="s18_semicolon" output="Je"/>
-			<when state="s24_nbsp_colon" output="Je"/>
-			<when state="s25_nnbsp_semicolon" output="Je"/>
-			<when state="s26_nnbsp_interrogation" output="’E"/>
-			<when state="s35_q" output="que"/>
-			<when state="s36_Q" output="Que"/>
-			<when state="s47_ê" output="œ"/>
-			<when state="s48_Ê" output="Œ"/>
+			<when state="s13_comma" output="je"/>
+			<when state="s14_semicolon" output="Je"/>
+			<when state="s15_nnbsp_semicolon" output="Je"/>
+			<when state="s16_nbsp_colon" output="Je"/>
+			<when state="s29_Q" output="Que"/>
+			<when state="s37_Ê" output="Œ"/>
+			<when state="s47_q" output="que"/>
+			<when state="s55_ê" output="œ"/>
 		</action>
 		<action id="è">
-			<when state="none" next="s43_è"/>
+			<when state="none" next="s53_è"/>
 			<when state="s1_circumflex" output="ó"/>
 			<when state="s5_superscript" output="ᵞ"/>
 			<when state="s6_subscript" output="ᵧ"/>
-			<when state="s12_apostrophe" output="’è"/>
-			<when state="s17_comma" output="z"/>
-			<when state="s18_semicolon" output="Z"/>
-			<when state="s24_nbsp_colon" output="Z"/>
-			<when state="s25_nnbsp_semicolon" output="Z"/>
-			<when state="s26_nnbsp_interrogation" output="’È"/>
-			<when state="s35_q" output="què"/>
-			<when state="s36_Q" output="Què"/>
-			<when state="s39_y" output="â"/>
-			<when state="s40_Y" output="Â"/>
+			<when state="s13_comma" output="z"/>
+			<when state="s14_semicolon" output="Z"/>
+			<when state="s15_nnbsp_semicolon" output="Z"/>
+			<when state="s16_nbsp_colon" output="Z"/>
+			<when state="s29_Q" output="Què"/>
+			<when state="s32_Y" output="Â"/>
+			<when state="s47_q" output="què"/>
+			<when state="s50_y" output="â"/>
 		</action>
 		<action id="é">
-			<when state="none" next="s45_é"/>
+			<when state="none" next="s54_é"/>
 			<when state="s1_circumflex" output="œ"/>
 			<when state="s4_greek" output="η"/>
 			<when state="s5_superscript" output="ᵟ"/>
-			<when state="s12_apostrophe" output="’é"/>
-			<when state="s17_comma" output="jé"/>
-			<when state="s18_semicolon" output="Jé"/>
-			<when state="s24_nbsp_colon" output="Jé"/>
-			<when state="s25_nnbsp_semicolon" output="Jé"/>
-			<when state="s26_nnbsp_interrogation" output="’É"/>
-			<when state="s29_e" output="ez"/>
-			<when state="s30_E" output="Ez"/>
-			<when state="s35_q" output="qué"/>
-			<when state="s36_Q" output="Qué"/>
-			<when state="s41_à" output="éi"/>
-			<when state="s42_À" output="Éi"/>
-			<when state="s47_ê" output="oe"/>
-			<when state="s48_Ê" output="Oe"/>
+			<when state="s13_comma" output="jé"/>
+			<when state="s14_semicolon" output="Jé"/>
+			<when state="s15_nnbsp_semicolon" output="Jé"/>
+			<when state="s16_nbsp_colon" output="Jé"/>
+			<when state="s22_E" output="Ez"/>
+			<when state="s29_Q" output="Qué"/>
+			<when state="s33_À" output="Éi"/>
+			<when state="s37_Ê" output="Oe"/>
+			<when state="s40_e" output="ez"/>
+			<when state="s47_q" output="qué"/>
+			<when state="s51_à" output="éi"/>
+			<when state="s55_ê" output="oe"/>
 		</action>
 		<action id="ê">
-			<when state="none" next="s47_ê"/>
+			<when state="none" next="s55_ê"/>
 			<when state="s1_circumflex" output="á"/>
 			<when state="s4_greek" output="ϕ"/>
 			<when state="s5_superscript" output="ᵠ"/>
 			<when state="s6_subscript" output="ᵩ"/>
-			<when state="s12_apostrophe" output="’ê"/>
-			<when state="s17_comma" output="ju"/>
-			<when state="s18_semicolon" output="Ju"/>
-			<when state="s24_nbsp_colon" output="Ju"/>
-			<when state="s25_nnbsp_semicolon" output="Ju"/>
-			<when state="s26_nnbsp_interrogation" output="’Ê"/>
-			<when state="s35_q" output="quê"/>
-			<when state="s36_Q" output="Quê"/>
-			<when state="s41_à" output="able"/>
-			<when state="s42_À" output="Able"/>
-			<when state="s45_é" output="eo"/>
-			<when state="s46_É" output="Eo"/>
+			<when state="s13_comma" output="ju"/>
+			<when state="s14_semicolon" output="Ju"/>
+			<when state="s15_nnbsp_semicolon" output="Ju"/>
+			<when state="s16_nbsp_colon" output="Ju"/>
+			<when state="s29_Q" output="Quê"/>
+			<when state="s36_É" output="Eo"/>
+			<when state="s47_q" output="quê"/>
+			<when state="s54_é" output="eo"/>
 		</action>
 		<action id="ᵉ">
 			<when state="none" next="s5_superscript"/>
@@ -826,12 +812,10 @@
 			<when state="s4_greek" output="φ"/>
 			<when state="s5_superscript" output="ᶠ"/>
 			<when state="s6_subscript" output="ꜰ"/>
-			<when state="s17_comma" output="fl"/>
-			<when state="s18_semicolon" output="Fl"/>
-			<when state="s24_nbsp_colon" output="Fl"/>
-			<when state="s25_nnbsp_semicolon" output="Fl"/>
-			<when state="s41_à" output="iste"/>
-			<when state="s42_À" output="Iste"/>
+			<when state="s13_comma" output="fl"/>
+			<when state="s14_semicolon" output="Fl"/>
+			<when state="s15_nnbsp_semicolon" output="Fl"/>
+			<when state="s16_nbsp_colon" output="Fl"/>
 		</action>
 		<action id="g">
 			<when state="none" output="g"/>
@@ -841,29 +825,23 @@
 			<when state="s5_superscript" output="ᵍ"/>
 			<when state="s6_subscript" output="ᵧ"/>
 			<when state="s7_RR" output="ℊ"/>
-			<when state="s17_comma" output="gl"/>
-			<when state="s18_semicolon" output="Gl"/>
-			<when state="s24_nbsp_colon" output="Gl"/>
-			<when state="s25_nnbsp_semicolon" output="Gl"/>
-			<when state="s41_à" output="ought"/>
-			<when state="s42_À" output="Ought"/>
+			<when state="s13_comma" output="gl"/>
+			<when state="s14_semicolon" output="Gl"/>
+			<when state="s15_nnbsp_semicolon" output="Gl"/>
+			<when state="s16_nbsp_colon" output="Gl"/>
 		</action>
 		<action id="h">
-			<when state="none" next="s31_h"/>
+			<when state="none" next="s41_h"/>
 			<when state="s1_circumflex" output="ĥ"/>
 			<when state="s2_currency" output="₴"/>
 			<when state="s3_diaeresis" output="ḧ"/>
 			<when state="s4_greek" output="η"/>
 			<when state="s5_superscript" output="ʰ"/>
 			<when state="s6_subscript" output="ₕ"/>
-			<when state="s12_apostrophe" output="’h"/>
-			<when state="s17_comma" output="ph"/>
-			<when state="s18_semicolon" output="Ph"/>
-			<when state="s24_nbsp_colon" output="Ph"/>
-			<when state="s25_nnbsp_semicolon" output="Ph"/>
-			<when state="s26_nnbsp_interrogation" output="’H"/>
-			<when state="s41_à" output="ight"/>
-			<when state="s42_À" output="Ight"/>
+			<when state="s13_comma" output="ph"/>
+			<when state="s14_semicolon" output="Ph"/>
+			<when state="s15_nnbsp_semicolon" output="Ph"/>
+			<when state="s16_nbsp_colon" output="Ph"/>
 		</action>
 		<action id="i">
 			<when state="none" output="i"/>
@@ -873,30 +851,24 @@
 			<when state="s4_greek" output="ι"/>
 			<when state="s5_superscript" output="ⁱ"/>
 			<when state="s6_subscript" output="ᵢ"/>
-			<when state="s12_apostrophe" output="’i"/>
-			<when state="s17_comma" output="ji"/>
-			<when state="s18_semicolon" output="Ji"/>
-			<when state="s24_nbsp_colon" output="Ji"/>
-			<when state="s25_nnbsp_semicolon" output="Ji"/>
-			<when state="s26_nnbsp_interrogation" output="’I"/>
-			<when state="s35_q" output="qui"/>
-			<when state="s36_Q" output="Qui"/>
-			<when state="s41_à" output="ying"/>
-			<when state="s42_À" output="Ying"/>
-			<when state="s47_ê" output="î"/>
-			<when state="s48_Ê" output="Î"/>
+			<when state="s13_comma" output="ji"/>
+			<when state="s14_semicolon" output="Ji"/>
+			<when state="s15_nnbsp_semicolon" output="Ji"/>
+			<when state="s16_nbsp_colon" output="Ji"/>
+			<when state="s29_Q" output="Qui"/>
+			<when state="s37_Ê" output="Î"/>
+			<when state="s47_q" output="qui"/>
+			<when state="s55_ê" output="î"/>
 		</action>
 		<action id="ᵢ">
 			<when state="none" next="s6_subscript"/>
 		</action>
 		<action id="j">
-			<when state="none" output="j"/>
+			<when state="none" next="s42_j"/>
 			<when state="s1_circumflex" output="j"/>
 			<when state="s4_greek" output="ξ"/>
 			<when state="s5_superscript" output="ʲ"/>
 			<when state="s6_subscript" output="ⱼ"/>
-			<when state="s41_à" output="bu"/>
-			<when state="s42_À" output="Bu"/>
 		</action>
 		<action id="k">
 			<when state="none" output="k"/>
@@ -905,52 +877,44 @@
 			<when state="s4_greek" output="κ"/>
 			<when state="s5_superscript" output="ᵏ"/>
 			<when state="s6_subscript" output="ₖ"/>
-			<when state="s41_à" output="ique"/>
-			<when state="s42_À" output="Ique"/>
 		</action>
 		<action id="l">
-			<when state="none" output="l"/>
+			<when state="none" next="s43_l"/>
 			<when state="s1_circumflex" output="†"/>
 			<when state="s2_currency" output="₺"/>
 			<when state="s4_greek" output="λ"/>
 			<when state="s5_superscript" output="ˡ"/>
 			<when state="s6_subscript" output="ₗ"/>
 			<when state="s7_RR" output="ℓ"/>
-			<when state="s17_comma" output="cl"/>
-			<when state="s18_semicolon" output="Cl"/>
-			<when state="s24_nbsp_colon" output="Cl"/>
-			<when state="s25_nnbsp_semicolon" output="Cl"/>
-			<when state="s41_à" output="elle"/>
-			<when state="s42_À" output="Elle"/>
+			<when state="s13_comma" output="cl"/>
+			<when state="s14_semicolon" output="Cl"/>
+			<when state="s15_nnbsp_semicolon" output="Cl"/>
+			<when state="s16_nbsp_colon" output="Cl"/>
 		</action>
 		<action id="m">
-			<when state="none" output="m"/>
+			<when state="none" next="s44_m"/>
 			<when state="s1_circumflex" output="✅"/>
 			<when state="s2_currency" output="₥"/>
 			<when state="s4_greek" output="μ"/>
 			<when state="s5_superscript" output="ᵐ"/>
 			<when state="s6_subscript" output="ₘ"/>
-			<when state="s17_comma" output="ms"/>
-			<when state="s18_semicolon" output="Ms"/>
-			<when state="s24_nbsp_colon" output="Ms"/>
-			<when state="s25_nnbsp_semicolon" output="Ms"/>
-			<when state="s41_à" output="isme"/>
-			<when state="s42_À" output="Isme"/>
+			<when state="s13_comma" output="ms"/>
+			<when state="s14_semicolon" output="Ms"/>
+			<when state="s15_nnbsp_semicolon" output="Ms"/>
+			<when state="s16_nbsp_colon" output="Ms"/>
 		</action>
 		<action id="n">
-			<when state="none" output="n"/>
+			<when state="none" next="s45_n"/>
 			<when state="s1_circumflex" output="ñ"/>
 			<when state="s2_currency" output="₦"/>
 			<when state="s3_diaeresis" output=" "/>
 			<when state="s4_greek" output="ν"/>
 			<when state="s5_superscript" output="ⁿ"/>
 			<when state="s6_subscript" output="ₙ"/>
-			<when state="s17_comma" output="nl"/>
-			<when state="s18_semicolon" output="Nl"/>
-			<when state="s24_nbsp_colon" output="Nl"/>
-			<when state="s25_nnbsp_semicolon" output="Nl"/>
-			<when state="s41_à" output="ation"/>
-			<when state="s42_À" output="Ation"/>
+			<when state="s13_comma" output="nl"/>
+			<when state="s14_semicolon" output="Nl"/>
+			<when state="s15_nnbsp_semicolon" output="Nl"/>
+			<when state="s16_nbsp_colon" output="Nl"/>
 		</action>
 		<action id="o">
 			<when state="none" output="o"/>
@@ -960,41 +924,35 @@
 			<when state="s4_greek" output="ο"/>
 			<when state="s5_superscript" output="ᵒ"/>
 			<when state="s6_subscript" output="ₒ"/>
-			<when state="s12_apostrophe" output="’o"/>
-			<when state="s17_comma" output="jo"/>
-			<when state="s18_semicolon" output="Jo"/>
-			<when state="s24_nbsp_colon" output="Jo"/>
-			<when state="s25_nnbsp_semicolon" output="Jo"/>
-			<when state="s26_nnbsp_interrogation" output="’O"/>
-			<when state="s35_q" output="quo"/>
-			<when state="s36_Q" output="Quo"/>
-			<when state="s47_ê" output="ô"/>
-			<when state="s48_Ê" output="Ô"/>
+			<when state="s13_comma" output="jo"/>
+			<when state="s14_semicolon" output="Jo"/>
+			<when state="s15_nnbsp_semicolon" output="Jo"/>
+			<when state="s16_nbsp_colon" output="Jo"/>
+			<when state="s29_Q" output="Quo"/>
+			<when state="s37_Ê" output="Ô"/>
+			<when state="s47_q" output="quo"/>
+			<when state="s55_ê" output="ô"/>
 		</action>
 		<action id="p">
-			<when state="none" next="s33_p"/>
+			<when state="none" next="s46_p"/>
 			<when state="s1_circumflex" output="¶"/>
 			<when state="s2_currency" output="₱"/>
 			<when state="s4_greek" output="π"/>
 			<when state="s5_superscript" output="ᵖ"/>
 			<when state="s6_subscript" output="ₚ"/>
-			<when state="s17_comma" output="xp"/>
-			<when state="s18_semicolon" output="Xp"/>
-			<when state="s24_nbsp_colon" output="Xp"/>
-			<when state="s25_nnbsp_semicolon" output="Xp"/>
-			<when state="s41_à" output="ence"/>
-			<when state="s42_À" output="Ence"/>
+			<when state="s13_comma" output="xp"/>
+			<when state="s14_semicolon" output="Xp"/>
+			<when state="s15_nnbsp_semicolon" output="Xp"/>
+			<when state="s16_nbsp_colon" output="Xp"/>
 		</action>
 		<action id="q">
-			<when state="none" next="s35_q"/>
+			<when state="none" next="s47_q"/>
 			<when state="s1_circumflex" output="☒"/>
 			<when state="s4_greek" output="χ"/>
-			<when state="s17_comma" output="qu’"/>
-			<when state="s18_semicolon" output="Qu’"/>
-			<when state="s24_nbsp_colon" output="Qu’"/>
-			<when state="s25_nnbsp_semicolon" output="Qu’"/>
-			<when state="s41_à" output="ique"/>
-			<when state="s42_À" output="Ique"/>
+			<when state="s13_comma" output="qu’"/>
+			<when state="s14_semicolon" output="Qu’"/>
+			<when state="s15_nnbsp_semicolon" output="Qu’"/>
+			<when state="s16_nbsp_colon" output="Qu’"/>
 		</action>
 		<action id="r">
 			<when state="none" output="r"/>
@@ -1004,44 +962,36 @@
 			<when state="s4_greek" output="ρ"/>
 			<when state="s5_superscript" output="ʳ"/>
 			<when state="s6_subscript" output="ᵣ"/>
-			<when state="s17_comma" output="rq"/>
-			<when state="s18_semicolon" output="Rq"/>
-			<when state="s24_nbsp_colon" output="Rq"/>
-			<when state="s25_nnbsp_semicolon" output="Rq"/>
-			<when state="s41_à" output="erre"/>
-			<when state="s42_À" output="Erre"/>
+			<when state="s13_comma" output="rq"/>
+			<when state="s14_semicolon" output="Rq"/>
+			<when state="s15_nnbsp_semicolon" output="Rq"/>
+			<when state="s16_nbsp_colon" output="Rq"/>
 		</action>
 		<action id="s">
-			<when state="none" next="s37_s"/>
+			<when state="none" next="s48_s"/>
 			<when state="s1_circumflex" output="ß"/>
 			<when state="s2_currency" output="₪"/>
 			<when state="s3_diaeresis" output=" "/>
 			<when state="s4_greek" output="σ"/>
 			<when state="s5_superscript" output="ˢ"/>
 			<when state="s6_subscript" output="ₛ"/>
-			<when state="s17_comma" output="qu"/>
-			<when state="s18_semicolon" output="Qu"/>
-			<when state="s24_nbsp_colon" output="Qu"/>
-			<when state="s25_nnbsp_semicolon" output="Qu"/>
-			<when state="s41_à" output="ement"/>
-			<when state="s42_À" output="Ement"/>
+			<when state="s13_comma" output="q"/>
+			<when state="s14_semicolon" output="Q"/>
+			<when state="s15_nnbsp_semicolon" output="Q"/>
+			<when state="s16_nbsp_colon" output="Q"/>
 		</action>
 		<action id="t">
-			<when state="none" output="t"/>
+			<when state="none" next="s49_t"/>
 			<when state="s1_circumflex" output="!"/>
 			<when state="s2_currency" output="₸"/>
 			<when state="s3_diaeresis" output="™"/>
 			<when state="s4_greek" output="τ"/>
 			<when state="s5_superscript" output="ᵗ"/>
 			<when state="s6_subscript" output="ₜ"/>
-			<when state="s12_apostrophe" output="’t"/>
-			<when state="s17_comma" output="pt"/>
-			<when state="s18_semicolon" output="Pt"/>
-			<when state="s24_nbsp_colon" output="Pt"/>
-			<when state="s25_nnbsp_semicolon" output="Pt"/>
-			<when state="s26_nnbsp_interrogation" output="’T"/>
-			<when state="s41_à" output="ettre"/>
-			<when state="s42_À" output="Ettre"/>
+			<when state="s13_comma" output="pt"/>
+			<when state="s14_semicolon" output="Pt"/>
+			<when state="s15_nnbsp_semicolon" output="Pt"/>
+			<when state="s16_nbsp_colon" output="Pt"/>
 		</action>
 		<action id="u">
 			<when state="none" output="u"/>
@@ -1051,16 +1001,12 @@
 			<when state="s4_greek" output="θ"/>
 			<when state="s5_superscript" output="ᵘ"/>
 			<when state="s6_subscript" output="ᵤ"/>
-			<when state="s12_apostrophe" output="’u"/>
-			<when state="s17_comma" output="ju"/>
-			<when state="s18_semicolon" output="Ju"/>
-			<when state="s24_nbsp_colon" output="Ju"/>
-			<when state="s25_nnbsp_semicolon" output="Ju"/>
-			<when state="s26_nnbsp_interrogation" output="’U"/>
-			<when state="s41_à" output="ub"/>
-			<when state="s42_À" output="Ub"/>
-			<when state="s47_ê" output="û"/>
-			<when state="s48_Ê" output="Û"/>
+			<when state="s13_comma" output="ju"/>
+			<when state="s14_semicolon" output="Ju"/>
+			<when state="s15_nnbsp_semicolon" output="Ju"/>
+			<when state="s16_nbsp_colon" output="Ju"/>
+			<when state="s37_Ê" output="Û"/>
+			<when state="s55_ê" output="û"/>
 		</action>
 		<action id="v">
 			<when state="none" output="v"/>
@@ -1068,12 +1014,10 @@
 			<when state="s4_greek" output="ν"/>
 			<when state="s5_superscript" output="ᵛ"/>
 			<when state="s6_subscript" output="ᵥ"/>
-			<when state="s17_comma" output="dv"/>
-			<when state="s18_semicolon" output="Dv"/>
-			<when state="s24_nbsp_colon" output="Dv"/>
-			<when state="s25_nnbsp_semicolon" output="Dv"/>
-			<when state="s41_à" output="ment"/>
-			<when state="s42_À" output="Ment"/>
+			<when state="s13_comma" output="dv"/>
+			<when state="s14_semicolon" output="Dv"/>
+			<when state="s15_nnbsp_semicolon" output="Dv"/>
+			<when state="s16_nbsp_colon" output="Dv"/>
 		</action>
 		<action id="w">
 			<when state="none" output="w"/>
@@ -1089,45 +1033,41 @@
 			<when state="s3_diaeresis" output="ẍ"/>
 			<when state="s5_superscript" output="ˣ"/>
 			<when state="s6_subscript" output="ₓ"/>
-			<when state="s17_comma" output="où"/>
-			<when state="s18_semicolon" output="Où"/>
-			<when state="s24_nbsp_colon" output="Où"/>
-			<when state="s25_nnbsp_semicolon" output="Où"/>
-			<when state="s27_c" output="ck"/>
-			<when state="s28_C" output="Ck"/>
-			<when state="s37_s" output="sk"/>
-			<when state="s38_S" output="Sk"/>
-			<when state="s41_à" output="ieux"/>
-			<when state="s42_À" output="Ieux"/>
+			<when state="s13_comma" output="où"/>
+			<when state="s14_semicolon" output="Où"/>
+			<when state="s15_nnbsp_semicolon" output="Où"/>
+			<when state="s16_nbsp_colon" output="Où"/>
+			<when state="s20_C" output="Ck"/>
+			<when state="s30_S" output="Sk"/>
+			<when state="s38_c" output="ck"/>
+			<when state="s48_s" output="sk"/>
 		</action>
 		<action id="y">
-			<when state="none" next="s39_y"/>
+			<when state="none" next="s50_y"/>
 			<when state="s1_circumflex" output="ŷ"/>
 			<when state="s2_currency" output="¥"/>
 			<when state="s3_diaeresis" output="ÿ"/>
 			<when state="s4_greek" output="υ"/>
 			<when state="s5_superscript" output="ʸ"/>
 			<when state="s6_subscript" output="ᵧ"/>
-			<when state="s12_apostrophe" output="’y"/>
-			<when state="s17_comma" output="k"/>
-			<when state="s18_semicolon" output="K"/>
-			<when state="s24_nbsp_colon" output="K"/>
-			<when state="s25_nnbsp_semicolon" output="K"/>
-			<when state="s26_nnbsp_interrogation" output="’Y"/>
-			<when state="s43_è" output="aî"/>
-			<when state="s44_È" output="Aî"/>
+			<when state="s13_comma" output="k"/>
+			<when state="s14_semicolon" output="K"/>
+			<when state="s15_nnbsp_semicolon" output="K"/>
+			<when state="s16_nbsp_colon" output="K"/>
+			<when state="s35_È" output="Aî"/>
+			<when state="s37_Ê" output="Ŷ"/>
+			<when state="s53_è" output="aî"/>
+			<when state="s55_ê" output="ŷ"/>
 		</action>
 		<action id="z">
 			<when state="none" output="z"/>
 			<when state="s1_circumflex" output="ẑ"/>
 			<when state="s4_greek" output="ζ"/>
 			<when state="s5_superscript" output="ᶻ"/>
-			<when state="s17_comma" output="bj"/>
-			<when state="s18_semicolon" output="Bj"/>
-			<when state="s24_nbsp_colon" output="Bj"/>
-			<when state="s25_nnbsp_semicolon" output="Bj"/>
-			<when state="s41_à" output="ez-vous"/>
-			<when state="s42_À" output="Ez-Vous"/>
+			<when state="s13_comma" output="bj"/>
+			<when state="s14_semicolon" output="Bj"/>
+			<when state="s15_nnbsp_semicolon" output="Bj"/>
+			<when state="s16_nbsp_colon" output="Bj"/>
 		</action>
 		<action id="œ">
 			<when state="none" output="œ"/>
@@ -1145,30 +1085,26 @@
 			<when state="s4_greek" output="Α"/>
 			<when state="s5_superscript" output="ᴬ"/>
 			<when state="s6_subscript" output="ᴀ"/>
-			<when state="s12_apostrophe" output="’A"/>
-			<when state="s17_comma" output="Ja"/>
-			<when state="s18_semicolon" output="JA"/>
-			<when state="s24_nbsp_colon" output="JA"/>
-			<when state="s25_nnbsp_semicolon" output="JA"/>
-			<when state="s26_nnbsp_interrogation" output="’A"/>
-			<when state="s35_q" output="Qua"/>
-			<when state="s36_Q" output="QUA"/>
-			<when state="s41_à" output="Aire"/>
-			<when state="s42_À" output="AIRE"/>
-			<when state="s47_ê" output="Â"/>
-			<when state="s48_Ê" output="Â"/>
+			<when state="s13_comma" output="Ja"/>
+			<when state="s14_semicolon" output="JA"/>
+			<when state="s15_nnbsp_semicolon" output="JA"/>
+			<when state="s16_nbsp_colon" output="JA"/>
+			<when state="s29_Q" output="QUA"/>
+			<when state="s37_Ê" output="Â"/>
+			<when state="s47_q" output="Qua"/>
+			<when state="s55_ê" output="Â"/>
 		</action>
 		<action id="À">
-			<when state="none" next="s42_À"/>
+			<when state="none" next="s33_À"/>
 			<when state="s1_circumflex" output="Æ"/>
-			<when state="s17_comma" output="J"/>
-			<when state="s18_semicolon" output="J"/>
-			<when state="s24_nbsp_colon" output="J"/>
-			<when state="s25_nnbsp_semicolon" output="J"/>
-			<when state="s45_é" output="Ié"/>
-			<when state="s46_É" output="IÉ"/>
-			<when state="s47_ê" output="Æ"/>
-			<when state="s48_Ê" output="Æ"/>
+			<when state="s13_comma" output="J"/>
+			<when state="s14_semicolon" output="J"/>
+			<when state="s15_nnbsp_semicolon" output="J"/>
+			<when state="s16_nbsp_colon" output="J"/>
+			<when state="s29_Q" output="QUÀ"/>
+			<when state="s36_É" output="IÉ"/>
+			<when state="s47_q" output="Quà"/>
+			<when state="s54_é" output="Ié"/>
 		</action>
 		<action id="B">
 			<when state="none" output="B"/>
@@ -1180,7 +1116,7 @@
 			<when state="s7_RR" output="ℬ"/>
 		</action>
 		<action id="C">
-			<when state="none" next="s28_C"/>
+			<when state="none" next="s20_C"/>
 			<when state="s1_circumflex" output="Ç"/>
 			<when state="s2_currency" output="₵"/>
 			<when state="s3_diaeresis" output="©"/>
@@ -1188,31 +1124,31 @@
 			<when state="s5_superscript" output="ꟲ"/>
 			<when state="s6_subscript" output="ᴄ"/>
 			<when state="s7_RR" output="ℂ"/>
-			<when state="s17_comma" output="Ç"/>
-			<when state="s18_semicolon" output="Ç"/>
-			<when state="s24_nbsp_colon" output="Ç"/>
-			<when state="s25_nnbsp_semicolon" output="Ç"/>
-			<when state="s31_h" output="Wh"/>
-			<when state="s32_H" output="WH"/>
-			<when state="s41_à" output="Ction"/>
-			<when state="s42_À" output="CTION"/>
+			<when state="s13_comma" output="Ç"/>
+			<when state="s14_semicolon" output="Ç"/>
+			<when state="s15_nnbsp_semicolon" output="Ç"/>
+			<when state="s16_nbsp_colon" output="Ç"/>
+			<when state="s23_H" output="WH"/>
+			<when state="s41_h" output="Wh"/>
+		</action>
+		<action id="Ç">
+			<when state="none" next="s34_Ç"/>
+			<when state="s9_hashtag" output=" := "/>
 		</action>
 		<action id="D">
-			<when state="none" output="D"/>
+			<when state="none" next="s21_D"/>
 			<when state="s1_circumflex" output="☆"/>
 			<when state="s2_currency" output="₯"/>
 			<when state="s4_greek" output="Δ"/>
 			<when state="s5_superscript" output="ᴰ"/>
 			<when state="s6_subscript" output="ᴅ"/>
-			<when state="s17_comma" output="Ds"/>
-			<when state="s18_semicolon" output="DS"/>
-			<when state="s24_nbsp_colon" output="DS"/>
-			<when state="s25_nnbsp_semicolon" output="DS"/>
-			<when state="s41_à" output="Would"/>
-			<when state="s42_À" output="WOULD"/>
+			<when state="s13_comma" output="Ds"/>
+			<when state="s14_semicolon" output="DS"/>
+			<when state="s15_nnbsp_semicolon" output="DS"/>
+			<when state="s16_nbsp_colon" output="DS"/>
 		</action>
 		<action id="E">
-			<when state="none" next="s30_E"/>
+			<when state="none" next="s22_E"/>
 			<when state="s1_circumflex" output="Ê"/>
 			<when state="s2_currency" output="₠"/>
 			<when state="s3_diaeresis" output="Ë"/>
@@ -1220,65 +1156,55 @@
 			<when state="s5_superscript" output="ᴱ"/>
 			<when state="s6_subscript" output="ᴇ"/>
 			<when state="s7_RR" output="⅀"/>
-			<when state="s12_apostrophe" output="’E"/>
-			<when state="s17_comma" output="Je"/>
-			<when state="s18_semicolon" output="JE"/>
-			<when state="s24_nbsp_colon" output="JE"/>
-			<when state="s25_nnbsp_semicolon" output="JE"/>
-			<when state="s26_nnbsp_interrogation" output="’E"/>
-			<when state="s35_q" output="Que"/>
-			<when state="s36_Q" output="QUE"/>
-			<when state="s47_ê" output="Œ"/>
-			<when state="s48_Ê" output="Œ"/>
+			<when state="s13_comma" output="Je"/>
+			<when state="s14_semicolon" output="JE"/>
+			<when state="s15_nnbsp_semicolon" output="JE"/>
+			<when state="s16_nbsp_colon" output="JE"/>
+			<when state="s29_Q" output="QUE"/>
+			<when state="s37_Ê" output="Œ"/>
+			<when state="s47_q" output="Que"/>
+			<when state="s55_ê" output="Œ"/>
 		</action>
 		<action id="È">
-			<when state="none" next="s44_È"/>
+			<when state="none" next="s35_È"/>
 			<when state="s1_circumflex" output="Ó"/>
-			<when state="s12_apostrophe" output="’È"/>
-			<when state="s17_comma" output="Z"/>
-			<when state="s18_semicolon" output="Z"/>
-			<when state="s24_nbsp_colon" output="Z"/>
-			<when state="s25_nnbsp_semicolon" output="Z"/>
-			<when state="s26_nnbsp_interrogation" output="’È"/>
-			<when state="s35_q" output="Què"/>
-			<when state="s36_Q" output="QUÈ"/>
-			<when state="s39_y" output="Â"/>
-			<when state="s40_Y" output="Â"/>
+			<when state="s13_comma" output="Z"/>
+			<when state="s14_semicolon" output="Z"/>
+			<when state="s15_nnbsp_semicolon" output="Z"/>
+			<when state="s16_nbsp_colon" output="Z"/>
+			<when state="s29_Q" output="QUÈ"/>
+			<when state="s32_Y" output="Â"/>
+			<when state="s47_q" output="Què"/>
+			<when state="s50_y" output="Â"/>
 		</action>
 		<action id="É">
-			<when state="none" next="s46_É"/>
+			<when state="none" next="s36_É"/>
 			<when state="s1_circumflex" output="Œ"/>
 			<when state="s4_greek" output="Η"/>
-			<when state="s12_apostrophe" output="’É"/>
-			<when state="s17_comma" output="Jé"/>
-			<when state="s18_semicolon" output="JÉ"/>
-			<when state="s24_nbsp_colon" output="JÉ"/>
-			<when state="s25_nnbsp_semicolon" output="JÉ"/>
-			<when state="s26_nnbsp_interrogation" output="’É"/>
-			<when state="s29_e" output="Ez"/>
-			<when state="s30_E" output="EZ"/>
-			<when state="s35_q" output="Qué"/>
-			<when state="s36_Q" output="QUÉ"/>
-			<when state="s41_à" output="Éi"/>
-			<when state="s42_À" output="ÉI"/>
-			<when state="s47_ê" output="Oe"/>
-			<when state="s48_Ê" output="OE"/>
+			<when state="s13_comma" output="Jé"/>
+			<when state="s14_semicolon" output="JÉ"/>
+			<when state="s15_nnbsp_semicolon" output="JÉ"/>
+			<when state="s16_nbsp_colon" output="JÉ"/>
+			<when state="s22_E" output="EZ"/>
+			<when state="s29_Q" output="QUÉ"/>
+			<when state="s33_À" output="ÉI"/>
+			<when state="s37_Ê" output="OE"/>
+			<when state="s40_e" output="Ez"/>
+			<when state="s47_q" output="Qué"/>
+			<when state="s51_à" output="Éi"/>
+			<when state="s55_ê" output="Oe"/>
 		</action>
 		<action id="Ê">
-			<when state="none" next="s48_Ê"/>
+			<when state="none" next="s37_Ê"/>
 			<when state="s1_circumflex" output="Á"/>
-			<when state="s12_apostrophe" output="’Ê"/>
-			<when state="s17_comma" output="Ju"/>
-			<when state="s18_semicolon" output="JU"/>
-			<when state="s24_nbsp_colon" output="JU"/>
-			<when state="s25_nnbsp_semicolon" output="JU"/>
-			<when state="s26_nnbsp_interrogation" output="’Ê"/>
-			<when state="s35_q" output="Quê"/>
-			<when state="s36_Q" output="QUÊ"/>
-			<when state="s41_à" output="Able"/>
-			<when state="s42_À" output="ABLE"/>
-			<when state="s45_é" output="Eo"/>
-			<when state="s46_É" output="EO"/>
+			<when state="s13_comma" output="Ju"/>
+			<when state="s14_semicolon" output="JU"/>
+			<when state="s15_nnbsp_semicolon" output="JU"/>
+			<when state="s16_nbsp_colon" output="JU"/>
+			<when state="s29_Q" output="QUÊ"/>
+			<when state="s36_É" output="EO"/>
+			<when state="s47_q" output="Quê"/>
+			<when state="s54_é" output="Eo"/>
 		</action>
 		<action id="F">
 			<when state="none" output="F"/>
@@ -1288,12 +1214,10 @@
 			<when state="s5_superscript" output="ꟳ"/>
 			<when state="s6_subscript" output="ꜰ"/>
 			<when state="s7_RR" output="ℱ"/>
-			<when state="s17_comma" output="Fl"/>
-			<when state="s18_semicolon" output="FL"/>
-			<when state="s24_nbsp_colon" output="FL"/>
-			<when state="s25_nnbsp_semicolon" output="FL"/>
-			<when state="s41_à" output="Iste"/>
-			<when state="s42_À" output="ISTE"/>
+			<when state="s13_comma" output="Fl"/>
+			<when state="s14_semicolon" output="FL"/>
+			<when state="s15_nnbsp_semicolon" output="FL"/>
+			<when state="s16_nbsp_colon" output="FL"/>
 		</action>
 		<action id="G">
 			<when state="none" output="G"/>
@@ -1303,15 +1227,13 @@
 			<when state="s5_superscript" output="ᴳ"/>
 			<when state="s6_subscript" output="ɢ"/>
 			<when state="s7_RR" output="ℊ"/>
-			<when state="s17_comma" output="Gl"/>
-			<when state="s18_semicolon" output="GL"/>
-			<when state="s24_nbsp_colon" output="GL"/>
-			<when state="s25_nnbsp_semicolon" output="GL"/>
-			<when state="s41_à" output="Ought"/>
-			<when state="s42_À" output="OUGHT"/>
+			<when state="s13_comma" output="Gl"/>
+			<when state="s14_semicolon" output="GL"/>
+			<when state="s15_nnbsp_semicolon" output="GL"/>
+			<when state="s16_nbsp_colon" output="GL"/>
 		</action>
 		<action id="H">
-			<when state="none" next="s32_H"/>
+			<when state="none" next="s23_H"/>
 			<when state="s1_circumflex" output="Ĥ"/>
 			<when state="s2_currency" output="₴"/>
 			<when state="s3_diaeresis" output="Ḧ"/>
@@ -1319,14 +1241,10 @@
 			<when state="s5_superscript" output="ᴴ"/>
 			<when state="s6_subscript" output="ʜ"/>
 			<when state="s7_RR" output="ℋ"/>
-			<when state="s12_apostrophe" output="’H"/>
-			<when state="s17_comma" output="Ph"/>
-			<when state="s18_semicolon" output="PH"/>
-			<when state="s24_nbsp_colon" output="PH"/>
-			<when state="s25_nnbsp_semicolon" output="PH"/>
-			<when state="s26_nnbsp_interrogation" output="’H"/>
-			<when state="s41_à" output="Ight"/>
-			<when state="s42_À" output="IGHT"/>
+			<when state="s13_comma" output="Ph"/>
+			<when state="s14_semicolon" output="PH"/>
+			<when state="s15_nnbsp_semicolon" output="PH"/>
+			<when state="s16_nbsp_colon" output="PH"/>
 		</action>
 		<action id="I">
 			<when state="none" output="I"/>
@@ -1336,28 +1254,22 @@
 			<when state="s4_greek" output="Ι"/>
 			<when state="s5_superscript" output="ᴵ"/>
 			<when state="s6_subscript" output="ɪ"/>
-			<when state="s12_apostrophe" output="’I"/>
-			<when state="s17_comma" output="Ji"/>
-			<when state="s18_semicolon" output="JI"/>
-			<when state="s24_nbsp_colon" output="JI"/>
-			<when state="s25_nnbsp_semicolon" output="JI"/>
-			<when state="s26_nnbsp_interrogation" output="’I"/>
-			<when state="s35_q" output="Qui"/>
-			<when state="s36_Q" output="QUI"/>
-			<when state="s41_à" output="Ying"/>
-			<when state="s42_À" output="YING"/>
-			<when state="s47_ê" output="Î"/>
-			<when state="s48_Ê" output="Î"/>
+			<when state="s13_comma" output="Ji"/>
+			<when state="s14_semicolon" output="JI"/>
+			<when state="s15_nnbsp_semicolon" output="JI"/>
+			<when state="s16_nbsp_colon" output="JI"/>
+			<when state="s29_Q" output="QUI"/>
+			<when state="s37_Ê" output="Î"/>
+			<when state="s47_q" output="Qui"/>
+			<when state="s55_ê" output="Î"/>
 		</action>
 		<action id="J">
-			<when state="none" output="J"/>
+			<when state="none" next="s24_J"/>
 			<when state="s1_circumflex" output="J"/>
 			<when state="s4_greek" output="Ξ"/>
 			<when state="s5_superscript" output="ᴶ"/>
 			<when state="s6_subscript" output="ᴊ"/>
 			<when state="s7_RR" output="ℐ"/>
-			<when state="s41_à" output="Bu"/>
-			<when state="s42_À" output="BU"/>
 		</action>
 		<action id="K">
 			<when state="none" output="K"/>
@@ -1366,41 +1278,35 @@
 			<when state="s4_greek" output="Κ"/>
 			<when state="s5_superscript" output="ᴷ"/>
 			<when state="s6_subscript" output="ᴋ"/>
-			<when state="s41_à" output="Ique"/>
-			<when state="s42_À" output="IQUE"/>
 		</action>
 		<action id="L">
-			<when state="none" output="L"/>
+			<when state="none" next="s25_L"/>
 			<when state="s1_circumflex" output="‡"/>
 			<when state="s2_currency" output="₤"/>
 			<when state="s4_greek" output="Λ"/>
 			<when state="s5_superscript" output="ᴸ"/>
 			<when state="s6_subscript" output="ʟ"/>
 			<when state="s7_RR" output="ℒ"/>
-			<when state="s17_comma" output="Cl"/>
-			<when state="s18_semicolon" output="CL"/>
-			<when state="s24_nbsp_colon" output="CL"/>
-			<when state="s25_nnbsp_semicolon" output="CL"/>
-			<when state="s41_à" output="Elle"/>
-			<when state="s42_À" output="ELLE"/>
+			<when state="s13_comma" output="Cl"/>
+			<when state="s14_semicolon" output="CL"/>
+			<when state="s15_nnbsp_semicolon" output="CL"/>
+			<when state="s16_nbsp_colon" output="CL"/>
 		</action>
 		<action id="M">
-			<when state="none" output="M"/>
+			<when state="none" next="s26_M"/>
 			<when state="s1_circumflex" output="☑"/>
 			<when state="s2_currency" output="ℳ"/>
 			<when state="s4_greek" output="Μ"/>
 			<when state="s5_superscript" output="ᴹ"/>
 			<when state="s6_subscript" output="ᴍ"/>
 			<when state="s7_RR" output="ℳ"/>
-			<when state="s17_comma" output="Ms"/>
-			<when state="s18_semicolon" output="MS"/>
-			<when state="s24_nbsp_colon" output="MS"/>
-			<when state="s25_nnbsp_semicolon" output="MS"/>
-			<when state="s41_à" output="Isme"/>
-			<when state="s42_À" output="ISME"/>
+			<when state="s13_comma" output="Ms"/>
+			<when state="s14_semicolon" output="MS"/>
+			<when state="s15_nnbsp_semicolon" output="MS"/>
+			<when state="s16_nbsp_colon" output="MS"/>
 		</action>
 		<action id="N">
-			<when state="none" output="N"/>
+			<when state="none" next="s27_N"/>
 			<when state="s1_circumflex" output="Ñ"/>
 			<when state="s2_currency" output="₦"/>
 			<when state="s3_diaeresis" output=" "/>
@@ -1408,12 +1314,10 @@
 			<when state="s5_superscript" output="ᴺ"/>
 			<when state="s6_subscript" output="ɴ"/>
 			<when state="s7_RR" output="ℕ"/>
-			<when state="s17_comma" output="Nl"/>
-			<when state="s18_semicolon" output="NL"/>
-			<when state="s24_nbsp_colon" output="NL"/>
-			<when state="s25_nnbsp_semicolon" output="NL"/>
-			<when state="s41_à" output="Ation"/>
-			<when state="s42_À" output="ATION"/>
+			<when state="s13_comma" output="Nl"/>
+			<when state="s14_semicolon" output="NL"/>
+			<when state="s15_nnbsp_semicolon" output="NL"/>
+			<when state="s16_nbsp_colon" output="NL"/>
 		</action>
 		<action id="O">
 			<when state="none" output="O"/>
@@ -1423,44 +1327,38 @@
 			<when state="s4_greek" output="Ο"/>
 			<when state="s5_superscript" output="ᴼ"/>
 			<when state="s6_subscript" output="ᴏ"/>
-			<when state="s12_apostrophe" output="’O"/>
-			<when state="s17_comma" output="Jo"/>
-			<when state="s18_semicolon" output="JO"/>
-			<when state="s24_nbsp_colon" output="JO"/>
-			<when state="s25_nnbsp_semicolon" output="JO"/>
-			<when state="s26_nnbsp_interrogation" output="’O"/>
-			<when state="s35_q" output="Quo"/>
-			<when state="s36_Q" output="QUO"/>
-			<when state="s47_ê" output="Ô"/>
-			<when state="s48_Ê" output="Ô"/>
+			<when state="s13_comma" output="Jo"/>
+			<when state="s14_semicolon" output="JO"/>
+			<when state="s15_nnbsp_semicolon" output="JO"/>
+			<when state="s16_nbsp_colon" output="JO"/>
+			<when state="s29_Q" output="QUO"/>
+			<when state="s37_Ê" output="Ô"/>
+			<when state="s47_q" output="Quo"/>
+			<when state="s55_ê" output="Ô"/>
 		</action>
 		<action id="P">
-			<when state="none" next="s34_P"/>
+			<when state="none" next="s28_P"/>
 			<when state="s1_circumflex" output="⁂"/>
 			<when state="s2_currency" output="₧"/>
 			<when state="s4_greek" output="Π"/>
 			<when state="s5_superscript" output="ᴾ"/>
 			<when state="s7_RR" output="ℙ"/>
-			<when state="s17_comma" output="Xp"/>
-			<when state="s18_semicolon" output="XP"/>
-			<when state="s24_nbsp_colon" output="XP"/>
-			<when state="s25_nnbsp_semicolon" output="XP"/>
-			<when state="s41_à" output="Ence"/>
-			<when state="s42_À" output="ENCE"/>
+			<when state="s13_comma" output="Xp"/>
+			<when state="s14_semicolon" output="XP"/>
+			<when state="s15_nnbsp_semicolon" output="XP"/>
+			<when state="s16_nbsp_colon" output="XP"/>
 		</action>
 		<action id="Q">
-			<when state="none" next="s36_Q"/>
+			<when state="none" next="s29_Q"/>
 			<when state="s1_circumflex" output="☐"/>
 			<when state="s4_greek" output="Χ"/>
 			<when state="s5_superscript" output="ꟴ"/>
 			<when state="s6_subscript" output="ꞯ"/>
 			<when state="s7_RR" output="ℚ"/>
-			<when state="s17_comma" output="Qu’"/>
-			<when state="s18_semicolon" output="QU’"/>
-			<when state="s24_nbsp_colon" output="QU’"/>
-			<when state="s25_nnbsp_semicolon" output="QU’"/>
-			<when state="s41_à" output="Ique"/>
-			<when state="s42_À" output="IQUE"/>
+			<when state="s13_comma" output="Qu’"/>
+			<when state="s14_semicolon" output="QU’"/>
+			<when state="s15_nnbsp_semicolon" output="QU’"/>
+			<when state="s16_nbsp_colon" output="QU’"/>
 		</action>
 		<action id="R">
 			<when state="none" output="R"/>
@@ -1471,33 +1369,29 @@
 			<when state="s5_superscript" output="ᴿ"/>
 			<when state="s6_subscript" output="ʀ"/>
 			<when state="s7_RR" output="ℝ"/>
-			<when state="s17_comma" output="Rq"/>
-			<when state="s18_semicolon" output="RQ"/>
-			<when state="s24_nbsp_colon" output="RQ"/>
-			<when state="s25_nnbsp_semicolon" output="RQ"/>
-			<when state="s41_à" output="Erre"/>
-			<when state="s42_À" output="ERRE"/>
+			<when state="s13_comma" output="Rq"/>
+			<when state="s14_semicolon" output="RQ"/>
+			<when state="s15_nnbsp_semicolon" output="RQ"/>
+			<when state="s16_nbsp_colon" output="RQ"/>
 		</action>
 		<action id="ℝ">
 			<when state="none" next="s7_RR"/>
 		</action>
 		<action id="S">
-			<when state="none" next="s38_S"/>
+			<when state="none" next="s30_S"/>
 			<when state="s1_circumflex" output="ẞ"/>
 			<when state="s2_currency" output="₷"/>
 			<when state="s3_diaeresis" output=" "/>
 			<when state="s4_greek" output="Σ"/>
 			<when state="s6_subscript" output="ꜱ"/>
 			<when state="s7_RR" output="⅀"/>
-			<when state="s17_comma" output="Qu"/>
-			<when state="s18_semicolon" output="QU"/>
-			<when state="s24_nbsp_colon" output="QU"/>
-			<when state="s25_nnbsp_semicolon" output="QU"/>
-			<when state="s41_à" output="Ement"/>
-			<when state="s42_À" output="EMENT"/>
+			<when state="s13_comma" output="Q"/>
+			<when state="s14_semicolon" output="Q"/>
+			<when state="s15_nnbsp_semicolon" output="Q"/>
+			<when state="s16_nbsp_colon" output="Q"/>
 		</action>
 		<action id="T">
-			<when state="none" output="T"/>
+			<when state="none" next="s31_T"/>
 			<when state="s1_circumflex" output="¡"/>
 			<when state="s2_currency" output="₮"/>
 			<when state="s3_diaeresis" output="™"/>
@@ -1505,14 +1399,10 @@
 			<when state="s5_superscript" output="ᵀ"/>
 			<when state="s6_subscript" output="ᴛ"/>
 			<when state="s7_RR" output="ℭ"/>
-			<when state="s12_apostrophe" output="’T"/>
-			<when state="s17_comma" output="Pt"/>
-			<when state="s18_semicolon" output="PT"/>
-			<when state="s24_nbsp_colon" output="PT"/>
-			<when state="s25_nnbsp_semicolon" output="PT"/>
-			<when state="s26_nnbsp_interrogation" output="’T"/>
-			<when state="s41_à" output="Ettre"/>
-			<when state="s42_À" output="ETTRE"/>
+			<when state="s13_comma" output="Pt"/>
+			<when state="s14_semicolon" output="PT"/>
+			<when state="s15_nnbsp_semicolon" output="PT"/>
+			<when state="s16_nbsp_colon" output="PT"/>
 		</action>
 		<action id="U">
 			<when state="none" output="U"/>
@@ -1523,16 +1413,12 @@
 			<when state="s5_superscript" output="ᵁ"/>
 			<when state="s6_subscript" output="ᴜ"/>
 			<when state="s7_RR" output="ℿ"/>
-			<when state="s12_apostrophe" output="’U"/>
-			<when state="s17_comma" output="Ju"/>
-			<when state="s18_semicolon" output="JU"/>
-			<when state="s24_nbsp_colon" output="JU"/>
-			<when state="s25_nnbsp_semicolon" output="JU"/>
-			<when state="s26_nnbsp_interrogation" output="’U"/>
-			<when state="s41_à" output="Ub"/>
-			<when state="s42_À" output="UB"/>
-			<when state="s47_ê" output="Û"/>
-			<when state="s48_Ê" output="Û"/>
+			<when state="s13_comma" output="Ju"/>
+			<when state="s14_semicolon" output="JU"/>
+			<when state="s15_nnbsp_semicolon" output="JU"/>
+			<when state="s16_nbsp_colon" output="JU"/>
+			<when state="s37_Ê" output="Û"/>
+			<when state="s55_ê" output="Û"/>
 		</action>
 		<action id="V">
 			<when state="none" output="V"/>
@@ -1540,12 +1426,10 @@
 			<when state="s4_greek" output="Ν"/>
 			<when state="s5_superscript" output="ⱽ"/>
 			<when state="s6_subscript" output="ᴠ"/>
-			<when state="s17_comma" output="Dv"/>
-			<when state="s18_semicolon" output="DV"/>
-			<when state="s24_nbsp_colon" output="DV"/>
-			<when state="s25_nnbsp_semicolon" output="DV"/>
-			<when state="s41_à" output="Ment"/>
-			<when state="s42_À" output="MENT"/>
+			<when state="s13_comma" output="Dv"/>
+			<when state="s14_semicolon" output="DV"/>
+			<when state="s15_nnbsp_semicolon" output="DV"/>
+			<when state="s16_nbsp_colon" output="DV"/>
 		</action>
 		<action id="W">
 			<when state="none" output="W"/>
@@ -1563,32 +1447,30 @@
 			<when state="s5_superscript" output="ˣ"/>
 			<when state="s6_subscript" output="ᵪ"/>
 			<when state="s7_RR" output="ℛ"/>
-			<when state="s17_comma" output="Où"/>
-			<when state="s18_semicolon" output="OÙ"/>
-			<when state="s24_nbsp_colon" output="OÙ"/>
-			<when state="s25_nnbsp_semicolon" output="OÙ"/>
-			<when state="s27_c" output="Ck"/>
-			<when state="s28_C" output="CK"/>
-			<when state="s37_s" output="Sk"/>
-			<when state="s38_S" output="SK"/>
-			<when state="s41_à" output="Ieux"/>
-			<when state="s42_À" output="IEUX"/>
+			<when state="s13_comma" output="Où"/>
+			<when state="s14_semicolon" output="OÙ"/>
+			<when state="s15_nnbsp_semicolon" output="OÙ"/>
+			<when state="s16_nbsp_colon" output="OÙ"/>
+			<when state="s20_C" output="CK"/>
+			<when state="s30_S" output="SK"/>
+			<when state="s38_c" output="Ck"/>
+			<when state="s48_s" output="Sk"/>
 		</action>
 		<action id="Y">
-			<when state="none" next="s40_Y"/>
+			<when state="none" next="s32_Y"/>
 			<when state="s1_circumflex" output="Ŷ"/>
 			<when state="s2_currency" output="円"/>
 			<when state="s3_diaeresis" output="Ÿ"/>
 			<when state="s4_greek" output="Υ"/>
 			<when state="s6_subscript" output="ʏ"/>
-			<when state="s12_apostrophe" output="’Y"/>
-			<when state="s17_comma" output="K"/>
-			<when state="s18_semicolon" output="K"/>
-			<when state="s24_nbsp_colon" output="K"/>
-			<when state="s25_nnbsp_semicolon" output="K"/>
-			<when state="s26_nnbsp_interrogation" output="’Y"/>
-			<when state="s43_è" output="Aî"/>
-			<when state="s44_È" output="AÎ"/>
+			<when state="s13_comma" output="K"/>
+			<when state="s14_semicolon" output="K"/>
+			<when state="s15_nnbsp_semicolon" output="K"/>
+			<when state="s16_nbsp_colon" output="K"/>
+			<when state="s35_È" output="AÎ"/>
+			<when state="s37_Ê" output="Ŷ"/>
+			<when state="s53_è" output="Aî"/>
+			<when state="s55_ê" output="Ŷ"/>
 		</action>
 		<action id="Z">
 			<when state="none" output="Z"/>
@@ -1596,12 +1478,10 @@
 			<when state="s4_greek" output="Ζ"/>
 			<when state="s6_subscript" output="ᴢ"/>
 			<when state="s7_RR" output="ℨ"/>
-			<when state="s17_comma" output="Bj"/>
-			<when state="s18_semicolon" output="BJ"/>
-			<when state="s24_nbsp_colon" output="BJ"/>
-			<when state="s25_nnbsp_semicolon" output="BJ"/>
-			<when state="s41_à" output="Ez-Vous"/>
-			<when state="s42_À" output="EZ-VOUS"/>
+			<when state="s13_comma" output="Bj"/>
+			<when state="s14_semicolon" output="BJ"/>
+			<when state="s15_nnbsp_semicolon" output="BJ"/>
+			<when state="s16_nbsp_colon" output="BJ"/>
 		</action>
 		<action id="Œ">
 			<when state="none" output="Œ"/>
@@ -1622,23 +1502,37 @@
 			<when state="s3_diaeresis" output="¨"/>
 		</action>
 		<action id=" :">
-			<when state="none" next="s24_nbsp_colon"/>
+			<when state="none" next="s16_nbsp_colon"/>
 		</action>
 		<action id=" ;">
-			<when state="none" next="s25_nnbsp_semicolon"/>
+			<when state="none" next="s15_nnbsp_semicolon"/>
 		</action>
 		<action id=" ?">
-			<when state="none" next="s26_nnbsp_interrogation"/>
-			<when state="s17_comma" output="J’"/>
-			<when state="s18_semicolon" output="J’"/>
-			<when state="s24_nbsp_colon" output="J’"/>
-			<when state="s25_nnbsp_semicolon" output="J’"/>
-			<when state="s33_p" output="Ct"/>
-			<when state="s34_P" output="CT"/>
-			<when state="s35_q" output="Qu’"/>
-			<when state="s36_Q" output="QU’"/>
-			<when state="s41_à" output="Ance"/>
-			<when state="s42_À" output="ANCE"/>
+			<when state="none" output=" ?"/>
+			<when state="s13_comma" output="J’"/>
+			<when state="s14_semicolon" output="J’"/>
+			<when state="s15_nnbsp_semicolon" output="J’"/>
+			<when state="s16_nbsp_colon" output="J’"/>
+			<when state="s20_C" output="C’"/>
+			<when state="s21_D" output="D’"/>
+			<when state="s24_J" output="J’"/>
+			<when state="s25_L" output="L’"/>
+			<when state="s26_M" output="M’"/>
+			<when state="s27_N" output="N’"/>
+			<when state="s28_P" output="CT"/>
+			<when state="s29_Q" output="QU’"/>
+			<when state="s30_S" output="S’"/>
+			<when state="s31_T" output="T’"/>
+			<when state="s38_c" output="C’"/>
+			<when state="s39_d" output="D’"/>
+			<when state="s42_j" output="J’"/>
+			<when state="s43_l" output="L’"/>
+			<when state="s44_m" output="M’"/>
+			<when state="s45_n" output="N’"/>
+			<when state="s46_p" output="Ct"/>
+			<when state="s47_q" output="Qu’"/>
+			<when state="s48_s" output="S’"/>
+			<when state="s49_t" output="T’"/>
 		</action>
 		<action id="!">
 			<when state="none" next="s8_exclamation"/>
@@ -1647,55 +1541,62 @@
 		<action id="#">
 			<when state="none" next="s9_hashtag"/>
 			<when state="s8_exclamation" output=" != "/>
-			<when state="s15_left_parenthesis" output="(&#x0022;"/>
-			<when state="s21_left_bracket" output="[&#x0022;"/>
-			<when state="s23_right_bracket" output="&#x0022;]"/>
+			<when state="s34_Ç" output=" != "/>
+			<when state="s52_ç" output=" != "/>
 		</action>
 		<action id="$">
 			<when state="none" next="s10_dollar"/>
 			<when state="s2_currency" output="£"/>
-			<when state="s19_equal" output=" &#x003C;= "/>
+			<when state="s17_equal" output=" &#x003C;= "/>
 		</action>
 		<action id="%">
 			<when state="none" output="%"/>
-			<when state="s13_left_chevron" output=" &#x003C;= "/>
-			<when state="s14_right_chevron" output=" &#x003E;= "/>
-		</action>
-		<action id="&#x0022;">
-			<when state="none" next="s11_quote"/>
-			<when state="s22_backslash" output="/*"/>
 		</action>
 		<action id="&#x0026;">
 			<when state="none" output="&#x0026;"/>
 			<when state="s2_currency" output="৳"/>
 		</action>
 		<action id="&#x0027;">
-			<when state="none" next="s12_apostrophe"/>
+			<when state="none" output="&#x0027;"/>
 			<when state="s1_circumflex" output="⚠"/>
 			<when state="s2_currency" output="£"/>
 			<when state="s4_greek" output="ς"/>
 			<when state="s7_RR" output="ℜ"/>
-			<when state="s17_comma" output="j’"/>
-			<when state="s18_semicolon" output="J’"/>
-			<when state="s24_nbsp_colon" output="J’"/>
-			<when state="s25_nnbsp_semicolon" output="J’"/>
-			<when state="s33_p" output="ct"/>
-			<when state="s34_P" output="Ct"/>
-			<when state="s35_q" output="qu’"/>
-			<when state="s36_Q" output="Qu’"/>
-			<when state="s41_à" output="ance"/>
-			<when state="s42_À" output="Ance"/>
+			<when state="s13_comma" output="j’"/>
+			<when state="s14_semicolon" output="J’"/>
+			<when state="s15_nnbsp_semicolon" output="J’"/>
+			<when state="s16_nbsp_colon" output="J’"/>
+			<when state="s20_C" output="C’"/>
+			<when state="s21_D" output="D’"/>
+			<when state="s24_J" output="J’"/>
+			<when state="s25_L" output="L’"/>
+			<when state="s26_M" output="M’"/>
+			<when state="s27_N" output="N’"/>
+			<when state="s28_P" output="Ct"/>
+			<when state="s29_Q" output="Qu’"/>
+			<when state="s30_S" output="S’"/>
+			<when state="s31_T" output="T’"/>
+			<when state="s38_c" output="c’"/>
+			<when state="s39_d" output="d’"/>
+			<when state="s42_j" output="j’"/>
+			<when state="s43_l" output="l’"/>
+			<when state="s44_m" output="m’"/>
+			<when state="s45_n" output="n’"/>
+			<when state="s46_p" output="ct"/>
+			<when state="s47_q" output="qu’"/>
+			<when state="s48_s" output="s’"/>
+			<when state="s49_t" output="t’"/>
 		</action>
 		<action id="&#x003C;">
-			<when state="none" next="s13_left_chevron"/>
+			<when state="none" next="s11_left_chevron"/>
 			<when state="s7_RR" output="⟪"/>
 		</action>
 		<action id="&#x003E;">
-			<when state="none" next="s14_right_chevron"/>
+			<when state="none" output="&#x003E;"/>
 			<when state="s7_RR" output="⟫"/>
 		</action>
 		<action id="(">
-			<when state="none" next="s15_left_parenthesis"/>
+			<when state="none" output="("/>
 			<when state="s5_superscript" output="⁽"/>
 			<when state="s6_subscript" output="₍"/>
 			<when state="s7_RR" output="⟦"/>
@@ -1706,19 +1607,21 @@
 			<when state="s5_superscript" output="⁾"/>
 			<when state="s6_subscript" output="₎"/>
 			<when state="s7_RR" output="⟧"/>
-			<when state="s21_left_bracket" output=" = &#x0022;"/>
+			<when state="s19_left_bracket" output=" = &#x0022;"/>
 		</action>
 		<action id="+">
-			<when state="none" next="s16_plus"/>
+			<when state="none" next="s12_plus"/>
 			<when state="s5_superscript" output="⁺"/>
 			<when state="s6_subscript" output="₊"/>
-			<when state="s19_equal" output=" ➜ "/>
-			<when state="s20_interrogation" output=" &#x003C;- "/>
+			<when state="s17_equal" output=" ➜ "/>
+			<when state="s18_interrogation" output=" &#x003C;- "/>
 		</action>
 		<action id=",">
-			<when state="none" next="s17_comma"/>
+			<when state="none" next="s13_comma"/>
 			<when state="s1_circumflex" output="➜"/>
 			<when state="s5_superscript" output="ᶿ"/>
+			<when state="s37_Ê" output="U,"/>
+			<when state="s55_ê" output="u,"/>
 		</action>
 		<action id="-">
 			<when state="none" output="-"/>
@@ -1731,6 +1634,8 @@
 			<when state="none" output="."/>
 			<when state="s1_circumflex" output="•"/>
 			<when state="s5_superscript" output="ᵝ"/>
+			<when state="s37_Ê" output="U."/>
+			<when state="s55_ê" output="u."/>
 		</action>
 		<action id="/">
 			<when state="none" output="/"/>
@@ -1811,49 +1716,60 @@
 			<when state="s1_circumflex" output="▶"/>
 		</action>
 		<action id=";">
-			<when state="none" next="s18_semicolon"/>
+			<when state="none" next="s14_semicolon"/>
 			<when state="s1_circumflex" output="↪"/>
 		</action>
 		<action id="=">
-			<when state="none" next="s19_equal"/>
+			<when state="none" next="s17_equal"/>
 			<when state="s5_superscript" output="⁼"/>
 			<when state="s6_subscript" output="₌"/>
 			<when state="s10_dollar" output=" =&#x003E; "/>
 		</action>
 		<action id="?">
-			<when state="none" next="s20_interrogation"/>
-			<when state="s16_plus" output=" -&#x003E; "/>
-			<when state="s17_comma" output="J’"/>
-			<when state="s18_semicolon" output="J’"/>
-			<when state="s24_nbsp_colon" output="J’"/>
-			<when state="s25_nnbsp_semicolon" output="J’"/>
-			<when state="s33_p" output="Ct"/>
-			<when state="s34_P" output="CT"/>
-			<when state="s35_q" output="Qu’"/>
-			<when state="s36_Q" output="QU’"/>
-			<when state="s41_à" output="Ance"/>
-			<when state="s42_À" output="ANCE"/>
+			<when state="none" next="s18_interrogation"/>
+			<when state="s12_plus" output=" -&#x003E; "/>
+			<when state="s13_comma" output="J’"/>
+			<when state="s14_semicolon" output="J’"/>
+			<when state="s15_nnbsp_semicolon" output="J’"/>
+			<when state="s16_nbsp_colon" output="J’"/>
+			<when state="s20_C" output="C’"/>
+			<when state="s21_D" output="D’"/>
+			<when state="s24_J" output="J’"/>
+			<when state="s25_L" output="L’"/>
+			<when state="s26_M" output="M’"/>
+			<when state="s27_N" output="N’"/>
+			<when state="s28_P" output="CT"/>
+			<when state="s29_Q" output="QU’"/>
+			<when state="s30_S" output="S’"/>
+			<when state="s31_T" output="T’"/>
+			<when state="s38_c" output="C’"/>
+			<when state="s39_d" output="D’"/>
+			<when state="s42_j" output="J’"/>
+			<when state="s43_l" output="L’"/>
+			<when state="s44_m" output="M’"/>
+			<when state="s45_n" output="N’"/>
+			<when state="s46_p" output="Ct"/>
+			<when state="s47_q" output="Qu’"/>
+			<when state="s48_s" output="S’"/>
+			<when state="s49_t" output="T’"/>
 		</action>
 		<action id="@">
 			<when state="none" output="@"/>
-			<when state="s13_left_chevron" output="&#x003C;/"/>
+			<when state="s11_left_chevron" output="&#x003C;/"/>
 		</action>
 		<action id="[">
-			<when state="none" next="s21_left_bracket"/>
+			<when state="none" next="s19_left_bracket"/>
 			<when state="s5_superscript" output="˹"/>
 			<when state="s6_subscript" output="˻"/>
 			<when state="s7_RR" output="⟦"/>
 			<when state="s9_hashtag" output="&#x0022;]"/>
 		</action>
-		<action id="\">
-			<when state="none" next="s22_backslash"/>
-			<when state="s11_quote" output="*/"/>
-		</action>
 		<action id="]">
-			<when state="none" next="s23_right_bracket"/>
+			<when state="none" output="]"/>
 			<when state="s5_superscript" output="˺"/>
 			<when state="s6_subscript" output="˼"/>
 			<when state="s7_RR" output="⟧"/>
+			<when state="s9_hashtag" output="&#x0022;]"/>
 		</action>
 		<action id="^">
 			<when state="none" next="s1_circumflex"/>
@@ -1873,14 +1789,8 @@
 		</action>
 		<action id="’">
 			<when state="none" output="’"/>
-			<when state="s17_comma" output="j’"/>
-			<when state="s18_semicolon" output="J’"/>
-			<when state="s24_nbsp_colon" output="J’"/>
-			<when state="s25_nnbsp_semicolon" output="J’"/>
-			<when state="s35_q" output="qu’"/>
-			<when state="s36_Q" output="Qu’"/>
-			<when state="s41_à" output="ance"/>
-			<when state="s42_À" output="Ance"/>
+			<when state="s29_Q" output="Qu’"/>
+			<when state="s47_q" output="qu’"/>
 		</action>
 	</actions>
 	<terminators>
@@ -1894,43 +1804,50 @@
 		<when state="s8_exclamation" output="!"/>
 		<when state="s9_hashtag" output="#"/>
 		<when state="s10_dollar" output="$"/>
-		<when state="s11_quote" output="&#x0022;"/>
-		<when state="s12_apostrophe" output="&#x0027;"/>
-		<when state="s13_left_chevron" output="&#x003C;"/>
-		<when state="s14_right_chevron" output="&#x003E;"/>
-		<when state="s15_left_parenthesis" output="("/>
-		<when state="s16_plus" output="+"/>
-		<when state="s17_comma" output=","/>
-		<when state="s18_semicolon" output=";"/>
-		<when state="s19_equal" output="="/>
-		<when state="s20_interrogation" output="?"/>
-		<when state="s21_left_bracket" output="["/>
-		<when state="s22_backslash" output="\"/>
-		<when state="s23_right_bracket" output="]"/>
-		<when state="s24_nbsp_colon" output=" :"/>
-		<when state="s25_nnbsp_semicolon" output=" ;"/>
-		<when state="s26_nnbsp_interrogation" output=" ?"/>
-		<when state="s27_c" output="c"/>
-		<when state="s28_C" output="C"/>
-		<when state="s29_e" output="e"/>
-		<when state="s30_E" output="E"/>
-		<when state="s31_h" output="h"/>
-		<when state="s32_H" output="H"/>
-		<when state="s33_p" output="p"/>
-		<when state="s34_P" output="P"/>
-		<when state="s35_q" output="q"/>
-		<when state="s36_Q" output="Q"/>
-		<when state="s37_s" output="s"/>
-		<when state="s38_S" output="S"/>
-		<when state="s39_y" output="y"/>
-		<when state="s40_Y" output="Y"/>
-		<when state="s41_à" output="à"/>
-		<when state="s42_À" output="À"/>
-		<when state="s43_è" output="è"/>
-		<when state="s44_È" output="È"/>
-		<when state="s45_é" output="é"/>
-		<when state="s46_É" output="É"/>
-		<when state="s47_ê" output="ê"/>
-		<when state="s48_Ê" output="Ê"/>
+		<when state="s11_left_chevron" output="&#x003C;"/>
+		<when state="s12_plus" output="+"/>
+		<when state="s13_comma" output=","/>
+		<when state="s14_semicolon" output=";"/>
+		<when state="s15_nnbsp_semicolon" output=" ;"/>
+		<when state="s16_nbsp_colon" output=" :"/>
+		<when state="s17_equal" output="="/>
+		<when state="s18_interrogation" output="?"/>
+		<when state="s19_left_bracket" output="["/>
+		<when state="s20_C" output="C"/>
+		<when state="s21_D" output="D"/>
+		<when state="s22_E" output="E"/>
+		<when state="s23_H" output="H"/>
+		<when state="s24_J" output="J"/>
+		<when state="s25_L" output="L"/>
+		<when state="s26_M" output="M"/>
+		<when state="s27_N" output="N"/>
+		<when state="s28_P" output="P"/>
+		<when state="s29_Q" output="Q"/>
+		<when state="s30_S" output="S"/>
+		<when state="s31_T" output="T"/>
+		<when state="s32_Y" output="Y"/>
+		<when state="s33_À" output="À"/>
+		<when state="s34_Ç" output="Ç"/>
+		<when state="s35_È" output="È"/>
+		<when state="s36_É" output="É"/>
+		<when state="s37_Ê" output="Ê"/>
+		<when state="s38_c" output="c"/>
+		<when state="s39_d" output="d"/>
+		<when state="s40_e" output="e"/>
+		<when state="s41_h" output="h"/>
+		<when state="s42_j" output="j"/>
+		<when state="s43_l" output="l"/>
+		<when state="s44_m" output="m"/>
+		<when state="s45_n" output="n"/>
+		<when state="s46_p" output="p"/>
+		<when state="s47_q" output="q"/>
+		<when state="s48_s" output="s"/>
+		<when state="s49_t" output="t"/>
+		<when state="s50_y" output="y"/>
+		<when state="s51_à" output="à"/>
+		<when state="s52_ç" output="ç"/>
+		<when state="s53_è" output="è"/>
+		<when state="s54_é" output="é"/>
+		<when state="s55_ê" output="ê"/>
 	</terminators>
 </keyboard>
