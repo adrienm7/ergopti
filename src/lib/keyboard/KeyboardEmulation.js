@@ -17,7 +17,7 @@ function parseTomlSimple(toml) {
 
 // Load magic dynamically via HTTP request (public static directory)
 if (typeof window !== 'undefined') {
-	fetch('/drivers/configuration/magic.toml')
+	fetch('/drivers/hotstrings/magic.toml')
 		.then((response) => response.text())
 		.then((text) => {
 			const parsedMagic = parseTomlSimple(text);

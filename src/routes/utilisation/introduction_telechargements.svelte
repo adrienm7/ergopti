@@ -23,7 +23,7 @@
 	remplacementsSample = parseTomlSimple(magicSampleToml);
 
 	if (typeof window !== 'undefined') {
-		fetch('/drivers/configuration/magic.toml')
+		fetch('/drivers/hotstrings/magic.toml')
 			.then((response) => response.text())
 			.then((text) => {
 				remplacements = parseTomlSimple(text);

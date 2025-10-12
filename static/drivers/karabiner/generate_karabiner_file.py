@@ -1,10 +1,10 @@
 """Generate Karabiner roll rules for Ergopti(+).
 
 Extract key positions from the macOS .keylayout file, build roll / dead-key
-manipulators based on the Ergopti+ mapping configuration, and export:
+manipulators based on the Ergopti+ mapping hotstrings, and export:
     - rolls.json: raw list of rules grouped by trigger mapping
     - rolls_grouped.json: rules regrouped by originating key
-    - karabiner.json: merged configuration (by adding those rules to base file)
+    - karabiner.json: merged hotstrings (by adding those rules to base file)
 
 Multi-key output symbols (e.g. '➜') are represented as ordered sequences of
 key positions.

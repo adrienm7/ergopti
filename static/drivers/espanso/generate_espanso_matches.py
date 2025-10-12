@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Script to generate Espanso match files from TOML configuration files.
+Script to generate Espanso match files from TOML hotstrings files.
 
-This script creates .yml files for each TOML file in the configuration directory.
+This script creates .yml files for each TOML file in the hotstrings directory.
 It handles symbol extraction from triggers (★, $) and generates proper Espanso format
 with propagate_case support.
 
@@ -52,7 +52,7 @@ def main(
     overwrite: bool = False,
 ) -> None:
     """
-    Main function to generate Espanso match files from TOML configuration files.
+    Main function to generate Espanso match files from TOML hotstrings files.
 
     Args:
             input_directory: Directory containing TOML files. If None, uses default config directory.
@@ -69,9 +69,7 @@ def main(
     if input_directory:
         config_directory = Path(input_directory).resolve()
     else:
-        config_directory = (
-            Path(__file__).resolve().parent.parent / "configuration"
-        )
+        config_directory = Path(__file__).resolve().parent.parent / "hotstrings"
 
     if output_directory:
         output_directory = Path(output_directory).resolve()

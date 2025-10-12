@@ -20,8 +20,8 @@ LOGS_INDENTATION = "\t\t"
 
 
 def _get_config_files() -> list[Path]:
-    """Get list of configuration files to load."""
-    config_dir = Path(__file__).parent.parent / "configuration"
+    """Get list of hotstrings files to load."""
+    config_dir = Path(__file__).parent.parent / "hotstrings"
     filenames = [
         "apostrophe.toml",
         "comma.toml",
@@ -50,14 +50,12 @@ def _merge_section_data(existing_data, new_data):
 
 
 def _load_toml_files(config_files: list[Path]) -> dict:
-    """Load and merge all TOML configuration files."""
+    """Load and merge all TOML hotstrings files."""
     merged_data = {}
 
     for config_file in config_files:
         if not config_file.exists():
-            raise FileNotFoundError(
-                f"Configuration file not found: {config_file}"
-            )
+            raise FileNotFoundError(f"hotstrings file not found: {config_file}")
 
         try:
             with open(config_file, "rb") as f:
@@ -75,10 +73,10 @@ def _load_toml_files(config_files: list[Path]) -> dict:
                     else:
                         merged_data[section_name] = section_data
 
-                logger.info("Loaded configuration from: %s", config_file.name)
+                logger.info("Loaded hotstrings from: %s", config_file.name)
         except OSError as e:
             raise OSError(
-                f"Error reading configuration file {config_file}: {e}"
+                f"Error reading hotstrings file {config_file}: {e}"
             ) from e
 
     return merged_data
@@ -131,10 +129,10 @@ def _process_mappings(merged_toml_data: dict) -> dict:
 
 def load_plus_mappings_config() -> dict:
     """
-    Load Ergopti+ mappings configuration from TOML files.
+    Load Ergopti+ mappings hotstrings from TOML files.
 
     Returns:
-        Dictionary containing the merged mappings configuration
+        Dictionary containing the merged mappings hotstrings
 
     Raises:
         ImportError: If tomllib/tomli is not available
@@ -146,15 +144,15 @@ def load_plus_mappings_config() -> dict:
     return _process_mappings(merged_toml_data)
 
 
-# Load configuration from TOML files
+# Load hotstrings from TOML files
 try:
     PLUS_MAPPINGS_CONFIG = load_plus_mappings_config()
     logger.info(
-        "Loaded Ergopti+ mappings configuration from rolls.toml and suffixes.toml files"
+        "Loaded Ergopti+ mappings hotstrings from rolls.toml and suffixes.toml files"
     )
 except (ImportError, FileNotFoundError, OSError) as e:
-    logger.error("Error loading TOML configuration: %s", e)
-    logger.info("Falling back to empty configuration")
+    logger.error("Error loading TOML hotstrings: %s", e)
+    logger.info("Falling back to empty hotstrings")
     # Fallback to empty config if TOML loading fails
     PLUS_MAPPINGS_CONFIG = {}
 
