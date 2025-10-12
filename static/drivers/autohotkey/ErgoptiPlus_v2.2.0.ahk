@@ -591,7 +591,7 @@ global Features := Map(
             "-",
             "Errors",
             "OU",
-            "MultiplePonctuationMarks",
+            "MultiplePunctuationMarks",
             "SuffixesAChaining",
             "-",
             "Minus",
@@ -637,7 +637,7 @@ global Features := Map(
             Description: "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant",
             TimeActivationSeconds: 1,
         },
-        "MultiplePonctuationMarks", {
+        "MultiplePunctuationMarks", {
             Enabled: True,
             Description: "Taper `"!`" ou `"?`" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère",
             TimeActivationSeconds: 1,
@@ -4657,23 +4657,23 @@ if Features["Autocorrection"]["OU"].Enabled {
     )
 }
 
-if Features["Autocorrection"]["MultiplePonctuationMarks"].Enabled {
+if Features["Autocorrection"]["MultiplePunctuationMarks"].Enabled {
     CreateHotstring(
         "*", " ! !", " !!",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
     )
     CreateHotstring(
         "*", "! !", "!!",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
     )
 
     CreateHotstring(
         "*", " ? ?", " ??",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
     )
     CreateHotstring(
         "*", "? ?", "??",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePonctuationMarks"].TimeActivationSeconds)
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
     )
 
     ; We can’t use the TimeActivationSeconds here, as previous character = current character = "."
@@ -5357,6 +5357,10 @@ if Features["DistancesReduction"]["SuffixesA"].Enabled {
     )
     CreateCaseSensitiveHotstrings(
         "*?", "à'", "ance",
+        Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "à’", "ance",
         Map("TimeActivationSeconds", Features["DistancesReduction"]["SuffixesA"].TimeActivationSeconds)
     )
 }
