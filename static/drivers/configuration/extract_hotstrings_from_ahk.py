@@ -132,7 +132,6 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
         ],
         "sfb_reduction": [
             ("SFBsReduction", "ECirc"),
-            ("SFBsReduction", "BU"),
             ("SFBsReduction", "IÉ"),
         ],
         "rolls": ["Rolls"],  # Special case: extract all Rolls blocks
@@ -575,24 +574,110 @@ def extract_hotstrings(
 def process_autohotkey_escapes(text: str) -> str:
     """
     Process AutoHotkey escape sequences in text.
-    
+
     Args:
         text: The text containing AutoHotkey escape sequences
-    
+
     Returns:
         Text with escape sequences converted to actual characters
     """
+    # Handle special complex sequences first
+    # Convert \`" to " (backslash-escaped backtick quote)
+    text = text.replace('\\`"', '"')
+    # Convert `"\ to "\ (backtick quote followed by backslash)
+    text = text.replace('`"\\', '"\\')
+    # Convert `"" to " (double backtick quote to single quote)
+    text = text.replace('`""', '"')
+
     # Convert `" to "
     text = text.replace('`"', '"')
+    # Convert `' to '
+    text = text.replace("`'", "'")
     # Convert `` to `
-    text = text.replace('``', '`')
+    text = text.replace("``", "`")
     # Convert `n to newline
-    text = text.replace('`n', '\n')
+    text = text.replace("`n", "\n")
     # Convert `t to tab
-    text = text.replace('`t', '\t')
+    text = text.replace("`t", "\t")
     # Convert `r to carriage return
-    text = text.replace('`r', '\r')
+    text = text.replace("`r", "\r")
+    # Convert `{ and `} to { and }
+    text = text.replace("`{", "{")
+    text = text.replace("`}", "}")
+    # Convert backslash escapes
+    text = text.replace('\\"', '"')
+    text = text.replace("\\'", "'")
+    text = text.replace("\\\\", "\\")
     return text
+
+
+def process_complex_output_expression(output_expr: str) -> Optional[str]:
+    """
+    Process complex AutoHotkey output expressions that include variable concatenation.
+
+    Args:
+        output_expr: The AutoHotkey output expression to process
+
+    Returns:
+        The processed output string, or None if it cannot be processed
+    """
+    # Remove surrounding quotes if present
+    output_expr = output_expr.strip()
+    if output_expr.startswith('"') and output_expr.endswith('"'):
+        return process_autohotkey_escapes(output_expr[1:-1])
+
+    # Handle common variable concatenations
+    space_around_symbols = " "  # Default value for SpaceAroundSymbols
+
+    # Simple string literals
+    if output_expr.startswith('"') and output_expr.endswith('"'):
+        return process_autohotkey_escapes(output_expr[1:-1])
+
+    # Handle concatenation with SpaceAroundSymbols
+    if "SpaceAroundSymbols" in output_expr:
+        # Replace SpaceAroundSymbols with space and evaluate concatenation
+        parts = output_expr.split(".")
+        result = ""
+
+        for part in parts:
+            part = part.strip()
+            if part == "SpaceAroundSymbols":
+                result += space_around_symbols
+            elif part.startswith('"') and part.endswith('"'):
+                result += process_autohotkey_escapes(part[1:-1])
+            elif part in (
+                '":="',
+                '"!="',
+                '"="',
+                '"=>"',
+                '"<="',
+                '"->"',
+                '"<-"',
+                '"➜"',
+            ):
+                result += part[1:-1]  # Remove surrounding quotes
+            elif part == '"`"`"{Left}"':
+                result += '""'  # Simplified for TOML output
+            # Skip unknown variables or complex expressions
+
+        return result if result else None
+
+    # Handle other simple quoted strings
+    quote_match = re.search(r'^"([^"]*)"$', output_expr)
+    if quote_match:
+        result = process_autohotkey_escapes(quote_match.group(1))
+        # Remove AutoHotkey specific cursor positioning
+        result = result.replace("{Left}", "")
+        result = result.replace("{Right}", "")
+        result = result.replace("{Up}", "")
+        result = result.replace("{Down}", "")
+        result = result.replace("{Home}", "")
+        result = result.replace("{End}", "")
+        return result
+
+    # If we can't process it, log and return None
+    logger.debug("Cannot process complex output expression: %s", output_expr)
+    return None
 
 
 def extract_hotstring_from_line(
@@ -607,13 +692,127 @@ def extract_hotstring_from_line(
     Returns:
             Tuple of (trigger, output, is_word, auto_expand) or (None, None, False, False) if no match
     """
-    # First, try to match new CreateHotstring format
-    # Updated regex to handle escaped quotes in output like "`"" and trigger concatenation
+    # Pattern for CreateHotstring with complex escape sequences
+    complex_escape_pattern = (
+        r"CreateHotstring\s*\(\s*"
+        r'"([^"]*)",\s*'  # Options group 1
+        r'"([^"]+)",\s*'  # Trigger group 2 - simple capture
+        r'"(`"[^"]*)"'  # Output group 3 - specifically for backtick-quote sequences like `") and `"]
+        r".*?"  # Match anything after
+        r"\)"
+    )
+
+    complex_escape_match = re.search(complex_escape_pattern, line, re.DOTALL)
+
+    if complex_escape_match:
+        options, trigger, output = complex_escape_match.groups()
+
+        # Determine auto_expand and is_word based on options
+        auto_expand = "*" in options
+        is_word = "?" not in options
+
+        # Handle special case where trigger contains ScriptInformation["MagicKey"]
+        if 'ScriptInformation["MagicKey"]' in line:
+            trigger += "★"
+
+        # Process both trigger and output through AutoHotkey escape processing
+        trigger = process_autohotkey_escapes(trigger)
+        output = process_autohotkey_escapes(output)
+
+        logger.debug(
+            "Found CreateHotstring (complex): trigger='%s', options='%s', auto_expand=%s, is_word=%s",
+            trigger,
+            options,
+            auto_expand,
+            is_word,
+        )
+
+        return trigger, output, is_word, auto_expand
+
+    # General pattern for CreateHotstring with escaped triggers
+    general_escape_pattern = (
+        r"CreateHotstring\s*\(\s*"
+        r'"([^"]*)",\s*'  # Options group 1
+        r'"((?:[^"\\]|\\.|"")*)",\s*'  # Trigger group 2 - handles \`" sequences and quotes
+        r'"([^"]*)"'  # Output group 3 - simple output
+        r".*?"  # Match anything after
+        r"\)"
+    )
+
+    general_escape_match = re.search(general_escape_pattern, line, re.DOTALL)
+
+    if general_escape_match:
+        options, trigger, output = general_escape_match.groups()
+
+        # Determine auto_expand and is_word based on options
+        auto_expand = "*" in options
+        is_word = "?" not in options
+
+        # Handle special case where trigger contains ScriptInformation["MagicKey"]
+        if 'ScriptInformation["MagicKey"]' in line:
+            trigger += "★"
+
+        # Process both trigger and output through AutoHotkey escape processing
+        trigger = process_autohotkey_escapes(trigger)
+        output = process_autohotkey_escapes(output)
+
+        logger.debug(
+            "Found CreateHotstring (general): trigger='%s', options='%s', auto_expand=%s, is_word=%s",
+            trigger,
+            options,
+            auto_expand,
+            is_word,
+        )
+
+        return trigger, output, is_word, auto_expand
+
+    # Handle complex CreateHotstring lines with variable concatenation
+    # Pattern for CreateHotstring with string concatenation in output
+    complex_create_pattern = (
+        r"CreateHotstring\s*\(\s*"
+        r'"([^"]*)",\s*'  # Options group 1
+        r'"([^"\\]*(?:\\.[^"\\]*)*)",\s*'  # Trigger group 2 - handles escaped chars
+        r"([^,)]+),\s*"  # Output group 3 - can be complex expression with concatenation
+        r".*?"  # Match anything after (Map parameters)
+        r"\)"
+    )
+
+    complex_match = re.search(complex_create_pattern, line, re.DOTALL)
+
+    if complex_match:
+        options, trigger, output_expr = complex_match.groups()
+
+        # Determine auto_expand and is_word based on options
+        auto_expand = "*" in options
+        is_word = "?" not in options
+
+        # Handle special case where trigger contains ScriptInformation["MagicKey"]
+        if 'ScriptInformation["MagicKey"]' in line:
+            trigger += "★"
+
+        # Process trigger escapes
+        trigger = process_autohotkey_escapes(trigger)
+
+        # Process complex output expressions
+        output = process_complex_output_expression(output_expr)
+
+        if output:  # Only return if we successfully processed the output
+            logger.debug(
+                "Found CreateHotstring: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
+                trigger,
+                options,
+                auto_expand,
+                is_word,
+            )
+            return trigger, output, is_word, auto_expand
+
+    # First, try to match simple CreateHotstring format
+    # Updated regex to handle escaped quotes in both trigger and output
     create_hotstring_pattern = (
         r"CreateHotstring\s*\(\s*"
         r'"([^"]*)",\s*'  # Options group 1
-        r'"([^"]+)"(?:\s*\.\s*ScriptInformation\["MagicKey"\])?,\s*'  # Trigger group 2 - handles concatenation with MagicKey
-        r'"((?:[^"\\]|\\.|`")*)"'  # Output group 3 - handles escaped quotes and backtick-quote combinations
+        r'"((?:[^"\\`]|\\.|`.|"")*)"(?:\s*\.\s*ScriptInformation\["MagicKey"\])?,\s*'  # Trigger group 2 - handles all escape sequences
+        r'"((?:[^"\\`]|\\.|`.|"")*)"'  # Output group 3 - handles all escape sequences
         r".*?"  # Match anything after the output (including Map parameters)
         r"\)"
     )
@@ -633,8 +832,9 @@ def extract_hotstring_from_line(
         if 'ScriptInformation["MagicKey"]' in line:
             trigger += "★"
 
-        # Convert AutoHotkey escaped quotes (`") to regular quotes (")
-        output = output.replace('`"', '"')
+        # Process both trigger and output through AutoHotkey escape processing
+        trigger = process_autohotkey_escapes(trigger)
+        output = process_autohotkey_escapes(output)
 
         logger.debug(
             "Found CreateHotstring: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
@@ -669,8 +869,9 @@ def extract_hotstring_from_line(
         if 'ScriptInformation["MagicKey"]' in line:
             trigger += "★"
 
-        # Convert AutoHotkey escaped quotes (`") to regular quotes (")
-        output = output.replace('`"', '"')
+        # Process both trigger and output through AutoHotkey escape processing
+        trigger = process_autohotkey_escapes(trigger)
+        output = process_autohotkey_escapes(output)
 
         logger.debug(
             "Found CreateCaseSensitiveHotstrings: trigger='%s', options='%s', auto_expand=%s, is_word=%s",
@@ -709,8 +910,9 @@ def extract_hotstring_from_line(
         if 'ScriptInformation["MagicKey"]' in line:
             trigger += "★"
 
-        # Convert AutoHotkey escaped quotes (`") to regular quotes (")
-        output = output.replace('`"', '"')
+        # Process both trigger and output through AutoHotkey escape processing
+        trigger = process_autohotkey_escapes(trigger)
+        output = process_autohotkey_escapes(output)
 
         logger.debug(
             "Found Hotstring: trigger='%s', options='%s', auto_expand=%s, is_word=%s",

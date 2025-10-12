@@ -6715,7 +6715,7 @@ if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
     CreateHotstring("*C", "$caron$", "ˇ")
     CreateHotstring("*C", "$hat$", "^")
     CreateHotstring("*C", "$diaer$", "¨")
-    CreateHotstring("*C", "$grave$", "`"")
+    CreateHotstring("*C", "$grave$", "``")
     CreateHotstring("*C", "$macron$", "¯")
     ; Quote
     CreateHotstring("*C", "$quote.double$", "`"")

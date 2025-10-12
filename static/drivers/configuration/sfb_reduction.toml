@@ -9,10 +9,6 @@
 "ê." = { output = "u.", is_word = false, auto_expand = true }
 "ê," = { output = "u,", is_word = false, auto_expand = true }
 
-[[bu_general]]
-"à★" = { output = "bu", is_word = false, auto_expand = true }
-"àu" = { output = "ub", is_word = false, auto_expand = true }
-
 [[ie_general]]
 "àé" = { output = "éi", is_word = false, auto_expand = true }
 "éà" = { output = "ié", is_word = false, auto_expand = true }
