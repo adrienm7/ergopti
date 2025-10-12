@@ -133,6 +133,7 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
         "sfb_reduction": [
             ("SFBsReduction", "ECirc"),
             ("SFBsReduction", "IÉ"),
+            ("SFBsReduction", "EGrave"),
         ],
         "rolls": ["Rolls"],  # Special case: extract all Rolls blocks
     }
@@ -404,17 +405,26 @@ def extract_block_content(
     """
     if isinstance(block_pattern, tuple):
         category, block_name = block_pattern
-        # Precise pattern to match Features["category"]["block_name"].Enabled block
-        start_pattern = (
+        # Try both patterns: with and without .Enabled suffix
+        start_pattern_enabled = (
             rf'if Features\["{category}"\]\["{block_name}"\]\.Enabled\s*\{{'
         )
+        start_pattern_simple = (
+            rf'if Features\["{category}"\]\["{block_name}"\]\s*\{{'
+        )
     else:
-        # Backward compatibility: general pattern to match any Features[...][block_pattern].Enabled block
-        start_pattern = (
+        # Backward compatibility: general pattern to match any Features[...][block_pattern] block
+        start_pattern_enabled = (
             rf'if Features\["[^"]+"\]\["{block_pattern}"\]\.Enabled\s*\{{'
         )
+        start_pattern_simple = (
+            rf'if Features\["[^"]+"\]\["{block_pattern}"\]\s*\{{'
+        )
 
-    start_match = re.search(start_pattern, content)
+    # Try both patterns: first with .Enabled, then without
+    start_match = re.search(start_pattern_enabled, content)
+    if not start_match:
+        start_match = re.search(start_pattern_simple, content)
 
     if not start_match:
         return ""
@@ -445,9 +455,12 @@ def extract_all_blocks_from_category(content: str, category: str) -> str:
     Returns:
         The merged content of all blocks in the category
     """
-    # Find all Features["category"]["..."].Enabled blocks
-    pattern = rf'if Features\["{category}"\]\["[^"]+"\]\.Enabled\s*\{{'
-    matches = list(re.finditer(pattern, content))
+    # Find all Features["category"]["..."] blocks (with or without .Enabled)
+    pattern_enabled = rf'if Features\["{category}"\]\["[^"]+"\]\.Enabled\s*\{{'
+    pattern_simple = rf'if Features\["{category}"\]\["[^"]+"\]\s*\{{'
+
+    matches = list(re.finditer(pattern_enabled, content))
+    matches.extend(re.finditer(pattern_simple, content))
 
     if not matches:
         return ""
@@ -608,6 +621,18 @@ def process_autohotkey_escapes(text: str) -> str:
     text = text.replace('\\"', '"')
     text = text.replace("\\'", "'")
     text = text.replace("\\\\", "\\")
+
+    # Remove AutoHotkey specific cursor positioning sequences
+    # Handle patterns like \"\"{Left} -> \"
+    text = text.replace('""{Left}', '"')
+    text = text.replace('"{Left}', "")
+    text = text.replace("{Left}", "")
+    text = text.replace("{Right}", "")
+    text = text.replace("{Up}", "")
+    text = text.replace("{Down}", "")
+    text = text.replace("{Home}", "")
+    text = text.replace("{End}", "")
+
     return text
 
 
@@ -1061,6 +1086,7 @@ def generate_e_deadkey_toml(ahk_file_path: str = None) -> None:
     output_file = output_dir / "e_deadkey.toml"
 
     # Define the basic deadkey mappings: ê + vowel = vowel with circumflex
+    # Only include lowercase mappings to avoid duplicates
     deadkey_mappings = [
         ("êa", "â"),
         ("êe", "œ"),  # Special case: ê + e = œ
@@ -1068,12 +1094,6 @@ def generate_e_deadkey_toml(ahk_file_path: str = None) -> None:
         ("êo", "ô"),
         ("êu", "û"),
         ("êy", "ŷ"),
-        ("êA", "Â"),
-        ("êE", "Œ"),  # Special case: ê + E = Œ
-        ("êI", "Î"),
-        ("êO", "Ô"),
-        ("êU", "Û"),
-        ("êY", "Ŷ"),
     ]
 
     # Extract additional mappings from ECirc block if AHK file is provided
@@ -1087,7 +1107,7 @@ def generate_e_deadkey_toml(ahk_file_path: str = None) -> None:
             ecirc_content = extract_block_content(content, "ECirc")
             if ecirc_content:
                 ecirc_hotstrings = extract_hotstrings(ecirc_content)
-                # Flatten all sections into a single list
+                # Flatten all sections into a single list, filtering out uppercase duplicates
                 for section_entries in ecirc_hotstrings.values():
                     for (
                         trigger,
@@ -1095,6 +1115,13 @@ def generate_e_deadkey_toml(ahk_file_path: str = None) -> None:
                         is_word,
                         auto_expand,
                     ) in section_entries:
+                        # Skip uppercase triggers if we already have lowercase equivalent
+                        lowercase_trigger = trigger.lower()
+                        if trigger != lowercase_trigger and any(
+                            existing_trigger == lowercase_trigger
+                            for existing_trigger, _ in deadkey_mappings
+                        ):
+                            continue
                         ecirc_mappings.append(
                             (trigger, output, is_word, auto_expand)
                         )
@@ -1122,19 +1149,6 @@ def generate_e_deadkey_toml(ahk_file_path: str = None) -> None:
         toml_lines.append(
             f'"{trigger}" = {{ output = "{output}", is_word = false, auto_expand = true }}'
         )
-
-    # Add ECirc mappings if any
-    if ecirc_mappings:
-        toml_lines.append("")
-        toml_lines.append("# Additional mappings from ECirc block")
-        for trigger, output, is_word, auto_expand in ecirc_mappings:
-            trigger_escaped = escape_toml_string(
-                trigger, escape_backslashes=False
-            )
-            output_escaped = escape_toml_string(output, escape_backslashes=True)
-            toml_lines.append(
-                f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()} }}'
-            )
 
     with open(output_file, "w", encoding="utf-8") as f:
         f.write("\n".join(toml_lines))
