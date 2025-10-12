@@ -120,32 +120,60 @@ def apply_case_to_text(original_trigger: str, target_text: str) -> str:
         return target_text.lower()
 
 
-def parse_toml_simple(toml_content: str) -> Dict[str, str]:
+def parse_toml_simple(toml_content: str) -> Dict[str, Dict[str, any]]:
     """
-    Parse TOML content to extract trigger-replacement mappings.
+    Parse TOML content to extract trigger-replacement mappings with metadata.
 
     Args:
         toml_content: TOML file content as string
 
     Returns:
-        Dictionary mapping triggers to replacements
+        Dictionary mapping triggers to dictionaries containing output, is_word, auto_expand
     """
     result = {}
     for line in toml_content.split("\n"):
         line = line.strip()
         if line.startswith("#") or not line or line.startswith("["):
             continue
-        match = re.match(r'^"([^"]+)"\s*=\s*"([^"]+)"', line)
+
+        # New format: "trigger" = { output = "replacement", is_word = true/false, auto_expand = true/false }
+        match = re.match(
+            r'^"([^"]+)"\s*=\s*\{\s*output\s*=\s*"([^"]+)",\s*is_word\s*=\s*(true|false),\s*auto_expand\s*=\s*(true|false)\s*\}',
+            line,
+        )
         if match:
             trigger = match.group(1)
-            replacement = match.group(2)
+            output = match.group(2)
+            is_word = match.group(3) == "true"
+            auto_expand = match.group(4) == "true"
             # Only add if trigger doesn't already exist (keep first occurrence)
             if trigger not in result:
-                result[trigger] = replacement
+                result[trigger] = {
+                    "output": output,
+                    "is_word": is_word,
+                    "auto_expand": auto_expand,
+                }
             else:
                 logger.warning(
                     "Duplicate trigger found and ignored: '%s'", trigger
                 )
+        else:
+            # Fallback for old format: "trigger" = "replacement"
+            old_match = re.match(r'^"([^"]+)"\s*=\s*"([^"]+)"', line)
+            if old_match:
+                trigger = old_match.group(1)
+                output = old_match.group(2)
+                # Only add if trigger doesn't already exist (keep first occurrence)
+                if trigger not in result:
+                    result[trigger] = {
+                        "output": output,
+                        "is_word": False,
+                        "auto_expand": True,  # Default to true for backward compatibility
+                    }
+                else:
+                    logger.warning(
+                        "Duplicate trigger found and ignored: '%s'", trigger
+                    )
     return result
 
 
@@ -179,13 +207,13 @@ def detect_trigger_symbols(triggers: List[str]) -> Tuple[str, str]:
 
 
 def clean_triggers(
-    triggers_dict: Dict[str, str],
-) -> Tuple[Dict[str, str], str, str]:
+    triggers_dict: Dict[str, Dict[str, any]],
+) -> Tuple[Dict[str, Dict[str, any]], str, str]:
     """
     Clean triggers by removing detected symbols and return them.
 
     Args:
-        triggers_dict: Dictionary of trigger -> replacement mappings
+        triggers_dict: Dictionary of trigger -> metadata mappings
 
     Returns:
         Tuple of (cleaned_dict, prefix, suffix)
@@ -194,18 +222,20 @@ def clean_triggers(
     prefix, suffix = detect_trigger_symbols(triggers_list)
 
     cleaned_dict = {}
-    for trigger, replacement in triggers_dict.items():
+    for trigger, metadata in triggers_dict.items():
         clean_trigger = trigger
         if prefix and clean_trigger.startswith(prefix):
             clean_trigger = clean_trigger[len(prefix) :]
         if suffix and clean_trigger.endswith(suffix):
             clean_trigger = clean_trigger[: -len(suffix)]
-        cleaned_dict[clean_trigger] = replacement
+        cleaned_dict[clean_trigger] = metadata
 
     return cleaned_dict, prefix, suffix
 
 
-def create_snippet_json(trigger: str, result: str, uid: str) -> Dict:
+def create_snippet_json(
+    trigger: str, result: str, uid: str, auto_expand: bool = True
+) -> Dict:
     """
     Create a snippet JSON structure for Alfred.
 
@@ -213,18 +243,23 @@ def create_snippet_json(trigger: str, result: str, uid: str) -> Dict:
         trigger: The trigger keyword
         result: The replacement text
         uid: Unique identifier for the snippet
+        auto_expand: Whether the snippet should auto-expand
 
     Returns:
         Dictionary representing the snippet JSON structure
     """
-    return {
+    snippet_data = {
         "alfredsnippet": {
             "uid": uid,
             "name": f"{trigger} ➜ {result}",
             "keyword": trigger,
             "snippet": result,
+            # Always include dontautoexpand field
+            "dontautoexpand": not auto_expand,
         }
     }
+
+    return snippet_data
 
 
 def create_info_plist(prefix: str = "", suffix: str = "") -> str:
@@ -401,7 +436,10 @@ def generate_alfred_snippets_from_toml(
     snippets_data = []
     all_triggers_seen = set()  # Track all triggers across all variants
 
-    for trigger, replacement in cleaned_dict.items():
+    for trigger, metadata in cleaned_dict.items():
+        replacement = metadata["output"]
+        auto_expand = metadata["auto_expand"]
+
         # Generate case variants
         variants = generate_case_variants(trigger, replacement)
 
@@ -410,7 +448,7 @@ def generate_alfred_snippets_from_toml(
             if variant_trigger not in all_triggers_seen:
                 uid = generate_uuid()
                 snippet_data = create_snippet_json(
-                    variant_trigger, variant_replacement, uid
+                    variant_trigger, variant_replacement, uid, auto_expand
                 )
                 snippets_data.append(snippet_data)
                 all_triggers_seen.add(variant_trigger)

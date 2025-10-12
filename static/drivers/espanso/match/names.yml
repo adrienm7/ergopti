@@ -1,0 +1,73 @@
+matches:
+  - trigger: 'Quatar'
+    replace: 'Qatar'
+    word: true
+  - trigger: 'alexei'
+    replace: 'Alexeï'
+    word: true
+  - trigger: 'anais'
+    replace: 'Anaïs'
+    word: true
+  - trigger: 'azerbaidjan'
+    replace: 'Azerbaïdjan'
+    word: true
+  - trigger: 'benoit'
+    replace: 'Benoît'
+    word: true
+  - trigger: 'caraibes'
+    replace: 'Caraïbes'
+    word: true
+  - trigger: 'cleopatre'
+    replace: 'Cléopâtre'
+    word: true
+  - trigger: 'cléopatre'
+    replace: 'Cléopâtre'
+    word: true
+  - trigger: 'dubai'
+    replace: 'Dubaï'
+    word: true
+  - trigger: 'gaetan'
+    replace: 'Gaëtan'
+    word: true
+  - trigger: 'hanoi'
+    replace: 'Hanoï'
+    word: true
+  - trigger: 'israel'
+    replace: 'Israël'
+    word: true
+  - trigger: 'jerome'
+    replace: 'Jérôme'
+    word: true
+  - trigger: 'joel'
+    replace: 'Joël'
+    word: true
+  - trigger: 'jérome'
+    replace: 'Jérôme'
+    word: true
+  - trigger: 'mickael'
+    replace: 'Mickaël'
+    word: true
+  - trigger: 'noel'
+    replace: 'Noël'
+    word: true
+  - trigger: 'raphael'
+    replace: 'Raphaël'
+    word: true
+  - trigger: 'serguei'
+    replace: 'Sergueï'
+    word: true
+  - trigger: 'shanghai'
+    replace: 'Shanghaï'
+    word: true
+  - trigger: 'taiwan'
+    replace: 'Taïwan'
+    word: true
+  - trigger: 'thailande'
+    replace: 'Thaïlande'
+    word: true
+  - trigger: 'thais'
+    replace: 'Thaïs'
+    word: true
+  - trigger: 'tolstoi'
+    replace: 'Tolstoï'
+    word: true

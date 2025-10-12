@@ -1,0 +1,42 @@
+matches:
+  - trigger: '#_'
+    replace: '# '
+    word: true
+  - trigger: '$_'
+    replace: '$ '
+    word: true
+  - trigger: '(_'
+    replace: '( '
+    word: true
+  - trigger: ')_'
+    replace: ') '
+    word: true
+  - trigger: '*_'
+    replace: '* '
+    word: true
+  - trigger: '+_'
+    replace: '+ '
+    word: true
+  - trigger: '=_'
+    replace: '= '
+    word: true
+  - trigger: 'OUi'
+    replace: 'Oui'
+  - trigger: '[_'
+    replace: '[ '
+    word: true
+  - trigger: ']_'
+    replace: '] '
+    word: true
+  - trigger: 'aeu'
+    replace: 'eau'
+  - trigger: 'eua'
+    replace: 'eau'
+  - trigger: 'oiu'
+    replace: 'oui'
+  - trigger: 'poru'
+    replace: 'pour'
+    word: true
+  - trigger: '~_'
+    replace: '~ '
+    word: true

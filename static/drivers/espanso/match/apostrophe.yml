@@ -1,0 +1,27 @@
+matches:
+  - trigger: "c'"
+    replace: 'c’'
+    word: true
+  - trigger: "d'"
+    replace: 'd’'
+    word: true
+  - trigger: "j'"
+    replace: 'j’'
+    word: true
+  - trigger: "l'"
+    replace: 'l’'
+    word: true
+  - trigger: "m'"
+    replace: 'm’'
+    word: true
+  - trigger: "n'"
+    replace: 'n’'
+    word: true
+  - trigger: "n't"
+    replace: 'n’t'
+  - trigger: "s'"
+    replace: 's’'
+    word: true
+  - trigger: "t'"
+    replace: 't’'
+    word: true

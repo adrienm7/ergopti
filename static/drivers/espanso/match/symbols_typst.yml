@@ -1,2329 +1,3493 @@
 matches:
   - trigger: '$AA$'
     replace: '𝔸'
+    word: true
   - trigger: '$Alpha$'
     replace: 'Α'
+    word: true
   - trigger: '$BB$'
     replace: '𝔹'
+    word: true
   - trigger: '$Beta$'
     replace: 'Β'
+    word: true
   - trigger: '$CC$'
     replace: 'ℂ'
+    word: true
   - trigger: '$Chi$'
     replace: 'Χ'
+    word: true
   - trigger: '$DD$'
     replace: '𝔻'
+    word: true
   - trigger: '$Delta$'
     replace: 'Δ'
+    word: true
   - trigger: '$Digamma$'
     replace: 'Ϝ'
+    word: true
   - trigger: '$EE$'
     replace: '𝔼'
+    word: true
   - trigger: '$Epsilon$'
     replace: 'Ε'
+    word: true
   - trigger: '$Eta$'
     replace: 'Η'
+    word: true
   - trigger: '$FF$'
     replace: '𝔽'
+    word: true
   - trigger: '$GG$'
     replace: '𝔾'
+    word: true
   - trigger: '$Gamma$'
     replace: 'Γ'
+    word: true
   - trigger: '$HH$'
     replace: 'ℍ'
+    word: true
   - trigger: '$II$'
     replace: '𝕀'
+    word: true
   - trigger: '$Im$'
     replace: 'ℑ'
+    word: true
   - trigger: '$Iota$'
     replace: 'Ι'
+    word: true
   - trigger: '$JJ$'
     replace: '𝕁'
+    word: true
   - trigger: '$KK$'
     replace: '𝕂'
+    word: true
   - trigger: '$Kai$'
     replace: 'Ϗ'
+    word: true
   - trigger: '$Kappa$'
     replace: 'Κ'
+    word: true
   - trigger: '$LL$'
     replace: '𝕃'
+    word: true
   - trigger: '$Lambda$'
     replace: 'Λ'
+    word: true
   - trigger: '$MM$'
     replace: '𝕄'
+    word: true
   - trigger: '$Mu$'
     replace: 'Μ'
+    word: true
   - trigger: '$NN$'
     replace: 'ℕ'
+    word: true
   - trigger: '$Nu$'
     replace: 'Ν'
+    word: true
   - trigger: '$OO$'
     replace: '𝕆'
+    word: true
   - trigger: '$Omega$'
     replace: 'Ω'
+    word: true
   - trigger: '$Omega.inv$'
     replace: '℧'
+    word: true
   - trigger: '$Omicron$'
     replace: 'Ο'
+    word: true
   - trigger: '$PP$'
     replace: 'ℙ'
+    word: true
   - trigger: '$Phi$'
     replace: 'Φ'
+    word: true
   - trigger: '$Pi$'
     replace: 'Π'
+    word: true
   - trigger: '$Psi$'
     replace: 'Ψ'
+    word: true
   - trigger: '$QQ$'
     replace: 'ℚ'
+    word: true
   - trigger: '$RR$'
     replace: 'ℝ'
+    word: true
   - trigger: '$Re$'
     replace: 'ℜ'
+    word: true
   - trigger: '$Rho$'
     replace: 'Ρ'
+    word: true
   - trigger: '$SS$'
     replace: '𝕊'
+    word: true
   - trigger: '$Sha$'
     replace: 'Ш'
+    word: true
   - trigger: '$Sigma$'
     replace: 'Σ'
+    word: true
   - trigger: '$TT$'
     replace: '𝕋'
+    word: true
   - trigger: '$Tau$'
     replace: 'Τ'
+    word: true
   - trigger: '$Theta$'
     replace: 'Θ'
+    word: true
   - trigger: '$Theta.alt$'
     replace: 'ϴ'
+    word: true
   - trigger: '$UU$'
     replace: '𝕌'
+    word: true
   - trigger: '$Upsilon$'
     replace: 'Υ'
+    word: true
   - trigger: '$VV$'
     replace: '𝕍'
+    word: true
   - trigger: '$WW$'
     replace: '𝕎'
+    word: true
   - trigger: '$XX$'
     replace: '𝕏'
+    word: true
   - trigger: '$Xi$'
     replace: 'Ξ'
+    word: true
   - trigger: '$YY$'
     replace: '𝕐'
+    word: true
   - trigger: '$ZZ$'
     replace: 'ℤ'
+    word: true
   - trigger: '$Zeta$'
     replace: 'Ζ'
+    word: true
   - trigger: '$acute$'
     replace: '´'
+    word: true
   - trigger: '$acute.double$'
     replace: '˝'
+    word: true
   - trigger: '$afghani$'
     replace: '؋'
+    word: true
   - trigger: '$alef$'
     replace: 'א'
+    word: true
   - trigger: '$aleph$'
     replace: 'א'
+    word: true
   - trigger: '$alpha$'
     replace: 'α'
+    word: true
   - trigger: '$amp$'
     replace: '&'
+    word: true
   - trigger: '$amp.inv$'
     replace: '⅋'
+    word: true
   - trigger: '$and$'
     replace: '∧'
+    word: true
   - trigger: '$and.big$'
     replace: '⋀'
+    word: true
   - trigger: '$and.curly$'
     replace: '⋏'
+    word: true
   - trigger: '$and.dot$'
     replace: '⟑'
+    word: true
   - trigger: '$and.double$'
     replace: '⩓'
+    word: true
   - trigger: '$angle$'
     replace: '∠'
+    word: true
   - trigger: '$angle.acute$'
     replace: '⦟'
+    word: true
   - trigger: '$angle.arc$'
     replace: '∡'
+    word: true
   - trigger: '$angle.arc.rev$'
     replace: '⦛'
+    word: true
   - trigger: '$angle.azimuth$'
     replace: '⍼'
+    word: true
   - trigger: '$angle.l$'
     replace: '⟨'
+    word: true
   - trigger: '$angle.l.curly$'
     replace: '⧼'
+    word: true
   - trigger: '$angle.l.dot$'
     replace: '⦑'
+    word: true
   - trigger: '$angle.l.double$'
     replace: '⟪'
+    word: true
   - trigger: '$angle.oblique$'
     replace: '⦦'
+    word: true
   - trigger: '$angle.r$'
     replace: '⟩'
+    word: true
   - trigger: '$angle.r.curly$'
     replace: '⧽'
+    word: true
   - trigger: '$angle.r.dot$'
     replace: '⦒'
+    word: true
   - trigger: '$angle.r.double$'
     replace: '⟫'
+    word: true
   - trigger: '$angle.rev$'
     replace: '⦣'
+    word: true
   - trigger: '$angle.right$'
     replace: '∟'
+    word: true
   - trigger: '$angle.right.arc$'
     replace: '⊾'
+    word: true
   - trigger: '$angle.right.dot$'
     replace: '⦝'
+    word: true
   - trigger: '$angle.right.rev$'
     replace: '⯾'
+    word: true
   - trigger: '$angle.right.sq$'
     replace: '⦜'
+    word: true
   - trigger: '$angle.s$'
     replace: '⦞'
+    word: true
   - trigger: '$angle.spatial$'
     replace: '⟀'
+    word: true
   - trigger: '$angle.spheric$'
     replace: '∢'
+    word: true
   - trigger: '$angle.spheric.rev$'
     replace: '⦠'
+    word: true
   - trigger: '$angle.spheric.t$'
     replace: '⦡'
+    word: true
   - trigger: '$angle.spheric.top$'
     replace: '⦡'
+    word: true
   - trigger: '$angstrom$'
     replace: 'Å'
+    word: true
   - trigger: '$angzarr$'
     replace: '⍼'
+    word: true
   - trigger: '$approx$'
     replace: '≈'
+    word: true
   - trigger: '$approx.eq$'
     replace: '≊'
+    word: true
   - trigger: '$approx.not$'
     replace: '≉'
+    word: true
   - trigger: '$arrow.b$'
     replace: '↓'
+    word: true
   - trigger: '$arrow.b.bar$'
     replace: '↧'
+    word: true
   - trigger: '$arrow.b.curve$'
     replace: '⤵'
+    word: true
   - trigger: '$arrow.b.dashed$'
     replace: '⇣'
+    word: true
   - trigger: '$arrow.b.double$'
     replace: '⇓'
+    word: true
   - trigger: '$arrow.b.dstruck$'
     replace: '⇟'
+    word: true
   - trigger: '$arrow.b.filled$'
     replace: '⬇'
+    word: true
   - trigger: '$arrow.b.quad$'
     replace: '⟱'
+    word: true
   - trigger: '$arrow.b.stop$'
     replace: '⤓'
+    word: true
   - trigger: '$arrow.b.stroked$'
     replace: '⇩'
+    word: true
   - trigger: '$arrow.b.struck$'
     replace: '⤈'
+    word: true
   - trigger: '$arrow.b.triple$'
     replace: '⤋'
+    word: true
   - trigger: '$arrow.b.turn$'
     replace: '⮏'
+    word: true
   - trigger: '$arrow.b.twohead$'
     replace: '↡'
+    word: true
   - trigger: '$arrow.bl$'
     replace: '↙'
+    word: true
   - trigger: '$arrow.bl.double$'
     replace: '⇙'
+    word: true
   - trigger: '$arrow.bl.filled$'
     replace: '⬋'
+    word: true
   - trigger: '$arrow.bl.hook$'
     replace: '⤦'
+    word: true
   - trigger: '$arrow.bl.stroked$'
     replace: '⬃'
+    word: true
   - trigger: '$arrow.br$'
     replace: '↘'
+    word: true
   - trigger: '$arrow.br.double$'
     replace: '⇘'
+    word: true
   - trigger: '$arrow.br.filled$'
     replace: '⬊'
+    word: true
   - trigger: '$arrow.br.hook$'
     replace: '⤥'
+    word: true
   - trigger: '$arrow.br.stroked$'
     replace: '⬂'
+    word: true
   - trigger: '$arrow.ccw$'
     replace: '↺'
+    word: true
   - trigger: '$arrow.ccw.half$'
     replace: '↶'
+    word: true
   - trigger: '$arrow.cw$'
     replace: '↻'
+    word: true
   - trigger: '$arrow.cw.half$'
     replace: '↷'
+    word: true
   - trigger: '$arrow.l$'
     replace: '←'
+    word: true
   - trigger: '$arrow.l.bar$'
     replace: '↤'
+    word: true
   - trigger: '$arrow.l.curve$'
     replace: '⤶'
+    word: true
   - trigger: '$arrow.l.dashed$'
     replace: '⇠'
+    word: true
   - trigger: '$arrow.l.dotted$'
     replace: '⬸'
+    word: true
   - trigger: '$arrow.l.double$'
     replace: '⇐'
+    word: true
   - trigger: '$arrow.l.double.bar$'
     replace: '⤆'
+    word: true
   - trigger: '$arrow.l.double.long$'
     replace: '⟸'
+    word: true
   - trigger: '$arrow.l.double.long.bar$'
     replace: '⟽'
+    word: true
   - trigger: '$arrow.l.double.not$'
     replace: '⇍'
+    word: true
   - trigger: '$arrow.l.double.struck$'
     replace: '⤂'
+    word: true
   - trigger: '$arrow.l.dstruck$'
     replace: '⇺'
+    word: true
   - trigger: '$arrow.l.filled$'
     replace: '⬅'
+    word: true
   - trigger: '$arrow.l.hook$'
     replace: '↩'
+    word: true
   - trigger: '$arrow.l.long$'
     replace: '⟵'
+    word: true
   - trigger: '$arrow.l.long.bar$'
     replace: '⟻'
+    word: true
   - trigger: '$arrow.l.long.squiggly$'
     replace: '⬳'
+    word: true
   - trigger: '$arrow.l.loop$'
     replace: '↫'
+    word: true
   - trigger: '$arrow.l.not$'
     replace: '↚'
+    word: true
   - trigger: '$arrow.l.open$'
     replace: '⇽'
+    word: true
   - trigger: '$arrow.l.quad$'
     replace: '⭅'
+    word: true
   - trigger: '$arrow.l.r$'
     replace: '↔'
+    word: true
   - trigger: '$arrow.l.r.double$'
     replace: '⇔'
+    word: true
   - trigger: '$arrow.l.r.double.long$'
     replace: '⟺'
+    word: true
   - trigger: '$arrow.l.r.double.not$'
     replace: '⇎'
+    word: true
   - trigger: '$arrow.l.r.double.struck$'
     replace: '⤄'
+    word: true
   - trigger: '$arrow.l.r.dstruck$'
     replace: '⇼'
+    word: true
   - trigger: '$arrow.l.r.filled$'
     replace: '⬌'
+    word: true
   - trigger: '$arrow.l.r.long$'
     replace: '⟷'
+    word: true
   - trigger: '$arrow.l.r.not$'
     replace: '↮'
+    word: true
   - trigger: '$arrow.l.r.open$'
     replace: '⇿'
+    word: true
   - trigger: '$arrow.l.r.stroked$'
     replace: '⬄'
+    word: true
   - trigger: '$arrow.l.r.struck$'
     replace: '⇹'
+    word: true
   - trigger: '$arrow.l.r.wave$'
     replace: '↭'
+    word: true
   - trigger: '$arrow.l.squiggly$'
     replace: '⇜'
+    word: true
   - trigger: '$arrow.l.stop$'
     replace: '⇤'
+    word: true
   - trigger: '$arrow.l.stroked$'
     replace: '⇦'
+    word: true
   - trigger: '$arrow.l.struck$'
     replace: '⇷'
+    word: true
   - trigger: '$arrow.l.tail$'
     replace: '↢'
+    word: true
   - trigger: '$arrow.l.tail.dstruck$'
     replace: '⬺'
+    word: true
   - trigger: '$arrow.l.tail.struck$'
     replace: '⬹'
+    word: true
   - trigger: '$arrow.l.tilde$'
     replace: '⭉'
+    word: true
   - trigger: '$arrow.l.triple$'
     replace: '⇚'
+    word: true
   - trigger: '$arrow.l.turn$'
     replace: '⮌'
+    word: true
   - trigger: '$arrow.l.twohead$'
     replace: '↞'
+    word: true
   - trigger: '$arrow.l.twohead.bar$'
     replace: '⬶'
+    word: true
   - trigger: '$arrow.l.twohead.dstruck$'
     replace: '⬵'
+    word: true
   - trigger: '$arrow.l.twohead.struck$'
     replace: '⬴'
+    word: true
   - trigger: '$arrow.l.twohead.tail$'
     replace: '⬻'
+    word: true
   - trigger: '$arrow.l.twohead.tail.dstruck$'
     replace: '⬽'
+    word: true
   - trigger: '$arrow.l.twohead.tail.struck$'
     replace: '⬼'
+    word: true
   - trigger: '$arrow.l.wave$'
     replace: '↜'
+    word: true
   - trigger: '$arrow.r$'
     replace: '→'
+    word: true
   - trigger: '$arrow.r.bar$'
     replace: '↦'
+    word: true
   - trigger: '$arrow.r.curve$'
     replace: '⤷'
+    word: true
   - trigger: '$arrow.r.dashed$'
     replace: '⇢'
+    word: true
   - trigger: '$arrow.r.dotted$'
     replace: '⤑'
+    word: true
   - trigger: '$arrow.r.double$'
     replace: '⇒'
+    word: true
   - trigger: '$arrow.r.double.bar$'
     replace: '⤇'
+    word: true
   - trigger: '$arrow.r.double.long$'
     replace: '⟹'
+    word: true
   - trigger: '$arrow.r.double.long.bar$'
     replace: '⟾'
+    word: true
   - trigger: '$arrow.r.double.not$'
     replace: '⇏'
+    word: true
   - trigger: '$arrow.r.double.struck$'
     replace: '⤃'
+    word: true
   - trigger: '$arrow.r.dstruck$'
     replace: '⇻'
+    word: true
   - trigger: '$arrow.r.filled$'
     replace: '➡'
+    word: true
   - trigger: '$arrow.r.hook$'
     replace: '↪'
+    word: true
   - trigger: '$arrow.r.long$'
     replace: '⟶'
+    word: true
   - trigger: '$arrow.r.long.bar$'
     replace: '⟼'
+    word: true
   - trigger: '$arrow.r.long.squiggly$'
     replace: '⟿'
+    word: true
   - trigger: '$arrow.r.loop$'
     replace: '↬'
+    word: true
   - trigger: '$arrow.r.not$'
     replace: '↛'
+    word: true
   - trigger: '$arrow.r.open$'
     replace: '⇾'
+    word: true
   - trigger: '$arrow.r.quad$'
     replace: '⭆'
+    word: true
   - trigger: '$arrow.r.squiggly$'
     replace: '⇝'
+    word: true
   - trigger: '$arrow.r.stop$'
     replace: '⇥'
+    word: true
   - trigger: '$arrow.r.stroked$'
     replace: '⇨'
+    word: true
   - trigger: '$arrow.r.struck$'
     replace: '⇸'
+    word: true
   - trigger: '$arrow.r.tail$'
     replace: '↣'
+    word: true
   - trigger: '$arrow.r.tail.dstruck$'
     replace: '⤕'
+    word: true
   - trigger: '$arrow.r.tail.struck$'
     replace: '⤔'
+    word: true
   - trigger: '$arrow.r.tilde$'
     replace: '⥲'
+    word: true
   - trigger: '$arrow.r.triple$'
     replace: '⇛'
+    word: true
   - trigger: '$arrow.r.turn$'
     replace: '⮎'
+    word: true
   - trigger: '$arrow.r.twohead$'
     replace: '↠'
+    word: true
   - trigger: '$arrow.r.twohead.bar$'
     replace: '⤅'
+    word: true
   - trigger: '$arrow.r.twohead.dstruck$'
     replace: '⤁'
+    word: true
   - trigger: '$arrow.r.twohead.struck$'
     replace: '⤀'
+    word: true
   - trigger: '$arrow.r.twohead.tail$'
     replace: '⤖'
+    word: true
   - trigger: '$arrow.r.twohead.tail.dstruck$'
     replace: '⤘'
+    word: true
   - trigger: '$arrow.r.twohead.tail.struck$'
     replace: '⤗'
+    word: true
   - trigger: '$arrow.r.wave$'
     replace: '↝'
+    word: true
   - trigger: '$arrow.t$'
     replace: '↑'
+    word: true
   - trigger: '$arrow.t.b$'
     replace: '↕'
+    word: true
   - trigger: '$arrow.t.b.double$'
     replace: '⇕'
+    word: true
   - trigger: '$arrow.t.b.filled$'
     replace: '⬍'
+    word: true
   - trigger: '$arrow.t.b.stroked$'
     replace: '⇳'
+    word: true
   - trigger: '$arrow.t.bar$'
     replace: '↥'
+    word: true
   - trigger: '$arrow.t.curve$'
     replace: '⤴'
+    word: true
   - trigger: '$arrow.t.dashed$'
     replace: '⇡'
+    word: true
   - trigger: '$arrow.t.double$'
     replace: '⇑'
+    word: true
   - trigger: '$arrow.t.dstruck$'
     replace: '⇞'
+    word: true
   - trigger: '$arrow.t.filled$'
     replace: '⬆'
+    word: true
   - trigger: '$arrow.t.quad$'
     replace: '⟰'
+    word: true
   - trigger: '$arrow.t.stop$'
     replace: '⤒'
+    word: true
   - trigger: '$arrow.t.stroked$'
     replace: '⇧'
+    word: true
   - trigger: '$arrow.t.struck$'
     replace: '⤉'
+    word: true
   - trigger: '$arrow.t.triple$'
     replace: '⤊'
+    word: true
   - trigger: '$arrow.t.turn$'
     replace: '⮍'
+    word: true
   - trigger: '$arrow.t.twohead$'
     replace: '↟'
+    word: true
   - trigger: '$arrow.tl$'
     replace: '↖'
+    word: true
   - trigger: '$arrow.tl.br$'
     replace: '⤡'
+    word: true
   - trigger: '$arrow.tl.double$'
     replace: '⇖'
+    word: true
   - trigger: '$arrow.tl.filled$'
     replace: '⬉'
+    word: true
   - trigger: '$arrow.tl.hook$'
     replace: '⤣'
+    word: true
   - trigger: '$arrow.tl.stroked$'
     replace: '⬁'
+    word: true
   - trigger: '$arrow.tr$'
     replace: '↗'
+    word: true
   - trigger: '$arrow.tr.bl$'
     replace: '⥢'
+    word: true
   - trigger: '$arrow.tr.double$'
     replace: '⇗'
+    word: true
   - trigger: '$arrow.tr.filled$'
     replace: '⬈'
+    word: true
   - trigger: '$arrow.tr.hook$'
     replace: '⤤'
+    word: true
   - trigger: '$arrow.tr.stroked$'
     replace: '⬀'
+    word: true
   - trigger: '$arrow.zigzag$'
     replace: '↯'
+    word: true
   - trigger: '$arrowhead.b$'
     replace: '⌄'
+    word: true
   - trigger: '$arrowhead.t$'
     replace: '⌃'
+    word: true
   - trigger: '$arrows.bb$'
     replace: '⇊'
+    word: true
   - trigger: '$arrows.bt$'
     replace: '⇵'
+    word: true
   - trigger: '$arrows.ll$'
     replace: '⇇'
+    word: true
   - trigger: '$arrows.lll$'
     replace: '⬱'
+    word: true
   - trigger: '$arrows.lr$'
     replace: '⇆'
+    word: true
   - trigger: '$arrows.lr.stop$'
     replace: '↹'
+    word: true
   - trigger: '$arrows.rl$'
     replace: '⇄'
+    word: true
   - trigger: '$arrows.rr$'
     replace: '⇉'
+    word: true
   - trigger: '$arrows.rrr$'
     replace: '⇶'
+    word: true
   - trigger: '$arrows.tb$'
     replace: '⇅'
+    word: true
   - trigger: '$arrows.tt$'
     replace: '⇈'
+    word: true
   - trigger: '$ast.basic$'
     replace: '*'
+    word: true
   - trigger: '$ast.circle$'
     replace: '⊛'
+    word: true
   - trigger: '$ast.double$'
     replace: '⁑'
+    word: true
   - trigger: '$ast.low$'
     replace: '⁎'
+    word: true
   - trigger: '$ast.op$'
     replace: '∗'
+    word: true
   - trigger: '$ast.op.o$'
     replace: '⊛'
+    word: true
   - trigger: '$ast.small$'
     replace: '﹡'
+    word: true
   - trigger: '$ast.square$'
     replace: '⧆'
+    word: true
   - trigger: '$ast.triple$'
     replace: '⁂'
+    word: true
   - trigger: '$asymp$'
     replace: '≍'
+    word: true
   - trigger: '$asymp.not$'
     replace: '≭'
+    word: true
   - trigger: '$at$'
     replace: '@'
+    word: true
   - trigger: '$backslash$'
     replace: '\\'
+    word: true
   - trigger: '$backslash.circle$'
     replace: '⦸'
+    word: true
   - trigger: '$backslash.not$'
     replace: '⧷'
+    word: true
   - trigger: '$backslash.o$'
     replace: '⦸'
+    word: true
   - trigger: '$bag.l$'
     replace: '⟅'
+    word: true
   - trigger: '$bag.r$'
     replace: '⟆'
+    word: true
   - trigger: '$baht$'
     replace: '฿'
+    word: true
   - trigger: '$ballot$'
     replace: '☐'
+    word: true
   - trigger: '$ballot.check$'
     replace: '☑'
+    word: true
   - trigger: '$ballot.check.heavy$'
     replace: '🗹'
+    word: true
   - trigger: '$ballot.cross$'
     replace: '☒'
+    word: true
   - trigger: '$bar.h$'
     replace: '―'
+    word: true
   - trigger: '$bar.v$'
     replace: '|'
+    word: true
   - trigger: '$bar.v.broken$'
     replace: '¦'
+    word: true
   - trigger: '$bar.v.circle$'
     replace: '⦶'
+    word: true
   - trigger: '$bar.v.double$'
     replace: '‖'
+    word: true
   - trigger: '$bar.v.o$'
     replace: '⦶'
+    word: true
   - trigger: '$bar.v.triple$'
     replace: '⦀'
+    word: true
   - trigger: '$because$'
     replace: '∵'
+    word: true
   - trigger: '$bet$'
     replace: 'ב'
+    word: true
   - trigger: '$beta$'
     replace: 'β'
+    word: true
   - trigger: '$beta.alt$'
     replace: 'ϐ'
+    word: true
   - trigger: '$beth$'
     replace: 'ב'
+    word: true
   - trigger: '$bitcoin$'
     replace: '₿'
+    word: true
   - trigger: '$bot$'
     replace: '⊥'
+    word: true
   - trigger: '$brace.b$'
     replace: '⏟'
+    word: true
   - trigger: '$brace.l$'
     replace: '{'
+    word: true
   - trigger: '$brace.l.double$'
     replace: '{U+27C3}'
+    word: true
   - trigger: '$brace.l.stroked$'
     replace: '{U+27C3}'
+    word: true
   - trigger: '$brace.r$'
     replace: '}'
+    word: true
   - trigger: '$brace.r.double$'
     replace: '⦄'
+    word: true
   - trigger: '$brace.r.stroked$'
     replace: '⦄'
+    word: true
   - trigger: '$brace.t$'
     replace: '⏞'
+    word: true
   - trigger: '$bracket.b$'
     replace: '⎵'
+    word: true
   - trigger: '$bracket.l$'
     replace: '['
+    word: true
   - trigger: '$bracket.l.double$'
     replace: '⟦'
+    word: true
   - trigger: '$bracket.l.stroked$'
     replace: '⟦'
+    word: true
   - trigger: '$bracket.l.tick.b$'
     replace: '⦏'
+    word: true
   - trigger: '$bracket.l.tick.t$'
     replace: '⦍'
+    word: true
   - trigger: '$bracket.r$'
     replace: ']'
+    word: true
   - trigger: '$bracket.r.double$'
     replace: '⟧'
+    word: true
   - trigger: '$bracket.r.stroked$'
     replace: '⟧'
+    word: true
   - trigger: '$bracket.r.tick.b$'
     replace: '⦎'
+    word: true
   - trigger: '$bracket.r.tick.t$'
     replace: '⦐'
+    word: true
   - trigger: '$bracket.t$'
     replace: '⎴'
+    word: true
   - trigger: '$breve$'
     replace: '˘'
+    word: true
   - trigger: '$bullet$'
     replace: '•'
+    word: true
   - trigger: '$bullet.hole$'
     replace: '◘'
+    word: true
   - trigger: '$bullet.hyph$'
     replace: '⁃'
+    word: true
   - trigger: '$bullet.l$'
     replace: '⁌'
+    word: true
   - trigger: '$bullet.o$'
     replace: '⦿'
+    word: true
   - trigger: '$bullet.op$'
     replace: '∙'
+    word: true
   - trigger: '$bullet.r$'
     replace: '⁍'
+    word: true
   - trigger: '$bullet.stroked$'
     replace: '◦'
+    word: true
   - trigger: '$bullet.stroked.o$'
     replace: '⦾'
+    word: true
   - trigger: '$bullet.tri$'
     replace: '‣'
+    word: true
   - trigger: '$caret$'
     replace: '‸'
+    word: true
   - trigger: '$caron$'
     replace: 'ˇ'
+    word: true
   - trigger: '$cc$'
     replace: '🅭'
+    word: true
   - trigger: '$cc.by$'
     replace: '🅯'
+    word: true
   - trigger: '$cc.nc$'
     replace: '🄏'
+    word: true
   - trigger: '$cc.nd$'
     replace: '⊜'
+    word: true
   - trigger: '$cc.public$'
     replace: '🅮'
+    word: true
   - trigger: '$cc.sa$'
     replace: '🄎'
+    word: true
   - trigger: '$cc.zero$'
     replace: '🄍'
+    word: true
   - trigger: '$cedi$'
     replace: '₵'
+    word: true
   - trigger: '$ceil.l$'
     replace: '⌈'
+    word: true
   - trigger: '$ceil.r$'
     replace: '⌉'
+    word: true
   - trigger: '$cent$'
     replace: '¢'
+    word: true
   - trigger: '$checkmark$'
     replace: '✓'
+    word: true
   - trigger: '$checkmark.heavy$'
     replace: '✔'
+    word: true
   - trigger: '$checkmark.light$'
     replace: '🗸'
+    word: true
   - trigger: '$chevron.l$'
     replace: '⟨'
+    word: true
   - trigger: '$chevron.l.closed$'
     replace: '⦉'
+    word: true
   - trigger: '$chevron.l.curly$'
     replace: '⧼'
+    word: true
   - trigger: '$chevron.l.dot$'
     replace: '⦑'
+    word: true
   - trigger: '$chevron.l.double$'
     replace: '⟪'
+    word: true
   - trigger: '$chevron.r$'
     replace: '⟩'
+    word: true
   - trigger: '$chevron.r.closed$'
     replace: '⦊'
+    word: true
   - trigger: '$chevron.r.curly$'
     replace: '⧽'
+    word: true
   - trigger: '$chevron.r.dot$'
     replace: '⦒'
+    word: true
   - trigger: '$chevron.r.double$'
     replace: '⟫'
+    word: true
   - trigger: '$chi$'
     replace: 'χ'
+    word: true
   - trigger: '$circle.dotted$'
     replace: '◌'
+    word: true
   - trigger: '$circle.filled$'
     replace: '●'
+    word: true
   - trigger: '$circle.filled.big$'
     replace: '⬤'
+    word: true
   - trigger: '$circle.filled.small$'
     replace: '∙'
+    word: true
   - trigger: '$circle.filled.tiny$'
     replace: '⦁'
+    word: true
   - trigger: '$circle.nested$'
     replace: '⊚'
+    word: true
   - trigger: '$circle.stroked$'
     replace: '○'
+    word: true
   - trigger: '$circle.stroked.big$'
     replace: '◯'
+    word: true
   - trigger: '$circle.stroked.small$'
     replace: '⚬'
+    word: true
   - trigger: '$circle.stroked.tiny$'
     replace: '∘'
+    word: true
   - trigger: '$co$'
     replace: '℅'
+    word: true
   - trigger: '$colon$'
     replace: ':'
+    word: true
   - trigger: '$colon.currency$'
     replace: '₡'
+    word: true
   - trigger: '$colon.double$'
     replace: '∷'
+    word: true
   - trigger: '$colon.double.eq$'
     replace: '⩴'
+    word: true
   - trigger: '$colon.eq$'
     replace: '≔'
+    word: true
   - trigger: '$colon.tri$'
     replace: '⁝'
+    word: true
   - trigger: '$colon.tri.op$'
     replace: '⫶'
+    word: true
   - trigger: '$comma$'
     replace: ','
+    word: true
   - trigger: '$comma.inv$'
     replace: '⸲'
+    word: true
   - trigger: '$comma.rev$'
     replace: '⹁'
+    word: true
   - trigger: '$complement$'
     replace: '∁'
+    word: true
   - trigger: '$compose$'
     replace: '∘'
+    word: true
   - trigger: '$compose.o$'
     replace: '⊚'
+    word: true
   - trigger: '$convolve$'
     replace: '∗'
+    word: true
   - trigger: '$convolve.o$'
     replace: '⊛'
+    word: true
   - trigger: '$copyleft$'
     replace: '🄯'
+    word: true
   - trigger: '$copyright$'
     replace: '©'
+    word: true
   - trigger: '$copyright.sound$'
     replace: '℗'
+    word: true
   - trigger: '$corner.l.b$'
     replace: '⌞'
+    word: true
   - trigger: '$corner.l.t$'
     replace: '⌜'
+    word: true
   - trigger: '$corner.r.b$'
     replace: '⌟'
+    word: true
   - trigger: '$corner.r.t$'
     replace: '⌝'
+    word: true
   - trigger: '$crossmark$'
     replace: '✗'
+    word: true
   - trigger: '$crossmark.heavy$'
     replace: '✘'
+    word: true
   - trigger: '$currency$'
     replace: '¤'
+    word: true
   - trigger: '$dagger$'
     replace: '†'
+    word: true
   - trigger: '$dagger.double$'
     replace: '‡'
+    word: true
   - trigger: '$dagger.inv$'
     replace: '⸸'
+    word: true
   - trigger: '$dagger.l$'
     replace: '⸶'
+    word: true
   - trigger: '$dagger.r$'
     replace: '⸷'
+    word: true
   - trigger: '$dagger.triple$'
     replace: '⹋'
+    word: true
   - trigger: '$dalet$'
     replace: 'ד'
+    word: true
   - trigger: '$daleth$'
     replace: 'ד'
+    word: true
   - trigger: '$dash.circle$'
     replace: '⊝'
+    word: true
   - trigger: '$dash.colon$'
     replace: '∹'
+    word: true
   - trigger: '$dash.em$'
     replace: '—'
+    word: true
   - trigger: '$dash.em.three$'
     replace: '⸻'
+    word: true
   - trigger: '$dash.em.two$'
     replace: '⸺'
+    word: true
   - trigger: '$dash.en$'
     replace: '–'
+    word: true
   - trigger: '$dash.fig$'
     replace: '‒'
+    word: true
   - trigger: '$dash.o$'
     replace: '⊝'
+    word: true
   - trigger: '$dash.wave$'
     replace: '〜'
+    word: true
   - trigger: '$dash.wave.double$'
     replace: '〰'
+    word: true
   - trigger: '$degree$'
     replace: '°'
+    word: true
   - trigger: '$delta$'
     replace: 'δ'
+    word: true
   - trigger: '$diaer$'
     replace: '¨'
+    word: true
   - trigger: '$diameter$'
     replace: '⌀'
+    word: true
   - trigger: '$diamond.filled$'
     replace: '◆'
+    word: true
   - trigger: '$diamond.filled.medium$'
     replace: '⬥'
+    word: true
   - trigger: '$diamond.filled.small$'
     replace: '⬩'
+    word: true
   - trigger: '$diamond.stroked$'
     replace: '◇'
+    word: true
   - trigger: '$diamond.stroked.dot$'
     replace: '⟐'
+    word: true
   - trigger: '$diamond.stroked.medium$'
     replace: '⬦'
+    word: true
   - trigger: '$diamond.stroked.small$'
     replace: '⋄'
+    word: true
   - trigger: '$die.five$'
     replace: '⚄'
+    word: true
   - trigger: '$die.four$'
     replace: '⚃'
+    word: true
   - trigger: '$die.one$'
     replace: '⚀'
+    word: true
   - trigger: '$die.six$'
     replace: '⚅'
+    word: true
   - trigger: '$die.three$'
     replace: '⚂'
+    word: true
   - trigger: '$die.two$'
     replace: '⚁'
+    word: true
   - trigger: '$diff$'
     replace: '∂'
+    word: true
   - trigger: '$digamma$'
     replace: 'ϝ'
+    word: true
   - trigger: '$div$'
     replace: '÷'
+    word: true
   - trigger: '$div.circle$'
     replace: '⨸'
+    word: true
   - trigger: '$div.o$'
     replace: '⨸'
+    word: true
   - trigger: '$div.slanted.o$'
     replace: '⦼'
+    word: true
   - trigger: '$divides$'
     replace: '∣'
+    word: true
   - trigger: '$divides.not$'
     replace: '∤'
+    word: true
   - trigger: '$divides.not.rev$'
     replace: '⫮'
+    word: true
   - trigger: '$divides.struck$'
     replace: '⟊'
+    word: true
   - trigger: '$dollar$'
     replace: '$'
+    word: true
   - trigger: '$dong$'
     replace: '₫'
+    word: true
   - trigger: '$dorome$'
     replace: '߾'
+    word: true
   - trigger: '$dot.basic$'
     replace: '.'
+    word: true
   - trigger: '$dot.c$'
     replace: '·'
+    word: true
   - trigger: '$dot.circle$'
     replace: '⊙'
+    word: true
   - trigger: '$dot.circle.big$'
     replace: '⨀'
+    word: true
   - trigger: '$dot.double$'
     replace: '¨'
+    word: true
   - trigger: '$dot.o$'
     replace: '⊙'
+    word: true
   - trigger: '$dot.o.big$'
     replace: '⨀'
+    word: true
   - trigger: '$dot.op$'
     replace: '⋅'
+    word: true
   - trigger: '$dot.quad$'
     replace: '{U+20DC}'
+    word: true
   - trigger: '$dot.square$'
     replace: '⊡'
+    word: true
   - trigger: '$dot.triple$'
     replace: '{U+20DB}'
+    word: true
   - trigger: '$dotless.i$'
     replace: 'ı'
+    word: true
   - trigger: '$dotless.j$'
     replace: 'ȷ'
+    word: true
   - trigger: '$dots.down$'
     replace: '⋱'
+    word: true
   - trigger: '$dots.h$'
     replace: '…'
+    word: true
   - trigger: '$dots.h.c$'
     replace: '⋯'
+    word: true
   - trigger: '$dots.up$'
     replace: '⋰'
+    word: true
   - trigger: '$dots.v$'
     replace: '⋮'
+    word: true
   - trigger: '$dram$'
     replace: '֏'
+    word: true
   - trigger: '$earth$'
     replace: '🜨'
+    word: true
   - trigger: '$earth.alt$'
     replace: '♁'
+    word: true
   - trigger: '$ell$'
     replace: 'ℓ'
+    word: true
   - trigger: '$ellipse.filled.h$'
     replace: '⬬'
+    word: true
   - trigger: '$ellipse.filled.v$'
     replace: '⬮'
+    word: true
   - trigger: '$ellipse.stroked.h$'
     replace: '⬭'
+    word: true
   - trigger: '$ellipse.stroked.v$'
     replace: '⬯'
+    word: true
   - trigger: '$emptyset$'
     replace: '∅'
+    word: true
   - trigger: '$emptyset.arrow.l$'
     replace: '⦴'
+    word: true
   - trigger: '$emptyset.arrow.r$'
     replace: '⦳'
+    word: true
   - trigger: '$emptyset.bar$'
     replace: '⦱'
+    word: true
   - trigger: '$emptyset.circle$'
     replace: '⦲'
+    word: true
   - trigger: '$emptyset.rev$'
     replace: '⦰'
+    word: true
   - trigger: '$epsilon$'
     replace: 'ε'
+    word: true
   - trigger: '$epsilon.alt$'
     replace: 'ϵ'
+    word: true
   - trigger: '$epsilon.alt.rev$'
     replace: '϶'
+    word: true
   - trigger: '$eq$'
     replace: '='
+    word: true
   - trigger: '$eq.circle$'
     replace: '⊜'
+    word: true
   - trigger: '$eq.colon$'
     replace: '≕'
+    word: true
   - trigger: '$eq.def$'
     replace: '≝'
+    word: true
   - trigger: '$eq.delta$'
     replace: '≜'
+    word: true
   - trigger: '$eq.dots$'
     replace: '≑'
+    word: true
   - trigger: '$eq.dots.down$'
     replace: '≒'
+    word: true
   - trigger: '$eq.dots.up$'
     replace: '≓'
+    word: true
   - trigger: '$eq.equi$'
     replace: '≚'
+    word: true
   - trigger: '$eq.est$'
     replace: '≙'
+    word: true
   - trigger: '$eq.gt$'
     replace: '⋝'
+    word: true
   - trigger: '$eq.lt$'
     replace: '⋜'
+    word: true
   - trigger: '$eq.m$'
     replace: '≞'
+    word: true
   - trigger: '$eq.not$'
     replace: '≠'
+    word: true
   - trigger: '$eq.o$'
     replace: '⊜'
+    word: true
   - trigger: '$eq.prec$'
     replace: '⋞'
+    word: true
   - trigger: '$eq.quad$'
     replace: '≣'
+    word: true
   - trigger: '$eq.quest$'
     replace: '≟'
+    word: true
   - trigger: '$eq.small$'
     replace: '﹦'
+    word: true
   - trigger: '$eq.star$'
     replace: '≛'
+    word: true
   - trigger: '$eq.succ$'
     replace: '⋟'
+    word: true
   - trigger: '$eq.triple$'
     replace: '≡'
+    word: true
   - trigger: '$eq.triple.not$'
     replace: '≢'
+    word: true
   - trigger: '$equiv$'
     replace: '≡'
+    word: true
   - trigger: '$equiv.not$'
     replace: '≢'
+    word: true
   - trigger: '$errorbar.circle.filled$'
     replace: '⧳'
+    word: true
   - trigger: '$errorbar.circle.stroked$'
     replace: '⧲'
+    word: true
   - trigger: '$errorbar.diamond.filled$'
     replace: '⧱'
+    word: true
   - trigger: '$errorbar.diamond.stroked$'
     replace: '⧰'
+    word: true
   - trigger: '$errorbar.square.filled$'
     replace: '⧯'
+    word: true
   - trigger: '$errorbar.square.stroked$'
     replace: '⧮'
+    word: true
   - trigger: '$eta$'
     replace: 'η'
+    word: true
   - trigger: '$euro$'
     replace: '€'
+    word: true
   - trigger: '$excl$'
     replace: '!'
+    word: true
   - trigger: '$excl.double$'
     replace: '‼'
+    word: true
   - trigger: '$excl.inv$'
     replace: '¡'
+    word: true
   - trigger: '$excl.quest$'
     replace: '⁉'
+    word: true
   - trigger: '$exists$'
     replace: '∃'
+    word: true
   - trigger: '$exists.not$'
     replace: '∄'
+    word: true
   - trigger: '$fence.dotted$'
     replace: '⦙'
+    word: true
   - trigger: '$fence.l$'
     replace: '⧘'
+    word: true
   - trigger: '$fence.l.double$'
     replace: '⧚'
+    word: true
   - trigger: '$fence.r$'
     replace: '⧙'
+    word: true
   - trigger: '$fence.r.double$'
     replace: '⧛'
+    word: true
   - trigger: '$flat$'
     replace: '♭'
+    word: true
   - trigger: '$flat.b$'
     replace: '𝄭'
+    word: true
   - trigger: '$flat.double$'
     replace: '𝄫'
+    word: true
   - trigger: '$flat.quarter$'
     replace: '𝄳'
+    word: true
   - trigger: '$flat.t$'
     replace: '𝄬'
+    word: true
   - trigger: '$floor.l$'
     replace: '⌊'
+    word: true
   - trigger: '$floor.r$'
     replace: '⌋'
+    word: true
   - trigger: '$floral$'
     replace: '❦'
+    word: true
   - trigger: '$floral.l$'
     replace: '☙'
+    word: true
   - trigger: '$floral.r$'
     replace: '❧'
+    word: true
   - trigger: '$forall$'
     replace: '∀'
+    word: true
   - trigger: '$forces$'
     replace: '⊩'
+    word: true
   - trigger: '$forces.not$'
     replace: '⊮'
+    word: true
   - trigger: '$franc$'
     replace: '₣'
+    word: true
   - trigger: '$frown$'
     replace: '⌢'
+    word: true
   - trigger: '$gamma$'
     replace: 'γ'
+    word: true
   - trigger: '$gender.female$'
     replace: '♀'
+    word: true
   - trigger: '$gender.female.double$'
     replace: '⚢'
+    word: true
   - trigger: '$gender.female.male$'
     replace: '⚤'
+    word: true
   - trigger: '$gender.intersex$'
     replace: '⚥'
+    word: true
   - trigger: '$gender.male$'
     replace: '♂'
+    word: true
   - trigger: '$gender.male.double$'
     replace: '⚣'
+    word: true
   - trigger: '$gender.male.female$'
     replace: '⚤'
+    word: true
   - trigger: '$gender.male.stroke$'
     replace: '⚦'
+    word: true
   - trigger: '$gender.male.stroke.r$'
     replace: '⚩'
+    word: true
   - trigger: '$gender.male.stroke.t$'
     replace: '⚨'
+    word: true
   - trigger: '$gender.neuter$'
     replace: '⚲'
+    word: true
   - trigger: '$gender.trans$'
     replace: '⚧'
+    word: true
   - trigger: '$gimel$'
     replace: 'ג'
+    word: true
   - trigger: '$gimmel$'
     replace: 'ג'
+    word: true
   - trigger: '$gradient$'
     replace: '∇'
+    word: true
   - trigger: '$grave$'
     replace: '`'
+    word: true
   - trigger: '$gt$'
     replace: '>'
+    word: true
   - trigger: '$gt.approx$'
     replace: '⪆'
+    word: true
   - trigger: '$gt.circle$'
     replace: '⧁'
+    word: true
   - trigger: '$gt.dot$'
     replace: '⋗'
+    word: true
   - trigger: '$gt.double$'
     replace: '≫'
+    word: true
   - trigger: '$gt.eq$'
     replace: '≥'
+    word: true
   - trigger: '$gt.eq.lt$'
     replace: '⋛'
+    word: true
   - trigger: '$gt.eq.not$'
     replace: '≱'
+    word: true
   - trigger: '$gt.eq.slant$'
     replace: '⩾'
+    word: true
   - trigger: '$gt.equiv$'
     replace: '≧'
+    word: true
   - trigger: '$gt.lt$'
     replace: '≷'
+    word: true
   - trigger: '$gt.lt.not$'
     replace: '≹'
+    word: true
   - trigger: '$gt.napprox$'
     replace: '⪊'
+    word: true
   - trigger: '$gt.neq$'
     replace: '⪈'
+    word: true
   - trigger: '$gt.nequiv$'
     replace: '≩'
+    word: true
   - trigger: '$gt.not$'
     replace: '≯'
+    word: true
   - trigger: '$gt.ntilde$'
     replace: '⋧'
+    word: true
   - trigger: '$gt.o$'
     replace: '⧁'
+    word: true
   - trigger: '$gt.small$'
     replace: '﹥'
+    word: true
   - trigger: '$gt.tilde$'
     replace: '≳'
+    word: true
   - trigger: '$gt.tilde.not$'
     replace: '≵'
+    word: true
   - trigger: '$gt.tri$'
     replace: '⊳'
+    word: true
   - trigger: '$gt.tri.eq$'
     replace: '⊵'
+    word: true
   - trigger: '$gt.tri.eq.not$'
     replace: '⋭'
+    word: true
   - trigger: '$gt.tri.not$'
     replace: '⋫'
+    word: true
   - trigger: '$gt.triple$'
     replace: '⋙'
+    word: true
   - trigger: '$gt.triple.nested$'
     replace: '⫸'
+    word: true
   - trigger: '$guarani$'
     replace: '₲'
+    word: true
   - trigger: '$harpoon.bl$'
     replace: '⇃'
+    word: true
   - trigger: '$harpoon.bl.bar$'
     replace: '⥡'
+    word: true
   - trigger: '$harpoon.bl.stop$'
     replace: '⥙'
+    word: true
   - trigger: '$harpoon.br$'
     replace: '⇂'
+    word: true
   - trigger: '$harpoon.br.bar$'
     replace: '⥝'
+    word: true
   - trigger: '$harpoon.br.stop$'
     replace: '⥕'
+    word: true
   - trigger: '$harpoon.lb$'
     replace: '↽'
+    word: true
   - trigger: '$harpoon.lb.bar$'
     replace: '⥞'
+    word: true
   - trigger: '$harpoon.lb.rb$'
     replace: '⥐'
+    word: true
   - trigger: '$harpoon.lb.rt$'
     replace: '⥋'
+    word: true
   - trigger: '$harpoon.lb.stop$'
     replace: '⥖'
+    word: true
   - trigger: '$harpoon.lt$'
     replace: '↼'
+    word: true
   - trigger: '$harpoon.lt.bar$'
     replace: '⥚'
+    word: true
   - trigger: '$harpoon.lt.rb$'
     replace: '⥊'
+    word: true
   - trigger: '$harpoon.lt.rt$'
     replace: '⥎'
+    word: true
   - trigger: '$harpoon.lt.stop$'
     replace: '⥒'
+    word: true
   - trigger: '$harpoon.rb$'
     replace: '⇁'
+    word: true
   - trigger: '$harpoon.rb.bar$'
     replace: '⥟'
+    word: true
   - trigger: '$harpoon.rb.stop$'
     replace: '⥗'
+    word: true
   - trigger: '$harpoon.rt$'
     replace: '⇀'
+    word: true
   - trigger: '$harpoon.rt.bar$'
     replace: '⥛'
+    word: true
   - trigger: '$harpoon.rt.stop$'
     replace: '⥓'
+    word: true
   - trigger: '$harpoon.tl$'
     replace: '↿'
+    word: true
   - trigger: '$harpoon.tl.bar$'
     replace: '⥠'
+    word: true
   - trigger: '$harpoon.tl.bl$'
     replace: '⥑'
+    word: true
   - trigger: '$harpoon.tl.br$'
     replace: '⥍'
+    word: true
   - trigger: '$harpoon.tl.stop$'
     replace: '⥘'
+    word: true
   - trigger: '$harpoon.tr$'
     replace: '↾'
+    word: true
   - trigger: '$harpoon.tr.bar$'
     replace: '⥜'
+    word: true
   - trigger: '$harpoon.tr.bl$'
     replace: '⥌'
+    word: true
   - trigger: '$harpoon.tr.br$'
     replace: '⥏'
+    word: true
   - trigger: '$harpoon.tr.stop$'
     replace: '⥔'
+    word: true
   - trigger: '$harpoons.blbr$'
     replace: '⥥'
+    word: true
   - trigger: '$harpoons.bltr$'
     replace: '⥯'
+    word: true
   - trigger: '$harpoons.lbrb$'
     replace: '⥧'
+    word: true
   - trigger: '$harpoons.ltlb$'
     replace: '⥢'
+    word: true
   - trigger: '$harpoons.ltrb$'
     replace: '⇋'
+    word: true
   - trigger: '$harpoons.ltrt$'
     replace: '⥦'
+    word: true
   - trigger: '$harpoons.rblb$'
     replace: '⥩'
+    word: true
   - trigger: '$harpoons.rtlb$'
     replace: '⇌'
+    word: true
   - trigger: '$harpoons.rtlt$'
     replace: '⥨'
+    word: true
   - trigger: '$harpoons.rtrb$'
     replace: '⥤'
+    word: true
   - trigger: '$harpoons.tlbr$'
     replace: '⥮'
+    word: true
   - trigger: '$harpoons.tltr$'
     replace: '⥣'
+    word: true
   - trigger: '$hash$'
     replace: '#'
+    word: true
   - trigger: '$hat$'
     replace: '^'
+    word: true
   - trigger: '$hexa.filled$'
     replace: '⬢'
+    word: true
   - trigger: '$hexa.stroked$'
     replace: '⬡'
+    word: true
   - trigger: '$hourglass.filled$'
     replace: '⧗'
+    word: true
   - trigger: '$hourglass.stroked$'
     replace: '⧖'
+    word: true
   - trigger: '$hryvnia$'
     replace: '₴'
+    word: true
   - trigger: '$hyph$'
     replace: '‐'
+    word: true
   - trigger: '$hyph.minus$'
     replace: '-'
+    word: true
   - trigger: '$hyph.nobreak$'
     replace: '{U+2011}'
+    word: true
   - trigger: '$hyph.point$'
     replace: '‧'
+    word: true
   - trigger: '$hyph.soft$'
     replace: '{U+00AD}'
+    word: true
   - trigger: '$image$'
     replace: '⊷'
+    word: true
   - trigger: '$in$'
     replace: '∈'
+    word: true
   - trigger: '$in.not$'
     replace: '∉'
+    word: true
   - trigger: '$in.rev$'
     replace: '∋'
+    word: true
   - trigger: '$in.rev.not$'
     replace: '∌'
+    word: true
   - trigger: '$in.rev.small$'
     replace: '∍'
+    word: true
   - trigger: '$in.small$'
     replace: '∊'
+    word: true
   - trigger: '$infinity$'
     replace: '∞'
+    word: true
   - trigger: '$infinity.bar$'
     replace: '⧞'
+    word: true
   - trigger: '$infinity.incomplete$'
     replace: '⧜'
+    word: true
   - trigger: '$infinity.tie$'
     replace: '⧝'
+    word: true
   - trigger: '$integral$'
     replace: '∫'
+    word: true
   - trigger: '$integral.arrow.hook$'
     replace: '⨗'
+    word: true
   - trigger: '$integral.ccw$'
     replace: '⨑'
+    word: true
   - trigger: '$integral.cont$'
     replace: '∮'
+    word: true
   - trigger: '$integral.cont.ccw$'
     replace: '∳'
+    word: true
   - trigger: '$integral.cont.cw$'
     replace: '∲'
+    word: true
   - trigger: '$integral.cw$'
     replace: '∱'
+    word: true
   - trigger: '$integral.dash$'
     replace: '⨍'
+    word: true
   - trigger: '$integral.dash.double$'
     replace: '⨎'
+    word: true
   - trigger: '$integral.double$'
     replace: '∬'
+    word: true
   - trigger: '$integral.inter$'
     replace: '⨙'
+    word: true
   - trigger: '$integral.quad$'
     replace: '⨌'
+    word: true
   - trigger: '$integral.sect$'
     replace: '⨙'
+    word: true
   - trigger: '$integral.slash$'
     replace: '⨏'
+    word: true
   - trigger: '$integral.square$'
     replace: '⨖'
+    word: true
   - trigger: '$integral.surf$'
     replace: '∯'
+    word: true
   - trigger: '$integral.times$'
     replace: '⨘'
+    word: true
   - trigger: '$integral.triple$'
     replace: '∭'
+    word: true
   - trigger: '$integral.union$'
     replace: '⨚'
+    word: true
   - trigger: '$integral.vol$'
     replace: '∰'
+    word: true
   - trigger: '$inter$'
     replace: '∩'
+    word: true
   - trigger: '$inter.and$'
     replace: '⩄'
+    word: true
   - trigger: '$inter.big$'
     replace: '⋂'
+    word: true
   - trigger: '$inter.dot$'
     replace: '⩀'
+    word: true
   - trigger: '$inter.double$'
     replace: '⋒'
+    word: true
   - trigger: '$inter.sq$'
     replace: '⊓'
+    word: true
   - trigger: '$inter.sq.big$'
     replace: '⨅'
+    word: true
   - trigger: '$inter.sq.double$'
     replace: '⩎'
+    word: true
   - trigger: '$interleave$'
     replace: '⫴'
+    word: true
   - trigger: '$interleave.big$'
     replace: '⫼'
+    word: true
   - trigger: '$interleave.struck$'
     replace: '⫵'
+    word: true
   - trigger: '$interrobang$'
     replace: '‽'
+    word: true
   - trigger: '$interrobang.inv$'
     replace: '⸘'
+    word: true
   - trigger: '$iota$'
     replace: 'ι'
+    word: true
   - trigger: '$iota.inv$'
     replace: '℩'
+    word: true
   - trigger: '$join$'
     replace: '⨝'
+    word: true
   - trigger: '$join.l$'
     replace: '⟕'
+    word: true
   - trigger: '$join.l.r$'
     replace: '⟗'
+    word: true
   - trigger: '$join.r$'
     replace: '⟖'
+    word: true
   - trigger: '$jupiter$'
     replace: '♃'
+    word: true
   - trigger: '$kai$'
     replace: 'ϗ'
+    word: true
   - trigger: '$kappa$'
     replace: 'κ'
+    word: true
   - trigger: '$kappa.alt$'
     replace: 'ϰ'
+    word: true
   - trigger: '$kip$'
     replace: '₭'
+    word: true
   - trigger: '$lambda$'
     replace: 'λ'
+    word: true
   - trigger: '$laplace$'
     replace: '∆'
+    word: true
   - trigger: '$lari$'
     replace: '₾'
+    word: true
   - trigger: '$lat$'
     replace: '⪫'
+    word: true
   - trigger: '$lat.eq$'
     replace: '⪭'
+    word: true
   - trigger: '$lira$'
     replace: '₺'
+    word: true
   - trigger: '$lozenge.filled$'
     replace: '⧫'
+    word: true
   - trigger: '$lozenge.filled.medium$'
     replace: '⬧'
+    word: true
   - trigger: '$lozenge.filled.small$'
     replace: '⬪'
+    word: true
   - trigger: '$lozenge.stroked$'
     replace: '◊'
+    word: true
   - trigger: '$lozenge.stroked.medium$'
     replace: '⬨'
+    word: true
   - trigger: '$lozenge.stroked.small$'
     replace: '⬫'
+    word: true
   - trigger: '$lrm$'
     replace: '{U+200E}'
+    word: true
   - trigger: '$lt$'
     replace: '<'
+    word: true
   - trigger: '$lt.approx$'
     replace: '⪅'
+    word: true
   - trigger: '$lt.circle$'
     replace: '⧀'
+    word: true
   - trigger: '$lt.dot$'
     replace: '⋖'
+    word: true
   - trigger: '$lt.double$'
     replace: '≪'
+    word: true
   - trigger: '$lt.eq$'
     replace: '≤'
+    word: true
   - trigger: '$lt.eq.gt$'
     replace: '⋚'
+    word: true
   - trigger: '$lt.eq.not$'
     replace: '≰'
+    word: true
   - trigger: '$lt.eq.slant$'
     replace: '⩽'
+    word: true
   - trigger: '$lt.equiv$'
     replace: '≦'
+    word: true
   - trigger: '$lt.gt$'
     replace: '≶'
+    word: true
   - trigger: '$lt.gt.not$'
     replace: '≸'
+    word: true
   - trigger: '$lt.napprox$'
     replace: '⪉'
+    word: true
   - trigger: '$lt.neq$'
     replace: '⪇'
+    word: true
   - trigger: '$lt.nequiv$'
     replace: '≨'
+    word: true
   - trigger: '$lt.not$'
     replace: '≮'
+    word: true
   - trigger: '$lt.ntilde$'
     replace: '⋦'
+    word: true
   - trigger: '$lt.o$'
     replace: '⧀'
+    word: true
   - trigger: '$lt.small$'
     replace: '﹤'
+    word: true
   - trigger: '$lt.tilde$'
     replace: '≲'
+    word: true
   - trigger: '$lt.tilde.not$'
     replace: '≴'
+    word: true
   - trigger: '$lt.tri$'
     replace: '⊲'
+    word: true
   - trigger: '$lt.tri.eq$'
     replace: '⊴'
+    word: true
   - trigger: '$lt.tri.eq.not$'
     replace: '⋬'
+    word: true
   - trigger: '$lt.tri.not$'
     replace: '⋪'
+    word: true
   - trigger: '$lt.triple$'
     replace: '⋘'
+    word: true
   - trigger: '$lt.triple.nested$'
     replace: '⫷'
+    word: true
   - trigger: '$macron$'
     replace: '¯'
+    word: true
   - trigger: '$maltese$'
     replace: '✠'
+    word: true
   - trigger: '$manat$'
     replace: '₼'
+    word: true
   - trigger: '$mapsto$'
     replace: '↦'
+    word: true
   - trigger: '$mapsto.long$'
     replace: '⟼'
+    word: true
   - trigger: '$mars$'
     replace: '♂'
+    word: true
   - trigger: '$mercury$'
     replace: '☿'
+    word: true
   - trigger: '$minus$'
     replace: '−'
+    word: true
   - trigger: '$minus.circle$'
     replace: '⊖'
+    word: true
   - trigger: '$minus.dot$'
     replace: '∸'
+    word: true
   - trigger: '$minus.o$'
     replace: '⊖'
+    word: true
   - trigger: '$minus.plus$'
     replace: '∓'
+    word: true
   - trigger: '$minus.square$'
     replace: '⊟'
+    word: true
   - trigger: '$minus.tilde$'
     replace: '≂'
+    word: true
   - trigger: '$minus.triangle$'
     replace: '⨺'
+    word: true
   - trigger: '$miny$'
     replace: '⧿'
+    word: true
   - trigger: '$models$'
     replace: '⊧'
+    word: true
   - trigger: '$mu$'
     replace: 'μ'
+    word: true
   - trigger: '$multimap$'
     replace: '⊸'
+    word: true
   - trigger: '$multimap.double$'
     replace: '⧟'
+    word: true
   - trigger: '$mustache.l$'
     replace: '⎰'
+    word: true
   - trigger: '$mustache.r$'
     replace: '⎱'
+    word: true
   - trigger: '$nabla$'
     replace: '∇'
+    word: true
   - trigger: '$naira$'
     replace: '₦'
+    word: true
   - trigger: '$natural$'
     replace: '♮'
+    word: true
   - trigger: '$natural.b$'
     replace: '𝄯'
+    word: true
   - trigger: '$natural.t$'
     replace: '𝄮'
+    word: true
   - trigger: '$neptune$'
     replace: '♆'
+    word: true
   - trigger: '$neptune.alt$'
     replace: '⯉'
+    word: true
   - trigger: '$not$'
     replace: '¬'
+    word: true
   - trigger: '$note.down$'
     replace: '🎝'
+    word: true
   - trigger: '$note.eighth$'
     replace: '𝅘𝅥𝅮'
+    word: true
   - trigger: '$note.eighth.alt$'
     replace: '♪'
+    word: true
   - trigger: '$note.eighth.beamed$'
     replace: '♫'
+    word: true
   - trigger: '$note.grace$'
     replace: '𝆕'
+    word: true
   - trigger: '$note.grace.slash$'
     replace: '𝆔'
+    word: true
   - trigger: '$note.half$'
     replace: '𝅗𝅥'
+    word: true
   - trigger: '$note.quarter$'
     replace: '𝅘𝅥'
+    word: true
   - trigger: '$note.quarter.alt$'
     replace: '♩'
+    word: true
   - trigger: '$note.sixteenth$'
     replace: '𝅘𝅥𝅯'
+    word: true
   - trigger: '$note.sixteenth.beamed$'
     replace: '♬'
+    word: true
   - trigger: '$note.up$'
     replace: '🎜'
+    word: true
   - trigger: '$note.whole$'
     replace: '𝅝'
+    word: true
   - trigger: '$nothing$'
     replace: '∅'
+    word: true
   - trigger: '$nothing.arrow.l$'
     replace: '⦴'
+    word: true
   - trigger: '$nothing.arrow.r$'
     replace: '⦳'
+    word: true
   - trigger: '$nothing.bar$'
     replace: '⦱'
+    word: true
   - trigger: '$nothing.circle$'
     replace: '⦲'
+    word: true
   - trigger: '$nothing.rev$'
     replace: '⦰'
+    word: true
   - trigger: '$nu$'
     replace: 'ν'
+    word: true
   - trigger: '$numero$'
     replace: '№'
+    word: true
   - trigger: '$omega$'
     replace: 'ω'
+    word: true
   - trigger: '$omicron$'
     replace: 'ο'
+    word: true
   - trigger: '$oo$'
     replace: '∞'
+    word: true
   - trigger: '$or$'
     replace: '∨'
+    word: true
   - trigger: '$or.big$'
     replace: '⋁'
+    word: true
   - trigger: '$or.curly$'
     replace: '⋎'
+    word: true
   - trigger: '$or.dot$'
     replace: '⟇'
+    word: true
   - trigger: '$or.double$'
     replace: '⩔'
+    word: true
   - trigger: '$original$'
     replace: '⊶'
+    word: true
   - trigger: '$parallel$'
     replace: '∥'
+    word: true
   - trigger: '$parallel.circle$'
     replace: '⦷'
+    word: true
   - trigger: '$parallel.eq$'
     replace: '⋕'
+    word: true
   - trigger: '$parallel.equiv$'
     replace: '⩨'
+    word: true
   - trigger: '$parallel.not$'
     replace: '∦'
+    word: true
   - trigger: '$parallel.o$'
     replace: '⦷'
+    word: true
   - trigger: '$parallel.slanted.eq$'
     replace: '⧣'
+    word: true
   - trigger: '$parallel.slanted.eq.tilde$'
     replace: '⧤'
+    word: true
   - trigger: '$parallel.slanted.equiv$'
     replace: '⧥'
+    word: true
   - trigger: '$parallel.struck$'
     replace: '⫲'
+    word: true
   - trigger: '$parallel.tilde$'
     replace: '⫳'
+    word: true
   - trigger: '$parallelogram.filled$'
     replace: '▰'
+    word: true
   - trigger: '$parallelogram.stroked$'
     replace: '▱'
+    word: true
   - trigger: '$paren.b$'
     replace: '⏝'
+    word: true
   - trigger: '$paren.l$'
     replace: '('
+    word: true
   - trigger: '$paren.l.closed$'
     replace: '⦇'
+    word: true
   - trigger: '$paren.l.double$'
     replace: '⦅'
+    word: true
   - trigger: '$paren.l.flat$'
     replace: '⟮'
+    word: true
   - trigger: '$paren.l.stroked$'
     replace: '⦅'
+    word: true
   - trigger: '$paren.r$'
     replace: ')'
+    word: true
   - trigger: '$paren.r.closed$'
     replace: '⦈'
+    word: true
   - trigger: '$paren.r.double$'
     replace: '⦆'
+    word: true
   - trigger: '$paren.r.flat$'
     replace: '⟯'
+    word: true
   - trigger: '$paren.r.stroked$'
     replace: '⦆'
+    word: true
   - trigger: '$paren.t$'
     replace: '⏜'
+    word: true
   - trigger: '$partial$'
     replace: '∂'
+    word: true
   - trigger: '$pataca$'
     replace: '$'
+    word: true
   - trigger: '$penta.filled$'
     replace: '⬟'
+    word: true
   - trigger: '$penta.stroked$'
     replace: '⬠'
+    word: true
   - trigger: '$percent$'
     replace: '%'
+    word: true
   - trigger: '$permille$'
     replace: '‰'
+    word: true
   - trigger: '$permyriad$'
     replace: '‱'
+    word: true
   - trigger: '$perp$'
     replace: '⟂'
+    word: true
   - trigger: '$perp.circle$'
     replace: '⦹'
+    word: true
   - trigger: '$perp.o$'
     replace: '⦹'
+    word: true
   - trigger: '$peso$'
     replace: '$'
+    word: true
   - trigger: '$peso.philippine$'
     replace: '₱'
+    word: true
   - trigger: '$phi$'
     replace: 'φ'
+    word: true
   - trigger: '$phi.alt$'
     replace: 'ϕ'
+    word: true
   - trigger: '$pi$'
     replace: 'π'
+    word: true
   - trigger: '$pi.alt$'
     replace: 'ϖ'
+    word: true
   - trigger: '$pilcrow$'
     replace: '¶'
+    word: true
   - trigger: '$pilcrow.rev$'
     replace: '⁋'
+    word: true
   - trigger: '$planck$'
     replace: 'ħ'
+    word: true
   - trigger: '$planck.reduce$'
     replace: 'ħ'
+    word: true
   - trigger: '$plus$'
     replace: '+'
+    word: true
   - trigger: '$plus.circle$'
     replace: '⊕'
+    word: true
   - trigger: '$plus.circle.arrow$'
     replace: '⟴'
+    word: true
   - trigger: '$plus.circle.big$'
     replace: '⨁'
+    word: true
   - trigger: '$plus.dot$'
     replace: '∔'
+    word: true
   - trigger: '$plus.double$'
     replace: '⧺'
+    word: true
   - trigger: '$plus.minus$'
     replace: '±'
+    word: true
   - trigger: '$plus.o$'
     replace: '⊕'
+    word: true
   - trigger: '$plus.o.arrow$'
     replace: '⟴'
+    word: true
   - trigger: '$plus.o.big$'
     replace: '⨁'
+    word: true
   - trigger: '$plus.o.l$'
     replace: '⨭'
+    word: true
   - trigger: '$plus.o.r$'
     replace: '⨮'
+    word: true
   - trigger: '$plus.small$'
     replace: '﹢'
+    word: true
   - trigger: '$plus.square$'
     replace: '⊞'
+    word: true
   - trigger: '$plus.triangle$'
     replace: '⨹'
+    word: true
   - trigger: '$plus.triple$'
     replace: '⧻'
+    word: true
   - trigger: '$pound$'
     replace: '£'
+    word: true
   - trigger: '$power.off$'
     replace: '⭘'
+    word: true
   - trigger: '$power.on$'
     replace: '⏽'
+    word: true
   - trigger: '$power.on.off$'
     replace: '⏼'
+    word: true
   - trigger: '$power.sleep$'
     replace: '⏾'
+    word: true
   - trigger: '$power.standby$'
     replace: '⏻'
+    word: true
   - trigger: '$prec$'
     replace: '≺'
+    word: true
   - trigger: '$prec.approx$'
     replace: '⪷'
+    word: true
   - trigger: '$prec.curly.eq$'
     replace: '≼'
+    word: true
   - trigger: '$prec.curly.eq.not$'
     replace: '⋠'
+    word: true
   - trigger: '$prec.double$'
     replace: '⪻'
+    word: true
   - trigger: '$prec.eq$'
     replace: '⪯'
+    word: true
   - trigger: '$prec.equiv$'
     replace: '⪳'
+    word: true
   - trigger: '$prec.napprox$'
     replace: '⪹'
+    word: true
   - trigger: '$prec.neq$'
     replace: '⪱'
+    word: true
   - trigger: '$prec.nequiv$'
     replace: '⪵'
+    word: true
   - trigger: '$prec.not$'
     replace: '⊀'
+    word: true
   - trigger: '$prec.ntilde$'
     replace: '⋨'
+    word: true
   - trigger: '$prec.tilde$'
     replace: '≾'
+    word: true
   - trigger: '$prime$'
     replace: '′'
+    word: true
   - trigger: '$prime.double$'
     replace: '″'
+    word: true
   - trigger: '$prime.double.rev$'
     replace: '‶'
+    word: true
   - trigger: '$prime.quad$'
     replace: '⁗'
+    word: true
   - trigger: '$prime.rev$'
     replace: '‵'
+    word: true
   - trigger: '$prime.triple$'
     replace: '‴'
+    word: true
   - trigger: '$prime.triple.rev$'
     replace: '‷'
+    word: true
   - trigger: '$product$'
     replace: '∏'
+    word: true
   - trigger: '$product.co$'
     replace: '∐'
+    word: true
   - trigger: '$prop$'
     replace: '∝'
+    word: true
   - trigger: '$psi$'
     replace: 'ψ'
+    word: true
   - trigger: '$qed$'
     replace: '∎'
+    word: true
   - trigger: '$quest$'
     replace: '?'
+    word: true
   - trigger: '$quest.double$'
     replace: '⁇'
+    word: true
   - trigger: '$quest.excl$'
     replace: '⁈'
+    word: true
   - trigger: '$quest.inv$'
     replace: '¿'
+    word: true
   - trigger: '$quote.angle.l.double$'
     replace: '«'
+    word: true
   - trigger: '$quote.angle.l.single$'
     replace: '‹'
+    word: true
   - trigger: '$quote.angle.r.double$'
     replace: '»'
+    word: true
   - trigger: '$quote.angle.r.single$'
     replace: '›'
+    word: true
   - trigger: '$quote.chevron.l.double$'
     replace: '«'
+    word: true
   - trigger: '$quote.chevron.l.single$'
     replace: '‹'
+    word: true
   - trigger: '$quote.chevron.r.double$'
     replace: '»'
+    word: true
   - trigger: '$quote.chevron.r.single$'
     replace: '›'
+    word: true
   - trigger: '$quote.double$'
     replace: '`'
+    word: true
   - trigger: '$quote.high.double$'
     replace: '‟'
+    word: true
   - trigger: '$quote.high.single$'
     replace: '‛'
+    word: true
   - trigger: '$quote.l.double$'
     replace: '“'
+    word: true
   - trigger: '$quote.l.single$'
     replace: '‘'
+    word: true
   - trigger: '$quote.low.double$'
     replace: '„'
+    word: true
   - trigger: '$quote.low.single$'
     replace: '‚'
+    word: true
   - trigger: '$quote.r.double$'
     replace: '”'
+    word: true
   - trigger: '$quote.r.single$'
     replace: '’'
+    word: true
   - trigger: '$quote.single$'
     replace: "'"
+    word: true
   - trigger: '$ratio$'
     replace: '∶'
+    word: true
   - trigger: '$rect.filled.h$'
     replace: '▬'
+    word: true
   - trigger: '$rect.filled.v$'
     replace: '▮'
+    word: true
   - trigger: '$rect.stroked.h$'
     replace: '▭'
+    word: true
   - trigger: '$rect.stroked.v$'
     replace: '▯'
+    word: true
   - trigger: '$refmark$'
     replace: '※'
+    word: true
   - trigger: '$rest.eighth$'
     replace: '𝄾'
+    word: true
   - trigger: '$rest.half$'
     replace: '𝄼'
+    word: true
   - trigger: '$rest.multiple$'
     replace: '𝄺'
+    word: true
   - trigger: '$rest.multiple.measure$'
     replace: '𝄩'
+    word: true
   - trigger: '$rest.quarter$'
     replace: '𝄽'
+    word: true
   - trigger: '$rest.sixteenth$'
     replace: '𝄿'
+    word: true
   - trigger: '$rest.whole$'
     replace: '𝄻'
+    word: true
   - trigger: '$rho$'
     replace: 'ρ'
+    word: true
   - trigger: '$rho.alt$'
     replace: 'ϱ'
+    word: true
   - trigger: '$riel$'
     replace: '៛'
+    word: true
   - trigger: '$rlm$'
     replace: '{U+200F}'
+    word: true
   - trigger: '$ruble$'
     replace: '₽'
+    word: true
   - trigger: '$rupee.generic$'
     replace: '₨'
+    word: true
   - trigger: '$rupee.indian$'
     replace: '₹'
+    word: true
   - trigger: '$rupee.tamil$'
     replace: '௹'
+    word: true
   - trigger: '$rupee.wancho$'
     replace: '𞋿'
+    word: true
   - trigger: '$saturn$'
     replace: '♄'
+    word: true
   - trigger: '$sect$'
     replace: '∩'
+    word: true
   - trigger: '$sect.and$'
     replace: '⩄'
+    word: true
   - trigger: '$sect.big$'
     replace: '⋂'
+    word: true
   - trigger: '$sect.dot$'
     replace: '⩀'
+    word: true
   - trigger: '$sect.double$'
     replace: '⋒'
+    word: true
   - trigger: '$sect.sq$'
     replace: '⊓'
+    word: true
   - trigger: '$sect.sq.big$'
     replace: '⨅'
+    word: true
   - trigger: '$sect.sq.double$'
     replace: '⩎'
+    word: true
   - trigger: '$section$'
     replace: '§'
+    word: true
   - trigger: '$semi$'
     replace: ';'
+    word: true
   - trigger: '$semi.inv$'
     replace: '⸵'
+    word: true
   - trigger: '$semi.rev$'
     replace: '⁏'
+    word: true
   - trigger: '$sha$'
     replace: 'ш'
+    word: true
   - trigger: '$sharp$'
     replace: '♯'
+    word: true
   - trigger: '$sharp.b$'
     replace: '𝄱'
+    word: true
   - trigger: '$sharp.double$'
     replace: '𝄪'
+    word: true
   - trigger: '$sharp.quarter$'
     replace: '𝄲'
+    word: true
   - trigger: '$sharp.t$'
     replace: '𝄰'
+    word: true
   - trigger: '$shekel$'
     replace: '₪'
+    word: true
   - trigger: '$shell.b$'
     replace: '⏡'
+    word: true
   - trigger: '$shell.l$'
     replace: '❲'
+    word: true
   - trigger: '$shell.l.double$'
     replace: '⟬'
+    word: true
   - trigger: '$shell.l.filled$'
     replace: '⦗'
+    word: true
   - trigger: '$shell.l.stroked$'
     replace: '⟬'
+    word: true
   - trigger: '$shell.r$'
     replace: '❳'
+    word: true
   - trigger: '$shell.r.double$'
     replace: '⟭'
+    word: true
   - trigger: '$shell.r.filled$'
     replace: '⦘'
+    word: true
   - trigger: '$shell.r.stroked$'
     replace: '⟭'
+    word: true
   - trigger: '$shell.t$'
     replace: '⏠'
+    word: true
   - trigger: '$shin$'
     replace: 'ש'
+    word: true
   - trigger: '$sigma$'
     replace: 'σ'
+    word: true
   - trigger: '$sigma.alt$'
     replace: 'ς'
+    word: true
   - trigger: '$slash$'
     replace: '/'
+    word: true
   - trigger: '$slash.big$'
     replace: '⧸'
+    word: true
   - trigger: '$slash.double$'
     replace: '⫽'
+    word: true
   - trigger: '$slash.o$'
     replace: '⊘'
+    word: true
   - trigger: '$slash.triple$'
     replace: '⫻'
+    word: true
   - trigger: '$smash$'
     replace: '⨳'
+    word: true
   - trigger: '$smile$'
     replace: '⌣'
+    word: true
   - trigger: '$smt$'
     replace: '⪪'
+    word: true
   - trigger: '$smt.eq$'
     replace: '⪬'
+    word: true
   - trigger: '$som$'
     replace: '⃀'
+    word: true
   - trigger: '$space$'
     replace: '{U+0020}'
+    word: true
   - trigger: '$space.en$'
     replace: '{U+2002}'
+    word: true
   - trigger: '$space.fig$'
     replace: '{U+2007}'
+    word: true
   - trigger: '$space.hair$'
     replace: '{U+200A}'
+    word: true
   - trigger: '$space.med$'
     replace: '{U+205F}'
+    word: true
   - trigger: '$space.nobreak$'
     replace: '{U+00A0}'
+    word: true
   - trigger: '$space.nobreak.narrow$'
     replace: '{U+202F}'
+    word: true
   - trigger: '$space.punct$'
     replace: '{U+2008}'
+    word: true
   - trigger: '$space.quad$'
     replace: '{U+2003}'
+    word: true
   - trigger: '$space.quarter$'
     replace: '{U+2005}'
+    word: true
   - trigger: '$space.sixth$'
     replace: '{U+2006}'
+    word: true
   - trigger: '$space.thin$'
     replace: '{U+2009}'
+    word: true
   - trigger: '$space.third$'
     replace: '{U+2004}'
+    word: true
   - trigger: '$square.filled$'
     replace: '■'
+    word: true
   - trigger: '$square.filled.big$'
     replace: '⬛'
+    word: true
   - trigger: '$square.filled.medium$'
     replace: '◼'
+    word: true
   - trigger: '$square.filled.small$'
     replace: '◾'
+    word: true
   - trigger: '$square.filled.tiny$'
     replace: '▪'
+    word: true
   - trigger: '$square.stroked$'
     replace: '□'
+    word: true
   - trigger: '$square.stroked.big$'
     replace: '⬜'
+    word: true
   - trigger: '$square.stroked.dotted$'
     replace: '⬚'
+    word: true
   - trigger: '$square.stroked.medium$'
     replace: '◻'
+    word: true
   - trigger: '$square.stroked.rounded$'
     replace: '▢'
+    word: true
   - trigger: '$square.stroked.small$'
     replace: '◽'
+    word: true
   - trigger: '$square.stroked.tiny$'
     replace: '▫'
+    word: true
   - trigger: '$star.filled$'
     replace: '★'
+    word: true
   - trigger: '$star.op$'
     replace: '⋆'
+    word: true
   - trigger: '$star.stroked$'
     replace: '☆'
+    word: true
   - trigger: '$subset$'
     replace: '⊂'
+    word: true
   - trigger: '$subset.dot$'
     replace: '⪽'
+    word: true
   - trigger: '$subset.double$'
     replace: '⋐'
+    word: true
   - trigger: '$subset.eq$'
     replace: '⊆'
+    word: true
   - trigger: '$subset.eq.not$'
     replace: '⊈'
+    word: true
   - trigger: '$subset.eq.sq$'
     replace: '⊑'
+    word: true
   - trigger: '$subset.eq.sq.not$'
     replace: '⋢'
+    word: true
   - trigger: '$subset.neq$'
     replace: '⊊'
+    word: true
   - trigger: '$subset.not$'
     replace: '⊄'
+    word: true
   - trigger: '$subset.sq$'
     replace: '⊏'
+    word: true
   - trigger: '$subset.sq.neq$'
     replace: '⋤'
+    word: true
   - trigger: '$succ$'
     replace: '≻'
+    word: true
   - trigger: '$succ.approx$'
     replace: '⪸'
+    word: true
   - trigger: '$succ.curly.eq$'
     replace: '≽'
+    word: true
   - trigger: '$succ.curly.eq.not$'
     replace: '⋡'
+    word: true
   - trigger: '$succ.double$'
     replace: '⪼'
+    word: true
   - trigger: '$succ.eq$'
     replace: '⪰'
+    word: true
   - trigger: '$succ.equiv$'
     replace: '⪴'
+    word: true
   - trigger: '$succ.napprox$'
     replace: '⪺'
+    word: true
   - trigger: '$succ.neq$'
     replace: '⪲'
+    word: true
   - trigger: '$succ.nequiv$'
     replace: '⪶'
+    word: true
   - trigger: '$succ.not$'
     replace: '⊁'
+    word: true
   - trigger: '$succ.ntilde$'
     replace: '⋩'
+    word: true
   - trigger: '$succ.tilde$'
     replace: '≿'
+    word: true
   - trigger: '$suit.club.filled$'
     replace: '♣'
+    word: true
   - trigger: '$suit.club.stroked$'
     replace: '♧'
+    word: true
   - trigger: '$suit.diamond.filled$'
     replace: '♦'
+    word: true
   - trigger: '$suit.diamond.stroked$'
     replace: '♢'
+    word: true
   - trigger: '$suit.heart.filled$'
     replace: '♥'
+    word: true
   - trigger: '$suit.heart.stroked$'
     replace: '♡'
+    word: true
   - trigger: '$suit.spade.filled$'
     replace: '♠'
+    word: true
   - trigger: '$suit.spade.stroked$'
     replace: '♤'
+    word: true
   - trigger: '$sum$'
     replace: '∑'
+    word: true
   - trigger: '$sum.integral$'
     replace: '⨋'
+    word: true
   - trigger: '$sun$'
     replace: '☉'
+    word: true
   - trigger: '$supset$'
     replace: '⊃'
+    word: true
   - trigger: '$supset.dot$'
     replace: '⪾'
+    word: true
   - trigger: '$supset.double$'
     replace: '⋑'
+    word: true
   - trigger: '$supset.eq$'
     replace: '⊇'
+    word: true
   - trigger: '$supset.eq.not$'
     replace: '⊉'
+    word: true
   - trigger: '$supset.eq.sq$'
     replace: '⊒'
+    word: true
   - trigger: '$supset.eq.sq.not$'
     replace: '⋣'
+    word: true
   - trigger: '$supset.neq$'
     replace: '⊋'
+    word: true
   - trigger: '$supset.not$'
     replace: '⊅'
+    word: true
   - trigger: '$supset.sq$'
     replace: '⊐'
+    word: true
   - trigger: '$supset.sq.neq$'
     replace: '⋥'
+    word: true
   - trigger: '$tack.b$'
     replace: '⊤'
+    word: true
   - trigger: '$tack.b.big$'
     replace: '⟙'
+    word: true
   - trigger: '$tack.b.double$'
     replace: '⫪'
+    word: true
   - trigger: '$tack.b.short$'
     replace: '⫟'
+    word: true
   - trigger: '$tack.l$'
     replace: '⊣'
+    word: true
   - trigger: '$tack.l.double$'
     replace: '⫤'
+    word: true
   - trigger: '$tack.l.long$'
     replace: '⟞'
+    word: true
   - trigger: '$tack.l.r$'
     replace: '⟛'
+    word: true
   - trigger: '$tack.l.short$'
     replace: '⫞'
+    word: true
   - trigger: '$tack.r$'
     replace: '⊢'
+    word: true
   - trigger: '$tack.r.double$'
     replace: '⊨'
+    word: true
   - trigger: '$tack.r.double.not$'
     replace: '⊭'
+    word: true
   - trigger: '$tack.r.long$'
     replace: '⟝'
+    word: true
   - trigger: '$tack.r.not$'
     replace: '⊬'
+    word: true
   - trigger: '$tack.r.short$'
     replace: '⊦'
+    word: true
   - trigger: '$tack.t$'
     replace: '⊥'
+    word: true
   - trigger: '$tack.t.big$'
     replace: '⟘'
+    word: true
   - trigger: '$tack.t.double$'
     replace: '⫫'
+    word: true
   - trigger: '$tack.t.short$'
     replace: '⫠'
+    word: true
   - trigger: '$taka$'
     replace: '৳'
+    word: true
   - trigger: '$taman$'
     replace: '߿'
+    word: true
   - trigger: '$tau$'
     replace: 'τ'
+    word: true
   - trigger: '$tenge$'
     replace: '₸'
+    word: true
   - trigger: '$therefore$'
     replace: '∴'
+    word: true
   - trigger: '$theta$'
     replace: 'θ'
+    word: true
   - trigger: '$theta.alt$'
     replace: 'ϑ'
+    word: true
   - trigger: '$tilde.basic$'
     replace: '~'
+    word: true
   - trigger: '$tilde.dot$'
     replace: '⩪'
+    word: true
   - trigger: '$tilde.eq$'
     replace: '≃'
+    word: true
   - trigger: '$tilde.eq.not$'
     replace: '≄'
+    word: true
   - trigger: '$tilde.eq.rev$'
     replace: '⋍'
+    word: true
   - trigger: '$tilde.equiv$'
     replace: '≅'
+    word: true
   - trigger: '$tilde.equiv.not$'
     replace: '≇'
+    word: true
   - trigger: '$tilde.nequiv$'
     replace: '≆'
+    word: true
   - trigger: '$tilde.not$'
     replace: '≁'
+    word: true
   - trigger: '$tilde.op$'
     replace: '∼'
+    word: true
   - trigger: '$tilde.rev$'
     replace: '∽'
+    word: true
   - trigger: '$tilde.rev.equiv$'
     replace: '≌'
+    word: true
   - trigger: '$tilde.triple$'
     replace: '≋'
+    word: true
   - trigger: '$times$'
     replace: '×'
+    word: true
   - trigger: '$times.big$'
     replace: '⨉'
+    word: true
   - trigger: '$times.circle$'
     replace: '⊗'
+    word: true
   - trigger: '$times.circle.big$'
     replace: '⨂'
+    word: true
   - trigger: '$times.div$'
     replace: '⋇'
+    word: true
   - trigger: '$times.l$'
     replace: '⋉'
+    word: true
   - trigger: '$times.o$'
     replace: '⊗'
+    word: true
   - trigger: '$times.o.big$'
     replace: '⨂'
+    word: true
   - trigger: '$times.o.hat$'
     replace: '⨶'
+    word: true
   - trigger: '$times.o.l$'
     replace: '⨴'
+    word: true
   - trigger: '$times.o.r$'
     replace: '⨵'
+    word: true
   - trigger: '$times.r$'
     replace: '⋊'
+    word: true
   - trigger: '$times.square$'
     replace: '⊠'
+    word: true
   - trigger: '$times.three.l$'
     replace: '⋋'
+    word: true
   - trigger: '$times.three.r$'
     replace: '⋌'
+    word: true
   - trigger: '$times.triangle$'
     replace: '⨻'
+    word: true
   - trigger: '$tiny$'
     replace: '⧾'
+    word: true
   - trigger: '$togrog$'
     replace: '₮'
+    word: true
   - trigger: '$top$'
     replace: '⊤'
+    word: true
   - trigger: '$trademark$'
     replace: '™'
+    word: true
   - trigger: '$trademark.registered$'
     replace: '®'
+    word: true
   - trigger: '$trademark.service$'
     replace: '℠'
+    word: true
   - trigger: '$triangle.filled.b$'
     replace: '▼'
+    word: true
   - trigger: '$triangle.filled.bl$'
     replace: '◣'
+    word: true
   - trigger: '$triangle.filled.br$'
     replace: '◢'
+    word: true
   - trigger: '$triangle.filled.l$'
     replace: '◀'
+    word: true
   - trigger: '$triangle.filled.r$'
     replace: '▶'
+    word: true
   - trigger: '$triangle.filled.small.b$'
     replace: '▾'
+    word: true
   - trigger: '$triangle.filled.small.l$'
     replace: '◂'
+    word: true
   - trigger: '$triangle.filled.small.r$'
     replace: '▸'
+    word: true
   - trigger: '$triangle.filled.small.t$'
     replace: '▴'
+    word: true
   - trigger: '$triangle.filled.t$'
     replace: '▲'
+    word: true
   - trigger: '$triangle.filled.tl$'
     replace: '◤'
+    word: true
   - trigger: '$triangle.filled.tr$'
     replace: '◥'
+    word: true
   - trigger: '$triangle.stroked.b$'
     replace: '▽'
+    word: true
   - trigger: '$triangle.stroked.bl$'
     replace: '◺'
+    word: true
   - trigger: '$triangle.stroked.br$'
     replace: '◿'
+    word: true
   - trigger: '$triangle.stroked.dot$'
     replace: '◬'
+    word: true
   - trigger: '$triangle.stroked.l$'
     replace: '◁'
+    word: true
   - trigger: '$triangle.stroked.nested$'
     replace: '⟁'
+    word: true
   - trigger: '$triangle.stroked.r$'
     replace: '▷'
+    word: true
   - trigger: '$triangle.stroked.rounded$'
     replace: '🛆'
+    word: true
   - trigger: '$triangle.stroked.small.b$'
     replace: '▿'
+    word: true
   - trigger: '$triangle.stroked.small.l$'
     replace: '◃'
+    word: true
   - trigger: '$triangle.stroked.small.r$'
     replace: '▹'
+    word: true
   - trigger: '$triangle.stroked.small.t$'
     replace: '▵'
+    word: true
   - trigger: '$triangle.stroked.t$'
     replace: '△'
+    word: true
   - trigger: '$triangle.stroked.tl$'
     replace: '◸'
+    word: true
   - trigger: '$triangle.stroked.tr$'
     replace: '◹'
+    word: true
   - trigger: '$union$'
     replace: '∪'
+    word: true
   - trigger: '$union.arrow$'
     replace: '⊌'
+    word: true
   - trigger: '$union.big$'
     replace: '⋃'
+    word: true
   - trigger: '$union.dot$'
     replace: '⊍'
+    word: true
   - trigger: '$union.dot.big$'
     replace: '⨃'
+    word: true
   - trigger: '$union.double$'
     replace: '⋓'
+    word: true
   - trigger: '$union.minus$'
     replace: '⩁'
+    word: true
   - trigger: '$union.or$'
     replace: '⩅'
+    word: true
   - trigger: '$union.plus$'
     replace: '⊎'
+    word: true
   - trigger: '$union.plus.big$'
     replace: '⨄'
+    word: true
   - trigger: '$union.sq$'
     replace: '⊔'
+    word: true
   - trigger: '$union.sq.big$'
     replace: '⨆'
+    word: true
   - trigger: '$union.sq.double$'
     replace: '⩏'
+    word: true
   - trigger: '$upsilon$'
     replace: 'υ'
+    word: true
   - trigger: '$uranus$'
     replace: '⛢'
+    word: true
   - trigger: '$uranus.alt$'
     replace: '♅'
+    word: true
   - trigger: '$venus$'
     replace: '♀'
+    word: true
   - trigger: '$without$'
     replace: '∖'
+    word: true
   - trigger: '$wj$'
     replace: '{U+2060}'
+    word: true
   - trigger: '$won$'
     replace: '₩'
+    word: true
   - trigger: '$wreath$'
     replace: '≀'
+    word: true
   - trigger: '$xi$'
     replace: 'ξ'
+    word: true
   - trigger: '$xor$'
     replace: '⊕'
+    word: true
   - trigger: '$xor.big$'
     replace: '⨁'
+    word: true
   - trigger: '$yen$'
     replace: '¥'
+    word: true
   - trigger: '$yuan$'
     replace: '¥'
+    word: true
   - trigger: '$zeta$'
     replace: 'ζ'
+    word: true
   - trigger: '$zwj$'
     replace: '{U+200D}'
+    word: true
   - trigger: '$zwnj$'
     replace: '{U+200C}'
+    word: true
   - trigger: '$zws$'
     replace: '{U+200B}'
+    word: true
