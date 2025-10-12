@@ -1,110 +1,75 @@
 matches:
   - trigger: 'aije'
     replace: 'ai-je'
-    word: true
   - trigger: 'astu'
     replace: 'as-tu'
-    word: true
   - trigger: 'atil'
     replace: 'a-t-il'
-    word: true
   - trigger: 'aton'
     replace: 'a-t-on'
-    word: true
   - trigger: 'auratelle'
     replace: 'aura-t-elle'
-    word: true
   - trigger: 'auratil'
     replace: 'aura-t-il'
-    word: true
   - trigger: 'auraton'
     replace: 'aura-t-on'
-    word: true
   - trigger: 'dismoi'
     replace: 'dis-moi'
-    word: true
   - trigger: 'distu'
     replace: 'dis-tu'
-    word: true
   - trigger: 'ditelle'
     replace: 'dit-elle'
-    word: true
   - trigger: 'ditil'
     replace: 'dit-il'
-    word: true
   - trigger: 'diton'
     replace: 'dit-on'
-    word: true
   - trigger: 'doisje'
     replace: 'dois-je'
-    word: true
   - trigger: 'doitelle'
     replace: 'doit-elle'
-    word: true
   - trigger: 'doitil'
     replace: 'doit-il'
-    word: true
   - trigger: 'doiton'
     replace: 'doit-on'
-    word: true
   - trigger: 'estil'
     replace: 'est-il'
-    word: true
   - trigger: 'eston'
     replace: 'est-on'
-    word: true
   - trigger: 'estu'
     replace: 'es-tu'
-    word: true
   - trigger: 'fautelle'
     replace: 'faut-elle'
-    word: true
   - trigger: 'fautil'
     replace: 'faut-il'
-    word: true
   - trigger: 'fauton'
     replace: 'faut-on'
-    word: true
   - trigger: 'peutelle'
     replace: 'peut-elle'
-    word: true
   - trigger: 'peutil'
     replace: 'peut-il'
-    word: true
   - trigger: 'peuton'
     replace: 'peut-on'
-    word: true
   - trigger: 'peuxtu'
     replace: 'peux-tu'
-    word: true
   - trigger: 'puisje'
     replace: 'puis-je'
-    word: true
   - trigger: 'vatelle'
     replace: 'va-t-elle'
-    word: true
   - trigger: 'vatil'
     replace: 'va-t-il'
-    word: true
   - trigger: 'vaton'
     replace: 'va-t-on'
-    word: true
   - trigger: 'veutelle'
     replace: 'veut-elle'
-    word: true
   - trigger: 'veutil'
     replace: 'veut-il'
-    word: true
   - trigger: 'veuton'
     replace: 'veut-on'
-    word: true
   - trigger: 'veuxtu'
     replace: 'veux-tu'
-    word: true
   - trigger: 'vezv'
     replace: 'vez-v'
   - trigger: 'vonsn'
     replace: 'vons-n'
   - trigger: 'yatil'
     replace: 'y a-t-il'
-    word: true

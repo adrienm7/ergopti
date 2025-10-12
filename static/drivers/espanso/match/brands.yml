@@ -1,55 +1,37 @@
 matches:
   - trigger: 'autohotkey'
     replace: 'AutoHotkey'
-    word: true
   - trigger: 'chatgpt'
     replace: 'ChatGPT'
-    word: true
   - trigger: 'citroen'
     replace: 'Citroën'
-    word: true
   - trigger: 'insee'
     replace: 'INSEE'
-    word: true
   - trigger: 'latex'
     replace: 'LaTeX'
-    word: true
   - trigger: 'lualatex'
     replace: 'LuaLaTeX'
-    word: true
   - trigger: 'mbti'
     replace: 'MBTI'
-    word: true
   - trigger: 'nasa'
     replace: 'NASA'
-    word: true
   - trigger: 'nlp'
     replace: 'NLP'
-    word: true
   - trigger: 'onedrive'
     replace: 'OneDrive'
-    word: true
   - trigger: 'onenote'
     replace: 'OneNote'
-    word: true
   - trigger: 'optimot'
     replace: 'Optimot'
-    word: true
   - trigger: 'outlook'
     replace: 'Outlook'
-    word: true
   - trigger: 'pnl'
     replace: 'PNL'
-    word: true
   - trigger: 'powerbi'
     replace: 'PowerBI'
-    word: true
   - trigger: 'powerpoint'
     replace: 'PowerPoint'
-    word: true
   - trigger: 'sharepoint'
     replace: 'SharePoint'
-    word: true
   - trigger: 'vscode'
     replace: 'VSCode'
-    word: true
