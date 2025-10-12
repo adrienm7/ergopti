@@ -1,766 +1,511 @@
 matches:
   - trigger: '(n)★'
     replace: '👎'
-    word: true
   - trigger: '(y)★'
     replace: '👍'
-    word: true
   - trigger: ':)★'
     replace: '😀'
-    word: true
   - trigger: ':))★'
     replace: '😁'
-    word: true
   - trigger: ':3★'
     replace: '😗'
-    word: true
   - trigger: ':D★'
     replace: '😁'
-    word: true
   - trigger: ':O★'
     replace: '😮'
-    word: true
   - trigger: ':P★'
     replace: '😛'
-    word: true
   - trigger: 'abeille★'
     replace: '🐝'
-    word: true
   - trigger: 'aigle★'
     replace: '🦅'
-    word: true
   - trigger: 'aimant★'
     replace: '🧲'
-    word: true
   - trigger: 'amour★'
     replace: '🥰'
-    word: true
   - trigger: 'ampoule★'
     replace: '💡'
-    word: true
   - trigger: 'ananas★'
     replace: '🍍'
-    word: true
   - trigger: 'ancre★'
     replace: '⚓'
-    word: true
   - trigger: 'ange★'
     replace: '👼'
-    word: true
   - trigger: 'araignée★'
     replace: '🕷️'
-    word: true
   - trigger: 'arbre★'
     replace: '🌲'
-    word: true
   - trigger: 'argent★'
     replace: '💰'
-    word: true
   - trigger: 'attention★'
     replace: '⚠️'
-    word: true
   - trigger: 'aubergine★'
     replace: '🍆'
-    word: true
   - trigger: 'avion★'
     replace: '✈️'
-    word: true
   - trigger: 'avocat★'
     replace: '🥑'
-    word: true
   - trigger: 'balance★'
     replace: '⚖️'
-    word: true
   - trigger: 'baleine★'
     replace: '🐋'
-    word: true
   - trigger: 'ballon★'
     replace: '🎈'
-    word: true
   - trigger: 'banane★'
     replace: '🍌'
-    word: true
   - trigger: 'batterie★'
     replace: '🔋'
-    word: true
   - trigger: 'bisou★'
     replace: '😘'
-    word: true
   - trigger: 'bière★'
     replace: '🍺'
-    word: true
   - trigger: 'blanc★'
     replace: '🏳️'
-    word: true
   - trigger: 'bombe★'
     replace: '💣'
-    word: true
   - trigger: 'bouche★'
     replace: '🤭'
-    word: true
   - trigger: 'bougie★'
     replace: '🕯️'
-    word: true
   - trigger: 'boussole★'
     replace: '🧭'
-    word: true
   - trigger: 'brocoli★'
     replace: '🥦'
-    word: true
   - trigger: 'burger★'
     replace: '🍔'
-    word: true
   - trigger: 'caca★'
     replace: '💩'
-    word: true
   - trigger: 'cadeau★'
     replace: '🎁'
-    word: true
   - trigger: 'cadenas★'
     replace: '🔒'
-    word: true
   - trigger: 'café★'
     replace: '☕'
-    word: true
   - trigger: 'calendrier★'
     replace: '📅'
-    word: true
   - trigger: 'caméra★'
     replace: '📷'
-    word: true
   - trigger: 'canard★'
     replace: '🦆'
-    word: true
   - trigger: 'carotte★'
     replace: '🥕'
-    word: true
   - trigger: 'cerf★'
     replace: '🦌'
-    word: true
   - trigger: 'cerise★'
     replace: '🍒'
-    word: true
   - trigger: 'chameau★'
     replace: '🐪'
-    word: true
   - trigger: 'champignon★'
     replace: '🍄'
-    word: true
   - trigger: 'chat★'
     replace: '🐈'
-    word: true
   - trigger: 'chauve-souris★'
     replace: '🦇'
-    word: true
   - trigger: 'check★'
     replace: '✔️'
-    word: true
   - trigger: 'cheval★'
     replace: '🐎'
-    word: true
   - trigger: 'chien★'
     replace: '🐕'
-    word: true
   - trigger: 'chocolat★'
     replace: '🍫'
-    word: true
   - trigger: 'chèvre★'
     replace: '🐐'
-    word: true
   - trigger: 'citron★'
     replace: '🍋'
-    word: true
   - trigger: 'clap★'
     replace: '👏'
-    word: true
   - trigger: 'clavier★'
     replace: '⌨️'
-    word: true
   - trigger: 'clin★'
     replace: '😉'
-    word: true
   - trigger: 'cloche★'
     replace: '🔔'
-    word: true
   - trigger: 'clé★'
     replace: '🔑'
-    word: true
   - trigger: 'cochon★'
     replace: '🐖'
-    word: true
   - trigger: 'coco★'
     replace: '🥥'
-    word: true
   - trigger: 'coeur★'
     replace: '❤️'
-    word: true
   - trigger: 'colère★'
     replace: '😠'
-    word: true
   - trigger: 'cookie★'
     replace: '🍪'
-    word: true
   - trigger: 'coq★'
     replace: '🐓'
-    word: true
   - trigger: 'couronne★'
     replace: '👑'
-    word: true
   - trigger: 'cowboy★'
     replace: '🤠'
-    word: true
   - trigger: 'crabe★'
     replace: '🦀'
-    word: true
   - trigger: 'croco★'
     replace: '🐊'
-    word: true
   - trigger: 'crocodile★'
     replace: '🐊'
-    word: true
   - trigger: 'croissant★'
     replace: '🥐'
-    word: true
   - trigger: 'croix★'
     replace: '❌'
-    word: true
   - trigger: 'cygne★'
     replace: '🦢'
-    word: true
   - trigger: 'cœur★'
     replace: '❤️'
-    word: true
   - trigger: 'dauphin★'
     replace: '🐬'
-    word: true
   - trigger: 'diable★'
     replace: '😈'
-    word: true
   - trigger: 'diamant★'
     replace: '💎'
-    word: true
   - trigger: 'dislike★'
     replace: '👎'
-    word: true
   - trigger: 'dodo★'
     replace: '😴'
-    word: true
   - trigger: 'donut★'
     replace: '🍩'
-    word: true
   - trigger: 'douche★'
     replace: '🛁'
-    word: true
   - trigger: 'dragon★'
     replace: '🐉'
-    word: true
   - trigger: 'drapeau★'
     replace: '🏁'
-    word: true
   - trigger: 'dégoût★'
     replace: '🤮'
-    word: true
   - trigger: 'délice★'
     replace: '😋'
-    word: true
   - trigger: 'délicieux★'
     replace: '😋'
-    word: true
   - trigger: 'eau★'
     replace: '💧'
-    word: true
   - trigger: 'effroi★'
     replace: '😱'
-    word: true
   - trigger: 'email★'
     replace: '📧'
-    word: true
   - trigger: 'escargot★'
     replace: '🐌'
-    word: true
   - trigger: 'facepalm★'
     replace: '🤦'
-    word: true
   - trigger: 'fatigue★'
     replace: '😩'
-    word: true
   - trigger: 'faux★'
     replace: '❌'
-    word: true
   - trigger: 'fete★'
     replace: '🎉'
-    word: true
   - trigger: 'feu★'
     replace: '🔥'
-    word: true
   - trigger: 'fier★'
     replace: '😤'
-    word: true
   - trigger: 'film★'
     replace: '🎬'
-    word: true
   - trigger: 'flamant★'
     replace: '🦩'
-    word: true
   - trigger: 'fleur★'
     replace: '🌸'
-    word: true
   - trigger: 'fort★'
     replace: '💪'
-    word: true
   - trigger: 'fou★'
     replace: '🤪'
-    word: true
   - trigger: 'fourmi★'
     replace: '🐜'
-    word: true
   - trigger: 'fraise★'
     replace: '🍓'
-    word: true
   - trigger: 'frites★'
     replace: '🍟'
-    word: true
   - trigger: 'fromage★'
     replace: '🧀'
-    word: true
   - trigger: 'fête★'
     replace: '🎉'
-    word: true
   - trigger: 'girafe★'
     replace: '🦒'
-    word: true
   - trigger: 'glace★'
     replace: '🍦'
-    word: true
   - trigger: 'gorille★'
     replace: '🦍'
-    word: true
   - trigger: 'grenouille★'
     replace: '🐸'
-    word: true
   - trigger: 'guitare★'
     replace: '🎸'
-    word: true
   - trigger: 'gâteau★'
     replace: '🎂'
-    word: true
   - trigger: 'hamburger★'
     replace: '🍔'
-    word: true
   - trigger: 'hamster★'
     replace: '🐹'
-    word: true
   - trigger: 'heureux★'
     replace: '😊'
-    word: true
   - trigger: 'hibou★'
     replace: '🦉'
-    word: true
   - trigger: 'hippopotame★'
     replace: '🦛'
-    word: true
   - trigger: 'homard★'
     replace: '🦞'
-    word: true
   - trigger: 'hotdog★'
     replace: '🌭'
-    word: true
   - trigger: 'hérisson★'
     replace: '🦔'
-    word: true
   - trigger: 'idee★'
     replace: '💡'
-    word: true
   - trigger: 'idée★'
     replace: '💡'
-    word: true
   - trigger: 'innocent★'
     replace: '😇'
-    word: true
   - trigger: 'intello★'
     replace: '🤓'
-    word: true
   - trigger: 'interdit★'
     replace: '⛔'
-    word: true
   - trigger: 'journal★'
     replace: '📰'
-    word: true
   - trigger: 'kangourou★'
     replace: '🦘'
-    word: true
   - trigger: 'kiwi★'
     replace: '🥝'
-    word: true
   - trigger: 'koala★'
     replace: '🐨'
-    word: true
   - trigger: 'lait★'
     replace: '🥛'
-    word: true
   - trigger: 'lama★'
     replace: '🦙'
-    word: true
   - trigger: 'lapin★'
     replace: '🐇'
-    word: true
   - trigger: 'larme★'
     replace: '😢'
-    word: true
   - trigger: 'larmes★'
     replace: '😭'
-    word: true
   - trigger: 'licorne★'
     replace: '🦄'
-    word: true
   - trigger: 'like★'
     replace: '👍'
-    word: true
   - trigger: 'lion★'
     replace: '🦁'
-    word: true
   - trigger: 'livre★'
     replace: '📖'
-    word: true
   - trigger: 'lol★'
     replace: '😂'
-    word: true
   - trigger: 'loup★'
     replace: '🐺'
-    word: true
   - trigger: 'loupe★'
     replace: '🔎'
-    word: true
   - trigger: 'lune★'
     replace: '🌙'
-    word: true
   - trigger: 'lunettes★'
     replace: '🤓'
-    word: true
   - trigger: 'léopard★'
     replace: '🐆'
-    word: true
   - trigger: 'malade★'
     replace: '🤒'
-    word: true
   - trigger: 'masque★'
     replace: '😷'
-    word: true
   - trigger: 'maïs★'
     replace: '🌽'
-    word: true
   - trigger: 'mdr★'
     replace: '😂'
-    word: true
   - trigger: 'medaille★'
     replace: '🥇'
-    word: true
   - trigger: 'melon★'
     replace: '🍈'
-    word: true
   - trigger: 'microphone★'
     replace: '🎤'
-    word: true
   - trigger: 'miel★'
     replace: '🍯'
-    word: true
   - trigger: 'mignon★'
     replace: '🥺'
-    word: true
   - trigger: 'monocle★'
     replace: '🧐'
-    word: true
   - trigger: 'montre★'
     replace: '⌚'
-    word: true
   - trigger: 'mort★'
     replace: '💀'
-    word: true
   - trigger: 'mouton★'
     replace: '🐑'
-    word: true
   - trigger: 'muscles★'
     replace: '💪'
-    word: true
   - trigger: 'musique★'
     replace: '🎵'
-    word: true
   - trigger: 'médaille★'
     replace: '🥇'
-    word: true
   - trigger: 'nice★'
     replace: '👌'
-    word: true
   - trigger: 'noel★'
     replace: '🎄'
-    word: true
   - trigger: 'nuage★'
     replace: '☁️'
-    word: true
   - trigger: 'octopus★'
     replace: '🐙'
-    word: true
   - trigger: 'olaf★'
     replace: '⛄'
-    word: true
   - trigger: 'orange★'
     replace: '🍊'
-    word: true
   - trigger: 'ordinateur★'
     replace: '💻'
-    word: true
   - trigger: 'ouf★'
     replace: '😅'
-    word: true
   - trigger: 'oups★'
     replace: '😅'
-    word: true
   - trigger: 'ours★'
     replace: '🐻'
-    word: true
   - trigger: 'pain★'
     replace: '🍞'
-    word: true
   - trigger: 'panda★'
     replace: '🐼'
-    word: true
   - trigger: 'papillon★'
     replace: '🦋'
-    word: true
   - trigger: 'parapluie★'
     replace: '☂️'
-    word: true
   - trigger: 'paresseux★'
     replace: '🦥'
-    word: true
   - trigger: 'parfait★'
     replace: '👌'
-    word: true
   - trigger: 'pastèque★'
     replace: '🍉'
-    word: true
   - trigger: 'pates★'
     replace: '🍝'
-    word: true
   - trigger: 'penser★'
     replace: '🤔'
-    word: true
   - trigger: 'pensif★'
     replace: '🤔'
-    word: true
   - trigger: 'perroquet★'
     replace: '🦜'
-    word: true
   - trigger: 'peur★'
     replace: '😨'
-    word: true
   - trigger: 'piano★'
     replace: '🎹'
-    word: true
   - trigger: 'pingouin★'
     replace: '🐧'
-    word: true
   - trigger: 'pirate★'
     replace: '🏴‍☠️'
-    word: true
   - trigger: 'pizza★'
     replace: '🍕'
-    word: true
   - trigger: 'pleur★'
     replace: '😭'
-    word: true
   - trigger: 'pleurer★'
     replace: '😭'
-    word: true
   - trigger: 'pluie★'
     replace: '🌧️'
-    word: true
   - trigger: 'poire★'
     replace: '🍐'
-    word: true
   - trigger: 'poisson★'
     replace: '🐟'
-    word: true
   - trigger: 'pomme★'
     replace: '🍎'
-    word: true
   - trigger: 'popcorn★'
     replace: '🍿'
-    word: true
   - trigger: 'pouce★'
     replace: '👍'
-    word: true
   - trigger: 'poule★'
     replace: '🐔'
-    word: true
   - trigger: 'poussin★'
     replace: '🐣'
-    word: true
   - trigger: 'pêche★'
     replace: '🍑'
-    word: true
   - trigger: 'radioactif★'
     replace: '☢️'
-    word: true
   - trigger: 'rage★'
     replace: '😡'
-    word: true
   - trigger: 'raisin★'
     replace: '🍇'
-    word: true
   - trigger: 'regard★'
     replace: '👀'
-    word: true
   - trigger: 'renard★'
     replace: '🦊'
-    word: true
   - trigger: 'requin★'
     replace: '🦈'
-    word: true
   - trigger: 'rhinoceros★'
     replace: '🦏'
-    word: true
   - trigger: 'rhinocéros★'
     replace: '🦏'
-    word: true
   - trigger: 'rire★'
     replace: '😂'
-    word: true
   - trigger: 'riz★'
     replace: '🍚'
-    word: true
   - trigger: 'robot★'
     replace: '🤖'
-    word: true
   - trigger: 'sacoche★'
     replace: '💼'
-    word: true
   - trigger: 'salade★'
     replace: '🥗'
-    word: true
   - trigger: 'sandwich★'
     replace: '🥪'
-    word: true
   - trigger: 'sanglier★'
     replace: '🐗'
-    word: true
   - trigger: 'serpent★'
     replace: '🐍'
-    word: true
   - trigger: 'silence★'
     replace: '🤫'
-    word: true
   - trigger: 'singe★'
     replace: '🐒'
-    word: true
   - trigger: 'smartphone★'
     replace: '📱'
-    word: true
   - trigger: 'snif★'
     replace: '😢'
-    word: true
   - trigger: 'soleil★'
     replace: '☀️'
-    word: true
   - trigger: 'souris★'
     replace: '🐁'
-    word: true
   - trigger: 'spaghetti★'
     replace: '🍝'
-    word: true
   - trigger: 'stress★'
     replace: '😰'
-    word: true
   - trigger: 'strong★'
     replace: '💪'
-    word: true
   - trigger: 'surprise★'
     replace: '😲'
-    word: true
   - trigger: 'taco★'
     replace: '🌮'
-    word: true
   - trigger: 'tacos★'
     replace: '🌮'
-    word: true
   - trigger: 'telephone★'
     replace: '☎️'
-    word: true
   - trigger: 'terre★'
     replace: '🌍'
-    word: true
   - trigger: 'thermomètre★'
     replace: '🌡️'
-    word: true
   - trigger: 'thé★'
     replace: '🍵'
-    word: true
   - trigger: 'tigre★'
     replace: '🐅'
-    word: true
   - trigger: 'timer★'
     replace: '⏲️'
-    word: true
   - trigger: 'timide★'
     replace: '😳'
-    word: true
   - trigger: 'toilette★'
     replace: '🧻'
-    word: true
   - trigger: 'tomate★'
     replace: '🍅'
-    word: true
   - trigger: 'tortue★'
     replace: '🐢'
-    word: true
   - trigger: 'train★'
     replace: '🚂'
-    word: true
   - trigger: 'trex★'
     replace: '🦖'
-    word: true
   - trigger: 'triste★'
     replace: '😢'
-    word: true
   - trigger: 'téléphone★'
     replace: '☎️'
-    word: true
   - trigger: 'vache★'
     replace: '🐄'
-    word: true
   - trigger: 'victoire★'
     replace: '✌️'
-    word: true
   - trigger: 'vin★'
     replace: '🍷'
-    word: true
   - trigger: 'voiture★'
     replace: '🚗'
-    word: true
   - trigger: 'vélo★'
     replace: '🚲'
-    word: true
   - trigger: 'yeux★'
     replace: '👀'
-    word: true
   - trigger: 'zombie★'
     replace: '🧟'
-    word: true
   - trigger: 'zèbre★'
     replace: '🦓'
-    word: true
   - trigger: 'éclair★'
     replace: '⚡'
-    word: true
   - trigger: 'écureuil★'
     replace: '🐿️'
-    word: true
   - trigger: 'éléphant★'
     replace: '🐘'
-    word: true
   - trigger: 'épée★'
     replace: '⚔️'
-    word: true
   - trigger: 'étoile★'
     replace: '⭐'
-    word: true

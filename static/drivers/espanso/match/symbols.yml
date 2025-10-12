@@ -1,442 +1,295 @@
 matches:
   - trigger: ' -> ★'
     replace: ' ➜ '
-    word: true
   - trigger: '(0)★'
     replace: '🄋'
-    word: true
   - trigger: '(0b)★'
     replace: '𝟎'
-    word: true
   - trigger: '(0g)★'
     replace: '𝟬'
-    word: true
   - trigger: '(0n)★'
     replace: '🄌'
-    word: true
   - trigger: '(1)★'
     replace: '➀'
-    word: true
   - trigger: '(10)★'
     replace: '➉'
-    word: true
   - trigger: '(10n)★'
     replace: '➓'
-    word: true
   - trigger: '(1b)★'
     replace: '𝟏'
-    word: true
   - trigger: '(1g)★'
     replace: '𝟭'
-    word: true
   - trigger: '(1n)★'
     replace: '➊'
-    word: true
   - trigger: '(2)★'
     replace: '➁'
-    word: true
   - trigger: '(2b)★'
     replace: '𝟐'
-    word: true
   - trigger: '(2g)★'
     replace: '𝟮'
-    word: true
   - trigger: '(2n)★'
     replace: '➋'
-    word: true
   - trigger: '(3)★'
     replace: '➂'
-    word: true
   - trigger: '(3b)★'
     replace: '𝟑'
-    word: true
   - trigger: '(3g)★'
     replace: '𝟯'
-    word: true
   - trigger: '(3n)★'
     replace: '➌'
-    word: true
   - trigger: '(4)★'
     replace: '➃'
-    word: true
   - trigger: '(4b)★'
     replace: '𝟒'
-    word: true
   - trigger: '(4g)★'
     replace: '𝟰'
-    word: true
   - trigger: '(4n)★'
     replace: '➍'
-    word: true
   - trigger: '(5)★'
     replace: '➄'
-    word: true
   - trigger: '(5b)★'
     replace: '𝟓'
-    word: true
   - trigger: '(5g)★'
     replace: '𝟱'
-    word: true
   - trigger: '(5n)★'
     replace: '➎'
-    word: true
   - trigger: '(6)★'
     replace: '➅'
-    word: true
   - trigger: '(6b)★'
     replace: '𝟔'
-    word: true
   - trigger: '(6g)★'
     replace: '𝟲'
-    word: true
   - trigger: '(6n)★'
     replace: '➏'
-    word: true
   - trigger: '(7)★'
     replace: '➆'
-    word: true
   - trigger: '(7b)★'
     replace: '𝟕'
-    word: true
   - trigger: '(7g)★'
     replace: '𝟳'
-    word: true
   - trigger: '(7n)★'
     replace: '➐'
-    word: true
   - trigger: '(8)★'
     replace: '➇'
-    word: true
   - trigger: '(8b)★'
     replace: '𝟖'
-    word: true
   - trigger: '(8g)★'
     replace: '𝟴'
-    word: true
   - trigger: '(8n)★'
     replace: '➑'
-    word: true
   - trigger: '(9)★'
     replace: '➈'
-    word: true
   - trigger: '(9b)★'
     replace: '𝟗'
-    word: true
   - trigger: '(9g)★'
     replace: '𝟵'
-    word: true
   - trigger: '(9n)★'
     replace: '➒'
-    word: true
   - trigger: '(<<)★'
     replace: '≪'
-    word: true
   - trigger: '(=)★'
     replace: '≡'
-    word: true
   - trigger: '(^)★'
     replace: '∧'
-    word: true
   - trigger: '(appartient)★'
     replace: '∈'
-    word: true
   - trigger: '(b)★'
     replace: '•'
-    word: true
   - trigger: '(c)★'
     replace: '©'
-    word: true
   - trigger: '(coproduct)★'
     replace: '∐'
-    word: true
   - trigger: '(coproduit)★'
     replace: '∐'
-    word: true
   - trigger: '(delta)★'
     replace: '∆'
-    word: true
   - trigger: '(empty)★'
     replace: '∅'
-    word: true
   - trigger: '(end of proof)★'
     replace: '∎'
-    word: true
   - trigger: '(ensemble vide)★'
     replace: '∅'
-    word: true
   - trigger: '(eop)★'
     replace: '∎'
-    word: true
   - trigger: '(equivalent)★'
     replace: '⇔'
-    word: true
   - trigger: '(et)★'
     replace: '∧'
-    word: true
   - trigger: '(exist)★'
     replace: '∃'
-    word: true
   - trigger: '(exists)★'
     replace: '∃'
-    word: true
   - trigger: '(for all)★'
     replace: '∀'
-    word: true
   - trigger: '(forall)★'
     replace: '∀'
-    word: true
   - trigger: '(implique)★'
     replace: '⇒'
-    word: true
   - trigger: '(impliqué)★'
     replace: '⇒'
-    word: true
   - trigger: '(imply)★'
     replace: '⇒'
-    word: true
   - trigger: '(inclus)★'
     replace: '⊂'
-    word: true
   - trigger: '(infini)★'
     replace: '∞'
-    word: true
   - trigger: '(int)★'
     replace: '∫'
-    word: true
   - trigger: '(intersection)★'
     replace: '⋂'
-    word: true
   - trigger: '(nabla)★'
     replace: '∇'
-    word: true
   - trigger: '(non appartient)★'
     replace: '∉'
-    word: true
   - trigger: '(non implique)★'
     replace: '⇏'
-    word: true
   - trigger: '(non impliqué)★'
     replace: '⇏'
-    word: true
   - trigger: '(non inclus)★'
     replace: '⊄'
-    word: true
   - trigger: '(non équivalent)★'
     replace: '⇎'
-    word: true
   - trigger: '(non)★'
     replace: '¬'
-    word: true
   - trigger: '(not equivalent)★'
     replace: '⇎'
-    word: true
   - trigger: '(n’appartient pas)★'
     replace: '∉'
-    word: true
   - trigger: '(o)★'
     replace: '•'
-    word: true
   - trigger: '(partial)★'
     replace: '∂'
-    word: true
   - trigger: '(pour tout)★'
     replace: '∀'
-    word: true
   - trigger: '(product)★'
     replace: '∏'
-    word: true
   - trigger: '(produit)★'
     replace: '∏'
-    word: true
   - trigger: '(prop)★'
     replace: '∝'
-    word: true
   - trigger: '(proportionnal)★'
     replace: '∝'
-    word: true
   - trigger: '(proportionnel)★'
     replace: '∝'
-    word: true
   - trigger: '(r)★'
     replace: '®'
-    word: true
   - trigger: '(racine)★'
     replace: '√'
-    word: true
   - trigger: '(s)★'
     replace: '∫'
-    word: true
   - trigger: '(so)★'
     replace: '∮'
-    word: true
   - trigger: '(sqrt)★'
     replace: '√'
-    word: true
   - trigger: '(sso)★'
     replace: '∯'
-    word: true
   - trigger: '(sss)★'
     replace: '∭'
-    word: true
   - trigger: '(ssso)★'
     replace: '∰'
-    word: true
   - trigger: '(tm)★'
     replace: '™'
-    word: true
   - trigger: '(union)★'
     replace: '∪'
-    word: true
   - trigger: '(v)★'
     replace: '✓'
-    word: true
   - trigger: '(vide)★'
     replace: '∅'
-    word: true
   - trigger: '(void)★'
     replace: '∅'
-    word: true
   - trigger: '(x)★'
     replace: '✗'
-    word: true
   - trigger: '(équivalent)★'
     replace: '⇔'
-    word: true
   - trigger: '**★'
     replace: '⁂'
-    word: true
   - trigger: '-->★'
     replace: ' ➜ '
-    word: true
   - trigger: '->★'
     replace: '→'
-    word: true
   - trigger: '->>★'
     replace: '➡'
-    word: true
   - trigger: '/!\★'
     replace: '⚠'
-    word: true
   - trigger: '0/3★'
     replace: '↉'
-    word: true
   - trigger: '1/★'
     replace: '⅟'
-    word: true
   - trigger: '1/10★'
     replace: '⅒'
-    word: true
   - trigger: '1/2★'
     replace: '½'
-    word: true
   - trigger: '1/3★'
     replace: '⅓'
-    word: true
   - trigger: '1/4★'
     replace: '¼'
-    word: true
   - trigger: '1/5★'
     replace: '⅕'
-    word: true
   - trigger: '1/6★'
     replace: '⅙'
-    word: true
   - trigger: '1/7★'
     replace: '⅐'
-    word: true
   - trigger: '1/8★'
     replace: '⅛'
-    word: true
   - trigger: '1/9★'
     replace: '⅑'
-    word: true
   - trigger: '2/3★'
     replace: '⅔'
-    word: true
   - trigger: '2/5★'
     replace: '⅖'
-    word: true
   - trigger: '3/4★'
     replace: '¾'
-    word: true
   - trigger: '3/5★'
     replace: '⅗'
-    word: true
   - trigger: '3/8★'
     replace: '⅜'
-    word: true
   - trigger: '4/5★'
     replace: '⅘'
-    word: true
   - trigger: '5/6★'
     replace: '⅚'
-    word: true
   - trigger: '5/8★'
     replace: '⅝'
-    word: true
   - trigger: '7/8★'
     replace: '⅞'
-    word: true
   - trigger: '<-★'
     replace: '←'
-    word: true
   - trigger: '<-|★'
     replace: '↩'
-    word: true
   - trigger: '<<-★'
     replace: '⬅'
-    word: true
   - trigger: '<=/=>★'
     replace: '⇎'
-    word: true
   - trigger: '<==★'
     replace: '⇐'
-    word: true
   - trigger: '<==>★'
     replace: '⇔'
-    word: true
   - trigger: '<=>★'
     replace: '⇔'
-    word: true
   - trigger: '=/=>★'
     replace: '⇏'
-    word: true
   - trigger: '==>★'
     replace: '⇒'
-    word: true
   - trigger: '>★'
     replace: '➢'
-    word: true
   - trigger: '[v]★'
     replace: '☑'
-    word: true
   - trigger: '[x]★'
     replace: '☒'
-    word: true
   - trigger: '^|★'
     replace: '↑'
-    word: true
   - trigger: '^|-★'
     replace: '⭮'
-    word: true
   - trigger: 'eme★'
     replace: 'ᵉ'
-    word: true
   - trigger: 'ieme★'
     replace: 'ᵉ'
-    word: true
   - trigger: 'ième★'
     replace: 'ᵉ'
-    word: true
   - trigger: '|->★'
     replace: '↪'
-    word: true
   - trigger: '|^★'
     replace: '↓'
-    word: true
   - trigger: '°C★'
     replace: '℃'
-    word: true
   - trigger: 'ème★'
     replace: 'ᵉ'
-    word: true

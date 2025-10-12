@@ -1,6 +1,8 @@
 matches:
   - trigger: 'yè'
     replace: 'â'
+  - trigger: 'àé'
+    replace: 'éi'
   - trigger: 'èy'
     replace: 'aî'
   - trigger: 'éà'

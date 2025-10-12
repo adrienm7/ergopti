@@ -1,882 +1,601 @@
 matches:
   - trigger: 'abim'
     replace: 'abîm'
-    word: true
   - trigger: 'accroit'
     replace: 'accroît'
-    word: true
   - trigger: 'affut'
     replace: 'affût'
-    word: true
   - trigger: 'agé'
     replace: 'âgé'
-    word: true
   - trigger: 'agée'
     replace: 'âgée'
-    word: true
   - trigger: 'agées'
     replace: 'âgées'
-    word: true
   - trigger: 'agés'
     replace: 'âgés'
-    word: true
   - trigger: 'aieul'
     replace: 'aïeul'
-    word: true
   - trigger: 'aieux'
     replace: 'aïeux'
-    word: true
   - trigger: 'ainé'
     replace: 'aîné'
-    word: true
   - trigger: 'ambigue'
     replace: 'ambiguë'
-    word: true
   - trigger: 'ambigui'
     replace: 'ambiguï'
-    word: true
   - trigger: 'ame'
     replace: 'âme'
-    word: true
   - trigger: 'ames'
     replace: 'âmes'
-    word: true
   - trigger: 'ane'
     replace: 'âne'
-    word: true
   - trigger: 'anerie'
     replace: 'ânerie'
-    word: true
   - trigger: 'anes'
     replace: 'ânes'
-    word: true
   - trigger: 'angstrom'
     replace: 'ångström'
-    word: true
   - trigger: 'aout'
     replace: 'août'
-    word: true
   - trigger: 'apotre'
     replace: 'apôtre'
-    word: true
   - trigger: 'appat'
     replace: 'appât'
-    word: true
   - trigger: 'apprete'
     replace: 'apprête'
-    word: true
   - trigger: 'appreter'
     replace: 'apprêter'
-    word: true
   - trigger: 'apre'
     replace: 'âpre'
-    word: true
   - trigger: 'archaique'
     replace: 'archaïque'
-    word: true
   - trigger: 'archaisme'
     replace: 'archaïsme'
-    word: true
   - trigger: 'archeveque'
     replace: 'archevêque'
-    word: true
   - trigger: 'archeveques'
     replace: 'archevêques'
-    word: true
   - trigger: 'arete'
     replace: 'arête'
-    word: true
   - trigger: 'aretes'
     replace: 'arêtes'
-    word: true
   - trigger: 'arome'
     replace: 'arôme'
-    word: true
   - trigger: 'arret'
     replace: 'arrêt'
-    word: true
   - trigger: 'aumone'
     replace: 'aumône'
-    word: true
   - trigger: 'aumonier'
     replace: 'aumônier'
-    word: true
   - trigger: 'aussitot'
     replace: 'aussitôt'
-    word: true
   - trigger: 'avant-gout'
     replace: 'avant-goût'
-    word: true
   - trigger: 'babord'
     replace: 'bâbord'
-    word: true
   - trigger: 'baille'
     replace: 'bâille'
-    word: true
   - trigger: 'baillon'
     replace: 'bâillon'
-    word: true
   - trigger: 'baionnette'
     replace: 'baïonnette'
-    word: true
   - trigger: 'batard'
     replace: 'bâtard'
-    word: true
   - trigger: 'bati'
     replace: 'bâti'
-    word: true
   - trigger: 'baton'
     replace: 'bâton'
-    word: true
   - trigger: 'beche'
     replace: 'bêche'
-    word: true
   - trigger: 'beches'
     replace: 'bêches'
-    word: true
   - trigger: 'benet'
     replace: 'benêt'
-    word: true
   - trigger: 'benets'
     replace: 'benêts'
-    word: true
   - trigger: 'bete'
     replace: 'bête'
-    word: true
   - trigger: 'betis'
     replace: 'bêtis'
-    word: true
   - trigger: 'bientot'
     replace: 'bientôt'
-    word: true
   - trigger: 'binome'
     replace: 'binôme'
-    word: true
   - trigger: 'blamer'
     replace: 'blâmer'
-    word: true
   - trigger: 'bleme'
     replace: 'blême'
-    word: true
   - trigger: 'blemes'
     replace: 'blêmes'
-    word: true
   - trigger: 'blemir'
     replace: 'blêmir'
-    word: true
   - trigger: 'blémir'
     replace: 'blêmir'
-    word: true
   - trigger: 'boeuf'
     replace: 'bœuf'
-    word: true
   - trigger: 'boite'
     replace: 'boîte'
   - trigger: 'brul'
     replace: 'brûl'
-    word: true
   - trigger: 'buche'
     replace: 'bûche'
-    word: true
   - trigger: 'calin'
     replace: 'câlin'
-    word: true
   - trigger: 'canoe'
     replace: 'canoë'
-    word: true
   - trigger: 'chaine'
     replace: 'chaîne'
   - trigger: 'chainé'
     replace: 'chaîné'
   - trigger: 'chassis'
     replace: 'châssis'
-    word: true
   - trigger: 'chateau'
     replace: 'château'
-    word: true
   - trigger: 'chatier'
     replace: 'châtier'
-    word: true
   - trigger: 'chatiment'
     replace: 'châtiment'
-    word: true
   - trigger: 'chaîned'
     replace: 'chained'
   - trigger: 'chomage'
     replace: 'chômage'
-    word: true
   - trigger: 'chomer'
     replace: 'chômer'
-    word: true
   - trigger: 'chomeu'
     replace: 'chômeu'
-    word: true
   - trigger: 'chomé'
     replace: 'chômé'
-    word: true
   - trigger: 'cloture'
     replace: 'clôture'
-    word: true
   - trigger: 'cloturé'
     replace: 'clôturé'
-    word: true
   - trigger: 'coeur'
     replace: 'cœur'
-    word: true
   - trigger: 'coincide'
     replace: 'coïncide'
-    word: true
   - trigger: 'connait'
     replace: 'connaît'
   - trigger: 'controle'
     replace: 'contrôle'
-    word: true
   - trigger: 'controlé'
     replace: 'contrôlé'
-    word: true
   - trigger: 'cote'
     replace: 'côte'
-    word: true
   - trigger: 'cotes'
     replace: 'côtes'
-    word: true
   - trigger: 'cotoie'
     replace: 'côtoie'
-    word: true
   - trigger: 'cotoy'
     replace: 'côtoy'
-    word: true
   - trigger: 'cout'
     replace: 'coût'
-    word: true
   - trigger: 'coute'
     replace: 'coûte'
-    word: true
   - trigger: 'couter'
     replace: 'coûter'
-    word: true
   - trigger: 'couteu'
     replace: 'coûteu'
-    word: true
   - trigger: 'couts'
     replace: 'coûts'
-    word: true
   - trigger: 'croitre'
     replace: 'croître'
   - trigger: 'crouton'
     replace: 'croûton'
-    word: true
   - trigger: 'diplome'
     replace: 'diplôme'
-    word: true
   - trigger: 'diplomé'
     replace: 'diplômé'
-    word: true
   - trigger: 'drole'
     replace: 'drôle'
-    word: true
   - trigger: 'dument'
     replace: 'dûment'
-    word: true
   - trigger: 'débacle'
     replace: 'débâcle'
-    word: true
   - trigger: 'dégat'
     replace: 'dégât'
-    word: true
   - trigger: 'dégout'
     replace: 'dégoût'
-    word: true
   - trigger: 'dépech'
     replace: 'dépêch'
-    word: true
   - trigger: 'dépot'
     replace: 'dépôt'
-    word: true
   - trigger: 'dépots'
     replace: 'dépôts'
-    word: true
   - trigger: 'egoisme'
     replace: 'egoïsme'
-    word: true
   - trigger: 'egoiste'
     replace: 'egoïste'
-    word: true
   - trigger: 'elle-meme'
     replace: 'elle-même'
-    word: true
   - trigger: 'elles-meme'
     replace: 'elles-mêmes'
-    word: true
   - trigger: 'elles-memes'
     replace: 'elles-mêmes'
-    word: true
   - trigger: 'embet'
     replace: 'embêt'
-    word: true
   - trigger: 'embuch'
     replace: 'embûch'
-    word: true
   - trigger: 'empeche'
     replace: 'empêche'
-    word: true
   - trigger: 'enchaine'
     replace: 'enchaîne'
-    word: true
   - trigger: 'enjoleu'
     replace: 'enjôleu'
-    word: true
   - trigger: 'enrole'
     replace: 'enrôle'
-    word: true
   - trigger: 'entete'
     replace: 'entête'
-    word: true
   - trigger: 'enteté'
     replace: 'entêté'
-    word: true
   - trigger: 'entraina'
     replace: 'entraîna'
-    word: true
   - trigger: 'entraine'
     replace: 'entraîne'
-    word: true
   - trigger: 'entrainé'
     replace: 'entraîné'
-    word: true
   - trigger: 'entrepot'
     replace: 'entrepôt'
-    word: true
   - trigger: 'envout'
     replace: 'envoût'
-    word: true
   - trigger: 'eux-meme'
     replace: 'eux-mêmes'
-    word: true
   - trigger: 'fache'
     replace: 'fâche'
-    word: true
   - trigger: 'faché'
     replace: 'fâché'
-    word: true
   - trigger: 'fantom'
     replace: 'fantôm'
-    word: true
   - trigger: 'felure'
     replace: 'fêlure'
-    word: true
   - trigger: 'fenetre'
     replace: 'fenêtre'
-    word: true
   - trigger: 'fete'
     replace: 'fête'
-    word: true
   - trigger: 'feter'
     replace: 'fêter'
-    word: true
   - trigger: 'fetes'
     replace: 'fêtes'
-    word: true
   - trigger: 'flane'
     replace: 'flâne'
-    word: true
   - trigger: 'flaner'
     replace: 'flâner'
-    word: true
   - trigger: 'flanes'
     replace: 'flânes'
-    word: true
   - trigger: 'flaneu'
     replace: 'flâneu'
-    word: true
   - trigger: 'flanez'
     replace: 'flânez'
-    word: true
   - trigger: 'flanons'
     replace: 'flânons'
-    word: true
   - trigger: 'flute'
     replace: 'flûte'
-    word: true
   - trigger: 'flutes'
     replace: 'flûtes'
-    word: true
   - trigger: 'foetus'
     replace: 'fœtus'
-    word: true
   - trigger: 'foret'
     replace: 'forêt'
-    word: true
   - trigger: 'fraich'
     replace: 'fraîch'
   - trigger: 'froide'
     replace: 'froide'
   - trigger: 'frole'
     replace: 'frôle'
-    word: true
   - trigger: 'félure'
     replace: 'fêlure'
-    word: true
   - trigger: 'gach'
     replace: 'gâch'
-    word: true
   - trigger: 'gateau'
     replace: 'gâteau'
-    word: true
   - trigger: 'gater'
     replace: 'gâter'
-    word: true
   - trigger: 'gaté'
     replace: 'gâté'
-    word: true
   - trigger: 'gatés'
     replace: 'gâtés'
-    word: true
   - trigger: 'genant'
     replace: 'gênant'
-    word: true
   - trigger: 'gener'
     replace: 'gêner'
-    word: true
   - trigger: 'geole'
     replace: 'geôle'
-    word: true
   - trigger: 'geolier'
     replace: 'geôlier'
   - trigger: 'geoliè'
     replace: 'geôliè'
   - trigger: 'gout'
     replace: 'goût'
-    word: true
   - trigger: 'gouta'
     replace: 'goûta'
-    word: true
   - trigger: 'goute'
     replace: 'goûte'
-    word: true
   - trigger: 'gouter'
     replace: 'goûter'
-    word: true
   - trigger: 'goutes'
     replace: 'goûtes'
-    word: true
   - trigger: 'goutez'
     replace: 'goûtez'
-    word: true
   - trigger: 'goutons'
     replace: 'goûtons'
-    word: true
   - trigger: 'grele'
     replace: 'grêle'
-    word: true
   - trigger: 'greler'
     replace: 'grêler'
-    word: true
   - trigger: 'grèle'
     replace: 'grêle'
-    word: true
   - trigger: 'guepe'
     replace: 'guêpe'
-    word: true
   - trigger: 'génant'
     replace: 'gênant'
-    word: true
   - trigger: 'génants'
     replace: 'gênants'
-    word: true
   - trigger: 'heroique'
     replace: 'héroïque'
-    word: true
   - trigger: 'heroisme'
     replace: 'héroïsme'
-    word: true
   - trigger: 'honnete'
     replace: 'honnête'
   - trigger: 'hopita'
     replace: 'hôpita'
-    word: true
   - trigger: 'huitre'
     replace: 'huître'
-    word: true
   - trigger: 'héroique'
     replace: 'héroïque'
-    word: true
   - trigger: 'héroisme'
     replace: 'héroïsme'
-    word: true
   - trigger: 'icone'
     replace: 'icône'
-    word: true
   - trigger: 'idolatr'
     replace: 'idolâtr'
-    word: true
   - trigger: 'ile'
     replace: 'île'
-    word: true
   - trigger: 'iles'
     replace: 'îles'
-    word: true
   - trigger: 'ilot'
     replace: 'îlot'
-    word: true
   - trigger: 'ilots'
     replace: 'îlots'
-    word: true
   - trigger: 'impot'
     replace: 'impôt'
-    word: true
   - trigger: 'impots'
     replace: 'impôts'
-    word: true
   - trigger: 'indu'
     replace: 'indû'
-    word: true
   - trigger: 'indument'
     replace: 'indûment'
-    word: true
   - trigger: 'indus'
     replace: 'indûs'
-    word: true
   - trigger: 'infame'
     replace: 'infâme'
-    word: true
   - trigger: 'infamie'
     replace: 'infâmie'
-    word: true
   - trigger: 'inoui'
     replace: 'inouï'
-    word: true
   - trigger: 'interet'
     replace: 'intérêt'
-    word: true
   - trigger: 'intéret'
     replace: 'intérêt'
-    word: true
   - trigger: 'jeuner'
     replace: 'jeûner'
-    word: true
   - trigger: 'lache'
     replace: 'lâche'
-    word: true
   - trigger: 'laique'
     replace: 'laïque'
-    word: true
   - trigger: 'laius'
     replace: 'laïus'
-    word: true
   - trigger: 'les notres'
     replace: 'les nôtres'
-    word: true
   - trigger: 'les votres'
     replace: 'les vôtres'
-    word: true
   - trigger: 'lui-meme'
     replace: 'lui-même'
-    word: true
   - trigger: "m'apprete"
     replace: "m'apprête"
-    word: true
   - trigger: 'mache'
     replace: 'mâche'
-    word: true
   - trigger: 'macher'
     replace: 'mâcher'
-    word: true
   - trigger: 'machoire'
     replace: 'mâchoire'
-    word: true
   - trigger: 'machouill'
     replace: 'mâchouill'
-    word: true
   - trigger: 'maelstrom'
     replace: 'maelström'
-    word: true
   - trigger: 'maitr'
     replace: 'maîtr'
-    word: true
   - trigger: 'male'
     replace: 'mâle'
-    word: true
   - trigger: 'males'
     replace: 'mâles'
-    word: true
   - trigger: 'malstrom'
     replace: 'malström'
-    word: true
   - trigger: 'manoeuvr'
     replace: 'manœuvr'
-    word: true
   - trigger: 'maratre'
     replace: 'marâtre'
-    word: true
   - trigger: 'meler'
     replace: 'mêler'
   - trigger: 'mome'
     replace: 'môme'
-    word: true
   - trigger: 'momes'
     replace: 'mômes'
-    word: true
   - trigger: 'mosaique'
     replace: 'mosaïque'
-    word: true
   - trigger: 'multitache'
     replace: 'multitâche'
-    word: true
   - trigger: 'murement'
     replace: 'mûrement'
-    word: true
   - trigger: 'murir'
     replace: 'mûrir'
-    word: true
   - trigger: 'm’apprete'
     replace: 'm’apprête'
-    word: true
   - trigger: 'naif'
     replace: 'naïf'
-    word: true
   - trigger: 'naifs'
     replace: 'naïfs'
-    word: true
   - trigger: 'naitre'
     replace: 'naître'
-    word: true
   - trigger: 'naives'
     replace: 'naïves'
-    word: true
   - trigger: 'noeud'
     replace: 'nœud'
-    word: true
   - trigger: 'oecuméni'
     replace: 'œcuméni'
-    word: true
   - trigger: 'oeil'
     replace: 'œil'
-    word: true
   - trigger: 'oesophage'
     replace: 'œsophage'
-    word: true
   - trigger: 'oeuf'
     replace: 'œuf'
-    word: true
   - trigger: 'oeuvre'
     replace: 'œuvre'
-    word: true
   - trigger: 'oiaque'
     replace: 'oïaque'
   - trigger: 'oide'
     replace: 'oïde'
   - trigger: 'opiniatre'
     replace: 'opiniâtre'
-    word: true
   - trigger: 'oter'
     replace: 'ôter'
-    word: true
   - trigger: 'ouie'
     replace: 'ouïe'
-    word: true
   - trigger: 'paella'
     replace: 'paëlla'
-    word: true
   - trigger: 'palir'
     replace: 'pâlir'
-    word: true
   - trigger: 'parait'
     replace: 'paraît'
   - trigger: 'paranoia'
     replace: 'paranoïa'
   - trigger: 'pate'
     replace: 'pâte'
-    word: true
   - trigger: 'pates'
     replace: 'pâtes'
-    word: true
   - trigger: 'patir'
     replace: 'pâtir'
-    word: true
   - trigger: 'patiss'
     replace: 'pâtiss'
-    word: true
   - trigger: 'patur'
     replace: 'pâtur'
-    word: true
   - trigger: 'paté'
     replace: 'pâté'
-    word: true
   - trigger: 'patés'
     replace: 'pâtés'
-    word: true
   - trigger: 'peche'
     replace: 'pêche'
-    word: true
   - trigger: 'pecher'
     replace: 'pêcher'
-    word: true
   - trigger: 'peches'
     replace: 'pêches'
-    word: true
   - trigger: 'pecheu'
     replace: 'pêcheu'
-    word: true
   - trigger: 'phoenix'
     replace: 'phœnix'
-    word: true
   - trigger: 'photovoltai'
     replace: 'photovoltaï'
-    word: true
   - trigger: 'piqure'
     replace: 'piqûre'
-    word: true
   - trigger: 'plait'
     replace: 'plaît'
-    word: true
   - trigger: 'platre'
     replace: 'plâtre'
-    word: true
   - trigger: 'plutot'
     replace: 'plutôt'
-    word: true
   - trigger: 'poele'
     replace: 'poêle'
-    word: true
   - trigger: 'polynom'
     replace: 'polynôm'
-    word: true
   - trigger: 'pret'
     replace: 'prêt'
-    word: true
   - trigger: 'prets'
     replace: 'prêts'
-    word: true
   - trigger: 'prochaine'
     replace: 'prochaine'
-    word: true
   - trigger: 'prosaique'
     replace: 'prosaïque'
-    word: true
   - trigger: 'pylone'
     replace: 'pylône'
-    word: true
   - trigger: 'quete'
     replace: 'quête'
-    word: true
   - trigger: 'raler'
     replace: 'râler'
-    word: true
   - trigger: 'relache'
     replace: 'relâche'
-    word: true
   - trigger: 'requete'
     replace: 'requête'
-    word: true
   - trigger: 'revasse'
     replace: 'rêvasse'
-    word: true
   - trigger: 'reve'
     replace: 'rêve'
-    word: true
   - trigger: 'rever'
     replace: 'rêver'
-    word: true
   - trigger: 'reverie'
     replace: 'rêverie'
-    word: true
   - trigger: 'reves'
     replace: 'rêves'
-    word: true
   - trigger: 'roti'
     replace: 'rôti'
-    word: true
   - trigger: 'salpetre'
     replace: 'salpêtre'
-    word: true
   - trigger: 'samourai'
     replace: 'samouraï'
-    word: true
   - trigger: 'soeur'
     replace: 'sœur'
-    word: true
   - trigger: 'soule'
     replace: 'soûle'
-    word: true
   - trigger: 'souler'
     replace: 'soûler'
-    word: true
   - trigger: 'soules'
     replace: 'soûles'
-    word: true
   - trigger: 'soulé'
     replace: 'soûlé'
-    word: true
   - trigger: 'stoicisme'
     replace: 'stoïcisme'
-    word: true
   - trigger: 'stoique'
     replace: 'stoïque'
-    word: true
   - trigger: 'surcout'
     replace: 'surcoût'
-    word: true
   - trigger: 'surcroit'
     replace: 'surcroît'
-    word: true
   - trigger: 'surement'
     replace: 'sûrement'
-    word: true
   - trigger: 'sureté'
     replace: 'sûreté'
-    word: true
   - trigger: 'surs'
     replace: 'sûrs'
-    word: true
   - trigger: 'symptom'
     replace: 'symptôm'
   - trigger: 'tantot'
     replace: 'tantôt'
-    word: true
   - trigger: 'tempete'
     replace: 'tempête'
-    word: true
   - trigger: 'tete'
     replace: 'tête'
-    word: true
   - trigger: 'tetes'
     replace: 'têtes'
-    word: true
   - trigger: 'theatr'
     replace: 'théâtr'
-    word: true
   - trigger: 'théatr'
     replace: 'théâtr'
-    word: true
   - trigger: 'tole'
     replace: 'tôle'
-    word: true
   - trigger: 'toles'
     replace: 'tôles'
-    word: true
   - trigger: 'traitr'
     replace: 'traîtr'
-    word: true
   - trigger: 'treve'
     replace: 'trêve'
-    word: true
   - trigger: 'treves'
     replace: 'trêves'
-    word: true
   - trigger: 'trinome'
     replace: 'trinôme'
-    word: true
   - trigger: 'trone'
     replace: 'trône'
   - trigger: 'vetement'
     replace: 'vêtement'
   - trigger: 'voeu'
     replace: 'vœu'
-    word: true
   - trigger: 'égoisme'
     replace: 'égoïsme'
-    word: true
   - trigger: 'égoiste'
     replace: 'égoïste'
-    word: true

@@ -1,13 +1,9 @@
 matches:
   - trigger: '! !'
     replace: '!!'
-    word: true
   - trigger: '? ?'
     replace: '??'
-    word: true
   - trigger: ' ! !'
     replace: ' !!'
-    word: true
   - trigger: ' ? ?'
     replace: ' ??'
-    word: true
