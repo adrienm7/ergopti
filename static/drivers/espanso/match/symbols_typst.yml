@@ -2690,9 +2690,6 @@ matches:
   - trigger: '$quote.chevron.r.single$'
     replace: '›'
     word: true
-  - trigger: '$quote.double$'
-    replace: '`'
-    word: true
   - trigger: '$quote.high.double$'
     replace: '‟'
     word: true

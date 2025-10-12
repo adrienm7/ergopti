@@ -1,8 +1,38 @@
 matches:
+  - trigger: ' !#'
+    replace: ' != '
+    propagate_case: true
+  - trigger: ' #!'
+    replace: ' := '
+    propagate_case: true
+  - trigger: ' #ç'
+    replace: ' := '
+    propagate_case: true
+  - trigger: ' $='
+    replace: ' => '
+    propagate_case: true
+  - trigger: ' +?'
+    replace: ' -> '
+    propagate_case: true
+  - trigger: ' =$'
+    replace: ' <= '
+    propagate_case: true
+  - trigger: ' =+'
+    replace: ' ➜ '
+    propagate_case: true
+  - trigger: ' ?+'
+    replace: ' <- '
+    propagate_case: true
+  - trigger: ' ç#'
+    replace: ' != '
+    propagate_case: true
   - trigger: '!#'
     replace: ' != '
     propagate_case: true
   - trigger: '#!'
+    replace: ' := '
+    propagate_case: true
+  - trigger: '#ç'
     replace: ' := '
     propagate_case: true
   - trigger: '$='
@@ -10,93 +40,6 @@ matches:
     propagate_case: true
   - trigger: '+?'
     replace: ' -> '
-    propagate_case: true
-  - trigger: ",'"
-    replace: 'j’'
-    propagate_case: true
-  - trigger: ',a'
-    replace: 'ja'
-    propagate_case: true
-  - trigger: ',c'
-    replace: 'ç'
-    propagate_case: true
-  - trigger: ',d'
-    replace: 'ds'
-    propagate_case: true
-  - trigger: ',e'
-    replace: 'je'
-    propagate_case: true
-  - trigger: ',f'
-    replace: 'fl'
-    propagate_case: true
-  - trigger: ',g'
-    replace: 'gl'
-    propagate_case: true
-  - trigger: ',h'
-    replace: 'ph'
-    propagate_case: true
-  - trigger: ',i'
-    replace: 'ji'
-    propagate_case: true
-  - trigger: ',l'
-    replace: 'cl'
-    propagate_case: true
-  - trigger: ',m'
-    replace: 'ms'
-    propagate_case: true
-  - trigger: ',n'
-    replace: 'nl'
-    propagate_case: true
-  - trigger: ',o'
-    replace: 'jo'
-    propagate_case: true
-  - trigger: ',p'
-    replace: 'xp'
-    propagate_case: true
-  - trigger: ',q'
-    replace: 'qu’'
-    propagate_case: true
-  - trigger: ',r'
-    replace: 'rq'
-    propagate_case: true
-  - trigger: ',s'
-    replace: 'qu'
-    propagate_case: true
-  - trigger: ',t'
-    replace: 'pt'
-    propagate_case: true
-  - trigger: ',u'
-    replace: 'ju'
-    propagate_case: true
-  - trigger: ',v'
-    replace: 'dv'
-    propagate_case: true
-  - trigger: ',x'
-    replace: 'où'
-    propagate_case: true
-  - trigger: ',y'
-    replace: 'k'
-    propagate_case: true
-  - trigger: ',z'
-    replace: 'bj'
-    propagate_case: true
-  - trigger: ',à'
-    replace: 'j'
-    propagate_case: true
-  - trigger: ',è'
-    replace: 'z'
-    propagate_case: true
-  - trigger: ',é'
-    replace: 'jé'
-    propagate_case: true
-  - trigger: ',ê'
-    replace: 'ju'
-    propagate_case: true
-  - trigger: ',’'
-    replace: 'j’'
-    propagate_case: true
-  - trigger: '<%'
-    replace: ' <= '
     propagate_case: true
   - trigger: '<@'
     replace: '</'
@@ -106,9 +49,6 @@ matches:
     propagate_case: true
   - trigger: '=+'
     replace: ' ➜ '
-    propagate_case: true
-  - trigger: '>%'
-    replace: ' >= '
     propagate_case: true
   - trigger: '?+'
     replace: ' <- '
@@ -122,69 +62,18 @@ matches:
   - trigger: 'hc'
     replace: 'wh'
     propagate_case: true
+  - trigger: "nt'"
+    replace: "n't"
+    propagate_case: true
   - trigger: "p'"
     replace: 'ct'
-    propagate_case: true
-  - trigger: "q'"
-    replace: 'qu’'
-    propagate_case: true
-  - trigger: 'qa'
-    replace: 'qua'
-    propagate_case: true
-  - trigger: 'qe'
-    replace: 'que'
-    propagate_case: true
-  - trigger: 'qi'
-    replace: 'qui'
-    propagate_case: true
-  - trigger: 'qo'
-    replace: 'quo'
-    propagate_case: true
-  - trigger: 'qè'
-    replace: 'què'
-    propagate_case: true
-  - trigger: 'qé'
-    replace: 'qué'
-    propagate_case: true
-  - trigger: 'qê'
-    replace: 'quê'
-    propagate_case: true
-  - trigger: 'q’'
-    replace: 'qu’'
     propagate_case: true
   - trigger: 'sx'
     replace: 'sk'
     propagate_case: true
-  - trigger: 'yè'
-    replace: 'â'
+  - trigger: 'xlsx'
+    replace: 'xlsx'
     propagate_case: true
-  - trigger: 'èy'
-    replace: 'aî'
-    propagate_case: true
-  - trigger: 'éà'
-    replace: 'ié'
-    propagate_case: true
-  - trigger: 'éê'
-    replace: 'eo'
-    propagate_case: true
-  - trigger: 'êa'
-    replace: 'â'
-    propagate_case: true
-  - trigger: 'êe'
-    replace: 'œ'
-    propagate_case: true
-  - trigger: 'êi'
-    replace: 'î'
-    propagate_case: true
-  - trigger: 'êo'
-    replace: 'ô'
-    propagate_case: true
-  - trigger: 'êu'
-    replace: 'û'
-    propagate_case: true
-  - trigger: 'êà'
-    replace: 'æ'
-    propagate_case: true
-  - trigger: 'êé'
-    replace: 'oe'
+  - trigger: 'ç#'
+    replace: ' != '
     propagate_case: true
