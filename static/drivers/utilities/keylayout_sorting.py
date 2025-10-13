@@ -98,10 +98,13 @@ def sort_keys(body: str) -> str:
         header, keymap_body, footer = match.groups()
         # Extract all <key .../> elements
         keys = re.findall(r"(\s*<key[^>]+/>)", keymap_body)
+
         # Sort keys numerically by their code attribute
-        keys_sorted = sorted(
-            keys, key=lambda k: int(re.search(r'code="(\d+)"', k).group(1))
-        )
+        def get_code_or_default(k):
+            m = re.search(r'code="(\d+)"', k)
+            return int(m.group(1)) if m else 0
+
+        keys_sorted = sorted(keys, key=get_code_or_default)
         # Rebuild the <keyMap> block
         return f"{header}{''.join(keys_sorted)}\n\t\t{footer}"
 
@@ -169,12 +172,12 @@ def sort_actions(body: str) -> str:
             r"(\s*<action\b.*?>.*?</action>)", body_content, flags=re.DOTALL
         )
 
-        # Sort by ID using the custom sort_key function
+        def get_id_or_default(a):
+            m = re.search(r'id=["\']([^"\']+)["\']', a)
+            return m.group(1) if m else ""
+
         actions_sorted = sorted(
-            actions,
-            key=lambda a: sort_key(
-                re.search(r'id=["\']([^"\']+)["\']', a).group(1)
-            ),
+            actions, key=lambda a: sort_key(get_id_or_default(a))
         )
 
         # Rebuild <actions> block

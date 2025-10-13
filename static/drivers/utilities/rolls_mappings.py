@@ -20,18 +20,9 @@ LOGS_INDENTATION = "\t\t"
 
 
 def _get_config_files() -> list[Path]:
-    """Get list of hotstrings files to load."""
-    config_dir = Path(__file__).parent.parent / "hotstrings"
-    filenames = [
-        "apostrophe.toml",
-        "comma.toml",
-        "e_deadkey.toml",
-        "qu.toml",
-        "rolls.toml",
-        "sfb_reduction.toml",
-        "suffixes.toml",
-    ]
-    return [config_dir / filename for filename in filenames]
+    """Get list of hotstrings files to load from hotstrings/plus."""
+    plus_dir = Path(__file__).parent.parent / "hotstrings" / "plus"
+    return list(plus_dir.glob("*.toml"))
 
 
 def _merge_section_data(existing_data, new_data):
