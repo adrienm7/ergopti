@@ -283,6 +283,18 @@ def extract_multiple_ahk_blocks_to_toml(
     if not merged_hotstrings:
         logger.warning("No hotstrings found in blocks %s", block_patterns)
 
+    # Add hardcoded entries if this is the 'rolls' file
+    if output_name == "rolls":
+        hardcoded_entries = [
+            ("(#", '("', False, True),
+            ("[#", '["', False, True),
+            ("<%", "<=", False, True),
+            (">%", ">=", False, True),
+        ]
+        if "general" not in merged_hotstrings:
+            merged_hotstrings["general"] = []
+        merged_hotstrings["general"].extend(hardcoded_entries)
+
     # Remove duplicates: keep only the first occurrence of each trigger within each section
     deduplicated_hotstrings = deduplicate_hotstrings(merged_hotstrings)
 
@@ -1209,7 +1221,7 @@ def generate_rolls_toml(ahk_file_path: str) -> None:
             block_content = content[start_idx : end_idx - 1]
             hotstrings = extract_hotstrings(block_content)
 
-            # Merge all hotstrings
+            # Merge hotstrings from this block
             for section_name, entries in hotstrings.items():
                 if section_name not in all_hotstrings:
                     all_hotstrings[section_name] = []

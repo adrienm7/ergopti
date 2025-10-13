@@ -54,6 +54,202 @@
           }
         ],
         "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "<"
+          }
+        ],
+        "from": {
+          "key_code": "hyphen"
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "<"
+          }
+        ],
+        "from": {
+          "key_code": "e",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "<"
+          }
+        ],
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "<"
+          }
+        ],
+        "from": {
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "a",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
       }
     ]
   },
@@ -995,6 +1191,59 @@
           },
           {
             "key_code": "spacebar"
+          },
+          {
+            "key_code": "c",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "["
+          }
+        ],
+        "from": {
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "l",
+            "modifiers": [
+              "option"
+            ]
           },
           {
             "key_code": "c",
@@ -2044,6 +2293,265 @@
           },
           {
             "key_code": "l"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Roll mapping for trigger '(' (()",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "("
+          }
+        ],
+        "from": {
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "j",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "c",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      }
+    ]
+  },
+  {
+    "description": "Roll mapping for trigger '>' (>)",
+    "manipulators": [
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": ">"
+          }
+        ],
+        "from": {
+          "key_code": "hyphen"
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": ">"
+          }
+        ],
+        "from": {
+          "key_code": "e",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": ">"
+          }
+        ],
+        "from": {
+          "key_code": "open_bracket",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": ">"
+          }
+        ],
+        "from": {
+          "key_code": "i",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "s",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "key_code": "equal_sign"
           },
           {
             "set_variable": {

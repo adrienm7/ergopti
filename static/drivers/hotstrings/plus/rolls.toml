@@ -37,3 +37,7 @@
 " ?+" = { output = " <- ", is_word = false, auto_expand = true }
 "?+" = { output = " <- ", is_word = false, auto_expand = true }
 "p'" = { output = "ct", is_word = false, auto_expand = true }
+"(#" = { output = "(\"", is_word = false, auto_expand = true }
+"[#" = { output = "[\"", is_word = false, auto_expand = true }
+"<%" = { output = "<=", is_word = false, auto_expand = true }
+">%" = { output = ">=", is_word = false, auto_expand = true }
