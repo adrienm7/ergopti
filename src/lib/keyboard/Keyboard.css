@@ -483,8 +483,9 @@ keyboard-key[data-style='different'] {
 	--key-opacity: 5% !important;
 	font-weight: 400;
 }
-keyboard-key[data-style='morte'] {
-	font-family: sans-serif; /* Prevent some glyphs on dead keys to be incorrectly displayed */
+keyboard-key[data-content='◌̈'],
+keyboard-key[data-content='◌̂'] {
+	font-family: 'Open Sans'; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 }
 
 /* J key seems lower than the others otherwise */
