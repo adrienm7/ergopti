@@ -615,14 +615,6 @@ def process_autohotkey_escapes(text: str) -> str:
     Returns:
         Text with escape sequences converted to actual characters
     """
-    # Handle special complex sequences first
-    # Convert \`" to " (backslash-escaped backtick quote)
-    text = text.replace('\\`"', '"')
-    # Convert `"\ to "\ (backtick quote followed by backslash)
-    text = text.replace('`"\\', '"\\')
-    # Convert `"" to " (double backtick quote to single quote)
-    text = text.replace('`""', '"')
-
     # Convert `" to "
     text = text.replace('`"', '"')
     # Convert `' to '
@@ -638,10 +630,6 @@ def process_autohotkey_escapes(text: str) -> str:
     # Convert `{ and `} to { and }
     text = text.replace("`{", "{")
     text = text.replace("`}", "}")
-    # Convert backslash escapes
-    text = text.replace('\\"', '"')
-    text = text.replace("\\'", "'")
-    text = text.replace("\\\\", "\\")
 
     # Remove AutoHotkey specific cursor positioning sequences
     # Handle patterns like \"\"{Left} -> \"
@@ -1002,11 +990,9 @@ def convert_to_toml(
             continue
         toml_lines.append(f"[[{section_name}]]")
         for trigger, output, is_word, auto_expand in entries:
-            # Always escape backslashes for both trigger and output to ensure valid TOML
-            trigger_escaped = escape_toml_string(
-                trigger, escape_backslashes=True
-            )
-            output_escaped = escape_toml_string(output, escape_backslashes=True)
+            # Always escape both trigger and output for valid TOML
+            trigger_escaped = escape_toml_string(trigger)
+            output_escaped = escape_toml_string(output)
 
             # Always use complex format for all entries
             toml_lines.append(
@@ -1016,19 +1002,22 @@ def convert_to_toml(
     return "\n".join(toml_lines)
 
 
-def escape_toml_string(text: str, escape_backslashes: bool = True) -> str:
+def escape_toml_string(text: str) -> str:
     """
     Escape special characters in a string for TOML format.
 
+    This function properly escapes backslashes first, then quotes to ensure
+    correct TOML formatting. For example: \" becomes \\\"
+
     Args:
         text: The string to escape
-        escape_backslashes: Whether to escape backslashes (needed for output, not triggers)
 
     Returns:
-            Escaped string suitable for TOML
+        Escaped string suitable for TOML
     """
-    if escape_backslashes:
-        text = text.replace("\\", "\\\\")
+    # Important: escape backslashes first, then quotes
+    # This ensures that \" becomes \\\" (not \\\")
+    text = text.replace("\\", "\\\\")
     text = text.replace('"', '\\"')
     return text
 

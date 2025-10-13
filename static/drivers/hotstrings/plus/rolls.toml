@@ -6,7 +6,7 @@
 [[general]]
 "<@" = { output = "</", is_word = false, auto_expand = true }
 "eé" = { output = "ez", is_word = false, auto_expand = true }
-"\"" = { output = "/*", is_word = false, auto_expand = true }
+"\\\"" = { output = "/*", is_word = false, auto_expand = true }
 "\"\\" = { output = "*/", is_word = false, auto_expand = true }
 "#(" = { output = "\")", is_word = false, auto_expand = true }
 "#[" = { output = "\"]", is_word = false, auto_expand = true }
