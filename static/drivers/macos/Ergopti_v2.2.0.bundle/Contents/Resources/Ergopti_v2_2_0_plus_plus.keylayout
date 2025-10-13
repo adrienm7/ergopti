@@ -601,7 +601,7 @@
 			<key code="11" action="+"/>
 			<key code="12" output="„"/>
 			<key code="13" output="€"/>
-			<key code="14" action="Œ"/>
+			<key code="14" output=" %"/>
 			<key code="15" output="Où"/>
 			<key code="16" output="”"/>
 			<key code="17" output="“"/>
