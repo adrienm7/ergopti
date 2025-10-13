@@ -112,7 +112,7 @@ xkb_symbols "Ergopti_v2_2_0_plus_plus" {
         // Letters — Row 1/3
         key <AD01> { type[group1] = "SEVEN_LEVEL_KEY", [egrave, Egrave, Egrave, egrave, z, grave, doublelowquotemark] }; // è È È è z ` „
         key <AD02> { type[group1] = "SEVEN_LEVEL_KEY", [y, Y, Y, y, y, at, EuroSign] }; // y Y Y y y @ €
-        key <AD03> { type[group1] = "SEVEN_LEVEL_KEY", [o, O, O, o, o, percent, OE] }; // o O O o o % Œ
+        key <AD03> { type[group1] = "SEVEN_LEVEL_KEY", [o, O, O, o, o, percent, fourfifths] }; // o O O o o % " %"
         key <AD04> { type[group1] = "SEVEN_LEVEL_KEY", [w, W, W, w, w, seveneighths, threeeighths] }; // w W W w w "où" "Où"
         key <AD05> { type[group1] = "SEVEN_LEVEL_KEY", [b, B, B, b, b, guillemotleft, leftdoublequotemark] }; // b B B b b "« " “
         key <AD06> { type[group1] = "SEVEN_LEVEL_KEY", [f, F, F, f, f, guillemotright, rightdoublequotemark] }; // f F F f f " »" ”

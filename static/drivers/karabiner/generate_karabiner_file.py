@@ -430,7 +430,7 @@ for mapping_name, mapping in plus_mappings.items():
                     {
                         "set_variable": {
                             "name": "previous_key",
-                            "value": last_char,
+                            "value": "none",  # not last_char, otherwise "ct ?" gives cT’
                         }
                     }
                 )

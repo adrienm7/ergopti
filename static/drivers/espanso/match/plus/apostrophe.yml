@@ -1,28 +1,34 @@
 matches:
-  - trigger: "c'"
-    replace: 'c’'
+  - trigger: "'a"
+    replace: '’a'
     propagate_case: true
-  - trigger: "d'"
-    replace: 'd’'
+  - trigger: "'e"
+    replace: '’e'
     propagate_case: true
-  - trigger: "j'"
-    replace: 'j’'
+  - trigger: "'i"
+    replace: '’i'
     propagate_case: true
-  - trigger: "l'"
-    replace: 'l’'
+  - trigger: "'o"
+    replace: '’o'
     propagate_case: true
-  - trigger: "m'"
-    replace: 'm’'
+  - trigger: "'r"
+    replace: '’r'
     propagate_case: true
-  - trigger: "n'"
-    replace: 'n’'
+  - trigger: "'t"
+    replace: '’t'
     propagate_case: true
-  - trigger: "n't"
-    replace: 'n’t'
+  - trigger: "'u"
+    replace: '’u'
     propagate_case: true
-  - trigger: "s'"
-    replace: 's’'
+  - trigger: "'y"
+    replace: '’y'
     propagate_case: true
-  - trigger: "t'"
-    replace: 't’'
+  - trigger: "'è"
+    replace: '’è'
+    propagate_case: true
+  - trigger: "'é"
+    replace: '’é'
+    propagate_case: true
+  - trigger: "'ê"
+    replace: '’ê'
     propagate_case: true
