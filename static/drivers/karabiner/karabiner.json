@@ -8757,7 +8757,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -8928,7 +8931,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -8978,7 +8984,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -9028,7 +9037,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -9194,7 +9206,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o"
                                     },
                                     {
                                         "set_variable": {
@@ -9332,7 +9347,13 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -9374,7 +9395,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -9419,7 +9443,10 @@
                                         "key_code": "delete_or_backspace"
                                     },
                                     {
-                                        "key_code": "ç",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "o",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -10746,7 +10773,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "ù"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r"
                                     },
                                     {
                                         "set_variable": {
@@ -10967,7 +10997,13 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "ù"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -11020,7 +11056,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "ù",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -11076,7 +11115,10 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "ù",
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -11284,7 +11326,10 @@
                                         "key_code": "e"
                                     },
                                     {
-                                        "key_code": "ù"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r"
                                     },
                                     {
                                         "set_variable": {
@@ -11467,7 +11512,10 @@
                                         "key_code": "e"
                                     },
                                     {
-                                        "key_code": "ù"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r"
                                     },
                                     {
                                         "set_variable": {
@@ -11515,7 +11563,13 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "ù"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
@@ -11563,7 +11617,13 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "ù"
+                                        "key_code": "backslash"
+                                    },
+                                    {
+                                        "key_code": "r",
+                                        "modifiers": [
+                                            "shift"
+                                        ]
                                     },
                                     {
                                         "set_variable": {
