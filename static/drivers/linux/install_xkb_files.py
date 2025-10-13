@@ -218,7 +218,7 @@ def update_lst(file_path, symbols_line, name_line):
         if line.startswith("! variant"):
             variant_section_found = True
             continue
-        if variant_section_found and symbols_line in line.split()[0]:
+        if variant_section_found and line.strip() and line.split() and symbols_line in line.split()[0]:
             symbols_line_exists = True
             symbols_line_index = i
             break
