@@ -316,6 +316,76 @@ for mapping_name, mapping in plus_mappings.items():
                                 to_list.append({"key_code": o_name})
                         continue
 
+                    # Cas particulier pour ç/Ç : touche morte circonflexe + c/C
+                    if char in ["ç", "Ç"]:
+                        # Envoyer backslash (touche morte ^)
+                        to_list.append({"key_code": "backslash"})
+
+                        # Envoyer la touche 'c' du layout Ergopti
+                        c_positions = letter_to_num.get("c", [])
+                        if c_positions:
+                            c_code, c_layer = c_positions[0]
+                            c_name = macos_keycodes.get(str(c_code), c_code)
+                            c_modifiers: List[str] = []
+                            if c_layer == 2:
+                                c_modifiers.append("shift")
+                            elif c_layer == 5:
+                                c_modifiers.append("option")
+                            elif c_layer == 6:
+                                c_modifiers.extend(["shift", "option"])
+                            # Shift logic for ç/Ç
+                            if (
+                                second_layer == 2
+                                or is_trigger_shifted(trigger)
+                                or char.isupper()
+                            ) and "shift" not in c_modifiers:
+                                c_modifiers.append("shift")
+                            if c_modifiers:
+                                to_list.append(
+                                    {
+                                        "key_code": c_name,
+                                        "modifiers": c_modifiers,
+                                    }
+                                )
+                            else:
+                                to_list.append({"key_code": c_name})
+                        continue
+
+                    # Cas particulier pour ù/Ù : touche morte circonflexe + w
+                    if char in ["ù", "Ù"]:
+                        # Envoyer backslash (touche morte ^)
+                        to_list.append({"key_code": "backslash"})
+
+                        # Envoyer la touche 'w' du layout Ergopti
+                        w_positions = letter_to_num.get("w", [])
+                        if w_positions:
+                            w_code, w_layer = w_positions[0]
+                            w_name = macos_keycodes.get(str(w_code), w_code)
+                            w_modifiers: List[str] = []
+                            if w_layer == 2:
+                                w_modifiers.append("shift")
+                            elif w_layer == 5:
+                                w_modifiers.append("option")
+                            elif w_layer == 6:
+                                w_modifiers.extend(["shift", "option"])
+                            # Shift logic for ù/Ù
+                            if (
+                                second_layer == 2
+                                or is_trigger_shifted(trigger)
+                                or char.isupper()
+                            ) and "shift" not in w_modifiers:
+                                w_modifiers.append("shift")
+                            if w_modifiers:
+                                to_list.append(
+                                    {
+                                        "key_code": w_name,
+                                        "modifiers": w_modifiers,
+                                    }
+                                )
+                            else:
+                                to_list.append({"key_code": w_name})
+                        continue
+
                     # Multi-key sequence
                     if char_base in multi_sequences:
                         sequences = multi_sequences[char_base]
