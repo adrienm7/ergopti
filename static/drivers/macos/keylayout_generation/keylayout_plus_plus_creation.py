@@ -69,6 +69,15 @@ def create_keylayout_plus_plus(content: str):
 
         # Add all dead key outputs
         for trigger, output in data["map"]:
+            # Skip empty triggers to avoid empty XML action IDs
+            if not trigger or not trigger.strip():
+                logger.debug(
+                    "%s— Skipping empty trigger for output '%s'…",
+                    LOGS_INDENTATION + "\t\t",
+                    output,
+                )
+                continue
+
             logger.debug(
                 "%s— Adding output '%s' + '%s' ➜ '%s'…",
                 LOGS_INDENTATION + "\t\t",
