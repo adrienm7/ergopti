@@ -2372,7 +2372,7 @@ SC035:: SendNewResult("'")
 #HotIf Features["Rolls"]["ChevronEqual"].Enabled
 SC138 & SC012:: RemapAltGr(
     () => AddRollEqual(),
-    () => SendNewResult("Œ")
+    () => Features["Layout"]["ErgoptiPlus"].Enabled ? SendNewResult(" %") : SendNewResult("Œ")
 )
 AddRollEqual() {
     LastSentCharacter := GetLastSentCharacterAt(-1)
