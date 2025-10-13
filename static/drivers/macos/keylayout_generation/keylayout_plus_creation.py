@@ -119,10 +119,12 @@ def ergopti_plus_shiftaltgr_modifications(body):
     # This code replaces specific outputs in keymap index 6 = Shift + AltGr
     def replace_in_keymap(match):
         header, body, footer = match.groups()
-        # output="Ç" → " !" (fine non-breaking space + !)
-        body = re.sub(r'(<key[^>]*(output|action)=")Ç(")', r"\1 !\3", body)
-        # output="Ù" → "Où"
-        body = re.sub(r'(<key[^>]*(output|action)=")Ù(")', r"\1Où\3", body)
+        # output="Œ" ou action="Œ" → output=" %"
+        body = re.sub(r'(<key[^>]*)(output|action)="Œ"', r'\1output=" %"', body)
+        # output="Ç" ou action="Ç" → output=" !"
+        body = re.sub(r'(<key[^>]*)(output|action)="Ç"', r'\1output=" !"', body)
+        # output="Ù" ou action="Ù" → output="Où"
+        body = re.sub(r'(<key[^>]*)(output|action)="Ù"', r'\1output="Où"', body)
         return f"{header}{body}{footer}"
 
     for idx in (6, 7):

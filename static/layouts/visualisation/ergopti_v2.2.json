@@ -1558,6 +1558,7 @@
 			"AltGr": "œ",
 			"AltGr+": "%",
 			"ShiftAltGr": "Œ",
+			"ShiftAltGr+": "<nbsp></nbsp>%",
 			"Ctrl": "o",
 			"Circonflexe": "ô",
 			"CirconflexeShift": "Ô",

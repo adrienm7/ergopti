@@ -112,7 +112,7 @@ def check_each_action_in_keymaps_is_used(body: str) -> None:
     # Detect unused actions
     unused_action_ids = list(set(defined_actions.keys()) - used_actions)
 
-    ACTION_IDS_TOLERATED = ["œ", "ç", "Ç"]
+    ACTION_IDS_TOLERATED = ["œ", "Œ", "ç", "Ç"]
     # Check if all unused_action_ids are in the tolerated list
     if all(
         action_id in ACTION_IDS_TOLERATED for action_id in unused_action_ids
