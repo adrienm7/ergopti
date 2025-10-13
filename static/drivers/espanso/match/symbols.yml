@@ -209,7 +209,7 @@ matches:
     replace: '→'
   - trigger: '->>★'
     replace: '➡'
-  - trigger: '/!\★'
+  - trigger: '/!\\★'
     replace: '⚠'
   - trigger: '0/3★'
     replace: '↉'

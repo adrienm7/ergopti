@@ -10,7 +10,7 @@ import unicodedata
 from pathlib import Path
 from typing import Optional
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from utilities.logger import get_error_count, logger, reset_error_count
 
@@ -141,13 +141,27 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
     processed = 0
     errors = 0
 
+    # Define which files should go in the "plus" subfolder
+    plus_files = {
+        "apostrophe",
+        "comma",
+        "e_deadkey",
+        "qu",
+        "rolls",
+        "sfb_reduction",
+        "suffixes",
+    }
+
     for output_name, block_patterns in extractions.items():
         logger.launch(
             "Extracting blocks %s to '%s.toml'", block_patterns, output_name
         )
         try:
+            # Determine subfolder based on output name
+            subfolder = "plus" if output_name in plus_files else ""
+
             extract_multiple_ahk_blocks_to_toml(
-                str(source_file), block_patterns, output_name
+                str(source_file), block_patterns, output_name, subfolder
             )
             processed += 1
             logger.success(
@@ -164,7 +178,7 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
     # Generate additional TOML files
     logger.info("Generating additional TOML files...")
     try:
-        generate_e_deadkey_toml(str(source_file))
+        generate_e_deadkey_toml(str(source_file), "plus")
         logger.success("Successfully generated e_deadkey.toml")
     except (OSError, ValueError) as e:
         logger.error("Error generating e_deadkey.toml: %s", e)
@@ -175,6 +189,7 @@ def extract_multiple_ahk_blocks_to_toml(
     ahk_file_path: str,
     block_patterns: list[tuple[str, str] | str],
     output_name: str,
+    subfolder: str = "",
 ) -> None:
     """
     Extract multiple blocks from an AutoHotkey file and merge them into a single TOML file.
@@ -184,14 +199,18 @@ def extract_multiple_ahk_blocks_to_toml(
         block_patterns: List of block patterns to extract. Can be tuples (category, block_name)
                        or strings (category) for extracting all blocks from a category
         output_name: Output filename without extension (e.g., 'comma')
+        subfolder: Optional subfolder name for organizing output files
 
     Raises:
         FileNotFoundError: If the source file doesn't exist
         ValueError: If none of the block patterns are found
         OSError: If there's an error writing the output file
     """
-    # Determine output file path
-    output_dir = Path(__file__).parent
+    # Determine output file path (root hotstrings directory)
+    generation_dir = Path(__file__).parent
+    hotstrings_root = generation_dir.parent  # Move up from generation/
+    output_dir = hotstrings_root / (subfolder if subfolder else "")
+    output_dir.mkdir(exist_ok=True)
     output_file = output_dir / f"{output_name}.toml"
 
     # Read the AutoHotkey file
@@ -290,7 +309,7 @@ def get_latest_ahk_file() -> Path:
     Raises:
         FileNotFoundError: If no AHK file is found.
     """
-    ahk_directory = Path(__file__).parent.parent / "autohotkey"
+    ahk_directory = Path(__file__).parent.parent.parent / "autohotkey"
 
     # Look for files matching pattern ErgoptiPlus_v*.*.*.ahk
     ahk_files = list(ahk_directory.glob("ErgoptiPlus_v*.*.*.ahk"))
@@ -338,8 +357,10 @@ def extract_ahk_block_to_toml(
         ValueError: If the block pattern is not found
         OSError: If there's an error writing the output file
     """
-    # Determine output file path
-    output_dir = Path(__file__).parent
+    # Determine output file path (root hotstrings directory)
+    generation_dir = Path(__file__).parent
+    hotstrings_root = generation_dir.parent
+    output_dir = hotstrings_root
     output_file = output_dir / f"{output_name}.toml"
 
     # Read the AutoHotkey file
@@ -836,8 +857,8 @@ def extract_hotstring_from_line(
     create_hotstring_pattern = (
         r"CreateHotstring\s*\(\s*"
         r'"([^"]*)",\s*'  # Options group 1
-        r'"((?:[^"\\`]|\\.|`.|"")*)"(?:\s*\.\s*ScriptInformation\["MagicKey"\])?,\s*'  # Trigger group 2 - handles all escape sequences
-        r'"((?:[^"\\`]|\\.|`.|"")*)"'  # Output group 3 - handles all escape sequences
+        r'"((?:[^"]|""|`.)*?)"(?:\s*\.\s*ScriptInformation\["MagicKey"\])?,\s*'  # Trigger group 2
+        r'"((?:[^"]|""|`.)*?)"'  # Output group 3
         r".*?"  # Match anything after the output (including Map parameters)
         r"\)"
     )
@@ -981,8 +1002,9 @@ def convert_to_toml(
             continue
         toml_lines.append(f"[[{section_name}]]")
         for trigger, output, is_word, auto_expand in entries:
+            # Always escape backslashes for both trigger and output to ensure valid TOML
             trigger_escaped = escape_toml_string(
-                trigger, escape_backslashes=False
+                trigger, escape_backslashes=True
             )
             output_escaped = escape_toml_string(output, escape_backslashes=True)
 
@@ -1045,15 +1067,21 @@ def show_execution_summary(processed: int, errors: int) -> None:
         logger.error("=" * 100)
 
 
-def generate_e_deadkey_toml(ahk_file_path: str = None) -> None:
+def generate_e_deadkey_toml(
+    ahk_file_path: Optional[str] = None, subfolder: str = ""
+) -> None:
     """
     Generate e_deadkey.toml file with ê + vowel = vowel with ^ mappings.
     Also includes content from ECirc block and ê + e = œ.
 
     Args:
         ahk_file_path: Optional path to AHK file. If None, uses latest version.
+        subfolder: Optional subfolder name for organizing output files
     """
-    output_dir = Path(__file__).parent
+    generation_dir = Path(__file__).parent
+    hotstrings_root = generation_dir.parent
+    output_dir = hotstrings_root / (subfolder if subfolder else "")
+    output_dir.mkdir(exist_ok=True)
     output_file = output_dir / "e_deadkey.toml"
 
     # Define the basic deadkey mappings: ê + vowel = vowel with circumflex
@@ -1140,7 +1168,9 @@ def generate_rolls_toml(ahk_file_path: str) -> None:
     Args:
         ahk_file_path: Path to the source .ahk file
     """
-    output_dir = Path(__file__).parent
+    generation_dir = Path(__file__).parent
+    hotstrings_root = generation_dir.parent
+    output_dir = hotstrings_root
     output_file = output_dir / "rolls.toml"
 
     # Read the AutoHotkey file

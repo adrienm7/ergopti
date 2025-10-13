@@ -91,10 +91,33 @@ def main(
         )
         return
 
-    # Find all TOML files and filter out magic_sample
-    toml_files = list(config_directory.glob("*.toml"))
-    # Exclude magic_sample from processing
-    toml_files = [f for f in toml_files if f.stem != "magic_sample"]
+    # Find all TOML files recursively in the directory structure
+    toml_files = []
+
+    def find_toml_files_recursive(directory: Path, relative_path: str = ""):
+        """Recursively find all TOML files and their relative paths."""
+        try:
+            for item in directory.iterdir():
+                if item.is_file() and item.suffix == ".toml":
+                    # Exclude magic_sample from processing
+                    if item.stem != "magic_sample":
+                        toml_files.append((item, relative_path))
+                elif item.is_dir():
+                    # Recursively process subdirectories
+                    new_relative_path = (
+                        str(Path(relative_path) / item.name)
+                        if relative_path
+                        else item.name
+                    )
+                    find_toml_files_recursive(item, new_relative_path)
+        except PermissionError:
+            logger.warning(
+                "Permission denied accessing directory: %s", directory
+            )
+        except OSError as e:
+            logger.warning("Error accessing directory %s: %s", directory, e)
+
+    find_toml_files_recursive(config_directory)
 
     if not toml_files:
         logger.error("No TOML files found in: %s", config_directory)
@@ -110,13 +133,24 @@ def main(
         "repeat",
     ]
 
-    # Sort files by priority
-    toml_files_sorted = sort_files_by_priority(toml_files, priority_order)
+    # Sort files by priority, keeping track of their subdirectories
+    def get_file_priority(file_info):
+        file_path, _ = file_info
+        stem = file_path.stem
+        try:
+            return priority_order.index(stem)
+        except ValueError:
+            return len(priority_order)
+
+    toml_files_sorted = sorted(toml_files, key=get_file_priority)
 
     logger.info("Found %d TOML file(s) to process", len(toml_files_sorted))
     logger.info(
         "Processing order (by priority): %s",
-        [f.stem for f in toml_files_sorted],
+        [
+            f"{file_path.stem}{f'({subdir})' if subdir else ''}"
+            for file_path, subdir in toml_files_sorted
+        ],
     )
 
     # Collect all triggers to avoid duplicates
@@ -124,14 +158,23 @@ def main(
     processed = 0
     errors = 0
 
-    for toml_file in toml_files_sorted:
-        logger.launch("Processing: %s", toml_file.name)
+    for toml_file, subdir in toml_files_sorted:
+        subdir_info = f" in {subdir}/" if subdir else ""
+        logger.launch("Processing: %s%s", toml_file.name, subdir_info)
         try:
+            # Determine output directory based on subdirectory
+            target_output_directory = output_directory
+            if subdir:
+                target_output_directory = output_directory / subdir
+                target_output_directory.mkdir(parents=True, exist_ok=True)
+
             generate_espanso_match_from_toml(
-                toml_file, output_directory, overwrite, used_triggers
+                toml_file, target_output_directory, overwrite, used_triggers
             )
             processed += 1
-            logger.success("Successfully processed: %s", toml_file.name)
+            logger.success(
+                "Successfully processed: %s%s", toml_file.name, subdir_info
+            )
         except (OSError, ValueError, RuntimeError) as e:
             logger.error("Error processing %s: %s", toml_file.name, e)
             errors += 1
@@ -262,6 +305,7 @@ def create_espanso_match_entry(
     suffix: str = "",
     use_propagate_case: bool = False,
     is_word: bool = False,
+    file_stem: str = "",
 ) -> str:
     """
     Create a single Espanso match entry in YAML format.
@@ -272,6 +316,7 @@ def create_espanso_match_entry(
         suffix: The suffix symbol to add to trigger (e.g., "★")
         use_propagate_case: Whether to add propagate_case: true
         is_word: Whether to add word: true
+        file_stem: The name of the source file (used for special handling)
 
     Returns:
         YAML formatted match entry as string
@@ -286,8 +331,9 @@ def create_espanso_match_entry(
     if use_propagate_case:
         lines.append("    propagate_case: true")
 
-    # if is_word:
-    #     lines.append("    word: true")
+    # For accents file specifically, add word: true when is_word = true
+    if is_word and file_stem == "accents":
+        lines.append("    word: true")
 
     return "\n".join(lines)
 
@@ -435,13 +481,13 @@ def generate_espanso_match_from_toml(
         if no_case_handling:
             # For brands, emojis, etc.: just use the original trigger without case variants
             match_entry = create_espanso_match_entry(
-                trigger, replacement, suffix, False, is_word
+                trigger, replacement, suffix, False, is_word, file_stem
             )
             yaml_lines.append(match_entry)
         elif use_propagate_case:
             # Use propagate_case for automatic case handling
             match_entry = create_espanso_match_entry(
-                trigger, replacement, suffix, True, is_word
+                trigger, replacement, suffix, True, is_word, file_stem
             )
             yaml_lines.append(match_entry)
         else:
@@ -451,7 +497,12 @@ def generate_espanso_match_from_toml(
             )
             for variant_trigger, variant_replacement in case_variants:
                 match_entry = create_espanso_match_entry(
-                    variant_trigger, variant_replacement, suffix, False, is_word
+                    variant_trigger,
+                    variant_replacement,
+                    suffix,
+                    False,
+                    is_word,
+                    file_stem,
                 )
                 yaml_lines.append(match_entry)
 

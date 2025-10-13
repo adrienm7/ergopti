@@ -61,10 +61,32 @@ def main(
     logger.info("Input directory: %s", config_directory)
     logger.info("Output directory: %s", output_directory)
 
-    # Find all TOML files and filter out magic_sample
-    toml_files = list(config_directory.glob("*.toml"))
-    # Exclude magic_sample from processing
-    toml_files = [f for f in toml_files if f.stem != "magic_sample"]
+    # Find all TOML files recursively and filter out magic_sample
+    toml_files = []
+
+    def find_toml_files_recursive(directory: Path, relative_path: str = ""):
+        """Recursively find all TOML files and their relative paths."""
+        try:
+            for item in directory.iterdir():
+                if (
+                    item.is_file()
+                    and item.suffix == ".toml"
+                    and item.stem != "magic_sample"
+                ):
+                    toml_files.append((item, relative_path))
+                elif item.is_dir():
+                    new_relative_path = (
+                        relative_path + "/" + item.name
+                        if relative_path
+                        else item.name
+                    )
+                    find_toml_files_recursive(item, new_relative_path)
+        except PermissionError:
+            logger.warning(
+                "Permission denied accessing directory: %s", directory
+            )
+
+    find_toml_files_recursive(config_directory)
 
     if not toml_files:
         logger.error("No TOML files found in: %s", config_directory)
@@ -75,16 +97,28 @@ def main(
     processed = 0
     errors = 0
 
-    for toml_file in toml_files:
-        logger.launch("Processing: %s", toml_file.name)
+    for toml_file, relative_path in toml_files:
+        display_name = toml_file.name
+        if relative_path:
+            display_name = f"{toml_file.name} in {relative_path}/"
+
+        logger.launch("Processing: %s", display_name)
         try:
+            # Create output directory with preserved structure
+            output_subdir = (
+                output_directory / relative_path
+                if relative_path
+                else output_directory
+            )
+            output_subdir.mkdir(parents=True, exist_ok=True)
+
             generate_alfred_snippets_from_toml(
-                toml_file, output_directory, overwrite
+                toml_file, output_subdir, overwrite
             )
             processed += 1
-            logger.success("Successfully processed: %s", toml_file.name)
+            logger.success("Successfully processed: %s", display_name)
         except (OSError, ValueError, RuntimeError) as e:
-            logger.error("Error processing %s: %s", toml_file.name, e)
+            logger.error("Error processing %s: %s", display_name, e)
             errors += 1
 
     show_execution_summary(processed, errors)

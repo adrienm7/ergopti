@@ -683,9 +683,6 @@ matches:
   - trigger: 'km★'
     replace: 'kmm'
     propagate_case: true
-  - trigger: 'ko★'
-    replace: 'koo'
-    propagate_case: true
   - trigger: 'kp★'
     replace: 'kpp'
     propagate_case: true
@@ -944,9 +941,6 @@ matches:
   - trigger: 'oj★'
     replace: 'ojj'
     propagate_case: true
-  - trigger: 'ok★'
-    replace: 'okk'
-    propagate_case: true
   - trigger: 'ol★'
     replace: 'oll'
     propagate_case: true
@@ -991,9 +985,6 @@ matches:
     propagate_case: true
   - trigger: 'pa★'
     replace: 'paa'
-    propagate_case: true
-  - trigger: 'pc★'
-    replace: 'pcc'
     propagate_case: true
   - trigger: 'pe★'
     replace: 'pee'
