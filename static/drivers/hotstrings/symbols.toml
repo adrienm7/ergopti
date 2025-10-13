@@ -150,7 +150,7 @@
 "[x]★" = { output = "☒", is_word = true, auto_expand = true }
 
 [[miscellaneous_symbols]]
-"/!\★" = { output = "⚠", is_word = true, auto_expand = true }
+"/!\\★" = { output = "⚠", is_word = true, auto_expand = true }
 "**★" = { output = "⁂", is_word = true, auto_expand = true }
 "°C★" = { output = "℃", is_word = true, auto_expand = true }
 "(b)★" = { output = "•", is_word = true, auto_expand = true }

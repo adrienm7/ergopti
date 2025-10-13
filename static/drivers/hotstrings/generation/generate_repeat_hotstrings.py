@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import List, Set, Tuple
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from utilities.logger import get_error_count, logger, reset_error_count
 
@@ -29,12 +29,15 @@ def main() -> None:
     logger.info("=" * 80)
 
     try:
-        # Get output directory
-        output_dir = Path(__file__).parent
+        # Get directories
+        script_dir = Path(__file__).parent
+        hotstrings_dir = script_dir.parent  # Root hotstrings directory
+        output_dir = hotstrings_dir / "plus"
+        output_dir.mkdir(exist_ok=True)
         output_file = output_dir / "repeat.toml"
 
-        # Scan existing TOML files for conflicts
-        existing_triggers = scan_existing_toml_files(output_dir)
+        # Scan existing TOML files (root hotstrings directory) for conflicts
+        existing_triggers = scan_existing_toml_files(hotstrings_dir)
         logger.info(
             "Found %d existing triggers in TOML files", len(existing_triggers)
         )
@@ -50,7 +53,7 @@ def main() -> None:
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(toml_content)
 
-        logger.success(
+        logger.info(
             "Repeat keys file created: %s (%d entries)",
             output_file.name,
             len(repeat_keys),
@@ -76,7 +79,7 @@ def scan_existing_toml_files(directory: Path) -> Set[str]:
 
     # Find all TOML files except the output file (repeat.toml)
     toml_files = [
-        f for f in directory.glob("*.toml") if f.name != "repeat.toml"
+        f for f in directory.rglob("*.toml") if f.name != "repeat.toml"
     ]
 
     logger.info("Scanning %d TOML files for existing triggers", len(toml_files))
@@ -86,11 +89,15 @@ def scan_existing_toml_files(directory: Path) -> Set[str]:
             with open(toml_file, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Extract triggers using regex pattern: "trigger" = "output"
-            trigger_pattern = r'"([^"]+)"\s*=\s*"[^"]*"'
-            matches = re.findall(trigger_pattern, content)
+            # Extract triggers using a more robust regex for TOML keys
+            # This handles quoted and bare keys.
+            trigger_pattern = r'^\s*([a-zA-Z0-9_.-]+|".*?")\s*='
+            matches = re.findall(trigger_pattern, content, re.MULTILINE)
 
-            file_triggers = set(matches)
+            # Clean up triggers by removing quotes
+            cleaned_matches = [m.strip().strip('"') for m in matches]
+
+            file_triggers = set(cleaned_matches)
             existing_triggers.update(file_triggers)
 
             logger.info(
