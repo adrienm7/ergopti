@@ -32,7 +32,7 @@ def main() -> None:
         # Get directories
         script_dir = Path(__file__).parent
         hotstrings_dir = script_dir.parent  # Root hotstrings directory
-        output_dir = hotstrings_dir / "plus"
+        output_dir = hotstrings_dir
         output_dir.mkdir(exist_ok=True)
         output_file = output_dir / "repeat.toml"
 
