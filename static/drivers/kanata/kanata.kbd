@@ -1,23 +1,32 @@
 (defcfg
   process-unmapped-keys yes
 )
+
 (defsrc
   caps grv         i
               j    k    l
   lsft lctl lalt ralt rctl
 )
+
 (deflayer default
   @cap @grv        _
               _    _    _
-  (multi lctl o) (multi lctl h) bspc tab _
+  @lsft @lctl @lalt @ralt _
 )
+
 (deflayer arrows
   _    _           up
               left down rght
   _    _    _    _ _
 )
+
 (defalias
+  copy (multi lctl o)
+  paste (multi lctl h)
   cap (tap-hold-press 200 200 caps lctl)
   grv (tap-hold-press 200 200 grv (layer-toggle arrows))
+  lalt (tap-hold 200 200 bspc lalt)
+  ralt (tap-hold 200 200 tab ralt)
+  lsft (tap-hold 200 200 @copy lsft)
+  lctl (tap-hold 200 200 @paste lctllsft)
 )
-
