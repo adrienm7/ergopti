@@ -6,7 +6,7 @@ xkb_types         {
     include "complete"
 
     type "SEVEN_LEVEL_KEY" {
-        modifiers = Shift + Lock + LevelThree + Control + Alt + Mod4;
+        modifiers = Shift + Lock + LevelThree;
 
         // ==============================
         // ======= Level mappings =======
@@ -23,22 +23,6 @@ xkb_types         {
         // Level 4: CapsLock + Shift
         map[Lock + Shift]                       = Level4;
 
-        // Level 5: Other modifiers (Control, Alt, Super)
-        map[Alt]                                = Level5;
-        map[Control]                            = Level5;
-        map[Mod4]                               = Level5;
-        map[Control + Alt]                      = Level5;
-        map[Control + Mod4]                     = Level5;
-        map[Alt + Mod4]                         = Level5;
-        map[Control + Alt + Mod4]               = Level5;
-        map[Shift + Alt]                        = Level5;
-        map[Shift + Control]                    = Level5;
-        map[Shift + Mod4]                       = Level5;
-        map[Shift + Control + Alt]              = Level5;
-        map[Shift + Control + Mod4]             = Level5;
-        map[Shift + Alt + Mod4]                 = Level5;
-        map[Shift + Control + Alt + Mod4]       = Level5;
-
         // Level 6: AltGr (LevelThree)
         map[LevelThree]                         = Level6;
         map[Lock + LevelThree]                  = Level6;
@@ -46,26 +30,6 @@ xkb_types         {
         // Level 7: Shift + AltGr
         map[Shift + LevelThree]                 = Level7;
         map[Lock + Shift + LevelThree]          = Level7;
-
-        // =====================================
-        // ======= Modifier preservation =======
-        // =====================================
-
-        // Keep these modifiers active in the final key event
-        preserve[Alt]                           = Alt;
-        preserve[Control]                       = Control;
-        preserve[Mod4]                          = Mod4;
-        preserve[Control + Alt]                 = Control + Alt;
-        preserve[Control + Mod4]                = Control + Mod4;
-        preserve[Alt + Mod4]                    = Alt + Mod4;
-        preserve[Control + Alt + Mod4]          = Control + Alt + Mod4;
-        preserve[Shift + Alt]                   = Shift + Alt;
-        preserve[Shift + Control]               = Shift + Control;
-        preserve[Shift + Mod4]                  = Shift + Mod4;
-        preserve[Shift + Control + Alt]         = Shift + Control + Alt;
-        preserve[Shift + Control + Mod4]        = Shift + Control + Mod4;
-        preserve[Shift + Alt + Mod4]            = Shift + Alt + Mod4;
-        preserve[Shift + Control + Alt + Mod4]  = Shift + Control + Alt + Mod4;
 
         // ===========================
         // ======= Level names =======
