@@ -37,7 +37,7 @@
   cap (tap-hold-press 200 200 enter lctl)
   grv (tap-hold-press 200 200 grv (layer-toggle arrows))
   lalt (tap-hold-press 200 200 bspc lalt)
-  ralt (tap-hold-press 200 200 (multi (release-key lctl) (release-key lalt) tab) ralt)
+  ralt (tap-hold-press 200 200 (multi (release-key lctl) (release-key lalt) tab)  (multi ralt (release-key lctl)))
   lsft (tap-hold-press 200 200 @copy lsft)
   lctl (tap-hold-press 200 200 @paste lctl)
 )
