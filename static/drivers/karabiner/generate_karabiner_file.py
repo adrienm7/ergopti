@@ -29,6 +29,10 @@ from utilities.rolls_mappings import (
 
 REPEAT_KEY = False
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
+# Save plus_mappings to a file named 'plus_mappings' in the current directory
+plus_mappings_path = Path(__file__).parent / "plus_mappings"
+with open(plus_mappings_path, "w", encoding="utf-8") as f:
+    json.dump(plus_mappings, f, ensure_ascii=False, indent=2)
 
 
 def is_trigger_shifted(trigger: str) -> bool:
@@ -1092,6 +1096,9 @@ for key, manips in manipulators_by_key.items():
             "manipulators": sorted_manips,
         }
     )
+
+# Sort grouped list alphabetically by description
+grouped.sort(key=lambda x: x["description"])
 
 with open(rolls_grouped_path, "w", encoding="utf-8") as f:
     json.dump(grouped, f, ensure_ascii=False, indent=2)
