@@ -66,7 +66,8 @@ def generate_mixed_case_variants(trigger: str) -> List[str]:
                 trigger.lower(),
                 trigger.upper(),
                 trigger.capitalize(),
-            ]:
+            ] and b not in [" ?", " ;", " :"]:
+                # We remove ' ?' to avoid 'stp ?' giving 'stCt'
                 variants.append(mixed1)
 
     return variants
