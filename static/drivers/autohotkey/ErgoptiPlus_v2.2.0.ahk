@@ -4507,6 +4507,10 @@ if Features["Rolls"]["AssignArrowMinusLeft"].Enabled {
     )
 }
 if Features["Rolls"]["CT"].Enabled {
+    CreateHotstring(
+        "*?", "p ?", "p ?",
+        Map("TimeActivationSeconds", Features["Rolls"]["CT"].TimeActivationSeconds)
+    ) ; Fix "stp ?"
     CreateCaseSensitiveHotstrings(
         "*?", "p'", "ct",
         Map("TimeActivationSeconds", Features["Rolls"]["CT"].TimeActivationSeconds)

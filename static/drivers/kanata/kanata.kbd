@@ -28,5 +28,5 @@
   lalt (tap-hold 200 200 bspc lalt)
   ralt (tap-hold 200 200 tab ralt)
   lsft (tap-hold 200 200 @copy lsft)
-  lctl (tap-hold 200 200 @paste lctllsft)
+  lctl (tap-hold 200 200 @paste lctl)
 )
