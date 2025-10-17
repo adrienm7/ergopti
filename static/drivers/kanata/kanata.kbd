@@ -1,32 +1,43 @@
+;; === Configuration ===
 (defcfg
   process-unmapped-keys yes
 )
 
+;; === Physical key source ===
 (defsrc
   caps grv         i
               j    k    l
-  lsft lctl lalt ralt rctl
+  lsft lctl lalt ralt
 )
 
+;; === Default layer ===
 (deflayer default
   @cap @grv        _
               _    _    _
-  @lsft @lctl @lalt @ralt _
+  @lsft @lctl @lalt @ralt
 )
 
+;; === Arrows layer ===
 (deflayer arrows
   _    _           up
               left down rght
-  _    _    _    _ _
+  _    _    _    _
 )
 
+;; === Ergopti → QWERTY mapping ===
 (defalias
-  copy (multi lctl o)
-  paste (multi lctl h)
-  cap (tap-hold-press 200 200 caps lctl)
+  c o
+  v h
+)
+
+;; === Functions and shortcuts ===
+(defalias
+  copy (multi lctl @c)
+  paste (multi lctl @v)
+  cap (tap-hold-press 200 200 enter lctl)
   grv (tap-hold-press 200 200 grv (layer-toggle arrows))
-  lalt (tap-hold 200 200 bspc lalt)
-  ralt (tap-hold 200 200 tab ralt)
-  lsft (tap-hold 200 200 @copy lsft)
-  lctl (tap-hold 200 200 @paste lctl)
+  lalt (tap-hold-press 200 200 bspc lalt)
+  ralt (tap-hold-press 200 200 (multi (release-key lctl) (release-key lalt) tab) ralt)
+  lsft (tap-hold-press 200 200 @copy lsft)
+  lctl (tap-hold-press 200 200 @paste lctl)
 )
