@@ -5,32 +5,32 @@
 
 ;; === Physical key source ===
 (defsrc
-    1           2           3           4           5                       6           7           8           9           0
-    q           w           e           r           t                       y           u           i           o           p
-    a           s           d           f           g                       h           j           k           l           ;
-    <           z           x           c           v           b           n           m           ,           .           /
-    lsft        lctl        lmet        lalt                   spc                      ralt        rctl        rsft
+    `           1           2           3           4           5                       6           7           8           9           0
+    tab         q           w           e           r           t                       y           u           i           o           p           [
+    caps        a           s           d           f           g                       h           j           k           l           ;           '
+    lsft        <           z           x           c           v           b           n           m           ,           .           /
+    lctl                                lmet        lalt                   spc                      ralt        rctl                    rsft
 )
 
 ;; === Default layer ===
 (deflayer default
-    _           _           _           _           _                       _           _           _           _           _
-    _           _           _           _           _                       _           _           _           _           _
-    _           _           _           _           _                       _           _           _           _           _
-    _           _           _           _           _            _          _           _           _           _           _
-    @lsft       @lctl       _           @lalt                    _                      @ralt       _           _
+    _           _           _           _           _           _                       _           _           _           _           _
+    @alttab     _           _           _           _           _                       _           _           _           _           _           _
+    @cap        _           _           _           _           _                       _           _           _           _           _           _
+    @lsft       _           _           _           _           _            _          _           _           _           _           _
+    @lctl                               _           @lalt                    _                      @ralt       @ossft                  _
 )
 
 ;; === Navigation layer ===
 (deflayer navigation
-    _           _           _           _           _                       _           _           _           _           _
-    _           _           _           _           _                       _           C-S-left    S-left      S-right     C-S-right
-    C-up        up          down        C-down      _                       _           C-left      left        right       C-right
-    S-A-up      A-up        A-down      S-A-down    _           _           _           _           _           _           _
-    _           _           _           _                       _                       _           _           _
+    _           _           _           _           _           _                       _           _           _           _           _
+    _           S-C-home    C-home      C-end       S-C-end     f12                     S-home      S-C-left    S-left      S-right     S-C-right   S-end
+    _           C-up        up          down        C-down      f2                      M-S-left    C-left      left        right       C-right     M-S-right
+    _           S-A-up      A-up        A-down      S-A-down    _            _          M-up        home        M-left      M-right     end
+    _                                   _           _                        _                      _           _                       _
 )
 
-;; ==================================s
+;; ==================================
 ;; === Ergopti ➜ QWERTY mappings ===
 ;; ==================================
 
@@ -100,6 +100,7 @@
 (defalias
     copy (multi lctl @c)
     paste (multi lctl @v)
+    alttab (tap-hold-press 200 200 (multi lalt tab) lalt)
     cap (tap-hold-press 200 200 enter lctl)
     lsft (tap-hold-press 200 200 @copy lsft)
     lctl (tap-hold-press 200 200 @paste lctl)
@@ -108,4 +109,5 @@
         (multi (release-key lctl) (release-key lalt) tab)
         (multi ralt (release-key lctl))
     )
+    ossft (one-shot 1000 lsft)
 )
