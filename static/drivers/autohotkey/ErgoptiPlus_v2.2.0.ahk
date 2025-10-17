@@ -4528,19 +4528,19 @@ if Features["Rolls"]["CT"].Enabled {
 if Features["Autocorrection"]["TypographicApostrophe"].Enabled {
     ; This prevents false positives like writing ['key'] ➜ ['key’]
     for Letter in StrSplit("aàâæbcçdeéèêëfghiîïjklmnoôœpqrstuùûüvwxyÿz") {
-        ; la + apostrophe → l’apostrophe
+        ; ce est → c’est
+        ; de + une → d’une
+        ; je ai → j’ai
         ; la + île → l’île
         ; la + apostrophe → l’apostrophe
         ; le + éléphant → l’éléphant
-        ; le + ouragan → l’ouragan
-        ; le + histoire → l’histoire
         ; si + il → s’il
-        ; que + elle → qu’elle
-        ; te + aime → t’aime
-        ; se + appeler → s’appeler
+        ; me + étire → m’étire
         ; ne + oublie pas → n’oublie pas
+        ; se + appeler → s’appeler
+        ; te + aime → t’aime
         ; jusque + à → jusqu’à
-        ; de + une → d’une
+        ; que + elle → qu’elle
         ; il y a → y’a
         for FrElisionLetter in StrSplit("cdjlmnstuy") {
             CreateCaseSensitiveHotstrings(
