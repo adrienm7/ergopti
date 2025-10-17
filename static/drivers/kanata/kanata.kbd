@@ -5,39 +5,107 @@
 
 ;; === Physical key source ===
 (defsrc
-  caps grv         i
-              j    k    l
-  lsft lctl lalt ralt
+    1           2           3           4           5                       6           7           8           9           0
+    q           w           e           r           t                       y           u           i           o           p
+    a           s           d           f           g                       h           j           k           l           ;
+    <           z           x           c           v           b           n           m           ,           .           /
+    lsft        lctl        lmet        lalt                   spc                      ralt        rctl        rsft
 )
 
 ;; === Default layer ===
 (deflayer default
-  @cap @grv        _
-              _    _    _
-  @lsft @lctl @lalt @ralt
+    _           _           _           _           _                       _           _           _           _           _
+    _           _           _           _           _                       _           _           _           _           _
+    _           _           _           _           _                       _           _           _           _           _
+    _           _           _           _           _            _          _           _           _           _           _
+    @lsft       @lctl       _           @lalt                    _                      @ralt       _           _
 )
 
-;; === Arrows layer ===
-(deflayer arrows
-  _    _           up
-              left down rght
-  _    _    _    _
+;; === Navigation layer ===
+(deflayer navigation
+    _           _           _           _           _                       _           _           _           _           _
+    _           _           _           _           _                       _           C-S-left    S-left      S-right     C-S-right
+    C-up        up          down        C-down      _                       _           C-left      left        right       C-right
+    S-A-up      A-up        A-down      S-A-down    _           _           _           _           _           _           _
+    _           _           _           _                       _                       _           _           _
 )
 
-;; === Ergopti → QWERTY mapping ===
+;; ==================================s
+;; === Ergopti ➜ QWERTY mappings ===
+;; ==================================
+
 (defalias
+  ;; === Numbers and symbols ===
+  $ `
+  1 1
+  2 2
+  3 3
+  4 4
+  5 5
+  6 6
+  7 7
+  8 8
+  9 9
+  0 0
+  % -
+  = =
+
+  ;; === Top row ===
+  è q
+  y w
+  o e
+  w r
+  b t
+  f y
+  g u
+  h i
   c o
+  x p
+  z [
+  deadtrema ]
+
+  ;; === Middle row ===
+  a a
+  i s
+  e d
+  u f
+  : g
+  . AG-g
   v h
+  s j
+  n k
+  t l
+  r ;
+  q '
+  deadcirc \
+
+  ;; === Bottom row ===
+  é z
+  à x
+  j c
+  , v
+  ; AG-v
+  k b
+  m n
+  d m
+  l ,
+  p .
+  ' /
 )
 
+;; ===============================
 ;; === Functions and shortcuts ===
+;; ===============================
+
 (defalias
-  copy (multi lctl @c)
-  paste (multi lctl @v)
-  cap (tap-hold-press 200 200 enter lctl)
-  grv (tap-hold-press 200 200 grv (layer-toggle arrows))
-  lalt (tap-hold-press 200 200 bspc lalt)
-  ralt (tap-hold-press 200 200 (multi (release-key lctl) (release-key lalt) tab)  (multi ralt (release-key lctl)))
-  lsft (tap-hold-press 200 200 @copy lsft)
-  lctl (tap-hold-press 200 200 @paste lctl)
+    copy (multi lctl @c)
+    paste (multi lctl @v)
+    cap (tap-hold-press 200 200 enter lctl)
+    lsft (tap-hold-press 200 200 @copy lsft)
+    lctl (tap-hold-press 200 200 @paste lctl)
+    lalt (tap-hold-press 200 200 bspc (layer-toggle navigation))
+    ralt (tap-hold-press 200 200 
+        (multi (release-key lctl) (release-key lalt) tab)
+        (multi ralt (release-key lctl))
+    )
 )
