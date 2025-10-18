@@ -17,7 +17,7 @@
     _           _           _           _           _           _                       _           _           _           _           _
     @alttab     _           _           _           _           _                       _           _           _           @rollc      @rollx      _
     @cap        _           _           _           _           _                       _           _           _           _           _           _
-    @lsft       _           _           _           @magic      _            _          _           _           _           _           _
+    @lsft       _           _           _           rpt         _            _          _           _           _           _           _
     @lctl                               _           @lalt                    _                      @ralt       @ossft                  _
 )
 
@@ -99,7 +99,7 @@
 
 (defalias
     rollc (switch
-        ((key-history i 1)) (multi bspc r i) break ;; HC --> WH
+        ((key-history i 1)) (macro bspc 50 @w 30 @h 30) break ;; HC --> WH
         () @c break
     )
     rollx (switch
