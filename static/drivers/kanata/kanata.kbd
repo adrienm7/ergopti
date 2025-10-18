@@ -15,7 +15,7 @@
 ;; === Default layer ===
 (deflayer default
     _           _           _           _           _           _                       _           _           _           _           _
-    @alttab     _           _           _           _           _                       _           _           _           _           _           _
+    @alttab     _           _           _           _           _                       _           _           _           @rollc      @rollx      _
     @cap        _           _           _           _           _                       _           _           _           _           _           _
     @lsft       _           _           _           _           _            _          _           _           _           _           _
     @lctl                               _           @lalt                    _                      @ralt       @ossft                  _
@@ -98,6 +98,14 @@
 ;; ===============================
 
 (defalias
+    rollc (switch
+        ((key-history i 1)) (multi bspc r i) break ;; HC --> WH
+        () @c break
+    )
+    rollx (switch
+        ((key-history j 1)) b break ;; SX --> SK
+        () @x break
+    )
     copy (multi lctl @c)
     paste (multi lctl @v)
     alttab (tap-hold-press 200 200 (multi lalt tab) lalt)
@@ -105,7 +113,7 @@
     lsft (tap-hold-press 200 200 @copy lsft)
     lctl (tap-hold-press 200 200 @paste lctl)
     lalt (tap-hold-press 200 200 bspc (layer-toggle navigation))
-    ralt (tap-hold-press 200 200 
+    ralt (tap-hold-press 200 200
         (multi (release-key lctl) (release-key lalt) tab)
         (multi ralt (release-key lctl))
     )
