@@ -141,7 +141,7 @@ xkb_symbols "Ergopti_v2_2_0_plus" {
         key <LSGT> { type[group1] = "SEVEN_LEVEL_KEY", [ecircumflex, Ecircumflex, Ecircumflex, ecircumflex, x, asciicircum, dead_circumflex] }; // ê Ê Ê ê x ^ ^
         key <AB01> { type[group1] = "SEVEN_LEVEL_KEY", [eacute, Eacute, Eacute, eacute, c, slash, division] }; // é É É é c / ÷
         key <AB02> { type[group1] = "SEVEN_LEVEL_KEY", [agrave, Agrave, Agrave, agrave, v, backslash, downarrow] }; // à À À à v \ ᵢ
-        key <AB03> { type[group1] = "SEVEN_LEVEL_KEY", [j, J, J, j, j, quotedbl, j] }; // j J J j j " j
+        key <AB03> { type[group1] = "SEVEN_LEVEL_KEY", [U2605, J, J, j, j, quotedbl, j] }; // ★ J J j j " j
         key <AB04> { type[group1] = "SEVEN_LEVEL_KEY", [comma, comma, onesixth, onesixth, comma, semicolon, ellipsis] }; // , , " ;" " ;" , ; …
         key <AB05> { type[group1] = "SEVEN_LEVEL_KEY", [k, K, K, k, k, ellipsis, plus] }; // k K K k k … +
         key <AB06> { type[group1] = "SEVEN_LEVEL_KEY", [m, M, M, m, m, ampersand, U2212] }; // m M M m m & −
