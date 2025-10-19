@@ -85,9 +85,9 @@ xkb_types         {
 xkb_compatibility { include "complete" };
 
 partial alphanumeric_keys
-xkb_symbols "Ergopti_v2_2_0_plus_plus" {
+xkb_symbols "Ergopti_v2_2_0" {
 
-	name[Group1] = "Français — Ergopti++ v2.2.0 Beta 4";
+	name[Group1] = "Français — Ergopti v2.2.0 Beta 4";
 
 	include "latin"
 
@@ -112,16 +112,16 @@ xkb_symbols "Ergopti_v2_2_0_plus_plus" {
         // Letters — Row 1/3
         key <AD01> { type[group1] = "SEVEN_LEVEL_KEY", [egrave, Egrave, Egrave, egrave, z, grave, doublelowquotemark] }; // è È È è z ` „
         key <AD02> { type[group1] = "SEVEN_LEVEL_KEY", [y, Y, Y, y, y, at, EuroSign] }; // y Y Y y y @ €
-        key <AD03> { type[group1] = "SEVEN_LEVEL_KEY", [o, O, O, o, o, percent, fourfifths] }; // o O O o o % " %"
-        key <AD04> { type[group1] = "SEVEN_LEVEL_KEY", [w, W, W, w, w, seveneighths, threeeighths] }; // w W W w w "où" "Où"
+        key <AD03> { type[group1] = "SEVEN_LEVEL_KEY", [o, O, O, o, o, oe, OE] }; // o O O o o œ Œ
+        key <AD04> { type[group1] = "SEVEN_LEVEL_KEY", [w, W, W, w, w, ugrave, Ugrave] }; // w W W w w ù Ù
         key <AD05> { type[group1] = "SEVEN_LEVEL_KEY", [b, B, B, b, b, guillemotleft, leftdoublequotemark] }; // b B B b b "« " “
         key <AD06> { type[group1] = "SEVEN_LEVEL_KEY", [f, F, F, f, f, guillemotright, rightdoublequotemark] }; // f F F f f " »" ”
         key <AD07> { type[group1] = "SEVEN_LEVEL_KEY", [g, G, G, g, g, asciitilde, U2248] }; // g G G g g ~ ≈
         key <AD08> { type[group1] = "SEVEN_LEVEL_KEY", [h, H, H, h, h, numbersign, percent] }; // h H H h h # %
-        key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, exclam, onefifth] }; // c C C c c ! " !"
+        key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, ccedilla, Ccedilla] }; // c C C c c ç Ç
         key <AD10> { type[group1] = "SEVEN_LEVEL_KEY", [x, X, X, x, x, asterisk, multiply] }; // x X X x x * ×
         key <AD11> { type[group1] = "SEVEN_LEVEL_KEY", [z, Z, Z, z, z, percent, U2030] }; // z Z Z z z % ‰
-        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [j, dead_diaeresis, minus, minus, diaeresis, underscore, dead_diaeresis] }; // j ¨ - - ¨ _ ¨
+        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, minus, minus, diaeresis, underscore, U2605] }; // ¨ ¨ - - ¨ _ ★
 
         // Letters — Row 2/3
         key <AC01> { type[group1] = "SEVEN_LEVEL_KEY", [a, A, A, a, a, less, lessthanequal] }; // a A A a a < ≤
