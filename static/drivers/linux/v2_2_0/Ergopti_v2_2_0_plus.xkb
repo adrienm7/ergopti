@@ -121,7 +121,7 @@ xkb_symbols "Ergopti_v2_2_0_plus" {
         key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, exclam, onefifth] }; // c C C c c ! " !"
         key <AD10> { type[group1] = "SEVEN_LEVEL_KEY", [x, X, X, x, x, asterisk, multiply] }; // x X X x x * ×
         key <AD11> { type[group1] = "SEVEN_LEVEL_KEY", [z, Z, Z, z, z, percent, U2030] }; // z Z Z z z % ‰
-        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, minus, minus, diaeresis, underscore, U2605] }; // ¨ ¨ - - ¨ _ ★
+        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [j, dead_diaeresis, minus, minus, diaeresis, underscore, dead_diaeresis] }; // j ¨ - - ¨ _ ¨
 
         // Letters — Row 2/3
         key <AC01> { type[group1] = "SEVEN_LEVEL_KEY", [a, A, A, a, a, less, lessthanequal] }; // a A A a a < ≤

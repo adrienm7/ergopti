@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-2510133" maxout="1" name="Ergopti_v2_2_0_plus_plus">
+<keyboard group="126" id="-2510193" maxout="1" name="Ergopti_v2_2_0_plus_plus">
 	<layouts>
 		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
@@ -60,7 +60,7 @@
 			<key code="27" output="%"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" action="¨"/>
+			<key code="30" output="j"/>
 			<key code="31" action="c"/>
 			<key code="32" action="g"/>
 			<key code="33" action="z"/>
@@ -617,7 +617,7 @@
 			<key code="27" output="‱"/>
 			<key code="28" output="₈"/>
 			<key code="29" output="₀"/>
-			<key code="30" output="★"/>
+			<key code="30" action="¨"/>
 			<key code="31" output=" !"/>
 			<key code="32" output="≈"/>
 			<key code="33" output="‰"/>
@@ -892,7 +892,7 @@
 			<when state="none" next="s6_subscript"/>
 		</action>
 		<action id="j">
-			<when state="none" output="j"/>
+			<when state="none" output="★"/>
 			<when state="s1_circumflex" output="j"/>
 			<when state="s4_greek" output="ξ"/>
 			<when state="s5_superscript" output="ʲ"/>
@@ -1627,21 +1627,20 @@
 		</action>
 		<action id=" :">
 			<when state="none" next="s21_nbsp_colon"/>
+			<when state="s49_Ê" output="U,"/>
 		</action>
 		<action id=" ;">
 			<when state="none" next="s20_nnbsp_semicolon"/>
+			<when state="s48_ê" output="U,"/>
+			<when state="s49_Ê" output="U,"/>
 		</action>
 		<action id=" ?">
 			<when state="none" next="s13_nnbsp_interrogation"/>
-			<when state="s18_comma" output="J’"/>
 			<when state="s19_semicolon" output="J’"/>
 			<when state="s20_nnbsp_semicolon" output="J’"/>
 			<when state="s21_nbsp_colon" output="J’"/>
-			<when state="s32_p" output="Ct"/>
 			<when state="s33_P" output="CT"/>
-			<when state="s34_q" output="Qu’"/>
 			<when state="s35_Q" output="QU’"/>
-			<when state="s40_à" output="Ance"/>
 			<when state="s41_À" output="ANCE"/>
 		</action>
 		<action id="!">
@@ -1822,6 +1821,8 @@
 		<action id=";">
 			<when state="none" next="s19_semicolon"/>
 			<when state="s1_circumflex" output="↪"/>
+			<when state="s48_ê" output="U,"/>
+			<when state="s49_Ê" output="U,"/>
 		</action>
 		<action id="=">
 			<when state="none" next="s22_equal"/>
