@@ -730,9 +730,12 @@ for (keycode, layer), symbols in num_to_letter.items():
                         "from": {"key_code": name},
                         "to": [
                             {
-                                "key_code": "close_bracket",
-                                "modifiers": ["shift", "option"],
+                                "key_code": name,
                             },
+                            # {
+                            #     "key_code": "close_bracket",
+                            #     "modifiers": ["shift", "option"],
+                            # },
                             {
                                 "set_variable": {
                                     "name": "star_activated",
