@@ -595,7 +595,7 @@
 			<key code="5" output="·"/>
 			<key code="6" output="÷"/>
 			<key code="7" action="ᵢ"/>
-			<key code="8" action="j"/>
+			<key code="8" output="j"/>
 			<key code="9" output="…"/>
 			<key code="10" action="¤"/>
 			<key code="11" action="+"/>
