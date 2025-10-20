@@ -37407,16 +37407,35 @@
         },
         "to": [
           {
-            "key_code": "close_bracket",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
+            "key_code": "c"
           },
           {
             "set_variable": {
               "name": "star_activated",
               "value": 1
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket"
+        },
+        "to": [
+          {
+            "key_code": "close_bracket"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "j"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
             }
           }
         ]
@@ -38394,62 +38413,6 @@
             "set_variable": {
               "name": "previous_key",
               "value": "0"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "close_bracket"
-        },
-        "to": [
-          {
-            "key_code": "close_bracket"
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "¨"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "l",
-          "modifiers": {
-            "mandatory": [
-              "shift",
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "l",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "¨"
             }
           },
           {
@@ -42761,7 +42724,40 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": "★"
+              "value": "¨"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "l",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "l",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¨"
             }
           },
           {

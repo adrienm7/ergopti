@@ -5740,11 +5740,7 @@
         },
         "to": [
           {
-            "key_code": "close_bracket",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
+            "key_code": "c"
           },
           {
             "set_variable": {
@@ -5781,7 +5777,7 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": "★"
+              "value": "¨"
             }
           },
           {
@@ -5866,7 +5862,7 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": "¨"
+              "value": "j"
             }
           },
           {
