@@ -113,24 +113,32 @@ def find_layout_files(
     Returns:
         A tuple containing paths to the XKB, XCompose, and types files, or None.
     """
-    version_patterns = {
-        "normal": "*ergopti_v*[0-9].xkb",
-        "plus": "*ergopti_v*plus.xkb",
-        "plus_plus": "*ergopti_v*plus_plus.xkb",
-    }
+    # Collect all .xkb files and perform case-insensitive filtering. Using
+    # a single rglob("*.xkb") avoids issues with case-sensitive patterns on
+    # Linux filesystems and is more robust to filename variations.
+    xkb_files = list(directory.rglob("*.xkb"))
 
-    search_pattern = version_patterns.get(version, "")
-    if not search_pattern:
-        return None, None, None
-
-    # Find all matching XKB files recursively
-    xkb_files = list(directory.rglob(search_pattern))
-
-    # Filter out incorrect matches
-    if version == "normal":
-        xkb_files = [f for f in xkb_files if "plus" not in f.name.lower()]
-    elif version == "plus":
-        xkb_files = [f for f in xkb_files if "plus_plus" not in f.name.lower()]
+    # Match files by stem endings: base (no suffix), '_plus', or '_plus_plus'.
+    # Use stem() to avoid extension influence and lower() for case-insensitivity.
+    matches = []
+    for f in xkb_files:
+        name_lower = f.name.lower()
+        stem_lower = f.stem.lower()
+        if "ergopti" not in name_lower:
+            continue
+        # normal: stem does not end with '_plus' or '_plus_plus'
+        if version == "normal":
+            if not stem_lower.endswith("_plus") and not stem_lower.endswith("_plus_plus"):
+                matches.append(f)
+        # plus: stem ends with '_plus' but not '_plus_plus'
+        elif version == "plus":
+            if stem_lower.endswith("_plus") and not stem_lower.endswith("_plus_plus"):
+                matches.append(f)
+        # plus_plus: stem ends with '_plus_plus'
+        elif version == "plus_plus":
+            if stem_lower.endswith("_plus_plus"):
+                matches.append(f)
+    xkb_files = matches
 
     if not xkb_files:
         logging.warning("No .xkb files found for version '%s'.", version)
@@ -266,33 +274,55 @@ def update_xml_file(
         tree = ET.parse(str(xml_path))
         root = tree.getroot()
 
-        fr_layout = root.find(".//layout[configItem/name='fr']")
+        # ElementTree's XPath implementation does not support nested
+        # predicates like "configItem/name='fr'". Manually search for the
+        # layout element whose configItem/name text is 'fr'. This avoids the
+        # SyntaxError raised by xml.etree.ElementPath for unsupported
+        # predicate expressions.
+        fr_layout = None
+        for layout in root.findall('.//layout'):
+            ci = layout.find('configItem')
+            if ci is None:
+                continue
+            name_elem = ci.find('name')
+            if name_elem is not None and name_elem.text == 'fr':
+                fr_layout = layout
+                break
+
         if fr_layout is None:
             logging.error("French layout section not found in %s.", xml_path)
             return
 
-        variant_list = fr_layout.find("variantList")
+        variant_list = fr_layout.find('variantList')
         if variant_list is None:
-            variant_list = ET.SubElement(fr_layout, "variantList")
+            variant_list = ET.SubElement(fr_layout, 'variantList')
 
-        existing_variant = variant_list.find(
-            f"variant[configItem/name='{symbol_name}']"
-        )
+        # Find existing variant by iterating since nested predicates are not
+        # supported by ElementTree's find/findall XPath subset.
+        existing_variant = None
+        for variant in variant_list.findall('variant'):
+            ci = variant.find('configItem')
+            if ci is None:
+                continue
+            name_elem = ci.find('name')
+            if name_elem is not None and name_elem.text == symbol_name:
+                existing_variant = variant
+                break
 
         backup_file(xml_path)
 
         if existing_variant is not None:
-            desc = existing_variant.find("configItem/description")
+            desc = existing_variant.find('configItem/description')
             if desc is not None:
                 desc.text = display_name
                 logging.info(
                     "Updated variant '%s' in %s.", symbol_name, xml_path
                 )
         else:
-            new_variant = ET.Element("variant")
-            config_item = ET.SubElement(new_variant, "configItem")
-            ET.SubElement(config_item, "name").text = symbol_name
-            ET.SubElement(config_item, "description").text = display_name
+            new_variant = ET.Element('variant')
+            config_item = ET.SubElement(new_variant, 'configItem')
+            ET.SubElement(config_item, 'name').text = symbol_name
+            ET.SubElement(config_item, 'description').text = display_name
             variant_list.insert(0, new_variant)
             logging.info("Added new variant '%s' to %s.", symbol_name, xml_path)
 
