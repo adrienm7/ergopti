@@ -1,669 +1,561 @@
+"""
+Installs Ergopti XKB keyboard layouts on Linux systems.
+
+This script handles the installation of .xkb files, corresponding .XCompose files,
+and updates necessary system configuration files like evdev.xml and evdev.lst.
+It can be run in interactive mode for guided installation or with command-line
+arguments for automated setup.
+
+Requires sudo privileges to modify system files in /usr/share/X11/xkb.
+"""
+
 import argparse
-import glob
+import logging
 import os
 import pwd
+import re
 import shutil
 import sys
 import xml.etree.ElementTree as ET
+from pathlib import Path
+from typing import Dict, Optional, Tuple
 
-xkb_folder = "/usr/share/X11/xkb"
+# --- Constants ---
+XKB_BASE_DIR = Path("/usr/share/X11/xkb")
+XKB_SYMBOLS_DIR = XKB_BASE_DIR / "symbols"
+XKB_TYPES_DIR = XKB_BASE_DIR / "types"
+XKB_RULES_DIR = XKB_BASE_DIR / "rules"
+
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
 
 
-def check_sudo():
-    """Check if the script is run with sudo privileges."""
-    if os.getuid() != 0:
-        print("This script must be run with sudo.")
+def check_sudo() -> None:
+    """
+    Exits if the script is not run with sudo privileges.
+
+    Raises:
+        SystemExit: If the effective user ID is not 0.
+    """
+    if os.geteuid() != 0:
+        logging.error("This script must be run with sudo privileges.")
         sys.exit(1)
 
 
-def show_help():
-    """Display help information."""
-    print(
-        "Usage: install_xkb.py [--xkb <xkb_file>] [--xcompose <xcompose_file>] [--types <types_file>]"
-    )
-    print(
-        "This script installs a specified XKB file and updates the corresponding LST and XML files."
-    )
-    print()
-    print(
-        "Interactive mode: run the script without arguments to select a version."
-    )
-    print()
-    print("Arguments:")
-    print("  --xkb FILE       Path to the .xkb file.")
-    print("  --xcompose FILE  Optional. Path to the .XCompose file.")
-    print(
-        "  --types FILE     Optional. Path to the xkb_types.txt or xkb_types_without_ctrl.txt file."
-    )
-    print("  -h, --help       Show this help message and exit.")
+def backup_file(file_path: Path) -> bool:
+    """
+    Creates a numbered backup of a file.
+
+    Args:
+        file_path: The path to the file to back up.
+
+    Returns:
+        True if a backup was created, False otherwise.
+    """
+    if not file_path.exists():
+        return False
+
+    version = 1
+    while True:
+        backup_path = file_path.with_suffix(f"{file_path.suffix}.{version}")
+        if not backup_path.exists():
+            try:
+                shutil.copy(file_path, backup_path)
+                logging.info("Created backup: %s", backup_path)
+                return True
+            except OSError as e:
+                logging.error(
+                    "Failed to create backup for %s: %s", file_path, e
+                )
+                return False
+        version += 1
 
 
-def select_version():
-    """Let user select between normal, plus, or plus_plus version."""
-    print("Select the Ergopti version to install:")
-    print("1. Ergopti (normal version)")
-    print("2. Ergopti+ (plus version)")
-    print("3. Ergopti++ (plus plus version)")
+# --- Interactive Mode Functions ---
+
+
+def select_from_menu(prompt: str, options: Dict[str, str]) -> str:
+    """
+    Displays a menu and returns the user's selection.
+
+    Args:
+        prompt: The message to display to the user.
+        options: A dictionary mapping choice numbers to descriptions.
+
+    Returns:
+        The key corresponding to the user's choice.
+    """
+    print(prompt)
+    for key, value in options.items():
+        print(f"{key}. {value}")
 
     while True:
-        choice = input("Your choice (1, 2, or 3): ").strip()
-        if choice == "1":
-            return "normal"
-        elif choice == "2":
-            return "plus"
-        elif choice == "3":
-            return "plus_plus"
-        else:
-            print("Invalid choice. Please enter 1, 2, or 3.")
+        choice = input(f"Your choice ({', '.join(options.keys())}): ").strip()
+        if choice in options:
+            return choice
+        logging.warning("Invalid choice. Please try again.")
 
 
-def select_types_file(directory, xkb_basename):
-    """Let user select the types file to use."""
-    print("Select the types file to use:")
-    print("1. Default types (xkb_types.txt)")
-    print("2. Types without Ctrl mappings (xkb_types_without_ctrl.txt)")
+def find_layout_files(
+    directory: Path, version: str
+) -> Tuple[Optional[Path], Optional[Path], Optional[Path]]:
+    """
+    Finds the latest XKB, XCompose, and types files for a given version.
 
-    while True:
-        choice = input("Your choice (1 or 2): ").strip()
-        if choice == "1":
-            filename = "xkb_types.txt"
-        elif choice == "2":
-            filename = "xkb_types_without_ctrl.txt"
-        else:
-            print("Invalid choice. Please enter 1 or 2.")
-            continue
+    Args:
+        directory: The root directory to search within.
+        version: The layout version ('normal', 'plus', 'plus_plus').
 
-        # Look for the types file in the same directory as the xkb file
-        types_file = os.path.join(os.path.dirname(xkb_basename), filename)
-        if os.path.exists(types_file):
-            return types_file
-
-        # Fallback to searching in the script's directory and subdirectories
-        for root, _, files in os.walk(directory):
-            if filename in files:
-                return os.path.join(root, filename)
-
-        print(
-            f"Could not find {filename}. Please check the directory structure."
-        )
-
-
-def find_xkb_files_by_version(directory, version):
-    """Find XKB files matching the specified version."""
-    patterns = {
-        "normal": ["*Ergopti_v*[0-9].xkb", "*ergopti_v*[0-9].xkb"],
-        "plus": ["*Ergopti_v*plus.xkb", "*ergopti_v*plus.xkb"],
-        "plus_plus": ["*Ergopti_v*plus_plus.xkb", "*ergopti_v*plus_plus.xkb"],
+    Returns:
+        A tuple containing paths to the XKB, XCompose, and types files, or None.
+    """
+    version_patterns = {
+        "normal": "*ergopti_v*[0-9].xkb",
+        "plus": "*ergopti_v*plus.xkb",
+        "plus_plus": "*ergopti_v*plus_plus.xkb",
     }
 
-    import glob
+    search_pattern = version_patterns.get(version, "")
+    if not search_pattern:
+        return None, None, None
 
-    files = []
-    for pattern in patterns.get(version, []):
-        files.extend(glob.glob(os.path.join(directory, pattern)))
+    # Find all matching XKB files recursively
+    xkb_files = list(directory.rglob(search_pattern))
 
-    # Filter out files that don't match the exact version
+    # Filter out incorrect matches
     if version == "normal":
-        files = [f for f in files if "plus" not in os.path.basename(f).lower()]
+        xkb_files = [f for f in xkb_files if "plus" not in f.name.lower()]
     elif version == "plus":
-        files = [
-            f
-            for f in files
-            if "plus" in os.path.basename(f).lower()
-            and "plus_plus" not in os.path.basename(f).lower()
-        ]
+        xkb_files = [f for f in xkb_files if "plus_plus" not in f.name.lower()]
 
-    return files
+    if not xkb_files:
+        logging.warning("No .xkb files found for version '%s'.", version)
+        return None, None, None
+
+    # Select the most recently modified XKB file
+    latest_xkb = max(xkb_files, key=lambda f: f.stat().st_mtime)
+    logging.info("Selected XKB file: %s", latest_xkb)
+
+    xkb_dir = latest_xkb.parent
+    xkb_basename = latest_xkb.stem
+
+    # Find corresponding XCompose and types files
+    xcompose_file = xkb_dir / f"{xkb_basename}.XCompose"
+    if not xcompose_file.exists():
+        logging.warning("No corresponding .XCompose file found.")
+        xcompose_file = None
+
+    types_choice = select_from_menu(
+        "Select the types file to use:",
+        {
+            "1": "Default types (xkb_types.txt)",
+            "2": "Types without Ctrl mappings (xkb_types_without_ctrl.txt)",
+        },
+    )
+    types_filename = (
+        "xkb_types.txt" if types_choice == "1" else "xkb_types_without_ctrl.txt"
+    )
+    types_file = xkb_dir / types_filename
+    if not types_file.exists():
+        logging.warning("Could not find '%s' in %s.", types_filename, xkb_dir)
+        return latest_xkb, xcompose_file, None
+
+    return latest_xkb, xcompose_file, types_file
 
 
-def file_exists(file_path):
-    return os.path.exists(file_path)
+# --- File Content Extraction and Manipulation ---
 
 
-def backup_file(file_path):
-    """Backup the specified file."""
-    if os.path.exists(file_path):
-        version = 1
-        backup_path = f"{file_path}.{version}"
-        while os.path.exists(backup_path):
-            version += 1
-            backup_path = f"{file_path}.{version}"
-        shutil.copy(file_path, backup_path)
-        return True
-    return False
-
-
-def install_file(source, destination_dir):
+def extract_xkb_info(xkb_file: Path) -> Tuple[str, str]:
     """
-    Copy the source file to the destination directory if it doesn't already exist.
+    Extracts the layout's symbol name and display name from an .xkb file.
 
-    :param source: Path to the source file
-    :param destination_dir: Directory where the file should be copied
+    Args:
+        xkb_file: Path to the .xkb file.
+
+    Returns:
+        A tuple containing the symbol name and the display name.
     """
-    file_name = os.path.basename(source)
-    destination_file = os.path.join(destination_dir, file_name)
-
-    if os.path.isfile(destination_file):
-        print(f"XKB file is already installed: {destination_file}")
-    else:
-        shutil.copy(source, destination_file)
-        print(f"XKB file copied successfully: {destination_file}")
-
-
-def prettify_xml(element, indent="  ", level=0):
-    """
-    Prettify and indent XML element.
-
-    :param element: XML element to be prettified.
-    :param indent: Indentation string (default is two spaces).
-    :param level: Current level of indentation.
-    """
-    if len(element):  # checks if element has children
-        if not element.text or not element.text.strip():
-            element.text = "\n" + indent * (level + 1)
-        if not element.tail or not element.tail.strip():
-            element.tail = "\n" + indent * level
-        for elem in element:
-            prettify_xml(elem, indent, level + 1)
-        if not element[-1].tail or not element[-1].tail.strip():
-            element[-1].tail = "\n" + indent * level
-    else:
-        if level and (not element.tail or not element.tail.strip()):
-            element.tail = "\n" + indent * level
-    return element
-
-
-def update_xml(file_path, symbols_line, name_line):
-    """Update the XML file by inserting or replacing a variant element."""
-    if not file_exists(file_path):
-        print(f"File not found: {file_path}")
-        return
-    tree = ET.parse(file_path)
-    root = tree.getroot()
-    for layout in root.findall(".//layout"):
-        name = layout.find("./configItem/name")
-        if name is not None and name.text == "fr":
-            variant_list = layout.find("variantList")
-            if variant_list is not None:
-                # Search if the variant already exists
-                existing_variant = None
-                for variant in variant_list.findall("variant"):
-                    config_item = variant.find("./configItem")
-                    if config_item is not None:
-                        name_elem = config_item.find("name")
-                        if (
-                            name_elem is not None
-                            and name_elem.text == symbols_line
-                        ):
-                            existing_variant = variant
-                            break
-                backup_file(file_path)
-                if existing_variant is not None:
-                    # Replace existing variant
-                    config_item = existing_variant.find("configItem")
-                    name_elem = config_item.find("name")
-                    description_elem = config_item.find("description")
-                    name_elem.text = symbols_line
-                    description_elem.text = name_line
-                    print(f"Variant '{symbols_line}' updated in XML file.")
-                else:
-                    # Add new variant
-                    new_variant = ET.Element("variant")
-                    config_item = ET.SubElement(new_variant, "configItem")
-                    name_elem = ET.SubElement(config_item, "name")
-                    description_elem = ET.SubElement(config_item, "description")
-                    name_elem.text = symbols_line
-                    description_elem.text = name_line
-                    variant_list.insert(0, new_variant)
-                    print(f"Variant '{symbols_line}' added to XML file.")
-                root = prettify_xml(root)
-                tree.write(file_path, encoding="utf-8", xml_declaration=True)
-                return
-    print("Layout element with 'name=fr' not found.")
-
-
-def update_lst(file_path, symbols_line, name_line):
-    """Update the LST file by inserting or replacing the line under the '! variant' section."""
-    if not file_exists(file_path):
-        print(f"File not found: {file_path}")
-        return
-    with open(file_path, "r") as file:
-        lines = file.readlines()
-    variant_section_found = False
-    symbols_line_exists = False
-    symbols_line_index = -1
-    for i, line in enumerate(lines):
-        if line.startswith("! variant"):
-            variant_section_found = True
-            continue
-        if (
-            variant_section_found
-            and line.strip()
-            and line.split()
-            and symbols_line in line.split()[0]
-        ):
-            symbols_line_exists = True
-            symbols_line_index = i
-            break
-    if not variant_section_found:
-        print("Section '! variant' not found in LST file.")
-        return
-    backup_file(file_path)
-    if symbols_line_exists:
-        # Replace existing line
-        lst_line = f"  {symbols_line:<15} fr: {name_line}\n"
-        lines[symbols_line_index] = lst_line
-    else:
-        # Add new line under '! variant' section
-        for i, line in enumerate(lines):
-            if line.startswith("! variant"):
-                lst_line = f"  {symbols_line:<15} fr: {name_line}\n"
-                lines.insert(i + 1, lst_line)
-                break
-    with open(file_path, "w") as file:
-        file.writelines(lines)
-    print("LST file updated successfully.")
-
-
-def validate_file(file_path, extension):
-    """Check if the file exists and has the correct extension."""
-    if not os.path.isfile(file_path):
-        print(f"File {file_path} does not exist.")
-        return False
-    if not file_path.endswith(extension):
-        print(f"The extension of {file_path} must be {extension}")
-        return False
-    return True
-
-
-def extract_xkb_info(xkb_file):
-    """
-    Extract symbols_line and name_line from the XKB file.
-
-    :param xkb_file: Path to the XKB file
-    :return: A tuple containing symbols_line and name_line
-    """
-    symbols_line = ""
-    name_line = ""
-    with open(xkb_file, "r") as file:
-        for line in file:
-            if "xkb_symbols" in line:
-                symbols_line = line.split('"')[1]
-            if "name[Group1]" in line:
-                name_line = line.split('"')[1]
-
-    return symbols_line, name_line
-
-
-def install_xcompose(xcompose_file):
-    """
-    Install the XCompose file to the user's home directory.
-
-    :param xcompose_file: Path to the XCompose file
-    """
-    if not validate_file(xcompose_file, ".XCompose"):
-        return
-
-    # Get the username of the user who invoked sudo
-    username = os.getenv("SUDO_USER")
-    if not username:
-        print("Could not get username for XCompose installation.")
-        return
-
-    # Get the home directory of the user
-    home_dir = os.path.expanduser(f"~{username}")
-    xcompose_destination_file = os.path.join(home_dir, ".XCompose")
-
-    if os.path.exists(xcompose_destination_file):
-        user_choice = (
-            input(
-                "XCompose file already exists. Do you want to overwrite it? (Yes/No) "
-            )
-            .strip()
-            .lower()
-        )
-        if user_choice not in ["yes", "y"]:
-            print("XCompose installation cancelled.")
-            return
-
-    # Copy the XCompose file to the user's home directory
-    shutil.copy(xcompose_file, xcompose_destination_file)
-    print(f"XCompose file copied successfully: {xcompose_destination_file}")
-
-    # Get the user ID and group ID
-    uid = pwd.getpwnam(username).pw_uid
-    gid = pwd.getpwnam(username).pw_gid
-
-    # Change file ownership to the user
-    if hasattr(os, "chown"):
-        try:
-            os.chown(xcompose_destination_file, uid, gid)
-            print(f"XCompose file permissions updated for user '{username}'.")
-        except Exception as e:
-            print(f"Error during chown: {e}")
-    else:
-        print("os.chown is not available on this platform (Windows).")
-
-
-def update_xkb_symbols(source_file, symbols_line, system_file):
-    """
-    Copy a specific section from the XKB file to the end of a system file.
-    Improved to better handle existing sections.
-
-    :param source_file: Path to the source XKB file.
-    :param symbols_line: The key of the section to be copied (e.g., "optimot_ergo").
-    :param system_file: Path to the system file where the section should be appended.
-    """
-    if not file_exists(system_file):
-        print(f"File not found: {system_file}")
-        return
-
-    # Get the section to copy from the source file
-    with open(source_file, "r") as file:
-        lines = file.readlines()
-
-    section_found = False
-    section_lines = []
-    brace_level = 0
-
-    for i, line in enumerate(lines):
-        if f'xkb_symbols "{symbols_line}"' in line and "{" in line:
-            section_found = True
-            brace_level = 0
-
-        if section_found:
-            section_lines.append(line)
-            brace_level += line.count("{")
-            brace_level -= line.count("}")
-
-            # Check if the section ends (look for '};')
-            if brace_level == 0 and line.strip().endswith("};"):
-                break
-
-    if not section_found or brace_level != 0:
-        print(
-            f"Section for '{symbols_line}' not found or incomplete in {source_file}."
-        )
-        return
-
-    # Read the system file to see if the section already exists
-    with open(system_file, "r") as file:
-        system_lines = file.readlines()
-
-    # More robust search for the existing section
-    existing_start_idx = None
-    existing_end_idx = None
-
-    for i, line in enumerate(system_lines):
-        if f'xkb_symbols "{symbols_line}"' in line and "{" in line:
-            existing_start_idx = i
-            brace_level = 0
-            for j in range(i, len(system_lines)):
-                brace_level += system_lines[j].count("{")
-                brace_level -= system_lines[j].count("}")
-                if brace_level == 0 and system_lines[j].strip().endswith("};"):
-                    existing_end_idx = j
+    symbol_name, display_name = "", ""
+    try:
+        with xkb_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                if "xkb_symbols" in line:
+                    symbol_name = line.split('"')[1]
+                if "name[Group1]" in line:
+                    display_name = line.split('"')[1]
+                if symbol_name and display_name:
                     break
-            break
-
-    backup_file(system_file)
-
-    if existing_start_idx is not None and existing_end_idx is not None:
-        # Replace the existing section
-        print(
-            f"Section '{symbols_line}' found at lines {existing_start_idx + 1}-{existing_end_idx + 1}, replacing..."
-        )
-        system_lines[existing_start_idx : existing_end_idx + 1] = section_lines
-        with open(system_file, "w") as file:
-            file.writelines(system_lines)
-        print(f"Section '{symbols_line}' updated successfully in {system_file}")
-    else:
-        # Add the section to the end if it doesn't exist
-        print(
-            f"Section '{symbols_line}' not found, appending to the end of the file..."
-        )
-        with open(system_file, "a") as file:
-            file.write("\n")  # Ensure newline before new section
-            file.writelines(section_lines)
-        print(f"Section '{symbols_line}' added successfully to {system_file}")
+    except IOError as e:
+        logging.error("Could not read from %s: %s", xkb_file, e)
+    return symbol_name, display_name
 
 
-def update_xkb_types(types_file, system_file):
+def update_lst_file(
+    lst_path: Path, symbol_name: str, display_name: str
+) -> None:
     """
-    Copy xkb_types sections from the types file and insert them into the system file.
-    :param types_file: Path to the source types file (e.g., xkb_types.txt).
-    :param system_file: Path to the system file where the section should be inserted.
+    Updates the evdev.lst file with the new layout variant.
+
+    Args:
+        lst_path: Path to the evdev.lst file.
+        symbol_name: The symbol name of the layout (e.g., 'ergopti_v2_2_0').
+        display_name: The human-readable name of the layout.
     """
-    if not file_exists(types_file):
-        print(f"Types file not found: {types_file}")
-        return
-    if not file_exists(system_file):
-        print(f"System file not found: {system_file}")
+    if not lst_path.exists():
+        logging.error("LST file not found: %s", lst_path)
         return
 
     try:
-        with open(types_file, "r") as file:
-            source_lines = file.readlines()
+        with lst_path.open("r", encoding="utf-8") as f:
+            lines = f.readlines()
 
-        # Automatically discover types to copy
-        sections_to_copy = []
-        collected_sections = {}
-        current_section = None
-        brace_level = 0
+        variant_section_index = -1
+        for i, line in enumerate(lines):
+            if line.strip() == "! variant":
+                variant_section_index = i
+                break
 
-        for line in source_lines:
-            if line.strip().startswith('type "') and "{" in line:
-                current_section = line.split('type "')[1].split('"')[0]
-                sections_to_copy.append(current_section)
-                collected_sections[current_section] = [line]
-                brace_level = line.count("{") - line.count("}")
-                continue
+        if variant_section_index == -1:
+            logging.error("Could not find '! variant' section in %s.", lst_path)
+            return
 
-            if current_section:
-                collected_sections[current_section].append(line)
-                brace_level += line.count("{")
-                brace_level -= line.count("}")
-                if brace_level == 0:
-                    current_section = None
+        new_line = f"  {symbol_name:<15} fr: {display_name}\n"
+        line_exists = any(symbol_name in line for line in lines)
 
-        with open(system_file, "r") as file:
-            system_lines = file.readlines()
+        backup_file(lst_path)
 
-        backup_file(system_file)
-
-        # Check and replace existing sections
-        sections_replaced = set()
-        i = 0
-        new_system_lines = []
-        while i < len(system_lines):
-            line = system_lines[i]
-
-            section_found = None
-            for section in sections_to_copy:
-                if f'type "{section}"' in line and "{" in line:
-                    section_found = section
+        if line_exists:
+            for i, line in enumerate(lines):
+                if symbol_name in line:
+                    lines[i] = new_line
+                    logging.info("Updated variant in %s.", lst_path)
                     break
+        else:
+            lines.insert(variant_section_index + 1, new_line)
+            logging.info("Added new variant to %s.", lst_path)
 
-            if section_found:
-                # Find the end of this section
-                brace_level = 0
-                end_idx = -1
-                for j in range(i, len(system_lines)):
-                    brace_level += system_lines[j].count("{")
-                    brace_level -= system_lines[j].count("}")
-                    if brace_level == 0:
-                        end_idx = j
-                        break
-
-                if end_idx != -1:
-                    # Replace the existing section
-                    new_system_lines.extend(collected_sections[section_found])
-                    sections_replaced.add(section_found)
-                    print(
-                        f"Section '{section_found}' replaced successfully in {system_file}"
-                    )
-                    i = end_idx + 1
-                    continue
-
-            new_system_lines.append(line)
-            i += 1
-
-        system_lines = new_system_lines
-
-        # Insert sections that did not exist
-        sections_to_insert = [
-            s for s in sections_to_copy if s not in sections_replaced
-        ]
-
-        if sections_to_insert:
-            insertion_point = None
-            for i, line in enumerate(system_lines):
-                if 'default partial xkb_types "default"' in line:
-                    brace_level = 0
-                    for j in range(i, len(system_lines)):
-                        brace_level += system_lines[j].count("{")
-                        brace_level -= system_lines[j].count("}")
-                        if brace_level == 0:
-                            insertion_point = j
-                            break
-                    break
-
-            if insertion_point is not None:
-                # Insert new sections before the closing brace
-                for section in sections_to_insert:
-                    if collected_sections[section]:
-                        system_lines.insert(
-                            insertion_point,
-                            "".join(collected_sections[section]) + "\n",
-                        )
-                print(f"New sections inserted successfully into {system_file}")
-            else:
-                print(f"Target section 'default' not found in {system_file}.")
-
-        # Write the modified file
-        with open(system_file, "w") as file:
-            file.writelines(system_lines)
-
-        if sections_replaced:
-            print(f"Total of {len(sections_replaced)} section(s) replaced.")
-        if sections_to_insert:
-            print(f"Total of {len(sections_to_insert)} section(s) inserted.")
+        with lst_path.open("w", encoding="utf-8") as f:
+            f.writelines(lines)
 
     except IOError as e:
-        print(f"Error during file read/write: {e}")
+        logging.error("Failed to update %s: %s", lst_path, e)
 
 
-def main():
-    check_sudo()
+def update_xml_file(
+    xml_path: Path, symbol_name: str, display_name: str
+) -> None:
+    """
+    Updates the evdev.xml file to include the new layout variant.
 
-    parser = argparse.ArgumentParser(
-        description="Install XKB layout.", add_help=False
-    )
-    parser.add_argument("--xkb", help="Path to the .xkb file.")
-    parser.add_argument("--xcompose", help="Path to the .XCompose file.")
-    parser.add_argument(
-        "--types", help="Path to the types file (e.g., xkb_types.txt)."
-    )
-    parser.add_argument(
-        "-h", "--help", action="store_true", help="Show help message."
-    )
-
-    args = parser.parse_args()
-
-    if args.help:
-        show_help()
+    Args:
+        xml_path: Path to the evdev.xml file.
+        symbol_name: The symbol name of the layout.
+        display_name: The human-readable name of the layout.
+    """
+    if not xml_path.exists():
+        logging.error("XML file not found: %s", xml_path)
         return
 
-    xkb_file = args.xkb
-    xcompose_file = args.xcompose
-    types_file = args.types
+    try:
+        ET.register_namespace("", "http://www.freedesktop.org/xkb/xconfig")
+        tree = ET.parse(str(xml_path))
+        root = tree.getroot()
 
-    # Interactive mode if no xkb file is provided
-    if not xkb_file:
-        print("Interactive mode: selecting Ergopti version to install...")
-        script_dir = os.path.dirname(__file__)
-        version = select_version()
+        fr_layout = root.find(".//layout[configItem/name='fr']")
+        if fr_layout is None:
+            logging.error("French layout section not found in %s.", xml_path)
+            return
 
-        # Find files based on version
-        xkb_files = find_xkb_files_by_version(script_dir, version)
-        if not xkb_files:
-            print(f"No .xkb file found for version {version}.")
-            print("Searching in subdirectories...")
-            for subdir in os.listdir(script_dir):
-                subdir_path = os.path.join(script_dir, subdir)
-                if os.path.isdir(subdir_path):
-                    xkb_files.extend(
-                        find_xkb_files_by_version(subdir_path, version)
+        variant_list = fr_layout.find("variantList")
+        if variant_list is None:
+            variant_list = ET.SubElement(fr_layout, "variantList")
+
+        existing_variant = variant_list.find(
+            f"variant[configItem/name='{symbol_name}']"
+        )
+
+        backup_file(xml_path)
+
+        if existing_variant is not None:
+            desc = existing_variant.find("configItem/description")
+            if desc is not None:
+                desc.text = display_name
+                logging.info(
+                    "Updated variant '%s' in %s.", symbol_name, xml_path
+                )
+        else:
+            new_variant = ET.Element("variant")
+            config_item = ET.SubElement(new_variant, "configItem")
+            ET.SubElement(config_item, "name").text = symbol_name
+            ET.SubElement(config_item, "description").text = display_name
+            variant_list.insert(0, new_variant)
+            logging.info("Added new variant '%s' to %s.", symbol_name, xml_path)
+
+        tree.write(
+            str(xml_path),
+            encoding="utf-8",
+            xml_declaration=True,
+            short_empty_elements=False,
+        )
+
+    except (ET.ParseError, IOError) as e:
+        logging.error("Failed to update %s: %s", xml_path, e)
+
+
+def update_xkb_symbols_file(
+    source_xkb: Path, symbol_name: str, dest_symbols_file: Path
+) -> None:
+    """
+    Appends or replaces the layout definition in the system's 'fr' symbols file.
+
+    Args:
+        source_xkb: The path to the source .xkb file.
+        symbol_name: The symbol name of the layout to update.
+        dest_symbols_file: The path to the system's 'fr' symbols file.
+    """
+    try:
+        with source_xkb.open("r", encoding="utf-8") as f:
+            source_content = f.read()
+
+        section_match = re.search(
+            rf'xkb_symbols "{symbol_name}" \{{.*?^\}};',
+            source_content,
+            re.DOTALL | re.MULTILINE,
+        )
+        if not section_match:
+            logging.error("Could not find symbol section in %s.", source_xkb)
+            return
+        section_to_add = section_match.group(0)
+
+        if not dest_symbols_file.exists():
+            logging.info(
+                "System symbols file %s not found. Creating it.",
+                dest_symbols_file,
+            )
+            dest_symbols_file.touch()
+
+        with dest_symbols_file.open("r+", encoding="utf-8") as f:
+            content = f.read()
+            backup_file(dest_symbols_file)
+
+            # Use regex to find and replace the whole block
+            pattern = re.compile(
+                rf'xkb_symbols "{symbol_name}" \{{.*?^\}};',
+                re.DOTALL | re.MULTILINE,
+            )
+            if pattern.search(content):
+                new_content = pattern.sub(section_to_add, content)
+                logging.info(
+                    "Replaced existing symbols section in %s.",
+                    dest_symbols_file,
+                )
+            else:
+                new_content = content.rstrip() + "\n\n" + section_to_add + "\n"
+                logging.info(
+                    "Appended new symbols section to %s.", dest_symbols_file
+                )
+
+            f.seek(0)
+            f.write(new_content)
+            f.truncate()
+
+    except (IOError, re.error) as e:
+        logging.error(
+            "Failed to update symbols file %s: %s", dest_symbols_file, e
+        )
+
+
+def update_xkb_types_file(source_types: Path, dest_types_file: Path) -> None:
+    """
+    Appends or replaces type definitions in the system's 'extra' types file.
+
+    Args:
+        source_types: The path to the file with type definitions.
+        dest_types_file: The path to the system's 'extra' types file.
+    """
+    try:
+        with source_types.open("r", encoding="utf-8") as f:
+            source_content = f.read()
+
+        type_sections = re.findall(
+            r'type ".*?" \{.*?\};', source_content, re.DOTALL
+        )
+        if not type_sections:
+            logging.warning("No type sections found in %s.", source_types)
+            return
+
+        if not dest_types_file.exists():
+            logging.info(
+                "System types file %s not found. Creating it.", dest_types_file
+            )
+            dest_types_file.touch()
+
+        with dest_types_file.open("r+", encoding="utf-8") as f:
+            content = f.read()
+            backup_file(dest_types_file)
+            new_content = content
+
+            for section in type_sections:
+                type_name_match = re.search(r'type "(.*?)"', section)
+                if not type_name_match:
+                    continue
+                type_name = type_name_match.group(1)
+
+                pattern = re.compile(
+                    f'type "{re.escape(type_name)}"' + r" \{.*?};", re.DOTALL
+                )
+                if pattern.search(new_content):
+                    new_content = pattern.sub(section, new_content)
+                    logging.info(
+                        "Replaced type '%s' in %s.", type_name, dest_types_file
+                    )
+                else:
+                    new_content = new_content.rstrip() + "\n\n" + section + "\n"
+                    logging.info(
+                        "Appended type '%s' to %s.", type_name, dest_types_file
                     )
 
-        if not xkb_files:
-            print(f"No .xkb file found for version {version}.")
-            sys.exit(1)
+            f.seek(0)
+            f.write(new_content)
+            f.truncate()
 
-        xkb_file = max(xkb_files, key=os.path.getmtime)
-        print(f"Selected XKB file: {xkb_file}")
+    except (IOError, re.error) as e:
+        logging.error("Failed to update types file %s: %s", dest_types_file, e)
 
-        # Find corresponding XCompose file
-        xkb_basename = os.path.basename(xkb_file).replace(".xkb", "")
 
-        # Search for XCompose file in the same directory as the XKB file
-        potential_xcompose = os.path.join(
-            os.path.dirname(xkb_file), f"{xkb_basename}.XCompose"
+def install_xcompose_file(xcompose_file: Path) -> None:
+    """
+    Installs the .XCompose file to the user's home directory.
+
+    Args:
+        xcompose_file: Path to the .XCompose file.
+    """
+    sudo_user = os.getenv("SUDO_USER")
+    if not sudo_user:
+        logging.error(
+            "SUDO_USER environment variable not set. Cannot determine home directory."
         )
-        if os.path.exists(potential_xcompose):
-            xcompose_file = potential_xcompose
-        else:
-            # Fallback to searching anywhere
-            xcompose_files = glob.glob(
-                os.path.join(script_dir, "**", "*.XCompose"), recursive=True
-            )
-            for xc_file in xcompose_files:
-                if xkb_basename in os.path.basename(xc_file):
-                    xcompose_file = xc_file
-                    break
+        return
 
-        if xcompose_file:
-            print(f"Found XCompose file: {xcompose_file}")
+    try:
+        user_info = pwd.getpwnam(sudo_user)
+        home_dir = Path(user_info.pw_dir)
+        dest_xcompose = home_dir / ".XCompose"
 
-        # Select types file
-        if not types_file:
-            types_file = select_types_file(script_dir, xkb_file)
-            if types_file:
-                print(f"Selected types file: {types_file}")
+        if dest_xcompose.exists():
+            choice = input(
+                f"{dest_xcompose} already exists. Overwrite? (y/N): "
+            ).lower()
+            if choice != "y":
+                logging.info("Skipping .XCompose installation.")
+                return
 
-    if not xkb_file or not validate_file(xkb_file, ".xkb"):
+        shutil.copy(xcompose_file, dest_xcompose)
+        os.chown(dest_xcompose, user_info.pw_uid, user_info.pw_gid)
+        logging.info("Installed .XCompose file to %s", dest_xcompose)
+
+    except (KeyError, OSError) as e:
+        logging.error("Failed to install .XCompose file: %s", e)
+
+
+# --- Main Execution ---
+
+
+def parse_arguments() -> argparse.Namespace:
+    """
+    Parses command-line arguments.
+
+    Returns:
+        An object containing the parsed arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description="Install Ergopti XKB layout on Linux.",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument("--xkb", type=Path, help="Path to the .xkb file.")
+    parser.add_argument(
+        "--xcompose", type=Path, help="Path to the .XCompose file."
+    )
+    parser.add_argument(
+        "--types", type=Path, help="Path to the xkb_types.txt file."
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    """
+    Main function to run the installation script.
+    """
+    if sys.platform == "win32":
+        logging.error("This script is for Linux and cannot be run on Windows.")
         sys.exit(1)
 
-    # Extract necessary info from the XKB file
-    symbols_line, name_line = extract_xkb_info(xkb_file)
+    check_sudo()
+    args = parse_arguments()
 
-    # Update XKB symbols
-    xkb_symbols_file = f"{xkb_folder}/symbols/fr"
-    update_xkb_symbols(xkb_file, symbols_line, xkb_symbols_file)
+    xkb_file, xcompose_file, types_file = args.xkb, args.xcompose, args.types
 
-    # Update XKB types if a types file is available
-    if types_file:
-        xkb_types_file = f"{xkb_folder}/types/extra"
-        update_xkb_types(types_file, xkb_types_file)
+    if not xkb_file:
+        # --- Interactive Mode ---
+        logging.info("Entering interactive installation mode...")
+        script_dir = Path(__file__).parent
+        version_choice = select_from_menu(
+            "Select the Ergopti version to install:",
+            {
+                "1": "Ergopti (normal)",
+                "2": "Ergopti+ (plus)",
+                "3": "Ergopti++ (plus plus)",
+            },
+        )
+        version_map = {"1": "normal", "2": "plus", "3": "plus_plus"}
+        version = version_map[version_choice]
+
+        xkb_file, xcompose_file, types_file = find_layout_files(
+            script_dir, version
+        )
+
+    # --- Validation and Installation ---
+    if not xkb_file or not xkb_file.is_file():
+        logging.error("XKB file not found or specified. Aborting.")
+        sys.exit(1)
+
+    symbol_name, display_name = extract_xkb_info(xkb_file)
+    if not symbol_name or not display_name:
+        logging.error(
+            "Could not extract layout info from %s. Aborting.", xkb_file
+        )
+        sys.exit(1)
+
+    # Update system files
+    update_xkb_symbols_file(xkb_file, symbol_name, XKB_SYMBOLS_DIR / "fr")
+
+    if types_file and types_file.is_file():
+        update_xkb_types_file(types_file, XKB_TYPES_DIR / "extra")
     else:
-        print("No types file specified, skipping types update.")
+        logging.warning(
+            "No types file provided or found. Skipping types update."
+        )
 
-    # Update LST file
-    lst_file = f"{xkb_folder}/rules/evdev.lst"
-    update_lst(lst_file, symbols_line, name_line)
+    update_lst_file(XKB_RULES_DIR / "evdev.lst", symbol_name, display_name)
+    update_xml_file(XKB_RULES_DIR / "evdev.xml", symbol_name, display_name)
 
-    # Update XML file
-    xml_file = f"{xkb_folder}/rules/evdev.xml"
-    update_xml(xml_file, symbols_line, name_line)
+    if xcompose_file and xcompose_file.is_file():
+        install_xcompose_file(xcompose_file)
+    else:
+        logging.info("No .XCompose file specified. Skipping.")
 
-    # Install XCompose file (optional)
-    if xcompose_file:
-        install_xcompose(xcompose_file)
+    logging.info(
+        "\nInstallation complete. You may need to restart your session for changes to take effect."
+    )
+    logging.info(
+        "To activate the layout, run: setxkbmap fr -variant %s", symbol_name
+    )
 
 
 if __name__ == "__main__":
-    if sys.platform == "win32":
-        raise RuntimeError(
-            "This script is intended for Linux and should not be run on Windows."
-        )
     main()
