@@ -2,6 +2,8 @@ import re
 
 from data.symbol_names import ALIAS_TO_ENTITY
 
+from utilities.keylayout_extraction import extract_keymap_body
+from utilities.keylayout_modification import replace_keymap
 from utilities.logger import logger
 
 LOGS_INDENTATION = "\t"
@@ -86,6 +88,16 @@ def replace_action_to_output_extra_keys(
         r'<key code="50"\1output="$"\2>',
         fixed_body,
     )
+
+    # Replace action by output for the j key (8) on Shift + AltGr + J (layer 6)
+    keymap_6 = extract_keymap_body(fixed_body, 6)
+    new_keymap_6 = re.sub(
+        r'(<key code="8") action="(.*)"',
+        r'\1 output="\2"',
+        keymap_6,
+    )
+    # Reinsert the modified keymap into the full body and update fixed_body.
+    fixed_body = replace_keymap(fixed_body, 6, new_keymap_6)
 
     return fixed_body
 
