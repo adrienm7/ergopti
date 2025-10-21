@@ -1,0 +1,68 @@
+partial alphanumeric_keys
+xkb_symbols "ergopti" {
+
+	name[Group1]= "Français — Ergopti";
+
+	include "latin"
+
+        // Space bar
+        key <SPCE> { [] };
+
+        // Digits
+        key <TLDE> { [] };
+        key <AE01> { [] };
+        key <AE02> { [] };
+        key <AE03> { [] };
+        key <AE04> { [] };
+        key <AE05> { [] };
+        key <AE06> { [] };
+        key <AE07> { [] };
+        key <AE08> { [] };
+        key <AE09> { [] };
+        key <AE10> { [] };
+        key <AE11> { [] };
+        key <AE12> { [] };
+
+        // Letters — Row 1/3
+        key <AD01> { [] };
+        key <AD02> { [] };
+        key <AD03> { [] };
+        key <AD04> { [] };
+        key <AD05> { [] };
+        key <AD06> { [] };
+        key <AD07> { [] };
+        key <AD08> { [] };
+        key <AD09> { [] };
+        key <AD10> { [] };
+        key <AD11> { [] };
+        key <AD12> { [] };
+
+        // Letters — Row 2/3
+        key <AC01> { [] };
+        key <AC02> { [] };
+        key <AC03> { [] };
+        key <AC04> { [] };
+        key <AC05> { [] };
+        key <AC06> { [] };
+        key <AC07> { [] };
+        key <AC08> { [] };
+        key <AC09> { [] };
+        key <AC10> { [] };
+        key <AC11> { [] };
+        key <BKSL> { [] };
+
+        // Letters — Row 3/3
+        key <LSGT> { [] };
+        key <AB01> { [] };
+        key <AB02> { [] };
+        key <AB03> { [] };
+        key <AB04> { [] };
+        key <AB05> { [] };
+        key <AB06> { [] };
+        key <AB07> { [] };
+        key <AB08> { [] };
+        key <AB09> { [] };
+        key <AB10> { [] };
+
+	include "level3(ralt_switch)"
+};
