@@ -11389,7 +11389,11 @@
             "key_code": "t"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -11439,7 +11443,11 @@
             ]
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -12318,7 +12326,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -12404,7 +12416,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "a"
@@ -12496,7 +12512,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "d"
@@ -12588,7 +12608,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "z"
@@ -12680,7 +12704,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "s"
@@ -12772,7 +12800,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "e"
@@ -12864,7 +12896,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "f"
@@ -12956,7 +12992,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "f"
@@ -13048,7 +13088,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "quote",
@@ -25355,7 +25399,11 @@
             "key_code": "t"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -29046,7 +29094,11 @@
             ]
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -33004,7 +33056,11 @@
             ]
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -37407,16 +37463,35 @@
         },
         "to": [
           {
-            "key_code": "close_bracket",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
+            "key_code": "c"
           },
           {
             "set_variable": {
               "name": "star_activated",
               "value": 1
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket"
+        },
+        "to": [
+          {
+            "key_code": "close_bracket"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "j"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
             }
           }
         ]
@@ -38394,62 +38469,6 @@
             "set_variable": {
               "name": "previous_key",
               "value": "0"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "close_bracket"
-        },
-        "to": [
-          {
-            "key_code": "close_bracket"
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "¨"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "l",
-          "modifiers": {
-            "mandatory": [
-              "shift",
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "l",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "¨"
             }
           },
           {
@@ -42761,7 +42780,40 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": "★"
+              "value": "¨"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "l",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "l",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¨"
             }
           },
           {

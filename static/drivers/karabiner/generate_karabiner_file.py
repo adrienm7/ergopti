@@ -285,6 +285,13 @@ for mapping_name, mapping in plus_mappings.items():
                                 to_list.append({"key_code": base_name})
                         continue
 
+                    # Cas particulier pour j
+                    if char in ["j"]:
+                        to_list.append(
+                            {"key_code": "c", "modifiers": ["shift", "option"]}
+                        )
+                        continue
+
                     # Cas particulier pour œ/Œ : touche morte circonflexe + o/O
                     if char in ["œ", "Œ"]:
                         # Envoyer backslash (touche morte ^) puis la touche o
@@ -730,9 +737,12 @@ for (keycode, layer), symbols in num_to_letter.items():
                         "from": {"key_code": name},
                         "to": [
                             {
-                                "key_code": "close_bracket",
-                                "modifiers": ["shift", "option"],
+                                "key_code": name,
                             },
+                            # {
+                            #     "key_code": "close_bracket",
+                            #     "modifiers": ["shift", "option"],
+                            # },
                             {
                                 "set_variable": {
                                     "name": "star_activated",

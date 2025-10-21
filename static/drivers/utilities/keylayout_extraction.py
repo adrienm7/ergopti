@@ -192,6 +192,18 @@ def extract_keymap_body(body: str, index: int) -> str:
     return match.group(1)
 
 
+def extract_actions_body(body: str) -> str:
+    """Extract the <actions>...</actions> block from a keylayout file body.
+
+    Returns the inner content of the actions element (not including the
+    surrounding tags) or an empty string if not present.
+    """
+    match = re.search(r'<actions>(.*?)</actions>', body, flags=re.DOTALL)
+    if not match:
+        return ""
+    return match.group(1)
+
+
 def get_last_used_layer(body: str) -> int:
     """
     Scan the keylayout body to find the highest layer number in use.
@@ -213,12 +225,48 @@ def get_last_used_layer(body: str) -> int:
     return max_layer
 
 
-def get_symbol(keymap_body: str, macos_code: int) -> str:
-    """Extract the symbol (output or action) for a given macOS key code in a keyMap body. Returns the value (e.g. 'a', 'A', etc) or '' if not found. Décode les entités XML."""
+def get_symbol(keymap_body: str, macos_code: int, actions_body: str) -> str:
+    """Extract the symbol (output or action) for a given macOS key code
+    in a keyMap body.
+
+    Simplified behavior:
+    - If the <key ... output="..."> attribute exists for the macOS code,
+      return the unescaped output.
+    - If the key uses action="NAME":
+        - if an <action name="NAME"> block exists in `actions_body` and
+          it contains a `<when state="none" output="..."/>`, return that
+          unescaped output;
+        - otherwise return the action name ( NAME ).
+    """
     match = re.search(
-        rf'<key[^>]*code="{macos_code}"[^>]*(output|action)="([^"]+)"',
+        rf'<key[^>]*code="{macos_code}"[^>]*\b(output|action)="([^"]+)"',
         keymap_body,
     )
-    if match:
-        return html.unescape(match.group(2))
-    return ""
+    if not match:
+        return ""
+
+    kind = match.group(1)
+    value = html.unescape(match.group(2))
+
+    if kind == "output":
+        return value
+
+    # kind == 'action'
+    action_name = value
+    if not actions_body:
+        return action_name
+
+    # Find the action block and look for when state="none"
+    action_block_re = rf'<action[^>]*id="{re.escape(action_name)}"[^>]*>(.*?)</action>'
+    action_block = re.search(action_block_re, actions_body, flags=re.DOTALL)
+    if not action_block:
+        return action_name
+
+    action_inner = action_block.group(1)
+    when_none = re.search(
+        r'<when[^>]*state="none"[^>]*output="([^"]+)"', action_inner,
+    )
+    if when_none:
+        return html.unescape(when_none.group(1))
+
+    return action_name

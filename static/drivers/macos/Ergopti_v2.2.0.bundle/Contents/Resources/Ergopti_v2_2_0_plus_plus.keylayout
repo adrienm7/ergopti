@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-2510193" maxout="1" name="Ergopti_v2_2_0_plus_plus">
+<keyboard group="126" id="-2510203" maxout="1" name="Ergopti_v2_2_0_plus_plus">
 	<layouts>
 		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
@@ -595,7 +595,7 @@
 			<key code="5" output="·"/>
 			<key code="6" output="÷"/>
 			<key code="7" action="ᵢ"/>
-			<key code="8" action="j"/>
+			<key code="8" output="j"/>
 			<key code="9" output="…"/>
 			<key code="10" action="¤"/>
 			<key code="11" action="+"/>
