@@ -11,20 +11,6 @@
 
 	let versionValue;
 
-	// Fonction pour comparer deux versions
-	function compareVersions(versionA, versionB) {
-		const aParts = versionA.split('.').map(Number);
-		const bParts = versionB.split('.').map(Number);
-
-		for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-			const a = aParts[i] || 0;
-			const b = bParts[i] || 0;
-			if (a > b) return 1;
-			if (a < b) return -1;
-		}
-		return 0;
-	}
-
 	// Abonnement à la valeur du store
 	version.subscribe((value) => {
 		versionValue = value;
@@ -36,6 +22,12 @@
 	<meta name="description" content="Fichiers pour utiliser Ergopti" />
 </svelte:head>
 
+<p>
+	<span style="font-weight:bold;">Note :</span> Après toute installation ou réinstallation, il est
+	important de <strong>toujours penser à redémarrer son ordinateur</strong>. Cela permet d’être
+	certain que la nouvelle version soit prise en compte et évite bien des problèmes.
+</p>
+<tiny-space></tiny-space>
 <div style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem">
 	<a href="#windows">
 		<button class="bouton-telechargement"

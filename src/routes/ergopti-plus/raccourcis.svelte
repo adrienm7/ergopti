@@ -139,7 +139,7 @@
 		<li><kbd>"LAlt"</kbd> + <kbd>"CapsLock"</kbd> ➜ <kbd-output>CapsWord</kbd-output> ;</li>
 		<p>
 			<kbd>CapsWord</kbd> est une sorte de
-			<span class="important">CapsLock qui se désactive automatiquement</span>
+			<strong>CapsLock qui se désactive automatiquement</strong>
 			à la fin d’un "mot". Ainsi, CapsLock se désactive lors de la pression de
 			<kbd>Espace</kbd>, <kbd>,</kbd> ou encore <kbd>Entrée</kbd>. Cette fonctionnalité peut être
 			très utile pour écrire des abréviations telles que <kbd-output>QMK</kbd-output>,

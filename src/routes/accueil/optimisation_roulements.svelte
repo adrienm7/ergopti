@@ -83,9 +83,8 @@
 
 	<p>Avec même quelques trigrammes très confortables :</p>
 	<ul>
-		<li><kbd>AIE</kbd> notamment pour écrire <span class="hyper text-bold">AIE</span>NT ;</li>
-		(avec en plus<span style="width:0.3em; display:inline-block"></span><kbd>NT</kbd> qui est lui
-		aussi un roulement, que demander de plus ?)
+		<li><kbd>AIE</kbd> notamment pour écrire <strong>AIE</strong>NT ;</li>
+		(avec en plus<kbd>NT</kbd> qui est lui aussi un roulement, que demander de plus ?)
 		<li><kbd>IEU</kbd> ;</li>
 		<li><kbd>YOU</kbd>.</li>
 	</ul>
@@ -101,17 +100,16 @@
 		</li>
 		<li><kbd>PL</kbd> ;</li>
 		<li>
-			<kbd>LD</kbd> surtout fréquent en anglais (O<span class="hyper text-bold">LD</span>, COU<span
-				class="hyper text-bold">LD</span
-			>, SHOU<span class="hyper text-bold">LD</span>, WOU<span class="hyper text-bold">LD</span>,
-			etc.) ;
+			<kbd>LD</kbd> surtout fréquent en anglais (O<strong>LD</strong>, COU<strong>LD</strong>, SHOU<strong
+				>LD</strong
+			>, WOU<strong>LD</strong>, etc.) ;
 		</li>
 		<li><kbd>D’</kbd> ;</li>
 		<li><kbd>NC</kbd> ;</li>
 		<li>
-			<kbd>ND</kbd> notamment pour tous les A<span class="hyper text-bold">ND</span> en anglais ;
+			<kbd>ND</kbd> notamment pour tous les A<strong>ND</strong> en anglais ;
 		</li>
-		<li><kbd>NG</kbd> pour tous les -I<span class="hyper text-bold">NG</span> en anglais ;</li>
+		<li><kbd>NG</kbd> pour tous les -I<strong>NG</strong> en anglais ;</li>
 		<li><kbd>TH</kbd> bigramme le plus fréquent (et de loin) en anglais ;</li>
 		<li><kbd>CR</kbd> ;</li>
 		<li><kbd>GR</kbd>.</li>
@@ -119,19 +117,16 @@
 	<h3>Autres bons bigrammes</h3>
 	<ul>
 		<li>
-			<kbd>OW</kbd> très utilisé en anglais (ALL<span class="hyper text-bold">OW</span>, D<span
-				class="hyper text-bold">OW</span
-			>N, FOLL<span class="hyper text-bold">OW</span>, H<span class="hyper text-bold">OW</span>, KN<span
-				class="hyper text-bold">OW</span
-			>, N<span class="hyper text-bold">OW</span>,
-			<span class="hyper text-bold">OW</span>N, SH<span class="hyper text-bold">OW</span>, etc.) ;
+			<kbd>OW</kbd> très utilisé en anglais (ALL<strong>OW</strong>, D<strong>OW</strong>N, FOLL<strong
+				>OW</strong
+			>, H<strong>OW</strong>, KN<strong>OW</strong>, N<strong>OW</strong>,
+			<strong>OW</strong>N, SH<strong>OW</strong>, etc.) ;
 		</li>
 		<li>
-			<kbd>WO</kbd> très utilisé en anglais (T<span class="hyper text-bold">WO</span>,
-			<span class="hyper text-bold">WO</span>MAN, <span class="hyper text-bold">WO</span>RD,
-			<span class="hyper text-bold">WO</span>RK, <span class="hyper text-bold">WO</span>RLD,
-			<span class="hyper text-bold">WO</span>RTH, <span class="hyper text-bold">WO</span>ULD,
-			etc.) ;
+			<kbd>WO</kbd> très utilisé en anglais (T<strong>WO</strong>,
+			<strong>WO</strong>MAN, <strong>WO</strong>RD,
+			<strong>WO</strong>RK, <strong>WO</strong>RLD,
+			<strong>WO</strong>RTH, <strong>WO</strong>ULD, etc.) ;
 		</li>
 		<li><kbd>+=</kbd> utilisé en programmation pour incrémenter.</li>
 	</ul>

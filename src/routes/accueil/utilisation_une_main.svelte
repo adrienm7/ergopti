@@ -18,8 +18,8 @@
 	</p>
 	<p>
 		Par conséquent, il est également important de s’assurer que, grâce à sa disposition clavier,
-		beaucoup d’actions courantes puissent se réaliser avec la seule main gauche <span
-			class="important">afin de ne pas avoir à lâcher la souris</span
+		beaucoup d’actions courantes puissent se réaliser avec la seule main gauche <strong
+			>afin de ne pas avoir à lâcher la souris</strong
 		>. À noter que sur ce point AZERTY est très bon car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
 		et de nombreuses autres lettres fréquemment utilisées pour faire des raccourcis en combinaison avec
 		<kbd>Ctrl</kbd> sont du côté gauche.
@@ -74,11 +74,11 @@
 	</p>
 	<p>
 		<ErgoptiPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
-		<span class="important">mécanisme de tap-hold</span>. L’idée du tap-hold est qu’il est possible
-		d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir
-		pressé). Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une
-		touche envoie un raccourci, mais la presser la fait se comporter normalement. Cela permet
-		d’intégrer des touches
+		<strong>mécanisme de tap-hold</strong>. L’idée du tap-hold est qu’il est possible d’assigner
+		deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir pressé).
+		Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une touche envoie
+		un raccourci, mais la presser la fait se comporter normalement. Cela permet d’intégrer des
+		touches
 		<kbd-output>Copier</kbd-output>, <kbd-output>Coller</kbd-output> et
 		<kbd-output>Alt+Tab</kbd-output>
 		respectivement sur

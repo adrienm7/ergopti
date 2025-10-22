@@ -42,7 +42,7 @@ strong,
 i,
 i .path2::before,
 em,
-.hyper,
+strong,
 .important {
 	-webkit-background-clip: text;
 	background-clip: text;

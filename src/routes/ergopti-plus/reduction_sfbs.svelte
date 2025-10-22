@@ -93,7 +93,7 @@
 	<KeyboardBasis id="magique" />
 	<tiny-space></tiny-space>
 	<p>
-		La touche <kbd>★</kbd> est <span class="important">l’ajout principal</span>
+		La touche <kbd>★</kbd> est <strong>l’ajout principal</strong>
 		d’<ErgoptiPlus /> et mérite son excellent emplacement sous l’index gauche. Elle vient en remplacement
 		de la touche <kbd>J</kbd>
 		(mais pas le contenu des autres couches de la touche <kbd>J</kbd> tel qu’en
@@ -102,9 +102,8 @@
 		<kbd>Voyelle</kbd>.
 	</p>
 	<p>
-		La nouvelle touche <kbd>★</kbd>
-		<span class="important">va répéter la dernière touche tapée</span>. Ainsi, <kbd>l★</kbd>
-		va envoyer <kbd-output>ll</kbd-output>, tandis que <kbd>r★</kbd> va envoyer
+		La nouvelle touche <kbd>★</kbd> <strong>va répéter la dernière touche tapée</strong>. Ainsi,
+		<kbd>l★</kbd> va envoyer <kbd-output>ll</kbd-output>, tandis que <kbd>r★</kbd> va envoyer
 		<kbd-output>rr</kbd-output>. Cela engendrera cependant un petit <SFB></SFB> pour les lettres doublées
 		suivies d’un <kbd>U</kbd>, tel que « connu » ou « battu ». La combinaison <kbd>★ê</kbd> permet
 		d’éviter ce problème. Ainsi, « connu » pourra s’écrire <kbd>con★ê</kbd> et « battu » pourra
@@ -114,10 +113,7 @@
 		L’utilisation de la touche <kbd>★</kbd> va instantanément fluidifier la fra<kbd>p★</kbd>e et
 		réduire le nombre de <SFB />s. Une fois qu’on y est habitué, l’écriture au clavier devient
 		encore un peu plus rapide et efficace, car même les lettres doublées peuvent être parallélisées.
-		D’autant que
-		<span class="important"
-			>doubler les lettres est loin d’être la seule fonction de la touche
-		</span>
+		D’autant que <strong>doubler les lettres est loin d’être la seule fonction de la touche</strong>
 		<kbd>★</kbd>…
 	</p>
 </section>

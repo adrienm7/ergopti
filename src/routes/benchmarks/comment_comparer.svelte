@@ -7,8 +7,8 @@
 <section>
 	<h2 class="first-h2">Comment bien utiliser KLAnext</h2>
 	<p>
-		Pour bien utiliser des comparateurs de disposition, il faut <span class="important"
-			>comparer ce qui est comparable</span
+		Pour bien utiliser des comparateurs de disposition, il faut <strong
+			>comparer ce qui est comparable</strong
 		>. Ceci est très important, car si vous ne le faites pas, alors vos résultats n’auront aucune
 		valeur.
 	</p>
@@ -25,8 +25,8 @@
 	<tiny-space></tiny-space>
 	<h3>Comparer des claviers possédant une touche pour tous les caractères du corpus</h3>
 	<p>
-		Un autre point à bien faire attention est de <span class="important"
-			>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</span
+		Un autre point à bien faire attention est de <strong
+			>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</strong
 		>. Une disposition faite pour la langue anglaise aura de très bons scores pour des textes
 		français. Cela s’explique parce que tous les caractères accentués seront "sautés", n’existant
 		pas dans la disposition anglophone.
