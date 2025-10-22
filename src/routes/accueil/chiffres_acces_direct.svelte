@@ -17,9 +17,7 @@
 		> momentanément pour l’écrire.
 	</p>
 	<p>
-		Avoir les chiffres en accès direct permet d’<span class="important"
-			>écrire très rapidement des nombres</span
-		>. C’est un réel gain en confort. La rangée des chiffres n’est de toute façon pas très
+		Avoir les chiffres en accès direct permet d’<strong>écrire très rapidement des nombres</strong>. C’est un réel gain en confort. La rangée des chiffres n’est de toute façon pas très
 		accessible. Par conséquent, il vaut mieux placer les symboles qu’elle contenait sur la couche
 		<kbd>AltGr</kbd>
 		qui est plus proche des doigts. C’est exactement ce que fait <Ergopti /> avec sa couche AltGr de

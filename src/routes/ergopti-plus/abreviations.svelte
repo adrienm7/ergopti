@@ -41,9 +41,9 @@
 	</ul>
 	<p>
 		Avec cette fonction d’abréviations, <ErgoptiPlus></ErgoptiPlus>
-		<span class="important">devient plus qu’une disposition clavier</span>. Elle se transforme en un
-		outil de productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes
-		les plus fréquents.
+		<strong>devient plus qu’une disposition clavier</strong>. Elle se transforme en un outil de
+		productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes les plus
+		fréquents.
 	</p>
 	<p>
 		C’est une fonctionnalité tout à fait optionnelle, libre à vous de ne pas utiliser les
@@ -66,7 +66,7 @@
 		<kbd-output>ement</kbd-output>, très souvent utilisé en français, deux frappes suffisent :
 		<kbd>às</kbd>. Ces raccourcis vont diviser par deux le nombre de touches nécessaires pour écrire
 		les suffixes les plus communs,
-		<span class="important">entraînant une augmentation de vitesse</span>.
+		<strong>entraînant une augmentation de vitesse</strong>.
 	</p>
 	<KeyboardBasis id="a" />
 </section>

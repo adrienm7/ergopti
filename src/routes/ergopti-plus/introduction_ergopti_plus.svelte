@@ -26,7 +26,7 @@
 		<ErgoptiPlus /> est une variante améliorée de la disposition <Ergopti /> qui tire parti des meilleures
 		fonctionnalités des claviers programmables et outils d’automatisation. Elle se rapproche de très
 		près de la
-		<span class="important">disposition clavier idéale</span>. En effet, elle :
+		<strong>disposition clavier idéale</strong>. En effet, elle :
 	</p>
 	<div class="cards">
 		<div class="card">
@@ -36,9 +36,8 @@
 		</div>
 		<div class="card">
 			<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important"
-				>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span></span
-			> pour une frappe ultra-fluide et sans inconfort.
+			<strong>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span></strong> pour une frappe
+			ultra-fluide et sans inconfort.
 		</div>
 		<div class="card">
 			<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
@@ -47,7 +46,7 @@
 		</div>
 		<div class="card">
 			<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajoute de
-			<span class="important">nombreux raccourcis</span>
+			<strong>nombreux raccourcis</strong>
 			tels qu’un layer de navigation, des tap-holds et des touches
 			<kbd-output>Alt + Tab</kbd-output>,
 			<kbd-output>OneShotShift</kbd-output> et <kbd-output>CapsWord</kbd-output>.
@@ -61,8 +60,8 @@
 		<div class="card">
 			<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i> Chaque
 			fonctionnalité est optionnelle, désactivable et
-			<span class="important">peut être intégrée au fil du temps</span>. Nul besoin de chercher à
-			tout utiliser dès le départ.
+			<strong>peut être intégrée au fil du temps</strong>. Nul besoin de chercher à tout utiliser
+			dès le départ.
 		</div>
 	</div>
 	<tiny-space></tiny-space>
@@ -73,7 +72,7 @@
 	<div class="main">
 		<div class="encadre">
 			Cependant, l’utilisation d’<ErgoptiPlus></ErgoptiPlus> nécessite des
-			<span class="important">outils de programmation de clavier :</span>
+			<strong>outils de programmation de clavier :</strong>
 			<ul>
 				<li>
 					Sur Windows, le programme <a class="link" href="https://www.autohotkey.com/">AutoHotkey</a

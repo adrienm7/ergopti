@@ -21,6 +21,7 @@
 	transform: rotate(315deg);
 	width: 100vw;
 	z-index: 90;
+    font-weight: bold;
 }
 
 .banner p,
@@ -35,7 +36,7 @@
 }
 
 .banner .subtitle {
-	font-size: 0.5em;
+	font-size: 0.6rem;
 	margin-bottom: 1.1rem;
 	margin-top: -0.65rem;
 }
@@ -56,7 +57,7 @@
 	}
 
 	.banner .subtitle {
-		font-size: 0.6em;
+		font-size: 0.65rem;
 	}
 }
 

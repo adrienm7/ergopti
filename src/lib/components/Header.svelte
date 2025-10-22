@@ -63,8 +63,8 @@
 			<img src="img/logo/logo.svg" class="logo" alt="Logo Ergopti" />
 		</a>
 		<div id="ergopti-title">
-			<strong>
-				<a class="no-gradient text-white" href="/">
+			<strong class="no-gradient text-white">
+				<a href="/">
 					<span class="min-width-300">Disposition </span>
 					<span class="min-width-350">clavier </span>
 				</a>
@@ -87,7 +87,7 @@
 				</div>
 			</strong>
 			<p id="ergopti-subtitle">
-				<strong class="min-width-300 hyper" style="font-size:1.1em">Ergonomie optimisée</strong>
+				<strong class="min-width-300" style="font-size:1.1em">Ergonomie optimisée</strong>
 				<span class="min-width-600"> pour le français, l’anglais et le code</span>
 			</p>
 		</div>

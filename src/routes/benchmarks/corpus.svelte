@@ -8,8 +8,8 @@
 	<h2>La question du corpus</h2>
 	<p>
 		Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste encore
-		la <span class="important">question fondamentale du corpus</span>. Effectivement, vos résultats
-		vont sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de dialogues aura de
+		la <strong>question fondamentale du corpus</strong>. Effectivement, vos résultats vont
+		sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de dialogues aura de
 		nombreux "je", un corpus plus "sérieux" aura une sur-représentation de <kbd>Z</kbd> à cause du
 		vouvoiement, tandis qu’un corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus
 		élevée du mot "wagon".
@@ -22,8 +22,8 @@
 	<tiny-space></tiny-space>
 
 	<p>
-		En conclusion, <span class="important"
-			>ne prenez les résultats des benchmarks que comme des tendances générales</span
+		En conclusion, <strong
+			>ne prenez les résultats des benchmarks que comme des tendances générales</strong
 		>. Une disposition meilleure de 2,48% sur un certain corpus n’implique pas que la disposition
 		soit meilleure de 2,48% en général. En outre, passé une certaine performance, les gains sont
 		marginaux.

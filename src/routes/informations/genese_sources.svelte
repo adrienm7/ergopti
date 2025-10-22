@@ -31,8 +31,8 @@
 	<tiny-space></tiny-space>
 
 	<p>
-		Les premières versions de ce projet, baptisées <span class="important"
-			><a class="link" href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux">Optim7</a></span
+		Les premières versions de ce projet, baptisées <strong
+			><a class="link" href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux">Optim7</a></strong
 		>, étaient des dérivés directs d'Optimot. L'objectif initial était d’améliorer les scores sur
 		les analyseurs de disposition et de corriger des choix qui ne me convenaient pas. Par exemple,
 		je voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot, l’auteur préférant
@@ -73,29 +73,28 @@
 		de 90% de la disposition est restée constante. Les ajustements concernaient principalement le déplacement
 		de certaines lettres, nécessitant ainsi de petites phases de réapprentissage régulières. Néanmoins,
 		la plupart des changements se sont avérés non pertinents, ce qui explique l'absence de modifications
-		majeures entre les premières versions d’<span class="important">Optim7</span> et la version
-		finale d’<Ergopti></Ergopti>.
+		majeures entre les premières versions d’<strong>Optim7</strong> et la version finale d’<Ergopti
+		></Ergopti>.
 	</p>
 
 	<tiny-space></tiny-space>
 
 	<p>
 		À un certain stade de développement, il devint évident que la disposition
-		<span class="important">Optim7</span> n'était plus une simple variante d'Optimot. Le besoin de
-		renommer ce projet s’est alors imposé. Grâce à la suggestion d’un utilisateur nommé
+		<strong>Optim7</strong> n'était plus une simple variante d'Optimot. Le besoin de renommer ce
+		projet s’est alors imposé. Grâce à la suggestion d’un utilisateur nommé
 		<strong>Zigmund</strong> sur Discord, après avoir longtemps cherché avec lui un nom aussi
 		remarquablement bien trouvé que celui d’Optimot, le nom
-		<span class="important">HyperTexte</span> fut d’abord retenu. Cependant, il s’avéra par la suite
-		que ce nom était mal choisi, car déjà utilisé sur de nombreux sites ailleurs (ce qui n’est pas étonnant,
-		avec toutes les mentions de « lien hypertexte »). La découverte de la disposition, notamment grâce
-		à un moteur de recherche, s'en trouvait compromise. Le site de présentation n’apparaissait même pas
-		en première page des résultats.
+		<strong>HyperTexte</strong> fut d’abord retenu. Cependant, il s’avéra par la suite que ce nom était
+		mal choisi, car déjà utilisé sur de nombreux sites ailleurs (ce qui n’est pas étonnant, avec toutes
+		les mentions de « lien hypertexte »). La découverte de la disposition, notamment grâce à un moteur
+		de recherche, s'en trouvait compromise. Le site de présentation n’apparaissait même pas en première
+		page des résultats.
 	</p>
 	<p>
 		Environ un mois après la sortie publique de la disposition,
-		<span class="important">HyperTexte</span> fut renommée <Ergopti></Ergopti>, son nom définitif.
-		Ce nouveau nom reflète à la fois l’ergonomie de la disposition et l’optimisation de celle-ci, la
-		lettre
+		<strong>HyperTexte</strong> fut renommée <Ergopti></Ergopti>, son nom définitif. Ce nouveau nom
+		reflète à la fois l’ergonomie de la disposition et l’optimisation de celle-ci, la lettre
 		<kbd>O</kbd> faisant le lien entre les deux (ergo[nomie] & opti[misation]). En outre, il est
 		court, d’une longueur idéale de 7 lettres, et peu présent en ligne. Une fois la nouvelle
 		appellation trouvée, le nom de domaine

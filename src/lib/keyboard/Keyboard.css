@@ -617,7 +617,7 @@ keyboard-key[data-content='<nbsp></nbsp>%'] {
 #keyboard_presentation,
 #keyboard_presentation_plus,
 #keyboard_emulation {
-	--keyboard-width: calc(35vw + 25vh);
+	--keyboard-width: calc(40vw + 25vh);
 }
 
 @media (max-width: 900px) {

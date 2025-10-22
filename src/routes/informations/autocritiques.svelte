@@ -123,8 +123,8 @@
 			<kbd-output>CT</kbd-output> > <kbd-output>SC</kbd-output>.
 		</li>
 		<li>
-			<kbd>PT</kbd> : il est triste de se dire que pour quelqu’un utilisant une disposition o<span
-				class="important">pt</span
+			<kbd>PT</kbd> : il est triste de se dire que pour quelqu’un utilisant une disposition o<strong
+				>pt</strong
 			>imisée, l’écriture même de ce mot ne l’est pas…
 		</li>
 		<li>
