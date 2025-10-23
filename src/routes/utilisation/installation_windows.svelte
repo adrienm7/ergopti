@@ -2,7 +2,7 @@
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
-	import { version } from '$lib/stores_infos.js';
+	import { version, discordLink } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
 	let versionValue,
 		version_mineure_kbdedit_exe,
@@ -22,9 +22,8 @@
 	<i class="icon-windows purple" style="vertical-align:-0.05em"></i> Installation Windows
 </h2>
 <p>
-	Les fichiers de cette section ont été réalisés à l’aide de <a
-		class="link"
-		href="https://www.kbdedit.com/">KbdEdit</a
+	Le pilote ci-dessous a été réalisé à l’aide de <a class="link" href="https://www.kbdedit.com/"
+		>KbdEdit</a
 	>. C’est un logiciel très complet qui permet de modifier des dispositions de clavier sur Windows.
 	Il est en mesure de créer des pilotes pour Windows, et depuis peu pour Mac. Seul Linux n’est pas
 	supporté.
@@ -35,14 +34,14 @@
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
 			<button
 				><i class="icon-windows" style="vertical-align:-0.05em"></i>
-				Disposition KbdEdit Ergopti_v{version_mineure_kbdedit_exe}</button
+				Installateur KbdEdit d’Ergopti v{version_mineure_kbdedit_exe}</button
 			>
 		</a>
 		<tiny-space></tiny-space>
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
 			<button class="alt-button"
 				><i class="icon-windows" style="vertical-align:-0.05em"></i> Fichier source KbdEdit
-				d’Ergopti_v{version_mineure_kbdedit_kbe}</button
+				d’Ergopti v{version_mineure_kbdedit_kbe}</button
 			>
 		</a>
 	</div>
@@ -80,39 +79,57 @@
 
 <h3 id="ahk">Pilote AutoHotkey (sans droits d’administrateur)</h3>
 <p>
+	Le pilote Windows créé par KbdEdit nécessite des droits d’administrateur pour être installé. Il ne
+	peut donc pas être utilisé dans certaines situations, notamment en contexte professionnel. <strong
+		>La version AutoHotkey a exactement les mêmes fonctionnalités que la version KbdEdit, mais ne
+		nécessite pas d’installation avec des droits d’administrateur.</strong
+	> En réalité, elle est même beaucoup plus puissante, car elle permet d’avoir des fonctionnalités avancées
+	comme les remplacements de texte ou les macros.
+</p>
+<p>
+	Il est cependant toujours conseillé d’installer et utiliser le pilote KbdEdit si possible. En
+	effet, cela garantit que la disposition clavier sera <Ergopti></Ergopti> dès le démarrage et sur l’écran
+	de connexion. Au contraire, la version AutoHotkey, bien qu’elle soit fonctionnelle dans tous les programmes,
+	ne fonctionnera pas sur l’écran de connexion, car le script ne sera pas encore chargé.
+</p>
+<p class="encadre">
+	En résumé, le mieux est d’utiliser les deux versions en parallèle : le pilote KbdEdit pour avoir
+	<Ergopti></Ergopti> partout, et le script AutoHotkey pour bénéficier des fonctionnalités avancées.
+	Ce script corrige d’ailleurs quelques limitations du pilote KbdEdit, cf. la section
+	<a href="#windows-solutions">Résolution de problèmes connus</a>.
+</p>
+
+<small-space> </small-space>
+
+<p>
 	Afin que le code source ErgoptiPlus.ahk fonctionne, il faut auparavant installer <a
 		class="link"
 		href="https://www.autohotkey.com/">AutoHotkey v2</a
-	>. Une fois cela fait, il suffit de double-cliquer sur le fichier ErgoptiPlus.ahk pour l’exécuter
-	avec AutoHotkey.
+	>. L’installation pour l’utilisateur actuel ne nécessite pas de droits d’administrateur. Une fois
+	cela fait, il suffit de double-cliquer sur le fichier ErgoptiPlus.ahk pour l’exécuter avec
+	AutoHotkey. En fait, on peut même télécharger le binaire d’AutoHotkey et faire clic droit sur un
+	fichier .ahk pour l’exécuter avec ce binaire sans aucune installation.
 </p>
 <div class="download-buttons">
 	{#if version_mineure_plus !== undefined}
 		<a href="/drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download>
 			<button
 				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
-				ErgoptiPlus_v{version_mineure_plus}.ahk</button
+				ErgoptiPlus v{version_mineure_plus}.ahk</button
 			>
 		</a>
 	{/if}
 </div>
 
 <p>
-	Ce fichier se modifie avec un éditeur de texte afin que vous puissiez l’adapter selon vos envies,
-	notamment pour en désactiver des fonctionnalités ou en ajouter. N’oubliez pas de le relancer pour
-	appliquer vos modifications. Le raccourci <kbd>AltGr</kbd> + <kbd>BackSpace</kbd> a été implémenté
-	afin de relancer facilement le script après une modification.
+	Ce fichier se modifie avec un simple éditeur de texte (clic droit, <code>ouvrir avec</code>) afin
+	que vous puissiez l’adapter selon vos envies, notamment pour en désactiver des fonctionnalités ou
+	en ajouter. N’oubliez pas de le relancer pour appliquer vos modifications. Le raccourci
+	<kbd>AltGr</kbd>
+	+ <kbd>BackSpace</kbd> a été implémenté afin de relancer facilement le script après une modification.
 </p>
-<div class="encadre">
-	Il est possible d’utiliser Ergopti sans même installer de pilote. Pour cela, il suffit de passer à
-	1 la variable de la ligne 8 du fichier ErgoptiPlus.ahk. Idéalement, il vaut mieux utiliser le vrai
-	pilote, notamment pour que le clavier soit Ergopti même sur l’écran de démarrage pour taper son
-	mot de passe de session. Toutefois, la version sans pilote peut être utile <strong
-		>pour tester Ergopti sans l’installer, ou sur des ordinateurs professionnels où l’on n’a pas les
-		droits d’administrateur</strong
-	>.
-</div>
-<tiny-space></tiny-space>
+
+<h4>Automatisation du lancement du script</h4>
 <p>
 	Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
 	désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement du
@@ -132,26 +149,31 @@
 	</li>
 </ol>
 
-<h3>Résolution de problèmes connus</h3>
-<p>Certains problèmes ont été rapportés avec le pilote d’Ergopti dans quelques logiciels :</p>
+<h3 id="windows-solutions">Résolution de problèmes connus</h3>
+<p>
+	Certains problèmes ont été rapportés avec le pilote Windows d’<Ergopti></Ergopti> dans quelques logiciels :
+</p>
 <ul>
 	<li>
-		Microsoft Excel : Taper un <kbd>+</kbd> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause des problèmes
-		d’édition de la cellule : tout ce qui est tapé avant disparaît et le
-		<kbd-output>+</kbd-output> apparaît. Ce problème est résolu en utilisant le script ErgoptiPlus.ahk
-		pour émuler la disposition.
+		Microsoft Excel : Taper un <kbd-output>+</kbd-output> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause
+		des problèmes d’édition de la cellule : tout ce qui est tapé avant disparaît et est remplacé par
+		un
+		<kbd-output>+</kbd-output>.<br />➜ Ce problème se résout en utilisant le script ErgoptiPlus.ahk
+		pour émuler la disposition et garantir que ce soit bien un symbole <kbd-output>+</kbd-output> qui
+		soit envoyé et non un raccourci interne d’Excel qui interfère.
 	</li>
 	<li>
 		Un utilisateur de la version AutoHotkey avait des problèmes avec les remplacements de texte,
 		notamment pour l’autocorrection. Après de nombreuses recherches, il s’est avéré que la cause
-		était le logiciel de contrôle des LEDs de sa tour de pc, qui interférait avec AutoHotkey. Pour
-		résoudre ce genre de problèmes, il faut donc dans un premier temps fermer toutes ses
-		applications sauf AutoHotkey pour vérifier si le problème persiste. S’il persiste, c’est
-		peut-être un problème affectant tous les utilisateurs de la version AutoHotkey et vous êtes
-		invité à le signaler sur le GitHub ou le Discord. Le script AutoHotkey étant cependant utilisé
-		intensivement par plusieurs utilisateurs, la plupart des problèmes sont déjà résolus et il est
-		plus probable qu’il provienne d’un conflit avec une application. Cela peut être notamment si
-		vous utilisez un autre logiciel de remappage de clavier, ou un logiciel qui intercepte les
+		était le logiciel de contrôle des LEDs de sa tour de pc, qui interférait avec AutoHotkey.<br />
+		➜ Pour résoudre ce genre de problèmes, il faut donc dans un premier temps fermer toutes ses applications
+		sauf AutoHotkey pour vérifier si le problème persiste. S’il persiste, c’est peut-être un problème
+		affectant tous les utilisateurs de la version AutoHotkey et vous êtes invité à le signaler sur
+		<a href="https://github.com/adrienm7/ergopti" target="_blank">GitHub</a>
+		ou sur <a href={discordLink} target="_blank">Discord</a>. Le script AutoHotkey étant cependant
+		utilisé intensivement par plusieurs utilisateurs, la plupart des problèmes sont déjà résolus et
+		il est plus probable qu’il provienne d’un conflit avec une application. Cela peut être notamment
+		si vous utilisez un autre logiciel de remappage de clavier, ou un logiciel qui intercepte les
 		frappes clavier pour faire des raccourcis (Kanata, PowerToys, Espanso, etc.).
 	</li>
 </ul>

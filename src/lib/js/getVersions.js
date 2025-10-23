@@ -17,8 +17,8 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 		case 'kbdedit_kbe':
 			files = import.meta.glob('/static/drivers/windows/*.kbe');
 			break;
-		case 'kbdedit_mac':
-			files = import.meta.glob('/static/drivers/macos/*.keylayout');
+		case 'macos_keylayout':
+			files = import.meta.glob('/static/drivers/macos/zipped_bundles/*.zip');
 			break;
 		case 'ahk':
 			files = import.meta.glob('/static/pilotes/ahk/*.exe');
