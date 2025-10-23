@@ -30,27 +30,26 @@
 <tiny-space></tiny-space>
 <div style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem">
 	<a href="#windows">
-		<button class="bouton-telechargement"
-			><i class="icon-windows" style="vertical-align:0"></i> Windows</button
+		<button class="alt-button"><i class="icon-windows" style="vertical-align:0"></i> Windows</button
 		>
 	</a>
 	<a href="#macos">
-		<button class="bouton-telechargement"
+		<button class="alt-button"
 			><i class="icon-appleinc" style="vertical-align:-0.05em"></i>
 			macOS</button
 		>
 	</a>
 	<a href="#linux">
-		<button class="bouton-telechargement"><i class="icon-linux"></i> Linux</button>
+		<button class="alt-button"><i class="icon-linux"></i> Linux</button>
 	</a>
 </div>
 <div style="height:1rem"></div>
 <div style="display: flex; gap: 1rem; justify-content:center;">
 	<a href="/documents/printable_layout_v2.2.pdf" download>
-		<button class="bouton-telechargement">Layout à imprimer</button>
+		<button>Layout à imprimer</button>
 	</a>
 	<a href="/documents/printable_layout_v2.2_full.pdf" download>
-		<button class="bouton-telechargement">Layout à imprimer complet</button>
+		<button>Layout à imprimer complet</button>
 	</a>
 </div>
 <InstallationWindows />

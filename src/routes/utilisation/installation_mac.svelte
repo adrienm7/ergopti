@@ -18,7 +18,7 @@
 <div>
 	{#if version_mineure_kbdedit_mac !== undefined}
 		<a href="/drivers/macos/Ergopti_v{version_mineure_kbdedit_mac}.bundle.zip" download>
-			<button class="bouton-telechargement"
+			<button
 				><i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
 				Ergopti_v{version_mineure_kbdedit_mac}.bundle</button
 			>

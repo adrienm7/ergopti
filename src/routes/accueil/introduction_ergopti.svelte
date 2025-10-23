@@ -78,7 +78,7 @@
 
 	<div style="text-align:center;">
 		<a href="/utilisation">
-			<button class="bouton-telechargement">➜ Essayer en ligne / Installation</button>
+			<button class="alt-button">➜ Essayer en ligne / Installation</button>
 		</a>
 	</div>
 
