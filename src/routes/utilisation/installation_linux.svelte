@@ -16,16 +16,16 @@
 	{#if version_linux !== undefined}
 		<tiny-space></tiny-space>
 		<a href="/drivers/linux/Ergopti_v{version_linux}.xkb" download>
-			<button><i class="icon-linux"></i> Ergopti_v{version_linux}.xkb</button>
+			<button><i class="icon-linux"></i> Ergopti v{version_linux}.xkb</button>
 		</a>
 		<tiny-space></tiny-space>
 		<a href="/drivers/linux/Ergopti_v{version_linux}.XCompose" download>
-			<button><i class="icon-linux"></i> Ergopti_v{version_linux}.XCompose</button>
+			<button><i class="icon-linux"></i> Ergopti v{version_linux}.XCompose</button>
 		</a>
 	{/if}
 	<tiny-space></tiny-space>
 	<a href="/drivers/linux/install_xkb.py" download>
-		<button class="alt-button"><i class="icon-linux"></i>Script d’installation XKB</button>
+		<button class="alt-button"><i class="icon-linux"></i> Script d’installation XKB</button>
 	</a>
 </div>
 
@@ -42,7 +42,9 @@
 </ol>
 
 <h3>Résolution de problèmes connus</h3>
-<p>Certains problèmes ont été rapportés avec le keylayout d’Ergopti dans quelques logiciels :</p>
+<p>
+	Certains problèmes ont été rapportés avec le pilote XKB d’<Ergopti></Ergopti> dans quelques logiciels :
+</p>
 <ul>
 	<li>
 		Le raccourci <kbd-output>Ctrl+Z</kbd-output> en <kbd>Ctrl</kbd> + <kbd>È</kbd> ne semble pas fonctionner.

@@ -4,7 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import InstallationWindows from './installation_windows.svelte';
-	import InstallationMac from './installation_mac.svelte';
+	import InstallationMac from './installation_macos.svelte';
 	import InstallationLinux from './installation_linux.svelte';
 
 	import { version } from '$lib/stores_infos.js';

@@ -3,10 +3,10 @@
 	import SFB from '$lib/components/SFB.svelte';
 	import { version } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
-	let versionValue, version_mineure_kbdedit_mac;
+	let versionValue, version_mineure_macos;
 	version.subscribe((value) => {
 		versionValue = value;
-		version_mineure_kbdedit_mac = getLatestVersion('kbdedit_mac', versionValue);
+		version_mineure_macos = getLatestVersion('macos_keylayout', versionValue);
 	});
 </script>
 
@@ -15,41 +15,51 @@
 	></i>Installation macOS
 </h2>
 <tiny-space></tiny-space>
-<div>
-	{#if version_mineure_kbdedit_mac !== undefined}
-		<a href="/drivers/macos/Ergopti_v{version_mineure_kbdedit_mac}.bundle.zip" download>
+<div class="download-buttons">
+	{#if version_mineure_macos !== undefined}
+		<a href="/drivers/macos/zipped_bundles/Ergopti_v{version_mineure_macos}.bundle.zip" download>
 			<button
 				><i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
-				Ergopti_v{version_mineure_kbdedit_mac}.bundle</button
+				Ergopti v{version_mineure_macos}.bundle</button
 			>
 		</a>
 	{/if}
 </div>
+
+<tiny-space></tiny-space>
+
 <p>Ce bundle doit être dézippé puis placé dans le dossier des extensions de clavier de macOS :</p>
 <code>/Library/Keyboard Layouts/</code>
 
 <p>
-	Il est aussi possible de l’installer sans droits d’administrateur en plaçant le bundle dans le
+	Il est également possible de l’installer sans droits d’administrateur en plaçant le bundle dans le
 	dossier utilisateur :
 </p>
 <code>~/Library/Keyboard Layouts/</code>
 
-<br />
+<small-space></small-space>
+
 <p>
 	Après avoir placé le bundle dans le bon dossier, redémarrer la session (ou l’ordinateur) pour que
-	macOS prenne en compte la nouvelle disposition. Ensuite, aller dans Préférences Système ➜ Clavier
-	➜ Méthodes de saisie et ajouter la disposition Ergopti. Généralement, la disposition se trouvera
-	dans la section « Français », mais elle peut aussi parfois se trouver dans « Autres ».
+	macOS prenne en compte la nouvelle disposition. Ensuite, aller dans <code
+		>Préférences Système</code
+	>
+	> <code>Clavier</code>
+	> <code>Méthodes de saisie</code> et ajouter la disposition <Ergopti></Ergopti>. Généralement, la
+	disposition se trouvera dans la section « Français », mais elle peut aussi parfois se trouver dans
+	« Autres ».
 </p>
 
 <h3>Résolution de problèmes connus</h3>
-<p>Certains problèmes ont été rapportés avec le keylayout d’Ergopti dans quelques logiciels :</p>
+<p>
+	Certains problèmes ont été rapportés avec le keylayout d’<Ergopti></Ergopti> dans quelques logiciels :
+</p>
 <ul>
-	<li>
+	<!-- <li>
 		Databricks (sur navigateur) : Taper un <kbd>_</kbd> avec <kbd>AltGr</kbd> + <kbd>␣</kbd> n’est pas
 		possible, la combinaison est bloquée, probablement pour être utilisée par un raccourci interne. Il
 		n’y a pas de solution connue pour l’instant.
-	</li>
+	</li> -->
 	<li>
 		Les touches mortes suivies d’<kbd>Entrée</kbd> nécessitent un double appui sur
 		<kbd>Entrée</kbd>. En effet, il faut un premier appui pour valider la touche morte, puis un
