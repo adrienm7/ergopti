@@ -16,20 +16,16 @@
 	{#if version_linux !== undefined}
 		<tiny-space></tiny-space>
 		<a href="/drivers/linux/Ergopti_v{version_linux}.xkb" download>
-			<button class="bouton-telechargement"
-				><i class="icon-linux"></i> Ergopti_v{version_linux}.xkb</button
-			>
+			<button><i class="icon-linux"></i> Ergopti_v{version_linux}.xkb</button>
 		</a>
 		<tiny-space></tiny-space>
 		<a href="/drivers/linux/Ergopti_v{version_linux}.XCompose" download>
-			<button class="bouton-telechargement"
-				><i class="icon-linux"></i> Ergopti_v{version_linux}.XCompose</button
-			>
+			<button><i class="icon-linux"></i> Ergopti_v{version_linux}.XCompose</button>
 		</a>
 	{/if}
 	<tiny-space></tiny-space>
 	<a href="/drivers/linux/install_xkb.py" download>
-		<button><i class="icon-linux"></i>Script d’installation XKB</button>
+		<button class="alt-button"><i class="icon-linux"></i>Script d’installation XKB</button>
 	</a>
 </div>
 

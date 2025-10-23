@@ -30,38 +30,55 @@
 	supporté.
 </p>
 <tiny-space></tiny-space>
-<div>
-	{#if version_mineure_kbdedit_exe !== undefined}
+{#if version_mineure_kbdedit_exe !== undefined}
+	<div class="download-buttons">
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
-			<button class="bouton-telechargement"
+			<button
 				><i class="icon-windows" style="vertical-align:-0.05em"></i>
-				Ergopti_v{version_mineure_kbdedit_exe}.exe</button
+				Disposition KbdEdit Ergopti_v{version_mineure_kbdedit_exe}</button
 			>
 		</a>
-	{/if}
-</div>
-<tiny-space></tiny-space>
-<div>
-	{#if version_mineure_kbdedit_kbe !== undefined}
+		<tiny-space></tiny-space>
 		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
-			<button
+			<button class="alt-button"
 				><i class="icon-windows" style="vertical-align:-0.05em"></i> Fichier source KbdEdit
 				d’Ergopti_v{version_mineure_kbdedit_kbe}</button
 			>
 		</a>
-	{/if}
-</div>
-<h3 id="ahk">Installation AutoHotkey (méthode alternative)</h3>
-<div>
-	{#if version_mineure_plus !== undefined}
-		<a href="/drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download>
-			<button class="bouton-telechargement"
-				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
-				ErgoptiPlus_v{version_mineure_plus}.ahk</button
-			>
-		</a>
-	{/if}
-</div>
+	</div>
+{/if}
+
+<small-space></small-space>
+
+<p>
+	Il suffit d’exécuter le fichier <code>Ergopti_v{version_mineure_kbdedit_exe}.exe</code> et de cliquer
+	sur le bouton d’installation pour installer le pilote sur Windows. Ensuite, il est conseillé de redémarrer
+	l’ordinateur pour être sûr que le pilote soit bien pris en compte.
+</p>
+<enhanced:img
+	class="no-upscale"
+	style="width: min(400px, 100%)!important;"
+	src="$lib/images/windows_installation_1.jpg"
+	alt="Screenshot d’installation du pilote KbdEdit."
+/>
+
+<small-space></small-space>
+
+<p>
+	Après l’installation, se rendre dans <code>Paramètres</code> >
+	<code>Heure et langue</code> > <code>Langue et région</code>.
+</p>
+<enhanced:img
+	src="$lib/images/windows_installation_2.jpg"
+	alt="Screenshot 1/2 des paramètres Windows 11 pour changer sa disposition de clavier."
+/>
+<tiny-space></tiny-space>
+<enhanced:img
+	src="$lib/images/windows_installation_3.jpg"
+	alt="Screenshot 2/2 des paramètres Windows 11 pour changer sa disposition de clavier."
+/>
+
+<h3 id="ahk">Pilote AutoHotkey (sans droits d’administrateur)</h3>
 <p>
 	Afin que le code source ErgoptiPlus.ahk fonctionne, il faut auparavant installer <a
 		class="link"
@@ -69,6 +86,17 @@
 	>. Une fois cela fait, il suffit de double-cliquer sur le fichier ErgoptiPlus.ahk pour l’exécuter
 	avec AutoHotkey.
 </p>
+<div class="download-buttons">
+	{#if version_mineure_plus !== undefined}
+		<a href="/drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download>
+			<button
+				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
+				ErgoptiPlus_v{version_mineure_plus}.ahk</button
+			>
+		</a>
+	{/if}
+</div>
+
 <p>
 	Ce fichier se modifie avec un éditeur de texte afin que vous puissiez l’adapter selon vos envies,
 	notamment pour en désactiver des fonctionnalités ou en ajouter. N’oubliez pas de le relancer pour

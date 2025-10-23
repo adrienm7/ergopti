@@ -59,3 +59,8 @@ hr {
 	border: 0;
 	height: 1.5px;
 }
+
+ul li,
+ol li {
+    margin-bottom: 0.5rem;
+}
