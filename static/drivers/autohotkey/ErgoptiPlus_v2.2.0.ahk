@@ -2210,7 +2210,7 @@ SC00C:: SendNewResult("%")
 SC00D:: SendNewResult("=")
 #HotIf
 
-; Cannot be HotIf because the remapping is done with RemapKey function and cannot be undone afterwards
+; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards
 if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC039", " ")
 
@@ -2482,12 +2482,7 @@ SC138 & SC018:: RemapAltGr(
 )
 #HotIf
 
-; AltGr layer of the Ergopti layout
-#HotIf Features["Layout"]["ErgoptiAltGr"].Enabled
-
-; === Space bar ===
-SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
-
+#HotIf Features["Layout"]["ErgoptiAltGr"].Enabled and Features["Layout"]["ErgoptiBase"].Enabled
 ; === Number row ===
 SC138 & SC029:: RemapAltGr((*) => SendNewResult("€"), (*) => DeadKey(DeadkeyMappingCurrency))
 SC138 & SC002:: RemapAltGr((*) => SendNewResult("¹"), (*) => SendNewResult("₁"))
@@ -2515,7 +2510,11 @@ SC138 & SC00D:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"
 ^!SC009:: SendFinalResult("^!{Numpad8}")
 ^!SC00A:: SendFinalResult("^!{Numpad9}")
 ^!SC00B:: SendFinalResult("^!{Numpad0}")
+#HotIf
 
+#HotIf Features["Layout"]["ErgoptiAltGr"].Enabled
+; === Space bar ===
+SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
 ; === Top row ===
 SC138 & SC010:: RemapAltGr(
     (*) => WrapTextIfSelected("``", "``", "``"),
