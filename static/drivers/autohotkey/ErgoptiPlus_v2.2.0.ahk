@@ -4736,6 +4736,24 @@ if Features["Autocorrection"]["MultiplePunctuationMarks"].Enabled {
         Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
     )
 
+    CreateHotstring(
+        "*", " ! ?", " !?",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "! ?", "!?",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+
+    CreateHotstring(
+        "*", " ? !", " ?!",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "? !", "?!",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+
     ; We can’t use the TimeActivationSeconds here, as previous character = current character = "."
     Hotstring(
         ":*?B0:" . "...",
