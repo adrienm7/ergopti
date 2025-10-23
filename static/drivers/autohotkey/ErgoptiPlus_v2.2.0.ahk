@@ -2226,7 +2226,11 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC018", "c")
     RemapKey("SC019", "x")
     RemapKey("SC01A", "z")
-    SC01B:: DeadKey(DeadkeyMappingDiaresis)
+    Hotkey(
+        "SC01B",
+        (*) => DeadKey(DeadkeyMappingDiaresis),
+        "I2"
+    )
 
     ; === Middle row ===
     RemapKey("SC01E", "a")
@@ -2240,7 +2244,11 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC026", "t")
     RemapKey("SC027", "r")
     RemapKey("SC028", "q")
-    SC02B:: DeadKey(DeadkeyMappingCircumflex)
+    Hotkey(
+        "SC02B",
+        (*) => DeadKey(DeadkeyMappingCircumflex),
+        "I2"
+    )
 
     ; === Bottom row ===
     RemapKey("SC056", Features["Shortcuts"]["ECirc"].Letter, "ê")
