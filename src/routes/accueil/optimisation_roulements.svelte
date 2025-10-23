@@ -84,7 +84,8 @@
 	<p>Avec même quelques trigrammes très confortables :</p>
 	<ul>
 		<li><kbd>AIE</kbd> notamment pour écrire <strong>AIE</strong>NT ;</li>
-		(avec en plus<kbd>NT</kbd> qui est lui aussi un roulement, que demander de plus ?)
+		(avec en plus
+		<kbd>NT</kbd> qui est lui aussi un roulement, que demander de plus ?)
 		<li><kbd>IEU</kbd> ;</li>
 		<li><kbd>YOU</kbd>.</li>
 	</ul>
