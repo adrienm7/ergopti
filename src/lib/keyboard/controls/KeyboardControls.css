@@ -41,14 +41,17 @@ keyboard-control-plus button {
 */
 
 .ergodox-text-gradient {
+    font-weight: bold;
 	background: linear-gradient(to top, #0e6700 0%, #1aff00 70%);
 }
 
 .color-text-gradient {
+    font-weight: bold;
 	background: linear-gradient(to top, rgb(255, 47, 0) 0%, rgb(255, 174, 0) 70%);
 }
 
 keyboard-control-layer select {
+    font-weight: bold;
 	background: linear-gradient(to top, #b661eb 25%, #ff53f4 50%);
 }
 
