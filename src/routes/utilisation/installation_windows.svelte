@@ -96,44 +96,82 @@
 	En résumé, le mieux est d’utiliser les deux versions en parallèle : le pilote KbdEdit pour avoir
 	<Ergopti></Ergopti> partout, et le script AutoHotkey pour bénéficier des fonctionnalités avancées.
 	Ce script corrige d’ailleurs quelques limitations du pilote KbdEdit, cf. la section
-	<a href="#windows-solutions">Résolution de problèmes connus</a>.
+	<a class="link" href="#windows-solutions">Résolution de problèmes connus</a>.
 </p>
 
-<small-space> </small-space>
+<small-space></small-space>
 
-<p>
-	Afin que le code source ErgoptiPlus.ahk fonctionne, il faut auparavant installer <a
-		class="link"
-		href="https://www.autohotkey.com/">AutoHotkey v2</a
-	>. L’installation pour l’utilisateur actuel ne nécessite pas de droits d’administrateur. Une fois
-	cela fait, il suffit de double-cliquer sur le fichier ErgoptiPlus.ahk pour l’exécuter avec
-	AutoHotkey. En fait, on peut même télécharger le binaire d’AutoHotkey et faire clic droit sur un
-	fichier .ahk pour l’exécuter avec ce binaire sans aucune installation.
-</p>
-<div class="download-buttons">
-	{#if version_mineure_plus !== undefined}
+{#if version_mineure_plus !== undefined}
+	<div class="download-buttons">
 		<a href="/drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download>
 			<button
 				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
 				ErgoptiPlus v{version_mineure_plus}.ahk</button
 			>
 		</a>
-	{/if}
-</div>
+		<a href="/drivers/autohotkey/compiled/ErgoptiPlus_v{version_mineure_plus}.exe" download>
+			<button class="alt-button"
+				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
+				ErgoptiPlus v{version_mineure_plus} compilé</button
+			>
+		</a>
+	</div>
+{/if}
+<p>
+	Il est également conseillé (mais c’est optionnel) de télécharger les 2 fichiers suivants : <a
+		class="link"
+		href="/drivers/autohotkey/ErgoptiPlus_Icon.ico"
+		download>ErgoptiPlus_Icon.ico</a
+	>
+	ainsi que
+	<a class="link" href="/drivers/autohotkey/ErgoptiPlus_Icon_Disabled.ico" download
+		>ErgoptiPlus_Icon_Disabled.ico</a
+	>. Ils sont à placer dans le même dossier que celui du script <em>.ahk</em> et permettent d’en modifier
+	l’icône dans la barre des tâches.
+</p>
+
+<tiny-space></tiny-space>
 
 <p>
-	Ce fichier se modifie avec un simple éditeur de texte (clic droit, <code>ouvrir avec</code>) afin
-	que vous puissiez l’adapter selon vos envies, notamment pour en désactiver des fonctionnalités ou
-	en ajouter. N’oubliez pas de le relancer pour appliquer vos modifications. Le raccourci
+	Afin que le code source <em>ErgoptiPlus.ahk</em> fonctionne, il faut auparavant installer
+	<a class="link" href="https://www.autohotkey.com/">AutoHotkey v2</a>. L’installation pour
+	l’utilisateur actuel ne nécessite pas de droits d’administrateur. Une fois cela fait, il suffit de
+	double-cliquer sur le fichier <em>.ahk</em> pour l’exécuter avec AutoHotkey.
+</p>
+<p>
+	En réalité, il est même possible de ne rien installer du tout en se contentant de télécharger le
+	binaire d’AutoHotkey. Ensuite, il suffit de faire un clic droit sur le fichier <em>.ahk</em> puis
+	<code>ouvrir avec</code> et sélectionner ce binaire. Cette solution peut être utile si même l’installation
+	d’AutoHotkey n’est pas permise sur votre système.
+</p>
+<p>
+	Une dernière option est d’utiliser le code AutoHotkey compilé en un <em>.exe</em>. Cela évite même
+	de devoir installer AutoHotkey, car le code nécessaire au fonctionnement du script est directement
+	inclus dans le <em>.exe</em>. Toutefois, idéalement il vaut mieux installer AutoHotkey et utiliser
+	le code source, car cela permet d’inspecter le contenu du script pour voir comment il fonctionne,
+	voire pour le modifier afin de l’adapter à votre utilisation. Le fichier <em>.ahk</em> se modifie
+	avec un simple éditeur de texte (clic droit,
+	<code>ouvrir avec</code>) afin que vous puissiez l’adapter selon vos envies, notamment pour en
+	désactiver des fonctionnalités ou en ajouter. N’oubliez pas de le relancer pour appliquer vos
+	modifications.
+</p>
+<p>
+	Le raccourci
 	<kbd>AltGr</kbd>
-	+ <kbd>BackSpace</kbd> a été implémenté afin de relancer facilement le script après une modification.
+	+ <kbd>BackSpace</kbd> a été implémenté afin de relancer facilement le script après une
+	modification. De plus, le raccourci <kbd>AltGr</kbd>
+	+ <kbd>Entrée</kbd> permet de mettre le script en pause, ou de le réactiver s’il est déjà en
+	pause. C’est très utile pour désactiver momentanément le script, par exemple si un collègue veut
+	taper sur votre ordinateur et que votre clavier est encore en émulation <Ergopti></Ergopti>.
 </p>
 
 <h4>Automatisation du lancement du script</h4>
 <p>
-	Cependant, ce script ne sera actif que lorsque vous l’aurez lancé. Redémarrer l’ordinateur va le
-	désactiver, il faudra cliquer à nouveau dessus pour le relancer. Pour automatiser le lancement du
-	script ErgoptiPlus au démarrage, il est possible de suivre les étapes suivantes :
+	Il est important de noter que le script AutoHotkey ne sera actif que tant qu’il est en cours
+	d’exécution en arrière-plan. Redémarrer l’ordinateur va le désactiver, il faudra cliquer à nouveau
+	dessus pour le relancer. Pour automatiser le lancement automatique du script <em>.ahk</em> (ou sa
+	version compilée en <em>.exe</em>) au démarrage, et donc ne plus avoir besoin d’y penser, il est
+	possible de suivre les étapes suivantes :
 </p>
 <ol>
 	<li>
@@ -155,10 +193,12 @@
 </p>
 <ul>
 	<li>
-		Microsoft Excel : Taper un <kbd-output>+</kbd-output> avec <kbd>AltGr</kbd> + <kbd>P</kbd> cause
-		des problèmes d’édition de la cellule : tout ce qui est tapé avant disparaît et est remplacé par
-		un
-		<kbd-output>+</kbd-output>.<br />➜ Ce problème se résout en utilisant le script ErgoptiPlus.ahk
+		<b>Microsoft Excel :</b> Taper un <kbd-output>+</kbd-output> avec <kbd>AltGr</kbd> +
+		<kbd>P</kbd>
+		cause des problèmes d’édition de la cellule : tout ce qui est tapé avant disparaît et est remplacé
+		par un
+		<kbd-output>+</kbd-output>.<br />➜ Ce problème se résout en utilisant le script
+		<em>ErgoptiPlus.ahk</em>
 		pour émuler la disposition et garantir que ce soit bien un symbole <kbd-output>+</kbd-output> qui
 		soit envoyé et non un raccourci interne d’Excel qui interfère.
 	</li>
@@ -169,11 +209,15 @@
 		➜ Pour résoudre ce genre de problèmes, il faut donc dans un premier temps fermer toutes ses applications
 		sauf AutoHotkey pour vérifier si le problème persiste. S’il persiste, c’est peut-être un problème
 		affectant tous les utilisateurs de la version AutoHotkey et vous êtes invité à le signaler sur
-		<a href="https://github.com/adrienm7/ergopti" target="_blank">GitHub</a>
-		ou sur <a href={discordLink} target="_blank">Discord</a>. Le script AutoHotkey étant cependant
-		utilisé intensivement par plusieurs utilisateurs, la plupart des problèmes sont déjà résolus et
-		il est plus probable qu’il provienne d’un conflit avec une application. Cela peut être notamment
-		si vous utilisez un autre logiciel de remappage de clavier, ou un logiciel qui intercepte les
-		frappes clavier pour faire des raccourcis (Kanata, PowerToys, Espanso, etc.).
+		<a class="link" href="https://github.com/adrienm7/ergopti" target="_blank"
+			>le repo GitHub <i class="icon-github"></i></a
+		>
+		ou sur
+		<a class="link" href={discordLink} target="_blank">le Discord <i class="icon-discord"></i></a>.
+		Le script AutoHotkey étant cependant utilisé intensivement par plusieurs utilisateurs, la
+		plupart des problèmes sont déjà résolus et il est plus probable qu’il provienne d’un conflit
+		avec une application. Cela peut notamment se produire si vous utilisez un autre logiciel de
+		remappage de clavier, ou un logiciel qui intercepte les frappes clavier pour faire des
+		raccourcis (Kanata, PowerToys, Espanso, logiciel Nvidia, de gaming, etc.).
 	</li>
 </ul>

@@ -40,8 +40,9 @@
 	<hr class="margin-h1" />
 </div>
 
-<h2 class="first-h2">Essayer la disposition en ligne</h2>
+<h2 class="first-h2" style="overflow-x: hidden;">Essayer la disposition en ligne</h2>
 <KeyboardEmulation />
+
 <div class="main">
 	<div style="display: flex; gap: 1em; align-items: center;">
 		<button onclick={() => (isSampleCollapsed = !isSampleCollapsed)}>
