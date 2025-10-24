@@ -119,19 +119,9 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
     # Define extraction tasks with support for multiple blocks per file
     # Format: {output_filename: [list_of_block_patterns]}
     # Each block pattern is a tuple: (category, block_name)
+    # Order in this list matters for the deduplication process
     extractions = {
-        "emojis": [("MagicKey", "TextExpansionEmojis")],
-        "magic": [("MagicKey", "TextExpansion")],
-        "symbols": [("MagicKey", "TextExpansionSymbols")],
-        "symbols_typst": [("MagicKey", "TextExpansionSymbolsTypst")],
-        "suffixes": [("DistancesReduction", "SuffixesA")],
-        "accents": [("Autocorrection", "Accents")],
-        "names": [("Autocorrection", "Names")],
-        "brands": [("Autocorrection", "Brands")],
-        "minus": [("Autocorrection", "Minus")],
-        "punctuation": [("Autocorrection", "MultiplePunctuationMarks")],
-        "errors": [("Autocorrection", "Errors")],
-        # "apostrophe": [("Autocorrection", "TypographicApostrophe")], # Doesn’t work well like in ahk
+        "rolls": ["Rolls"],  # Special case: extract all Rolls blocks
         "qu": [("DistancesReduction", "QU")],
         "comma": [
             ("SFBsReduction", "Comma"),
@@ -143,7 +133,18 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
             ("SFBsReduction", "IÉ"),
             ("SFBsReduction", "EGrave"),
         ],
-        "rolls": ["Rolls"],  # Special case: extract all Rolls blocks
+        "suffixes": [("DistancesReduction", "SuffixesA")],
+        "magic": [("MagicKey", "TextExpansion")],
+        "accents": [("Autocorrection", "Accents")],
+        "names": [("Autocorrection", "Names")],
+        "brands": [("Autocorrection", "Brands")],
+        "minus": [("Autocorrection", "Minus")],
+        "punctuation": [("Autocorrection", "MultiplePunctuationMarks")],
+        "errors": [("Autocorrection", "Errors")],
+        # "apostrophe": [("Autocorrection", "TypographicApostrophe")], # Doesn’t work well like in ahk
+        "emojis": [("MagicKey", "TextExpansionEmojis")],
+        "symbols": [("MagicKey", "TextExpansionSymbols")],
+        "symbols_typst": [("MagicKey", "TextExpansionSymbolsTypst")],
     }
 
     processed = 0
@@ -160,6 +161,9 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
         "suffixes",
     }
 
+    # Set to track all triggers already written
+    global_seen_triggers: set[str] = set()
+
     for output_name, block_patterns in extractions.items():
         logger.launch(
             "Extracting blocks %s to '%s.toml'", block_patterns, output_name
@@ -168,9 +172,140 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
             # Determine subfolder based on output name
             subfolder = "plus" if output_name in plus_files else ""
 
-            extract_multiple_ahk_blocks_to_toml(
-                str(source_file), block_patterns, output_name, subfolder
+            # Patch: extract blocks, filter triggers already seen
+            # Use extract_multiple_ahk_blocks_to_toml to get merged_hotstrings, but intercept before TOML write
+            # Copy-paste logic from extract_multiple_ahk_blocks_to_toml, mais indentation corrigée
+            # --- Begin extraction logic ---
+            # Determine output file path (root hotstrings directory)
+            generation_dir = Path(__file__).parent
+            hotstrings_root = generation_dir.parent  # Move up from generation/
+            output_dir = hotstrings_root / (subfolder if subfolder else "")
+            output_dir.mkdir(exist_ok=True)
+            output_file = output_dir / f"{output_name}.toml"
+
+            # Read the AutoHotkey file
+            try:
+                with open(str(source_file), "r", encoding="utf-8") as f:
+                    content = f.read()
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Source file not found: {source_file}")
+            except OSError as e:
+                raise OSError(f"Error reading file {source_file}: {e}")
+
+            # Extract and merge hotstrings from all specified blocks
+            merged_hotstrings: dict[str, list[tuple[str, str, bool, bool]]] = {}
+            found_blocks = []
+
+            for block_pattern in block_patterns:
+                # Handle special case where block_pattern is a category string (e.g., "Rolls")
+                if isinstance(block_pattern, str):
+                    block_content = extract_all_blocks_from_category(
+                        content, block_pattern
+                    )
+                else:
+                    block_content = extract_block_content(
+                        content, block_pattern
+                    )
+
+                if block_content:
+                    found_blocks.append(block_pattern)
+                    hotstrings = extract_hotstrings(block_content)
+
+                    # Merge hotstrings from this block
+                    for section_name, entries in hotstrings.items():
+                        # Create a unique section name to avoid conflicts
+                        if len(block_patterns) > 1:
+                            if isinstance(block_pattern, tuple):
+                                category, block_name = block_pattern
+                                unique_section_name = f"{normalize_section_name(block_name)}_{section_name}"
+                            else:
+                                unique_section_name = f"{normalize_section_name(block_pattern)}_{section_name}"
+                        else:
+                            unique_section_name = section_name
+
+                        if unique_section_name not in merged_hotstrings:
+                            merged_hotstrings[unique_section_name] = []
+                        merged_hotstrings[unique_section_name].extend(entries)
+                else:
+                    logger.warning(
+                        "Block '%s' not found in %s", block_pattern, source_file
+                    )
+
+            if not found_blocks:
+                raise ValueError(
+                    f"None of the blocks {block_patterns} found in {source_file}"
+                )
+
+            if not merged_hotstrings:
+                logger.warning(
+                    "No hotstrings found in blocks %s", block_patterns
+                )
+
+            # Add hardcoded entries if this is the 'rolls' file
+            if output_name == "rolls":
+                hardcoded_entries = [
+                    ("(#", '("', False, True),
+                    ("[#", '["', False, True),
+                    ("<%", "<=", False, True),
+                    (">%", ">=", False, True),
+                ]
+                if "general" not in merged_hotstrings:
+                    merged_hotstrings["general"] = []
+                merged_hotstrings["general"].extend(hardcoded_entries)
+
+            # Remove duplicates: keep only the first occurrence of each trigger within each section
+            deduplicated_hotstrings = deduplicate_hotstrings(merged_hotstrings)
+
+            # --- Patch: filter triggers already seen globally ---
+            filtered_hotstrings: dict[
+                str, list[tuple[str, str, bool, bool]]
+            ] = {}
+            for section_name, entries in deduplicated_hotstrings.items():
+                filtered_entries = []
+                for trigger, output, is_word, auto_expand in entries:
+                    if trigger not in global_seen_triggers:
+                        global_seen_triggers.add(trigger)
+                        filtered_entries.append(
+                            (trigger, output, is_word, auto_expand)
+                        )
+                    else:
+                        logger.info(
+                            "Skipping duplicate trigger '%s' (already present in previous file)",
+                            trigger,
+                        )
+                if filtered_entries:
+                    filtered_hotstrings[section_name] = filtered_entries
+
+            # Convert to TOML format using the first found block as block_name for compatibility
+            first_block = found_blocks[0]
+            if isinstance(first_block, tuple):
+                block_name_for_toml = first_block[1]  # Use the block name part
+            else:
+                block_name_for_toml = first_block
+
+            toml_content = convert_to_toml(
+                filtered_hotstrings, block_name_for_toml
             )
+
+            # Write the TOML file
+            try:
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(toml_content)
+
+                total_entries = sum(
+                    len(entries) for entries in filtered_hotstrings.values()
+                )
+                logger.info(
+                    "TOML file created: %s (%d entries from %d blocks: %s)",
+                    output_file.name,
+                    total_entries,
+                    len(found_blocks),
+                    found_blocks,
+                )
+
+            except OSError as e:
+                raise OSError(f"Error writing file {output_file}: {e}")
+            # --- End extraction logic ---
             processed += 1
             logger.info(
                 "Successfully extracted blocks %s to '%s.toml'",
@@ -183,22 +318,7 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
 
     show_execution_summary(processed, errors)
 
-    # Generate additional TOML files
-    logger.info("Generating additional TOML files...")
-    try:
-        generate_e_deadkey_toml(str(source_file), "plus")
-        logger.info("Successfully generated e_deadkey.toml")
-    except (OSError, ValueError) as e:
-        logger.error("Error generating e_deadkey.toml: %s", e)
-        errors += 1
-
-    try:
-        generate_apostrophe_toml("plus")
-    except (OSError, ValueError) as e:
-        logger.error("Error generating apostrophe.toml: %s", e)
-        errors += 1
-
-    show_execution_summary(processed, errors)
+    #
 
 
 def extract_multiple_ahk_blocks_to_toml(
