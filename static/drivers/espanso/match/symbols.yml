@@ -192,7 +192,7 @@ matches:
   - trigger: '(union)★'
     replace: '∪'
   - trigger: '(v)★'
-    replace: '✓'
+    replace: '∨'
   - trigger: '(vide)★'
     replace: '∅'
   - trigger: '(void)★'

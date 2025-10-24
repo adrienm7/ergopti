@@ -144,7 +144,6 @@
 "^|-★" = { output = "⭮", is_word = true, auto_expand = true }
 
 [[checks_and_checkboxes]]
-"(v)★" = { output = "✓", is_word = true, auto_expand = true }
 "(x)★" = { output = "✗", is_word = true, auto_expand = true }
 "[v]★" = { output = "☑", is_word = true, auto_expand = true }
 "[x]★" = { output = "☒", is_word = true, auto_expand = true }

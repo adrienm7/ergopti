@@ -103,7 +103,6 @@
 "cloche★" = { output = "🔔", is_word = true, auto_expand = true }
 "couronne★" = { output = "👑", is_word = true, auto_expand = true }
 "croix★" = { output = "❌", is_word = true, auto_expand = true }
-"dé★" = { output = "🎲", is_word = true, auto_expand = true }
 "diamant★" = { output = "💎", is_word = true, auto_expand = true }
 "drapeau★" = { output = "🏁", is_word = true, auto_expand = true }
 "douche★" = { output = "🛁", is_word = true, auto_expand = true }
@@ -136,7 +135,6 @@
 "nuage★" = { output = "☁️", is_word = true, auto_expand = true }
 "ok★" = { output = "✔️", is_word = true, auto_expand = true }
 "olaf★" = { output = "⛄", is_word = true, auto_expand = true }
-"ordi★" = { output = "💻", is_word = true, auto_expand = true }
 "ordinateur★" = { output = "💻", is_word = true, auto_expand = true }
 "parapluie★" = { output = "☂️", is_word = true, auto_expand = true }
 "pc★" = { output = "💻", is_word = true, auto_expand = true }
