@@ -25,27 +25,26 @@
 	<p class="main text-center">
 		<ErgoptiPlus /> est une variante améliorée de la disposition <Ergopti /> qui tire parti des meilleures
 		fonctionnalités des claviers programmables et outils d’automatisation. Elle se rapproche de très
-		près de la
-		<strong>disposition clavier idéale</strong>. En effet, elle :
+		près <span class="nowrap">de la <strong>disposition clavier idéale</strong> :</span>
 	</p>
 	<div class="cards">
 		<div class="card">
 			<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i>
-			Ajoute de
+			Ajout de
 			<span class="text-bold">nouveaux roulements</span> extrêmement confortables.
 		</div>
 		<div class="card">
 			<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i>
-			<strong>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span></strong> pour une frappe
-			ultra-fluide et sans inconfort.
+			<strong>Éradication de la quasi-totalité des <span class="nowrap"><SFB />s</span></strong> pour
+			une frappe ultra-fluide et sans inconfort.
 		</div>
 		<div class="card">
 			<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
-			<span class="text-bold">Réduit les distances parcourues par les doigts</span>, en particulier
-			l’auriculaire droit.
+			<span class="text-bold">Réduction des distances parcourues par les doigts</span>, en
+			particulier l’auriculaire droit.
 		</div>
 		<div class="card">
-			<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajoute de
+			<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajout de
 			<strong>nombreux raccourcis</strong>
 			tels qu’un layer de navigation, des tap-holds et des touches
 			<kbd-output>Alt + Tab</kbd-output>,
@@ -53,15 +52,15 @@
 		</div>
 		<div class="card">
 			<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>
-			Fonctionnalités d’<span class="text-bold">autocorrection et de snippets</span>. Permet
+			Fonctionnalités d’<span class="text-bold">autocorrection et de snippets</span>. Cela permet
 			également d’écrire des
 			<span class="text-bold">symboles complexes et des emojis</span>.
 		</div>
 		<div class="card">
 			<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i> Chaque
 			fonctionnalité est optionnelle, désactivable et
-			<strong>peut être intégrée au fil du temps</strong>. Nul besoin de chercher à tout utiliser
-			dès le départ.
+			<strong>peut être intégrée au fil du temps</strong>. Nul besoin de chercher à tout apprendre
+			ou utiliser dès le départ.
 		</div>
 	</div>
 	<tiny-space></tiny-space>

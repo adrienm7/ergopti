@@ -20,7 +20,8 @@
 		étrange, tant son apparition est incontournable dans les textes (sauf dans le livre
 		<em>La Disparition</em> qui arrive l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est la
 		lettre la plus fréquente, et de loin. Elle est si fréquente que sur le
-		<a href="/#keyboard_frequences">clavier affichant les touches les plus utilisées</a>
+		<a class="link" href="/#keyboard_frequences">clavier affichant les touches les plus utilisées</a
+		>
 		de la page d’accueil, une transformation mathématique a été nécessaire pour que les fréquences relatives
 		aux autres touches soient visibles et comparables (passage au logarithme). En effet, si l’on affichait
 		les fréquences relatives telles quelles, le <kbd>E</kbd> serait tellement plus fréquent qu’il écraserait
@@ -104,12 +105,13 @@
 	</p>
 	<p class="encadre">
 		<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
-		<a href="/benchmarks">page de benchmarks</a>
-		ainsi que sur la <a href="/utilisation">page de téléchargements</a>, par installation via
-		Kalamine. Elle utilise le fait qu’<Ergopti></Ergopti> ait été conçue de base pour utiliser de nouvelles
-		fonctionnalités grâce à l’emplacement réservé à la touche magique <kbd>★</kbd>. Cependant, les
-		gains apportés par cette version 1DFH sont faibles et il est donc recommandé de ne pas
-		l’utiliser, sauf si vous avez un clavier compact et n’avez pas d’autre choix.
+		<a class="link" href="/benchmarks">page de benchmarks</a>
+		ainsi que sur la <a class="link" href="/utilisation">page de téléchargements</a>, par
+		installation via Kalamine. Elle utilise le fait qu’<Ergopti></Ergopti> ait été conçue de base pour
+		utiliser de nouvelles fonctionnalités grâce à l’emplacement réservé à la touche magique
+		<kbd>★</kbd>. Cependant, les gains apportés par cette version 1DFH sont faibles et il est donc
+		recommandé de ne pas l’utiliser, sauf si vous avez un clavier compact et n’avez pas d’autre
+		choix.
 	</p>
 
 	<h3>Quelques <SFB />s restants</h3>
