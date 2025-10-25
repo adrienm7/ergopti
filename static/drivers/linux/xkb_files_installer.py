@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import sys
+import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, Tuple
@@ -346,6 +347,12 @@ def perform_install(
     else:
         logging.info("No .XCompose file specified. Skipping.")
 
+    # Try to apply the newly installed layout as the current system layout.
+    try:
+        _apply_installed_layout(symbol_name)
+    except Exception as e:
+        logging.warning("Could not automatically apply layout: %s", e)
+
 
 def parse_args() -> dict:
     import argparse
@@ -373,6 +380,65 @@ def main() -> None:
     check_sudo()
     args = parse_args()
     perform_install(args["xkb"], args.get("xcompose"), args.get("types"))
+
+
+def _apply_installed_layout(symbol_name: str) -> None:
+    """Attempt to set the newly installed layout as the active system layout.
+
+    This function tries a few fallbacks, in order of preference:
+    1. Use `localectl set-x11-keymap` (systemd) to persistently set the X11 layout.
+    2. Try to run `setxkbmap` in the user's X session (if we can locate DISPLAY and XAUTHORITY).
+
+    The function is best-effort: it logs success or failure but does not raise on
+    errors unless they are unexpected.
+    """
+    # 1) Try localectl (systemd) for a persistent system-wide setting
+    try:
+        if shutil.which("localectl"):
+            # localectl set-x11-keymap LAYOUT MODEL VARIANT OPTIONS
+            # Use 'fr' layout and the installed symbol_name as variant.
+            cmd = ["localectl", "set-x11-keymap", "fr", "", symbol_name, ""]
+            logging.info("Setting X11 keymap persistently via: %s", " ".join(cmd))
+            subprocess.run(cmd, check=False)
+        else:
+            logging.debug("localectl not found, skipping persistent system setting")
+    except Exception as exc:  # pragma: no cover - best-effort
+        logging.warning("localectl attempt failed: %s", exc)
+
+    # 2) Try to apply to the current X session using setxkbmap as the real user
+    sudo_user = os.getenv("SUDO_USER")
+    if not sudo_user:
+        logging.debug("SUDO_USER not set; cannot attempt user X session update")
+        return
+
+    try:
+        import pwd as _pwd  # type: ignore
+
+        user_info = _pwd.getpwnam(sudo_user)
+        home_dir = Path(user_info.pw_dir)
+        # Common X authority file
+        xauth = home_dir / ".Xauthority"
+
+        # Try a couple of DISPLAY values if none are present
+        display_candidates = [os.environ.get("DISPLAY", ":0"), ":0", ":1"]
+
+        for disp in display_candidates:
+            if xauth.exists():
+                setx_cmd = f'DISPLAY={disp} XAUTHORITY={xauth} setxkbmap fr -variant {symbol_name}'
+            else:
+                setx_cmd = f'DISPLAY={disp} setxkbmap fr -variant {symbol_name}'
+
+            # Run as the original user so the command affects their session
+            try:
+                logging.info("Attempting to apply layout in X session for %s: %s", sudo_user, setx_cmd)
+                subprocess.run(["runuser", "-l", sudo_user, "-c", setx_cmd], check=False)
+                # We don't strictly verify success; stop after first attempt
+                break
+            except Exception:
+                # try next candidate
+                continue
+    except Exception as exc:  # pragma: no cover - best-effort
+        logging.warning("Failed to update X session keymap: %s", exc)
 
 
 if __name__ == "__main__":

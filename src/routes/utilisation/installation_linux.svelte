@@ -12,10 +12,8 @@
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
-<code
-	>curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh
-	| sudo sh</code
->
+<code>curl -fsSL -o install.sh https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh && chmod +x ./install.sh && sudo sh ./install.sh</code>
+
 <div>
 	{#if version_linux !== undefined}
 		<tiny-space></tiny-space>
@@ -37,7 +35,20 @@
 <p>Installation d’<Ergopti></Ergopti> sur Linux (X11 et Wayland) :</p>
 <ol>
 	<li>Télécharger les 3 fichiers ci-dessus (XKB, XCompose et script d’installation)</li>
-	<li>Exécuter le script d’installation XKB en sudo : <code>sudo python3 install_xkb.py</code></li>
+	<li>
+		Exécuter le script d'installation XKB en sudo. Deux façons sûres (évite les erreurs de "Permission denied") :
+		<ul>
+				<li>Recommandé (aucun chmod requis) : télécharger puis exécuter en une seule ligne (préserve le TTY) :
+					<code>curl -fsSL -o install.sh https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh && sudo sh ./install.sh</code>
+			</li>
+			<li>Si vous avez téléchargé `install.sh` localement :
+				<ul>
+					<li>Exécuter sans modifier les permissions : <code>sudo sh ./install.sh</code></li>
+					<li>Ou rendre le script exécutable puis l'exécuter : <code>chmod +x install.sh && sudo ./install.sh</code></li>
+				</ul>
+			</li>
+		</ul>
+	</li>
 	<li>Redémarrer l’ordinateur pour que les changements prennent effet.</li>
 	<li>
 		Modifier la disposition clavier dans les paramètres de votre environnement de bureau où la
