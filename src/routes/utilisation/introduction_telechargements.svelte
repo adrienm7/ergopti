@@ -40,7 +40,9 @@
 	<hr class="margin-h1" />
 </div>
 
-<h2 class="first-h2" style="overflow-x: hidden;">Essayer la disposition en ligne</h2>
+<div style="overflow-x: hidden;">
+<h2 class="first-h2">Essayer la disposition en ligne</h2>
+</div>
 <KeyboardEmulation />
 
 <div class="main">
