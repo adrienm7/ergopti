@@ -10,6 +10,7 @@ Pressing Enter at each step accepts the shown default choice.
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -197,17 +198,30 @@ def select_from_menu(
         try:
 
             def _curses_menu(stdscr):
-                curses.curs_set(0)
+                # Try to hide the cursor; some terminals may not support it.
+                try:
+                    curses.curs_set(0)
+                except curses.error:
+                    # Ignore if the terminal doesn't support cursor visibility changes
+                    pass
+
                 stdscr.keypad(True)
-                stdscr.clear()
-                stdscr.addstr(0, 0, prompt + "\n")
                 keys = list(options.keys())
                 idx = keys.index(default) if default in keys else 0
+
+                # Redraw the menu on each iteration and refresh so the
+                # terminal receives updated content. This ensures arrow
+                # key navigation is visually reflected.
                 while True:
+                    stdscr.clear()
+                    stdscr.addstr(0, 0, prompt)
                     for i, k in enumerate(keys):
                         label = options[k]
                         marker = "▶ " if i == idx else "  "
-                        stdscr.addstr(2 + i, 0, f"{marker}{label}\n")
+                        # Position explicitly rather than relying on newlines
+                        stdscr.addstr(2 + i, 0, f"{marker}{label}")
+                    stdscr.refresh()
+
                     ch = stdscr.getch()
                     if ch in (curses.KEY_UP, ord("k")):
                         idx = (idx - 1) % len(keys)
@@ -215,10 +229,47 @@ def select_from_menu(
                         idx = (idx + 1) % len(keys)
                     elif ch in (ord("\n"), curses.KEY_ENTER, 10, 13):
                         return keys[idx]
-                    elif ch in (27,):  # ESC => cancel
+                    elif ch == 27:  # ESC => cancel
                         raise KeyboardInterrupt()
 
-            return curses.wrapper(_curses_menu)
+            # Ensure curses uses the controlling TTY even when stdin/out are
+            # redirected (this happens when the script is launched from a
+            # piped installer or another process). We temporarily dup /dev/tty
+            # onto fd 0/1/2 so curses talks to the real terminal.
+            tty_fd = None
+            saved_fds = {}
+            try:
+                try:
+                    tty_fd = os.open("/dev/tty", os.O_RDWR)
+                except OSError:
+                    tty_fd = None
+
+                if tty_fd is not None:
+                    # Save original std fds
+                    for fd in (0, 1, 2):
+                        saved_fds[fd] = os.dup(fd)
+                    # Redirect std fds to the tty
+                    os.dup2(tty_fd, 0)
+                    os.dup2(tty_fd, 1)
+                    os.dup2(tty_fd, 2)
+
+                return curses.wrapper(_curses_menu)
+            finally:
+                # Restore original fds
+                if tty_fd is not None:
+                    try:
+                        os.close(tty_fd)
+                    except OSError:
+                        pass
+                    for fd, dup in saved_fds.items():
+                        try:
+                            os.dup2(dup, fd)
+                        except OSError:
+                            pass
+                        try:
+                            os.close(dup)
+                        except OSError:
+                            pass
         except (curses.error, OSError):
             # If curses fails at runtime (terminal issues, IO errors),
             # fall back to the simple prompt below.

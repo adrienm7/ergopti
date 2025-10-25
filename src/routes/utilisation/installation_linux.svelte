@@ -13,10 +13,26 @@
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
 
-<code style="display:inline-block; width:100%; text-align:left">curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh</code>
-<a href="/drivers/linux/install_xkb.py" style="display:block; margin-top:5px" download>
-	<button><i class="icon-linux"></i> Copier le code</button>
-</a>
+{#if typeof window !== 'undefined'}
+	<script>
+		// client-only helpers injected here to keep SSR simple
+	</script>
+{/if}
+
+<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+	<code style="display:inline-block; width:100%; text-align:left">{#if versionValue}{`curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh -s -- --version v${versionValue.replaceAll('.', '_')}`}{:else}curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh{/if}</code>
+	<button id="copy-install-cmd" on:click={() => {
+		const cmd = 'curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh';
+		try {
+			navigator.clipboard.writeText(cmd).then(() => {
+				const el = document.getElementById('copy-install-cmd');
+				if (el) { el.textContent = 'Code copié'; setTimeout(() => el.textContent = 'Copy', 1600); }
+			}).catch(() => { window.prompt('Copy command (Ctrl+C):', cmd); });
+		} catch (e) { window.prompt('Copy command (Ctrl+C):', cmd); }
+	}}>
+	<i class="icon-linux"></i> Copier le script d'installation
+	</button>
+</div>
 
 <tiny-space></tiny-space>
 
