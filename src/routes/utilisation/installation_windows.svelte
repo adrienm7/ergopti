@@ -178,7 +178,7 @@
 		Presser simultanément la touche Windows et la touche R. Ce raccourci <kbd>Win</kbd> +
 		<kbd>R</kbd> permet d'ouvrir la fenêtre « Exécuter » de Windows ;
 	</li>
-	<li>Saisir <kbd>shell:startup</kbd> et valider en cliquant sur le bouton « OK » ;</li>
+	<li>Saisir <code>shell:startup</code> et valider en cliquant sur le bouton « OK » ;</li>
 	<li>
 		Le dossier qui vient de s'ouvrir correspond au dossier de démarrage. Tout élément dedans est
 		exécuté au démarrage de Windows. Créer un raccourci dans ce dossier pointant vers l'emplacement
