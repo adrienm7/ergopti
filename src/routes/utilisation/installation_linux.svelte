@@ -12,20 +12,15 @@
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
-<code>curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh</code>
+
+<code style="display:inline-block; width:100%; text-align:left">curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh</code>
+<a href="/drivers/linux/install_xkb.py" style="display:block; margin-top:5px" download>
+	<button><i class="icon-linux"></i> Copier le code</button>
+</a>
+
+<tiny-space></tiny-space>
 
 <div>
-	{#if version_linux !== undefined}
-		<tiny-space></tiny-space>
-		<a href="/drivers/linux/Ergopti_v{version_linux}.xkb" download>
-			<button><i class="icon-linux"></i> Ergopti v{version_linux}.xkb</button>
-		</a>
-		<tiny-space></tiny-space>
-		<a href="/drivers/linux/Ergopti_v{version_linux}.XCompose" download>
-			<button><i class="icon-linux"></i> Ergopti v{version_linux}.XCompose</button>
-		</a>
-	{/if}
-	<tiny-space></tiny-space>
 	<a href="/drivers/linux/install_xkb.py" download>
 		<button class="alt-button"><i class="icon-linux"></i> Script d’installation XKB</button>
 	</a>
