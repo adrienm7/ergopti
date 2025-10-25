@@ -17,7 +17,10 @@
 <tiny-space></tiny-space>
 <div class="download-buttons">
 	{#if version_mineure_macos !== undefined}
-		<a href="/drivers/macos/zipped_bundles/Ergopti_v{version_mineure_macos}.bundle.zip" download>
+		<a
+			href="/drivers/macos/bundles/zipped_bundles/Ergopti_v{version_mineure_macos}.bundle.zip"
+			download
+		>
 			<button
 				><i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
 				Ergopti v{version_mineure_macos}.bundle</button

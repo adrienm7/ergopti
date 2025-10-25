@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-2510201" maxout="1" name="Ergopti_v2_2_0">
+<keyboard group="126" id="-2510251" maxout="1" name="Ergopti_v2_2_0">
 	<layouts>
 		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
@@ -258,7 +258,7 @@
 			<key code="27" output=" %"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" action="-"/>
+			<key code="30" action="_"/>
 			<key code="31" action="C"/>
 			<key code="32" action="G"/>
 			<key code="33" action="Z"/>
@@ -347,7 +347,7 @@
 			<key code="27" output=" %"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" action="-"/>
+			<key code="30" action="_"/>
 			<key code="31" action="c"/>
 			<key code="32" action="g"/>
 			<key code="33" action="z"/>
@@ -535,7 +535,7 @@
 			<key code="27" output="‰"/>
 			<key code="28" output="⁸"/>
 			<key code="29" output="⁰"/>
-			<key code="30" action="_"/>
+			<key code="30" action="-"/>
 			<key code="31" output="ç"/>
 			<key code="32" output="~"/>
 			<key code="33" output="%"/>

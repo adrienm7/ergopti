@@ -18,12 +18,9 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			files = import.meta.glob('/static/drivers/windows/*.kbe');
 			break;
 		case 'macos_keylayout':
-			files = import.meta.glob('/static/drivers/macos/zipped_bundles/*.zip');
+			files = import.meta.glob('/static/drivers/macos/bundles/zipped_bundles/*.zip');
 			break;
-		case 'ahk':
-			files = import.meta.glob('/static/pilotes/ahk/*.exe');
-			break;
-		case 'plus':
+		case 'autohotkey':
 			files = import.meta.glob('/static/drivers/autohotkey/*.ahk');
 			break;
 		case 'kla_iso':
