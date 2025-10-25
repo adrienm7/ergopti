@@ -29,12 +29,12 @@
 		marginaux.
 	</p>
 	<p>
-		Par exemple, il serait probablement possible d’améliorer encore les résultats de <Ergopti /> sur
-		KLAnext, mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le confort
-		général ou la disparition de certains roulements. Autre exemple, certaines dispositions optimisent
-		tellement que les chiffres ne sont pas dans l’ordre mais plutôt du genre <kbd>3210987654</kbd>.
-		Cela rend la disposition beaucoup moins logique et donc plus difficile à apprendre, pour
-		seulement optimiser légèrement leurs scores.
+		Par exemple, il serait probablement possible d’améliorer encore les résultats d’<Ergopti /> sur KLAnext,
+		mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le confort général
+		ou la disparition de certains roulements. Autre exemple, certaines dispositions optimisent tellement
+		que les chiffres ne sont pas dans l’ordre mais plutôt du genre <kbd>3210987654</kbd>. Cela rend
+		la disposition beaucoup moins logique et donc plus difficile à apprendre, pour seulement
+		optimiser légèrement leurs scores.
 	</p>
 	<p>
 		Il serait aussi possible de faire cela pour les majuscules. Cela nous paraît évident que la

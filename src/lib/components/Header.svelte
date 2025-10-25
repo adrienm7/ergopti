@@ -182,8 +182,8 @@
 
 <style>
 	:root {
-		--header-color: rgba(0, 0, 0, 0.9);
-		--header-color-mobile: rgba(0, 16, 36, 0.975);
+		--header-color: rgba(0, 0, 0, 0.8);
+		--header-color-mobile: rgba(0, 18, 30, 0.975);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
 		--items-menu-spacing: clamp(4px, 0.8vw, 25px);
@@ -359,7 +359,6 @@
 	/* Menu mobile */
 	@media (max-width: 1280px) {
 		#menu {
-			backdrop-filter: blur(30px);
 			background-color: var(--header-color-mobile);
 			border-top: 1px solid rgba(255, 255, 255, 0.2);
 			left: 0;

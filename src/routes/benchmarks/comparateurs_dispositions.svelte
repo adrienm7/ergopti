@@ -61,7 +61,7 @@
 			download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
 		>
 		<p>
-			➜ Il n’y a de loin pas toutes les fonctionnalités de <ErgoptiPlus></ErgoptiPlus> dans ce fichier
+			➜ Il n’y a de loin pas toutes les fonctionnalités d’<ErgoptiPlus></ErgoptiPlus> dans ce fichier
 			ISO+, car c’est impossible de les ajouter. Pour pouvoir les prendre en compte, comme l’utilisation
 			de la touche
 			<kbd>★</kbd>, il faudrait nécessairement modifier le corpus utilisé en entrée. Cependant, dans

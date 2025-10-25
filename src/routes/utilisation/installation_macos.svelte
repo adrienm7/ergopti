@@ -53,7 +53,7 @@
 	« Autres ».
 </p>
 
-<h3>Résolution de problèmes connus</h3>
+<h3 id="macos-solutions">Résolution de problèmes connus</h3>
 <p>
 	Certains problèmes ont été rapportés avec le keylayout d’<Ergopti></Ergopti> dans quelques logiciels :
 </p>

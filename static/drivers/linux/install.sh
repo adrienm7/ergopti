@@ -1,19 +1,15 @@
 #!/bin/sh
 
 # Installer launcher for Ergopti:
-# 1. Download the full repository (git clone preferred, else zip).
-# 2. Run the interactive selector Python script from the downloaded repo.
-#    The selector will prompt for sudo.
+# 1. Download the repository (git clone preferred, else zip)
+# 2. Run the interactive XKB selector Python script from the downloaded repo
+# 3. Install the XKB files selected (needs sudo, the script will prompt for it)
 
 REPO_OWNER="adrienm7"
 REPO_NAME="ergopti"
 BRANCH="dev"
 TARGET_SUBPATH="static/drivers/linux"
-
-REPO_GIT_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
-REPO_ZIP_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/heads/${BRANCH}.zip"
-ZIPNAME="repo.zip"
-echo "Starting Ergopti installer: fetching repository ${REPO_OWNER}/${REPO_NAME}@${BRANCH}"
+SELECTOR_SCRIPT_NAME="xkb_files_selector"
 
 
 
@@ -29,10 +25,8 @@ done
 
 
 
-
-
-# Create a secure temporary directory.
-# Prefer mktemp when available, otherwise fall back to a $$-based name.
+# Create a secure temporary directory
+# Prefer mktemp when available, otherwise fall back to a $$-based name
 if command -v mktemp >/dev/null 2>&1; then
   TMPDIR="$(mktemp -d /tmp/ergopti_xkb.XXXXXX)" || TMPDIR="/tmp/ergopti_xkb_$$"
 else
@@ -47,8 +41,13 @@ trap 'rc=$?; rm -rf "$TMPDIR" >/dev/null 2>&1 || true; exit $rc' EXIT
 
 
 
-# Try git sparse-checkout of the target subpath to avoid downloading the
-# whole repository. Fall back to a shallow full clone, then to the zip archive.
+echo "Starting Ergopti installer: fetching repository ${REPO_OWNER}/${REPO_NAME}@${BRANCH}"
+REPO_GIT_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+REPO_ZIP_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/heads/${BRANCH}.zip"
+ZIPNAME="repo.zip"
+
+# Try git sparse-checkout of the target subpath to avoid downloading the whole repository
+# If it doesn’t work, fall back to a shallow full clone, or even to the zip archive
 REPO_DIR="${TMPDIR}/${REPO_NAME}-${BRANCH}"
 if command -v git >/dev/null 2>&1; then
   echo "Attempting git sparse-checkout of ${TARGET_SUBPATH} (lightweight)..."
@@ -93,13 +92,13 @@ fi
 
 
 # Launch the selector script from the downloaded repository
-SELECTOR_PY="$REPO_DIR/${TARGET_SUBPATH}/xkb_files_selector.py"
+SELECTOR_PY="$REPO_DIR/${TARGET_SUBPATH}/$SELECTOR_SCRIPT_NAME.py"
 if [ ! -f "$SELECTOR_PY" ]; then
   echo "Selector script not found: $SELECTOR_PY" >&2
   exit 1
 fi
 
-echo "Launching selector (will prompt for sudo later if needed): $SELECTOR_PY"
+echo "Launching selector: $SELECTOR_PY"
 python3 "$SELECTOR_PY" "$@"
 
 RET=$?
