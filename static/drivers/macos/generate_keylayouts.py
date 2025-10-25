@@ -37,7 +37,7 @@ def main(
         output_directory = Path(output_directory).resolve()
     else:
         # If no path is provided, use the macos directory (current file's parent)
-        output_directory = Path(__file__).resolve().parent
+        output_directory = Path(__file__).resolve().parent / "bundles"
 
     # Determine input directory
     if input_directory:
@@ -45,9 +45,7 @@ def main(
     else:
         # If no path is provided, use the "raw_kbdedit_keylayouts" folder
         kbdedit_files_directory = Path(
-            Path(__file__).parent.resolve()
-            / "keylayout_generation"
-            / "raw_kbdedit_keylayouts"
+            Path(__file__).parent.resolve() / "raw_kbdedit_keylayouts"
         )
 
     # Find files to process

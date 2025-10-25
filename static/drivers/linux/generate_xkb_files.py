@@ -172,7 +172,9 @@ def get_macos_dir():
     Raises:
             FileNotFoundError: If the directory does not exist.
     """
-    macos_dir = Path(__file__).parent.parent.parent / "drivers" / "macos"
+    macos_dir = (
+        Path(__file__).parent.parent.parent / "drivers" / "macos" / "bundles"
+    )
     if not macos_dir.is_dir():
         logger.error("macos directory does not exist: %s", macos_dir)
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
