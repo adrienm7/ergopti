@@ -399,7 +399,17 @@ def _apply_installed_layout(symbol_name: str) -> None:
             # Use 'fr' layout and the installed symbol_name as variant.
             cmd = ["localectl", "set-x11-keymap", "fr", "", symbol_name, ""]
             logging.info("Setting X11 keymap persistently via: %s", " ".join(cmd))
-            subprocess.run(cmd, check=False)
+            # Capture output so we don't leak raw stderr to the caller's terminal.
+            try:
+                res = subprocess.run(cmd, check=False, capture_output=True, text=True)
+                if res.stdout:
+                    logging.debug("localectl stdout: %s", res.stdout.strip())
+                if res.stderr:
+                    logging.debug("localectl stderr: %s", res.stderr.strip())
+                if res.returncode != 0:
+                    logging.warning("localectl exited with code %d (see debug logs)", res.returncode)
+            except Exception as exc_inner:
+                logging.warning("localectl attempt failed: %s", exc_inner)
         else:
             logging.debug("localectl not found, skipping persistent system setting")
     except Exception as exc:  # pragma: no cover - best-effort
@@ -431,8 +441,47 @@ def _apply_installed_layout(symbol_name: str) -> None:
             # Run as the original user so the command affects their session
             try:
                 logging.info("Attempting to apply layout in X session for %s: %s", sudo_user, setx_cmd)
-                subprocess.run(["runuser", "-l", sudo_user, "-c", setx_cmd], check=False)
-                # We don't strictly verify success; stop after first attempt
+                # Capture stdout/stderr so we can map expected X errors to friendly info
+                try:
+                    res = subprocess.run(
+                        ["runuser", "-l", sudo_user, "-c", setx_cmd],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                except Exception as exc_run:
+                    logging.debug("Failed to run user command: %s", exc_run)
+                    continue
+
+                # If the command produced stderr with known X11 authorization/display
+                # messages, log a friendly informational message rather than exposing
+                # raw stderr to the caller.
+                stderr = (res.stderr or "").strip()
+                if res.returncode != 0 and stderr:
+                    # Common messages that indicate inability to access the user's X
+                    # session but are non-fatal for the installation.
+                    if (
+                        "Authorization required" in stderr
+                        or "no authorization protocol" in stderr.lower()
+                        or "Cannot open display" in stderr
+                        or "No protocol specified" in stderr
+                    ):
+                        logging.info(
+                            "Could not apply layout inside the user's X session (non-fatal)."
+                        )
+                        logging.debug("setxkbmap stderr: %s", stderr)
+                    else:
+                        # Unexpected stderr — preserve as a warning so the user can see
+                        # that something else happened.
+                        logging.warning(
+                            "setxkbmap returned code %d: %s", res.returncode, stderr
+                        )
+                else:
+                    # No stderr and/or returncode 0 — treat as success (best-effort)
+                    logging.info("Applied layout (or attempted successfully) for DISPLAY=%s", disp)
+
+                # Stop after the first attempt regardless of result; we don't want to
+                # spam multiple DISPLAY candidates in most setups.
                 break
             except Exception:
                 # try next candidate

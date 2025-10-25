@@ -206,9 +206,94 @@ if [ ! -f "$SCRIPT" ]; then
 fi
 
 echo "Running selector script: $SCRIPT"
-python3 "$SCRIPT" "$@"
+# If the installer was invoked via sudo, try to forward the user's X11
+# environment so setxkbmap / other X calls can open the display.
+if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+  echo "Detected invoker user: $SUDO_USER — attempting to forward X11 env"
+  # Resolve original user's home
+  ORIG_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6 2>/dev/null || true)
 
+  # Try to find DISPLAY and XAUTHORITY from one of the user's processes
+  FOUND_DISPLAY=""
+  FOUND_XAUTH=""
+  for pid in $(pgrep -u "$SUDO_USER" 2>/dev/null || true); do
+    if [ -r "/proc/$pid/environ" ]; then
+      envvars=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null || true)
+      if [ -z "$FOUND_DISPLAY" ]; then
+        d=$(printf '%s' "$envvars" | awk -F= '/^DISPLAY=/ {print substr($0, index($0,$2)) ; exit}' )
+        if [ -n "$d" ]; then
+          FOUND_DISPLAY="$d"
+        fi
+      fi
+      if [ -z "$FOUND_XAUTH" ]; then
+        x=$(printf '%s' "$envvars" | awk -F= '/^XAUTHORITY=/ {print substr($0, index($0,$2)) ; exit}' )
+        if [ -n "$x" ]; then
+          FOUND_XAUTH="$x"
+        fi
+      fi
+    fi
+    if [ -n "$FOUND_DISPLAY" ] && [ -n "$FOUND_XAUTH" ]; then
+      break
+    fi
+  done
+
+  # Fallbacks
+  if [ -z "$FOUND_DISPLAY" ]; then
+    # Try common default
+    FOUND_DISPLAY=":0"
+  fi
+  if [ -z "$FOUND_XAUTH" ]; then
+    if [ -n "$ORIG_HOME" ] && [ -f "$ORIG_HOME/.Xauthority" ]; then
+      FOUND_XAUTH="$ORIG_HOME/.Xauthority"
+    fi
+  fi
+
+  if [ -n "$FOUND_DISPLAY" ]; then
+    export DISPLAY="$FOUND_DISPLAY"
+    echo "Using DISPLAY=$DISPLAY"
+  fi
+  if [ -n "$FOUND_XAUTH" ]; then
+    export XAUTHORITY="$FOUND_XAUTH"
+    echo "Using XAUTHORITY=$XAUTHORITY"
+  else
+    echo "Warning: could not locate XAUTHORITY for $SUDO_USER — X session operations may fail"
+  fi
+fi
+
+# Run the selector. Running as root is required for system changes; the exported
+# DISPLAY/XAUTHORITY above allow X calls to reach the user's X server when
+# possible. We'll capture stderr and treat common X11 authorization/display
+# messages as informational (non-fatal) to avoid alarming red errors.
+SEL_STDERR="$TMPDIR/selector_stderr.txt"
+rm -f "$SEL_STDERR" 2>/dev/null || true
+
+python3 "$SCRIPT" "$@" 2>"$SEL_STDERR"
 RET=$?
+
+# Inspect stderr for common X authorization/display messages
+if [ -s "$SEL_STDERR" ]; then
+  # Patterns considered non-fatal and user-facing as informational
+  X_PATTERNS="Authorization required|no authorization protocol|Cannot open display|No protocol specified"
+  if grep -Ei "$X_PATTERNS" "$SEL_STDERR" >/dev/null 2>&1; then
+    echo "Info: The installer couldn't apply the layout inside the user's X session automatically."
+    echo "      This is non-fatal — the keyboard files were installed. To apply the layout manually, run as the logged-in user:"
+    echo "        localectl set-x11-keymap fr <VARIANT>"
+    echo "      or"
+    echo "        DISPLAY=:0 setxkbmap fr -variant <VARIANT>"
+    echo "      If you prefer the installer to attempt applying the layout later, re-run it from an active user session (not via sudo piping)."
+    # remove the matched lines so we don't re-print them below
+    grep -viE "$X_PATTERNS" "$SEL_STDERR" >"${SEL_STDERR}.filtered" || true
+    mv "${SEL_STDERR}.filtered" "$SEL_STDERR" || true
+  fi
+
+  # Any remaining stderr lines (unexpected errors) should still be shown.
+  if [ -s "$SEL_STDERR" ]; then
+    echo "--- Additional output from selector (stderr) ---" >&2
+    cat "$SEL_STDERR" >&2
+    echo "--- end selector stderr ---" >&2
+  fi
+fi
+
 echo "Cleaning up..."
 rm -rf "$TMPDIR"
 
