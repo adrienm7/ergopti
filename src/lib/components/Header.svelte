@@ -191,7 +191,7 @@
 		--marge-fenetre: var(--marge-bords-menu);
 		--header-height: clamp(70px, 5.5vw, 120px);
 		--couleur-icone-hamburger: white;
-		--marge-bords-menu: clamp(15px, 2vw, 50px);
+		--marge-bords-menu: clamp(15px, 1vw, 50px);
 		--longueur-traits-hamburger: 18px;
 	}
 
@@ -199,7 +199,7 @@
 		align-items: center;
 		backdrop-filter: blur(30px);
 		background-color: var(--header-color);
-		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
+		box-shadow: 0px 0px 5px 2px var(--couleur-ombre);
 		display: flex;
 		height: var(--header-height);
 		justify-content: space-between;

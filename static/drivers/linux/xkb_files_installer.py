@@ -12,8 +12,8 @@ import logging
 import os
 import re
 import shutil
-import sys
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, Tuple
@@ -310,6 +310,46 @@ def install_xcompose_file(xcompose_file: Path) -> None:
         home_dir = Path(user_info.pw_dir)
         dest_xcompose = home_dir / ".XCompose"
 
+        # If destination exists, ask user to confirm overwrite when possible.
+        if dest_xcompose.exists():
+            try:
+                interactive = sys.stdin.isatty()
+            except Exception:
+                interactive = False
+
+            if not interactive:
+                logging.info(
+                    "%s already exists; not overwriting in non-interactive mode.",
+                    dest_xcompose,
+                )
+                return
+
+            # Prompt the user; default to YES on empty input (Enter)
+            try:
+                # Prompt in English and clearly indicate that Enter = yes (default)
+                resp = (
+                    input(
+                        f"{dest_xcompose} already exists. Overwrite? [Y/n] (Enter = yes): "
+                    )
+                    .strip()
+                    .lower()
+                )
+            except Exception:
+                logging.info(
+                    "Could not read user input; skipping .XCompose install."
+                )
+                return
+
+            # Treat empty input (Enter) as confirmation
+            if resp not in ("", "y", "yes"):
+                logging.info(
+                    "User declined to overwrite %s; skipping.", dest_xcompose
+                )
+                return
+
+            # Create backup of existing .XCompose like other files
+            backup_file(dest_xcompose)
+
         shutil.copy(xcompose_file, dest_xcompose)
         chown = getattr(os, "chown", None)
         if callable(chown):
@@ -398,20 +438,29 @@ def _apply_installed_layout(symbol_name: str) -> None:
             # localectl set-x11-keymap LAYOUT MODEL VARIANT OPTIONS
             # Use 'fr' layout and the installed symbol_name as variant.
             cmd = ["localectl", "set-x11-keymap", "fr", "", symbol_name, ""]
-            logging.info("Setting X11 keymap persistently via: %s", " ".join(cmd))
+            logging.info(
+                "Setting X11 keymap persistently via: %s", " ".join(cmd)
+            )
             # Capture output so we don't leak raw stderr to the caller's terminal.
             try:
-                res = subprocess.run(cmd, check=False, capture_output=True, text=True)
+                res = subprocess.run(
+                    cmd, check=False, capture_output=True, text=True
+                )
                 if res.stdout:
                     logging.debug("localectl stdout: %s", res.stdout.strip())
                 if res.stderr:
                     logging.debug("localectl stderr: %s", res.stderr.strip())
                 if res.returncode != 0:
-                    logging.warning("localectl exited with code %d (see debug logs)", res.returncode)
+                    logging.warning(
+                        "localectl exited with code %d (see debug logs)",
+                        res.returncode,
+                    )
             except Exception as exc_inner:
                 logging.warning("localectl attempt failed: %s", exc_inner)
         else:
-            logging.debug("localectl not found, skipping persistent system setting")
+            logging.debug(
+                "localectl not found, skipping persistent system setting"
+            )
     except Exception as exc:  # pragma: no cover - best-effort
         logging.warning("localectl attempt failed: %s", exc)
 
@@ -434,13 +483,17 @@ def _apply_installed_layout(symbol_name: str) -> None:
 
         for disp in display_candidates:
             if xauth.exists():
-                setx_cmd = f'DISPLAY={disp} XAUTHORITY={xauth} setxkbmap fr -variant {symbol_name}'
+                setx_cmd = f"DISPLAY={disp} XAUTHORITY={xauth} setxkbmap fr -variant {symbol_name}"
             else:
-                setx_cmd = f'DISPLAY={disp} setxkbmap fr -variant {symbol_name}'
+                setx_cmd = f"DISPLAY={disp} setxkbmap fr -variant {symbol_name}"
 
             # Run as the original user so the command affects their session
             try:
-                logging.info("Attempting to apply layout in X session for %s: %s", sudo_user, setx_cmd)
+                logging.info(
+                    "Attempting to apply layout in X session for %s: %s",
+                    sudo_user,
+                    setx_cmd,
+                )
                 # Capture stdout/stderr so we can map expected X errors to friendly info
                 try:
                     res = subprocess.run(
@@ -474,11 +527,16 @@ def _apply_installed_layout(symbol_name: str) -> None:
                         # Unexpected stderr — preserve as a warning so the user can see
                         # that something else happened.
                         logging.warning(
-                            "setxkbmap returned code %d: %s", res.returncode, stderr
+                            "setxkbmap returned code %d: %s",
+                            res.returncode,
+                            stderr,
                         )
                 else:
                     # No stderr and/or returncode 0 — treat as success (best-effort)
-                    logging.info("Applied layout (or attempted successfully) for DISPLAY=%s", disp)
+                    logging.info(
+                        "Applied layout (or attempted successfully) for DISPLAY=%s",
+                        disp,
+                    )
 
                 # Stop after the first attempt regardless of result; we don't want to
                 # spam multiple DISPLAY candidates in most setups.
