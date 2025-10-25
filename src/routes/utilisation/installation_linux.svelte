@@ -20,7 +20,7 @@
 {/if}
 
 <code
-	style="display:inline-block; width:100%; border-bottom-left-radius:0; border-bottom-right-radius:0; text-align:left"
+	style="display:inline-block; width:100%; padding:1em; border-bottom-left-radius:0; border-bottom-right-radius:0; text-align:left"
 	>curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh
 	| sh</code
 >
@@ -137,7 +137,7 @@
 	.XCompose personnalisé.
 </p>
 
-<h3>Résolution de problèmes connus</h3>
+<h3 id="linux-solutions">Résolution de problèmes connus</h3>
 <p>
 	Certains problèmes ont été rapportés avec le pilote XKB d’<Ergopti></Ergopti> dans quelques logiciels :
 </p>

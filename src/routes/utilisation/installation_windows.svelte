@@ -169,9 +169,9 @@
 	Une dernière option est d’utiliser le code AutoHotkey compilé en un <em>.exe</em>. Cela évite même
 	de devoir installer AutoHotkey, car le code nécessaire au fonctionnement du script est directement
 	inclus dans le <em>.exe</em>. Toutefois, idéalement il vaut mieux installer AutoHotkey et utiliser
-	le code source, car cela permet d’inspecter le contenu du script pour voir comment il fonctionne,
-	voire pour le modifier afin de l’adapter à votre utilisation. Le fichier <em>.ahk</em> se modifie
-	avec un simple éditeur de texte (clic droit,
+	le code source, car cela permet d’inspecter le contenu du script afin de comprendre comment il
+	fonctionne, voire le modifier pour l’adapter à votre utilisation. Le fichier <em>.ahk</em> se
+	modifie avec un simple éditeur de texte (clic droit,
 	<code>ouvrir avec</code>) afin que vous puissiez l’adapter selon vos envies, notamment pour en
 	désactiver des fonctionnalités ou en ajouter. N’oubliez pas de le relancer pour appliquer vos
 	modifications.

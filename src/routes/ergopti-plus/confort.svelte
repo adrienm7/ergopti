@@ -88,7 +88,7 @@
 		extrêmement confortables sur des bigrammes qui n’existent pas et donc ne posent aucun problème.
 	</p>
 	<p>
-		En outre, le mécanisme de correction automatique de <ErgoptiPlus /> permet de donner
+		En outre, le mécanisme de correction automatique d’<ErgoptiPlus /> permet de donner
 		<kbd-output>paraît</kbd-output>
 		lors de l’écriture de <kbd>parait</kbd>, rendant ce <SFB /> encore plus inoffensif.
 	</p>

@@ -9,7 +9,7 @@
 <section>
 	<h2>Diminution des SFBs</h2>
 	<p>
-		L’un des avantages majeurs de <ErgoptiPlus /> est qu’il réduit presque totalement les <SFB />s.
+		L’un des avantages majeurs d’<ErgoptiPlus /> est qu’il réduit presque totalement les <SFB />s.
 	</p>
 	<p>
 		Les <SFB />s les plus fréquents de la disposition sont : <kbd>CT</kbd>,

@@ -25,7 +25,12 @@
 	/* color: var(--couleur-bleue); */
 }
 
-.toc-list .is-active-link {
+.toc-list ul li .toc-link {
+	background-image: linear-gradient(to right, white, white);
+}
+
+.toc-list .is-active-link,
+.toc-list ul li .is-active-link {
 	background: linear-gradient(var(--gradient-purple));
 	background-clip: text;
 	-webkit-background-clip: text;
@@ -35,7 +40,7 @@
 }
 
 .toc-list li {
-    margin:0;
+	margin: 0;
 	margin-top: 1rem;
 }
 
