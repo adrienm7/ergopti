@@ -12,6 +12,10 @@
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
+<code
+	>curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh
+	| sudo sh</code
+>
 <div>
 	{#if version_linux !== undefined}
 		<tiny-space></tiny-space>
