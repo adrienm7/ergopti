@@ -1,10 +1,10 @@
 @font-face {
   font-family: 'icomoon';
-  src:  url('fonts/icomoon.eot?2loe7j');
-  src:  url('fonts/icomoon.eot?2loe7j#iefix') format('embedded-opentype'),
-    url('fonts/icomoon.ttf?2loe7j') format('truetype'),
-    url('fonts/icomoon.woff?2loe7j') format('woff'),
-    url('fonts/icomoon.svg?2loe7j#icomoon') format('svg');
+  src:  url('fonts/icomoon.eot?hd3e8k');
+  src:  url('fonts/icomoon.eot?hd3e8k#iefix') format('embedded-opentype'),
+    url('fonts/icomoon.ttf?hd3e8k') format('truetype'),
+    url('fonts/icomoon.woff?hd3e8k') format('woff'),
+    url('fonts/icomoon.svg?hd3e8k#icomoon') format('svg');
   font-weight: normal;
   font-style: normal;
   font-display: block;
@@ -25,6 +25,29 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.icon-kanata .path1:before {
+  content: "\e92f";
+  color: ;
+}
+.icon-kanata .path2:before {
+  content: "\e930";
+  margin-left: -1.1162109375em;
+  color: ;
+}
+.icon-kanata .path3:before {
+  content: "\e931";
+  margin-left: -1.1162109375em;
+  color: rgb(254, 255, 254);
+}
+.icon-karabiner:before {
+  content: "\e92c";
+}
+.icon-espanso:before {
+  content: "\e92e";
+}
+.icon-alfred:before {
+  content: "\e92d";
+}
 .icon-windows:before {
   content: "\e92b";
 }

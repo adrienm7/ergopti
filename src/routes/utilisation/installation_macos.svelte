@@ -1,5 +1,6 @@
 <script>
 	import Ergopti from '$lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 	import { version } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
@@ -40,8 +41,6 @@
 </p>
 <code>~/Library/Keyboard Layouts/</code>
 
-<small-space></small-space>
-
 <p>
 	Après avoir placé le bundle dans le bon dossier, redémarrer la session (ou l’ordinateur) pour que
 	macOS prenne en compte la nouvelle disposition. Ensuite, aller dans <code
@@ -51,6 +50,47 @@
 	> <code>Méthodes de saisie</code> et ajouter la disposition <Ergopti></Ergopti>. Généralement, la
 	disposition se trouvera dans la section « Français », mais elle peut aussi parfois se trouver dans
 	« Autres ».
+</p>
+
+<tiny-space></tiny-space>
+
+<p>Le bundle contient plusieurs variantes de la disposition :</p>
+<ul>
+	<li><strong>Ergopti</strong> : version standard, la même que le KbdEdit sur Windows ;</li>
+	<li>
+		<strong>Ergopti+</strong> : version standard incluant la touche <kbd-output>★</kbd-output> à la
+		place de
+		<kbd>J</kbd>
+		ainsi que les petites modifications en
+		<kbd>AltGr</kbd> (<kbd-output>%</kbd-output> à la place de <kbd>œ</kbd>,
+		<kbd-output>!</kbd-output>
+		à la place de <kbd>ç</kbd>, etc.) ;
+	</li>
+	<li>
+		<strong>Ergopti++</strong> : Ergopti+ avec l’ajout de nombreuses touches mortes pour avoir
+		directement les roulements personnalisés dans le keylayout ;
+	</li>
+</ul>
+<p>
+	<strong>Ergopti++</strong> permet de rapidement tester les roulements personnalisés comme
+	<kbd>hc</kbd>
+	donnant <kbd-output>wh</kbd-output> ou encore <kbd>(#</kbd> donnant <kbd-output>("</kbd-output>.
+	Toutefois, elle entraîne certains petits problèmes. Parmi ceux-ci, il y a le fait qu’il faut
+	appuyer 2 fois sur <kbd>Entrée</kbd> pour valider la touche morte et envoyer
+	<kbd-output>Entrée</kbd-output>. Les touches mortes ne fonctionnent pas non plus sur l’écran de
+	verrouillage, ce qui peut carrément empêcher la saisie de son mot de passe. Enfin, la fermeture
+	automatique des parenthèses ne fonctionne pas dans les éditeurs de code. Pour toutes ces raisons,
+	il est donc conseillé de plutôt utiliser <strong>Ergopti+</strong> avec Karabiner pour y définir ces
+	roulements.
+</p>
+<p>
+	Des <strong>variantes ANSI</strong> de ces dispositions sont également disponibles. En effet, sur
+	macOS, un clavier ANSI entraîne de petites différences dans l’arrangement des codes de touches. Si
+	aucun pilote dédié n’était disponible, le <kbd>ê</kbd> se verrait être échangé de place avec le
+	<kbd>$</kbd>
+	de la rangée des chiffres. En outre, la touche morte <kbd class="morte">◌̂</kbd> se verrait être
+	échangée avec
+	<kbd class="morte">◌̈</kbd> et donc être encore moins accessible.
 </p>
 
 <h3 id="macos-solutions">Résolution de problèmes connus</h3>
@@ -96,3 +136,120 @@
 		Python.
 	</li>
 </ul>
+
+<h3>
+	<i class="icon-karabiner" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+	></i>Karabiner
+</h3>
+
+<p class="encadre">
+	<b>Attention :</b> Le code Karabiner suivant est encore en bêta et risque d’être régulièrement mis
+	à jour. Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez
+	à vérifier régulièrement si une nouvelle version est disponible.
+</p>
+
+<tiny-space></tiny-space>
+
+<div class="download-buttons">
+	<a href="/drivers/karabiner/karabiner.json" download>
+		<button
+			><i class="icon-karabiner" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
+			karabiner.json</button
+		>
+	</a>
+</div>
+<p>
+	<a class="link" href="https://karabiner-elements.pqrs.org/">Karabiner-Elements</a> est un logiciel
+	open source permettant de remapper les touches sur macOS. Il est particulièrement utile avec la
+	disposition <ErgoptiPlus></ErgoptiPlus> pour ajouter des tap-holds, définir des roulements personnalisés,
+	etc. Voici ce qui est inclus dans le fichier de configuration fourni :
+</p>
+<ul>
+	<li>
+		Interversion des touches <kbd>ROption</kbd> et <kbd>RCmd</kbd> pour avoir la couche
+		<kbd-output>AltGr</kbd-output> aussi facilement accessible que sur Windows ;
+	</li>
+	<li>
+		Tap-hold sur <kbd>CapsLock</kbd> avec <kbd-output>Entrée</kbd-output> en tap et
+		<kbd-output>Cmd</kbd-output> en hold ;
+	</li>
+	<li>
+		Tap-hold sur <kbd>ROption</kbd> (intervertie en <kbd>RCmd</kbd>) avec
+		<kbd-output>One-Shot Shift</kbd-output>
+		en tap et
+		<kbd-output>Shift</kbd-output> en hold ;
+	</li>
+	<li>
+		Tap-hold sur <kbd>LShift</kbd> avec <kbd-output>Copier</kbd-output> en tap ;
+	</li>
+	<li>
+		Tap-hold sur <kbd>Fn</kbd> avec <kbd-output>Coller</kbd-output> en tap ;
+	</li>
+	<li>
+		Tap-hold sur <kbd>LCtrl</kbd> avec <kbd-output>Couper</kbd-output> en tap ;
+	</li>
+	<li>
+		Tap-hold sur <kbd>LOption</kbd> avec <kbd-output>BackSpace</kbd-output> en tap ;
+	</li>
+	<li>
+		Définition de tous les roulements personnalisés d’Ergopti++ comme
+		<kbd>hc</kbd> → <kbd-output>wh</kbd-output>, <kbd>qa</kbd> → <kbd-output>qua</kbd-output>,
+		<kbd>(#</kbd>
+		→ <kbd-output>("</kbd-output>, etc. ;
+	</li>
+</ul>
+<p>
+	À noter que le code Karabiner est loin d'être concis, car beaucoup de lignes n’ont qu’une seule
+	accolade ouvrante ou fermante. Ainsi, pour définir un seul comportement, des dizaines de lignes
+	sont nécessaires. En outre, afin de définir les roulements personnalisés, il était nécessaire
+	d’avoir l’information de la dernière touche pressée, ce qui n’est pas disponible par défaut dans
+	Karabiner. C’est pour cela que chaque touche du clavier a été redéfinie pour envoyer le contenu de
+	sa touche, mais aussi mettre à jour une variable contenant la dernière touche pressée. Tout cela
+	entraîne un code Karabiner extrêmement volumineux (des dizaines de milliers de lignes) pour un
+	comportement pourtant très simple. Cela n’a cependant jamais posé de problème en pratique, ni de
+	performances.
+</p>
+
+<h3>
+	<i class="icon-alfred" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>Alfred
+</h3>
+
+<p class="encadre">
+	<b>Attention :</b> Le code Alfred suivant est encore en bêta et risque d’être régulièrement mis à jour.
+	Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez à vérifier
+	régulièrement si une nouvelle version est disponible.
+</p>
+
+<tiny-space></tiny-space>
+
+<div class="download-buttons">
+	<a href="https://github.com/adrienm7/ergopti/tree/dev/static/drivers/alfred/snippets" download>
+		<button
+			><i class="icon-alfred" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
+			Dossier de snippets Alfred</button
+		>
+	</a>
+</div>
+
+<p>
+	<a class="link" href="https://www.alfredapp.com/">Alfred</a> est un lanceur d’applications et un
+	gestionnaire de snippets pour macOS. Il est possible d’y définir des snippets de texte qui seront
+	insérés lorsqu’on tape une abréviation. C’est grâce à ce logiciel que la touche <kbd>★</kbd>
+	d’<ErgoptiPlus></ErgoptiPlus>
+	peut être utilisée comme touche de répétition et pour insérer des snippets, des caractères spéciaux,
+	etc.
+</p>
+<p>
+	Le dossier de snippets fourni contient l’intégralité des snippets d’<ErgoptiPlus></ErgoptiPlus>.
+	Ils sont automatiquement extraits du fichier <em>.ahk</em>
+	d’<ErgoptiPlus></ErgoptiPlus>. Il suffit d’installer ces snippets dans Alfred pour pouvoir les
+	utiliser dans n’importe quelle application. Pour cela, il suffit de cliquer dessus, ce qui ouvrira
+	Alfred et proposera de les installer.
+</p>
+<p>
+	Attention, il faut bien penser à désactiver l’option
+	<code>Strip snippets from autoexpand</code> lors de chaque import. À noter aussi que les snippets dans
+	Alfred sont une fonctionnalité payante, disponible uniquement avec la licence Powerpack. Alfred semble
+	être le meilleur gestionnaire de snippets sur macOS, les alternatives gratuites ne fonctionnant malheureusement
+	pas aussi bien, étant notamment trop "lentes" à l’utilisation.
+</p>
