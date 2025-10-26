@@ -163,3 +163,69 @@
 		remappage de clavier, comme cela a été corrigé sur macOS.
 	</li>
 </ul>
+
+<h3>
+	<i class="icon-kanata" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+		><span class="path1"></span><span class="path2"></span><span class="path3"></span></i
+	>Kanata
+</h3>
+
+<p class="encadre">
+	<b>Attention :</b> Le code Kanata suivant est encore en bêta et risque d’être régulièrement mis à jour.
+	Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez à vérifier
+	régulièrement si une nouvelle version est disponible.
+</p>
+
+<tiny-space></tiny-space>
+
+<div class="download-buttons">
+	<a href="/drivers/kanata/kanata.kbd" download>
+		<button
+			><i class="icon-kanata" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+				><span class="path1"></span><span class="path2"></span><span class="path3"></span></i
+			>
+			kanata.kbd</button
+		>
+	</a>
+</div>
+
+<p>
+	<a class="link" href="https://github.com/jtroo/kanata">Kanata</a> est un outil de remappage de clavier
+	open source fonctionnant sur tous les systèmes d’exploitation majeurs (Linux, macOS et Windows). Il
+	permet de redéfinir le comportement des touches du clavier à l’échelle du système.
+</p>
+<p>Voici les fonctionnalités implémentées dans le fichier Kanata :</p>
+<ul>
+	<li>Tap holds sur <kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>RCtrl</kbd> ;</li>
+	<li>Layer de navigation en hold sur <kbd>Alt</kbd>.</li>
+</ul>
+
+<h3>
+	<i class="icon-espanso" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>Espanso
+</h3>
+
+<p class="encadre">
+	<b>Attention :</b> Le code Espanso suivant est encore en bêta et risque d’être régulièrement mis à
+	jour. Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez
+	à vérifier régulièrement si une nouvelle version est disponible.
+</p>
+
+<tiny-space></tiny-space>
+
+<div class="download-buttons">
+	<a href="https://github.com/adrienm7/ergopti/tree/dev/static/drivers/espanso" download>
+		<button
+			><i class="icon-espanso" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
+			Dossier de snippets Espanso</button
+		>
+	</a>
+</div>
+
+<p>
+	<a class="link" href="https://espanso.org/">Espanso</a> est un gestionnaire de snippets open source
+	pour Linux, macOS et Windows. Il permet d’utiliser des snippets de texte dans n’importe quelle application.
+	Cela semblerait donc être la solution parfaite, fonctionnant sur tous les systèmes d’exploitation et
+	étant open source. Cependant, Espanso ne fonctionne pas aussi bien qu’Alfred sur macOS, notamment en
+	termes de rapidité d’insertion des snippets. Néanmoins, c’est actuellement la meilleure solution disponible
+	pour Linux.
+</p>

@@ -1,7 +1,8 @@
 p,
 ul,
 .encadre,
-.tooltiptext {
+.tooltiptext,
+li {
 	line-height: 1.5em;
 	text-align: justify;
 }
@@ -10,7 +11,8 @@ ul,
 	p,
 	ul,
 	.encadre,
-	.tooltiptext {
+	.tooltiptext,
+	li {
 		text-align: left;
 	}
 }
@@ -113,6 +115,19 @@ i .path1::before {
 	-webkit-background-clip: text;
 	background-clip: text;
 	background-color: #00407b !important;
+	-webkit-text-fill-color: transparent;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	color: transparent;
+	opacity: 1 !important;
+	text-decoration: none;
+}
+
+i .path3,
+i .path3::before {
+	-webkit-background-clip: text;
+	background-clip: text;
+	background-color: rgb(212, 250, 255) !important;
 	-webkit-text-fill-color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;
