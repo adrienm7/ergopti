@@ -603,11 +603,11 @@ def _choose_types(
         should be used or was found.
     """
     types_options = {
-        "1": "Default types (xkb_types.txt)",
-        "2": "Types without Ctrl mappings (xkb_types_without_ctrl.txt)",
+        "1": "Complete types (xkb_types.txt)",
+        "2": "Types without Ctrl mappings on accented letters to prevent issues (xkb_types_without_ctrl.txt)",
         "3": "None / Skip types file",
     }
-    default_types_key = "1"
+    default_types_key = "2"
 
     if args.types:
         if args.types in types_options:
