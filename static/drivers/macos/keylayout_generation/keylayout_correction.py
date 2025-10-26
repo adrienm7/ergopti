@@ -13,6 +13,7 @@ from utilities.keylayout_modification import (
     replace_keymapselect,
     replace_keymapset_id_with_layout,
     replace_modifier_map_id,
+    swap_keys,
 )
 from utilities.keylayout_sorting import sort_keylayout
 from utilities.layer_names import replace_layer_names_in_file
@@ -25,7 +26,6 @@ from utilities.output_modification import (
     modify_accented_letters_shortcuts,
     normalize_attribute_entities,
     replace_action_to_output_extra_keys,
-    swap_keys,
 )
 
 LOGS_INDENTATION = "\t"
@@ -53,7 +53,7 @@ KEYMAPSELECT_MAPINDEX_7 = (
 )
 
 
-def correct_keylayout(content: str) -> str:
+def correct_keylayout(content: str, variant_number: int) -> str:
     """
     Apply all necessary corrections and modifications to a keylayout content.
     Returns the fully corrected content.
@@ -96,7 +96,7 @@ def correct_keylayout(content: str) -> str:
     content = replace_keymap(content, 4, keymap_content)
 
     content = sort_keylayout(content)
-    content = set_unique_keyboard_id(content, 1)
+    content = set_unique_keyboard_id(content, variant_number)
     validate_keylayout(content)
 
     logger.info("Keylayout corrections complete.")

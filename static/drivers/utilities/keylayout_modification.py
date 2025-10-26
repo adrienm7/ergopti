@@ -177,3 +177,17 @@ def replace_keymapset_id_with_layout(content: str) -> str:
         rf'(mapSet=")({re.escape(old_id)})(")', r"\1layout\3", content
     )
     return content
+
+
+def swap_keys(body: str, key1: int, key2: int) -> str:
+    """Swap key codes."""
+    logger.info(
+        "%s🔹 Swapping key codes %d and %d…",
+        LOGS_INDENTATION + "\t",
+        key1,
+        key2,
+    )
+    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
+    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
+    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
+    return body

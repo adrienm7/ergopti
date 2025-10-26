@@ -27,7 +27,7 @@ from utilities.rolls_mappings import plus_mappings
 LOGS_INDENTATION = "\t"
 
 
-def create_keylayout_plus_plus(content: str):
+def create_keylayout_plus_plus(content: str, variant_number: int):
     """
     Create a '_plus' variant of the plus keylayout, with extra dead keys.
     """
@@ -99,7 +99,7 @@ def create_keylayout_plus_plus(content: str):
 
     content = replace_action_to_output_extra_keys(content, EXTRA_KEYS)
     content = sort_keylayout(content)
-    content = set_unique_keyboard_id(content, 3)
+    content = set_unique_keyboard_id(content, variant_number)
 
     validate_keylayout(content)
 
