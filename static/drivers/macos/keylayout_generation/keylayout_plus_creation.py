@@ -22,7 +22,7 @@ from utilities.output_modification import replace_action_to_output_extra_keys
 LOGS_INDENTATION = "\t"
 
 
-def create_keylayout_plus(content: str):
+def create_keylayout_plus(content: str, variant_number: int):
     """
     Create a '_plus' variant of the corrected keylayout, with extra actions.
     """
@@ -41,7 +41,7 @@ def create_keylayout_plus(content: str):
 
     content = replace_action_to_output_extra_keys(content, EXTRA_KEYS)
     content = sort_keylayout(content)
-    content = set_unique_keyboard_id(content, 2)
+    content = set_unique_keyboard_id(content, variant_number)
 
     validate_keylayout(content)
 

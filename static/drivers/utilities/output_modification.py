@@ -138,17 +138,3 @@ def fix_ctrl_symbols(body: str) -> str:
         r'(<key code="27"[^>]*(output|action)=")[^"]*(")', r"\1-\3", body
     )
     return body
-
-
-def swap_keys(body: str, key1: int, key2: int) -> str:
-    """Swap key codes."""
-    logger.info(
-        "%s🔹 Swapping key codes %d and %d…",
-        LOGS_INDENTATION + "\t",
-        key1,
-        key2,
-    )
-    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
-    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
-    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
-    return body

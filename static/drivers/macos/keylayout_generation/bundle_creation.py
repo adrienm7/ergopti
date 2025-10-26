@@ -38,7 +38,8 @@ def create_bundle(
     resources_path.mkdir(parents=True, exist_ok=True)
 
     info_plist_entries = []
-    layout_localization_infos: list[tuple[str, str]] = []
+    # Each entry: (internal_name, variant, is_ansi)
+    layout_localization_infos: list[tuple[str, str, bool]] = []
 
     # Extract version for filename format
     match = re.search(r"(v\d+\.\d+\.\d+)", version)
@@ -61,19 +62,35 @@ def create_bundle(
         # Read and patch keylayout content
         content = keylayout.read_text(encoding="utf-8")
         stem = keylayout.stem.lower()
-        is_plusplus = stem.endswith("plus_plus")
+        # Detect plus_plus anywhere in the stem (covers both
+        # "..._plus_plus" and "..._plus_plus_ANSI" filenames)
+        is_plusplus = "plus_plus" in stem
         is_plus = "plus" in stem and not is_plusplus
+        is_ansi = "ansi" in stem
 
         # Generate new name in the format Ergopti_vx_x_x
-        if is_plusplus:
-            new_name = f"Ergopti_{version_underscore}_plus_plus"
-            display_name = f"Ergopti_{version_underscore}_plus_plus"
+        # Base name depending on variant
+        if is_plusplus and is_ansi:
+            base_name = f"Ergopti_{version_underscore}_plus_plus_ansi"
+            variant = "++"
+        elif is_plusplus:
+            base_name = f"Ergopti_{version_underscore}_plus_plus"
+            variant = "++"
+        elif is_plus and is_ansi:
+            base_name = f"Ergopti_{version_underscore}_plus_ansi"
+            variant = "+"
         elif is_plus:
-            new_name = f"Ergopti_{version_underscore}_plus"
-            display_name = f"Ergopti_{version_underscore}_plus"
+            base_name = f"Ergopti_{version_underscore}_plus"
+            variant = "+"
+        elif is_ansi:
+            base_name = f"Ergopti_{version_underscore}_ansi"
+            variant = ""
         else:
-            new_name = f"Ergopti_{version_underscore}"
-            display_name = f"Ergopti_{version_underscore}"
+            base_name = f"Ergopti_{version_underscore}"
+            variant = ""
+
+        new_name = base_name
+        display_name = new_name
 
         # Use the same name for both filename and internal name attribute
         content = re.sub(
@@ -87,12 +104,8 @@ def create_bundle(
         dest_layout = resources_path / dest_filename
         dest_layout.write_text(content, encoding="utf-8")
 
-        if is_plusplus:
-            layout_localization_infos.append((new_name, "++"))
-        elif is_plus:
-            layout_localization_infos.append((new_name, "+"))
-        else:
-            layout_localization_infos.append((new_name, ""))
+        # Store variant and whether it's ANSI for localization
+        layout_localization_infos.append((new_name, variant, is_ansi))
 
         # Copy logo file with matching base name
         icon_tag = ""
@@ -112,12 +125,23 @@ def create_bundle(
             )
 
         plist_key = f"KLInfo_{new_name}"
-        if is_plusplus:
+        # Build input source id and add .ansi suffix for ANSI variants
+        if is_plusplus and is_ansi:
+            input_source_id = (
+                f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus_plus.ansi"
+            )
+        elif is_plusplus:
             input_source_id = (
                 f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus_plus"
             )
+        elif is_plus and is_ansi:
+            input_source_id = (
+                f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus.ansi"
+            )
         elif is_plus:
             input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus"
+        elif is_ansi:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}.ansi"
         else:
             input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}"
 
@@ -176,7 +200,7 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
 
 
 def generate_localizations(
-    bundle_path: Path, version: str, layouts: list[tuple[str, str]]
+    bundle_path: Path, version: str, layouts: list[tuple[str, str, bool]]
 ):
     """
     Generate localized InfoPlist.strings files (en and fr).
@@ -191,13 +215,14 @@ def generate_localizations(
         strings_path = lproj_dir / "InfoPlist.strings"
 
         lines = []
-        for original_name, variant in layouts:
+        for original_name, variant, is_ansi in layouts:
+            ansi_suffix = " ANSI" if is_ansi else ""
             if variant == "++":
-                localized = f"Ergopti++ {version}"
+                localized = f"Ergopti++{ansi_suffix} {version}"
             elif variant == "+":
-                localized = f"Ergopti+ {version}"
+                localized = f"Ergopti+{ansi_suffix} {version}"
             else:
-                localized = f"Ergopti {version}"
+                localized = f"Ergopti{ansi_suffix} {version}"
             lines.append(f'"{original_name}" = "{localized}";')
 
         strings_content = "\n".join(lines) + "\n"

@@ -16,7 +16,7 @@ from .logger import logger
 LOGS_INDENTATION = "\t"
 
 
-def extract_name_from_file(content: str) -> str:
+def extract_name(content: str) -> str:
     """
     Extracts the name string (e.g. My Key Layout)
     from the name attribute in the given file.
@@ -198,7 +198,7 @@ def extract_actions_body(body: str) -> str:
     Returns the inner content of the actions element (not including the
     surrounding tags) or an empty string if not present.
     """
-    match = re.search(r'<actions>(.*?)</actions>', body, flags=re.DOTALL)
+    match = re.search(r"<actions>(.*?)</actions>", body, flags=re.DOTALL)
     if not match:
         return ""
     return match.group(1)
@@ -257,14 +257,17 @@ def get_symbol(keymap_body: str, macos_code: int, actions_body: str) -> str:
         return action_name
 
     # Find the action block and look for when state="none"
-    action_block_re = rf'<action[^>]*id="{re.escape(action_name)}"[^>]*>(.*?)</action>'
+    action_block_re = (
+        rf'<action[^>]*id="{re.escape(action_name)}"[^>]*>(.*?)</action>'
+    )
     action_block = re.search(action_block_re, actions_body, flags=re.DOTALL)
     if not action_block:
         return action_name
 
     action_inner = action_block.group(1)
     when_none = re.search(
-        r'<when[^>]*state="none"[^>]*output="([^"]+)"', action_inner,
+        r'<when[^>]*state="none"[^>]*output="([^"]+)"',
+        action_inner,
     )
     if when_none:
         return html.unescape(when_none.group(1))
