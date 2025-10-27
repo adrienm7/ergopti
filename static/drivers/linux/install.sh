@@ -7,7 +7,7 @@
 
 REPO_OWNER="adrienm7"
 REPO_NAME="ergopti"
-BRANCH="dev"
+BRANCH="main"
 TARGET_SUBPATH="static/drivers/linux"
 SELECTOR_SCRIPT_NAME="xkb_files_selector"
 
