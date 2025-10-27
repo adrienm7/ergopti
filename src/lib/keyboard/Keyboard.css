@@ -314,6 +314,7 @@ tap-hold {
 	display: inline-block;
 	font-size: calc(var(--key-text-size) * 0.65);
 	font-weight: 400;
+	margin-top: 0.25em;
 }
 
 output-tap {

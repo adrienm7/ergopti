@@ -3,5 +3,5 @@
 </script>
 
 <name-ergopti-plus>
-	<Ergopti /><span class="glow">+</span>
+	<Ergopti /><span class="glow plus">+</span>
 </name-ergopti-plus>

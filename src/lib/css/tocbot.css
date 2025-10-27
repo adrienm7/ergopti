@@ -42,6 +42,7 @@
 .toc-list li {
 	margin: 0;
 	margin-top: 1rem;
+	text-align: left;
 }
 
 .toc-list .toc-list li {

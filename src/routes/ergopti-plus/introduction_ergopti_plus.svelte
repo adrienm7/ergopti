@@ -77,20 +77,23 @@
 					Sur Windows, le programme <a class="link" href="https://www.autohotkey.com/">AutoHotkey</a
 					>
 					est utilisé afin de réaliser ces changements. Il donne une immense liberté et est l’implémentation
-					actuelle d’<ErgoptiPlus></ErgoptiPlus>.
+					la plus complète d’<ErgoptiPlus></ErgoptiPlus>.
 				</li>
 				<li>
 					Sur macOS,
 					<a class="link" href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a>
-					permettrait de réaliser une partie des fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>.
-					Celles pouvant être implémentées sont les remappages de touches, les tap-holds et la
-					création d’un layer de navigation. Cependant, ce logiciel ne gère pas les hotstrings
-					(remplacements de texte), ce qui ne permet pas d’utiliser la moitié des possibilités d’<ErgoptiPlus
-					></ErgoptiPlus> sur macOS : création de nouveaux roulements, touche <kbd>,</kbd> de
-					correction de <SFB></SFB>s, touche
-					<kbd>★</kbd> de répétition et d’expansion de texte, etc. Peut-être un programme complémentaire
-					pourrait se charger de cette partie, mais il n’y a pas de solution aussi simple et puissante
-					qu’AutoHotkey sur macOS.
+					et <a class="link" href="https://www.alfredapp.com/">Alfred</a> permettent de se
+					rapprocher de très près de toutes les fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>.
+				</li>
+				<li>
+					Sur Linux, les meilleurs outils sont actuellement <a
+						class="link"
+						href="https://github.com/jtroo/kanata/">Kanata</a
+					>
+					et
+					<a class="link" href="https://espanso.org/">Espanso</a>. Ce sont des programmes open
+					source et fonctionnant sur tous les OS, mais qui ne sont actuellement pas aussi bons que
+					leurs alternatives sur macOS, et encore moins qu’AutoHotkey sur Windows.
 				</li>
 				<li>
 					Il est aussi possible de programmer le firmware de son clavier (avec <a

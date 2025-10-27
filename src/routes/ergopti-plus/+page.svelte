@@ -12,8 +12,8 @@
 </script>
 
 <svelte:head>
-	<title>Ergopti +</title>
-	<meta name="description" content="Découvrez Ergopti +" />
+	<title>Ergopti+</title>
+	<meta name="description" content="Disposition Ergopti+" />
 </svelte:head>
 
 <Menu />

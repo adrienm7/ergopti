@@ -8,10 +8,10 @@
 
 <section>
 	<h2>Abréviations</h2>
-	<h3>Remplacement de texte avec <kbd>★</kbd></h3>
+	<h3>Remplacement de texte avec <kbd class="glow">★</kbd></h3>
 	<p>
-		Le comportement par défaut de la touche <kbd>★</kbd> est de répéter dernière touche tapée.
-		Cependant, dans le cas où une abréviation terminant par cette touche existe dans la liste
+		Le comportement par défaut de la touche <kbd class="glow">★</kbd> est de répéter dernière touche
+		tapée. Cependant, dans le cas où une abréviation terminant par cette touche existe dans la liste
 		d’abréviations, alors celle-ci sera renvoyée à la place. Ainsi,
 		<kbd>r★</kbd> envoie le raccourci <kbd-output>rien</kbd-output>, tandis que <kbd>ar★iver</kbd>
 		enverra <kbd-output>arriver</kbd-output>. De même, <kbd>av★</kbd> enverra
@@ -47,8 +47,8 @@
 	</p>
 	<p>
 		C’est une fonctionnalité tout à fait optionnelle, libre à vous de ne pas utiliser les
-		abréviations et de seulement utiliser la touche <kbd>★</kbd> afin de doubler la précédente lettre.
-		Cependant, bien utilisée, cette touche peut être encore plus puissante.
+		abréviations et de seulement utiliser la touche <kbd class="glow">★</kbd> afin de doubler la précédente
+		lettre. Cependant, bien utilisée, cette touche peut être encore plus puissante.
 	</p>
 
 	<h3>

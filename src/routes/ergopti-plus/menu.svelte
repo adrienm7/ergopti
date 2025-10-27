@@ -7,6 +7,10 @@
 <section>
 	<h2 class="first-h2">Menu de gestion des fonctionnalités</h2>
 
+	<p>
+		Sur Windows, la version AutoHotkey est extrêmement complète. Elle possède même désormais un menu
+		de gestion de chacune des fonctionnalités implémentées :
+	</p>
 	<enhanced:img
 		src="$lib/images/menu_ergopti_plus.jpg"
 		alt="Screenshot du menu du script Ergopti+"
