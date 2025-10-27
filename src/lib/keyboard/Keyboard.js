@@ -230,7 +230,7 @@ export class Keyboard {
 		}
 
 		// Make the ★ key glow
-		if (plus && layer === 'Visuel' && keyName === 'magique') {
+		if (plus && layer === 'Visuel' && keyName === 'j') {
 			key.innerHTML = '<span class="glow" style = "position:initial">★</span>';
 		}
 
