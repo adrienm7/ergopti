@@ -88,6 +88,13 @@
 			ultra-confortables.
 		</p>
 		<li>
+			<kbd>{'<@'}</kbd> ➜ <kbd-output>{'</'}</kbd-output> ;
+		</li>
+		<li>
+			<kbd>{'<%'}</kbd> ➜ <kbd-output>{'<='}</kbd-output> et <kbd>{'>%'}</kbd> ➜
+			<kbd-output>{'>='}</kbd-output> ;
+		</li>
+		<li>
 			<kbd>{'[)'}</kbd> ➜ <kbd-output>{'=""'}</kbd-output> ;
 		</li>
 		<p>
@@ -109,6 +116,9 @@
 		<li>
 			<kbd>+?</kbd> ➜ <kbd-output>{'->'}</kbd-output> et <kbd>?+</kbd> ➜
 			<kbd-output>{'<-'}</kbd-output> ;
+		</li>
+		<li>
+			<kbd>=+</kbd> ➜ <kbd-output> ➜ </kbd-output>.
 		</li>
 	</ul>
 </section>

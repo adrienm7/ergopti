@@ -8,21 +8,24 @@
 	<h2>Confort</h2>
 
 	<h3>
-		Touche <kbd>BackSpace</kbd> à la place de <kbd>"RCtrl"</kbd>
+		Touche <kbd>BackSpace</kbd> à la place de <kbd>"LAlt"</kbd>
 	</h3>
 	<p>
 		La touche <kbd>BackSpace</kbd> est l’une des touches les plus utilisées sur un clavier. En
 		effet, elle permet de corriger une erreur, ce qui est très fréquent lors de la frappe d’un
-		texte. Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée en haut à
-		droite du clavier. Par conséquent, il est logique de vouloir la placer sur un emplacement très
+		texte. Pourtant, sur les claviers standards, elle est extrêmement loin, étant placée tout en
+		haut à droite. Par conséquent, il est logique de vouloir la mettre sur un emplacement très
 		accessible. C’est pour cela que la touche <kbd>BackSpace</kbd> a été dupliquée sur la touche
-		<kbd>"RCtrl"</kbd> avec <ErgoptiPlus />.
+		<kbd>"LAlt"</kbd> avec <ErgoptiPlus />.
 	</p>
 	<p>
 		La touche <kbd-output>Delete</kbd-output> se trouve quant à elle sur la combinaison
-		<kbd>Shift</kbd> + <kbd>"RCtrl"</kbd>.
+		<kbd>Shift</kbd> + <kbd>"LAlt"</kbd>.
 	</p>
-	<p>Pour être encore plus rapide, deux raccourcis optionnels ont aussi été implémentés :</p>
+	<p>
+		Pour être encore plus confortable et rapide, deux raccourcis optionnels ont en outre été
+		implémentés :
+	</p>
 	<ul>
 		<li>
 			<kbd>AltGr</kbd> + <kbd>"LAlt"</kbd> ➜ <kbd-output>Ctrl</kbd-output> +
@@ -36,8 +39,8 @@
 
 	<h3>[QU] automatiques avant les voyelles</h3>
 	<p>
-		La touche <kbd>Q</kbd> est 99% du temps suivie de <kbd>U</kbd> si une voyelle vient ensuite. Par
-		conséquent, lors de la frappe de <kbd>Q</kbd> + <kbd>Voyelle</kbd>, un <kbd>U</kbd>
+		La touche <kbd>Q</kbd> est à 99% du temps suivie d’un <kbd>U</kbd> si une voyelle vient ensuite.
+		Par conséquent, lors de la frappe de <kbd>Q</kbd> + <kbd>Voyelle</kbd>, un <kbd>U</kbd>
 		s’intercale automatiquement entre les deux pour donner <kbd-output>Q</kbd-output> +
 		<kbd-output>U</kbd-output>
 		+ <kbd-output>Voyelle</kbd-output>.
@@ -68,11 +71,13 @@
 		<kbd>E</kbd> afin d’écrire <kbd-output>Ê</kbd-output>. C’est pour cela qu’une touche
 		<kbd>Ê</kbd>
 		a été placée sur l’auriculaire gauche afin d’éviter un appui sur deux touches pour cette lettre circonflexe
-		très commune.
+		très commune. Elle demeure une touche optionnelle, ce qui explique son emplacement sur la 105e touche,
+		qui n’existe pas sur les claviers ANSI. Ainsi, sur ce genre de claviers où cette touche n’existe
+		pas, on peut toujours écrire <kbd-output>ê</kbd-output> en utilisant la touche morte.
 	</p>
 	<p>
 		Toutefois, dans de rares cas, il est nécessaire d’écrire <kbd>Â</kbd>,
-		<kbd>Î</kbd>, <kbd>Ô</kbd> ou encore <kbd>Û</kbd>. C’est pour cela que <kbd>ÊA</kbd> va donner
+		<kbd>Î</kbd>, <kbd>Ô</kbd> ou encore <kbd>Û</kbd>. Ainsi, <kbd>ÊA</kbd> va donner
 		<kbd-output>Â</kbd-output>, <kbd>ÊI</kbd> va donner <kbd-output>Î</kbd-output>, etc. Cela permet
 		de ne plus du tout avoir à utiliser la touche morte <kbd class="morte">◌̂</kbd>, et donc bouger
 		encore moins les mains.
@@ -98,12 +103,12 @@
 	</h3>
 	<p>
 		Lorsqu’on écrit en français ou anglais, il faudrait idéalement utiliser l’apostrophe
-		typographique plutôt que l’apostrophe droite. C’est pour cela que <ErgoptiPlus /> va automatiquement
+		typographique plutôt que l’apostrophe droite. C’est pour cette raison qu’<ErgoptiPlus /> va automatiquement
 		l’utiliser à la place de l’apostrophe droite lors de l’écriture de texte. Cette apostrophe est d’ailleurs
 		plus jolie et présente l’avantage de ne pas avoir à être échappée en programmation si une chaîne
-		de caractères est écrite avec ce caractère à l’intérieur. Il n’y a pas à réfléchir, il suffit d’écrire
-		normalement et l’apostrophe typographique apparaîtra. Les faux positifs devraient être extrêmement
-		rares.
+		de caractères est écrite avec ce caractère à l’intérieur. Il n’y a pas besoin de réfléchir : il suffit
+		d’écrire normalement et l’apostrophe typographique apparaîtra automatiquement si c’est du texte qui
+		est écrit et non du code. Les faux positifs devraient être extrêmement rares.
 	</p>
 	<p>
 		Un autre raccourci a aussi été ajouté pour avoir la possibilité d’écrire <kbd-output
@@ -120,13 +125,16 @@
 		Utilisation de la touche <kbd>,</kbd> + <kbd>voyelle</kbd> en tant que <kbd>j</kbd>
 	</h3>
 	<p>
-		La touche <kbd>j</kbd> minuscule se fait remplacer par <kbd>★</kbd> avec <ErgoptiPlus
+		La touche <kbd>j</kbd> minuscule se fait remplacer par <kbd class="glow">★</kbd> avec <ErgoptiPlus
 		></ErgoptiPlus>. Cette nouvelle touche possède plusieurs fonctionnalités extrêmement utiles qui
 		seront détaillées par la suite. Toutefois, elle prend la place du <kbd>j</kbd> et il convient
 		donc de replacer ce caractère autre part. Il convient de noter que seul le caractère
 		<kbd-output>j</kbd-output>
-		change de place, la touche <kbd>J/★</kbd> reste une touche <kbd>J</kbd> dans tous les autres
-		cas, que ce soit pour les raccourcis avec <kbd>Ctrl</kbd> (<kbd-output>Ctrl</kbd-output> +
+		change de place, la touche <kbd class="glow">j/★</kbd> restant une touche <kbd>J</kbd> dans tous
+		les autres cas, que ce soit pour les raccourcis avec
+		<kbd>Ctrl</kbd>
+		(<kbd-output>Ctrl</kbd-output>
+		+
 		<kbd-output>J</kbd-output>), avec <kbd>Alt</kbd> (<kbd-output>Alt</kbd-output> +
 		<kbd-output>J</kbd-output>), ou simplement les caractères en <kbd>AltGr</kbd> (<kbd-output
 			>"</kbd-output
@@ -147,11 +155,12 @@
 		d’écrire par exemple <kbd>ja</kbd> et de supprimer la voyelle. Une autre possibilité est de
 		réaliser la suite de touches <kbd>,</kbd> + <kbd>à</kbd> qui donne la lettre
 		<kbd-output>j</kbd-output>. Dernière possibilité, <kbd-output>j</kbd-output> est aussi présente
-		nativement en <kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>J/★</kbd>. En fait, on pourrait même
-		toujours utiliser cet emplacement en <kbd>Shift</kbd> + <kbd>AltGr</kbd> sans utiliser l’astuce
-		de la touche <kbd>,</kbd>, mais utiliser cette dernière permet une frappe plus rapide et plus
-		fluide, car il suffit de taper sur <kbd>,</kbd> et non d’activer plusieurs modificateurs en même
-		temps.
+		nativement en <kbd>Shift</kbd> + <kbd>AltGr</kbd> +
+		<kbd class="glow">j/★</kbd>. En fait, on pourrait même toujours utiliser cet emplacement en
+		<kbd>Shift</kbd>
+		+ <kbd>AltGr</kbd> sans utiliser l’astuce de la touche <kbd>,</kbd>, mais utiliser cette
+		dernière permet une frappe plus rapide et plus fluide, car il suffit de taper sur <kbd>,</kbd> et
+		non d’activer plusieurs modificateurs en même temps.
 	</p>
 
 	<p class="text-bold">En résumé :</p>
@@ -165,16 +174,22 @@
 		<li><kbd>,ê</kbd> ➜ <kbd-output>ju</kbd-output> pour éviter un <SFB /> ;</li>
 		<li><kbd>,'</kbd> ➜ <kbd-output>j’</kbd-output> ;</li>
 		<li><kbd>,à</kbd> ➜ <kbd-output>j</kbd-output> ;</li>
-		<li><kbd>Shift</kbd> + <kbd>J/★</kbd> ➜ <kbd-output>J</kbd-output> ;</li>
-		<li><kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd>J/★</kbd> ➜ <kbd-output>j</kbd-output>.</li>
+		<li>
+			<kbd>Shift</kbd> + <kbd class="glow">j/★</kbd> ➜
+			<kbd-output>J</kbd-output> ;
+		</li>
+		<li>
+			<kbd>Shift</kbd> + <kbd>AltGr</kbd> + <kbd class="glow">j/★</kbd> ➜
+			<kbd-output>j</kbd-output>.
+		</li>
 	</ul>
 
 	<p>
 		L’avantage de ce choix en <kbd>,</kbd> est aussi que contrairement à une touche morte, il n’y a
 		pas besoin ici de frapper sur deux touches pour n’en donner qu’une seule. Nul besoin de taper
 		sur
-		<kbd class="morte">touche morte</kbd> + <kbd class="morte">j sur la touche morte</kbd> +
-		<kbd>voyelle</kbd>. Il suffit de faire <kbd>,</kbd> + <kbd>voyelle</kbd>. Ainsi, la frappe n’est
+		<kbd>touche morte</kbd> + <kbd>j sur la touche morte</kbd> +
+		<kbd>voyelle</kbd>, il suffit de faire <kbd>,</kbd> + <kbd>voyelle</kbd>. Ainsi, la frappe n’est
 		absolument pas ralentie, car on ne rajoute pas de touches supplémentaires à taper.
 	</p>
 

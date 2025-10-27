@@ -11,7 +11,7 @@
 
 	<h3>Tap-holds</h3>
 	<p>
-		Le tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et
+		Un tap-hold permet d’assigner deux fonctions à une même touche : une lors d’un bref appui, et
 		une lors de son maintien. C’est particulièrement adapté pour les touches modificatrices (<kbd
 			>Shift</kbd
 		>,
@@ -30,26 +30,27 @@
 	<ul>
 		<li>Tap hold en <kbd>AltGr</kbd> ➜ <kbd-output>Tab</kbd-output> sur le tap ;</li>
 		<li>
-			Tap hold en <kbd>Alt</kbd> ➜ <kbd-output>Shift</kbd-output> en hold et
-			<kbd-output>OneShotShift</kbd-output> en tap ;
-		</li>
-		<p>
-			Il est beaucoup plus judicieux de mettre <kbd>Shift</kbd> sous un pouce, afin d’éviter
-			d’utiliser un auriculaire qui est le doigt le plus faible. Cela évite également beaucoup de <SFB
-			></SFB>s.
-		</p>
-		<li>
 			Tap hold en <kbd>"CapsLock"</kbd> ➜ <kbd-output>Ctrl</kbd-output> sur le hold et
 			<kbd-output>Enter</kbd-output> sur le tap ;
 		</li>
 		<p>
 			La touche <kbd>Entrée</kbd> est très utilisée sur un clavier, elle l’est même plus que
-			certaines consonnes. Toutefois, elle est peu accessible sur un clavier standard, nécessitant
-			que l’auriculaire droit traverse 3 colonnes de lettres avant de l’atteindre. Par conséquent,
-			placer cette touche sur <kbd>"Alt"</kbd> la ramène à un endroit extrêmement accessible. Cela
-			supprime aussi beaucoup de <SFB />s. À noter que les raccourcis comme <kbd>Ctrl</kbd> +
+			certaines lettres. Toutefois, elle est peu accessible sur un clavier standard, nécessitant que
+			l’auriculaire droit traverse 3 colonnes de touches avant de l’atteindre. Par conséquent,
+			placer cette touche sur <kbd>"CapsLock"</kbd> la ramène à un endroit extrêmement accessible.
+			Cela supprime aussi beaucoup de <SFB />s. À noter que les raccourcis comme ou <kbd>Shift</kbd>
+			+
 			<kbd>Entrée</kbd>
 			par exemple sont également fonctionnels avec cette nouvelle touche <kbd>Entrée</kbd>.
+		</p>
+		<li>
+			Tap hold en <kbd>"RCtrl"</kbd> ➜ <kbd-output>Shift</kbd-output> sur le hold et
+			<kbd-output>One-Shot Shift</kbd-output> sur le tap ;
+		</li>
+		<p>
+			Il est beaucoup plus judicieux de mettre <kbd>Shift</kbd> sous un pouce, afin d’éviter
+			d’utiliser un auriculaire qui est le doigt le plus faible. Cela évite également beaucoup de <SFB
+			></SFB>s.
 		</p>
 		<li>
 			Tap hold en <kbd>"Tab"</kbd> ➜ <kbd-output>Alt</kbd-output> sur le hold et
@@ -64,7 +65,10 @@
 		</p>
 
 		<small-space></small-space>
-
+		<li>
+			Tap hold en <kbd>Alt</kbd> ➜ <kbd-output>Layer de navigation</kbd-output> en hold et
+			<kbd-output>BackSpace</kbd-output> en tap ;
+		</li>
 		<KeyboardBasis id="layer" />
 		<p>
 			Le <kbd>Layer</kbd> de navigation contient quant à lui les flèches directionnelles pour

@@ -219,7 +219,7 @@ export class Keyboard {
 
 		// Override the Space key content to also show the name of the layout
 		const plusSymbol = plus
-			? '<span class="glow" style = "position:relative; margin-left:0.1em">+</span>'
+			? '<span class="glow plus" style = "position:relative; margin-left:0.1em">+</span>'
 			: '';
 		if (type === 'iso' && layer === 'Visuel' && keyName === 'Space') {
 			if (plusSymbol) {

@@ -13,7 +13,7 @@ html,
 body {
 	color: white;
 	font-size: 100%;
-	font-size: clamp(14px, 0.3vw + 14px, 24px);
+	font-size: clamp(14px, 0.3vw + 14px, 18px);
 	scroll-behavior: smooth;
 }
 

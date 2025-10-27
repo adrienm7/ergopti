@@ -117,7 +117,7 @@
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title" style="margin-top:3px;">
-					Ergopti<span class="glow">+</span>
+					Ergopti<span class="glow plus">+</span>
 				</span>
 			</a>
 			<a

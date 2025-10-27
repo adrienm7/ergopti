@@ -33,6 +33,9 @@ name-ergopti-plus {
 .glow {
 	animation: glow 2s ease-in-out infinite alternate;
 	color: #fff;
+}
+
+.plus {
 	font-size: 1.2em;
 	font-weight: bold;
 	left: 0.03em;
@@ -40,7 +43,6 @@ name-ergopti-plus {
 	text-align: center;
 	top: 0.05em;
 }
-
 @-webkit-keyframes glow {
 	from {
 		text-shadow:
