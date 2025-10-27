@@ -1,6 +1,5 @@
 .toc-list {
 	font-size: 0.85rem;
-	line-height: 1.25em;
 	list-style-type: none;
 	margin: 0;
 	padding: 0;
@@ -40,6 +39,7 @@
 }
 
 .toc-list li {
+	line-height: 1.25em;
 	margin: 0;
 	margin-top: 1rem;
 	text-align: left;
