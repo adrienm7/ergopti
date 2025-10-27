@@ -12,12 +12,12 @@ button p {
 }
 
 .download-buttons {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5em;
-    align-content: center;
+	align-content: center;
+	align-items: center;
+	display: flex;
+	flex-direction: row;
+	gap: 0.5em;
+	justify-content: center;
 }
 
 .alt-button,
@@ -94,7 +94,7 @@ kbd-output.morte {
 		var(--key-opacity)
 	) !important;
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
-	font-family: sans-serif;
+	font-family: 'Open Sans'; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 	font-weight: normal;
 }
 

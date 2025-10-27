@@ -42,15 +42,48 @@
 <code>~/Library/Keyboard Layouts/</code>
 
 <p>
+	Pour naviguer rapidement vers ce chemin, il existe le raccourci <kbd>Cmd</kbd> + <kbd>Shift</kbd>
+	+ <kbd>G</kbd> dans le Finder. Cela ouvre directement l'emplacement spécifié.
+</p>
+
+<tiny-space></tiny-space>
+
+<p>
 	Après avoir placé le bundle dans le bon dossier, redémarrer la session (ou l’ordinateur) pour que
 	macOS prenne en compte la nouvelle disposition. Ensuite, aller dans <code
 		>Préférences Système</code
 	>
 	> <code>Clavier</code>
-	> <code>Méthodes de saisie</code> et ajouter la disposition <Ergopti></Ergopti>. Généralement, la
-	disposition se trouvera dans la section « Français », mais elle peut aussi parfois se trouver dans
-	« Autres ».
+	> <code>Méthodes de saisie</code> > <code>Modifier…</code> et ajouter une disposition en appuyant
+	sur <code>+</code> en bas à gauche. Généralement, la disposition se trouvera dans la section « Français »,
+	mais elle peut aussi parfois se trouver dans « Autres ».
 </p>
+<enhanced:img
+	src="$lib/images/macos_installation_1.jpg"
+	alt="Screenshot 1/4 des paramètres macOS pour changer sa disposition de clavier"
+/>
+<div style="margin-top:15px"></div>
+<enhanced:img
+	src="$lib/images/macos_installation_2.jpg"
+	alt="Screenshot 2/4 des paramètres macOS pour changer sa disposition de clavier"
+/>
+<div style="margin-top:15px"></div>
+<enhanced:img
+	src="$lib/images/macos_installation_3.jpg"
+	alt="Screenshot 3/4 des paramètres macOS pour changer sa disposition de clavier"
+/>
+<div style="margin-top:15px"></div>
+<enhanced:img
+	src="$lib/images/macos_installation_4.jpg"
+	alt="Screenshot 4/4 des paramètres macOS pour changer sa disposition de clavier"
+/>
+<div style="margin-top:15px"></div>
+<p>La disposition pourra ensuite être sélectionnée depuis la barre des tâches :</p>
+<enhanced:img
+	src="$lib/images/macos_language_bar.jpg"
+	alt="Screenshot de la sélection de clavier dans la barre des tâches"
+/>
+<div style="margin-top:15px"></div>
 
 <tiny-space></tiny-space>
 
@@ -135,6 +168,7 @@
 		avant d’être partagé. Ces tests sont à la fois manuels et automatisés par de nombreux tests unitaires
 		Python.
 	</li>
+	<enhanced:img src="$lib/images/macos_open_bundle.jpg" alt="Ouverture du bundle" />
 </ul>
 
 <h3>

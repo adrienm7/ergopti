@@ -30,7 +30,7 @@ def create_keylayout_ansi(content: str, variant_number: int):
         LOGS_INDENTATION,
     )
     content = swap_keys(content, 10, 50)  # Swap ê and $
-    content = swap_keys(content, 42, 44)  # Swap dead keys ¨ and ^
+    content = swap_keys(content, 42, 30)  # Swap dead keys ¨ and ^
 
     content = sort_keylayout(content)
     content = set_unique_keyboard_id(content, variant_number)
