@@ -9,7 +9,8 @@ keyboard {
 	--keyboard-width: calc(var(--main-width) * var(--keyboard-percentage));
 	--keyboard-padding: clamp(7px, calc(var(--keyboard-width) / 50), 50px);
 	--keyboard-border-radius: var(--keyboard-padding);
-	background-color: hsla(0, 0%, 65%, 0.05);
+	backdrop-filter: blur(600px);
+	background-color: rgba(60, 60, 60, 0.15);
 	border: 1px solid hsla(225, 100%, 8%, 0.8);
 	border-radius: var(--keyboard-border-radius);
 	box-shadow: rgba(255, 255, 255, 0.8) 0px 1px 4px;
@@ -220,13 +221,13 @@ keyboard-key[data-hand='right'][data-finger='auriculaire'] {
 keyboard-key {
 	--key-color-luminosity: 70%;
 	--key-color-saturation: 100%;
-	--key-opacity: 30%;
+	--key-opacity: 40%;
 }
 
 keyboard[data-color='no'] keyboard-key {
 	--key-color-hue: 190 !important;
 	--key-color-luminosity: 70%;
-	--key-opacity: 20%;
+	--key-opacity: 40%;
 }
 
 keyboard[data-color='azerty'] keyboard-key {
