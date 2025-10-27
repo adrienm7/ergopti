@@ -185,7 +185,7 @@
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href="/drivers/karabiner/karabiner.json" download>
+	<a href="/drivers/karabiner/karabiner.json" target="_blank">
 		<button
 			><i class="icon-karabiner" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
 			karabiner.json</button
@@ -257,7 +257,10 @@
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href="https://github.com/adrienm7/ergopti/tree/dev/static/drivers/alfred/snippets" download>
+	<a
+		href="https://github.com/adrienm7/ergopti/tree/main/static/drivers/alfred/snippets"
+		target="_blank"
+	>
 		<button
 			><i class="icon-alfred" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
 			Dossier de snippets Alfred</button

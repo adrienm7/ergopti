@@ -213,7 +213,7 @@
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href="https://github.com/adrienm7/ergopti/tree/dev/static/drivers/espanso" download>
+	<a href="https://github.com/adrienm7/ergopti/tree/main/static/drivers/espanso" target="_blank">
 		<button
 			><i class="icon-espanso" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
 			Dossier de snippets Espanso</button
