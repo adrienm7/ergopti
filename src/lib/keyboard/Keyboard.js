@@ -222,7 +222,11 @@ export class Keyboard {
 			? '<span class="glow" style = "position:relative; margin-left:0.1em">+</span>'
 			: '';
 		if (type === 'iso' && layer === 'Visuel' && keyName === 'Space') {
-			key.innerHTML = get(stores_infos['layoutData'])['name'] + plusSymbol;
+			if (plusSymbol) {
+				key.innerHTML = `<span style="position:relative; top:-0.05em;">${get(stores_infos['layoutData'])['name'] + plusSymbol}</span>`;
+			} else {
+				key.innerHTML = get(stores_infos['layoutData'])['name'];
+			}
 		}
 
 		// Make the ★ key glow
