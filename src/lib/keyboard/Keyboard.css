@@ -221,13 +221,13 @@ keyboard-key[data-hand='right'][data-finger='auriculaire'] {
 keyboard-key {
 	--key-color-luminosity: 70%;
 	--key-color-saturation: 100%;
-	--key-opacity: 40%;
+	--key-opacity: 35%;
 }
 
 keyboard[data-color='no'] keyboard-key {
 	--key-color-hue: 190 !important;
 	--key-color-luminosity: 70%;
-	--key-opacity: 40%;
+	--key-opacity: 35%;
 }
 
 keyboard[data-color='azerty'] keyboard-key {
