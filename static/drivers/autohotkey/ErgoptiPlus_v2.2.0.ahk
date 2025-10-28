@@ -4586,50 +4586,73 @@ if Features["Rolls"]["CT"].Enabled {
 ; ==============================================================================
 
 if Features["Autocorrection"]["TypographicApostrophe"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*", "c'", "c’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "d'", "d’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "j'", "j’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "l'", "l’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "m'", "m’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "n'", "n’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "s'", "s’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "t'", "t’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-
-    ; Create all hotstrings y'a → y’a, y'b → y’b, etc.
     ; This prevents false positives like writing ['key'] ➜ ['key’]
-    for Letter in StrSplit("abcdefghijklmnopqrstuvwxyz") {
+    for Letter in StrSplit("aàâæbcçdeéèêëfghiîïjklmnoôœpqrstuùûüvwxyÿz") {
+        ; ce est → c’est
+        ; de + une → d’une
+        ; je ai → j’ai
+        ; la + île → l’île
+        ; la + apostrophe → l’apostrophe
+        ; le + éléphant → l’éléphant
+        ; si + il → s’il
+        ; me + étire → m’étire
+        ; ne + oublie pas → n’oublie pas
+        ; se + appeler → s’appeler
+        ; te + aime → t’aime
+        ; jusque + à → jusqu’à
+        ; que + elle → qu’elle
+        ; il y a → y’a
+        for FrElisionLetter in StrSplit("cdjlmnstuy") {
+            CreateCaseSensitiveHotstrings(
+                "*", FrElisionLetter . "'" . Letter, FrElisionLetter . "’" . Letter,
+                Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+            )
+        }
+        
+        ; it would → it’d
+        ; he will → he’ll
+        ; we are → we’re
+        ; you have → you’ve
+        for engContractionLetter in StrSplit("dlrv") {
+            CreateCaseSensitiveHotstrings(
+                "*?", Letter . "'" . engContractionLetter, Letter . "’" . engContractionLetter,
+                Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+            )
+        }
+        
+        ; 9 o’clock
+        ; O’Neill
         CreateCaseSensitiveHotstrings(
-            "*?", "y'" . Letter, "y’" . Letter,
+            "*?", "o'" . Letter, "o’" . Letter, 
+            Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+        )
+        
+        ; Plural possessive in English, ex: keyboards’
+        CreateCaseSensitiveHotstrings(
+            "*?", "s' " . Letter,"s’ " . Letter,
+            Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+        )
+    }
+    
+    ; Singular possessive in English, ex: Adrien’s
+    ; 90’s
+    ; she is → she’s
+    for Letter in StrSplit("abcdefghijklmnopqrstuvwxyz0") {
+        CreateCaseSensitiveHotstrings(
+            "*?", Letter . "'s", Letter . "’s", 
             Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
         )
     }
 
+    ; cannot → can’t
     CreateCaseSensitiveHotstrings(
-        "*?", "n't", "n’t",  ; words negated with -n’t in English
+        "*?", "n't", "n’t", 
+        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+    )
+
+    ; I am → I’m
+    CreateCaseSensitiveHotstrings(
+        "*?", "I'm", "I’m",
         Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
     )
 }
