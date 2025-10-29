@@ -10,7 +10,7 @@
 	<h3>L’importance des compromis</h3>
 	<p>
 		Il est évident qu’il n’est pas possible de maximiser plusieurs paramètres simultanément. Bien
-		que largement supérieure à de nombreuses dispositions telles qu’AZERTY et même BÉPO, <Ergopti />
+		que largement supérieure sur de nombreux points à la plupart des dispositions, <Ergopti />
 		est donc malheureusement loin d’être parfaite. En effet, la création d’une disposition est une affaire
 		de compromis. Des choix ont dû être effectués pour maximiser chacun des critères d’évaluation sans
 		trop compromettre les autres.
@@ -18,10 +18,9 @@
 	<p>
 		Par exemple, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Cela peut sembler
 		étrange, tant son apparition est incontournable dans les textes (sauf dans le livre
-		<em>La Disparition</em> qui arrive l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est la
-		lettre la plus fréquente, et de loin. Elle est si fréquente que sur le
-		<a class="link" href="/#keyboard_frequences">clavier affichant les touches les plus utilisées</a
-		>
+		<em>La Disparition</em> qui réussit l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est de loin la
+		lettre la plus fréquente. Elle est tellement incontournable que sur le
+		<a class="link" href="/#keyboard_frequences">clavier affichant la fréquence des touches</a>
 		de la page d’accueil, une transformation mathématique a été nécessaire pour que les fréquences relatives
 		aux autres touches soient visibles et comparables (passage au logarithme). En effet, si l’on affichait
 		les fréquences relatives telles quelles, le <kbd>E</kbd> serait tellement plus fréquent qu’il écraserait
@@ -31,13 +30,13 @@
 		Pourtant, cette lettre n’a pas été placée sur l’index, comme le fait pourtant BÉPO. La raison
 		principale est que la mettre ailleurs permet de sensiblement de réduire les <SFB />s. En effet,
 		si le <kbd>E</kbd> avait été sur l’index, alors les 6 touches tapées par ce doigt auraient
-		possiblement générées des <SFB />s avec le <kbd>E</kbd>. <kbd>E</kbd> s’associe avec quasiment
-		toutes les lettres, donc ce serait une très mauvaise idée. Au contraire, la voyelle <kbd>U</kbd>
+		possiblement généré des <SFB />s avec le <kbd>E</kbd>. <kbd>E</kbd> s’associe avec quasiment
+		toutes les lettres, par conséquent ce serait une très mauvaise idée. Au contraire, la voyelle <kbd>U</kbd>
 		ne s’associe pas avec beaucoup de lettres, ce qui la rend beaucoup plus pertinente à cet emplacement.
-		D’autant que ce nouvel arrangement des voyelles permet alors de très bons roulements.
+		D’autant que ce nouvel arrangement des voyelles permet alors de très bons roulements. En outre, placer la lettre <kbd>E</kbd> sur l’index avec 5 autres lettres risque aussi de surcharger celui-ci. Il vaut mieux répartir la charge avec le majeur.
 	</p>
 	<p>
-		En outre, parfois tous les emplacements sont mauvais pour une touche, et il faut choisir le
+		Pour finir, parfois tous les emplacements sont mauvais pour une touche. Il faut alors choisir le
 		moins pire. Par conséquent, <Ergopti /> a évidemment des défauts, dont les principaux sont recensés
 		ici.
 	</p>
@@ -70,18 +69,18 @@
 			Certains pourront aussi critiquer le fait que la touche <kbd>J</kbd> soit trop bien située,
 			étant sur un excellent emplacement sur l’index gauche. En effet, cette lettre a l’une des
 			fréquences les plus faibles de toutes les lettres, que ce soit en français et en anglais. Si
-			cette lettre à été placée ici en <Ergopti></Ergopti>, c’est en vue de l’utilisation d’<ErgoptiPlus
-			></ErgoptiPlus>, qui a été pensée dès le début comme une extension de la disposition. Ainsi,
+			elle a été placée ici en <Ergopti></Ergopti>, c’est en vue de l’utilisation d’<ErgoptiPlus
+			></ErgoptiPlus>, pensée dès le début comme une extension de la disposition. Ainsi,
 			ce choix de placement de la touche <kbd>J</kbd> est justifié par le fait que cela permet de
 			facilement ajouter de nouvelles fonctionnalités à la disposition sans avoir à créer une toute
 			nouvelle disposition pour tirer parti de ces nouvelles fonctionnalités sans que cela n’ait
-			d’impact négatif. Si la touche magique <kbd>★</kbd> est à cet emplacement, c’est aussi parce
+			d’impact négatif. Si la touche magique <kbd class = "glow">★</kbd> est à cet emplacement, c’est aussi parce
 			que c’est sur la colonne du <kbd>U</kbd>, pour éviter le maximum de <SFB></SFB>s lors de la
-			conversion de cette touche en touche de répétition.
+			conversion de cette touche en touche de répétition. En effet, les doubles consonnes sont très peu suivies d’un <kbd>U</kbd>.
 		</li>
 	</ul>
 
-	<h3>Non compatible avec les claviers compacts</h3>
+	<h3>Non compatible avec les claviers très compacts</h3>
 	<p>
 		Certains claviers ont moins de touches, par exemple en n’ayant que 6 colonnes, voire seulement
 		5, par main. <Ergopti></Ergopti> a été conçue pour exploiter toutes les touches d’un clavier standard,
@@ -103,7 +102,7 @@
 		il y a plus de frappes pour écrire un mot, car pour écrire une lettre accentuée, il faut d’abord
 		appuyer sur la touche morte, puis sur la lettre.
 	</p>
-	<p class="encadre">
+	<!-- <p class="encadre">
 		<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
 		<a class="link" href="/benchmarks">page de benchmarks</a>
 		ainsi que sur la <a class="link" href="/utilisation">page de téléchargements</a>, par
@@ -112,13 +111,13 @@
 		<kbd>★</kbd>. Cependant, les gains apportés par cette version 1DFH sont faibles et il est donc
 		recommandé de ne pas l’utiliser, sauf si vous avez un clavier compact et n’avez pas d’autre
 		choix.
-	</p>
+	</p> -->
 
 	<h3>Quelques <SFB />s restants</h3>
 	<ul>
 		<li>
 			<kbd>CT</kbd> engendre beaucoup de <SFB />s, mais un <SFB /> avec le <kbd>C</kbd> est de toute
-			manière inévitable avec l’une des 4 touches de la homerow droite. Cette combinaison est l’une
+			manière inévitable avec l’une des 4 consonne de la <em>homerow</em> droite. Cette combinaison est l’une
 			des moins pires : en fréquence d’apparition,
 			<kbd-output>NC</kbd-output>
 			> <kbd-output>CR</kbd-output> >
