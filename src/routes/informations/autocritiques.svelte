@@ -18,9 +18,9 @@
 	<p>
 		Par exemple, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Cela peut sembler
 		étrange, tant son apparition est incontournable dans les textes (sauf dans le livre
-		<em>La Disparition</em> qui réussit l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est de loin la
-		lettre la plus fréquente. Elle est tellement incontournable que sur le
-		<a class="link" href="/#keyboard_frequences">clavier affichant la fréquence des touches</a>
+		<em>La Disparition</em> qui réussit l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est de
+		loin la lettre la plus fréquente. Elle est tellement incontournable que sur le
+		<a href="/#keyboard_frequences" class="link">clavier affichant la fréquence des touches</a>
 		de la page d’accueil, une transformation mathématique a été nécessaire pour que les fréquences relatives
 		aux autres touches soient visibles et comparables (passage au logarithme). En effet, si l’on affichait
 		les fréquences relatives telles quelles, le <kbd>E</kbd> serait tellement plus fréquent qu’il écraserait
@@ -31,9 +31,12 @@
 		principale est que la mettre ailleurs permet de sensiblement de réduire les <SFB />s. En effet,
 		si le <kbd>E</kbd> avait été sur l’index, alors les 6 touches tapées par ce doigt auraient
 		possiblement généré des <SFB />s avec le <kbd>E</kbd>. <kbd>E</kbd> s’associe avec quasiment
-		toutes les lettres, par conséquent ce serait une très mauvaise idée. Au contraire, la voyelle <kbd>U</kbd>
+		toutes les lettres, par conséquent ce serait une très mauvaise idée. Au contraire, la voyelle
+		<kbd>U</kbd>
 		ne s’associe pas avec beaucoup de lettres, ce qui la rend beaucoup plus pertinente à cet emplacement.
-		D’autant que ce nouvel arrangement des voyelles permet alors de très bons roulements. En outre, placer la lettre <kbd>E</kbd> sur l’index avec 5 autres lettres risque aussi de surcharger celui-ci. Il vaut mieux répartir la charge avec le majeur.
+		D’autant que ce nouvel arrangement des voyelles permet alors de très bons roulements. En outre, placer
+		la lettre <kbd>E</kbd> sur l’index avec 5 autres lettres risque aussi de surcharger celui-ci. Il
+		vaut mieux répartir la charge avec le majeur.
 	</p>
 	<p>
 		Pour finir, parfois tous les emplacements sont mauvais pour une touche. Il faut alors choisir le
@@ -70,13 +73,14 @@
 			étant sur un excellent emplacement sur l’index gauche. En effet, cette lettre a l’une des
 			fréquences les plus faibles de toutes les lettres, que ce soit en français et en anglais. Si
 			elle a été placée ici en <Ergopti></Ergopti>, c’est en vue de l’utilisation d’<ErgoptiPlus
-			></ErgoptiPlus>, pensée dès le début comme une extension de la disposition. Ainsi,
-			ce choix de placement de la touche <kbd>J</kbd> est justifié par le fait que cela permet de
-			facilement ajouter de nouvelles fonctionnalités à la disposition sans avoir à créer une toute
-			nouvelle disposition pour tirer parti de ces nouvelles fonctionnalités sans que cela n’ait
-			d’impact négatif. Si la touche magique <kbd class = "glow">★</kbd> est à cet emplacement, c’est aussi parce
-			que c’est sur la colonne du <kbd>U</kbd>, pour éviter le maximum de <SFB></SFB>s lors de la
-			conversion de cette touche en touche de répétition. En effet, les doubles consonnes sont très peu suivies d’un <kbd>U</kbd>.
+			></ErgoptiPlus>, pensée dès le début comme une extension de la disposition. Ainsi, ce choix de
+			placement de la touche <kbd>J</kbd> est justifié par le fait que cela permet de facilement
+			ajouter de nouvelles fonctionnalités à la disposition sans avoir à créer une toute nouvelle
+			disposition pour tirer parti de ces nouvelles fonctionnalités sans que cela n’ait d’impact
+			négatif. Si la touche magique <kbd class="glow">★</kbd> est à cet emplacement, c’est aussi
+			parce que c’est sur la colonne du <kbd>U</kbd>, pour éviter le maximum de <SFB></SFB>s lors de
+			la conversion de cette touche en touche de répétition. En effet, les doubles consonnes sont
+			très peu suivies d’un <kbd>U</kbd>.
 		</li>
 	</ul>
 
@@ -96,16 +100,15 @@
 		Il n’en demeure pas moins qu’<Ergopti></Ergopti> n’est pas 1DFH (1u Distance From Home). Les lettres
 		accentuées du français étant en accès direct avec <Ergopti></Ergopti>, il est impossible de
 		réaliser une disposition 1DFH, car il y a trop de touches à placer par rapport à l’espace
-		disponible. La disposition
-		<a class="link" href="https://ergol.org">Ergo-L</a> est quant à elle une disposition 1DFH, mais au
-		prix d’une touche morte permettant de réaliser les accents. Cela signifie que dans ce genre de dispositions,
-		il y a plus de frappes pour écrire un mot, car pour écrire une lettre accentuée, il faut d’abord
-		appuyer sur la touche morte, puis sur la lettre.
+		disponible. La disposition <a href="https://ergol.org" target="_blank" class="link">Ergo‑L</a> est
+		quant à elle une disposition 1DFH, mais au prix d’une touche morte permettant de réaliser les accents.
+		Cela signifie que dans ce genre de dispositions, il y a plus de frappes pour écrire un mot, car pour
+		écrire une lettre accentuée, il faut d’abord appuyer sur la touche morte, puis sur la lettre.
 	</p>
 	<!-- <p class="encadre">
 		<b>Note :</b> Une version 1DFH d’<Ergopti></Ergopti> a été développée. Elle est disponible sur la
-		<a class="link" href="/benchmarks">page de benchmarks</a>
-		ainsi que sur la <a class="link" href="/utilisation">page de téléchargements</a>, par
+		<a href="/benchmarks" class="link">page de benchmarks</a>
+		ainsi que sur la <a href="/utilisation" class="link">page de téléchargements</a>, par
 		installation via Kalamine. Elle utilise le fait qu’<Ergopti></Ergopti> ait été conçue de base pour
 		utiliser de nouvelles fonctionnalités grâce à l’emplacement réservé à la touche magique
 		<kbd>★</kbd>. Cependant, les gains apportés par cette version 1DFH sont faibles et il est donc
@@ -117,8 +120,8 @@
 	<ul>
 		<li>
 			<kbd>CT</kbd> engendre beaucoup de <SFB />s, mais un <SFB /> avec le <kbd>C</kbd> est de toute
-			manière inévitable avec l’une des 4 consonne de la <em>homerow</em> droite. Cette combinaison est l’une
-			des moins pires : en fréquence d’apparition,
+			manière inévitable avec l’une des 4 consonne de la <em>homerow</em> droite. Cette combinaison
+			est l’une des moins pires : en fréquence d’apparition,
 			<kbd-output>NC</kbd-output>
 			> <kbd-output>CR</kbd-output> >
 			<kbd-output>CT</kbd-output> > <kbd-output>SC</kbd-output>.

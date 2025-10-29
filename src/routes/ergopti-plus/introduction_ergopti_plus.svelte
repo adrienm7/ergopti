@@ -74,36 +74,43 @@
 			<strong>outils de programmation de clavier :</strong>
 			<ul>
 				<li>
-					Sur Windows, le programme <a class="link" href="https://www.autohotkey.com/">AutoHotkey</a
+					Sur Windows, le programme <a
+						class="link"
+						href="https://www.autohotkey.com/"
+						target="_blank">AutoHotkey</a
 					>
 					est utilisé afin de réaliser ces changements. Il donne une immense liberté et est l’implémentation
 					la plus complète d’<ErgoptiPlus></ErgoptiPlus>.
 				</li>
 				<li>
 					Sur macOS,
-					<a class="link" href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a>
-					et <a class="link" href="https://www.alfredapp.com/">Alfred</a> permettent de se
-					rapprocher de très près de toutes les fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>.
+					<a href="https://karabiner-elements.pqrs.org/" target="_blank" class="link"
+						>Karabiner Elements</a
+					>
+					et <a href="https://www.alfredapp.com/" target="_blank" class="link">Alfred</a> permettent
+					de se rapprocher de très près de toutes les fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>.
 				</li>
 				<li>
 					Sur Linux, les meilleurs outils sont actuellement <a
 						class="link"
-						href="https://github.com/jtroo/kanata/">Kanata</a
+						href="https://github.com/jtroo/kanata/"
+						target="_blank">Kanata</a
 					>
 					et
-					<a class="link" href="https://espanso.org/">Espanso</a>. Ce sont des programmes open
-					source et fonctionnant sur tous les OS, mais qui ne sont actuellement pas aussi bons que
-					leurs alternatives sur macOS, et encore moins qu’AutoHotkey sur Windows.
+					<a href="https://espanso.org/" target="_blank" class="link">Espanso</a>. Ce sont des
+					programmes open source et fonctionnant sur tous les OS, mais qui ne sont actuellement pas
+					aussi bons que leurs alternatives sur macOS, et encore moins qu’AutoHotkey sur Windows.
 				</li>
 				<li>
 					Il est aussi possible de programmer le firmware de son clavier (avec <a
 						class="link"
-						href="https://qmk.fm/">QMK</a
+						href="https://qmk.fm/"
+						target="_blank">QMK</a
 					>
-					ou <a class="link" href="https://zmk.dev/">ZMK</a>) pour bénéficier de ce genre de
-					fonctionnalités quelle que soit la plateforme (Windows, Mac, Linux, etc.). Cependant, cela
-					nécessite beaucoup de travail et là encore toutes les possibilités d’AutoHotkey ne seront
-					pas disponibles.
+					ou <a href="https://zmk.dev/" target="_blank" class="link">ZMK</a>) pour bénéficier de ce
+					genre de fonctionnalités quelle que soit la plateforme (Windows, Mac, Linux, etc.).
+					Cependant, cela nécessite beaucoup de travail et là encore toutes les possibilités
+					d’AutoHotkey ne seront pas disponibles.
 				</li>
 			</ul>
 		</div>

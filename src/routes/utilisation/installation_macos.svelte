@@ -193,7 +193,7 @@
 	</a>
 </div>
 <p>
-	<a class="link" href="https://karabiner-elements.pqrs.org/">Karabiner-Elements</a> est un logiciel
+	<a href="https://karabiner-elements.pqrs.org/" class="link">Karabiner-Elements</a> est un logiciel
 	open source permettant de remapper les touches sur macOS. Il est particulièrement utile avec la
 	disposition <ErgoptiPlus></ErgoptiPlus> pour ajouter des tap-holds, définir des roulements personnalisés,
 	etc. Voici ce qui est inclus dans le fichier de configuration fourni :
@@ -269,9 +269,10 @@
 </div>
 
 <p>
-	<a class="link" href="https://www.alfredapp.com/">Alfred</a> est un lanceur d’applications et un
-	gestionnaire de snippets pour macOS. Il est possible d’y définir des snippets de texte qui seront
-	insérés lorsqu’on tape une abréviation. C’est grâce à ce logiciel que la touche <kbd>★</kbd>
+	<a href="https://www.alfredapp.com/" target="_blank" class="link">Alfred</a> est un lanceur
+	d’applications et un gestionnaire de snippets pour macOS. Il est possible d’y définir des snippets
+	de texte qui seront insérés lorsqu’on tape une abréviation. C’est grâce à ce logiciel que la
+	touche <kbd>★</kbd>
 	d’<ErgoptiPlus></ErgoptiPlus>
 	peut être utilisée comme touche de répétition et pour insérer des snippets, des caractères spéciaux,
 	etc.
