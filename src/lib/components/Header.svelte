@@ -244,6 +244,7 @@
 
 	#ergopti-header #ergopti-title {
 		margin-left: calc(0.125 * var(--header-height));
+		margin-top: 1px; /* Looks better as the (i) takes vertical space */
 	}
 
 	#ergopti-header #ergopti-subtitle {
