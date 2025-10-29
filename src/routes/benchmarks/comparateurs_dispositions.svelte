@@ -44,7 +44,8 @@
 	<p>
 		Pour notamment les utiliser sur le site <a
 			class="link"
-			href="https://klanext.keyboard-design.com/">https://klanext.keyboard-design.com/</a
+			href="https://klanext.keyboard-design.com/"
+			target="_blank">https://klanext.keyboard-design.com/</a
 		> et ses dérivés.
 	</p>
 	<tiny-space></tiny-space>
@@ -79,7 +80,7 @@
 		>
 	</div>
 
-	<h3>Ergo-L</h3>
+	<h3>Ergo‑L</h3>
 	<div>
 		<div>
 			<select bind:value={variante_kalamine} style="height: 2rem">
@@ -88,7 +89,7 @@
 			</select>
 		</div>
 		<tiny-space></tiny-space>
-		<span>Version pour l’analyseur Ergo-L :&nbsp;</span><a
+		<span>Version pour l’analyseur Ergo‑L :&nbsp;</span><a
 			href="/drivers/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
 			download
 			><button
@@ -96,8 +97,8 @@
 			></a
 		>
 		<p>
-			À noter que sur <a class="link" href="https://github.com/Nuclear-Squid/ergol"
-				>l’analyseur Ergo-L</a
+			À noter que sur <a href="https://github.com/Nuclear-Squid/ergol" target="_blank" class="link"
+				>l’analyseur Ergo‑L</a
 			>, les touches assignées à chaque doigt diffèrent. Par exemple, la touche <kbd>À</kbd>
 			est assignée à l’annulaire et non au majeur. Cela entraîne un <SFB />, car la touche
 			<kbd>J</kbd>
@@ -108,7 +109,7 @@
 			sous le <kbd>A</kbd> au lieu de sous le <kbd>U</kbd>.
 		</p>
 		<p>
-			En résumé, l’analyse Ergo-L ne sera pas tout à fait avec la vraie disposition, ceci à cause du
+			En résumé, l’analyse Ergo‑L ne sera pas tout à fait avec la vraie disposition, ceci à cause du
 			déplacement du <kbd>K</kbd>. Toutefois, les résultats seront quand même très similaires,
 			peut-être avec un tout petit plus de <SFB></SFB>s sur le <kbd>A</kbd> que dans la réalité, car
 			il y a plus de

@@ -64,7 +64,7 @@
 		</a>
 		<div id="ergopti-title">
 			<strong class="no-gradient text-white">
-				<a href="/">
+				<a href="/" aria-label="Accéder à la page d’accueil">
 					<span class="min-width-300">Disposition </span>
 					<span class="min-width-350">clavier </span>
 				</a>
@@ -165,11 +165,11 @@
 			></div>
 			<div style="height:70px"></div>
 			<div class="links">
-				<a href="https://github.com/adrienm7/ergopti">
+				<a href="https://github.com/adrienm7/ergopti" target="_blank">
 					Repo GitHub <i class="icon-github"></i>
 				</a>
 				<span> — </span>
-				<a href={discordLink} style="position:relative; bottom:-0.1em;">
+				<a href={discordLink} target="_blank" style="position:relative; bottom:-0.1em;">
 					Serveur Discord
 					<i class="icon-discord"></i>
 				</a>

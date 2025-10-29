@@ -71,7 +71,9 @@
 	</div>
 	<p class="encart-introduction">
 		L’intégralité du code de la disposition et de ce site est disponible sous licence MIT sur
-		<a class="link nowrap" href="https://github.com/adrienm7/ergopti">le GitHub du projet</a>.
+		<a href="https://github.com/adrienm7/ergopti" target="_blank" class="link nowrap"
+			>le GitHub du projet</a
+		>.
 	</p>
 
 	<tiny-space></tiny-space>

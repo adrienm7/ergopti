@@ -190,9 +190,9 @@
 </div>
 
 <p>
-	<a class="link" href="https://github.com/jtroo/kanata">Kanata</a> est un outil de remappage de clavier
-	open source fonctionnant sur tous les systèmes d’exploitation majeurs (Linux, macOS et Windows). Il
-	permet de redéfinir le comportement des touches du clavier à l’échelle du système.
+	<a href="https://github.com/jtroo/kanata" target="_blank" class="link">Kanata</a> est un outil de remappage
+	de clavier open source fonctionnant sur tous les systèmes d’exploitation majeurs (Linux, macOS et Windows).
+	Il permet de redéfinir le comportement des touches du clavier à l’échelle du système.
 </p>
 <p>Voici les fonctionnalités implémentées dans le fichier Kanata :</p>
 <ul>
@@ -222,10 +222,10 @@
 </div>
 
 <p>
-	<a class="link" href="https://espanso.org/">Espanso</a> est un gestionnaire de snippets open source
-	pour Linux, macOS et Windows. Il permet d’utiliser des snippets de texte dans n’importe quelle application.
-	Cela semblerait donc être la solution parfaite, fonctionnant sur tous les systèmes d’exploitation et
-	étant open source. Cependant, Espanso ne fonctionne pas aussi bien qu’Alfred sur macOS, notamment en
-	termes de rapidité d’insertion des snippets. Néanmoins, c’est actuellement la meilleure solution disponible
-	pour Linux.
+	<a href="https://espanso.org/" target="_blank" class="link">Espanso</a> est un gestionnaire de snippets
+	open source pour Linux, macOS et Windows. Il permet d’utiliser des snippets de texte dans n’importe
+	quelle application. Cela semblerait donc être la solution parfaite, fonctionnant sur tous les systèmes
+	d’exploitation et étant open source. Cependant, Espanso ne fonctionne pas aussi bien qu’Alfred sur
+	macOS, notamment en termes de rapidité d’insertion des snippets. Néanmoins, c’est actuellement la meilleure
+	solution disponible pour Linux.
 </p>

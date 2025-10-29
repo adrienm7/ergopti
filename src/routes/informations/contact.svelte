@@ -13,11 +13,12 @@
 		</p>
 		<p>
 			Vous pouvez créer une nouvelle <em>Issue</em> sur
-			<a class="link" href="https://github.com/adrienm7/ergopti">la page GitHub du projet</a> si vous
-			avez une question ou un problème, notamment pour l’installation.
+			<a href="https://github.com/adrienm7/ergopti" target="_blank" class="link"
+				>la page GitHub du projet</a
+			> si vous avez une question ou un problème, notamment pour l’installation.
 		</p>
 		<p class="margin0">
-			Il est aussi possible de rejoindre le <a class="link" href={discordLink}
+			Il est aussi possible de rejoindre le <a href={discordLink} class="link"
 				>serveur Discord BÉPO | Ergodis</a
 			>
 			où <Ergopti></Ergopti> dispose d’un canal dédié, simplifiant les échanges.

@@ -22,8 +22,10 @@
 	<i class="icon-windows purple" style="vertical-align:-0.05em"></i> Installation Windows
 </h2>
 <p>
-	Le pilote ci-dessous a été réalisé à l’aide de <a class="link" href="https://www.kbdedit.com/"
-		>KbdEdit</a
+	Le pilote ci-dessous a été réalisé à l’aide de <a
+		class="link"
+		href="https://www.kbdedit.com/"
+		target="_blank">KbdEdit</a
 	>. C’est un logiciel très complet qui permet de modifier des dispositions de clavier sur Windows.
 	Il est en mesure de créer des pilotes pour Windows, et depuis peu pour Mac. Seul Linux n’est pas
 	supporté.
@@ -117,7 +119,7 @@
 	En résumé, le mieux est d’utiliser les deux versions en parallèle : le pilote KbdEdit pour avoir
 	<Ergopti></Ergopti> partout, et le script AutoHotkey pour bénéficier des fonctionnalités avancées.
 	Ce script corrige d’ailleurs quelques limitations du pilote KbdEdit, cf. la section
-	<a class="link" href="#windows-solutions">Résolution de problèmes connus</a>.
+	<a href="#windows-solutions" class="link">Résolution de problèmes connus</a>.
 </p>
 
 <small-space></small-space>
@@ -140,12 +142,12 @@
 {/if}
 <p>
 	Il est également conseillé (mais c’est optionnel) de télécharger les 2 fichiers suivants : <a
-		class="link"
 		href="/drivers/autohotkey/ErgoptiPlus_Icon.ico"
-		download>ErgoptiPlus_Icon.ico</a
+		download
+		class="link">ErgoptiPlus_Icon.ico</a
 	>
 	ainsi que
-	<a class="link" href="/drivers/autohotkey/ErgoptiPlus_Icon_Disabled.ico" download
+	<a href="/drivers/autohotkey/ErgoptiPlus_Icon_Disabled.ico" download class="link"
 		>ErgoptiPlus_Icon_Disabled.ico</a
 	>. Ils sont à placer dans le même dossier que celui du script <em>.ahk</em> et permettent d’en modifier
 	l’icône dans la barre des tâches.
@@ -155,7 +157,7 @@
 
 <p>
 	Afin que le code source <em>ErgoptiPlus.ahk</em> fonctionne, il faut auparavant installer
-	<a class="link" href="https://www.autohotkey.com/">AutoHotkey v2</a>. L’installation pour
+	<a href="https://www.autohotkey.com/" class="link">AutoHotkey v2</a>. L’installation pour
 	l’utilisateur actuel ne nécessite pas de droits d’administrateur. Une fois cela fait, il suffit de
 	double-cliquer sur le fichier <em>.ahk</em> pour l’exécuter avec AutoHotkey.
 </p>
@@ -230,11 +232,11 @@
 		➜ Pour résoudre ce genre de problèmes, il faut donc dans un premier temps fermer toutes ses applications
 		sauf AutoHotkey pour vérifier si le problème persiste. S’il persiste, c’est peut-être un problème
 		affectant tous les utilisateurs de la version AutoHotkey et vous êtes invité à le signaler sur
-		<a class="link" href="https://github.com/adrienm7/ergopti" target="_blank"
+		<a href="https://github.com/adrienm7/ergopti" target="_blank" class="link"
 			>le repo GitHub <i class="icon-github"></i></a
 		>
 		ou sur
-		<a class="link" href={discordLink} target="_blank">le Discord <i class="icon-discord"></i></a>.
+		<a href={discordLink} target="_blank" class="link">le Discord <i class="icon-discord"></i></a>.
 		Le script AutoHotkey étant cependant utilisé intensivement par plusieurs utilisateurs, la
 		plupart des problèmes sont déjà résolus et il est plus probable qu’il provienne d’un conflit
 		avec une application. Cela peut notamment se produire si vous utilisez un autre logiciel de

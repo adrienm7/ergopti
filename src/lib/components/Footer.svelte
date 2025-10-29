@@ -7,11 +7,12 @@
 <footer>
 	<p>
 		Disposition <Ergopti></Ergopti> —
-		<a href="https://github.com/adrienm7/ergopti" class="text-white"
+		<a href="https://github.com/adrienm7/ergopti" target="_blank" class="text-white"
 			>GitHub <i class="icon-github"></i></a
 		>
 		|
-		<a href={discordLink} class="text-white">Discord <i class="icon-discord"></i></a>
+		<a href={discordLink} target="_blank" class="text-white">Discord <i class="icon-discord"></i></a
+		>
 	</p>
 </footer>
 

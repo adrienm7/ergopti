@@ -9,9 +9,9 @@
 	<p>
 		La genèse de la disposition <Ergopti></Ergopti> remonte à début 2022, suite à la découverte de la
 		disposition
-		<a class="link" href="https://optimot.fr/">Optimot</a>. À ce moment-là, j’étais un utilisateur
-		du
-		<a class="link" href="https://bepo.fr/">BÉPO</a>
+		<a href="https://optimot.fr/" target="_blank" class="link">Optimot</a>. À ce moment-là, j’étais
+		un utilisateur du
+		<a href="https://bepo.fr/" target="_blank" class="link">BÉPO</a>
 		depuis déjà de nombreuses années. Les améliorations d’Optimot par rapport au BÉPO sont significatives,
 		avec notamment une forte diminution des bigrammes à un doigt (<SFB />s) et un meilleur placement
 		des lettres pour l’anglais. Cependant, l'idée d'apprendre Optimot, pour peut-être découvrir par
@@ -32,17 +32,19 @@
 
 	<p>
 		Les premières versions de ce projet, baptisées <strong
-			><a class="link" href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux">Optim7</a></strong
+			><a href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux" target="_blank" class="link"
+				>Optim7</a
+			></strong
 		>, étaient des dérivés directs d’Optimot. L'objectif initial était d’améliorer les scores sur
 		les analyseurs de disposition et de corriger des choix qui ne me convenaient pas. Par exemple,
-		je voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot, son créateur préférant
-		y mettre les symboles.
+		je voulais les chiffres en accès direct, ce qui n’est pas le cas en Optimot, son créateur
+		préférant y mettre les symboles.
 	</p>
 	<p>
 		Rapidement, <Ergopti></Ergopti> s’éloigna d’Optimot sur plusieurs aspects fondamentaux. L'un des
 		points clés était ma volonté d'optimiser les <em>roulements</em>, entraînant de nombreux essais
-		d’arrangements des touches pour la <em>homerow</em>, notamment sur la partie droite avec les consonnes.
-		Un des choix majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le
+		d’arrangements des touches pour la <em>homerow</em>, notamment sur la partie droite avec les
+		consonnes. Un des choix majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le
 		<kbd>TSRN</kbd>
 		du BÉPO et d’Optimot. En effet, le bigramme <kbd>NT</kbd> est le plus fréquent des bigrammes
 		consonne-consonne, et il est pertinent de l'optimiser pour qu'il se réalise sur des doigts
@@ -53,10 +55,13 @@
 		conçu pour maximiser les bigrammes consonantiques, pour une frappe harmonieuse. Seuls les
 		bigrammes <kbd>ST</kbd>
 		et <kbd>TS</kbd> (comme dans « <kbd>ST</kbd>A<kbd>TS</kbd> ») ne profitent malheureusement pas
-		de cette optimisation des roulements, car il était impossible de tout avoir en même temps. En résumé, <Ergopti></Ergopti> a été <strong>pensée dès le départ pour
-		maximiser les roulements, mais sans sacrifier l’alternance des mains</strong>. La disposition a la même alternance
-		des mains que BÉPO ou Optimot, tout en ayant des roulements largement plus fréquents pour les lettres
-		ne bénéficiant pas de cette alternance.
+		de cette optimisation des roulements, car il était impossible de tout avoir en même temps. En
+		résumé, <Ergopti></Ergopti> a été
+		<strong
+			>pensée dès le départ pour maximiser les roulements, mais sans sacrifier l’alternance des
+			mains</strong
+		>. La disposition a la même alternance des mains que BÉPO ou Optimot, tout en ayant des
+		roulements largement plus fréquents pour les lettres ne bénéficiant pas de cette alternance.
 	</p>
 
 	<tiny-space></tiny-space>
@@ -98,7 +103,7 @@
 		<kbd>O</kbd> faisant le lien entre les deux (ergo[nomie] & opti[misation]). En outre, il est
 		court, d’une longueur idéale de 7 lettres, et peu présent en ligne. Une fois la nouvelle
 		appellation trouvée, le nom de domaine
-		<a class="link" href="https://ergopti.fr">https://ergopti.fr</a> fut également réservé à ce moment-là.
+		<a href="https://ergopti.fr" class="link">https://ergopti.fr</a> fut également réservé à ce moment-là.
 	</p>
 
 	<h3>Comment la disposition a été développée</h3>
@@ -127,18 +132,19 @@
 	<p>
 		Le seul problème avec cette approche est que l’on perd des raccourcis utiles sur la main gauche
 		qui se font avec des consonnes, comme <kbd>Ctrl</kbd> + <kbd>C</kbd> pour copier ou
-		<kbd>Ctrl</kbd> + <kbd>V</kbd> pour coller. Cependant, <Ergopti></Ergopti> a une solution
-		pour que ce ne soit pas un problème en dupliquant ces raccourcis sur les voyelles accentuées.
+		<kbd>Ctrl</kbd> + <kbd>V</kbd> pour coller. Cependant, <Ergopti></Ergopti> a une solution pour que
+		ce ne soit pas un problème en dupliquant ces raccourcis sur les voyelles accentuées.
 	</p>
 
 	<tiny-space></tiny-space>
 
 	<p>
-		<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i> La deuxième étape
-		dans la création de la disposition a été de placer les touches les plus souvent utilisées le plus
-		proche possible des doigts. Les doigts sont effectivement toujours censés reposer sur la rangée de
-		repos du clavier (la ligne du milieu, aussi appelée <em>homerow</em>). Il est donc naturel de chercher à placer sur cette rangée
-		les lettres les plus utilisées pour réduire les déplacements de doigts aux touches.
+		<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i> La deuxième
+		étape dans la création de la disposition a été de placer les touches les plus souvent utilisées
+		le plus proche possible des doigts. Les doigts sont effectivement toujours censés reposer sur la
+		rangée de repos du clavier (la ligne du milieu, aussi appelée <em>homerow</em>). Il est donc
+		naturel de chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les
+		déplacements de doigts aux touches.
 	</p>
 	<p>
 		De même, certaines touches sont plus facilement accessibles que d’autres sur les claviers
@@ -153,14 +159,15 @@
 
 	<p>
 		<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i> La troisième
-		étape a été de déplacer des lettres pour réduire au maximum le nombre de <SFB />s et de ciseaux, tout en
-		maximisant les roulements. Encore une fois, la maximisation des roulements était la priorité dès le début du projet.
+		étape a été de déplacer des lettres pour réduire au maximum le nombre de <SFB />s et de ciseaux,
+		tout en maximisant les roulements. Encore une fois, la maximisation des roulements était la
+		priorité dès le début du projet.
 	</p>
 	<p>
-		Cette étape a été la plus difficile, car intervertir seulement deux touches peut transformer
-		une disposition excellente en une disposition très moyenne. Il faut effectivement avoir en tête
-		les bigrammes les plus fréquents et s’assurer que déplacer une touche à un autre emplacement ne
-		va pas empirer la situation.
+		Cette étape a été la plus difficile, car intervertir seulement deux touches peut transformer une
+		disposition excellente en une disposition très moyenne. Il faut effectivement avoir en tête les
+		bigrammes les plus fréquents et s’assurer que déplacer une touche à un autre emplacement ne va
+		pas empirer la situation.
 	</p>
 
 	<h3>
@@ -179,12 +186,12 @@
 	<p>
 		En outre, les chiffres sont quant à eux passés en accès direct, un changement très appréciable
 		lors de l'utilisation quotidienne. C’est une fois avoir passé les chiffres en accès direct que
-		l’on se rend compte de l’énorme gain de confort que cela procure et l’on se demande pourquoi on n’avait pas cela plus tôt. Pourtant, même BÉPO, qui
-		est déjà largement plus optimisé qu’AZERTY, ne le propose pas, pas plus qu’Optimot. D’ailleurs,
-		en dehors des dispositions françaises, la plupart des dispositions alternatives proposent les
-		chiffres en accès direct, comme Dvorak, Colemak, Neo, etc. Même le QWERTY américain propose les
-		chiffres en accès direct, ce qui est un comble pour cette disposition qui est l’une des moins
-		optimisées au monde.
+		l’on se rend compte de l’énorme gain de confort que cela procure et l’on se demande pourquoi on
+		n’avait pas cela plus tôt. Pourtant, même BÉPO, qui est déjà largement plus optimisé qu’AZERTY,
+		ne le propose pas, pas plus qu’Optimot. D’ailleurs, en dehors des dispositions françaises, la
+		plupart des dispositions alternatives proposent les chiffres en accès direct, comme Dvorak,
+		Colemak, Neo, etc. Même le QWERTY américain propose les chiffres en accès direct, ce qui est un
+		comble pour cette disposition qui est l’une des moins optimisées au monde.
 	</p>
 
 	<h3>
@@ -200,19 +207,24 @@
 	<p>
 		Le qualificatif d’exceptionnel n’est pas exagéré : <ErgoptiPlus></ErgoptiPlus> permet, une fois maîtrisée,
 		de supprimer presque totalement les <SFB></SFB>s, y compris ceux liés à la répétition d'une même
-		touche. Cela est rendu possible grâce à la touche spéciale <kbd class = "glow">★</kbd>, permettant de réitérer
-		la frappe de la touche précédente avec une fluidité inédite, ainsi qu’à la touche <kbd>,</kbd>
+		touche. Cela est rendu possible grâce à la touche spéciale <kbd class="glow">★</kbd>, permettant
+		de réitérer la frappe de la touche précédente avec une fluidité inédite, ainsi qu’à la touche
+		<kbd>,</kbd>
 		de réduction des <SFB></SFB>s.
 	</p>
 	<p>
-		Il convient de préciser que l’idée de cette touche de répétition ne vient pas d’<Ergopti></Ergopti>.
-		Elle provient d'une (voire plus) disposition anglophone.
-		D'autres concepts ont également été empruntés, comme l'utilisation d'AHK (AutoHotkey) dans la
-		disposition <a class="link" href="https://ballerboo.github.io/boolayout/">Boo</a> afin de modifier
-		le comportement des combinaisons de touches. Ce système permet d'optimiser encore davantage les
-		roulements sur des touches adjacentes qui n'engendrent pas de bigrammes habituels.
+		Il convient de préciser que l’idée de cette touche de répétition ne vient pas d’<Ergopti
+		></Ergopti>. Elle provient d'une (voire plus) disposition anglophone. D'autres concepts ont
+		également été empruntés, comme l'utilisation d'AHK (AutoHotkey) dans la disposition
+		<a href="https://ballerboo.github.io/boolayout/" target="_blank" class="link">Boo</a> afin de modifier
+		le comportement des combinaisons de touches. Ce système permet d'optimiser encore davantage les roulements
+		sur des touches adjacentes qui n'engendrent pas de bigrammes habituels.
 	</p>
-    <p>
-        C’est ainsi que l’on peut avoir à la fois les roulements <kbd>CH</kbd>, <kbd>WH</kbd> et <kbd>OW/WO</kbd>, grâce à ce mécanisme appliqué à la lettre <kbd>W</kbd>. Avoir les roulements <kbd>CH</kbd> et <kbd>WH</kbd> a depuis le début été un objectif, car ces deux combinaisons sont très fréquentes. Les avoir en roulement offre un confort exceptionnel.
-    </p>
+	<p>
+		C’est ainsi que l’on peut avoir à la fois les roulements <kbd>CH</kbd>, <kbd>WH</kbd> et
+		<kbd>OW/WO</kbd>, grâce à ce mécanisme appliqué à la lettre <kbd>W</kbd>. Avoir les roulements
+		<kbd>CH</kbd>
+		et <kbd>WH</kbd> a depuis le début été un objectif, car ces deux combinaisons sont très fréquentes.
+		Les avoir en roulement offre un confort exceptionnel.
+	</p>
 </section>
