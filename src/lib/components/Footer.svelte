@@ -24,7 +24,7 @@
 		color: white;
 		display: flex;
 		font-size: 0.9rem;
-		height: min(calc(5vh + 2vw), 80px);
+		height: 3rem;
 		justify-content: center;
 	}
 </style>

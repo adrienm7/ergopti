@@ -35,6 +35,6 @@
 		L’alternance des mains a une limite. Il est impossible d’alterner parfaitement à chaque frappe.
 		C’est pourquoi, une fois une alternance maximale atteinte, il faut encore améliorer l’expérience
 		de frappe dans le cas où deux touches de la même main doivent être frappées d’affilée. C’est là
-		qu’interviennent les roulements, présentés en détail dans le point suivant.
+		qu’interviennent les roulements, présentés en détail dans la section suivante.
 	</p>
 </section>
