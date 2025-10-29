@@ -27,9 +27,9 @@
 	];
 
 	const extraLayers = [
-		['★ Layer de navigation', 'Layer'],
+		['★ Navigation', 'Layer'],
 		['★ Virgule', ','],
-		['★ Suffixes en À', 'À']
+		['★ Suffixes (À)', 'À']
 	];
 
 	let layerValue;
