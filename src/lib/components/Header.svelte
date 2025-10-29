@@ -102,7 +102,7 @@
 				aria-label="Accéder à la page Ergopti"
 				aria-current={$page.url.pathname === '/' ? 'page' : undefined}
 			>
-				<i class="icon-keyboard-duotone" style="margin-right:7px; margin-top:2px">
+				<i class="icon-keyboard-duotone" style="margin-right:7px;">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title">Ergopti</span>
@@ -113,7 +113,7 @@
 				aria-label="Accéder à la page Ergopti+"
 				aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
 			>
-				<i class="icon-circle-star" style="margin-right:3px; margin-top:2px">
+				<i class="icon-circle-star" style="margin-right:3px; margin-top:1px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title" style="margin-top:3px;">
@@ -126,7 +126,7 @@
 				aria-label="Accéder à la page Benchmarks"
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 			>
-				<i class="icon-chart-mixed" style="margin-right:7px; margin-top:-2px">
+				<i class="icon-chart-mixed" style="margin-right:7px;">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title" style="margin-top:3px;">Benchmarks</span>
@@ -137,7 +137,7 @@
 				aria-label="Accéder à la page Utilisation"
 				aria-current={$page.url.pathname === '/utilisation' ? 'page' : undefined}
 			>
-				<i class="icon-download" style="margin-right:3px">
+				<i class="icon-download" style="margin-right:5px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title">Utilisation</span>
@@ -243,7 +243,7 @@
 	}
 
 	#ergopti-header #ergopti-title {
-		margin-left: calc(0.125 * var(--header-height));
+		margin-left: calc(0.1 * var(--header-height));
 		margin-top: 1px; /* Looks better as the (i) takes vertical space */
 	}
 
