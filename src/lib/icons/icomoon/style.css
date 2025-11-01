@@ -1,10 +1,10 @@
 @font-face {
   font-family: 'icomoon';
-  src:  url('fonts/icomoon.eot?hd3e8k');
-  src:  url('fonts/icomoon.eot?hd3e8k#iefix') format('embedded-opentype'),
-    url('fonts/icomoon.ttf?hd3e8k') format('truetype'),
-    url('fonts/icomoon.woff?hd3e8k') format('woff'),
-    url('fonts/icomoon.svg?hd3e8k#icomoon') format('svg');
+  src:  url('fonts/icomoon.eot?825wvd');
+  src:  url('fonts/icomoon.eot?825wvd#iefix') format('embedded-opentype'),
+    url('fonts/icomoon.ttf?825wvd') format('truetype'),
+    url('fonts/icomoon.woff?825wvd') format('woff'),
+    url('fonts/icomoon.svg?825wvd#icomoon') format('svg');
   font-weight: normal;
   font-style: normal;
   font-display: block;
@@ -25,6 +25,9 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.icon-discord:before {
+  content: "\e932";
+}
 .icon-kanata .path1:before {
   content: "\e92f";
   color: ;
@@ -247,7 +250,7 @@
   margin-left: -1.125em;
   color: rgb(0, 0, 0);
 }
-.icon-discord:before {
+.icon-discord-msg:before {
   content: "\e901";
 }
 .icon-keyboard2:before {
