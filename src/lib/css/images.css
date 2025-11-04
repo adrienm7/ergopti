@@ -17,8 +17,8 @@ image-block p {
 }
 
 picture {
-    display: block;
-  text-align: center;
+	display: block;
+	text-align: center;
 }
 
 /* Correction du problème d’images étirées */
@@ -31,7 +31,13 @@ picture img {
 .no-upscale,
 .no-upscale img {
 	display: inline-block;
-	width: auto !important;
-	max-width: none !important;
 	height: auto !important;
+	max-width: none !important;
+	width: auto !important;
+}
+
+/* Icons */
+.icon-discord {
+	position: relative;
+	top: 0.03em;
 }
