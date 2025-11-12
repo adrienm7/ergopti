@@ -1,126 +1,127 @@
 {
-    "profiles": [
-        {
-            "complex_modifications": {
-                "rules": [
-                    {
-                        "description": "Tab: Cmd+Tab when tapped, Fn when held",
-                        "manipulators": [
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "tab",
-                                    "modifiers": { "optional": ["any"] }
-                                },
-                                "to": [{ "key_code": "fn" }],
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "tab",
-                                        "modifiers": ["left_command"]
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Tap-hold: left_shift = copy, fn = paste, left_control = cut",
-                        "manipulators": [
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "left_shift",
-                                    "modifiers": { "optional": ["any"] }
-                                },
-                                "to": [{ "key_code": "left_shift" }],
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "o",
-                                        "modifiers": ["left_command"]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "fn",
-                                    "modifiers": { "optional": ["any"] }
-                                },
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "h",
-                                        "modifiers": ["left_command"]
-                                    }
-                                ],
-                                "to_if_held_down": [{ "key_code": "fn" }]
-                            },
-                            {
-                                "type": "basic",
-                                "from": { "key_code": "left_control" },
-                                "to": [{ "key_code": "left_control" }],
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "p",
-                                        "modifiers": ["left_command"]
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Mod-tap: left_command = backspace (tap), left_command (hold with other key)",
-                        "manipulators": [
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "left_command",
-                                    "modifiers": { "optional": ["any"] }
-                                },
-                                "parameters": { "basic.to_if_alone_timeout_milliseconds": 200 },
-                                "to": [{ "key_code": "left_command" }],
-                                "to_if_alone": [{ "key_code": "delete_or_backspace" }]
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Right Command: Tab when tapped, Right Option (AltGr) when held",
-                        "manipulators": [
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "right_command",
-                                    "modifiers": { "optional": ["any"] }
-                                },
-                                "to": [{ "key_code": "right_option" }],
-                                "to_if_alone": [{ "key_code": "tab" }]
-                            }
-                        ]
-                    }
-                ]
-            },
-            "devices": [
-                {
-                    "identifiers": { "is_keyboard": true },
-                    "simple_modifications": [
-                        {
-                            "from": { "key_code": "caps_lock" },
-                            "to": [{ "key_code": "return_or_enter" }]
-                        },
-                        {
-                            "from": { "key_code": "right_option" },
-                            "to": [
-                                { "sticky_modifier": { "right_shift": "toggle" } },
-                                { "key_code": "right_shift" }
-                            ]
-                        }
-                    ]
-                }
-            ],
-            "name": "Default profile",
-            "selected": true,
-            "virtual_hid_keyboard": {
-                "country_code": 0,
-                "keyboard_type_v2": "ansi"
-            }
-        }
-    ]
+	"profiles": [
+		{
+			"complex_modifications": {
+				"rules": [
+					{
+						"description": "Tab: Cmd+Tab when tapped, Fn when held",
+						"manipulators": [
+							{
+								"from": {
+									"key_code": "tab",
+									"modifiers": { "optional": ["any"] }
+								},
+								"to": [{ "key_code": "fn" }],
+								"to_if_alone": [
+									{
+										"key_code": "tab",
+										"modifiers": ["left_command"]
+									},
+									{ "key_code": "return_or_enter" }
+								],
+								"type": "basic"
+							}
+						]
+					},
+					{
+						"description": "Tap-hold: left_shift = copy, fn = paste, left_control = cut",
+						"manipulators": [
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "left_shift",
+									"modifiers": { "optional": ["any"] }
+								},
+								"to": [{ "key_code": "left_shift" }],
+								"to_if_alone": [
+									{
+										"key_code": "o",
+										"modifiers": ["left_command"]
+									}
+								]
+							},
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "fn",
+									"modifiers": { "optional": ["any"] }
+								},
+								"to_if_alone": [
+									{
+										"key_code": "h",
+										"modifiers": ["left_command"]
+									}
+								],
+								"to_if_held_down": [{ "key_code": "fn" }]
+							},
+							{
+								"type": "basic",
+								"from": { "key_code": "left_control" },
+								"to": [{ "key_code": "left_control" }],
+								"to_if_alone": [
+									{
+										"key_code": "p",
+										"modifiers": ["left_command"]
+									}
+								]
+							}
+						]
+					},
+					{
+						"description": "Mod-tap: left_command = backspace (tap), left_command (hold with other key)",
+						"manipulators": [
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "left_command",
+									"modifiers": { "optional": ["any"] }
+								},
+								"parameters": { "basic.to_if_alone_timeout_milliseconds": 200 },
+								"to": [{ "key_code": "left_command" }],
+								"to_if_alone": [{ "key_code": "delete_or_backspace" }]
+							}
+						]
+					},
+					{
+						"description": "Right Command: Tab when tapped, Right Option (AltGr) when held",
+						"manipulators": [
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "right_command",
+									"modifiers": { "optional": ["any"] }
+								},
+								"to": [{ "key_code": "right_option" }],
+								"to_if_alone": [{ "key_code": "tab" }]
+							}
+						]
+					}
+				]
+			},
+			"devices": [
+				{
+					"identifiers": { "is_keyboard": true },
+					"simple_modifications": [
+						{
+							"from": { "key_code": "caps_lock" },
+							"to": [{ "key_code": "return_or_enter" }]
+						},
+						{
+							"from": { "key_code": "right_option" },
+							"to": [
+								{ "sticky_modifier": { "right_shift": "toggle" } },
+								{ "key_code": "right_shift" }
+							]
+						}
+					]
+				}
+			],
+			"name": "Default profile",
+			"selected": true,
+			"virtual_hid_keyboard": {
+				"country_code": 0,
+				"keyboard_type_v2": "ansi"
+			}
+		}
+	]
 }

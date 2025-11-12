@@ -1953,7 +1953,7 @@
             "key_code": "spacebar"
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -2012,7 +2012,7 @@
             "key_code": "spacebar"
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -2082,7 +2082,7 @@
             ]
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -2142,7 +2142,7 @@
             ]
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -4563,7 +4563,7 @@
             "key_code": "open_bracket"
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -4631,7 +4631,7 @@
             "key_code": "open_bracket"
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -18153,7 +18153,7 @@
             "key_code": "open_bracket"
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -18224,7 +18224,7 @@
             ]
           },
           {
-            "key_code": "close_bracket",
+            "key_code": "spacebar",
             "modifiers": [
               "shift"
             ]
@@ -39802,7 +39802,7 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": "-"
+              "value": "_"
             }
           },
           {
@@ -39819,7 +39819,7 @@
           "key_code": "spacebar",
           "modifiers": {
             "mandatory": [
-              "shift"
+              "option"
             ]
           }
         },
@@ -39827,13 +39827,13 @@
           {
             "key_code": "spacebar",
             "modifiers": [
-              "shift"
+              "option"
             ]
           },
           {
             "set_variable": {
               "name": "previous_key",
-              "value": "-"
+              "value": "_"
             }
           },
           {
@@ -40363,6 +40363,68 @@
             "set_variable": {
               "name": "previous_key",
               "value": "P"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "spacebar",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "spacebar",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "-"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "close_bracket",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "-"
             }
           },
           {
@@ -41392,68 +41454,6 @@
             "set_variable": {
               "name": "previous_key",
               "value": "⁰"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "close_bracket",
-          "modifiers": {
-            "mandatory": [
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "close_bracket",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "_"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "spacebar",
-          "modifiers": {
-            "mandatory": [
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "spacebar",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "_"
             }
           },
           {
