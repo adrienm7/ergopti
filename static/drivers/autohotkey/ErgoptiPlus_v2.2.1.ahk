@@ -3843,7 +3843,7 @@ SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap direct
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
     tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["__Configuration"].TimeActivationSeconds)
-    if (tap and A_PriorKey == "RAlt") {
+    if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
         DisableCapsWord()
         if Features["TapHolds"]["AltGr"]["BackSpace"].Enabled {
             SendEvent("{Blind}{BackSpace}") ; SendEvent be able to trigger hotstrings
