@@ -42,39 +42,50 @@ def main(
             If empty, process all .keylayout files in input_directory.
         use_date_in_filename (bool): Whether to append the date to the output filenames.
         input_directory (str | Path): Directory containing keylayout files.
-            If None, use default macos dir.
+            If None, use default macos dirs from bundles.
     """
-    macos_dir = Path(input_directory) if input_directory else get_macos_dir()
+    if input_directory:
+        macos_dirs = [Path(input_directory)]
+    else:
+        macos_dirs = get_macos_dirs()
 
+    all_keylayout_files = []
     if keylayout_name:
-        # Process only the specified keylayout (and its _plus variants)
+        # If a specific keylayout is named, search for it in all macos_dirs
         base_prefix = Path(keylayout_name).stem
         variants = [
             base_prefix,
             base_prefix + "_plus",
             base_prefix + "_plus_plus",
         ]
-        keylayout_files = [macos_dir / f"{v}.keylayout" for v in variants]
+        for macos_dir in macos_dirs:
+            for variant in variants:
+                keylayout_path = macos_dir / f"{variant}.keylayout"
+                if keylayout_path.is_file():
+                    all_keylayout_files.append(keylayout_path)
     else:
-        # Process all .keylayout files (excluding _plus) in the directory
-        keylayout_files = sorted(
-            f
-            for f in macos_dir.glob("*.keylayout")
-            if not f.stem.endswith("_plus_plus")
-            and not f.stem.endswith("_plus")
-        )
-        # For each, add its _plus variant if it exists
-        plus_files = [
-            macos_dir / f"{f.stem}_plus.keylayout" for f in keylayout_files
-        ]
-        plus_plus_files = [
-            macos_dir / f"{f.stem}_plus_plus.keylayout" for f in keylayout_files
-        ]
-        keylayout_files += [
-            pf for pf in plus_plus_files + plus_files if pf.is_file()
-        ]
+        # Process all .keylayout files in all found directories
+        for macos_dir in macos_dirs:
+            keylayout_files = sorted(
+                f
+                for f in macos_dir.glob("*.keylayout")
+                if not f.stem.endswith("_plus_plus")
+                and not f.stem.endswith("_plus")
+            )
+            # For each, add its _plus variant if it exists
+            plus_files = [
+                macos_dir / f"{f.stem}_plus.keylayout" for f in keylayout_files
+            ]
+            plus_plus_files = [
+                macos_dir / f"{f.stem}_plus_plus.keylayout"
+                for f in keylayout_files
+            ]
+            all_keylayout_files.extend(keylayout_files)
+            all_keylayout_files.extend(
+                [pf for pf in plus_plus_files + plus_files if pf.is_file()]
+            )
 
-    for keylayout_path in keylayout_files:
+    for keylayout_path in all_keylayout_files:
         if not keylayout_path.is_file():
             logger.error("Keylayout file not found: %s", keylayout_path)
             continue
@@ -105,24 +116,7 @@ def main(
         )
 
         # Create output directory with version name
-        # Extract version from keylayout path or bundle name
-        if "v2.2.0" in str(keylayout_path) or "v2_2_0" in str(keylayout_path):
-            version_name = "v2_2_0"
-        elif "v2.1" in str(keylayout_path) or "v2_1" in str(keylayout_path):
-            version_name = "v2_1_0"
-        elif "v2.0" in str(keylayout_path) or "v2_0" in str(keylayout_path):
-            version_name = "v2_0_0"
-        else:
-            # Fallback: extract from bundle directory name
-            bundle_name = ""
-            for parent in keylayout_path.parents:
-                if parent.name.endswith(".bundle"):
-                    bundle_name = parent.name
-                    break
-            if "v2.2.0" in bundle_name or "v2_2_0" in bundle_name:
-                version_name = "v2_2_0"
-            else:
-                version_name = "unknown_version"
+        version_name = extract_version_from_path(keylayout_path)
 
         linux_dir = Path(__file__).parent
         out_dir = linux_dir / version_name
@@ -161,36 +155,39 @@ def main(
         save_file(xcompose_out_path, xcompose_content)
 
 
-def get_macos_dir():
+def get_macos_dirs():
     """
-    Return the absolute path to the macOS keylayout directory.
-    Try bundle first, then fallback to main directory.
+    Return a list of absolute paths to the macOS keylayout directories.
+    Finds all .bundle directories and returns their Resources path.
 
     Returns:
-            Path: Path to the macOS keylayout directory.
+        list[Path]: A list of paths to the macOS keylayout directories.
 
     Raises:
-            FileNotFoundError: If the directory does not exist.
+        FileNotFoundError: If the base macos directory does not exist.
     """
-    macos_dir = (
+    bundles_dir = (
         Path(__file__).parent.parent.parent / "drivers" / "macos" / "bundles"
     )
-    if not macos_dir.is_dir():
-        logger.error("macos directory does not exist: %s", macos_dir)
-        raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
+    if not bundles_dir.is_dir():
+        logger.error("macOS bundles directory does not exist: %s", bundles_dir)
+        raise FileNotFoundError(
+            f"macOS bundles directory does not exist: {bundles_dir}"
+        )
 
-    # Check for bundle directory first
-    bundle_dirs = list(macos_dir.glob("*.bundle"))
-    if bundle_dirs:
-        bundle_resources = bundle_dirs[0] / "Contents" / "Resources"
+    bundle_dirs = list(bundles_dir.glob("*.bundle"))
+    if not bundle_dirs:
+        logger.warning("No .bundle directories found in %s", bundles_dir)
+        return []
+
+    resource_dirs = []
+    for bundle in bundle_dirs:
+        bundle_resources = bundle / "Contents" / "Resources"
         if bundle_resources.is_dir():
-            logger.info(
-                "Using keylayout files from bundle: %s", bundle_resources
-            )
-            return bundle_resources
+            logger.info("Found keylayout directory: %s", bundle_resources)
+            resource_dirs.append(bundle_resources)
 
-    logger.info("macos directory found: %s", macos_dir)
-    return macos_dir
+    return resource_dirs
 
 
 def read_file(file_path: Union[str, Path]) -> str:
@@ -251,6 +248,45 @@ def extract_version_from_layout_name(layout_name: str) -> str:
     match = re.search(r"v(\d+)[._](\d+)", layout_name.lower())
     if match:
         return f"v{match.group(1)}_{match.group(2)}_0"
+
+    return "unknown_version"
+
+
+def extract_version_from_path(keylayout_path: Path) -> str:
+    """
+    Extract version from keylayout path to create a directory name.
+
+    Args:
+        keylayout_path: The path to the keylayout file.
+
+    Returns:
+        Version string for directory name, or "unknown_version".
+    """
+    path_str = str(keylayout_path).lower()
+
+    # Search for version patterns like vX.Y.Z or vX_Y_Z in the path
+    match = re.search(r"v(\d+)[._](\d+)[._](\d+)", path_str)
+    if match:
+        return f"v{match.group(1)}_{match.group(2)}_{match.group(3)}"
+
+    # Fallback for shorter versions like vX.Y or vX_Y
+    match = re.search(r"v(\d+)[._](\d+)", path_str)
+    if match:
+        return f"v{match.group(1)}_{match.group(2)}_0"
+
+    # Fallback: extract from bundle directory name
+    bundle_name = ""
+    for parent in keylayout_path.parents:
+        if parent.name.endswith(".bundle"):
+            bundle_name = parent.name
+            break
+    if bundle_name:
+        match = re.search(r"v(\d+)[._](\d+)[._](\d+)", bundle_name.lower())
+        if match:
+            return f"v{match.group(1)}_{match.group(2)}_{match.group(3)}"
+        match = re.search(r"v(\d+)[._](\d+)", bundle_name.lower())
+        if match:
+            return f"v{match.group(1)}_{match.group(2)}_0"
 
     return "unknown_version"
 

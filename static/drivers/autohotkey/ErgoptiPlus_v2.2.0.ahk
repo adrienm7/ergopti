@@ -2309,7 +2309,7 @@ if Features["MagicKey"]["Replace"].Enabled {
 +SC018:: SendNewResult("C")
 +SC019:: SendNewResult("X")
 +SC01A:: SendNewResult("Z")
-+SC01B:: SendNewResult("_")
++SC01B:: SendNewResult("-")
 
 ; === Middle row ===
 +SC01E:: SendNewResult("A")
@@ -2561,7 +2561,7 @@ SC138 & SC01A:: RemapAltGr(
     (*) => SendNewResult("‰")
 )
 SC138 & SC01B:: RemapAltGr(
-    (*) => SendNewResult("-"),
+    (*) => SendNewResult("_"),
     (*) => SendNewResult("★")
 )
 
@@ -4702,10 +4702,6 @@ if Features["Autocorrection"]["Errors"].Enabled {
     )
     CreateCaseSensitiveHotstrings(
         "*", "poru", "pour",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "acceuil", "accueil",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
 }
