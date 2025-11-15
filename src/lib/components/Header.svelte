@@ -166,10 +166,10 @@
 			<div style="height:70px"></div>
 			<div class="links">
 				<a href="https://github.com/adrienm7/ergopti" target="_blank">
-					Repo GitHub <i class="icon-github"></i>
+					Repo GitHub <i class="icon-github" style="transform: scale(0.927536)"></i>
 				</a>
 				<span> — </span>
-				<a href={discordLink} target="_blank" style="position:relative; bottom:-0.1em;">
+				<a href={discordLink} target="_blank">
 					Serveur Discord
 					<i class="icon-discord"></i>
 				</a>
