@@ -27,12 +27,12 @@ xkb_symbols "Ergopti_v2_2_0_plus" {
         key <AD01> { type[group1] = "SEVEN_LEVEL_KEY", [egrave, Egrave, Egrave, egrave, z, grave, doublelowquotemark] }; // è È È è z ` „
         key <AD02> { type[group1] = "SEVEN_LEVEL_KEY", [y, Y, Y, y, y, at, EuroSign] }; // y Y Y y y @ €
         key <AD03> { type[group1] = "SEVEN_LEVEL_KEY", [o, O, O, o, o, percent, fourfifths] }; // o O O o o % " %"
-        key <AD04> { type[group1] = "SEVEN_LEVEL_KEY", [w, W, W, w, w, seveneighths, threeeighths] }; // w W W w w "où" "Où"
+        key <AD04> { type[group1] = "SEVEN_LEVEL_KEY", [w, W, W, w, w, oneeighth, onefifth] }; // w W W w w "où" "Où"
         key <AD05> { type[group1] = "SEVEN_LEVEL_KEY", [b, B, B, b, b, guillemotleft, leftdoublequotemark] }; // b B B b b "« " “
         key <AD06> { type[group1] = "SEVEN_LEVEL_KEY", [f, F, F, f, f, guillemotright, rightdoublequotemark] }; // f F F f f " »" ”
         key <AD07> { type[group1] = "SEVEN_LEVEL_KEY", [g, G, G, g, g, asciitilde, U2248] }; // g G G g g ~ ≈
         key <AD08> { type[group1] = "SEVEN_LEVEL_KEY", [h, H, H, h, h, numbersign, percent] }; // h H H h h # %
-        key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, exclam, onefifth] }; // c C C c c ! " !"
+        key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, exclam, onesixth] }; // c C C c c ! " !"
         key <AD10> { type[group1] = "SEVEN_LEVEL_KEY", [x, X, X, x, x, asterisk, multiply] }; // x X X x x * ×
         key <AD11> { type[group1] = "SEVEN_LEVEL_KEY", [z, Z, Z, z, z, percent, U2030] }; // z Z Z z z % ‰
         key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [j, dead_diaeresis, underscore, underscore, diaeresis, minus, dead_diaeresis] }; // j ¨ _ _ ¨ - ¨
@@ -42,27 +42,27 @@ xkb_symbols "Ergopti_v2_2_0_plus" {
         key <AC02> { type[group1] = "SEVEN_LEVEL_KEY", [i, I, I, i, i, greater, greaterthanequal] }; // i I I i i > ≥
         key <AC03> { type[group1] = "SEVEN_LEVEL_KEY", [e, E, E, e, e, braceleft, uparrow] }; // e E E e e { ᵉ
         key <AC04> { type[group1] = "SEVEN_LEVEL_KEY", [u, U, U, u, u, braceright, mu] }; // u U U u u } µ
-        key <AC05> { type[group1] = "SEVEN_LEVEL_KEY", [period, period, oneeighth, oneeighth, period, colon, periodcentered] }; // . . " :" " :" . : ·
+        key <AC05> { type[group1] = "SEVEN_LEVEL_KEY", [period, period, onethird, onethird, period, colon, periodcentered] }; // . . " :" " :" . : ·
         key <AC06> { type[group1] = "SEVEN_LEVEL_KEY", [v, V, V, v, v, bar, brokenbar] }; // v V V v v | ¦
         key <AC07> { type[group1] = "SEVEN_LEVEL_KEY", [s, S, S, s, s, parenleft, emdash] }; // s S S s s ( —
         key <AC08> { type[group1] = "SEVEN_LEVEL_KEY", [n, N, N, n, n, parenright, endash] }; // n N N n n ) –
         key <AC09> { type[group1] = "SEVEN_LEVEL_KEY", [t, T, T, t, t, bracketleft, dead_diaeresis] }; // t T T t t [ ¨
         key <AC10> { type[group1] = "SEVEN_LEVEL_KEY", [r, R, R, r, r, bracketright, infinity] }; // r R R r r ] ℝ
         key <AC11> { type[group1] = "SEVEN_LEVEL_KEY", [q, Q, Q, q, q, rightsinglequotemark, dead_currency] }; // q Q Q q q ’ ¤
-        key <BKSL> { type[group1] = "SEVEN_LEVEL_KEY", [dead_circumflex, dead_circumflex, onefifth, onefifth, asciicircum, exclam, exclamdown] }; // ^ ^ " !" " !" ^ ! ¡
+        key <BKSL> { type[group1] = "SEVEN_LEVEL_KEY", [dead_circumflex, dead_circumflex, onesixth, onesixth, asciicircum, exclam, exclamdown] }; // ^ ^ " !" " !" ^ ! ¡
 
         // Letters — Row 3/3
         key <LSGT> { type[group1] = "SEVEN_LEVEL_KEY", [ecircumflex, Ecircumflex, Ecircumflex, ecircumflex, x, asciicircum, dead_circumflex] }; // ê Ê Ê ê x ^ ^
         key <AB01> { type[group1] = "SEVEN_LEVEL_KEY", [eacute, Eacute, Eacute, eacute, c, slash, division] }; // é É É é c / ÷
         key <AB02> { type[group1] = "SEVEN_LEVEL_KEY", [agrave, Agrave, Agrave, agrave, v, backslash, downarrow] }; // à À À à v \ ᵢ
         key <AB03> { type[group1] = "SEVEN_LEVEL_KEY", [U2605, J, J, j, j, quotedbl, j] }; // ★ J J j j " j
-        key <AB04> { type[group1] = "SEVEN_LEVEL_KEY", [comma, comma, onesixth, onesixth, comma, semicolon, ellipsis] }; // , , " ;" " ;" , ; …
+        key <AB04> { type[group1] = "SEVEN_LEVEL_KEY", [comma, comma, seveneighths, seveneighths, comma, semicolon, ellipsis] }; // , , " ;" " ;" , ; …
         key <AB05> { type[group1] = "SEVEN_LEVEL_KEY", [k, K, K, k, k, ellipsis, plus] }; // k K K k k … +
         key <AB06> { type[group1] = "SEVEN_LEVEL_KEY", [m, M, M, m, m, ampersand, U2212] }; // m M M m m & −
         key <AB07> { type[group1] = "SEVEN_LEVEL_KEY", [d, D, D, d, d, dollar, section] }; // d D D d d $ §
         key <AB08> { type[group1] = "SEVEN_LEVEL_KEY", [l, L, L, l, l, equal, notequal] }; // l L L l l = ≠
         key <AB09> { type[group1] = "SEVEN_LEVEL_KEY", [p, P, P, p, p, plus, plusminus] }; // p P P p p + ±
-        key <AB10> { type[group1] = "SEVEN_LEVEL_KEY", [apostrophe, apostrophe, onethird, onethird, apostrophe, question, questiondown] }; // ' ' " ?" " ?" ' ? ¿
+        key <AB10> { type[group1] = "SEVEN_LEVEL_KEY", [apostrophe, apostrophe, threeeighths, threeeighths, apostrophe, question, questiondown] }; // ' ' " ?" " ?" ' ? ¿
 
 	include "level3(ralt_switch)"
 };

@@ -1855,14 +1855,6 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
     }
 }
 
-RemapAltGr(AltGrFunction, ShiftAltGrFunction) {
-    if GetKeyState("Shift", "P") {
-        ShiftAltGrFunction.Call()
-    } else {
-        AltGrFunction.Call()
-    }
-}
-
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
     Selection := ""
     if (
@@ -2309,7 +2301,7 @@ if Features["MagicKey"]["Replace"].Enabled {
 +SC018:: SendNewResult("C")
 +SC019:: SendNewResult("X")
 +SC01A:: SendNewResult("Z")
-+SC01B:: SendNewResult("-")
++SC01B:: SendNewResult("_")
 
 ; === Middle row ===
 +SC01E:: SendNewResult("A")
@@ -2427,10 +2419,13 @@ SC035:: SendNewResult("'")
 
 ; This code comes before remapping ErgoptiAltGr to be able to override the keys
 #HotIf Features["Rolls"]["ChevronEqual"].Enabled
-SC138 & SC012:: RemapAltGr(
-    () => AddRollEqual(),
-    () => Features["Layout"]["ErgoptiPlus"].Enabled ? SendNewResult(" %") : SendNewResult("Œ")
-)
+SC138 & SC012:: {
+    if GetKeyState("Shift", "P") {
+        Features["Layout"]["ErgoptiPlus"].Enabled ? SendNewResult(" %") : SendNewResult("Œ")
+    } else {
+        AddRollEqual()
+    }
+}
 AddRollEqual() {
     LastSentCharacter := GetLastSentCharacterAt(-1)
     if (
@@ -2448,10 +2443,13 @@ AddRollEqual() {
 #HotIf
 
 #HotIf Features["Rolls"]["HashtagQuote"].Enabled
-SC138 & SC017:: RemapAltGr(
-    (*) => HashtagOrQuote(),
-    (*) => SendNewResult("%")
-)
+SC138 & SC017:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("%")
+    } else {
+        HashtagOrQuote()
+    }
+}
 HashtagOrQuote() {
     LastSentCharacter := GetLastSentCharacterAt(-1)
     if (
@@ -2468,35 +2466,122 @@ HashtagOrQuote() {
 
 ; AltGr changes made in ErgoptiPlus
 #HotIf Features["Layout"]["ErgoptiPlus"].Enabled
-SC138 & SC012:: RemapAltGr(
-    () => WrapTextIfSelected("%", "%", "%"),
-    () => SendNewResult("Œ")
-)
-SC138 & SC013:: RemapAltGr(
-    (*) => SendNewResult("où" . SpaceAroundSymbols),
-    (*) => SendNewResult("Où" . SpaceAroundSymbols)
-)
-SC138 & SC018:: RemapAltGr(
-    (*) => WrapTextIfSelected("!", "!", "!"),
-    (*) => SendNewResult(" !")
-)
+SC138 & SC012:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("Œ")
+    } else {
+        WrapTextIfSelected("%", "%", "%")
+    }
+}
+SC138 & SC013:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("Où" . SpaceAroundSymbols)
+    } else {
+        SendNewResult("où" . SpaceAroundSymbols)
+    }
+}
+SC138 & SC018:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult(" !")
+    } else {
+        WrapTextIfSelected("!", "!", "!")
+    }
+}
 #HotIf
 
 #HotIf Features["Layout"]["ErgoptiAltGr"].Enabled and Features["Layout"]["ErgoptiBase"].Enabled
 ; === Number row ===
-SC138 & SC029:: RemapAltGr((*) => SendNewResult("€"), (*) => DeadKey(DeadkeyMappingCurrency))
-SC138 & SC002:: RemapAltGr((*) => SendNewResult("¹"), (*) => SendNewResult("₁"))
-SC138 & SC003:: RemapAltGr((*) => SendNewResult("²"), (*) => SendNewResult("₂"))
-SC138 & SC004:: RemapAltGr((*) => SendNewResult("³"), (*) => SendNewResult("₃"))
-SC138 & SC005:: RemapAltGr((*) => SendNewResult("⁴"), (*) => SendNewResult("₄"))
-SC138 & SC006:: RemapAltGr((*) => SendNewResult("⁵"), (*) => SendNewResult("₅"))
-SC138 & SC007:: RemapAltGr((*) => SendNewResult("⁶"), (*) => SendNewResult("₆"))
-SC138 & SC008:: RemapAltGr((*) => SendNewResult("⁷"), (*) => SendNewResult("₇"))
-SC138 & SC009:: RemapAltGr((*) => SendNewResult("⁸"), (*) => SendNewResult("₈"))
-SC138 & SC00A:: RemapAltGr((*) => SendNewResult("⁹"), (*) => SendNewResult("₉"))
-SC138 & SC00B:: RemapAltGr((*) => SendNewResult("⁰"), (*) => SendNewResult("₀"))
-SC138 & SC00C:: RemapAltGr((*) => SendNewResult("‰"), (*) => SendNewResult("‱"))
-SC138 & SC00D:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"))
+SC138 & SC029:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingCurrency)
+    } else {
+        SendNewResult("€")
+    }
+}
+SC138 & SC002:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₁")
+    } else {
+        SendNewResult("¹")
+    }
+}
+SC138 & SC003:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₂")
+    } else {
+        SendNewResult("²")
+    }
+}
+SC138 & SC004:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₃")
+    } else {
+        SendNewResult("³")
+    }
+}
+SC138 & SC005:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₄")
+    } else {
+        SendNewResult("⁴")
+    }
+}
+SC138 & SC006:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₅")
+    } else {
+        SendNewResult("⁵")
+    }
+}
+SC138 & SC007:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₆")
+    } else {
+        SendNewResult("⁶")
+    }
+}
+SC138 & SC008:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₇")
+    } else {
+        SendNewResult("⁷")
+    }
+}
+SC138 & SC009:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₈")
+    } else {
+        SendNewResult("⁸")
+    }
+}
+SC138 & SC00A:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₉")
+    } else {
+        SendNewResult("⁹")
+    }
+}
+SC138 & SC00B:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("₀")
+    } else {
+        SendNewResult("⁰")
+    }
+}
+SC138 & SC00C:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("‱")
+    } else {
+        SendNewResult("‰")
+    }
+}
+SC138 & SC00D:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("ª")
+    } else {
+        SendNewResult("°")
+    }
+}
 
 ; ======= Ctrl + Alt is different from AltGr on the Number row =======
 ; Some programs use these shortcuts, like in Google Docs where it changes the heading
@@ -2514,152 +2599,262 @@ SC138 & SC00D:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"
 
 #HotIf Features["Layout"]["ErgoptiAltGr"].Enabled
 ; === Space bar ===
-SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
-; === Top row ===
-SC138 & SC010:: RemapAltGr(
-    (*) => WrapTextIfSelected("``", "``", "``"),
-    (*) => SendNewResult("„")
-)
-SC138 & SC011:: RemapAltGr(
-    (*) => WrapTextIfSelected("@", "@", "@"),
-    (*) => SendNewResult("€")
-)
-SC138 & SC012:: RemapAltGr(
-    (*) => SendNewResult("œ"),
-    (*) => SendNewResult("Œ")
-)
-SC138 & SC013:: RemapAltGr(
-    (*) => SendNewResult("ù"),
-    (*) => SendNewResult("Ù")
-)
-SC138 & SC014:: RemapAltGr(
-    (*) => WrapTextIfSelected("« ", '« ', ' »'),
-    (*) => SendNewResult("“")
-)
-SC138 & SC015:: RemapAltGr(
-    (*) => WrapTextIfSelected(" »", '« ', ' »'),
-    (*) => SendNewResult("”")
-)
-SC138 & SC016:: RemapAltGr(
-    (*) => WrapTextIfSelected("~", "~", "~"),
-    (*) => SendNewResult("≈")
-)
-SC138 & SC017:: RemapAltGr(
-    (*) => WrapTextIfSelected("#", "#", "#"),
-    (*) => SendNewResult("%")
-)
-SC138 & SC018:: RemapAltGr(
-    (*) => SendNewResult("ç"),
-    (*) => SendNewResult("Ç")
-)
-SC138 & SC019:: RemapAltGr(
-    (*) => WrapTextIfSelected("*", "*", "*"),
-    (*) => SendNewResult("×")
-)
-SC138 & SC01A:: RemapAltGr(
-    (*) => WrapTextIfSelected("%", "%", "%"),
-    (*) => SendNewResult("‰")
-)
-SC138 & SC01B:: RemapAltGr(
-    (*) => SendNewResult("_"),
-    (*) => SendNewResult("★")
-)
+SC138 & SC039:: {
+    if GetKeyState("Shift", "P") {
+
+    } else {
+        WrapTextIfSelected("_", "_", "_")
+    }
+}
+SC138 & SC010:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("„")
+    } else {
+        WrapTextIfSelected("``", "``", "``")
+    }
+}
+SC138 & SC011:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("€")
+    } else {
+        WrapTextIfSelected("@", "@", "@")
+    }
+}
+SC138 & SC012:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("Œ")
+    } else {
+        SendNewResult("œ")
+    }
+}
+SC138 & SC013:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("Ù")
+    } else {
+        SendNewResult("ù")
+    }
+}
+SC138 & SC014:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("“")
+    } else {
+        WrapTextIfSelected("« ", "« ", " »")
+    }
+}
+SC138 & SC015:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("”")
+    } else {
+        WrapTextIfSelected(" »", "« ", " »")
+    }
+}
+SC138 & SC016:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("≈")
+    } else {
+        WrapTextIfSelected("~", "~", "~")
+    }
+}
+SC138 & SC017:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("%")
+    } else {
+        WrapTextIfSelected("#", "#", "#")
+    }
+}
+SC138 & SC018:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("Ç")
+    } else {
+        SendNewResult("ç")
+    }
+}
+SC138 & SC019:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("×")
+    } else {
+        WrapTextIfSelected("*", "*", "*")
+    }
+}
+SC138 & SC01A:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("‰")
+    } else {
+        WrapTextIfSelected("%", "%", "%")
+    }
+}
+SC138 & SC01B:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("★")
+    } else {
+        SendNewResult("-")
+    }
+}
 
 ; === Middle row ===
-SC138 & SC01E:: RemapAltGr(
-    (*) => WrapTextIfSelected("<", "<", ">"),
-    (*) => SendNewResult("≤")
-)
-SC138 & SC01F:: RemapAltGr(
-    (*) => WrapTextIfSelected(">", "<", ">"),
-    (*) => SendNewResult("≥")
-)
-SC138 & SC020:: RemapAltGr(
-    (*) => WrapTextIfSelected("{", "{", "}"),
-    (*) => DeadKey(DeadkeyMappingSuperscript)
-)
-SC138 & SC021:: RemapAltGr(
-    (*) => WrapTextIfSelected("}", "{", "}"),
-    (*) => DeadKey(DeadkeyMappingGreek)
-)
-SC138 & SC022:: RemapAltGr(
-    (*) => WrapTextIfSelected(":", ":", ":"),
-    (*) => SendNewResult("·")
-)
-SC138 & SC023:: RemapAltGr(
-    (*) => WrapTextIfSelected("|", "|", "|"),
-    (*) => SendNewResult("¦")
-)
-SC138 & SC024:: RemapAltGr(
-    (*) => WrapTextIfSelected("(", "(", ")"),
-    (*) => SendNewResult("—")
-)
-SC138 & SC025:: RemapAltGr(
-    (*) => WrapTextIfSelected(")", "(", ")"),
-    (*) => SendNewResult("–")
-)
-SC138 & SC026:: RemapAltGr(
-    (*) => WrapTextIfSelected("[", "[", "]"),
-    (*) => DeadKey(DeadkeyMappingDiaresis)
-)
-SC138 & SC027:: RemapAltGr(
-    (*) => WrapTextIfSelected("]", "[", "]"),
-    (*) => DeadKey(DeadkeyMappingR)
-)
-SC138 & SC028:: RemapAltGr(
-    (*) => SendNewResult("’"),
-    (*) => DeadKey(DeadkeyMappingCurrency)
-)
-SC138 & SC02B:: RemapAltGr(
-    (*) => WrapTextIfSelected("!", "!", "!"),
-    (*) => SendNewResult("¡")
-)
+SC138 & SC01E:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("≤")
+    } else {
+        WrapTextIfSelected("<", "<", ">")
+    }
+}
+SC138 & SC01F:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("≥")
+    } else {
+        WrapTextIfSelected(">", "<", ">")
+    }
+}
+SC138 & SC020:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingSuperscript)
+    } else {
+        WrapTextIfSelected("{", "{", "}")
+    }
+}
+SC138 & SC021:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingGreek)
+    } else {
+        WrapTextIfSelected("}", "{", "}")
+    }
+}
+SC138 & SC022:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("·")
+    } else {
+        WrapTextIfSelected(":", ":", ":")
+    }
+}
+SC138 & SC023:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("¦")
+    } else {
+        WrapTextIfSelected("|", "|", "|")
+    }
+}
+SC138 & SC024:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("—")
+    } else {
+        WrapTextIfSelected("(", "(", ")")
+    }
+}
+SC138 & SC025:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("–")
+    } else {
+        WrapTextIfSelected(")", "(", ")")
+    }
+}
+SC138 & SC026:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingDiaresis)
+    } else {
+        WrapTextIfSelected("[", "[", "]")
+    }
+}
+SC138 & SC027:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingR)
+    } else {
+        WrapTextIfSelected("]", "[", "]")
+    }
+}
+SC138 & SC028:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingCurrency)
+    } else {
+        SendNewResult("’")
+    }
+}
+SC138 & SC02B:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("¡")
+    } else {
+        WrapTextIfSelected("!", "!", "!")
+    }
+}
 
 ; === Bottom row ===
-SC138 & SC056:: RemapAltGr(
-    (*) => WrapTextIfSelected("^", "^", "^"),
-    (*) => DeadKey(DeadkeyMappingCircumflex)
-)
-SC138 & SC02C:: RemapAltGr(
-    (*) => WrapTextIfSelected("/", "/", "/"),
-    (*) => SendNewResult("÷")
-)
-SC138 & SC02D:: RemapAltGr(
-    (*) => WrapTextIfSelected("\", "\", "\"),
-    (*) => DeadKey(DeadkeyMappingSubscript)
-)
-SC138 & SC02E:: RemapAltGr(
-    (*) => WrapTextIfSelected("`"", "`"", "`""),
-    (*) => SendNewResult("j")
-)
-SC138 & SC02F:: RemapAltGr(
-    (*) => WrapTextIfSelected(";", ";", ";"),
-    (*) => SendNewResult("…")
-)
-SC138 & SC030:: RemapAltGr(
-    (*) => SendNewResult("…"),
-    (*) => SendNewResult("+")
-)
-SC138 & SC031:: RemapAltGr(
-    (*) => WrapTextIfSelected("&", "&", "&"),
-    (*) => SendNewResult("−")
-)
-SC138 & SC032:: RemapAltGr(
-    (*) => WrapTextIfSelected("$", "$", "$"),
-    (*) => SendNewResult("§")
-)
-SC138 & SC033:: RemapAltGr(
-    (*) => WrapTextIfSelected("=", "=", "="),
-    (*) => SendNewResult("≠")
-)
-SC138 & SC034:: RemapAltGr(
-    (*) => WrapTextIfSelected("+", "+", "+"),
-    (*) => SendNewResult("±")
-)
-SC138 & SC035:: RemapAltGr(
-    (*) => WrapTextIfSelected("?", "?", "?"),
-    (*) => SendNewResult("¿")
-)
+SC138 & SC056:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingCircumflex)
+    } else {
+        WrapTextIfSelected("^", "^", "^")
+    }
+}
+SC138 & SC02C:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("÷")
+    } else {
+        WrapTextIfSelected("/", "/", "/")
+    }
+}
+SC138 & SC02D:: {
+    if GetKeyState("Shift", "P") {
+        DeadKey(DeadkeyMappingSubscript)
+    } else {
+        WrapTextIfSelected("\", "\", "\")
+    }
+}
+SC138 & SC02E:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("j")
+    } else {
+        WrapTextIfSelected("`"", "`"", "`"")
+    }
+}
+SC138 & SC02F:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("…")
+    } else {
+        WrapTextIfSelected(";", ";", ";")
+    }
+}
+SC138 & SC030:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("+")
+    } else {
+        SendNewResult("…")
+    }
+}
+SC138 & SC031:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("−")
+    } else {
+        WrapTextIfSelected("&", "&", "&")
+    }
+}
+SC138 & SC032:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("§")
+    } else {
+        WrapTextIfSelected("$", "$", "$")
+    }
+}
+SC138 & SC033:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("≠")
+    } else {
+        WrapTextIfSelected("=", "=", "=")
+    }
+}
+SC138 & SC034:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("±")
+    } else {
+        WrapTextIfSelected("+", "+", "+")
+    }
+}
+SC138 & SC035:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("¿")
+    } else {
+        WrapTextIfSelected("?", "?", "?")
+    }
+}
 #HotIf
 
 ; ============================
@@ -4702,6 +4897,10 @@ if Features["Autocorrection"]["Errors"].Enabled {
     )
     CreateCaseSensitiveHotstrings(
         "*", "poru", "pour",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*", "acceuil", "accueil",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
 }
