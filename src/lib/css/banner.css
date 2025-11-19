@@ -7,18 +7,19 @@
 	background-color: #a40606;
 	background-image: linear-gradient(0, #c80000 0%, #ff6f00 100%);
 	border: 2px solid white;
-	bottom: 6vw;
+	bottom: 5vw;
 	box-shadow:
 		rgba(0, 0, 0, 0.6) 0px -2px 4px,
 		rgba(0, 0, 0, 0.7) 0px 3px 8px;
 	display: flex;
+	font-weight: bold;
 	height: 3.5rem;
 	justify-content: center;
 	margin: 0 auto;
 	position: fixed;
-	right: -41vw;
+	right: -41.3vw;
 	text-align: center;
-	transform: rotate(315deg);
+	transform: rotate(320deg);
 	width: 100vw;
 	z-index: 90;
 }
@@ -35,7 +36,7 @@
 }
 
 .banner .subtitle {
-	font-size: 0.5em;
+	font-size: 0.6rem;
 	margin-bottom: 1.1rem;
 	margin-top: -0.65rem;
 }
@@ -56,7 +57,7 @@
 	}
 
 	.banner .subtitle {
-		font-size: 0.6em;
+		font-size: 0.65rem;
 	}
 }
 

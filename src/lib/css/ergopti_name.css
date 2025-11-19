@@ -9,9 +9,9 @@ name-ergopti-plus {
 }
 
 .namecolor {
-	margin: -0.5em;
 	background-clip: text;
 	-webkit-background-clip: text;
+	margin: -0.5em;
 	padding: 0.5em; /* Pour que le background-color entoure tout le texte */
 	-webkit-text-fill-color: transparent;
 	-moz-background-clip: text;
@@ -31,34 +31,34 @@ name-ergopti-plus {
 }
 
 .glow {
-	position: relative;
-	top: 0.05em;
-	left: 0.03em;
 	animation: glow 2s ease-in-out infinite alternate;
 	color: #fff;
-	font-weight: bold;
-	font-size: 1.2em;
-	text-align: center;
 }
 
+.plus {
+	font-size: 1.2em;
+	font-weight: bold;
+	left: 0.03em;
+	position: relative;
+	text-align: center;
+	top: 0.05em;
+}
 @-webkit-keyframes glow {
 	from {
 		text-shadow:
-			0 0 0 rgba(255, 255, 255, 0),
-			0 0 0 rgba(255, 255, 255, 0),
-			0 0 5px #fff,
-			0 0 10px #fff,
-			0 0 5px #009de6,
-			0 0 10px #004de6,
-			0 0 15px #000ce6,
-			0 0 20px #0049e6,
-			0 0 25px #9200e6;
+			0 0 0px #fff,
+			0 0 15px #009de6,
+			0 0 25px #009de6,
+			0 0 15px #009de6,
+			0 0 0px #fff;
 	}
 
 	to {
 		text-shadow:
-			0 0 1px #fff,
+			0 0 0px #fff,
 			0 0 5px #ff4da6,
-			0 0 10px #ff4da6;
+			0 0 10px #ff4da6,
+			0 0 5px #ff4da6,
+			0 0 0px #fff;
 	}
 }

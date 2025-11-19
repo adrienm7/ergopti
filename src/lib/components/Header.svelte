@@ -63,8 +63,8 @@
 			<img src="img/logo/logo.svg" class="logo" alt="Logo Ergopti" />
 		</a>
 		<div id="ergopti-title">
-			<strong>
-				<a class="no-gradient text-white" href="/">
+			<strong class="no-gradient text-white">
+				<a href="/" aria-label="Accéder à la page d’accueil">
 					<span class="min-width-300">Disposition </span>
 					<span class="min-width-350">clavier </span>
 				</a>
@@ -87,7 +87,7 @@
 				</div>
 			</strong>
 			<p id="ergopti-subtitle">
-				<strong class="min-width-300 hyper" style="font-size:1.1em">Ergonomie optimisée</strong>
+				<strong class="min-width-300" style="font-size:1.1em">Ergonomie optimisée</strong>
 				<span class="min-width-600"> pour le français, l’anglais et le code</span>
 			</p>
 		</div>
@@ -102,7 +102,7 @@
 				aria-label="Accéder à la page Ergopti"
 				aria-current={$page.url.pathname === '/' ? 'page' : undefined}
 			>
-				<i class="icon-keyboard-duotone" style="margin-right:7px; margin-top:2px">
+				<i class="icon-keyboard-duotone" style="margin-right:7px;">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title">Ergopti</span>
@@ -113,11 +113,11 @@
 				aria-label="Accéder à la page Ergopti+"
 				aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
 			>
-				<i class="icon-circle-star" style="margin-right:3px; margin-top:2px">
+				<i class="icon-circle-star" style="margin-right:3px; margin-top:1px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title" style="margin-top:3px;">
-					Ergopti<span class="glow">+</span>
+					Ergopti<span class="glow plus">+</span>
 				</span>
 			</a>
 			<a
@@ -126,7 +126,7 @@
 				aria-label="Accéder à la page Benchmarks"
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
 			>
-				<i class="icon-chart-mixed" style="margin-right:7px; margin-top:-2px">
+				<i class="icon-chart-mixed" style="margin-right:7px;">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title" style="margin-top:3px;">Benchmarks</span>
@@ -137,7 +137,7 @@
 				aria-label="Accéder à la page Utilisation"
 				aria-current={$page.url.pathname === '/utilisation' ? 'page' : undefined}
 			>
-				<i class="icon-download" style="margin-right:3px">
+				<i class="icon-download" style="margin-right:5px">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title">Utilisation</span>
@@ -165,11 +165,11 @@
 			></div>
 			<div style="height:70px"></div>
 			<div class="links">
-				<a href="https://github.com/adrienm7/ergopti">
-					Repo GitHub <i class="icon-github"></i>
+				<a href="https://github.com/adrienm7/ergopti" target="_blank">
+					Repo GitHub <i class="icon-github" style="transform: scale(0.927536)"></i>
 				</a>
 				<span> — </span>
-				<a href={discordLink} style="position:relative; bottom:-0.1em;">
+				<a href={discordLink} target="_blank">
 					Serveur Discord
 					<i class="icon-discord"></i>
 				</a>
@@ -182,8 +182,8 @@
 
 <style>
 	:root {
-		--header-color: rgba(0, 0, 0, 0.9);
-		--header-color-mobile: rgba(0, 16, 36, 0.975);
+		--header-color: rgba(0, 0, 0, 0.8);
+		--header-color-mobile: rgba(0, 18, 30, 0.975);
 		--couleur-liens-header: rgba(255, 255, 255, 0.9);
 		--hauteur-element-menu-mobile: 30px;
 		--items-menu-spacing: clamp(4px, 0.8vw, 25px);
@@ -191,7 +191,7 @@
 		--marge-fenetre: var(--marge-bords-menu);
 		--header-height: clamp(70px, 5.5vw, 120px);
 		--couleur-icone-hamburger: white;
-		--marge-bords-menu: clamp(15px, 2vw, 50px);
+		--marge-bords-menu: clamp(15px, 1vw, 50px);
 		--longueur-traits-hamburger: 18px;
 	}
 
@@ -199,7 +199,7 @@
 		align-items: center;
 		backdrop-filter: blur(30px);
 		background-color: var(--header-color);
-		box-shadow: 0px 0px 6px 3px var(--couleur-ombre);
+		box-shadow: 0px 0px 5px 2px var(--couleur-ombre);
 		display: flex;
 		height: var(--header-height);
 		justify-content: space-between;
@@ -243,7 +243,8 @@
 	}
 
 	#ergopti-header #ergopti-title {
-		margin-left: calc(0.125 * var(--header-height));
+		margin-left: calc(0.1 * var(--header-height));
+		margin-top: 1px; /* Looks better as the (i) takes vertical space */
 	}
 
 	#ergopti-header #ergopti-subtitle {
@@ -359,7 +360,6 @@
 	/* Menu mobile */
 	@media (max-width: 1280px) {
 		#menu {
-			backdrop-filter: blur(30px);
 			background-color: var(--header-color-mobile);
 			border-top: 1px solid rgba(255, 255, 255, 0.2);
 			left: 0;

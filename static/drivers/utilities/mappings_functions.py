@@ -66,7 +66,8 @@ def generate_mixed_case_variants(trigger: str) -> List[str]:
                 trigger.lower(),
                 trigger.upper(),
                 trigger.capitalize(),
-            ]:
+            ] and b not in [" ?", " ;", " :"]:
+                # We remove ' ?' to avoid 'stp ?' giving 'stCt'
                 variants.append(mixed1)
 
     return variants
@@ -349,7 +350,7 @@ def build_case_map(
     Generate all key case combinations for a given trigger case.
     Applies output capitalisation rules.
     """
-    special_upper_keys = {"'": ["?", " ?"]}
+    special_upper_keys = {"'": ["?", " ?"], ",": [";", " ;", " :"]}
     new_map = []
     for key_char, value in mapping:
         key_lower = key_char.lower()
@@ -358,12 +359,12 @@ def build_case_map(
         out_upper = get_output_for_case(is_trigger_upper, True, value)
         new_map.append((key_lower, out_lower))
         if key_upper != key_lower:
-            # i.e. is not a symbol, because symbols don’t have an uppercase version
             new_map.append((key_upper, out_upper))
         elif key_char in special_upper_keys:
             for special in special_upper_keys[key_char]:
-                new_map.append((special, out_upper))
-
+                # NE PAS ajouter les variantes ' ?' ou ' :' si le trigger est en minuscule
+                if not (not is_trigger_upper and special in [" ?", " :"]):
+                    new_map.append((special, out_upper))
     return new_map
 
 

@@ -2258,56 +2258,6 @@
           }
         ],
         "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "previous_key",
-            "type": "variable_if",
-            "value": "p"
-          }
-        ],
-        "from": {
-          "key_code": "slash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "o",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "key_code": "l"
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ],
-        "type": "basic"
       }
     ]
   },
@@ -4823,62 +4773,6 @@
           }
         ],
         "from": {
-          "key_code": "slash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "a",
-            "modifiers": [
-              "shift"
-            ]
-          },
-          {
-            "key_code": "k"
-          },
-          {
-            "key_code": "o"
-          },
-          {
-            "key_code": "d"
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "previous_key",
-            "type": "variable_if",
-            "value": "à"
-          }
-        ],
-        "from": {
           "key_code": "quote",
           "modifiers": {
             "mandatory": [
@@ -6254,62 +6148,6 @@
           },
           {
             "key_code": "quote"
-          },
-          {
-            "key_code": "f"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "previous_key",
-            "type": "variable_if",
-            "value": "q"
-          }
-        ],
-        "from": {
-          "key_code": "slash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "shift"
-            ]
           },
           {
             "key_code": "f"
@@ -10053,6 +9891,103 @@
           }
         ],
         "from": {
+          "key_code": "v",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "f"
+          },
+          {
+            "key_code": "v"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "ê"
+          }
+        ],
+        "from": {
+          "key_code": "v",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "key_code": "v"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "ê"
+          }
+        ],
+        "from": {
           "key_code": "a"
         },
         "to": [
@@ -11454,7 +11389,11 @@
             "key_code": "t"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -11504,7 +11443,11 @@
             ]
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -12383,7 +12326,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -12469,7 +12416,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "a"
@@ -12561,7 +12512,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "d"
@@ -12653,7 +12608,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "z"
@@ -12745,7 +12704,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "s"
@@ -12837,7 +12800,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "e"
@@ -12929,7 +12896,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "f"
@@ -13021,7 +12992,11 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "key_code": "f"
@@ -13113,110 +13088,61 @@
             "key_code": "delete_or_backspace"
           },
           {
-            "key_code": "c"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "previous_key",
-            "type": "variable_if",
-            "value": ","
-          }
-        ],
-        "from": {
-          "key_code": "slash",
-          "modifiers": {
-            "mandatory": [
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
-            "key_code": "c"
-          },
-          {
-            "key_code": "quote",
-            "modifiers": [
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ],
-        "type": "basic"
-      },
-      {
-        "conditions": [
-          {
-            "name": "previous_key",
-            "type": "variable_if",
-            "value": ","
-          }
-        ],
-        "from": {
-          "key_code": "slash",
-          "modifiers": {
-            "mandatory": [
-              "shift"
-            ]
-          }
-        },
-        "to": [
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "none"
-            }
-          },
-          {
-            "key_code": "delete_or_backspace"
-          },
-          {
             "key_code": "c",
             "modifiers": [
-              "shift"
+              "shift",
+              "option"
             ]
+          },
+          {
+            "key_code": "quote",
+            "modifiers": [
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": ","
+          }
+        ],
+        "from": {
+          "key_code": "slash",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "c"
           },
           {
             "key_code": "quote",
@@ -23918,6 +23844,156 @@
           {
             "name": "previous_key",
             "type": "variable_if",
+            "value": "Ê"
+          }
+        ],
+        "from": {
+          "key_code": "v",
+          "modifiers": {
+            "mandatory": [
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "key_code": "v"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "Ê"
+          }
+        ],
+        "from": {
+          "key_code": "v",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "key_code": "v"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
+            "value": "Ê"
+          }
+        ],
+        "from": {
+          "key_code": "g",
+          "modifiers": {
+            "mandatory": [
+              "shift"
+            ]
+          }
+        },
+        "to": [
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "key_code": "delete_or_backspace"
+          },
+          {
+            "key_code": "f",
+            "modifiers": [
+              "shift"
+            ]
+          },
+          {
+            "key_code": "v"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "none"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ],
+        "type": "basic"
+      },
+      {
+        "conditions": [
+          {
+            "name": "previous_key",
+            "type": "variable_if",
             "value": "ê"
           }
         ],
@@ -25323,7 +25399,11 @@
             "key_code": "t"
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -29014,7 +29094,11 @@
             ]
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -32972,7 +33056,11 @@
             ]
           },
           {
-            "key_code": "c"
+            "key_code": "c",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
           },
           {
             "set_variable": {
@@ -37375,16 +37463,35 @@
         },
         "to": [
           {
-            "key_code": "close_bracket",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
+            "key_code": "c"
           },
           {
             "set_variable": {
               "name": "star_activated",
               "value": 1
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "close_bracket"
+        },
+        "to": [
+          {
+            "key_code": "close_bracket"
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "j"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
             }
           }
         ]
@@ -38362,62 +38469,6 @@
             "set_variable": {
               "name": "previous_key",
               "value": "0"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "close_bracket"
-        },
-        "to": [
-          {
-            "key_code": "close_bracket"
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "¨"
-            }
-          },
-          {
-            "set_variable": {
-              "name": "star_activated",
-              "value": 0
-            }
-          }
-        ]
-      },
-      {
-        "type": "basic",
-        "from": {
-          "key_code": "l",
-          "modifiers": {
-            "mandatory": [
-              "shift",
-              "option"
-            ]
-          }
-        },
-        "to": [
-          {
-            "key_code": "l",
-            "modifiers": [
-              "shift",
-              "option"
-            ]
-          },
-          {
-            "set_variable": {
-              "name": "previous_key",
-              "value": "¨"
             }
           },
           {
@@ -42729,7 +42780,40 @@
           {
             "set_variable": {
               "name": "previous_key",
-              "value": "★"
+              "value": "¨"
+            }
+          },
+          {
+            "set_variable": {
+              "name": "star_activated",
+              "value": 0
+            }
+          }
+        ]
+      },
+      {
+        "type": "basic",
+        "from": {
+          "key_code": "l",
+          "modifiers": {
+            "mandatory": [
+              "shift",
+              "option"
+            ]
+          }
+        },
+        "to": [
+          {
+            "key_code": "l",
+            "modifiers": [
+              "shift",
+              "option"
+            ]
+          },
+          {
+            "set_variable": {
+              "name": "previous_key",
+              "value": "¨"
             }
           },
           {

@@ -8,7 +8,7 @@
     <key>CFBundleName</key>
     <string>Ergopti</string>
     <key>CFBundleVersion</key>
-    <string>2.2.0 Beta 4</string>
+    <string>2.2.0</string>
     <key>KLInfo_Ergopti_v2_2_0</key>
         <dict>
             <key>TICapsLockLanguageSwitchCapable</key>
@@ -19,6 +19,19 @@
             <string>Ergopti_v2_2_0.icns</string>
             <key>TISInputSourceID</key>
             <string>com.apple.keyboardlayout.ergopti.v2_2_0</string>
+            <key>TISIntendedLanguage</key>
+            <string>fr</string>
+        </dict>
+	<key>KLInfo_Ergopti_v2_2_0_ansi</key>
+        <dict>
+            <key>TICapsLockLanguageSwitchCapable</key>
+            <true/>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>ICNS</key>
+            <string>Ergopti_v2_2_0_ansi.icns</string>
+            <key>TISInputSourceID</key>
+            <string>com.apple.keyboardlayout.ergopti.v2_2_0.ansi</string>
             <key>TISIntendedLanguage</key>
             <string>fr</string>
         </dict>
@@ -35,6 +48,19 @@
             <key>TISIntendedLanguage</key>
             <string>fr</string>
         </dict>
+	<key>KLInfo_Ergopti_v2_2_0_plus_ansi</key>
+        <dict>
+            <key>TICapsLockLanguageSwitchCapable</key>
+            <true/>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>ICNS</key>
+            <string>Ergopti_v2_2_0_plus_ansi.icns</string>
+            <key>TISInputSourceID</key>
+            <string>com.apple.keyboardlayout.ergopti.v2_2_0.plus.ansi</string>
+            <key>TISIntendedLanguage</key>
+            <string>fr</string>
+        </dict>
 	<key>KLInfo_Ergopti_v2_2_0_plus_plus</key>
         <dict>
             <key>TICapsLockLanguageSwitchCapable</key>
@@ -45,6 +71,19 @@
             <string>Ergopti_v2_2_0_plus_plus.icns</string>
             <key>TISInputSourceID</key>
             <string>com.apple.keyboardlayout.ergopti.v2_2_0.plus_plus</string>
+            <key>TISIntendedLanguage</key>
+            <string>fr</string>
+        </dict>
+	<key>KLInfo_Ergopti_v2_2_0_plus_plus_ansi</key>
+        <dict>
+            <key>TICapsLockLanguageSwitchCapable</key>
+            <true/>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>ICNS</key>
+            <string>Ergopti_v2_2_0_plus_plus_ansi.icns</string>
+            <key>TISInputSourceID</key>
+            <string>com.apple.keyboardlayout.ergopti.v2_2_0.plus_plus.ansi</string>
             <key>TISIntendedLanguage</key>
             <string>fr</string>
         </dict>

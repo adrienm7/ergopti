@@ -156,11 +156,12 @@
 		/>
 	</image-block>
 
-	<h3>Analyse Ergo-L</h3>
+	<h3>Analyse Ergo‑L</h3>
 	<p>
 		Réalisée à l’aide de l’analyseur disponible ici : <a
 			class="link"
-			href="https://github.com/Nuclear-Squid/ergol">https://github.com/Nuclear-Squid/ergol</a
+			href="https://github.com/Nuclear-Squid/ergol"
+			target="_blank">https://github.com/Nuclear-Squid/ergol</a
 		>.
 	</p>
 	<div style="display:flex; align-items:center; justify-content:left; flex-wrap: wrap;">
@@ -177,7 +178,7 @@
 		</select>
 	</div>
 	<a href="/benchmarks/ergol/v2.1/analyse_ergol_ergopti{version_1dfh}_v2.1_{ergol}.pdf"
-		><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo-L</button></a
+		><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo‑L</button></a
 	>
 	<tiny-space></tiny-space>
 	<embed

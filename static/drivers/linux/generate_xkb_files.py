@@ -81,7 +81,10 @@ def main(
         keylayout = read_file(keylayout_path)
 
         xkb_template_path = (
-            Path(__file__).parent / "xkb_generation" / "data" / "base.xkb"
+            Path(__file__).parent
+            / "xkb_generation"
+            / "data"
+            / "xkb_symbols.txt"
         )
         if not xkb_template_path.is_file():
             logger.error("XKB template file not found: %s", xkb_template_path)
@@ -125,6 +128,26 @@ def main(
         out_dir = linux_dir / version_name
         out_dir.mkdir(exist_ok=True)
 
+        # Copy the xkb types files
+        try:
+            data_dir = Path(__file__).parent / "xkb_generation" / "data"
+            src_types = data_dir / "xkb_types.txt"
+            src_types_no_ctrl = data_dir / "xkb_types_without_ctrl.txt"
+
+            dest_types = out_dir / src_types.name
+            dest_types_no_ctrl = out_dir / src_types_no_ctrl.name
+
+            # read/write preserves UTF-8 encoding
+            dest_types.write_text(
+                src_types.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            dest_types_no_ctrl.write_text(
+                src_types_no_ctrl.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+        except OSError:
+            logger.error("Failed to copy xkb types files into %s", out_dir)
+
         base_name = f"{layout_id}"
         xkb_out_path = out_dir / f"{base_name}.xkb"
         xcompose_out_path = out_dir / f"{base_name}.XCompose"
@@ -149,7 +172,9 @@ def get_macos_dir():
     Raises:
             FileNotFoundError: If the directory does not exist.
     """
-    macos_dir = Path(__file__).parent.parent.parent / "drivers" / "macos"
+    macos_dir = (
+        Path(__file__).parent.parent.parent / "drivers" / "macos" / "bundles"
+    )
     if not macos_dir.is_dir():
         logger.error("macos directory does not exist: %s", macos_dir)
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
@@ -212,27 +237,22 @@ def extract_version_from_layout_name(layout_name: str) -> str:
     Extract version from layout name to create directory name.
 
     Args:
-            layout_name: The layout display name
+        layout_name: The layout display name.
 
     Returns:
-            Version string for directory name
+        Version string for directory name, or "unknown_version".
     """
-    # Extract version from bundle or keylayout name
-    if "v2.2.0" in layout_name.lower() or "v2_2_0" in layout_name.lower():
-        return "v2_2_0"
-    elif "v2.1" in layout_name.lower() or "v2_1" in layout_name.lower():
-        return "v2_1_0"
-    elif "v2.0" in layout_name.lower() or "v2_0" in layout_name.lower():
-        return "v2_0_0"
-    else:
-        # Fallback: try to extract version from the layout name
-        import re
+    # Search for version patterns like vX.Y.Z or vX_Y_Z
+    match = re.search(r"v(\d+)[._](\d+)[._](\d+)", layout_name.lower())
+    if match:
+        return f"v{match.group(1)}_{match.group(2)}_{match.group(3)}"
 
-        match = re.search(r"v(\d+)\.(\d+)\.(\d+)", layout_name.lower())
-        if match:
-            return f"v{match.group(1)}_{match.group(2)}_{match.group(3)}"
-        else:
-            return "unknown_version"
+    # Fallback for shorter versions like vX.Y or vX_Y
+    match = re.search(r"v(\d+)[._](\d+)", layout_name.lower())
+    if match:
+        return f"v{match.group(1)}_{match.group(2)}_0"
+
+    return "unknown_version"
 
 
 def create_layout_name(
@@ -275,8 +295,6 @@ def create_layout_name(
 
     # Fallback: extract version from filename if not found in content
     if not display_version:
-        import re
-
         # Try to extract version from variant filename (e.g., "Ergopti_v2_2_0_plus_plus" -> "v2.2.0")
         version_match = re.search(r"v(\d+)_(\d+)_(\d+)", variant.lower())
         if version_match:

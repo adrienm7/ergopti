@@ -37,7 +37,7 @@
 
 /* 1 column */
 @media (max-width: 500px) {
-	.cards .card:nth-child(odd) .important {
+	.cards .card:nth-child(odd) strong {
 		background: none;
 		-webkit-background-clip: border-box;
 		background-clip: border-box;
@@ -68,9 +68,9 @@
 		color: white;
 	}
 
-	.cards .card:nth-child(1) .important,
-	.cards .card:nth-child(4) .important,
-	.cards .card:nth-child(5) .important {
+	.cards .card:nth-child(1) strong,
+	.cards .card:nth-child(4) strong,
+	.cards .card:nth-child(5) strong {
 		background: none;
 		-webkit-background-clip: border-box;
 		background-clip: border-box;
@@ -113,7 +113,7 @@
 	.cards {
 		grid-template-columns: repeat(3, 1fr);
 	}
-	.cards .card:nth-child(odd) .important {
+    	.cards .card:nth-child(odd) strong {
 		background: none;
 		-webkit-background-clip: border-box;
 		background-clip: border-box;

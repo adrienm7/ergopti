@@ -11,7 +11,16 @@ button p {
 	margin: 0;
 }
 
-.bouton-telechargement,
+.download-buttons {
+	align-content: center;
+	align-items: center;
+	display: flex;
+	flex-direction: row;
+	gap: 0.5em;
+	justify-content: center;
+}
+
+.alt-button,
 select {
 	background-color: rgba(0, 0, 0, 0.8);
 	border: 1px solid rgba(255, 255, 255, 0.6);
@@ -85,7 +94,7 @@ kbd-output.morte {
 		var(--key-opacity)
 	) !important;
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
-	font-family: sans-serif;
+	font-family: 'Open Sans'; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 	font-weight: normal;
 }
 

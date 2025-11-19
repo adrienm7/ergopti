@@ -111,9 +111,11 @@
 					<div id="page-toc-pc">
 						<div id="page-toc"></div>
 					</div>
-					<p style="text-align:center; margin: 0; margin-top: 1em; margin-bottom: 0.5em;">
+					<hr style="margin:0; margin-top:20px" />
+					<p style="text-align:center; margin: 0; padding-top: 10px;">
 						<a
 							href="https://github.com/adrienm7/ergopti"
+							target="_blank"
 							style="font-size:0.9em!important; color:white"
 							>Repo GitHub <i class="icon-github"></i></a
 						>

@@ -25,6 +25,7 @@ keyboard-controls select {
 	border-right: 0;
 	color: white;
 	cursor: pointer;
+	max-width: 22vw;
 	min-height: 3em;
 	padding: 10px;
 }
@@ -42,14 +43,18 @@ keyboard-control-plus button {
 
 .ergodox-text-gradient {
 	background: linear-gradient(to top, #0e6700 0%, #1aff00 70%);
+	font-weight: bold;
 }
 
 .color-text-gradient {
 	background: linear-gradient(to top, rgb(255, 47, 0) 0%, rgb(255, 174, 0) 70%);
+	font-weight: bold;
 }
 
 keyboard-control-layer select {
 	background: linear-gradient(to top, #b661eb 25%, #ff53f4 50%);
+	font-weight: bold;
+	max-width: 30vw;
 }
 
 .ergodox-text-gradient,

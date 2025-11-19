@@ -1,57 +1,7 @@
-xkb_keymap        {
-
-xkb_keycodes      { include "evdev+aliases(azerty)" };
-
-xkb_types         { 
-    include "complete"
-
-    type "SEVEN_LEVEL_KEY" {
-        modifiers = Shift + Lock + LevelThree;
-
-        // ==============================
-        // ======= Level mappings =======
-        // ==============================
-
-        map[None]                               = Level1;
-
-        // Level 2: CapsLock only
-        map[Lock]                               = Level2;
-
-        // Level 3: Shift only
-        map[Shift]                              = Level3;
-
-        // Level 4: CapsLock + Shift
-        map[Lock + Shift]                       = Level4;
-
-        // Level 6: AltGr (LevelThree)
-        map[LevelThree]                         = Level6;
-        map[Lock + LevelThree]                  = Level6;
-
-        // Level 7: Shift + AltGr
-        map[Shift + LevelThree]                 = Level7;
-        map[Lock + Shift + LevelThree]          = Level7;
-
-        // ===========================
-        // ======= Level names =======
-        // ===========================
-        
-        level_name[Level1]                      = "Base";
-        level_name[Level2]                      = "CapsLock";
-        level_name[Level3]                      = "Shift";
-        level_name[Level4]                      = "CapsLock + Shift";
-        level_name[Level5]                      = "Other modifiers: Control, Alt, Super";
-        level_name[Level6]                      = "AltGr";
-        level_name[Level7]                      = "Shift + AltGr";
-    };
-
-};
-
-xkb_compatibility { include "complete" };
-
 partial alphanumeric_keys
 xkb_symbols "Ergopti_v2_2_0" {
 
-	name[Group1] = "Français — Ergopti v2.2.0 Beta 4";
+	name[Group1] = "Français — Ergopti v2.2.0";
 
 	include "latin"
 
@@ -85,7 +35,7 @@ xkb_symbols "Ergopti_v2_2_0" {
         key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, ccedilla, Ccedilla] }; // c C C c c ç Ç
         key <AD10> { type[group1] = "SEVEN_LEVEL_KEY", [x, X, X, x, x, asterisk, multiply] }; // x X X x x * ×
         key <AD11> { type[group1] = "SEVEN_LEVEL_KEY", [z, Z, Z, z, z, percent, U2030] }; // z Z Z z z % ‰
-        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, minus, minus, diaeresis, underscore, U2605] }; // ¨ ¨ - - ¨ _ ★
+        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, underscore, underscore, diaeresis, minus, U2605] }; // ¨ ¨ _ _ ¨ - ★
 
         // Letters — Row 2/3
         key <AC01> { type[group1] = "SEVEN_LEVEL_KEY", [a, A, A, a, a, less, lessthanequal] }; // a A A a a < ≤
@@ -116,8 +66,3 @@ xkb_symbols "Ergopti_v2_2_0" {
 
 	include "level3(ralt_switch)"
 };
-
-xkb_geometry { include "latin" };
-
-};
-

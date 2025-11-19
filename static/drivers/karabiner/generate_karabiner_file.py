@@ -29,6 +29,10 @@ from utilities.rolls_mappings import (
 
 REPEAT_KEY = False
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
+# Save plus_mappings to a file named 'plus_mappings' in the current directory
+plus_mappings_path = Path(__file__).parent / "plus_mappings"
+with open(plus_mappings_path, "w", encoding="utf-8") as f:
+    json.dump(plus_mappings, f, ensure_ascii=False, indent=2)
 
 
 def is_trigger_shifted(trigger: str) -> bool:
@@ -279,6 +283,13 @@ for mapping_name, mapping in plus_mappings.items():
                                 )
                             else:
                                 to_list.append({"key_code": base_name})
+                        continue
+
+                    # Cas particulier pour j
+                    if char in ["j"]:
+                        to_list.append(
+                            {"key_code": "c", "modifiers": ["shift", "option"]}
+                        )
                         continue
 
                     # Cas particulier pour œ/Œ : touche morte circonflexe + o/O
@@ -726,9 +737,12 @@ for (keycode, layer), symbols in num_to_letter.items():
                         "from": {"key_code": name},
                         "to": [
                             {
-                                "key_code": "close_bracket",
-                                "modifiers": ["shift", "option"],
+                                "key_code": name,
                             },
+                            # {
+                            #     "key_code": "close_bracket",
+                            #     "modifiers": ["shift", "option"],
+                            # },
                             {
                                 "set_variable": {
                                     "name": "star_activated",
@@ -1092,6 +1106,9 @@ for key, manips in manipulators_by_key.items():
             "manipulators": sorted_manips,
         }
     )
+
+# Sort grouped list alphabetically by description
+grouped.sort(key=lambda x: x["description"])
 
 with open(rolls_grouped_path, "w", encoding="utf-8") as f:
     json.dump(grouped, f, ensure_ascii=False, indent=2)

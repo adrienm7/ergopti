@@ -25,44 +25,42 @@
 	<p class="main text-center">
 		<ErgoptiPlus /> est une variante améliorée de la disposition <Ergopti /> qui tire parti des meilleures
 		fonctionnalités des claviers programmables et outils d’automatisation. Elle se rapproche de très
-		près de la
-		<span class="important">disposition clavier idéale</span>. En effet, elle :
+		près <span class="nowrap">de la <strong>disposition clavier idéale</strong> :</span>
 	</p>
 	<div class="cards">
 		<div class="card">
 			<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i>
-			Ajoute de
+			Ajout de
 			<span class="text-bold">nouveaux roulements</span> extrêmement confortables.
 		</div>
 		<div class="card">
 			<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important"
-				>Éradique la quasi-totalité des <span class="nowrap"><SFB />s</span></span
-			> pour une frappe ultra-fluide et sans inconfort.
+			<strong>Éradication de la quasi-totalité des <span class="nowrap"><SFB />s</span></strong> pour
+			une frappe ultra-fluide et sans inconfort.
 		</div>
 		<div class="card">
 			<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
-			<span class="text-bold">Réduit les distances parcourues par les doigts</span>, en particulier
-			l’auriculaire droit.
+			<span class="text-bold">Réduction des distances parcourues par les doigts</span>, en
+			particulier l’auriculaire droit.
 		</div>
 		<div class="card">
-			<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajoute de
-			<span class="important">nombreux raccourcis</span>
+			<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajout de
+			<strong>nombreux raccourcis</strong>
 			tels qu’un layer de navigation, des tap-holds et des touches
 			<kbd-output>Alt + Tab</kbd-output>,
 			<kbd-output>OneShotShift</kbd-output> et <kbd-output>CapsWord</kbd-output>.
 		</div>
 		<div class="card">
 			<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>
-			Fonctionnalités d’<span class="text-bold">autocorrection et de snippets</span>. Permet
+			Fonctionnalités d’<span class="text-bold">autocorrection et de snippets</span>. Cela permet
 			également d’écrire des
 			<span class="text-bold">symboles complexes et des emojis</span>.
 		</div>
 		<div class="card">
 			<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i> Chaque
 			fonctionnalité est optionnelle, désactivable et
-			<span class="important">peut être intégrée au fil du temps</span>. Nul besoin de chercher à
-			tout utiliser dès le départ.
+			<strong>peut être intégrée au fil du temps</strong>. Nul besoin de chercher à tout apprendre
+			ou utiliser dès le départ.
 		</div>
 	</div>
 	<tiny-space></tiny-space>
@@ -73,36 +71,46 @@
 	<div class="main">
 		<div class="encadre">
 			Cependant, l’utilisation d’<ErgoptiPlus></ErgoptiPlus> nécessite des
-			<span class="important">outils de programmation de clavier :</span>
+			<strong>outils de programmation de clavier :</strong>
 			<ul>
 				<li>
-					Sur Windows, le programme <a class="link" href="https://www.autohotkey.com/">AutoHotkey</a
+					Sur Windows, le programme <a
+						class="link"
+						href="https://www.autohotkey.com/"
+						target="_blank">AutoHotkey</a
 					>
 					est utilisé afin de réaliser ces changements. Il donne une immense liberté et est l’implémentation
-					actuelle d’<ErgoptiPlus></ErgoptiPlus>.
+					la plus complète d’<ErgoptiPlus></ErgoptiPlus>.
 				</li>
 				<li>
 					Sur macOS,
-					<a class="link" href="https://karabiner-elements.pqrs.org/">Karabiner Elements</a>
-					permettrait de réaliser une partie des fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>.
-					Celles pouvant être implémentées sont les remappages de touches, les tap-holds et la
-					création d’un layer de navigation. Cependant, ce logiciel ne gère pas les hotstrings
-					(remplacements de texte), ce qui ne permet pas d’utiliser la moitié des possibilités d’<ErgoptiPlus
-					></ErgoptiPlus> sur macOS : création de nouveaux roulements, touche <kbd>,</kbd> de
-					correction de <SFB></SFB>s, touche
-					<kbd>★</kbd> de répétition et d’expansion de texte, etc. Peut-être un programme complémentaire
-					pourrait se charger de cette partie, mais il n’y a pas de solution aussi simple et puissante
-					qu’AutoHotkey sur macOS.
+					<a href="https://karabiner-elements.pqrs.org/" target="_blank" class="link"
+						>Karabiner Elements</a
+					>
+					et <a href="https://www.alfredapp.com/" target="_blank" class="link">Alfred</a> permettent
+					de se rapprocher de très près de toutes les fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>.
+				</li>
+				<li>
+					Sur Linux, les meilleurs outils sont actuellement <a
+						class="link"
+						href="https://github.com/jtroo/kanata/"
+						target="_blank">Kanata</a
+					>
+					et
+					<a href="https://espanso.org/" target="_blank" class="link">Espanso</a>. Ce sont des
+					programmes open source et fonctionnant sur tous les OS, mais qui ne sont actuellement pas
+					aussi bons que leurs alternatives sur macOS, et encore moins qu’AutoHotkey sur Windows.
 				</li>
 				<li>
 					Il est aussi possible de programmer le firmware de son clavier (avec <a
 						class="link"
-						href="https://qmk.fm/">QMK</a
+						href="https://qmk.fm/"
+						target="_blank">QMK</a
 					>
-					ou <a class="link" href="https://zmk.dev/">ZMK</a>) pour bénéficier de ce genre de
-					fonctionnalités quelle que soit la plateforme (Windows, Mac, Linux, etc.). Cependant, cela
-					nécessite beaucoup de travail et là encore toutes les possibilités d’AutoHotkey ne seront
-					pas disponibles.
+					ou <a href="https://zmk.dev/" target="_blank" class="link">ZMK</a>) pour bénéficier de ce
+					genre de fonctionnalités quelle que soit la plateforme (Windows, Mac, Linux, etc.).
+					Cependant, cela nécessite beaucoup de travail et là encore toutes les possibilités
+					d’AutoHotkey ne seront pas disponibles.
 				</li>
 			</ul>
 		</div>

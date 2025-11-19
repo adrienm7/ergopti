@@ -16,8 +16,32 @@ image-block p {
 	font-weight: bold;
 }
 
+picture {
+	display: block;
+	text-align: center;
+}
+
 /* Correction du problème d’images étirées */
 picture img {
 	height: auto !important;
 	width: 100% !important;
+}
+
+/* If you want to avoid upscaling an image (keep intrinsic size), add this class */
+.no-upscale,
+.no-upscale img {
+	display: inline-block;
+	height: auto !important;
+	max-width: none !important;
+	width: auto !important;
+}
+
+/* Icons */
+.icon-discord {
+	vertical-align: -0.17em;
+}
+.icon-github {
+	/* Fix to prevent icon cropped on the right */
+	transform: scale(0.901288) translateX(-0.05em);
+	vertical-align: -0.065em;
 }

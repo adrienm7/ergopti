@@ -18,20 +18,13 @@
 	</p>
 	<p>
 		Par conséquent, il est également important de s’assurer que, grâce à sa disposition clavier,
-		beaucoup d’actions courantes puissent se réaliser avec la seule main gauche <span
-			class="important">afin de ne pas avoir à lâcher la souris</span
-		>. À noter que sur ce point AZERTY est très bon car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
+		beaucoup d’actions courantes puissent se réaliser avec la seule main gauche <strong
+			>afin de ne pas avoir à lâcher la souris</strong
+		>. À noter que sur ce point AZERTY est très bon, car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
 		et de nombreuses autres lettres fréquemment utilisées pour faire des raccourcis en combinaison avec
 		<kbd>Ctrl</kbd> sont du côté gauche.
 	</p>
-	<p>
-		Avec <Ergopti />, le <kbd>=</kbd> a ainsi été dupliqué à gauche pour être mis en accès direct.
-		Cela permet de faire facilement des raccourcis, notamment sur Excel, tels que <kbd>=</kbd> et
-		<kbd>Alt</kbd>
-		+
-		<kbd>=</kbd>. En effet, normalement le <kbd>=</kbd> se situe en <kbd>AltGr</kbd> +
-		<kbd>L</kbd>.
-	</p>
+
 
 	<h3>
 		Conservation des raccourcis <kbd>Ctrl</kbd> + <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd> et
@@ -46,7 +39,7 @@
 		+ <kbd-output>C</kbd-output>,
 		<kbd-output>Ctrl</kbd-output>
 		+ <kbd-output>V</kbd-output> et <kbd-output>Ctrl</kbd-output> + <kbd-output>Z</kbd-output>
-		sont également conservés à gauche. Cela permet de les réaliser sans avoir à bouger la main droite.
+		sont conservés à gauche avec <Ergopti></Ergopti>. Cela permet de les réaliser sans avoir à bouger la main droite.
 		Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>, <kbd>Ctrl</kbd> +
 		<kbd>É</kbd>,
 		<kbd>Ctrl</kbd>
@@ -69,16 +62,16 @@
 		La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier des
 		touches de raccourci de la version Ergodox, car les touches à sa gauche sont déjà occupées par
 		les touches
-		<kbd>Shift</kbd>, <kbd>"CapsLock"</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
+		<kbd>Shift</kbd>, <kbd>CapsLock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
 		placer ces 3 touches sous les pouces.
 	</p>
 	<p>
-		<ErgoptiPlus /> donne toutefois le moyen de contourner les limites de la version ISO grâce à un
-		<span class="important">mécanisme de tap-hold</span>. L’idée du tap-hold est qu’il est possible
-		d’assigner deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir
-		pressé). Grâce au tap-hold, il devient possible d’avoir le comportement suivant : taper une
-		touche envoie un raccourci, mais la presser la fait se comporter normalement. Cela permet
-		d’intégrer des touches
+		<ErgoptiPlus /> donne toutefois un moyen de contourner les limites de la version ISO grâce à un
+		<strong>mécanisme de tap-hold</strong>. L’idée du tap-hold est qu’il est possible d’assigner
+		deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir pressé).
+		Grâce au tap-hold, il devient possible d’avoir le comportement suivant : presser puis relâcher un modificateur envoie
+		un raccourci, mais le presser en combinaison avec une autre touche le fait se comporter normalement. Cela permet d’intégrer des
+		touches
 		<kbd-output>Copier</kbd-output>, <kbd-output>Coller</kbd-output> et
 		<kbd-output>Alt+Tab</kbd-output>
 		respectivement sur

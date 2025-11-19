@@ -15,13 +15,13 @@
 		Analyse de la vraie disposition<br /><ErgoptiPlus></ErgoptiPlus>
 	</h2>
 	<p>
-		Une réelle analyse de <ErgoptiPlus></ErgoptiPlus> nécessite de modifier le corpus afin d’y refléter
+		Une réelle analyse d’<ErgoptiPlus></ErgoptiPlus> nécessite de modifier le corpus afin d’y refléter
 		les nouvelles manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres
 		du corpus pour les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB
 		></SFB>s pris en charge par <ErgoptiPlus></ErgoptiPlus>, comme <kbd-output>pt</kbd-output> en
 		<kbd>,t</kbd>, doivent être remplacés. Un
-		<a href="/corpus/conversion_corpus.py" class="link">simple script Python</a> permet de faire ces
-		modifications.
+		<a href="/corpus/conversion_corpus.py" download class="link">simple script Python</a> permet de faire
+		ces modifications.
 	</p>
 	<p>
 		Toutefois, modifier le corpus rend la comparaison avec les autres dispositions plus compliquée,
@@ -32,8 +32,7 @@
 		leurs stats.
 	</p>
 	<p>
-		Voici les résultats de <ErgoptiPlus></ErgoptiPlus> obtenus sur le corpus français-anglais Essais
-		:
+		Voici les résultats d’<ErgoptiPlus></ErgoptiPlus> obtenus sur le corpus français-anglais Essais :
 	</p>
 	<image-block>
 		<enhanced:img
@@ -82,7 +81,7 @@
 	<p>
 		Ce gain peut paraître dérisoire, mais c’est quand même un gain de 10% de touches en moins à
 		taper ! Ou autrement dit une augmentation de la vitesse de 10% sans effort (si ce n’est
-		mémoriser les raccourcis de <ErgoptiPlus></ErgoptiPlus>).
+		mémoriser les raccourcis d’<ErgoptiPlus></ErgoptiPlus>).
 	</p>
 	<p>
 		La réduction du nombre de touches à taper peut encore s’accroître en personnalisant sa

@@ -9,10 +9,10 @@
 
 	<p>
 		La disposition de clavier <Ergopti />, ses pilotes ainsi que son site de présentation
-		<a class="link" href="https://ergopti.fr">https://ergopti.fr</a>
-		sont distribués sous la <strong class="important">licence MIT</strong>. Le code source est
-		librement disponible sur GitHub :
-		<a class="link" href="https://github.com/adrienm7/ergopti"
+		<a href="https://ergopti.fr" class="link">https://ergopti.fr</a>
+		sont distribués sous la <strong>licence MIT</strong>. Le code source est librement disponible
+		sur GitHub :
+		<a href="https://github.com/adrienm7/ergopti" class="link"
 			>https://github.com/adrienm7/ergopti</a
 		>.
 	</p>

@@ -1543,18 +1543,66 @@ ToggleAllFeaturesOff(*) {
     ToggleAllFeatures(0)
 }
 ToggleAllFeatures(Value) {
-    ; TO UPDATE because it isn’t easy like that anymore with one more level
+    ; Behavior:
+    ; - If Value == 0 : set everything to 0 recursively (including sub-sub-menus)
+    ; - If Value == 1 : set only first-level features (the defaults) to 1; do not enable nested choices
     global Features
-    for FeatureCategory in Features {
-        if FeatureCategory == "__Order" {
-            continue
-        }
-        for FeatureName in Features[FeatureCategory] {
-            if FeatureName == "__Order" {
+
+    ; Recursive setter used when Value == 0
+    SetAllRecursive(Path, Items) {
+        for Key, Val in Items {
+            if Key == "__Order" {
                 continue
             }
-            Features[FeatureCategory][FeatureName].Enabled := Value
-            IniWrite(Value, ConfigurationFile, FeatureCategory, FeatureName . ".Enabled")
+            NewPath := (Path = "") ? Key : Path "." Key
+            if Type(Val) == "Map" {
+                if Val.HasOwnProp("Enabled") {
+                    ; The Enabled flag of the map itself is written in the parent section
+                    parentSection := Path = "" ? Key : Path
+                    Val.Enabled := Value
+                    IniWrite(Value, ConfigurationFile, parentSection, Key . ".Enabled")
+                }
+                ; Recurse into nested entries to set their Enabled to Value
+                SetAllRecursive(NewPath, Val)
+            } else if IsObject(Val) and Val.HasOwnProp("Enabled") {
+                ; For leaf features, write under the section corresponding to the parent path
+                pos := InStr(NewPath, ".", , -1)
+                if pos {
+                    section := SubStr(NewPath, 1, pos - 1)
+                    keyName := SubStr(NewPath, pos + 1)
+                } else {
+                    section := NewPath
+                    keyName := ""
+                }
+                Val.Enabled := Value
+                if keyName = "" {
+                    IniWrite(Value, ConfigurationFile, section, Key . ".Enabled")
+                } else {
+                    IniWrite(Value, ConfigurationFile, section, keyName . ".Enabled")
+                }
+            }
+        }
+    }
+
+    if (Value == 0) {
+        ; Disable everything recursively
+        SetAllRecursive("", Features)
+    } else {
+        ; Enable only first-level/default features (do not descend into nested choices)
+        for Category, Items in Features {
+            if Category == "__Order" {
+                continue
+            }
+            for FeatureName, Val in Items {
+                if FeatureName == "__Order" {
+                    continue
+                }
+                if IsObject(Val) and Val.HasOwnProp("Enabled") {
+                    Val.Enabled := Value
+                    IniWrite(Value, ConfigurationFile, Category, FeatureName . ".Enabled")
+                }
+                ; If Val is a Map without Enabled, we skip its children when enabling
+            }
         }
     }
     Reload
@@ -2162,6 +2210,7 @@ SC00C:: SendNewResult("%")
 SC00D:: SendNewResult("=")
 #HotIf
 
+; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards
 if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC039", " ")
 
@@ -2177,7 +2226,11 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC018", "c")
     RemapKey("SC019", "x")
     RemapKey("SC01A", "z")
-    SC01B:: DeadKey(DeadkeyMappingDiaresis)
+    Hotkey(
+        "SC01B",
+        (*) => DeadKey(DeadkeyMappingDiaresis),
+        "I2"
+    )
 
     ; === Middle row ===
     RemapKey("SC01E", "a")
@@ -2191,7 +2244,11 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC026", "t")
     RemapKey("SC027", "r")
     RemapKey("SC028", "q")
-    SC02B:: DeadKey(DeadkeyMappingCircumflex)
+    Hotkey(
+        "SC02B",
+        (*) => DeadKey(DeadkeyMappingCircumflex),
+        "I2"
+    )
 
     ; === Bottom row ===
     RemapKey("SC056", Features["Shortcuts"]["ECirc"].Letter, "ê")
@@ -2215,84 +2272,84 @@ if Features["MagicKey"]["Replace"].Enabled {
 ; ======= 3.2) Shift =======
 ; ==========================
 
-if Features["Layout"]["ErgoptiBase"].Enabled {
-    ; === Space bar ===
-    +SC039:: WrapTextIfSelected("-", "-", "-")
+#HotIf Features["Layout"]["ErgoptiBase"].Enabled
+; === Space bar ===
++SC039:: WrapTextIfSelected("-", "-", "-")
 
-    ; === Number row ===
-    +SC029:: {
-        ActivateHotstrings()
-        SendNewResult(" €") ; Thin non-breaking space
-    }
-    +SC002:: SendNewResult("1")
-    +SC003:: SendNewResult("2")
-    +SC004:: SendNewResult("3")
-    +SC005:: SendNewResult("3")
-    +SC006:: SendNewResult("5")
-    +SC007:: SendNewResult("6")
-    +SC008:: SendNewResult("7")
-    +SC009:: SendNewResult("8")
-    +SC00A:: SendNewResult("9")
-    +SC00B:: SendNewResult("0")
-    +SC00C:: {
-        ActivateHotstrings()
-        SendNewResult(" %") ; Thin non-breaking space
-    }
-    +SC00D:: SendNewResult("º")
-
-    ; === Top row ===
-    +SC010:: SendNewResult("È")
-    +SC011:: SendNewResult("Y")
-    +SC012:: SendNewResult("O")
-    +SC013:: SendNewResult("W")
-    +SC014:: SendNewResult("B")
-    +SC015:: SendNewResult("F")
-    +SC016:: SendNewResult("G")
-    +SC017:: SendNewResult("H")
-    +SC018:: SendNewResult("C")
-    +SC019:: SendNewResult("X")
-    +SC01A:: SendNewResult("Z")
-    +SC01B:: SendNewResult("-")
-
-    ; === Middle row ===
-    +SC01E:: SendNewResult("A")
-    +SC01F:: SendNewResult("I")
-    +SC020:: SendNewResult("E")
-    +SC021:: SendNewResult("U")
-    +SC022:: {
-        ActivateHotstrings()
-        SendNewResult(" :") ; Non-breaking space
-    }
-    +SC023:: SendNewResult("V")
-    +SC024:: SendNewResult("S")
-    +SC025:: SendNewResult("N")
-    +SC026:: SendNewResult("T")
-    +SC027:: SendNewResult("R")
-    +SC028:: SendNewResult("Q")
-    +SC02B:: {
-        ActivateHotstrings()
-        SendNewResult(" !") ; Thin non-breaking space
-    }
-
-    ; === Bottom row ===
-    +SC056:: SendNewResult("Ê")
-    +SC02C:: SendNewResult("É")
-    +SC02D:: SendNewResult("À")
-    +SC02E:: SendNewResult("J")
-    +SC02F:: {
-        ActivateHotstrings()
-        SendNewResult(" ;") ; Thin non-breaking space
-    }
-    +SC030:: SendNewResult("K")
-    +SC031:: SendNewResult("M")
-    +SC032:: SendNewResult("D")
-    +SC033:: SendNewResult("L")
-    +SC034:: SendNewResult("P")
-    +SC035:: {
-        ActivateHotstrings()
-        SendNewResult(" ?") ; Thin non-breaking space
-    }
+; === Number row ===
++SC029:: {
+    ActivateHotstrings()
+    SendNewResult(" €") ; Thin non-breaking space
 }
++SC002:: SendNewResult("1")
++SC003:: SendNewResult("2")
++SC004:: SendNewResult("3")
++SC005:: SendNewResult("3")
++SC006:: SendNewResult("5")
++SC007:: SendNewResult("6")
++SC008:: SendNewResult("7")
++SC009:: SendNewResult("8")
++SC00A:: SendNewResult("9")
++SC00B:: SendNewResult("0")
++SC00C:: {
+    ActivateHotstrings()
+    SendNewResult(" %") ; Thin non-breaking space
+}
++SC00D:: SendNewResult("º")
+
+; === Top row ===
++SC010:: SendNewResult("È")
++SC011:: SendNewResult("Y")
++SC012:: SendNewResult("O")
++SC013:: SendNewResult("W")
++SC014:: SendNewResult("B")
++SC015:: SendNewResult("F")
++SC016:: SendNewResult("G")
++SC017:: SendNewResult("H")
++SC018:: SendNewResult("C")
++SC019:: SendNewResult("X")
++SC01A:: SendNewResult("Z")
++SC01B:: SendNewResult("-")
+
+; === Middle row ===
++SC01E:: SendNewResult("A")
++SC01F:: SendNewResult("I")
++SC020:: SendNewResult("E")
++SC021:: SendNewResult("U")
++SC022:: {
+    ActivateHotstrings()
+    SendNewResult(" :") ; Non-breaking space
+}
++SC023:: SendNewResult("V")
++SC024:: SendNewResult("S")
++SC025:: SendNewResult("N")
++SC026:: SendNewResult("T")
++SC027:: SendNewResult("R")
++SC028:: SendNewResult("Q")
++SC02B:: {
+    ActivateHotstrings()
+    SendNewResult(" !") ; Thin non-breaking space
+}
+
+; === Bottom row ===
++SC056:: SendNewResult("Ê")
++SC02C:: SendNewResult("É")
++SC02D:: SendNewResult("À")
++SC02E:: SendNewResult("J")
++SC02F:: {
+    ActivateHotstrings()
+    SendNewResult(" ;") ; Thin non-breaking space
+}
++SC030:: SendNewResult("K")
++SC031:: SendNewResult("M")
++SC032:: SendNewResult("D")
++SC033:: SendNewResult("L")
++SC034:: SendNewResult("P")
++SC035:: {
+    ActivateHotstrings()
+    SendNewResult(" ?") ; Thin non-breaking space
+}
+#HotIf
 
 ; =============================
 ; ======= 3.3) CapsLock =======
@@ -2425,12 +2482,7 @@ SC138 & SC018:: RemapAltGr(
 )
 #HotIf
 
-; AltGr layer of the Ergopti layout
-#HotIf Features["Layout"]["ErgoptiAltGr"].Enabled
-
-; === Space bar ===
-SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
-
+#HotIf Features["Layout"]["ErgoptiAltGr"].Enabled and Features["Layout"]["ErgoptiBase"].Enabled
 ; === Number row ===
 SC138 & SC029:: RemapAltGr((*) => SendNewResult("€"), (*) => DeadKey(DeadkeyMappingCurrency))
 SC138 & SC002:: RemapAltGr((*) => SendNewResult("¹"), (*) => SendNewResult("₁"))
@@ -2458,7 +2510,11 @@ SC138 & SC00D:: RemapAltGr((*) => SendNewResult("°"), (*) => SendNewResult("ª"
 ^!SC009:: SendFinalResult("^!{Numpad8}")
 ^!SC00A:: SendFinalResult("^!{Numpad9}")
 ^!SC00B:: SendFinalResult("^!{Numpad0}")
+#HotIf
 
+#HotIf Features["Layout"]["ErgoptiAltGr"].Enabled
+; === Space bar ===
+SC138 & SC039:: WrapTextIfSelected("_", "_", "_")
 ; === Top row ===
 SC138 & SC010:: RemapAltGr(
     (*) => WrapTextIfSelected("``", "``", "``"),
@@ -3010,7 +3066,7 @@ if Features["Shortcuts"]["Search"].Enabled {
         }
 
         ; Normalize leading Computer\ prefix to French "Ordinateur\"
-        if StrLeft(RegPath, 9) == "Computer\" {
+        if SubStr(RegPath, 1, 9) == "Computer\" {
             RegPath := "Ordinateur\" . SubStr(RegPath, 10)
         }
 
@@ -4507,6 +4563,10 @@ if Features["Rolls"]["AssignArrowMinusLeft"].Enabled {
     )
 }
 if Features["Rolls"]["CT"].Enabled {
+    CreateHotstring(
+        "*?", "p ?", "p ?",
+        Map("TimeActivationSeconds", Features["Rolls"]["CT"].TimeActivationSeconds)
+    ) ; Fix "stp ?"
     CreateCaseSensitiveHotstrings(
         "*?", "p'", "ct",
         Map("TimeActivationSeconds", Features["Rolls"]["CT"].TimeActivationSeconds)
@@ -4696,6 +4756,24 @@ if Features["Autocorrection"]["MultiplePunctuationMarks"].Enabled {
     )
     CreateHotstring(
         "*", "? ?", "??",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+
+    CreateHotstring(
+        "*", " ! ?", " !?",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "! ?", "!?",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+
+    CreateHotstring(
+        "*", " ? !", " ?!",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
+    )
+    CreateHotstring(
+        "*", "? !", "?!",
         Map("TimeActivationSeconds", Features["Autocorrection"]["MultiplePunctuationMarks"].TimeActivationSeconds)
     )
 

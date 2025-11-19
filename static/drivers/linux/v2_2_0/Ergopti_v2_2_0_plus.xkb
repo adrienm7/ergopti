@@ -1,93 +1,7 @@
-xkb_keymap        {
-
-xkb_keycodes      { include "evdev+aliases(azerty)" };
-
-xkb_types         { 
-    include "complete"
-
-    type "SEVEN_LEVEL_KEY" {
-        modifiers = Shift + Lock + LevelThree + Control + Alt + Mod4;
-
-        // ==============================
-        // ======= Level mappings =======
-        // ==============================
-
-        map[None]                               = Level1;
-
-        // Level 2: CapsLock only
-        map[Lock]                               = Level2;
-
-        // Level 3: Shift only
-        map[Shift]                              = Level3;
-
-        // Level 4: CapsLock + Shift
-        map[Lock + Shift]                       = Level4;
-
-        // Level 5: Other modifiers (Control, Alt, Super)
-        map[Alt]                                = Level5;
-        map[Control]                            = Level5;
-        map[Mod4]                               = Level5;
-        map[Control + Alt]                      = Level5;
-        map[Control + Mod4]                     = Level5;
-        map[Alt + Mod4]                         = Level5;
-        map[Control + Alt + Mod4]               = Level5;
-        map[Shift + Alt]                        = Level5;
-        map[Shift + Control]                    = Level5;
-        map[Shift + Mod4]                       = Level5;
-        map[Shift + Control + Alt]              = Level5;
-        map[Shift + Control + Mod4]             = Level5;
-        map[Shift + Alt + Mod4]                 = Level5;
-        map[Shift + Control + Alt + Mod4]       = Level5;
-
-        // Level 6: AltGr (LevelThree)
-        map[LevelThree]                         = Level6;
-        map[Lock + LevelThree]                  = Level6;
-
-        // Level 7: Shift + AltGr
-        map[Shift + LevelThree]                 = Level7;
-        map[Lock + Shift + LevelThree]          = Level7;
-
-        // =====================================
-        // ======= Modifier preservation =======
-        // =====================================
-
-        // Keep these modifiers active in the final key event
-        preserve[Alt]                           = Alt;
-        preserve[Control]                       = Control;
-        preserve[Mod4]                          = Mod4;
-        preserve[Control + Alt]                 = Control + Alt;
-        preserve[Control + Mod4]                = Control + Mod4;
-        preserve[Alt + Mod4]                    = Alt + Mod4;
-        preserve[Control + Alt + Mod4]          = Control + Alt + Mod4;
-        preserve[Shift + Alt]                   = Shift + Alt;
-        preserve[Shift + Control]               = Shift + Control;
-        preserve[Shift + Mod4]                  = Shift + Mod4;
-        preserve[Shift + Control + Alt]         = Shift + Control + Alt;
-        preserve[Shift + Control + Mod4]        = Shift + Control + Mod4;
-        preserve[Shift + Alt + Mod4]            = Shift + Alt + Mod4;
-        preserve[Shift + Control + Alt + Mod4]  = Shift + Control + Alt + Mod4;
-
-        // ===========================
-        // ======= Level names =======
-        // ===========================
-        
-        level_name[Level1]                      = "Base";
-        level_name[Level2]                      = "CapsLock";
-        level_name[Level3]                      = "Shift";
-        level_name[Level4]                      = "CapsLock + Shift";
-        level_name[Level5]                      = "Other modifiers: Control, Alt, Super";
-        level_name[Level6]                      = "AltGr";
-        level_name[Level7]                      = "Shift + AltGr";
-    };
-
-};
-
-xkb_compatibility { include "complete" };
-
 partial alphanumeric_keys
 xkb_symbols "Ergopti_v2_2_0_plus" {
 
-	name[Group1] = "Français — Ergopti+ v2.2.0 Beta 4";
+	name[Group1] = "Français — Ergopti+ v2.2.0";
 
 	include "latin"
 
@@ -121,7 +35,7 @@ xkb_symbols "Ergopti_v2_2_0_plus" {
         key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, exclam, onefifth] }; // c C C c c ! " !"
         key <AD10> { type[group1] = "SEVEN_LEVEL_KEY", [x, X, X, x, x, asterisk, multiply] }; // x X X x x * ×
         key <AD11> { type[group1] = "SEVEN_LEVEL_KEY", [z, Z, Z, z, z, percent, U2030] }; // z Z Z z z % ‰
-        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, minus, minus, diaeresis, underscore, U2605] }; // ¨ ¨ - - ¨ _ ★
+        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [j, dead_diaeresis, underscore, underscore, diaeresis, minus, dead_diaeresis] }; // j ¨ _ _ ¨ - ¨
 
         // Letters — Row 2/3
         key <AC01> { type[group1] = "SEVEN_LEVEL_KEY", [a, A, A, a, a, less, lessthanequal] }; // a A A a a < ≤
@@ -141,7 +55,7 @@ xkb_symbols "Ergopti_v2_2_0_plus" {
         key <LSGT> { type[group1] = "SEVEN_LEVEL_KEY", [ecircumflex, Ecircumflex, Ecircumflex, ecircumflex, x, asciicircum, dead_circumflex] }; // ê Ê Ê ê x ^ ^
         key <AB01> { type[group1] = "SEVEN_LEVEL_KEY", [eacute, Eacute, Eacute, eacute, c, slash, division] }; // é É É é c / ÷
         key <AB02> { type[group1] = "SEVEN_LEVEL_KEY", [agrave, Agrave, Agrave, agrave, v, backslash, downarrow] }; // à À À à v \ ᵢ
-        key <AB03> { type[group1] = "SEVEN_LEVEL_KEY", [j, J, J, j, j, quotedbl, j] }; // j J J j j " j
+        key <AB03> { type[group1] = "SEVEN_LEVEL_KEY", [U2605, J, J, j, j, quotedbl, j] }; // ★ J J j j " j
         key <AB04> { type[group1] = "SEVEN_LEVEL_KEY", [comma, comma, onesixth, onesixth, comma, semicolon, ellipsis] }; // , , " ;" " ;" , ; …
         key <AB05> { type[group1] = "SEVEN_LEVEL_KEY", [k, K, K, k, k, ellipsis, plus] }; // k K K k k … +
         key <AB06> { type[group1] = "SEVEN_LEVEL_KEY", [m, M, M, m, m, ampersand, U2212] }; // m M M m m & −
@@ -152,8 +66,3 @@ xkb_symbols "Ergopti_v2_2_0_plus" {
 
 	include "level3(ralt_switch)"
 };
-
-xkb_geometry { include "latin" };
-
-};
-

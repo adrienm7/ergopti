@@ -16,6 +16,7 @@ from levels import LEVELS
 from unused_symbols import UNUSED_SYMBOLS
 from utilities.keylayout_extraction import (
     extract_keymap_body,
+    extract_actions_body,
     get_symbol,
 )
 
@@ -55,12 +56,14 @@ def generate_xkb(
         new_xkb, mapping = generate_xkb(template, xml_data)
     """
     keymaps: List[Any] = extract_keymaps(keylayout_data)
+    actions_body = extract_actions_body(keylayout_data)
 
     for xkb_key, macos_code in LINUX_TO_MACOS_KEYCODES:
         symbols, comment_symbols = generate_symbols_and_comments(
             xkb_key,
             macos_code,
             keymaps,
+            actions_body,
         )
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         comment = " // " + " ".join(comment_symbols)
@@ -101,6 +104,7 @@ def generate_symbols_and_comments(
     xkb_key: str,
     macos_code: str,
     keymaps: List[Any],
+    actions_body: str,
 ) -> Tuple[List[str], List[str]]:
     """Generates the list of XKB symbols and comments for a given key.
 
@@ -116,7 +120,9 @@ def generate_symbols_and_comments(
     symbols: List[str] = []
     comment_symbols: List[str] = []
     for layer, keymap_body in enumerate(keymaps):
-        symbol = get_symbol(keymap_body, macos_code)
+        symbol = get_symbol(keymap_body, macos_code, actions_body)
+        if layer != 0 and macos_code == 8 and symbol == "★":
+            symbol = "j"
         linux_name = get_linux_name_from_output(
             symbol,
             layer,

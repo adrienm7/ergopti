@@ -3,6 +3,7 @@
 	--gradient-blue: #3088ed 0%, #02c9db 100%;
 	--gradient-purple: #f2dfff 0%, #db4bff 100%;
 	--gradient-purple-dark: #ab2dff 0%, #62007a 100%;
+	--couleur-ombre: rgb(24, 99, 146);
 
 	--largeur-main: 72.5vw;
 	--main-width: clamp(min(850px, 100vw), var(--largeur-main), 950px);
@@ -12,7 +13,7 @@ html,
 body {
 	color: white;
 	font-size: 100%;
-	font-size: clamp(14px, 0.3vw + 14px, 24px);
+	font-size: clamp(14px, 0.3vw + 14px, 18px);
 	scroll-behavior: smooth;
 }
 
@@ -31,7 +32,7 @@ body,
 
 /* New scrollbar design on Webkit browsers */
 
-::-webkit-scrollbar {
+*::-webkit-scrollbar {
 	width: 16px;
 }
 
@@ -40,7 +41,7 @@ body,
 	border-left: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
 	background: rgba(180, 180, 180, 0.5);
 	background-clip: content-box;
 	border: 3px solid transparent;

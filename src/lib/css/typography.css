@@ -1,7 +1,8 @@
 p,
 ul,
 .encadre,
-.tooltiptext {
+.tooltiptext,
+li {
 	line-height: 1.5em;
 	text-align: justify;
 }
@@ -10,7 +11,8 @@ ul,
 	p,
 	ul,
 	.encadre,
-	.tooltiptext {
+	.tooltiptext,
+	li {
 		text-align: left;
 	}
 }
@@ -25,9 +27,9 @@ ul,
 }
 
 .encadre {
-	background-color: rgba(0, 0, 0, 0.3);
-	border: 1px solid rgba(255, 255, 255, 0.7);
-	border-radius: 7px;
+	background-color: rgb(0, 23, 44);
+	border: 2px solid rgb(18, 59, 98);
+	border-radius: 10px;
 	margin: 0;
 	padding: 25px;
 }
@@ -42,7 +44,7 @@ strong,
 i,
 i .path2::before,
 em,
-.hyper,
+strong,
 .important {
 	-webkit-background-clip: text;
 	background-clip: text;
@@ -95,7 +97,9 @@ code {
 	color: white;
 	font-family: 'Fira Code', 'Fira Mono', 'Courier New', Courier, monospace;
 	font-size: 0.9em;
+	line-height: 1em;
 	padding: 0.1em 0.3em;
+	word-wrap: break-word;
 }
 
 /* Icons */
@@ -112,6 +116,19 @@ i .path1::before {
 	-webkit-background-clip: text;
 	background-clip: text;
 	background-color: #00407b !important;
+	-webkit-text-fill-color: transparent;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	color: transparent;
+	opacity: 1 !important;
+	text-decoration: none;
+}
+
+i .path3,
+i .path3::before {
+	-webkit-background-clip: text;
+	background-clip: text;
+	background-color: rgb(212, 250, 255) !important;
 	-webkit-text-fill-color: transparent;
 	-webkit-box-decoration-break: clone;
 	box-decoration-break: clone;

@@ -2,6 +2,8 @@ import re
 
 from data.symbol_names import ALIAS_TO_ENTITY
 
+from utilities.keylayout_extraction import extract_keymap_body
+from utilities.keylayout_modification import replace_keymap
 from utilities.logger import logger
 
 LOGS_INDENTATION = "\t"
@@ -87,6 +89,16 @@ def replace_action_to_output_extra_keys(
         fixed_body,
     )
 
+    # Replace action by output for the j key (8) on Shift + AltGr + J (layer 6)
+    keymap_6 = extract_keymap_body(fixed_body, 6)
+    new_keymap_6 = re.sub(
+        r'(<key code="8") action="(.*)"',
+        r'\1 output="\2"',
+        keymap_6,
+    )
+    # Reinsert the modified keymap into the full body and update fixed_body.
+    fixed_body = replace_keymap(fixed_body, 6, new_keymap_6)
+
     return fixed_body
 
 
@@ -125,18 +137,4 @@ def fix_ctrl_symbols(body: str) -> str:
     body = re.sub(
         r'(<key code="27"[^>]*(output|action)=")[^"]*(")', r"\1-\3", body
     )
-    return body
-
-
-def swap_keys(body: str, key1: int, key2: int) -> str:
-    """Swap key codes."""
-    logger.info(
-        "%s🔹 Swapping key codes %d and %d…",
-        LOGS_INDENTATION + "\t",
-        key1,
-        key2,
-    )
-    body = re.sub(f'code="{key2}"', "TEMP_CODE", body)
-    body = re.sub(f'code="{key1}"', f'code="{key2}"', body)
-    body = re.sub(r"TEMP_CODE", f'code="{key1}"', body)
     return body

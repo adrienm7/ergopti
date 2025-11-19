@@ -13,9 +13,7 @@
 	</p>
 	<p>
 		Qu’est-ce qu’un <SFB /> ? C’est le fait de
-		<span class="important">devoir taper deux touches d’affilée avec exactement le même doigt</span
-		>. Par exemple, c’est taper <kbd>DE</kbd> en AZERTY : il faut d’abord utiliser le majeur gauche
-		pour taper <kbd>D</kbd>, puis le remonter d’une rangée pour atteindre le <kbd>E</kbd>. Avec <Ergopti
+		<strong>devoir taper deux touches d’affilée avec exactement le même doigt</strong>. Par exemple, c’est taper <kbd>DE</kbd> en AZERTY : il faut d’abord utiliser le majeur gauche pour taper <kbd>D</kbd>, puis le remonter d’une rangée pour atteindre le <kbd>E</kbd>. Avec <Ergopti
 		/>, le
 		<kbd>D</kbd>
 		est sur l’annulaire droit sur la rangée du bas et le <kbd>E</kbd> est directement sur la rangée
@@ -29,7 +27,7 @@
 		deuxième, puis enfin frapper la deuxième touche, toujours avec le même doigt. Impossible de
 		déplacer deux doigts en même temps pour ne plus avoir qu’à taper dans le bon ordre sur les
 		touches atteintes. Le pire est quand ces <SFB />s constituent la majorité de nos frappes, ce qui
-		se produit si l’on utilise une disposition non optimisée telle que l’AZERTY.
+		se produit si l’on utilise une disposition non optimisée comme AZERTY.
 	</p>
 	<tiny-space></tiny-space>
 	<p>
@@ -38,10 +36,10 @@
 		>
 		(ou <em>digramme</em>). Pour optimiser une disposition clavier, il faut s’assurer que les
 		bigrammes les plus fréquents ne se fassent pas avec le même doigt : on parle de
-		<span class="important">limiter les <em>Same Finger Bigrams</em></span>.
+		<strong>limiter les <em>Same Finger Bigrams</em></strong>.
 	</p>
 	<p>
-		➜ Cette tâche est bien plus difficile qu’on le pense, car certaines lettres comme le <kbd>E</kbd
+		➜ Cette tâche est bien plus difficile qu’on puisse le penser, car certaines lettres comme le <kbd>E</kbd
 		>
 		ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
 		regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la

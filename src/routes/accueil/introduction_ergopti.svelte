@@ -27,11 +27,11 @@
 		<hr />
 		<p class="encart-introduction">
 			<strong><Ergopti></Ergopti></strong> est une
-			<strong class="hyper">disposition clavier ergonomique et optimisée</strong>
+			<strong>disposition clavier ergonomique et optimisée</strong>
 			pour le
-			<strong>français</strong>, l’<strong>anglais</strong> et la <strong>programmation</strong>.
-			Fruit de nombreuses réflexions et expérimentations, elle permet une frappe rapide, fluide et
-			<strong class="hyper">un&nbsp;confort&nbsp;d’exception</strong>.
+			<b>français</b>, l’<b>anglais</b> et la <b>programmation</b>. Fruit de nombreuses réflexions
+			et expérimentations, elle permet une frappe fluide, rapide et
+			<strong class="nowrap">un confort d’exception</strong>.
 		</p>
 		<hr />
 	</div>
@@ -41,44 +41,46 @@
 	<div class="cards">
 		<div class="card">
 			<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important">Diminution de la distance parcourue</span> par les doigts pour moins de
-			fatigue et plus de vitesse.
+			<strong>Diminution de la distance parcourue</strong> par les doigts pour moins de fatigue et plus
+			de vitesse.
 		</div>
 		<div class="card">
 			<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important">Frappe extrêmement fluide</span>
+			<strong>Frappe extrêmement fluide</strong>
 			par élimination de la quasi-totalité des
 			<span class="nowrap"><SFB />s.</span>
 		</div>
 		<div class="card">
 			<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important">Alternance des mains</span> maximisée pour paralléliser la frappe et ainsi
-			écrire plus vite.
+			<strong>Alternance des mains</strong> maximisée pour paralléliser la frappe et ainsi écrire plus
+			vite.
 		</div>
 		<div class="card">
 			<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important">Frappe ultra-confortable</span> grâce à une optimisation des roulements.
+			<strong>Frappe ultra-confortable</strong> grâce à une optimisation des roulements.
 		</div>
 		<div class="card">
 			<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important">Placement logique</span> des symboles, permettant de s’en souvenir aisément.
+			<strong>Placement logique</strong> des symboles, permettant de s’en souvenir aisément.
 		</div>
 		<div class="card">
 			<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i>
-			<span class="important">Chiffres en accès direct</span>, raccourcis sur la main gauche,
-			ponctuations insécables, et plus…
+			<strong>Chiffres en accès direct</strong>, raccourcis sur la main gauche, ponctuations
+			insécables, et plus…
 		</div>
 	</div>
 	<p class="encart-introduction">
-		L’intégralité du code de la disposition et de ce site est disponible<br />sous licence MIT sur
-		<a class="link" href="https://github.com/adrienm7/ergopti">le GitHub du projet</a>.
+		L’intégralité du code de la disposition et de ce site est disponible sous licence MIT sur
+		<a href="https://github.com/adrienm7/ergopti" target="_blank" class="link nowrap"
+			>le GitHub du projet</a
+		>.
 	</p>
 
 	<tiny-space></tiny-space>
 
 	<div style="text-align:center;">
 		<a href="/utilisation">
-			<button class="bouton-telechargement">➜ Essayer en ligne / Installation</button>
+			<button class="alt-button">➜ Essayer en ligne / Installation</button>
 		</a>
 	</div>
 

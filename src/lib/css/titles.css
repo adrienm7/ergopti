@@ -11,6 +11,7 @@ h1 {
 	font-weight: normal;
 	line-height: auto;
 	margin: 0;
+	margin-top: 5vh;
 	text-align: center;
 	-webkit-text-fill-color: transparent;
 	background-image: linear-gradient(to left, rgb(255, 255, 255) 0%, rgb(180, 180, 180) 100%);

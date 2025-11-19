@@ -1,6 +1,5 @@
 .toc-list {
 	font-size: 0.85rem;
-	line-height: 1.25em;
 	list-style-type: none;
 	margin: 0;
 	padding: 0;
@@ -25,7 +24,12 @@
 	/* color: var(--couleur-bleue); */
 }
 
-.toc-list .is-active-link {
+.toc-list ul li .toc-link {
+	background-image: linear-gradient(to right, white, white);
+}
+
+.toc-list .is-active-link,
+.toc-list ul li .is-active-link {
 	background: linear-gradient(var(--gradient-purple));
 	background-clip: text;
 	-webkit-background-clip: text;
@@ -35,7 +39,10 @@
 }
 
 .toc-list li {
+	line-height: 1.25em;
+	margin: 0;
 	margin-top: 1rem;
+	text-align: left;
 }
 
 .toc-list .toc-list li {

@@ -8,10 +8,10 @@
 
 <section>
 	<h2>Abréviations</h2>
-	<h3>Remplacement de texte avec <kbd>★</kbd></h3>
+	<h3>Remplacement de texte avec <kbd class="glow">★</kbd></h3>
 	<p>
-		Le comportement par défaut de la touche <kbd>★</kbd> est de répéter dernière touche tapée.
-		Cependant, dans le cas où une abréviation terminant par cette touche existe dans la liste
+		Le comportement par défaut de la touche <kbd class="glow">★</kbd> est de répéter dernière touche
+		tapée. Cependant, dans le cas où une abréviation terminant par cette touche existe dans la liste
 		d’abréviations, alors celle-ci sera renvoyée à la place. Ainsi,
 		<kbd>r★</kbd> envoie le raccourci <kbd-output>rien</kbd-output>, tandis que <kbd>ar★iver</kbd>
 		enverra <kbd-output>arriver</kbd-output>. De même, <kbd>av★</kbd> enverra
@@ -41,14 +41,14 @@
 	</ul>
 	<p>
 		Avec cette fonction d’abréviations, <ErgoptiPlus></ErgoptiPlus>
-		<span class="important">devient plus qu’une disposition clavier</span>. Elle se transforme en un
-		outil de productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes
-		les plus fréquents.
+		<strong>devient plus qu’une disposition clavier</strong>. Elle se transforme en un outil de
+		productivité permettant d’automatiser l’écriture des mots, voire phrases ou même textes les plus
+		fréquents.
 	</p>
 	<p>
 		C’est une fonctionnalité tout à fait optionnelle, libre à vous de ne pas utiliser les
-		abréviations et de seulement utiliser la touche <kbd>★</kbd> afin de doubler la précédente lettre.
-		Cependant, bien utilisée, cette touche peut être encore plus puissante.
+		abréviations et de seulement utiliser la touche <kbd class="glow">★</kbd> afin de doubler la précédente
+		lettre. Cependant, bien utilisée, cette touche peut être encore plus puissante.
 	</p>
 
 	<h3>
@@ -66,7 +66,7 @@
 		<kbd-output>ement</kbd-output>, très souvent utilisé en français, deux frappes suffisent :
 		<kbd>às</kbd>. Ces raccourcis vont diviser par deux le nombre de touches nécessaires pour écrire
 		les suffixes les plus communs,
-		<span class="important">entraînant une augmentation de vitesse</span>.
+		<strong>entraînant une augmentation de vitesse</strong>.
 	</p>
 	<KeyboardBasis id="a" />
 </section>

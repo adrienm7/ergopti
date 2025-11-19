@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-2510132" maxout="1" name="Ergopti_v2_2_0_plus">
+<keyboard group="126" id="-2510273" maxout="1" name="Ergopti_v2_2_0_plus">
 	<layouts>
 		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
@@ -60,7 +60,7 @@
 			<key code="27" output="%"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" action="¨"/>
+			<key code="30" output="j"/>
 			<key code="31" action="c"/>
 			<key code="32" action="g"/>
 			<key code="33" action="z"/>
@@ -258,7 +258,7 @@
 			<key code="27" output=" %"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" action="-"/>
+			<key code="30" action="_"/>
 			<key code="31" action="C"/>
 			<key code="32" action="G"/>
 			<key code="33" action="Z"/>
@@ -347,7 +347,7 @@
 			<key code="27" output=" %"/>
 			<key code="28" action="8"/>
 			<key code="29" action="0"/>
-			<key code="30" action="-"/>
+			<key code="30" action="_"/>
 			<key code="31" action="c"/>
 			<key code="32" action="g"/>
 			<key code="33" action="z"/>
@@ -535,7 +535,7 @@
 			<key code="27" output="‰"/>
 			<key code="28" output="⁸"/>
 			<key code="29" output="⁰"/>
-			<key code="30" action="_"/>
+			<key code="30" action="-"/>
 			<key code="31" action="!"/>
 			<key code="32" output="~"/>
 			<key code="33" output="%"/>
@@ -595,7 +595,7 @@
 			<key code="5" output="·"/>
 			<key code="6" output="÷"/>
 			<key code="7" action="ᵢ"/>
-			<key code="8" action="j"/>
+			<key code="8" output="j"/>
 			<key code="9" output="…"/>
 			<key code="10" action="¤"/>
 			<key code="11" action="+"/>
@@ -617,7 +617,7 @@
 			<key code="27" output="‱"/>
 			<key code="28" output="₈"/>
 			<key code="29" output="₀"/>
-			<key code="30" output="★"/>
+			<key code="30" action="¨"/>
 			<key code="31" output=" !"/>
 			<key code="32" output="≈"/>
 			<key code="33" output="‰"/>
@@ -778,7 +778,7 @@
 			<when state="none" next="s6_subscript"/>
 		</action>
 		<action id="j">
-			<when state="none" output="j"/>
+			<when state="none" output="★"/>
 			<when state="s1_circumflex" output="j"/>
 			<when state="s4_greek" output="ξ"/>
 			<when state="s5_superscript" output="ʲ"/>

@@ -26,7 +26,7 @@
 			manipulations ne devraient arriver que très rarement, mais tout dépend de votre utilisation.
 			Par exemple, l’enchaînement <kbd>XG</kbd>
 			est très peu commun, mais les Data Scientists l’utiliseront régulièrement pour écrire
-			<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts de <ErgoptiPlus
+			<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts d’<ErgoptiPlus
 			/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
 			macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
 			XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était
@@ -88,6 +88,13 @@
 			ultra-confortables.
 		</p>
 		<li>
+			<kbd>{'<@'}</kbd> ➜ <kbd-output>{'</'}</kbd-output> ;
+		</li>
+		<li>
+			<kbd>{'<%'}</kbd> ➜ <kbd-output>{'<='}</kbd-output> et <kbd>{'>%'}</kbd> ➜
+			<kbd-output>{'>='}</kbd-output> ;
+		</li>
+		<li>
 			<kbd>{'[)'}</kbd> ➜ <kbd-output>{'=""'}</kbd-output> ;
 		</li>
 		<p>
@@ -109,6 +116,9 @@
 		<li>
 			<kbd>+?</kbd> ➜ <kbd-output>{'->'}</kbd-output> et <kbd>?+</kbd> ➜
 			<kbd-output>{'<-'}</kbd-output> ;
+		</li>
+		<li>
+			<kbd>=+</kbd> ➜ <kbd-output> ➜ </kbd-output>.
 		</li>
 	</ul>
 </section>

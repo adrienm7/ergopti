@@ -12,19 +12,16 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 
 	switch (name) {
 		case 'kbdedit_exe':
-			files = import.meta.glob('/static/drivers/windows/*.exe');
+			files = import.meta.glob('/static/drivers/windows/*.exe', { as: 'url' });
 			break;
 		case 'kbdedit_kbe':
-			files = import.meta.glob('/static/drivers/windows/*.kbe');
+			files = import.meta.glob('/static/drivers/windows/*.kbe', { as: 'url' });
 			break;
-		case 'kbdedit_mac':
-			files = import.meta.glob('/static/drivers/macos/*.keylayout');
+		case 'macos_keylayout':
+			files = import.meta.glob('/static/drivers/macos/bundles/zipped_bundles/*.zip', { as: 'url' });
 			break;
-		case 'ahk':
-			files = import.meta.glob('/static/pilotes/ahk/*.exe');
-			break;
-		case 'plus':
-			files = import.meta.glob('/static/drivers/autohotkey/*.ahk');
+		case 'autohotkey':
+			files = import.meta.glob('/static/drivers/autohotkey/*.ahk', { as: 'url' });
 			break;
 		case 'kla_iso':
 			files = import.meta.glob('/static/layouts/kla_iso/*.json');
@@ -42,7 +39,7 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			files = import.meta.glob('/static/pilotes/kalamine/standard/*_analyse.toml');
 			break;
 		case 'kalamine_standard':
-			files = import.meta.glob('/static/pilotes/kalamine/standard/*.toml');
+			files = import.meta.glob('/static/pilotes/kalamine/standard/*.toml', { as: 'url' });
 			files = Object.fromEntries(
 				Object.entries(files).filter(([key]) => !key.endsWith('_analyse.toml'))
 			);
