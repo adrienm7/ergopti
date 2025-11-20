@@ -1,6 +1,7 @@
 name-ergopti {
 	/* font-style: italic; */
 	display: inline-block;
+	letter-spacing: -1px;
 	white-space: nowrap;
 }
 
