@@ -61,6 +61,10 @@ main,
 	top: calc(var(--header-height) + var(--banner-height) + 2rem);
 }
 
+#page-toc {
+	padding: 1px 0; /* Fix pour que la barre de scroll n’apparaisse pas quand il y a assez de place */
+}
+
 #page-toc-pc {
 	max-height: 65vh;
 	overflow-y: scroll;
