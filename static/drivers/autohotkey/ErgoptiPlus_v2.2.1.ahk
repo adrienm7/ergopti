@@ -121,6 +121,8 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
         return
     }
 
+    SendEvent("{SC138 Up}") ; Becomes necessary when we replaced the AltGr key by Kana
+
     ; We pass the abbreviation as argument to delete it manually, as we use the B0 flag
     ; This is to make it work everywhere, like in URL bar or in the code inspector inside navigators
     ; Otherwise, typing hc to get wh gives hwh for example when trying to type "white"
@@ -1704,7 +1706,7 @@ ActivateKeyHistory(*) {
 RAlt & Enter::
 SC138 & SC01C::
 {
-    if GetKeyState("SC138", "P") {
+    if (GetKeyState("SC138", "P") and GetKeyState("SC01C", "P")) {
         ToggleSuspend()
     } else {
         SendInput("{Enter}")
@@ -1717,7 +1719,7 @@ SC138 & SC01C::
 RAlt & BackSpace::
 SC138 & SC00E::
 {
-    if GetKeyState("SC138", "P") {
+    if (GetKeyState("SC138", "P") and GetKeyState("SC00E", "P")) {
         SendInput("{LControl Down}s{LControl Up}") ; Save the script by sending Ctrl + S
         Sleep(300) ; Leave time for the file to be saved
         Reload
@@ -1732,7 +1734,7 @@ SC138 & SC00E::
 RAlt & Delete::
 SC138 & SC153::
 {
-    if GetKeyState("SC138", "P") {
+    if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
         Edit
     } else {
         SendInput("{Delete}")
