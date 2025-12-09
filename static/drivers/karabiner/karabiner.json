@@ -26,9 +26,6 @@
                                         "modifiers": [
                                             "left_command"
                                         ]
-                                    },
-                                    {
-                                        "key_code": "return_or_enter"
                                     }
                                 ],
                                 "type": "basic"
