@@ -131,7 +131,7 @@
 			"description": "LEFT HAND - Middle row: CapsLock - Delete",
 			"conditions": [{ "type": "variable_if", "name": "layer_active", "value": 1 }],
 			"from": { "key_code": "return_or_enter", "modifiers": { "optional": ["any"] } },
-			"to": [{ "key_code": "right_arrow" }, { "key_code": "delete_or_backspace" }],
+			"to": [{ "key_code": "delete_forward" }],
 			"type": "basic"
 		},
 		{
@@ -292,10 +292,10 @@
 			"type": "basic"
 		},
 		{
-			"description": "RIGHT HAND - Bottom row: N - Maximize window",
+			"description": "RIGHT HAND - Bottom row: M - Maximize window",
 			"conditions": [{ "type": "variable_if", "name": "layer_active", "value": 1 }],
 			"from": { "key_code": "n", "modifiers": { "optional": ["any"] } },
-			"to": [{ "key_code": "f", "modifiers": ["fn", "control"] }],
+			"to_after_key_up": [{ "key_code": "y", "modifiers": ["fn", "control", "command"] }],
 			"type": "basic"
 		},
 		{
