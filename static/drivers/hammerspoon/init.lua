@@ -13,65 +13,66 @@ local touchdevice = require("hs._asm.undocumented.touchdevice")
 local leftClickPressed = false
 local mouseEventTap = nil
 
+-- Function to force cleanup of selection state
+local function forceCleanup()
+	if mouseEventTap then
+		pcall(function() mouseEventTap:stop() end)
+		mouseEventTap = nil
+	end
+	leftClickPressed = false
+end
+
+-- Timer to periodically check and cleanup stuck state
+hs.timer.doEvery(5, function()
+	if leftClickPressed and not mouseEventTap then
+		-- State is inconsistent, force cleanup
+		forceCleanup()
+	end
+end)
+
 -- Function to toggle selection mode
 local function toggleSelection()
+	-- Force cleanup first to ensure clean state
+	forceCleanup()
+	
 	local pos = hs.mouse.absolutePosition()
 	
-	if not leftClickPressed then
-		-- hs.alert.show("🖱️ Sélection ACTIVÉE", 1)
+	-- hs.alert.show("🖱️ Sélection ACTIVÉE", 1)
 
-		-- Activate selection mode
-		leftClickPressed = true
+	-- Activate selection mode
+	leftClickPressed = true
+	
+	-- Post initial mouseDown event
+	hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
+	
+	-- Create eventtap to intercept mouse events
+	mouseEventTap = hs.eventtap.new({
+		hs.eventtap.event.types.mouseMoved,
+		hs.eventtap.event.types.leftMouseDragged,
+		hs.eventtap.event.types.leftMouseUp
+	}, function(event)
+		local eventType = event:getType()
 		
-		-- Post initial mouseDown event
-		hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
-		
-		-- Create eventtap to intercept mouse events
-		mouseEventTap = hs.eventtap.new({
-			hs.eventtap.event.types.mouseMoved,
-			hs.eventtap.event.types.leftMouseDragged,
-			hs.eventtap.event.types.leftMouseUp
-		}, function(event)
-			local eventType = event:getType()
-			
-			-- Convert mouseMoved to leftMouseDragged while selection is active
-			if eventType == hs.eventtap.event.types.mouseMoved then
-				local newPos = event:location()
-				local dragEvent = hs.eventtap.event.newMouseEvent(
-					hs.eventtap.event.types.leftMouseDragged,
-					newPos
-				)
-				dragEvent:post()
-				return true -- Delete original mouseMoved event
-			end
-			
-			-- If real leftMouseUp is detected, deactivate selection mode
-			if eventType == hs.eventtap.event.types.leftMouseUp then
-				-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
-				if mouseEventTap then
-					mouseEventTap:stop()
-					mouseEventTap = nil
-				end
-				leftClickPressed = false
-				return false -- Let the mouseUp event propagate
-			end
-			
-			return false -- Let other events propagate
-		end):start()
-	else
-		-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
-
-		-- Deactivate selection mode
-		local currentPos = hs.mouse.absolutePosition()
-		hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, currentPos):post()
-		
-		if mouseEventTap then
-			mouseEventTap:stop()
-			mouseEventTap = nil
+		-- Convert mouseMoved to leftMouseDragged while selection is active
+		if eventType == hs.eventtap.event.types.mouseMoved then
+			local newPos = event:location()
+			local dragEvent = hs.eventtap.event.newMouseEvent(
+				hs.eventtap.event.types.leftMouseDragged,
+				newPos
+			)
+			dragEvent:post()
+			return true -- Delete original mouseMoved event
 		end
 		
-		leftClickPressed = false
-	end
+		-- If real leftMouseUp is detected, deactivate selection mode
+		if eventType == hs.eventtap.event.types.leftMouseUp then
+			-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
+			forceCleanup()
+			return false -- Let the mouseUp event propagate
+		end
+		
+		return false -- Let other events propagate
+	end):start()
 end
 
 -- Setup touch device watchers for 3-finger tap detection
