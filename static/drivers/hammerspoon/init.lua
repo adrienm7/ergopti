@@ -18,6 +18,8 @@ local function toggleSelection()
 	local pos = hs.mouse.absolutePosition()
 	
 	if not leftClickPressed then
+		-- hs.alert.show("🖱️ Sélection ACTIVÉE", 1)
+
 		-- Activate selection mode
 		leftClickPressed = true
 		
@@ -45,20 +47,20 @@ local function toggleSelection()
 			
 			-- If real leftMouseUp is detected, deactivate selection mode
 			if eventType == hs.eventtap.event.types.leftMouseUp then
+				-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
 				if mouseEventTap then
 					mouseEventTap:stop()
 					mouseEventTap = nil
 				end
 				leftClickPressed = false
-				hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
 				return false -- Let the mouseUp event propagate
 			end
 			
 			return false -- Let other events propagate
 		end):start()
-		
-		hs.alert.show("🖱️ Sélection ACTIVÉE", 1)
 	else
+		-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
+
 		-- Deactivate selection mode
 		local currentPos = hs.mouse.absolutePosition()
 		hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, currentPos):post()
@@ -69,7 +71,6 @@ local function toggleSelection()
 		end
 		
 		leftClickPressed = false
-		hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
 	end
 end
 
