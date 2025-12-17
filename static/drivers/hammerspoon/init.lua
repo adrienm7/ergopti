@@ -10,40 +10,74 @@ threshold_vertical = VERTICAL_DEFAULT
 
 -- Three-finger tap for selection toggle using touchdevice
 local touchdevice = require("hs._asm.undocumented.touchdevice")
-local rightClickPressed = false
+local leftClickPressed = false
+local mouseEventTap = nil
 
 -- Function to toggle selection mode
 local function toggleSelection()
-    local pos = hs.mouse.absolutePosition()
-    local currentButtons = hs.eventtap.checkMouseButtons()
-    local isButtonDown = currentButtons and currentButtons.left
-    
-    -- Sync state with actual mouse state
-    if isButtonDown and not rightClickPressed then
-        rightClickPressed = true
-        return
-    elseif not isButtonDown and rightClickPressed then
-        rightClickPressed = false
-    end
-    
-    -- Toggle
-    if not rightClickPressed then
-        rightClickPressed = true
-        hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
-        hs.alert.show("🖱️ Sélection ACTIVÉE", 1)
-    else
-        hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post()
-        rightClickPressed = false
-        hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
-    end
+	local pos = hs.mouse.absolutePosition()
+	
+	if not leftClickPressed then
+		-- Activate selection mode
+		leftClickPressed = true
+		
+		-- Post initial mouseDown event
+		hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
+		
+		-- Create eventtap to intercept mouse events
+		mouseEventTap = hs.eventtap.new({
+			hs.eventtap.event.types.mouseMoved,
+			hs.eventtap.event.types.leftMouseDragged,
+			hs.eventtap.event.types.leftMouseUp
+		}, function(event)
+			local eventType = event:getType()
+			
+			-- Convert mouseMoved to leftMouseDragged while selection is active
+			if eventType == hs.eventtap.event.types.mouseMoved then
+				local newPos = event:location()
+				local dragEvent = hs.eventtap.event.newMouseEvent(
+					hs.eventtap.event.types.leftMouseDragged,
+					newPos
+				)
+				dragEvent:post()
+				return true -- Delete original mouseMoved event
+			end
+			
+			-- If real leftMouseUp is detected, deactivate selection mode
+			if eventType == hs.eventtap.event.types.leftMouseUp then
+				if mouseEventTap then
+					mouseEventTap:stop()
+					mouseEventTap = nil
+				end
+				leftClickPressed = false
+				hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
+				return false -- Let the mouseUp event propagate
+			end
+			
+			return false -- Let other events propagate
+		end):start()
+		
+		hs.alert.show("🖱️ Sélection ACTIVÉE", 1)
+	else
+		-- Deactivate selection mode
+		local currentPos = hs.mouse.absolutePosition()
+		hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, currentPos):post()
+		
+		if mouseEventTap then
+			mouseEventTap:stop()
+			mouseEventTap = nil
+		end
+		
+		leftClickPressed = false
+		hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
+	end
 end
 
 -- Setup touch device watchers for 3-finger tap detection
-local _fingers = 3
 local _touchStartTime = nil
-local _middleclickPoint = nil
-local _middleclickPoint2 = nil
-local _maybeMiddleClick = false
+local _tapStartPoint = nil
+local _tapEndPoint = nil
+local _maybeTap = false
 local _tapDelta = 2.0
 
 for _, deviceID in ipairs(touchdevice.devices()) do
@@ -51,30 +85,29 @@ for _, deviceID in ipairs(touchdevice.devices()) do
         local nFingers = #touches
 
         if nFingers == 0 then
-            if _middleclickPoint and _middleclickPoint2 then
-                local delta = math.abs(_middleclickPoint.x - _middleclickPoint2.x) +
-                              math.abs(_middleclickPoint.y - _middleclickPoint2.y)
+            -- Fingers lifted - check if it was a tap
+            if _tapStartPoint and _tapEndPoint then
+                local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) +
+                              math.abs(_tapStartPoint.y - _tapEndPoint.y)
                 if delta < _tapDelta then
                     toggleSelection()
                 end
             end
             _touchStartTime = nil
-            _middleclickPoint = nil
-            _middleclickPoint2 = nil
+            _tapStartPoint = nil
+            _tapEndPoint = nil
+            _maybeTap = false
         elseif nFingers > 0 and not _touchStartTime then
             _touchStartTime = hs.timer.secondsSinceEpoch()
-            _maybeMiddleClick = true
-        elseif _maybeMiddleClick and (hs.timer.secondsSinceEpoch() - _touchStartTime > 0.5) then
-            _maybeMiddleClick = false
-            _middleclickPoint = nil
-            _middleclickPoint2 = nil
+            _maybeTap = true
+        elseif _maybeTap and (hs.timer.secondsSinceEpoch() - _touchStartTime > 0.5) then
+            -- Too long to be a tap
+            _maybeTap = false
+            _tapStartPoint = nil
+            _tapEndPoint = nil
         end
 
-        if nFingers > _fingers then
-            _maybeMiddleClick = false
-            _middleclickPoint = nil
-            _middleclickPoint2 = nil
-        elseif nFingers == _fingers then
+        if nFingers == 3 then
             local xAvg = (touches[1].absoluteVector.position.x +
                          touches[2].absoluteVector.position.x +
                          touches[3].absoluteVector.position.x) / 3
@@ -82,13 +115,15 @@ for _, deviceID in ipairs(touchdevice.devices()) do
                          touches[2].absoluteVector.position.y +
                          touches[3].absoluteVector.position.y) / 3
 
-            if _maybeMiddleClick then
-                _middleclickPoint = { x = xAvg, y = yAvg }
-                _middleclickPoint2 = { x = xAvg, y = yAvg }
-                _maybeMiddleClick = false
-            else
-                _middleclickPoint2 = { x = xAvg, y = yAvg }
+            if _maybeTap and not _tapStartPoint then
+                _tapStartPoint = { x = xAvg, y = yAvg }
             end
+            _tapEndPoint = { x = xAvg, y = yAvg }
+        elseif nFingers > 3 then
+            -- More than 3 fingers - cancel tap detection
+            _maybeTap = false
+            _tapStartPoint = nil
+            _tapEndPoint = nil
         end
     end):start()
 end
