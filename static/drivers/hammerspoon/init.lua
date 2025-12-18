@@ -37,7 +37,7 @@ local function toggleSelection()
 	
 	local pos = hs.mouse.absolutePosition()
 	
-	-- hs.alert.show("🖱️ Sélection ACTIVÉE", 1)
+	-- hs.alert.show("🖱️ TAP DÉTECTÉ - Sélection ACTIVÉE", 1)
 
 	-- Activate selection mode
 	leftClickPressed = true
@@ -66,7 +66,7 @@ local function toggleSelection()
 		
 		-- If real leftMouseUp is detected, deactivate selection mode
 		if eventType == hs.eventtap.event.types.leftMouseUp then
-			-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 1)
+			-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 0.5)
 			forceCleanup()
 			return false -- Let the mouseUp event propagate
 		end
@@ -81,17 +81,19 @@ local _tapStartPoint = nil
 local _tapEndPoint = nil
 local _maybeTap = false
 local _tapDelta = 2.0
+local _lastDebugTime = 0
 
 for _, deviceID in ipairs(touchdevice.devices()) do
     touchdevice.forDeviceID(deviceID):frameCallback(function(_, touches, _, _)
         local nFingers = #touches
+        local now = hs.timer.secondsSinceEpoch()
 
         if nFingers == 0 then
             -- Fingers lifted - check if it was a tap
             if _tapStartPoint and _tapEndPoint then
                 local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) +
                               math.abs(_tapStartPoint.y - _tapEndPoint.y)
-                if delta < _tapDelta then
+                if _maybeTap and delta < _tapDelta then
                     toggleSelection()
                 end
             end
@@ -100,9 +102,9 @@ for _, deviceID in ipairs(touchdevice.devices()) do
             _tapEndPoint = nil
             _maybeTap = false
         elseif nFingers > 0 and not _touchStartTime then
-            _touchStartTime = hs.timer.secondsSinceEpoch()
+            _touchStartTime = now
             _maybeTap = true
-        elseif _maybeTap and (hs.timer.secondsSinceEpoch() - _touchStartTime > 0.5) then
+        elseif _touchStartTime and _maybeTap and (now - _touchStartTime > 0.5) then
             -- Too long to be a tap
             _maybeTap = false
             _tapStartPoint = nil
@@ -120,7 +122,9 @@ for _, deviceID in ipairs(touchdevice.devices()) do
             if _maybeTap and not _tapStartPoint then
                 _tapStartPoint = { x = xAvg, y = yAvg }
             end
-            _tapEndPoint = { x = xAvg, y = yAvg }
+            if _maybeTap then
+                _tapEndPoint = { x = xAvg, y = yAvg }
+            end
         elseif nFingers > 3 then
             -- More than 3 fingers - cancel tap detection
             _maybeTap = false
@@ -153,3 +157,25 @@ Swipe3:start(3, function(direction, distance, id)
         threshold_vertical = VERTICAL_DEFAULT
     end
 end)
+
+-- Cmd + Scroll for zoom/dezoom
+local scrollZoom = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
+    local flags = event:getFlags()
+    
+    -- Check if cmd key is pressed
+    if flags.cmd then
+        local scrollY = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
+        
+        if scrollY > 0 then
+            -- Scroll up = zoom in
+            hs.eventtap.keyStroke({"cmd"}, "pad+", 0)
+        elseif scrollY < 0 then
+            -- Scroll down = zoom out
+            hs.eventtap.keyStroke({"cmd"}, "pad-", 0)
+        end
+        
+        return true -- Consume the event
+    end
+    
+    return false -- Let the event through
+end):start()
