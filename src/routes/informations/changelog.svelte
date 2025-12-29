@@ -7,6 +7,23 @@
 <section>
 	<h2 id="changelog">Changelog</h2>
 
+	<h3>Version 2.2.1 (Janvier 2026)</h3>
+	<ul>
+		<li>
+			Le pilote Windows utilise désormais Kana au lieu de "AltGr", ce qui libère toutes les
+			combinaisons en <kbd>Ctrl</kbd> + <kbd>Alt</kbd> pour de nouvelles utilisations. Auparavant,
+			<kbd>Ctrl</kbd>
+			+ <kbd>Alt</kbd> + <kbd>touche</kbd> renvoyait le contenu de la touche sur la couche AltGr du pilote,
+			ce qui empêchait d’utiliser certains raccourcis.
+		</li>
+		<li>
+			Correction de l’inversion des caractères <kbd-output>-</kbd-output> et
+			<kbd-output>_</kbd-output>
+			sur la touche <kbd>¨</kbd>.
+		</li>
+		<li>Ajout des caractères <kbd>í</kbd> et <kbd>Í</kbd> manquants.</li>
+	</ul>
+
 	<h3>Version 2.2 (Octobre 2025)</h3>
 	<p>
 		Le changement le plus visible d’<Ergopti></Ergopti> v2.2 est la permutation des touches
