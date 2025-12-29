@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<keyboard group="126" id="-2511151" maxout="1" name="Ergopti_v2_2_1">
+<keyboard group="126" id="-2512301" maxout="1" name="Ergopti_v2_2_1">
 	<layouts>
 		<layout first="0" last="0" mapSet="layout" modifiers="commonModifiers"/>
 	</layouts>
@@ -684,7 +684,7 @@
 		</action>
 		<action id="b">
 			<when state="none" output="b"/>
-			<when state="s1_circumflex" output="º"/>
+			<when state="s1_circumflex" output="ó"/>
 			<when state="s2_currency" output="₿"/>
 			<when state="s4_greek" output="β"/>
 			<when state="s5_superscript" output="ᵇ"/>
@@ -717,7 +717,7 @@
 		</action>
 		<action id="è">
 			<when state="none" output="è"/>
-			<when state="s1_circumflex" output="ó"/>
+			<when state="s1_circumflex" output="í"/>
 			<when state="s5_superscript" output="ᵞ"/>
 			<when state="s6_subscript" output="ᵧ"/>
 		</action>
@@ -840,7 +840,7 @@
 		</action>
 		<action id="r">
 			<when state="none" output="r"/>
-			<when state="s1_circumflex" output="/"/>
+			<when state="s1_circumflex" output="º"/>
 			<when state="s2_currency" output="₽"/>
 			<when state="s3_diaeresis" output="®"/>
 			<when state="s4_greek" output="ρ"/>
@@ -934,7 +934,7 @@
 		</action>
 		<action id="B">
 			<when state="none" output="B"/>
-			<when state="s1_circumflex" output="°"/>
+			<when state="s1_circumflex" output="Ó"/>
 			<when state="s2_currency" output="฿"/>
 			<when state="s4_greek" output="Β"/>
 			<when state="s5_superscript" output="ᴮ"/>
@@ -971,7 +971,7 @@
 		</action>
 		<action id="È">
 			<when state="none" output="È"/>
-			<when state="s1_circumflex" output="Ó"/>
+			<when state="s1_circumflex" output="Í"/>
 		</action>
 		<action id="É">
 			<when state="none" output="É"/>
@@ -1090,7 +1090,7 @@
 		</action>
 		<action id="R">
 			<when state="none" output="R"/>
-			<when state="s1_circumflex" output="\"/>
+			<when state="s1_circumflex" output="°"/>
 			<when state="s2_currency" output="₹"/>
 			<when state="s3_diaeresis" output="®"/>
 			<when state="s4_greek" output="Ρ"/>
@@ -1185,6 +1185,7 @@
 		</action>
 		<action id="¨">
 			<when state="none" next="s3_diaeresis"/>
+			<when state="s1_circumflex" output="/"/>
 			<when state="s3_diaeresis" output="¨"/>
 		</action>
 		<action id="$">
@@ -1349,6 +1350,7 @@
 		</action>
 		<action id="_">
 			<when state="none" output="_"/>
+			<when state="s1_circumflex" output="\"/>
 			<when state="s2_currency" output="€"/>
 			<when state="s4_greek" output="Ω"/>
 		</action>

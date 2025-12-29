@@ -1885,7 +1885,12 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 
 ; === Dead Keys ===
 
+global InDeadKeySequence := false
+
 DeadKey(Mapping) {
+    global InDeadKeySequence
+    InDeadKeySequence := true
+    ; DeadKeyName := Mapping[" "]
     ih := InputHook(
         "L1",
         "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
@@ -1893,6 +1898,7 @@ DeadKey(Mapping) {
     ih.Start()
     ih.Wait()
     PressedKey := ih.Input
+    InDeadKeySequence := false
     if Mapping.Has(PressedKey) {
         SendNewResult(Mapping[PressedKey])
     } else {
@@ -1906,6 +1912,7 @@ DeadKey(Mapping) {
 
 global DeadkeyMappingCircumflex := Map(
     " ", "^", "^", "^",
+    "¨", "/", "_", "\",
     "'", "⚠",
     ",", "➜",
     ".", "•",
@@ -1923,7 +1930,7 @@ global DeadkeyMappingCircumflex := Map(
     ":", "▶",
     ";", "↪",
     "a", "â", "A", "Â",
-    "b", "º", "B", "°",
+    "b", "ó", "B", "Ó",
     "c", "ç", "C", "Ç",
     "d", "★", "D", "☆",
     "e", "ê", "E", "Ê",
@@ -1939,7 +1946,7 @@ global DeadkeyMappingCircumflex := Map(
     "o", "ô", "O", "Ô",
     "p", "¶", "P", "⁂",
     "q", "☒", "Q", "☐",
-    "r", "/", "R", "\",
+    "r", "º", "R", "°",
     "s", "ß", "S", "ẞ",
     "t", "!", "T", "¡",
     "u", "û", "U", "Û",
@@ -1949,7 +1956,7 @@ global DeadkeyMappingCircumflex := Map(
     "y", "ŷ", "Y", "Ŷ",
     "z", "ẑ", "Z", "Ẑ",
     "à", "æ", "À", "Æ",
-    "è", "ó", "È", "Ó",
+    "è", "í", "È", "Í",
     "é", "œ", "É", "Œ",
     "ê", "á", "Ê", "Á",
 )
@@ -2222,7 +2229,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC01A", "z")
     Hotkey(
         "SC01B",
-        (*) => DeadKey(DeadkeyMappingDiaresis),
+        (*) => (InDeadKeySequence ? SendNewResult("¨") : DeadKey(DeadkeyMappingDiaresis)),
         "I2"
     )
 
@@ -2240,7 +2247,7 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
     RemapKey("SC028", "q")
     Hotkey(
         "SC02B",
-        (*) => DeadKey(DeadkeyMappingCircumflex),
+        (*) => (InDeadKeySequence ? SendNewResult("^") : DeadKey(DeadkeyMappingCircumflex)),
         "I2"
     )
 
@@ -2385,7 +2392,7 @@ SC017:: SendNewResult("H")
 SC018:: SendNewResult("C")
 SC019:: SendNewResult("X")
 SC01A:: SendNewResult("Z")
-SC01B:: DeadKey(DeadkeyMappingDiaresis)
+SC01B:: (InDeadKeySequence ? SendNewResult("¨") : DeadKey(DeadkeyMappingDiaresis))
 
 ; === Middle row ===
 SC01E:: SendNewResult("A")
@@ -2399,7 +2406,7 @@ SC025:: SendNewResult("N")
 SC026:: SendNewResult("T")
 SC027:: SendNewResult("R")
 SC028:: SendNewResult("Q")
-SC02B:: DeadKey(DeadkeyMappingCircumflex)
+SC02B:: (InDeadKeySequence ? SendNewResult("^") : DeadKey(DeadkeyMappingCircumflex))
 
 ; === Bottom row ===
 SC056:: SendNewResult("Ê")
@@ -3551,6 +3558,7 @@ CapsLockShortcut(CtrlActivated) {
     tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds * 1000)
     if (
         tap
+        and (TimeAfter - TimeBefore) >= 50
         and A_PriorKey == "LShift"
     ) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
         SendInput("{LCtrl Down}c{LCtrl Up}")
@@ -3572,6 +3580,7 @@ CapsLockShortcut(CtrlActivated) {
     tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000)
     if (
         tap
+        and (TimeAfter - TimeBefore) >= 50
         and A_PriorKey == "LControl"
         and not GetKeyState("SC03A", "P") ; "CapsLock"
         and not GetKeyState("SC038", "P") ; "LAlt"
@@ -4305,7 +4314,8 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
         ; We specify the result with the vowels first to be sure it will override any problems
         CreateCaseSensitiveHotstrings(
             "*?", "ê" . Vowel, DeadkeyMappingCircumflex[Vowel],
-            Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds)
+            Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+            )
         )
         ; Necessary for things to work, as we define them already
         DeadkeyMappingCircumflexModified.Delete(Vowel)
@@ -5650,23 +5660,31 @@ if Features["DistancesReduction"]["SuffixesA"].Enabled {
 
 if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
     CreateHotstring("*", "@b" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult", True))
-    CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult", True))
+    CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult",
+        True))
     CreateHotstring("*", "@c" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumberClean"], Map(
         "FinalResult", True))
-    CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map("FinalResult",
+    CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
+        "FinalResult",
         True))
-    CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map("FinalResult",
+    CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
+        "FinalResult",
         True))
-    CreateHotstring("*", "@i" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult", True))
-    CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult", True))
-    CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult", True))
+    CreateHotstring("*", "@i" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult", True
+    ))
+    CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
+        True))
+    CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
+        True))
     CreateHotstring("*", "@s" . ScriptInformation["MagicKey"], PersonalInformation["SocialSecurityNumber"], Map(
         "FinalResult", True))
     CreateHotstring("*", "@ss" . ScriptInformation["MagicKey"], PersonalInformation["SocialSecurityNumber"], Map(
         "FinalResult", True))
-    CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map("FinalResult",
+    CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map(
+        "FinalResult",
         True))
-    CreateHotstring("*", "@tél" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map("FinalResult",
+    CreateHotstring("*", "@tél" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map(
+        "FinalResult",
         True))
 
     global PersonalInformationHotstrings := Map(

@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="utf-8"?>
 <!DOCTYPE keyboard SYSTEM "file://localhost/System/Library/DTDs/KeyboardLayout.dtd">
-<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-11-15 at 19:44 (GMT+0)-->
+<!--Last edited by KbdEdit version 24.7.0 2674-3499 on 2025-12-29 at 23:35 (GMT+0)-->
 <keyboard group="126" id="-20043" maxout="1" name="Ergopti v2.2.1">
 	<layouts>
 		<layout first="0" last="0" mapSet="16c" modifiers="f4"/>
@@ -767,7 +767,7 @@
 		</action>
 		<action id="B">
 			<when state="none" output="B"/>
-			<when state="s1" output="°"/>
+			<when state="s1" output="Ó"/>
 			<when state="s2" output="฿"/>
 			<when state="s4" output="Β"/>
 			<when state="s5" output="ᴮ"/>
@@ -910,7 +910,7 @@
 		</action>
 		<action id="R">
 			<when state="none" output="R"/>
-			<when state="s1" output="\"/>
+			<when state="s1" output="°"/>
 			<when state="s2" output="₹"/>
 			<when state="s3" output="®"/>
 			<when state="s4" output="Ρ"/>
@@ -1004,6 +1004,7 @@
 		</action>
 		<action id="_">
 			<when state="none" output="_"/>
+			<when state="s1" output="\"/>
 			<when state="s2" output="€"/>
 			<when state="s4" output="Ω"/>
 		</action>
@@ -1022,7 +1023,7 @@
 		</action>
 		<action id="b">
 			<when state="none" output="b"/>
-			<when state="s1" output="º"/>
+			<when state="s1" output="ó"/>
 			<when state="s2" output="₿"/>
 			<when state="s4" output="β"/>
 			<when state="s5" output="ᵇ"/>
@@ -1153,7 +1154,7 @@
 		</action>
 		<action id="r">
 			<when state="none" output="r"/>
-			<when state="s1" output="/"/>
+			<when state="s1" output="º"/>
 			<when state="s2" output="₽"/>
 			<when state="s3" output="®"/>
 			<when state="s4" output="ρ"/>
@@ -1229,6 +1230,7 @@
 		</action>
 		<action id="¨">
 			<when state="none" next="s3"/>
+			<when state="s1" output="/"/>
 			<when state="s3" output="¨"/>
 		</action>
 		<action id="µ">
@@ -1240,7 +1242,7 @@
 		</action>
 		<action id="È">
 			<when state="none" output="È"/>
-			<when state="s1" output="Ó"/>
+			<when state="s1" output="Í"/>
 		</action>
 		<action id="É">
 			<when state="none" output="É"/>
@@ -1258,7 +1260,7 @@
 		</action>
 		<action id="è">
 			<when state="none" output="è"/>
-			<when state="s1" output="ó"/>
+			<when state="s1" output="í"/>
 			<when state="s5" output="ᵞ"/>
 			<when state="s6" output="ᵧ"/>
 		</action>
