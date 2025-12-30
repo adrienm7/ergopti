@@ -9,6 +9,9 @@
 		versionValue = value;
 		version_linux = getLatestVersion('linux', value)?.replaceAll('.', '_');
 	});
+
+	const cmd =
+		'curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/main/static/drivers/linux/install.sh | sh';
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
@@ -21,15 +24,12 @@
 
 <code
 	style="display:inline-block; width:100%; padding:1em; border-bottom-left-radius:0; border-bottom-right-radius:0; text-align:left"
-	>curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh
-	| sh</code
+	>{cmd}</code
 >
 <button
 	id="copy-install-cmd"
 	style="width:100%; border-top-left-radius:0; border-top-right-radius:0;"
 	on:click={() => {
-		const cmd =
-			'curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh';
 		try {
 			navigator.clipboard
 				.writeText(cmd)

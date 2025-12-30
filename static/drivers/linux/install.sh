@@ -13,8 +13,6 @@ SELECTOR_SCRIPT_NAME="xkb_files_selector"
 
 
 
-
-
 # Check requirements
 for cmd in python3 curl unzip; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -38,6 +36,22 @@ cd "$TMPDIR" || exit 1
 trap 'rc=$?; rm -rf "$TMPDIR" >/dev/null 2>&1 || true; exit $rc' EXIT
 
 
+
+# Prompt user for branch selection
+printf "Select branch to install from (main/dev) [main]: "
+read -r BRANCH_INPUT
+if [ -n "$BRANCH_INPUT" ]; then
+	case "$BRANCH_INPUT" in
+		main|dev)
+			BRANCH="$BRANCH_INPUT"
+			;;
+		*)
+			echo "Invalid branch '$BRANCH_INPUT', using 'main'"
+			;;
+	esac
+fi
+echo "Using branch: $BRANCH"
+echo ""
 
 
 
