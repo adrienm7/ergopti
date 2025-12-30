@@ -14,7 +14,7 @@ SELECTOR_SCRIPT_NAME="xkb_files_selector"
 
 
 # Check requirements
-for cmd in python3 curl unzip; do
+for cmd in python3 curl unzip fzf; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "$cmd is required but not installed. Please install it and retry."
     exit 1
@@ -37,33 +37,40 @@ trap 'rc=$?; rm -rf "$TMPDIR" >/dev/null 2>&1 || true; exit $rc' EXIT
 
 
 
-# Prompt user for branch selection
-printf "Select branch to install from (main/dev) [main]: "
-read -r BRANCH_INPUT
-if [ -n "$BRANCH_INPUT" ]; then
-	case "$BRANCH_INPUT" in
-		main|dev)
-			BRANCH="$BRANCH_INPUT"
-			;;
-		*)
-			echo "Invalid branch '$BRANCH_INPUT', using 'main'"
-			;;
-	esac
+# Prompt user for branch selection using fzf
+echo "Fetching available branches from ${REPO_OWNER}/${REPO_NAME}..."
+REPO_GIT_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+
+# Get list of branches from remote repository
+BRANCHES=$(git ls-remote --heads "$REPO_GIT_URL" 2>/dev/null | sed 's|.*refs/heads/||' | sort)
+
+if [ -z "$BRANCHES" ]; then
+	echo "Failed to fetch branches, using 'main' as default"
+	BRANCH="main"
+else
+	# Use fzf to select branch, with main as default
+	SELECTED_BRANCH=$(echo "$BRANCHES" | fzf --height=10 --prompt="Select branch: " --query="main" --select-1 --exit-0)
+	
+	if [ -n "$SELECTED_BRANCH" ]; then
+		BRANCH="$SELECTED_BRANCH"
+	else
+		echo "No branch selected, using 'main' as default"
+		BRANCH="main"
+	fi
 fi
+
 echo "Using branch: $BRANCH"
 echo ""
 
 
 
 echo "Starting Ergopti installer: fetching repository ${REPO_OWNER}/${REPO_NAME}@${BRANCH}"
-REPO_GIT_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
 REPO_ZIP_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/heads/${BRANCH}.zip"
 ZIPNAME="repo.zip"
 
 # Try git sparse-checkout of the target subpath to avoid downloading the whole repository
 # If it doesn’t work, fall back to a shallow full clone, or even to the zip archive
-REPO_DIR="${TMPDIR}/${REPO_NAME}-${BRANCH}"
-if command -v git >/dev/null 2>&1; then
+REPO_DIR="${TMPDIR}/${REPO_NAME}-${BRANCH}"REPO_GIT_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"if command -v git >/dev/null 2>&1; then
   echo "Attempting git sparse-checkout of ${TARGET_SUBPATH} (lightweight)..."
   if git clone --depth 1 --no-checkout --filter=blob:none --branch "$BRANCH" "$REPO_GIT_URL" "$REPO_DIR" >/dev/null 2>&1; then
     # initialize sparse-checkout and set path
