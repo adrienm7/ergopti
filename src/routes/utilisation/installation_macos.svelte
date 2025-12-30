@@ -121,9 +121,9 @@
 	macOS, un clavier ANSI entraîne de petites différences dans l’arrangement des codes de touches. Si
 	aucun pilote dédié n’était disponible, le <kbd>ê</kbd> se verrait être échangé de place avec le
 	<kbd>$</kbd>
-	de la rangée des chiffres. En outre, la touche morte <kbd class="morte">◌̂</kbd> se verrait être
+	de la rangée des chiffres. En outre, la touche morte <kbd class="deadkey">◌̂</kbd> se verrait être
 	échangée avec
-	<kbd class="morte">◌̈</kbd> et donc être encore moins accessible.
+	<kbd class="deadkey">◌̈</kbd> et donc être encore moins accessible.
 </p>
 
 <h3 id="macos-solutions">Résolution de problèmes connus</h3>
