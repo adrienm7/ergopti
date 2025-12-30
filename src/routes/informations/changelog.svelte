@@ -10,18 +10,26 @@
 	<h3>Version 2.2.1 (Janvier 2026)</h3>
 	<ul>
 		<li>
-			Le pilote Windows utilise désormais Kana au lieu de "AltGr", ce qui libère toutes les
-			combinaisons en <kbd>Ctrl</kbd> + <kbd>Alt</kbd> pour de nouvelles utilisations. Auparavant,
+			Le pilote Windows utilise désormais <strong>Kana au lieu de AltGr</strong>, ce qui libère
+			toutes les combinaisons en <kbd>Ctrl</kbd> + <kbd>Alt</kbd> pour de nouvelles utilisations.
+			Auparavant,
 			<kbd>Ctrl</kbd>
-			+ <kbd>Alt</kbd> + <kbd>touche</kbd> renvoyait le contenu de la touche sur la couche AltGr du pilote,
-			ce qui empêchait d’utiliser certains raccourcis.
+			+ <kbd>Alt</kbd> était une autre manière d’accéder à la couche AltGr du pilote, mais cette duplication
+			inutile empêchait d’utiliser certains raccourcis.
 		</li>
 		<li>
 			Correction de l’inversion des caractères <kbd-output>-</kbd-output> et
 			<kbd-output>_</kbd-output>
-			sur la touche <kbd>¨</kbd>.
+			sur la touche <kbd-output class="deadkey">◌̈</kbd-output>.
 		</li>
-		<li>Ajout des caractères <kbd>í</kbd> et <kbd>Í</kbd> manquants.</li>
+		<li>
+			Ajout des caractères <kbd>í</kbd> et <kbd>Í</kbd> manquants. Cet ajout permute les positions
+			sur la couche circonflexe de <kbd>ó</kbd>/<kbd>Ó</kbd>, <kbd>º</kbd>/<kbd>°</kbd> ainsi que de
+			<kbd>/</kbd>/<kbd>\</kbd>. Désormais, il est plus facile d’écrire des dates de type
+			<kbd>dd/mm/yyyy</kbd>, car le <kbd-output>/</kbd-output> est plus accessible, se réalisant par
+			appui de <kbd-output class="deadkey">◌̂</kbd-output> puis
+			<kbd-output class="deadkey">◌̈</kbd-output>.
+		</li>
 	</ul>
 
 	<h3>Version 2.2 (Octobre 2025)</h3>

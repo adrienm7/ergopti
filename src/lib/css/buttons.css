@@ -82,22 +82,24 @@ kbd-non:hover {
 	top: calc(calc(0.6 * 0.25vw) - calc(0.6 * 0.1vw));
 }
 
-kbd.morte,
-kbd-output.morte {
+kbd.deadkey,
+kbd-output.deadkey {
 	--key-color-saturation: 0% !important;
 	--key-color-luminosity: 100% !important;
 	--key-opacity: 5% !important;
-	background-color: hsla(
+	/* background-color: hsla(
 		0,
 		var(--key-color-saturation),
 		var(--key-color-luminosity),
 		var(--key-opacity)
-	) !important;
+	) !important; */
+	background-color: #09275f;
+	color: white;
 	/* Car les glyphes de certaines touches mortes s’affichent mal sinon */
 	font-family: 'Open Sans'; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 	font-weight: normal;
 }
 
-kbd-output.morte {
+kbd-output.deadkey {
 	--key-opacity: 100% !important;
 }

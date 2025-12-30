@@ -63,11 +63,11 @@
 	</p>
 
 	<h3>
-		<kbd>Ê</kbd> fait office de <kbd class="morte">◌̂</kbd>
+		<kbd>Ê</kbd> fait office de <kbd class="deadkey">◌̂</kbd>
 	</h3>
 
 	<p>
-		La touche morte <kbd class="morte">◌̂</kbd> est utilisée la majorité du temps suivie de
+		La touche morte <kbd class="deadkey">◌̂</kbd> est utilisée la majorité du temps suivie de
 		<kbd>E</kbd> afin d’écrire <kbd-output>Ê</kbd-output>. C’est pour cela qu’une touche
 		<kbd>Ê</kbd>
 		a été placée sur l’auriculaire gauche afin d’éviter un appui sur deux touches pour cette lettre circonflexe
@@ -79,7 +79,7 @@
 		Toutefois, dans de rares cas, il est nécessaire d’écrire <kbd>Â</kbd>,
 		<kbd>Î</kbd>, <kbd>Ô</kbd> ou encore <kbd>Û</kbd>. Ainsi, <kbd>ÊA</kbd> va donner
 		<kbd-output>Â</kbd-output>, <kbd>ÊI</kbd> va donner <kbd-output>Î</kbd-output>, etc. Cela permet
-		de ne plus du tout avoir à utiliser la touche morte <kbd class="morte">◌̂</kbd>, et donc bouger
+		de ne plus du tout avoir à utiliser la touche morte <kbd class="deadkey">◌̂</kbd>, et donc bouger
 		encore moins les mains.
 	</p>
 	<tiny-space></tiny-space>

@@ -478,7 +478,7 @@ keyboard-key[data-type='enter'].pressed-key::after {
 */
 
 /* Different style for dead keys and keys with a different Ctrl layer */
-keyboard-key[data-style='morte'],
+keyboard-key[data-style='deadkey'],
 keyboard-key[data-style='different'] {
 	--key-color-saturation: 0% !important;
 	--key-color-luminosity: 100% !important;

@@ -255,7 +255,7 @@ export class Keyboard {
 
 		let pressedKeyName = pressedKey.dataset['key'];
 		let pressedKeyContent = pressedKey.dataset['content'];
-		let deadKey = pressedKey.dataset['style'] === 'morte';
+		let deadKey = pressedKey.dataset['style'] === 'dead';
 		let newLayer = layer;
 
 		if (
