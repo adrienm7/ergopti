@@ -1,10 +1,10 @@
 @font-face {
   font-family: 'icomoon';
-  src:  url('fonts/icomoon.eot?825wvd');
-  src:  url('fonts/icomoon.eot?825wvd#iefix') format('embedded-opentype'),
-    url('fonts/icomoon.ttf?825wvd') format('truetype'),
-    url('fonts/icomoon.woff?825wvd') format('woff'),
-    url('fonts/icomoon.svg?825wvd#icomoon') format('svg');
+  src:  url('fonts/icomoon.eot?v81asb');
+  src:  url('fonts/icomoon.eot?v81asb#iefix') format('embedded-opentype'),
+    url('fonts/icomoon.ttf?v81asb') format('truetype'),
+    url('fonts/icomoon.woff?v81asb') format('woff'),
+    url('fonts/icomoon.svg?v81asb#icomoon') format('svg');
   font-weight: normal;
   font-style: normal;
   font-display: block;
@@ -25,6 +25,15 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.icon-hammerspoon .path1:before {
+  content: "\e933";
+  color: rgb(0, 0, 0);
+}
+.icon-hammerspoon .path2:before {
+  content: "\e934";
+  margin-left: -1em;
+  color: rgb(255, 255, 255);
+}
 .icon-discord:before {
   content: "\e932";
 }
