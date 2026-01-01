@@ -2,6 +2,7 @@
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
+	import BetaWarning from '$lib/components/BetaWarning.svelte';
 	import { version } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
 	let versionValue, version_linux;
@@ -228,11 +229,7 @@
 	>Kanata
 </h3>
 
-<p class="encadre">
-	<b>Attention :</b> Le code Kanata suivant est encore en bêta et risque d’être régulièrement mis à jour.
-	Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez à vérifier
-	régulièrement si une nouvelle version est disponible.
-</p>
+<BetaWarning tool="Kanata" />
 
 <tiny-space></tiny-space>
 
@@ -262,11 +259,7 @@
 	<i class="icon-espanso" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>Espanso
 </h3>
 
-<p class="encadre">
-	<b>Attention :</b> Le code Espanso suivant est encore en bêta et risque d’être régulièrement mis à
-	jour. Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez
-	à vérifier régulièrement si une nouvelle version est disponible.
-</p>
+<BetaWarning tool="Espanso" />
 
 <tiny-space></tiny-space>
 
