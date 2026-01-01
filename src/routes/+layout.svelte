@@ -166,7 +166,7 @@
 
 <div class="banner">
 	<a href="/informations#changelog"
-		><p>NOUVEAU : Ergopti v2.2</p>
+		><p>NOUVEAU : Ergopti v2.2.1</p>
 		<p class="subtitle">drivers Windows, macOS et Linux complets</p></a
 	>
 </div>
