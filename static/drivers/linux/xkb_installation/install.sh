@@ -37,6 +37,9 @@ DEFAULT_BRANCH="main"
 # Allow override via env var, otherwise use default
 SELECTED_BRANCH="${BRANCH:-$DEFAULT_BRANCH}"
 
+# Installation method (can be forced via CLI argument)
+FORCE_INSTALLATION_METHOD=""
+
 # ANSI Colors
 RED=$(printf '\033[31m')
 GREEN=$(printf '\033[32m')
@@ -112,6 +115,25 @@ run_fzf() {
 # =================================
 # ======= ENVIRONMENT SETUP =======
 # =================================
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		--installation-method)
+			FORCE_INSTALLATION_METHOD="$2"
+			if [[ "$FORCE_INSTALLATION_METHOD" != "clean" ]] && [[ "$FORCE_INSTALLATION_METHOD" != "legacy" ]]; then
+				printf "${RED}❌ Erreur : --installation-method doit être 'clean' ou 'legacy'${NO_COLOR}\n" >&2
+				exit 1
+			fi
+			shift 2
+			;;
+		*)
+			printf "${RED}❌ Option inconnue : $1${NO_COLOR}\n" >&2
+			printf "Usage : $0 [--installation-method clean|legacy]\n" >&2
+			exit 1
+			;;
+	esac
+done
 
 if [ ! -t 1 ]; then
     printf "%s❌ Erreur: terminal interactif requis.%s\n" "${RED}" "${NO_COLOR}" >&2
@@ -452,17 +474,29 @@ log_section "Préparation de l'installation"
 
 INSTALLER_SCRIPTS_DIR="$DRIVERS_ROOT/$INSTALLER_REL_PATH"
 
-# Par défaut : Legacy
-INSTALLER_SCRIPT="$SCRIPT_NAME_LEGACY"
-INSTALLER_METHOD="Legacy (Système)"
+# Check if method was forced via CLI argument
+if [ -n "$FORCE_INSTALLATION_METHOD" ]; then
+	if [ "$FORCE_INSTALLATION_METHOD" = "clean" ]; then
+		INSTALLER_SCRIPT="$SCRIPT_NAME_CLEAN"
+		INSTALLER_METHOD="Clean (Utilisateur/Ext) [Forcé]"
+	else
+		INSTALLER_SCRIPT="$SCRIPT_NAME_LEGACY"
+		INSTALLER_METHOD="Legacy (Système) [Forcé]"
+	fi
+	printf "${LOG_INDENT}${YELLOW}⚠️  Méthode forcée via argument : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
+else
+	# Par défaut : Legacy
+	INSTALLER_SCRIPT="$SCRIPT_NAME_LEGACY"
+	INSTALLER_METHOD="Legacy (Système)"
 
-# Tentative de détection de la méthode "Clean"
-# On ne redirige PAS la sortie pour permettre les questions interactives (o/N)
-if [ -f "$INSTALLER_SCRIPTS_DIR/detect_installation_method.sh" ]; then
-    if bash "$INSTALLER_SCRIPTS_DIR/detect_installation_method.sh"; then
-            INSTALLER_SCRIPT="$SCRIPT_NAME_CLEAN"
-            INSTALLER_METHOD="Clean (Utilisateur/Ext)"
-    fi
+	# Tentative de détection de la méthode "Clean"
+	# On ne redirige PAS la sortie pour permettre les questions interactives (o/N)
+	if [ -f "$INSTALLER_SCRIPTS_DIR/detect_installation_method.sh" ]; then
+		if bash "$INSTALLER_SCRIPTS_DIR/detect_installation_method.sh"; then
+				INSTALLER_SCRIPT="$SCRIPT_NAME_CLEAN"
+				INSTALLER_METHOD="Clean (Utilisateur/Ext)"
+		fi
+	fi
 fi
 
 INSTALLER_FULL_PATH="$INSTALLER_SCRIPTS_DIR/$INSTALLER_SCRIPT"
