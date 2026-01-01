@@ -10,14 +10,6 @@
 	<h3>Version 2.2.1 (Janvier 2026)</h3>
 	<ul>
 		<li>
-			Le pilote Windows utilise désormais <strong>Kana au lieu de AltGr</strong>, ce qui libère
-			toutes les combinaisons en <kbd>Ctrl</kbd> + <kbd>Alt</kbd> pour de nouvelles utilisations.
-			Auparavant,
-			<kbd>Ctrl</kbd>
-			+ <kbd>Alt</kbd> était une autre manière d’accéder à la couche AltGr du pilote, mais cette duplication
-			inutile empêchait d’utiliser certains raccourcis.
-		</li>
-		<li>
 			Correction de l’inversion des caractères <kbd-output>-</kbd-output> et
 			<kbd-output>_</kbd-output>
 			sur la touche <kbd-output class="deadkey">◌̈</kbd-output>.
@@ -27,8 +19,27 @@
 			sur la couche circonflexe de <kbd>ó</kbd>/<kbd>Ó</kbd>, <kbd>º</kbd>/<kbd>°</kbd> ainsi que de
 			<kbd>/</kbd>/<kbd>\</kbd>. Désormais, il est plus facile d’écrire des dates de type
 			<kbd>dd/mm/yyyy</kbd>, car le <kbd-output>/</kbd-output> est plus accessible, se réalisant par
-			appui de <kbd-output class="deadkey">◌̂</kbd-output> puis
+			appui sur <kbd-output class="deadkey">◌̂</kbd-output> puis
 			<kbd-output class="deadkey">◌̈</kbd-output>.
+		</li>
+		<li>
+			Le pilote Windows utilise désormais <strong>Kana au lieu de AltGr</strong>, ce qui libère
+			toutes les combinaisons en <kbd>Ctrl</kbd> + <kbd>Alt</kbd> pour de nouvelles utilisations.
+			Auparavant,
+			<kbd>Ctrl</kbd>
+			+ <kbd>Alt</kbd> était une autre manière d’accéder à la couche AltGr du pilote, mais cette duplication
+			inutile empêchait d’utiliser certains raccourcis.
+		</li>
+		<li>
+			Ajout de nombreux scripts <ErgoptiPlus></ErgoptiPlus> pour macOS. Cela inclut un script Hammerspoon
+			ainsi que des workflows Alfred.
+		</li>
+		<li>
+			Amélioration significative des scripts d’installation du pilote sur Linux. Désormais, les
+			systèmes les plus récents (avec une version de <em>libxkbcommon ≥ 1.13.0</em>) bénéficient
+			d’une installation plus propre et plus fiable. En effet, précédemment les installations
+			nécessitaient la modification manuelle de fichiers système, ce qui était très peu robuste et
+			pouvait entraîner des erreurs.
 		</li>
 	</ul>
 
