@@ -11,7 +11,7 @@
 	});
 
 	const cmd =
-		'curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/main/static/drivers/linux/install.sh | sh';
+		'branch="main"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/drivers/linux/xkb_installation/install.sh" | BRANCH="$branch" bash';
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
@@ -71,18 +71,18 @@
 	(nécessite
 	<code>sudo</code>).
 </p>
-<div class="download-buttons">
-	<a href="/drivers/linux/xkb_files_selector.py" download>
-		<button class="alt-button"
-			><i class="icon-linux"></i> ➀ Script de sélection des fichiers XKB</button
-		>
-	</a>
-	<a href="/drivers/linux/xkb_files_installer.py" download>
-		<button class="alt-button"
-			><i class="icon-linux"></i> ➁ Script d’installation des fichiers XKB</button
-		>
-	</a>
-</div>
+	<div class="download-buttons">
+		<a href="/drivers/linux/xkb_installation/xkb_files_selector.py" download>
+			<button class="alt-button"
+				><i class="icon-linux"></i> ➀ Script de sélection des fichiers XKB</button
+			>
+		</a>
+		<a href="/drivers/linux/xkb_installation/xkb_files_installer.py" download>
+			<button class="alt-button"
+				><i class="icon-linux"></i> ➁ Script d’installation des fichiers XKB</button
+			>
+		</a>
+	</div>
 
 <p>Voici un résumé de ce que réalise le script d’installation :</p>
 <ul>

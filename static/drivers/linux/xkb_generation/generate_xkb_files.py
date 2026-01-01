@@ -7,7 +7,10 @@ from typing import Optional, Union
 
 # Setup paths
 script_dir = Path(__file__).resolve().parent
-sys.path.insert(0, str(script_dir.parent))  # Add drivers directory to path
+# The file now lives in xkb_generation/. Add the top-level drivers directory
+# (two levels up) to sys.path so we can import sibling packages like
+# 'utilities'. Example: static/drivers is script_dir.parent.parent
+sys.path.insert(0, str(script_dir.parent.parent))  # Add drivers directory to path
 
 # Import utilities
 from utilities.keylayout_extraction import extract_version_enhanced
@@ -15,14 +18,14 @@ from utilities.logger import logger
 
 # Import local modules using importlib
 xcompose_spec = importlib.util.spec_from_file_location(
-    "xcompose_creation", script_dir / "xkb_generation" / "xcompose_creation.py"
+    "xcompose_creation", script_dir / "xcompose_creation.py"
 )
 xcompose_module = importlib.util.module_from_spec(xcompose_spec)
 xcompose_spec.loader.exec_module(xcompose_module)
 generate_xcompose = xcompose_module.generate_xcompose
 
 xkb_spec = importlib.util.spec_from_file_location(
-    "xkb_creation", script_dir / "xkb_generation" / "xkb_creation.py"
+    "xkb_creation", script_dir / "xkb_creation.py"
 )
 xkb_module = importlib.util.module_from_spec(xkb_spec)
 xkb_spec.loader.exec_module(xkb_module)
@@ -91,12 +94,7 @@ def main(
             continue
         keylayout = read_file(keylayout_path)
 
-        xkb_template_path = (
-            Path(__file__).parent
-            / "xkb_generation"
-            / "data"
-            / "xkb_symbols.txt"
-        )
+        xkb_template_path = Path(__file__).parent / "data" / "xkb_symbols.txt"
         if not xkb_template_path.is_file():
             logger.error("XKB template file not found: %s", xkb_template_path)
             continue
@@ -119,12 +117,14 @@ def main(
         version_name = extract_version_from_path(keylayout_path)
 
         linux_dir = Path(__file__).parent
-        out_dir = linux_dir / version_name
+        # place generated releases one level up from this xkb_generation/
+        # directory so the output directories match the previous layout
+        out_dir = linux_dir.parent / version_name
         out_dir.mkdir(exist_ok=True)
 
         # Copy the xkb types files
         try:
-            data_dir = Path(__file__).parent / "xkb_generation" / "data"
+            data_dir = Path(__file__).parent / "data"
             src_types = data_dir / "xkb_types.txt"
             src_types_no_ctrl = data_dir / "xkb_types_without_ctrl.txt"
 
@@ -166,9 +166,9 @@ def get_macos_dirs():
     Raises:
         FileNotFoundError: If the base macos directory does not exist.
     """
-    bundles_dir = (
-        Path(__file__).parent.parent.parent / "drivers" / "macos" / "bundles"
-    )
+    # script location: static/drivers/linux/xkb_generation
+    # -> want static/drivers/macos/bundles
+    bundles_dir = Path(__file__).parent.parent.parent / "macos" / "bundles"
     if not bundles_dir.is_dir():
         logger.error("macOS bundles directory does not exist: %s", bundles_dir)
         raise FileNotFoundError(

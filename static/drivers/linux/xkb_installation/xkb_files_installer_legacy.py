@@ -294,7 +294,7 @@ def update_xkb_types_file(source_types: Path, dest_types_file: Path) -> None:
         logging.error("Failed to update types file %s: %s", dest_types_file, e)
 
 
-def install_xcompose_file(xcompose_file: Path) -> None:
+def install_xcompose_file(xcompose_file: Path, force: bool = True) -> None:
     sudo_user = os.getenv("SUDO_USER")
     if not sudo_user:
         logging.error(
@@ -303,52 +303,61 @@ def install_xcompose_file(xcompose_file: Path) -> None:
         return
 
     try:
-        # Import pwd at runtime to avoid import errors on non-Unix platforms
         import pwd as _pwd  # type: ignore
 
         user_info = _pwd.getpwnam(sudo_user)
         home_dir = Path(user_info.pw_dir)
         dest_xcompose = home_dir / ".XCompose"
 
-        # If destination exists, ask user to confirm overwrite when possible.
         if dest_xcompose.exists():
-            try:
-                interactive = sys.stdin.isatty()
-            except Exception:
-                interactive = False
-
-            if not interactive:
+            if force:
                 logging.info(
-                    "%s already exists; not overwriting in non-interactive mode.",
+                    "Existing %s detected and force flag set: backing up and overwriting without prompting.",
                     dest_xcompose,
                 )
-                return
+                backup_file(dest_xcompose)
+            else:
+                tty = None
+                try:
+                    tty = open("/dev/tty", "r+")
+                except Exception:
+                    tty = None
 
-            # Prompt the user; default to YES on empty input (Enter)
-            try:
-                # Prompt in English and clearly indicate that Enter = yes (default)
-                resp = (
-                    input(
-                        f"{dest_xcompose} already exists. Overwrite? [Y/n] (Enter = yes): "
+                if tty is None:
+                    logging.error(
+                        "%s already exists and no terminal is available to ask the user. Run the installer interactively.",
+                        dest_xcompose,
                     )
-                    .strip()
-                    .lower()
-                )
-            except Exception:
-                logging.info(
-                    "Could not read user input; skipping .XCompose install."
-                )
-                return
+                    sys.exit(2)
 
-            # Treat empty input (Enter) as confirmation
-            if resp not in ("", "y", "yes"):
-                logging.info(
-                    "User declined to overwrite %s; skipping.", dest_xcompose
-                )
-                return
+                try:
+                    prompt = f"{dest_xcompose} already exists. Overwrite? [Y/n] (Enter = yes): "
+                    try:
+                        tty.write(prompt)
+                        tty.flush()
+                    except Exception:
+                        print(prompt, end="", flush=True)
 
-            # Create backup of existing .XCompose like other files
-            backup_file(dest_xcompose)
+                    try:
+                        resp = tty.readline().strip().lower()
+                    except Exception:
+                        logging.info(
+                            "Could not read user input from terminal; skipping .XCompose install."
+                        )
+                        return
+
+                    if resp not in ("", "y", "yes"):
+                        logging.info(
+                            "User declined to overwrite %s; skipping.", dest_xcompose
+                        )
+                        return
+
+                    backup_file(dest_xcompose)
+                finally:
+                    try:
+                        tty.close()
+                    except Exception:
+                        pass
 
         shutil.copy(xcompose_file, dest_xcompose)
         chown = getattr(os, "chown", None)
@@ -361,7 +370,10 @@ def install_xcompose_file(xcompose_file: Path) -> None:
 
 
 def perform_install(
-    xkb_file: Path, xcompose_file: Optional[Path], types_file: Optional[Path]
+    xkb_file: Path,
+    xcompose_file: Optional[Path],
+    types_file: Optional[Path],
+    force_xcompose: bool = False,
 ) -> None:
     symbol_name, display_name = extract_xkb_info(xkb_file)
     if not symbol_name or not display_name:
@@ -383,11 +395,10 @@ def perform_install(
     update_xml_file(XKB_RULES_DIR / "evdev.xml", symbol_name, display_name)
 
     if xcompose_file and xcompose_file.is_file():
-        install_xcompose_file(xcompose_file)
+        install_xcompose_file(xcompose_file, force=force_xcompose)
     else:
         logging.info("No .XCompose file specified. Skipping.")
 
-    # Try to apply the newly installed layout as the current system layout.
     try:
         _apply_installed_layout(symbol_name)
     except Exception as e:
@@ -409,6 +420,11 @@ def parse_args() -> dict:
     parser.add_argument(
         "--types", type=Path, help="Path to the xkb_types.txt file."
     )
+    parser.add_argument(
+        "--force-xcompose",
+        action="store_true",
+        help="When provided, overwrite the user's ~/.XCompose without prompting.",
+    )
     return vars(parser.parse_args())
 
 
@@ -419,33 +435,20 @@ def main() -> None:
 
     check_sudo()
     args = parse_args()
-    perform_install(args["xkb"], args.get("xcompose"), args.get("types"))
+    perform_install(
+        args["xkb"], args.get("xcompose"), args.get("types"), args.get("force_xcompose", False)
+    )
 
 
 def _apply_installed_layout(symbol_name: str) -> None:
-    """Attempt to set the newly installed layout as the active system layout.
-
-    This function tries a few fallbacks, in order of preference:
-    1. Use `localectl set-x11-keymap` (systemd) to persistently set the X11 layout.
-    2. Try to run `setxkbmap` in the user's X session (if we can locate DISPLAY and XAUTHORITY).
-
-    The function is best-effort: it logs success or failure but does not raise on
-    errors unless they are unexpected.
-    """
-    # 1) Try localectl (systemd) for a persistent system-wide setting
     try:
         if shutil.which("localectl"):
-            # localectl set-x11-keymap LAYOUT MODEL VARIANT OPTIONS
-            # Use 'fr' layout and the installed symbol_name as variant.
             cmd = ["localectl", "set-x11-keymap", "fr", "", symbol_name, ""]
             logging.info(
                 "Setting X11 keymap persistently via: %s", " ".join(cmd)
             )
-            # Capture output so we don't leak raw stderr to the caller's terminal.
             try:
-                res = subprocess.run(
-                    cmd, check=False, capture_output=True, text=True
-                )
+                res = subprocess.run(cmd, check=False, capture_output=True, text=True)
                 if res.stdout:
                     logging.debug("localectl stdout: %s", res.stdout.strip())
                 if res.stderr:
@@ -461,10 +464,9 @@ def _apply_installed_layout(symbol_name: str) -> None:
             logging.debug(
                 "localectl not found, skipping persistent system setting"
             )
-    except Exception as exc:  # pragma: no cover - best-effort
+    except Exception as exc:
         logging.warning("localectl attempt failed: %s", exc)
 
-    # 2) Try to apply to the current X session using setxkbmap as the real user
     sudo_user = os.getenv("SUDO_USER")
     if not sudo_user:
         logging.debug("SUDO_USER not set; cannot attempt user X session update")
@@ -475,10 +477,8 @@ def _apply_installed_layout(symbol_name: str) -> None:
 
         user_info = _pwd.getpwnam(sudo_user)
         home_dir = Path(user_info.pw_dir)
-        # Common X authority file
         xauth = home_dir / ".Xauthority"
 
-        # Try a couple of DISPLAY values if none are present
         display_candidates = [os.environ.get("DISPLAY", ":0"), ":0", ":1"]
 
         for disp in display_candidates:
@@ -487,14 +487,12 @@ def _apply_installed_layout(symbol_name: str) -> None:
             else:
                 setx_cmd = f"DISPLAY={disp} setxkbmap fr -variant {symbol_name}"
 
-            # Run as the original user so the command affects their session
             try:
                 logging.info(
                     "Attempting to apply layout in X session for %s: %s",
                     sudo_user,
                     setx_cmd,
                 )
-                # Capture stdout/stderr so we can map expected X errors to friendly info
                 try:
                     res = subprocess.run(
                         ["runuser", "-l", sudo_user, "-c", setx_cmd],
@@ -506,13 +504,8 @@ def _apply_installed_layout(symbol_name: str) -> None:
                     logging.debug("Failed to run user command: %s", exc_run)
                     continue
 
-                # If the command produced stderr with known X11 authorization/display
-                # messages, log a friendly informational message rather than exposing
-                # raw stderr to the caller.
                 stderr = (res.stderr or "").strip()
                 if res.returncode != 0 and stderr:
-                    # Common messages that indicate inability to access the user's X
-                    # session but are non-fatal for the installation.
                     if (
                         "Authorization required" in stderr
                         or "no authorization protocol" in stderr.lower()
@@ -524,27 +517,21 @@ def _apply_installed_layout(symbol_name: str) -> None:
                         )
                         logging.debug("setxkbmap stderr: %s", stderr)
                     else:
-                        # Unexpected stderr — preserve as a warning so the user can see
-                        # that something else happened.
                         logging.warning(
                             "setxkbmap returned code %d: %s",
                             res.returncode,
                             stderr,
                         )
                 else:
-                    # No stderr and/or returncode 0 — treat as success (best-effort)
                     logging.info(
                         "Applied layout (or attempted successfully) for DISPLAY=%s",
                         disp,
                     )
 
-                # Stop after the first attempt regardless of result; we don't want to
-                # spam multiple DISPLAY candidates in most setups.
                 break
             except Exception:
-                # try next candidate
                 continue
-    except Exception as exc:  # pragma: no cover - best-effort
+    except Exception as exc:
         logging.warning("Failed to update X session keymap: %s", exc)
 
 
