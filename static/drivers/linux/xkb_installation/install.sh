@@ -328,8 +328,8 @@ done <<< "$FILE_LIST"
 
 VARIANTS_MENU=""
 if $HAS_NORMAL; then VARIANTS_MENU="${VARIANTS_MENU}1. Ergopti (Standard)\n"; fi
-if $HAS_PLUS; then VARIANTS_MENU="${VARIANTS_MENU}2. Ergopti+\n"; fi
-if $HAS_PLUS_PLUS; then VARIANTS_MENU="${VARIANTS_MENU}3. Ergopti++\n"; fi
+if $HAS_PLUS; then VARIANTS_MENU="${VARIANTS_MENU}2. Ergopti+ (À utiliser avec Espanso)\n"; fi
+if $HAS_PLUS_PLUS; then VARIANTS_MENU="${VARIANTS_MENU}3. Ergopti++ (Déconseillé, pour tests uniquement)\n"; fi
 
 if [ -z "$VARIANTS_MENU" ]; then
     printf "${LOG_INDENT}${RED}❌ Erreur : Aucun fichier Ergopti .xkb trouvé dans cette version.${NO_COLOR}\n"
@@ -371,7 +371,7 @@ else
 fi
 
 # --- TYPES SELECTION ---
-TYPES_MENU="1. Sans Ctrl sur accents (Recommandé / Défaut)\n2. Complet (Standard)\n3. Aucun"
+TYPES_MENU="1. Sans Ctrl ZXCV sur voyelles accentuées (Recommandé)\n2. Complet (Standard)\n3. Aucun (Déconseillé, risque de générer des erreurs)"
 
 TYPES_CHOICE_RAW=$(printf "%b" "$TYPES_MENU" | run_fzf --prompt="Types > " --header="Configuration du comportement des touches (Types)")
 if [ -z "$TYPES_CHOICE_RAW" ]; then printf "\nAnnulé.\n"; exit 0; fi
