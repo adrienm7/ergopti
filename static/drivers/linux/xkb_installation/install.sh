@@ -238,7 +238,7 @@ if [ "$IS_LOCAL" = true ]; then
     printf "${LOG_INDENT}Analyse des fichiers locaux dans : ${BOLD}$DRIVERS_ROOT${NO_COLOR}\n"
 
 else
-    # --- REMOTE MODE: FETCH METADATA ONLY ---
+    # === REMOTE MODE: FETCH METADATA ONLY ===
     log_section "Connexion au dépôt distant ($SELECTED_BRANCH)"
     REPO_DIR="$TEMP_DIR/repo"
 
@@ -326,7 +326,7 @@ fi
 
 printf "\n${LOG_INDENT}${BOLD}Configuration de l’installation${NO_COLOR}\n"
 
-# --- VARIANT DETECTION ---
+# === VARIANT DETECTION ===
 HAS_NORMAL=false
 HAS_PLUS=false
 HAS_PLUS_PLUS=false
@@ -381,7 +381,7 @@ if [ -z "$XKB_FILENAME" ]; then printf "${RED}❌ Erreur interne : Fichier varia
 
 printf "${LOG_INDENT}${GREEN}➡️ Variante : $SELECTED_VARIANT_RAW${NO_COLOR}\n"
 
-# --- XCOMPOSE DETECTION ---
+# === XCOMPOSE DETECTION ===
 BASENAME="${XKB_FILENAME%.*}" # Remove extension
 XCOMPOSE_FILENAME=$(echo "$FILE_LIST" | grep -i "${BASENAME}.XCompose" | head -n 1)
 XCOMPOSE_FILENAME=$(basename "$XCOMPOSE_FILENAME")
@@ -392,7 +392,7 @@ else
     printf "${LOG_INDENT}${YELLOW}➡️ XCompose : Non trouvé${NO_COLOR}\n"
 fi
 
-# --- TYPES SELECTION ---
+# === TYPES SELECTION ===
 TYPES_MENU="1. Sans Ctrl ZXCV sur voyelles accentuées (Recommandé)\n2. Complet (Standard)\n3. Aucun (Déconseillé, risque de générer des erreurs)"
 
 TYPES_CHOICE_RAW=$(printf "%b" "$TYPES_MENU" | run_fzf --prompt="Types > " --header="Configuration du comportement des touches (Types)")

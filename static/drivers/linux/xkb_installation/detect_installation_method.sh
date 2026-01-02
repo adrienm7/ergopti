@@ -17,7 +17,7 @@ set -euo pipefail
 # -u: Treat unset variables as an error
 # -o pipefail: Return value of a pipeline is the status of the last command to exit with a non-zero status
 
-# --- NEW: Environment setup to see the compiled version immediately ---
+# === NEW: Environment setup to see the compiled version immediately ===
 export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:${PKG_CONFIG_PATH:-}"
 export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH:-}"
 
@@ -132,7 +132,7 @@ try_update_lib() {
     printf "   ${BOLD}plus propre${NO_COLOR} (dans votre dossier utilisateur sans toucher au système).\n"
     echo
     
-    # --- 1. IMMUTABLE SYSTEM CHECK ---
+    # === 1. IMMUTABLE SYSTEM CHECK ===
     # Check for SteamOS or OSTree based systems (Silverblue, Kinoite, etc.)
     local is_immutable=false
     if [ -f /etc/os-release ]; then
@@ -148,7 +148,7 @@ try_update_lib() {
         return 1
     fi
 
-    # --- 2. PROMPT ---
+    # === 2. PROMPT ===
     # Prompt user (Default Yes)
     read -p "   Voulez-vous télécharger et compiler la dernière version ? (O/n) " -n 1 -r
     echo
@@ -160,7 +160,7 @@ try_update_lib() {
 
     printf "   ${BLUE}1. Installation des outils de compilation...${NO_COLOR}\n"
 
-    # --- 3. EXECUTE UPDATE (SOURCE COMPILE) ---
+    # === 3. EXECUTE UPDATE (SOURCE COMPILE) ===
     if [ -f /etc/os-release ]; then . /etc/os-release; fi
     local DISTRO=${ID:-unknown}
 
