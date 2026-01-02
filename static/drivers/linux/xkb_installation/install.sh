@@ -182,7 +182,7 @@ log_section "Vérification des dépendances"
 
 # Install git if missing
 if ! command -v git >/dev/null 2>&1 && [ -f /etc/os-release ]; then
-    printf "${LOG_INDENT}Git non trouvé. Tentative d'installation automatique...\n"
+    printf "${LOG_INDENT}Git non trouvé. Tentative d’installation automatique...\n"
     . /etc/os-release
     case $ID in
         fedora) sudo dnf install -y git ;;
@@ -324,7 +324,7 @@ else
     FILE_LIST=$(git ls-tree --name-only "origin/$SELECTED_BRANCH:$REMOTE_PATH")
 fi
 
-printf "\n${LOG_INDENT}${BOLD}Configuration de l'installation${NO_COLOR}\n"
+printf "\n${LOG_INDENT}${BOLD}Configuration de l’installation${NO_COLOR}\n"
 
 # --- VARIANT DETECTION ---
 HAS_NORMAL=false
@@ -470,7 +470,7 @@ fi
 # ======= EXECUTION PHASE ========
 # ================================
 
-log_section "Préparation de l'installation"
+log_section "Préparation de l’installation"
 
 INSTALLER_SCRIPTS_DIR="$DRIVERS_ROOT/$INSTALLER_REL_PATH"
 
@@ -501,7 +501,7 @@ fi
 
 INSTALLER_FULL_PATH="$INSTALLER_SCRIPTS_DIR/$INSTALLER_SCRIPT"
 if [ ! -f "$INSTALLER_FULL_PATH" ]; then
-     printf "${LOG_INDENT}${RED}❌ Erreur : Script d'installation introuvable : %s${NO_COLOR}\n" "$INSTALLER_FULL_PATH"
+     printf "${LOG_INDENT}${RED}❌ Erreur : Script d’installation introuvable : %s${NO_COLOR}\n" "$INSTALLER_FULL_PATH"
      exit 1
 fi
 
@@ -518,12 +518,12 @@ if [ -n "$TYPES_FILENAME" ]; then
     TYPES_ARG="--types $(realpath "$SELECTED_VERSION_DIR/$TYPES_FILENAME")"
 fi
 
-printf "${LOG_INDENT}Méthode détectée : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
+printf "${LOG_INDENT}Méthode d’installation : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
 printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copier les fichiers.\n"
 
 CMD="python3 $INSTALLER_FULL_PATH --xkb $XKB_FULL_PATH $XCOMPOSE_ARG $TYPES_ARG"
 
-printf "\n🚀 Exécution de l'installateur...\n"
+printf "\n🚀 Exécution de l’installateur...\n"
 tput cnorm >/dev/null 2>&1 || true
 
 # Execute with sudo
