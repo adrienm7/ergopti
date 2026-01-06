@@ -185,9 +185,9 @@
 <div class="banner">
 	{#if isDevVersion}
 		<div class="dev-banner-content">
-			<a class="button-link" href="/">
+			<a href="/">
 				<p>🚧 VERSION DE DEV 🚧</p>
-				<p class="subtitle">➜ aller sur la version stable</p>
+				<p class="subtitle button-link">➜ aller sur la version stable</p>
 			</a>
 		</div>
 	{:else}
@@ -267,12 +267,6 @@
 	}
 
 	/* Banner dev links */
-	.banner .dev-links {
-		display: flex;
-		gap: 0.5rem;
-		justify-content: center;
-		margin-top: 0.5rem;
-	}
 
 	.banner .button-link {
 		background: rgba(255, 255, 255, 0.08);
