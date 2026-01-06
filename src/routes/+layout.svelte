@@ -80,6 +80,12 @@
 		affiche = affiche === 'none' ? 'block' : 'none';
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
+
+	// Detect if we're on the dev version
+	let isDevVersion = false;
+	onMount(() => {
+		isDevVersion = window.location.pathname.startsWith('/dev');
+	});
 </script>
 
 <bloc-page id="page" class="bg-blue">
@@ -165,10 +171,17 @@
 </keyboard-reference>
 
 <div class="banner">
-	<a href="/informations#changelog"
-		><p>NOUVEAU : Ergopti v2.2.1</p>
-		<p class="subtitle">drivers Windows, macOS et Linux complets</p></a
-	>
+	{#if isDevVersion}
+		<a href="/dev/informations#changelog"
+			><p>🚧 VERSION DE DÉVELOPPEMENT 🚧</p>
+			<p class="subtitle">Dernières fonctionnalités en test</p></a
+		>
+	{:else}
+		<a href="/informations#changelog"
+			><p>NOUVEAU : Ergopti v2.2.1</p>
+			<p class="subtitle">drivers Windows, macOS et Linux complets</p></a
+		>
+	{/if}
 </div>
 
 <style>
