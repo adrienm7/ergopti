@@ -45,10 +45,10 @@
 </div>
 <div style="height:1rem"></div>
 <div style="display: flex; gap: 1rem; justify-content:center;">
-	<a href="/documents/printable_layout_v2.2.pdf" download>
+	<a href="documents/printable_layout_v2.2.pdf" download>
 		<button>Layout à imprimer</button>
 	</a>
-	<a href="/documents/printable_layout_v2.2_full.pdf" download>
+	<a href="documents/printable_layout_v2.2_full.pdf" download>
 		<button>Layout à imprimer complet</button>
 	</a>
 </div>

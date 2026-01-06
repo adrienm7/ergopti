@@ -33,14 +33,14 @@
 
 {#if version_mineure_kbdedit_exe !== undefined}
 	<div class="download-buttons">
-		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
+		<a href="drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
 			<button
 				><i class="icon-windows" style="vertical-align:-0.05em"></i>
 				Installateur KbdEdit d’Ergopti v{version_mineure_kbdedit_exe}</button
 			>
 		</a>
 		<tiny-space></tiny-space>
-		<a href="/drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
+		<a href="drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
 			<button class="alt-button"
 				><i class="icon-windows" style="vertical-align:-0.05em"></i> Fichier source KbdEdit
 				d’Ergopti v{version_mineure_kbdedit_kbe}</button
@@ -126,13 +126,13 @@
 
 {#if version_mineure_plus !== undefined}
 	<div class="download-buttons">
-		<a href="/drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download>
+		<a href="drivers/autohotkey/ErgoptiPlus_v{version_mineure_plus}.ahk" download>
 			<button
 				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
 				ErgoptiPlus v{version_mineure_plus}.ahk</button
 			>
 		</a>
-		<a href="/drivers/autohotkey/compiled/ErgoptiPlus_v{version_mineure_plus}.exe" download>
+		<a href="drivers/autohotkey/compiled/ErgoptiPlus_v{version_mineure_plus}.exe" download>
 			<button class="alt-button"
 				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
 				ErgoptiPlus v{version_mineure_plus} compilé</button
@@ -142,12 +142,12 @@
 {/if}
 <p>
 	Il est également conseillé (mais c’est optionnel) de télécharger les 2 fichiers suivants : <a
-		href="/drivers/autohotkey/ErgoptiPlus_Icon.ico"
+		href="drivers/autohotkey/ErgoptiPlus_Icon.ico"
 		download
 		class="link">ErgoptiPlus_Icon.ico</a
 	>
 	ainsi que
-	<a href="/drivers/autohotkey/ErgoptiPlus_Icon_Disabled.ico" download class="link"
+	<a href="drivers/autohotkey/ErgoptiPlus_Icon_Disabled.ico" download class="link"
 		>ErgoptiPlus_Icon_Disabled.ico</a
 	>. Ils sont à placer dans le même dossier que celui du script <em>.ahk</em> et permettent d’en modifier
 	l’icône dans la barre des tâches.
