@@ -59,16 +59,16 @@
 
 <header>
 	<div id="ergopti-header">
-		<a href="" aria-label="Accéder à la page d’accueil">
+		<a href="./" aria-label="Accéder à la page d’accueil">
 			<img src="img/logo/logo.svg" class="logo" alt="Logo Ergopti" />
 		</a>
 		<div id="ergopti-title">
 			<strong class="no-gradient text-white">
-				<a href="" aria-label="Accéder à la page d’accueil">
+				<a href="./" aria-label="Accéder à la page d’accueil">
 					<span class="min-width-300">Disposition </span>
 					<span class="min-width-350">clavier </span>
 				</a>
-				<a href="" aria-label="Accéder à la page d’accueil">
+				<a href="./" aria-label="Accéder à la page d’accueil">
 					<Ergopti></Ergopti>
 				</a>
 				<div class="min-width-400">
