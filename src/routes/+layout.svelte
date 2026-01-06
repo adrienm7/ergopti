@@ -2,13 +2,6 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 
-	import IntroductionDisposition from './accueil/introduction_ergopti.svelte';
-	import IntroductionDispositionPlus from './ergopti-plus/introduction_ergopti_plus.svelte';
-	import IntroductionBenchmarks from './benchmarks/introduction_benchmarks.svelte';
-	import IntroductionTelechargements from './utilisation/introduction_telechargements.svelte';
-	import IntroductionInformations from './informations/introduction_informations.svelte';
-	import DispositionPlus from './accueil/ergopti_plus.svelte';
-
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
 
@@ -100,60 +93,7 @@
 <bloc-page id="page" class="bg-blue">
 	<div style="flex-grow:1">
 		<Header />
-		<bloc-introduction>
-			{#if $page.url.pathname === '/'}
-				<IntroductionDisposition></IntroductionDisposition>
-			{/if}
-			{#if $page.url.pathname === '/ergopti-plus'}
-				<IntroductionDispositionPlus></IntroductionDispositionPlus>
-			{/if}
-			{#if $page.url.pathname === '/benchmarks'}
-				<IntroductionBenchmarks></IntroductionBenchmarks>
-			{/if}
-			{#if $page.url.pathname === '/utilisation'}
-				<IntroductionTelechargements></IntroductionTelechargements>
-			{/if}
-			{#if $page.url.pathname === '/informations'}
-				<IntroductionInformations></IntroductionInformations>
-			{/if}
-		</bloc-introduction>
-		<bloc-main>
-			<nav id="sidebar">
-				<div>
-					<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
-						Contenu de la page
-					</p>
-					<div id="page-toc-pc">
-						<div id="page-toc"></div>
-					</div>
-					<hr style="margin:0; margin-top:20px" />
-					<p style="text-align:center; margin: 0; padding-top: 10px;">
-						<a
-							href="https://github.com/adrienm7/ergopti"
-							target="_blank"
-							style="font-size:0.9em!important; color:white"
-							>Repo GitHub <i class="icon-github"></i></a
-						>
-						—
-						<a
-							href={discordLink}
-							style="position:relative; bottom:-0.1em; font-size:0.9em!important; color:white"
-							>Serveur Discord <i class="icon-discord"></i></a
-						>
-					</p>
-				</div>
-			</nav>
-			<div id="main-content">
-				<main>
-					<slot />
-				</main>
-			</div>
-		</bloc-main>
-		<bloc-fin>
-			{#if $page.url.pathname === '/'}
-				<DispositionPlus></DispositionPlus>
-			{/if}
-		</bloc-fin>
+		<slot />
 	</div>
 	<Footer />
 </bloc-page>
