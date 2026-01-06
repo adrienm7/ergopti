@@ -172,15 +172,15 @@
 
 <div class="banner">
 	{#if isDevVersion}
-		<a href="/dev/informations#changelog"
-			><p>🚧 VERSION DE DÉVELOPPEMENT 🚧</p>
-			<p class="subtitle">Dernières fonctionnalités en test</p></a
-		>
+		<div class="dev-banner-content">
+			<p><a href="/dev/informations#changelog"> 🚧 VERSION DE DEV 🚧</a></p>
+			<p class="subtitle"><a class="button-link" href="/">➜ Aller sur la version stable</a></p>
+		</div>
 	{:else}
-		<a href="/informations#changelog"
-			><p>NOUVEAU : Ergopti v2.2.1</p>
-			<p class="subtitle">drivers Windows, macOS et Linux complets</p></a
-		>
+		<a href="/informations#changelog">
+			<p>NOUVEAU : Ergopti v2.2.1</p>
+			<p class="subtitle">drivers Windows, macOS et Linux complets</p>
+		</a>
 	{/if}
 </div>
 
@@ -250,5 +250,27 @@
 		justify-content: center;
 		margin: var(--marge) 0;
 		min-height: calc(100vh - var(--header-height) - var(--banner-height) - 2 * var(--marge) + 1px);
+	}
+
+	/* Banner dev links */
+	.banner .dev-links {
+		display: flex;
+		gap: 0.5rem;
+		justify-content: center;
+		margin-top: 0.5rem;
+	}
+
+	.banner .button-link {
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		border-radius: 4px;
+		color: white;
+		font-weight: 600;
+		padding: 0.4rem 0.8rem;
+		text-decoration: none;
+	}
+
+	.banner .button-link:hover {
+		background: rgba(255, 255, 255, 0.12);
 	}
 </style>
