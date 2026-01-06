@@ -271,11 +271,11 @@
 	.banner .button-link {
 		background: rgba(255, 255, 255, 0.08);
 		border: 1px solid rgba(255, 255, 255, 0.06);
-		border-radius: 4px;
+		border-radius: 3px;
 		color: white;
-		font-weight: 600;
-		padding: 0.4rem 0.8rem;
+		padding: 0.15em 0.3em;
 		text-decoration: none;
+		width: fit-content;
 	}
 
 	.banner .button-link:hover {
