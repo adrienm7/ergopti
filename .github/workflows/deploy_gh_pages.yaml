@@ -3,7 +3,7 @@ name: Build and Deploy to GitHub Pages
 on:
   # Déclenchement sur un push vers la branche principale
   push:
-    branches: ["main", "dev"]
+    branches: ['main', 'dev']
 
   # Permet de lancer manuellement depuis l'onglet Actions
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
 
 # Un seul déploiement peut être en cours à la fois
 concurrency:
-  group: "pages"
+  group: 'pages'
   cancel-in-progress: false
 
 jobs:
@@ -24,45 +24,60 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Récupération du code
-      - name: Checkout
-        uses: actions/checkout@v4
-
       # Configuration de Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # Installation des dépendances et génération du site
-      - name: Install dependencies and build
+      # Si push sur main : build seulement main
+      - name: Build main branch only
+        if: github.ref_name == 'main'
         run: |
+          git clone --depth 1 --branch main https://github.com/${{ github.repository }}.git main-repo
+          cd main-repo
           npm install
           npm run build
+          cd ..
+          mkdir -p staging
+          mv main-repo/build/* staging/
 
-      # Étape clé : Préparation de l'arborescence avant l'upload
-      - name: Organize build for subfolder
+      # Si push sur dev : build main ET dev
+      - name: Build both main and dev branches
+        if: github.ref_name == 'dev'
         run: |
-          if [ "${{ github.ref_name }}" == "dev" ]; then
-            echo "Branch is dev. Moving build to /dev folder."
-            mkdir -p staging/dev
-            mv build/* staging/dev/
-          else
-            echo "Branch is main. Keeping build at root."
-            mkdir -p staging
-            mv build/* staging/
-          fi
+          # Build main
+          echo "Building main branch..."
+          git clone --depth 1 --branch main https://github.com/${{ github.repository }}.git main-repo
+          cd main-repo
+          npm install
+          npm run build
+          cd ..
+
+          # Build dev
+          echo "Building dev branch..."
+          git clone --depth 1 --branch dev https://github.com/${{ github.repository }}.git dev-repo
+          cd dev-repo
+          npm install
+          npm run build
+          cd ..
+
+          # Organize: main at root, dev in /dev
+          mkdir -p staging
+          mv main-repo/build/* staging/
+          mkdir -p staging/dev
+          mv dev-repo/build/* staging/dev/
 
       # Envoi des fichiers générés comme artefact
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./staging # On pointe vers le dossier intermédiaire évitant une récursion dans le dossier build
+          path: ./staging
 
   # Étape de déploiement
   deploy:
     environment:
-      name: github-pages
+      name: ${{ github.ref_name == 'main' && 'github-pages' || '' }}
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
