@@ -10,3 +10,5 @@ vite.config.ts.timestamp-*
 static/corpus/modifie/
 /build/
 __pycache__
+
+version.json

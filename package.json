@@ -3,7 +3,9 @@
 	"version": "3.0.0",
 	"private": true,
 	"scripts": {
+		"predev": "node ./scripts/write-branch.js",
 		"dev": "vite dev",
+		"prebuild": "node ./scripts/write-branch.js",
 		"build": "vite build",
 		"preview": "vite preview",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
