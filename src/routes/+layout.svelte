@@ -15,6 +15,7 @@
 	import 'modern-normalize';
 
 	import { afterUpdate, onMount } from 'svelte';
+	import { detectDev } from '$lib/js/isDev.js';
 	import { page } from '$app/stores';
 	import { discordLink } from '$lib/stores_infos.js';
 
@@ -82,14 +83,14 @@
 	}
 
 	// Detect if we're on the dev version
-	let isDevVersion = false;
+	let isDev = false;
 	onMount(() => {
-		isDevVersion = window.location.pathname.startsWith('/dev');
+		isDev = detectDev();
 	});
 </script>
 
 <svelte:head>
-	{#if isDevVersion}
+	{#if isDev}
 		<meta name="robots" content="noindex, nofollow" />
 		<!-- Point canonical to production root to avoid duplicate content SEO issues -->
 		<link rel="canonical" href="/" />
@@ -183,7 +184,7 @@
 </keyboard-reference>
 
 <div class="banner">
-	{#if !isDevVersion}
+	{#if isDev}
 		<div class="dev-banner-content">
 			<a href="/">
 				<p>🚧 VERSION DE DEV 🚧</p>
