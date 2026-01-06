@@ -1,4 +1,4 @@
-Captures d’écran réalisées depuis le site d’Ergopti
+Les captures d’écran ont été réalisées depuis le site d’Ergopti
 
 Modification : background: #021c4e; dans le CSS du body
 car les dégradés sont hachés sinon lors de l’enregistrement des images en tailles optimisées
