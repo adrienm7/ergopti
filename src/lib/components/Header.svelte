@@ -59,16 +59,16 @@
 
 <header>
 	<div id="ergopti-header">
-		<a href="/" aria-label="Accéder à la page d’accueil">
+		<a href="" aria-label="Accéder à la page d’accueil">
 			<img src="img/logo/logo.svg" class="logo" alt="Logo Ergopti" />
 		</a>
 		<div id="ergopti-title">
 			<strong class="no-gradient text-white">
-				<a href="/" aria-label="Accéder à la page d’accueil">
+				<a href="" aria-label="Accéder à la page d’accueil">
 					<span class="min-width-300">Disposition </span>
 					<span class="min-width-350">clavier </span>
 				</a>
-				<a href="/" aria-label="Accéder à la page d’accueil">
+				<a href="" aria-label="Accéder à la page d’accueil">
 					<Ergopti></Ergopti>
 				</a>
 				<div class="min-width-400">
@@ -78,7 +78,7 @@
 						{/each}
 					</select>
 					<a
-						href="/informations/#changelog"
+						href="informations/#changelog"
 						aria-label="Accéder à la page d’accueil"
 						style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
 					>
@@ -97,7 +97,7 @@
 	<nav id="menu">
 		<div id="menu-pages">
 			<a
-				href="/"
+				href=""
 				onclick={closeMenu}
 				aria-label="Accéder à la page Ergopti"
 				aria-current={$page.url.pathname === '/' ? 'page' : undefined}
@@ -108,7 +108,7 @@
 				<span class="title">Ergopti</span>
 			</a>
 			<a
-				href="/ergopti-plus"
+				href="ergopti-plus"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Ergopti+"
 				aria-current={$page.url.pathname === '/ergopti-plus' ? 'page' : undefined}
@@ -121,7 +121,7 @@
 				</span>
 			</a>
 			<a
-				href="/benchmarks"
+				href="benchmarks"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Benchmarks"
 				aria-current={$page.url.pathname === '/benchmarks' ? 'page' : undefined}
@@ -132,7 +132,7 @@
 				<span class="title" style="margin-top:3px;">Benchmarks</span>
 			</a>
 			<a
-				href="/utilisation"
+				href="utilisation"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Utilisation"
 				aria-current={$page.url.pathname === '/utilisation' ? 'page' : undefined}
@@ -143,7 +143,7 @@
 				<span class="title">Utilisation</span>
 			</a>
 			<a
-				href="/informations"
+				href="informations"
 				onclick={closeMenu}
 				aria-current={$page.url.pathname === '/informations' ? 'page' : undefined}
 				aria-label="Accéder à la page Informations"
