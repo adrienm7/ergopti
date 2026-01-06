@@ -183,11 +183,13 @@
 </keyboard-reference>
 
 <div class="banner">
-	{#if isDevVersion}
+	{#if !isDevVersion}
 		<div class="dev-banner-content">
 			<a href="/">
 				<p>🚧 VERSION DE DEV 🚧</p>
-				<p class="subtitle button-link">➜ aller sur la version stable</p>
+				<p class="subtitle">
+					<span class="button-link">➜ aller sur la version stable</span>
+				</p>
 			</a>
 		</div>
 	{:else}
@@ -275,7 +277,6 @@
 		color: white;
 		padding: 0.15em 0.3em;
 		text-decoration: none;
-		width: fit-content;
 	}
 
 	.banner .button-link:hover {
