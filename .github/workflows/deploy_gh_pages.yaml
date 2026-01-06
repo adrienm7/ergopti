@@ -53,10 +53,11 @@ jobs:
             mv build/* staging/
           fi
 
+      # Envoi des fichiers générés comme artefact
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./staging # On pointe vers le dossier intermédiaire
+          path: ./staging # On pointe vers le dossier intermédiaire évitant une récursion dans le dossier build
 
   # Étape de déploiement
   deploy:
