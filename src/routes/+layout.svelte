@@ -185,8 +185,10 @@
 <div class="banner">
 	{#if isDevVersion}
 		<div class="dev-banner-content">
-			<p><a href="/dev/informations#changelog"> 🚧 VERSION DE DEV 🚧</a></p>
-			<p class="subtitle"><a class="button-link" href="/">➜ Aller sur la version stable</a></p>
+			<a class="button-link" href="/">
+				<p>🚧 VERSION DE DEV 🚧</p>
+				<p class="subtitle">➜ aller sur la version stable</p>
+			</a>
 		</div>
 	{:else}
 		<a href="/informations#changelog">
