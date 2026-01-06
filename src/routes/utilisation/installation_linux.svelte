@@ -5,23 +5,17 @@
 	import BetaWarning from '$lib/components/BetaWarning.svelte';
 	import { version } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
+	import { branchForInstall } from '$lib/js/isDev.js';
 	let versionValue, version_linux;
 	version.subscribe((value) => {
 		versionValue = value;
 		version_linux = getLatestVersion('linux', value)?.replaceAll('.', '_');
 	});
 
-	const cmd =
-		'branch="main"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/drivers/linux/xkb_installation/install.sh" | BRANCH="$branch" bash';
+	const cmd = `branch="${branchForInstall()}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/drivers/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
-
-{#if typeof window !== 'undefined'}
-	<script>
-		// client-only helpers injected here to keep SSR simple
-	</script>
-{/if}
 
 <code
 	style="display:inline-block; width:100%; padding:1em; border-bottom-left-radius:0; border-bottom-right-radius:0; text-align:left"
