@@ -88,6 +88,14 @@
 	});
 </script>
 
+<svelte:head>
+	{#if isDevVersion}
+		<meta name="robots" content="noindex, nofollow" />
+		<!-- Point canonical to production root to avoid duplicate content SEO issues -->
+		<link rel="canonical" href="/" />
+	{/if}
+</svelte:head>
+
 <bloc-page id="page" class="bg-blue">
 	<div style="flex-grow:1">
 		<Header />
@@ -150,7 +158,11 @@
 </bloc-page>
 
 <keyboard-reference>
-	<button id="afficher-clavier-reference" onclick={toggleZIndex}>
+	<button
+		id="afficher-clavier-reference"
+		onclick={toggleZIndex}
+		aria-label="Afficher la référence clavier"
+	>
 		<i
 			class="icon-keyboard-duotone"
 			style="width:100%; display:{affiche === 'none' ? 'block' : 'none'}"
