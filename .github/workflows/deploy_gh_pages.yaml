@@ -3,7 +3,7 @@ name: Build and Deploy to GitHub Pages
 on:
   # Déclenchement sur un push vers la branche principale
   push:
-    branches: ["main"]
+    branches: ["main", "dev"]
 
   # Permet de lancer manuellement depuis l'onglet Actions
   workflow_dispatch:
@@ -40,11 +40,23 @@ jobs:
           npm install
           npm run build
 
-      # Envoi des fichiers générés comme artefact
+      # Étape clé : Préparation de l'arborescence avant l'upload
+      - name: Organize build for subfolder
+        run: |
+          if [ "${{ github.ref_name }}" == "dev" ]; then
+            echo "Branch is dev. Moving build to /dev folder."
+            mkdir -p staging/dev
+            mv build/* staging/dev/
+          else
+            echo "Branch is main. Keeping build at root."
+            mkdir -p staging
+            mv build/* staging/
+          fi
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./build  # Modifier si le dossier de sortie est différent
+          path: ./staging # On pointe vers le dossier intermédiaire
 
   # Étape de déploiement
   deploy:
