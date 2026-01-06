@@ -125,18 +125,18 @@
 
 <div class="banner">
 	{#if isDev}
-		<div class="dev-banner-content">
-			<a href="/">
+		<a href="/">
+			<div class="dev-banner-content">
 				<p>🚧 VERSION DE DEV 🚧</p>
 				<p class="subtitle">
 					<span class="button-link">➜ aller sur la version stable</span>
 				</p>
-			</a>
-		</div>
+			</div>
+		</a>
 	{:else}
 		<a href="/informations#changelog">
 			<p>NOUVEAU : Ergopti v2.2.1</p>
-			<p class="subtitle">drivers Windows, macOS et Linux complets</p>
+			<p class="subtitle">découvrez les nouveautés</p>
 		</a>
 	{/if}
 </div>
