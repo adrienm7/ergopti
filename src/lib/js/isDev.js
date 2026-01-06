@@ -1,16 +1,24 @@
 // Centralized dev detection utilities
 export function detectDev() {
-	// Client-side check for URL path
+	// Client-side check for URL path or hostname
 	if (typeof window === 'undefined') return false;
-	return window.location.pathname.startsWith('/dev');
+
+	// Check if path starts with /dev
+	if (window.location.pathname.startsWith('/dev')) return true;
+
+	// Check if on localhost
+	const host = window.location.hostname;
+	if (host === 'localhost' || host === '127.0.0.1') return true;
+
+	return false;
 }
 
 export function branchForInstall() {
 	// If not running in browser, default to main
 	if (typeof window === 'undefined') return 'main';
 
-	// If path explicitly indicates dev, use dev
-	if (detectDev()) return 'dev';
+	// If path explicitly indicates dev (deployed to /dev/), use dev
+	if (window.location.pathname.startsWith('/dev')) return 'dev';
 
 	// If running on localhost, attempt to determine the git branch
 	const host = window.location.hostname;

@@ -75,11 +75,7 @@
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
 
-	// Detect if we're on the dev version
-	let isDev = false;
-	onMount(() => {
-		isDev = detectDev();
-	});
+	const isDev = detectDev();
 </script>
 
 <svelte:head>
