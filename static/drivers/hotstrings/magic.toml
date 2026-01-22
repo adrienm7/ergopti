@@ -401,6 +401,7 @@
 "prem★" = { output = "premier", is_word = true, auto_expand = true }
 "prez★" = { output = "présentation", is_word = true, auto_expand = true }
 "prg★" = { output = "programme", is_word = true, auto_expand = true }
+"prio★" = { output = "priorité", is_word = true, auto_expand = true }
 "pro★" = { output = "professionnel", is_word = true, auto_expand = true }
 "prob★" = { output = "problème", is_word = true, auto_expand = true }
 "proba★" = { output = "probabilité", is_word = true, auto_expand = true }
