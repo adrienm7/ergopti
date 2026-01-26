@@ -84,6 +84,16 @@
 					>
 						<i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
 					</a>
+					<span style="display:inline-block; width:0.15em"></span>
+					<span class="links">
+						<a href="https://github.com/adrienm7/ergopti" target="_blank">
+							<i class="icon-github" style="transform: scale(0.927536)"></i>
+						</a>
+						<span> – </span>
+						<a href={discordLink} target="_blank">
+							<i class="icon-discord"></i>
+						</a>
+					</span>
 				</div>
 			</strong>
 			<p id="ergopti-subtitle">
