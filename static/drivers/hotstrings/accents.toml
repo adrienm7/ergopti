@@ -13,6 +13,7 @@
 "agées" = { output = "âgées", is_word = true, auto_expand = false }
 "aieul" = { output = "aïeul", is_word = true, auto_expand = true }
 "aieux" = { output = "aïeux", is_word = true, auto_expand = true }
+"aikido" = { output = "aïkido", is_word = true, auto_expand = true }
 "ainé" = { output = "aîné", is_word = true, auto_expand = true }
 "ambigue" = { output = "ambiguë", is_word = true, auto_expand = true }
 "ambigui" = { output = "ambiguï", is_word = true, auto_expand = true }
@@ -280,6 +281,7 @@
 "pecher" = { output = "pêcher", is_word = true, auto_expand = false }
 "peches" = { output = "pêches", is_word = true, auto_expand = false }
 "pecheu" = { output = "pêcheu", is_word = true, auto_expand = true }
+"pentecote" = { output = "Pentecôte", is_word = true, auto_expand = true }
 "phoenix" = { output = "phœnix", is_word = true, auto_expand = true }
 "photovoltai" = { output = "photovoltaï", is_word = true, auto_expand = true }
 "piqure" = { output = "piqûre", is_word = true, auto_expand = true }

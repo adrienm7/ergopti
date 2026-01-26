@@ -35,6 +35,10 @@ matches:
     replace: 'aïeux'
     propagate_case: true
     word: true
+  - trigger: 'aikido'
+    replace: 'aïkido'
+    propagate_case: true
+    word: true
   - trigger: 'ainé'
     replace: 'aîné'
     propagate_case: true
@@ -961,6 +965,10 @@ matches:
     word: true
   - trigger: 'pecheu'
     replace: 'pêcheu'
+    propagate_case: true
+    word: true
+  - trigger: 'pentecote'
+    replace: 'Pentecôte'
     propagate_case: true
     word: true
   - trigger: 'phoenix'

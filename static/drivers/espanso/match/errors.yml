@@ -19,6 +19,8 @@ matches:
     replace: '[ '
   - trigger: ']_'
     replace: '] '
+  - trigger: 'acceuil'
+    replace: 'accueil'
   - trigger: 'aeu'
     replace: 'eau'
   - trigger: 'eua'
