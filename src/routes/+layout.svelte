@@ -2,19 +2,13 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 
-	import IntroductionDisposition from './accueil/introduction_ergopti.svelte';
-	import IntroductionDispositionPlus from './ergopti-plus/introduction_ergopti_plus.svelte';
-	import IntroductionBenchmarks from './benchmarks/introduction_benchmarks.svelte';
-	import IntroductionTelechargements from './utilisation/introduction_telechargements.svelte';
-	import IntroductionInformations from './informations/introduction_informations.svelte';
-	import DispositionPlus from './accueil/ergopti_plus.svelte';
-
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
 	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
 
 	import 'modern-normalize';
 
 	import { afterUpdate, onMount } from 'svelte';
+	import { detectDev } from '$lib/js/isDev.js';
 	import { page } from '$app/stores';
 	import { discordLink } from '$lib/stores_infos.js';
 
@@ -80,71 +74,36 @@
 		affiche = affiche === 'none' ? 'block' : 'none';
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
+
+	const isDev = detectDev();
+
+	let devHref = '/';
+	$: devHref =
+		($page.url && $page.url.pathname ? $page.url.pathname.replace(/^\/dev/, '') : '/') || '/';
 </script>
+
+<svelte:head>
+	{#if isDev}
+		<meta name="robots" content="noindex, nofollow" />
+		<!-- Point canonical to production root to avoid duplicate content SEO issues -->
+		<link rel="canonical" href="/" />
+	{/if}
+</svelte:head>
 
 <bloc-page id="page" class="bg-blue">
 	<div style="flex-grow:1">
 		<Header />
-		<bloc-introduction>
-			{#if $page.url.pathname === '/'}
-				<IntroductionDisposition></IntroductionDisposition>
-			{/if}
-			{#if $page.url.pathname === '/ergopti-plus'}
-				<IntroductionDispositionPlus></IntroductionDispositionPlus>
-			{/if}
-			{#if $page.url.pathname === '/benchmarks'}
-				<IntroductionBenchmarks></IntroductionBenchmarks>
-			{/if}
-			{#if $page.url.pathname === '/utilisation'}
-				<IntroductionTelechargements></IntroductionTelechargements>
-			{/if}
-			{#if $page.url.pathname === '/informations'}
-				<IntroductionInformations></IntroductionInformations>
-			{/if}
-		</bloc-introduction>
-		<bloc-main>
-			<nav id="sidebar">
-				<div>
-					<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
-						Contenu de la page
-					</p>
-					<div id="page-toc-pc">
-						<div id="page-toc"></div>
-					</div>
-					<hr style="margin:0; margin-top:20px" />
-					<p style="text-align:center; margin: 0; padding-top: 10px;">
-						<a
-							href="https://github.com/adrienm7/ergopti"
-							target="_blank"
-							style="font-size:0.9em!important; color:white"
-							>Repo GitHub <i class="icon-github"></i></a
-						>
-						—
-						<a
-							href={discordLink}
-							style="position:relative; bottom:-0.1em; font-size:0.9em!important; color:white"
-							>Serveur Discord <i class="icon-discord"></i></a
-						>
-					</p>
-				</div>
-			</nav>
-			<div id="main-content">
-				<main>
-					<slot />
-				</main>
-			</div>
-		</bloc-main>
-		<bloc-fin>
-			{#if $page.url.pathname === '/'}
-				<DispositionPlus></DispositionPlus>
-			{/if}
-		</bloc-fin>
+		<slot />
 	</div>
 	<Footer />
 </bloc-page>
 
 <keyboard-reference>
-	<button id="afficher-clavier-reference" onclick={toggleZIndex}>
+	<button
+		id="afficher-clavier-reference"
+		onclick={toggleZIndex}
+		aria-label="Afficher la référence clavier"
+	>
 		<i
 			class="icon-keyboard-duotone"
 			style="width:100%; display:{affiche === 'none' ? 'block' : 'none'}"
@@ -165,10 +124,21 @@
 </keyboard-reference>
 
 <div class="banner">
-	<a href="/informations#changelog"
-		><p>NOUVEAU : ERGOPTI 2.2</p>
-		<p class="subtitle">drivers Windows, macOS et Linux complets</p></a
-	>
+	{#if isDev}
+		<a href={devHref}>
+			<div class="dev-banner-content">
+				<p>🚧 VERSION DE DEV 🚧</p>
+				<p class="subtitle">
+					<span class="button-link">➜ aller sur la version stable</span>
+				</p>
+			</div>
+		</a>
+	{:else}
+		<a href="/informations#changelog">
+			<p>NOUVEAU : Ergopti v2.2.1</p>
+			<p class="subtitle">découvrez les nouveautés</p>
+		</a>
+	{/if}
 </div>
 
 <style>
@@ -237,5 +207,20 @@
 		justify-content: center;
 		margin: var(--marge) 0;
 		min-height: calc(100vh - var(--header-height) - var(--banner-height) - 2 * var(--marge) + 1px);
+	}
+
+	/* Banner dev links */
+
+	.banner .button-link {
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		border-radius: 3px;
+		color: white;
+		padding: 0.15em 0.3em;
+		text-decoration: none;
+	}
+
+	.banner .button-link:hover {
+		background: rgba(255, 255, 255, 0.12);
 	}
 </style>

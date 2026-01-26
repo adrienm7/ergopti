@@ -23,3 +23,4 @@
 "aeu" = { output = "eau", is_word = false, auto_expand = true }
 "oiu" = { output = "oui", is_word = false, auto_expand = true }
 "poru" = { output = "pour", is_word = true, auto_expand = true }
+"acceuil" = { output = "accueil", is_word = true, auto_expand = true }

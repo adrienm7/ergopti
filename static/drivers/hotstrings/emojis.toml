@@ -6,6 +6,8 @@
 [[basic_smileys]]
 ":)★" = { output = "😀", is_word = true, auto_expand = true }
 ":))★" = { output = "😁", is_word = true, auto_expand = true }
+":/★" = { output = "🫤", is_word = true, auto_expand = true }
+":(★" = { output = "☹️", is_word = true, auto_expand = true }
 ":3★" = { output = "😗", is_word = true, auto_expand = true }
 ":D★" = { output = "😁", is_word = true, auto_expand = true }
 ":O★" = { output = "😮", is_word = true, auto_expand = true }
@@ -133,7 +135,7 @@
 "musique★" = { output = "🎵", is_word = true, auto_expand = true }
 "noel★" = { output = "🎄", is_word = true, auto_expand = true }
 "nuage★" = { output = "☁️", is_word = true, auto_expand = true }
-"ok★" = { output = "✔️", is_word = true, auto_expand = true }
+"ok★" = { output = "✅", is_word = true, auto_expand = true }
 "olaf★" = { output = "⛄", is_word = true, auto_expand = true }
 "ordinateur★" = { output = "💻", is_word = true, auto_expand = true }
 "parapluie★" = { output = "☂️", is_word = true, auto_expand = true }

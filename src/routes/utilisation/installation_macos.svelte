@@ -2,6 +2,7 @@
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
+	import BetaWarning from '$lib/components/BetaWarning.svelte';
 	import { version } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
 	let versionValue, version_mineure_macos;
@@ -121,9 +122,9 @@
 	macOS, un clavier ANSI entraîne de petites différences dans l’arrangement des codes de touches. Si
 	aucun pilote dédié n’était disponible, le <kbd>ê</kbd> se verrait être échangé de place avec le
 	<kbd>$</kbd>
-	de la rangée des chiffres. En outre, la touche morte <kbd class="morte">◌̂</kbd> se verrait être
+	de la rangée des chiffres. En outre, la touche morte <kbd class="deadkey">◌̂</kbd> se verrait être
 	échangée avec
-	<kbd class="morte">◌̈</kbd> et donc être encore moins accessible.
+	<kbd class="deadkey">◌̈</kbd> et donc être encore moins accessible.
 </p>
 
 <h3 id="macos-solutions">Résolution de problèmes connus</h3>
@@ -176,11 +177,7 @@
 	></i>Karabiner
 </h3>
 
-<p class="encadre">
-	<b>Attention :</b> Le code Karabiner suivant est encore en bêta et risque d’être régulièrement mis
-	à jour. Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez
-	à vérifier régulièrement si une nouvelle version est disponible.
-</p>
+<BetaWarning tool="Karabiner" />
 
 <tiny-space></tiny-space>
 
@@ -245,14 +242,95 @@
 </p>
 
 <h3>
+	<i class="icon-hammerspoon" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+		><span class="icon-hammerspoon"><span class="path1"></span><span class="path2"></span></span></i
+	>Hammerspoon
+</h3>
+
+<BetaWarning tool="Hammerspoon" />
+
+<tiny-space></tiny-space>
+
+<div class="download-buttons">
+	<a href="/drivers/hammerspoon/init.lua" target="_blank">
+		<button
+			><i class="icon-hammerspoon" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+				><span class="icon-hammerspoon"><span class="path1"></span><span class="path2"></span></span
+				></i
+			>
+			init.lua</button
+		>
+	</a>
+</div>
+
+<p>
+	<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> est un outil d'automatisation
+	puissant et open source pour macOS, permettant d'interagir avec le système via des scripts Lua. Il
+	est particulièrement utile pour définir des gestes personnalisés sur le trackpad et ajouter des fonctionnalités
+	avancées. Voici ce qui est inclus dans le fichier de configuration fourni :
+</p>
+<ul>
+	<li>
+		<strong>Gestes à trois doigts :</strong> Utilisation de swipes à trois doigts pour la navigation
+		dans les onglets :
+		<ul>
+			<li>Swipe gauche/droite : Changer d'onglet (<kbd>Ctrl</kbd> + <kbd>Tab</kbd>) ;</li>
+			<li>Swipe haut : Ouvrir un nouvel onglet (<kbd>Cmd</kbd> + <kbd>T</kbd>) ;</li>
+			<li>Swipe bas : Fermer l'onglet actuel (<kbd>Cmd</kbd> + <kbd>W</kbd>).</li>
+		</ul>
+	</li>
+	<li>
+		<strong>Tap à trois doigts :</strong> Basculer en mode sélection pour faire glisser le curseur et
+		sélectionner du texte sans maintenir de bouton physique enfoncé. Un second tap ou clic désactive
+		ce mode.
+	</li>
+	<li>
+		<strong>Zoom avec scroll :</strong> Maintenir <kbd>Cmd</kbd> et utiliser le scroll pour zoomer (<kbd
+			>Cmd</kbd
+		>
+		+ <kbd>+</kbd>) ou dézoomer (<kbd>Cmd</kbd> + <kbd>-</kbd>).
+	</li>
+</ul>
+
+<p>
+	Le fichier de configuration nécessite également le Spoon <strong>Swipe.spoon</strong> qui est fourni
+	dans le dossier. Pour installer Hammerspoon et cette configuration :
+</p>
+<ol>
+	<li>
+		Télécharger et installer <a href="https://www.hammerspoon.org/" target="_blank" class="link"
+			>Hammerspoon</a
+		> ;
+	</li>
+	<li>Copier le fichier <code>init.lua</code> dans <code>~/.hammerspoon/</code> ;</li>
+	<li>
+		Copier le dossier <code>Spoons/</code> (contenant Swipe.spoon) dans
+		<code>~/.hammerspoon/Spoons/</code> ;
+	</li>
+	<li>Recharger la configuration Hammerspoon depuis l'icône dans la barre de menu.</li>
+</ol>
+
+<p>
+	<strong>Note :</strong> Pour éviter les conflits avec les gestes système de macOS, il est
+	recommandé d'aller dans <code>Réglages Système</code> > <code>Trackpad</code> >
+	<code>Plus de gestes</code>
+	et de :
+</p>
+<ul>
+	<li>
+		Configurer <code>Balayer entre les apps en plein écran</code> avec un nombre de doigts différent
+		(par exemple 4) ;
+	</li>
+	<li>
+		Configurer <code>Mission Control</code> avec un nombre de doigts différent (par exemple 4).
+	</li>
+</ul>
+
+<h3>
 	<i class="icon-alfred" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>Alfred
 </h3>
 
-<p class="encadre">
-	<b>Attention :</b> Le code Alfred suivant est encore en bêta et risque d’être régulièrement mis à jour.
-	Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez à vérifier
-	régulièrement si une nouvelle version est disponible.
-</p>
+<BetaWarning tool="Alfred" />
 
 <tiny-space></tiny-space>
 
@@ -266,6 +344,15 @@
 			Dossier de snippets Alfred</button
 		>
 	</a>
+	<a
+		href="https://github.com/adrienm7/ergopti/tree/main/static/drivers/alfred/workflows"
+		target="_blank"
+	>
+		<button
+			><i class="icon-alfred" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
+			Dossier de workflows Alfred</button
+		>
+	</a>
 </div>
 
 <p>
@@ -277,6 +364,8 @@
 	peut être utilisée comme touche de répétition et pour insérer des snippets, des caractères spéciaux,
 	etc.
 </p>
+
+<h4>Snippets</h4>
 <p>
 	Le dossier de snippets fourni contient l’intégralité des snippets d’<ErgoptiPlus></ErgoptiPlus>.
 	Ils sont automatiquement extraits du fichier <em>.ahk</em>
@@ -290,4 +379,18 @@
 	Alfred sont une fonctionnalité payante, disponible uniquement avec la licence Powerpack. Alfred semble
 	être le meilleur gestionnaire de snippets sur macOS, les alternatives gratuites ne fonctionnant malheureusement
 	pas aussi bien, étant notamment trop "lentes" à l’utilisation.
+</p>
+
+<h4>Workflows</h4>
+<p>
+	Plusieurs workflows Alfred sont fournis pour reproduire les raccourcis Windows (<kbd>Win</kbd> +
+	touche) en utilisant <kbd>Ctrl</kbd> + touche sur macOS. Seul cas particulier : <kbd>Ctrl</kbd> +
+	<kbd>H</kbd>
+	pour la capture d'écran, car <kbd>Ctrl</kbd> + <kbd>C</kbd> est déjà utilisé pour stopper un processus
+	dans le terminal.
+</p>
+<p>
+	Pour installer ces workflows, il suffit de double-cliquer sur les fichiers
+	<code>.alfredworkflow</code>, ce qui ouvrira Alfred et proposera de les importer. Ces workflows
+	nécessitent la licence Powerpack d'Alfred.
 </p>

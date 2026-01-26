@@ -7,7 +7,6 @@ from tests.run_all_tests import validate_keylayout
 from utilities.keyboard_id import set_unique_keyboard_id
 from utilities.keylayout_extraction import extract_keymap_body
 from utilities.keylayout_modification import (
-    change_keymap_id,
     delete_keymap,
     replace_keymap,
     replace_keymapselect,
@@ -46,8 +45,8 @@ KEYMAPSELECT_MAPINDEX_5 = (
 )
 
 
-KEYMAPSELECT_MAPINDEX_7 = (
-    '<keyMapSelect mapIndex="7">\n'
+KEYMAPSELECT_MAPINDEX_6 = (
+    '<keyMapSelect mapIndex="6">\n'
     '\t\t\t<modifier keys="anyOption anyShift caps?"/>\n'
     "\t\t</keyMapSelect>"
 )
@@ -70,11 +69,10 @@ def correct_keylayout(content: str, variant_number: int) -> str:
 
     content = replace_keymapselect(content, 4, KEYMAPSELECT_MAPINDEX_4)
     content = replace_keymapselect(content, 5, KEYMAPSELECT_MAPINDEX_5)
-    content = replace_keymapselect(content, 7, KEYMAPSELECT_MAPINDEX_7)
+    content = replace_keymapselect(content, 6, KEYMAPSELECT_MAPINDEX_6)
 
-    content = delete_keymap(content, 6)
+    content = delete_keymap(content, 7)
     content = delete_keymap(content, 8)
-    content = change_keymap_id(content, 7, 6)
 
     content = replace_modifier_map_id(content)
     content = replace_keymapset_id_with_layout(content)

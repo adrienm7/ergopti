@@ -30,7 +30,7 @@ from utilities.rolls_mappings import (
 REPEAT_KEY = False
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
 # Save plus_mappings to a file named 'plus_mappings' in the current directory
-plus_mappings_path = Path(__file__).parent / "plus_mappings"
+plus_mappings_path = Path(__file__).parent / "plus_mappings.json"
 with open(plus_mappings_path, "w", encoding="utf-8") as f:
     json.dump(plus_mappings, f, ensure_ascii=False, indent=2)
 
@@ -116,8 +116,14 @@ def get_macos_keylayout_path() -> Path:
     if not macos_dir.is_dir():
         raise FileNotFoundError(f"macos directory does not exist: {macos_dir}")
 
-    # Check for bundle directories
-    bundle_dirs = list(macos_dir.glob("*.bundle"))
+    # Check for bundle directories in the bundles subdirectory
+    bundles_dir = macos_dir / "bundles"
+    bundle_dirs = (
+        list(bundles_dir.glob("*.bundle")) if bundles_dir.is_dir() else []
+    )
+
+    # Also check for bundles directly in macos directory for backward compatibility
+    bundle_dirs.extend(macos_dir.glob("*.bundle"))
     if bundle_dirs:
         # Sort bundles by version to get the most recent one
         def extract_version(bundle_path: Path) -> tuple:

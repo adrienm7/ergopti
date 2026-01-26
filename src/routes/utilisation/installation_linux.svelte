@@ -2,34 +2,29 @@
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
+	import BetaWarning from '$lib/components/BetaWarning.svelte';
 	import { version } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
+	import { branchForInstall } from '$lib/js/isDev.js';
 	let versionValue, version_linux;
 	version.subscribe((value) => {
 		versionValue = value;
 		version_linux = getLatestVersion('linux', value)?.replaceAll('.', '_');
 	});
+
+	const cmd = `branch="${branchForInstall()}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/drivers/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
 
-{#if typeof window !== 'undefined'}
-	<script>
-		// client-only helpers injected here to keep SSR simple
-	</script>
-{/if}
-
 <code
 	style="display:inline-block; width:100%; padding:1em; border-bottom-left-radius:0; border-bottom-right-radius:0; text-align:left"
-	>curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh
-	| sh</code
+	>{cmd}</code
 >
 <button
 	id="copy-install-cmd"
 	style="width:100%; border-top-left-radius:0; border-top-right-radius:0;"
 	on:click={() => {
-		const cmd =
-			'curl -fsSL https://raw.githubusercontent.com/adrienm7/ergopti/dev/static/drivers/linux/install.sh | sh';
 		try {
 			navigator.clipboard
 				.writeText(cmd)
@@ -57,34 +52,86 @@
 </button>
 
 <p>
-	Après l’installation, redémarrer l’ordinateur pour que les changements prennent effet. Modifier
-	ensuite la disposition clavier dans les paramètres de votre environnement de bureau où la
-	disposition <Ergopti></Ergopti> devrait désormais être sélectionnable dans le groupe de langues Français.
+	Après l’installation, <strong>redémarrer l’ordinateur</strong> pour que les changements prennent effet.
+</p>
+<p>
+	Modifier ensuite la disposition clavier dans les paramètres de votre environnement de bureau. La
+	disposition <Ergopti></Ergopti> devrait désormais être sélectionnable dans le groupe de langues Français,
+	ou en tant que groupe de langue à part entière selon la méthode d’installation choisie.
+	<strong>À noter :</strong> Les scripts d’installation tentent d’appliquer la disposition automatiquement,
+	ce qui rend cette étape de sélection de la disposition après redémarrage parfois inutile.
 </p>
 
 <tiny-space></tiny-space>
+<hr />
+<tiny-space></tiny-space>
 
 <p>
-	Le processus d’installation se déroule en deux étapes. D’abord, un script de sélection choisit les
-	fichiers à installer : version d’<Ergopti></Ergopti>, variante, etc. Ensuite, un script
-	d’installation utilise ce qui a été sélectionné pour appliquer les modifications système
-	(nécessite
-	<code>sudo</code>).
+	Le processus d'installation utilise un script bash unique qui gère la sélection interactive
+	(version, variante, options) puis lance automatiquement l'installateur approprié. Deux méthodes
+	d'installation sont disponibles :
+</p>
+<ul>
+	<li>
+		<strong>Méthode "Clean"</strong> (recommandée) : utilise un répertoire d'extensions utilisateur
+		non invasif (<code>/usr/share/xkeyboard-config.d/</code>). Cette méthode n’existe que depuis fin
+		2025 et n’est disponible que sur les distributions les plus à jour comme Arch ou Fedora. En
+		effet, elle nécessite libxkbcommon ≥ 1.13.0.
+	</li>
+	<li>
+		<strong>Méthode "Legacy"</strong> : modifie directement les fichiers système XKB (<code
+			>/usr/share/X11/xkb/</code
+		>). Compatible avec toutes les versions, mais moins propre. C’est la méthode qui était utilisée
+		historiquement.
+	</li>
+</ul>
+<p>
+	Le script de détection choisit automatiquement la méthode optimale selon votre système.
+	L'installation nécessite <code>sudo</code>.
 </p>
 <div class="download-buttons">
-	<a href="/drivers/linux/xkb_files_selector.py" download>
-		<button class="alt-button"
-			><i class="icon-linux"></i> ➀ Script de sélection des fichiers XKB</button
-		>
+	<a href="/drivers/linux/xkb_installation/install.sh" download>
+		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>
 	</a>
-	<a href="/drivers/linux/xkb_files_installer.py" download>
-		<button class="alt-button"
-			><i class="icon-linux"></i> ➁ Script d’installation des fichiers XKB</button
-		>
+	<a href="/drivers/linux/xkb_installation/detect_installation_method.sh" download>
+		<button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button>
+	</a>
+</div>
+<div class="download-buttons" style="margin-top: 1em;">
+	<a href="/drivers/linux/xkb_installation/xkb_files_installer_clean.py" download>
+		<button><i class="icon-linux"></i> Installateur Clean</button>
+	</a>
+	<a href="/drivers/linux/xkb_installation/xkb_files_installer_legacy.py" download>
+		<button><i class="icon-linux"></i> Installateur Legacy</button>
 	</a>
 </div>
 
-<p>Voici un résumé de ce que réalise le script d’installation :</p>
+<h3>Détails techniques de l'installation</h3>
+
+<h4>Méthode Clean (recommandée)</h4>
+<p>Voici un résumé de ce que réalise l'installateur Clean :</p>
+<ul>
+	<li>
+		<strong>Installation non invasive</strong> : crée un répertoire d'extension dans
+		<code>/usr/share/xkeyboard-config.d/ergopti/</code>
+		contenant les fichiers de définition du layout (symbols, types, règles). Cette méthode ne modifie
+		aucun fichier système existant.
+	</li>
+	<li>
+		<strong>.XCompose</strong> : création (ou remplacement s'il existe déjà) du fichier
+		<code>.XCompose</code>
+		dans le home de l'utilisateur (<code>~/.XCompose</code>). Cela permet d'utiliser les touches
+		mortes ainsi que les sorties en plusieurs caractères, comme les ponctuations avec espaces
+		insécables automatiques.
+	</li>
+	<li>
+		<strong>Activation</strong> : le script tente d'appliquer la disposition via
+		<code>setxkbmap</code> et de purger le cache XKB pour une application immédiate des changements.
+	</li>
+</ul>
+
+<h4>Méthode Legacy (compatibilité)</h4>
+<p>Voici un résumé de ce que réalise l'installateur Legacy :</p>
 <ul>
 	<li>
 		<strong>Sauvegarde</strong> : création d’une copie de sauvegarde pour chaque fichier modifié.
@@ -132,9 +179,8 @@
 </ul>
 
 <p>
-	En bref : le script installe la définition des touches, les types associés, met à jour les
-	fichiers de règles pour que la disposition soit visible dans l’interface et installe le fichier
-	.XCompose personnalisé.
+	En bref : la méthode Clean installe dans un répertoire d'extensions sans toucher aux fichiers
+	système, tandis que la méthode Legacy modifie directement les fichiers système XKB.
 </p>
 
 <h3 id="linux-solutions">Résolution de problèmes connus</h3>
@@ -154,13 +200,20 @@
 		insécables automatiques. Il existe peut-être des workarounds.
 	</li>
 	<li>
-		Avec la version <ErgoptiPlus></ErgoptiPlus> directement intégrée au driver clavier, il y a les mêmes
-		problèmes que sur cette même version sur macOS. Cela inclut le fait qu’un appui sur
+		Avec la version <ErgoptiPlus></ErgoptiPlus> directement intégrée au driver clavier (« Ergopti++ »),
+		il y a les mêmes problèmes que sur cette même version sur macOS. Cela inclut le fait qu’un appui
+		sur
 		<kbd>Entrée</kbd>
 		en état de touche morte envoie la touche morte, mais pas directement
-		<kbd-output>Entrée</kbd-output>. Pour cela, il est nécessaire d’appuyer une deuxième fois sur
-		cette touche. Ce problème peut probablement être résolu en utilisant un autre logiciel de
-		remappage de clavier, comme cela a été corrigé sur macOS.
+		<kbd-output>Entrée</kbd-output>. Pour cela, il est nécessaire d’appuyer une deuxième fois sur la
+		touche. Ce problème peut probablement être résolu en utilisant un autre logiciel de remappage de
+		clavier, comme cela a été corrigé sur macOS. <br /> Un autre problème plus embêtant est que la
+		répétition de deux lettres ne fonctionne pas, notamment pour la lettre
+		<kbd>P</kbd>
+		où pour tapper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
+		<kbd>P</kbd>. Par conséquent, il est plutôt recommandé d’utiliser la version standard d’<Ergopti
+		></Ergopti> ou « Ergopti+ » (un seul +) avec un logiciel de remappage externe comme Kanata ou Espanso
+		(voir ci-dessous).
 	</li>
 </ul>
 
@@ -170,11 +223,7 @@
 	>Kanata
 </h3>
 
-<p class="encadre">
-	<b>Attention :</b> Le code Kanata suivant est encore en bêta et risque d’être régulièrement mis à jour.
-	Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez à vérifier
-	régulièrement si une nouvelle version est disponible.
-</p>
+<BetaWarning tool="Kanata" />
 
 <tiny-space></tiny-space>
 
@@ -204,11 +253,7 @@
 	<i class="icon-espanso" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>Espanso
 </h3>
 
-<p class="encadre">
-	<b>Attention :</b> Le code Espanso suivant est encore en bêta et risque d’être régulièrement mis à
-	jour. Il est totalement fonctionnel, mais des améliorations et ajouts sont encore possibles. Veillez
-	à vérifier régulièrement si une nouvelle version est disponible.
-</p>
+<BetaWarning tool="Espanso" />
 
 <tiny-space></tiny-space>
 
