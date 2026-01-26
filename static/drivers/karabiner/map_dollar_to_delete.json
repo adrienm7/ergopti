@@ -1,0 +1,15 @@
+{
+	"description": "Touche $ devient Delete",
+	"manipulators": [
+		{
+			"from": { "key_code": "non_us_backslash" },
+			"to": [
+				{
+					"key_code": "delete_or_backspace",
+					"modifiers": ["left_command"]
+				}
+			],
+			"type": "basic"
+		}
+	]
+}

@@ -15,8 +15,8 @@ sys.path.insert(0, str(script_dir.parent))
 from levels import LEVELS
 from unused_symbols import UNUSED_SYMBOLS
 from utilities.keylayout_extraction import (
-    extract_keymap_body,
     extract_actions_body,
+    extract_keymap_body,
     get_symbol,
 )
 
@@ -27,15 +27,6 @@ LINUX_TO_MACOS_KEYCODES: list[Tuple[str, str]] = json.loads(
 key_sym: Dict[str, str] = yaml.safe_load(
     (data_dir / "key_sym.yaml").read_text(encoding="utf-8")
 )
-
-mapped_symbols: Dict[str, str] = {
-    "« ": "guillemotleft",
-    " »": "guillemotright",
-    "ᵉ": "uparrow",
-    "ᵢ": "downarrow",
-    "ℝ": "infinity",
-}
-available_symbols: set[str] = set(UNUSED_SYMBOLS)
 
 logger = getLogger("ergopti.linux")
 
@@ -55,6 +46,16 @@ def generate_xkb(
     Example:
         new_xkb, mapping = generate_xkb(template, xml_data)
     """
+    # Initialize fresh symbol mappings for each keylayout
+    mapped_symbols: Dict[str, str] = {
+        "« ": "guillemotleft",
+        " »": "guillemotright",
+        "ᵉ": "uparrow",
+        "ᵢ": "downarrow",
+        "ℝ": "infinity",
+    }
+    available_symbols: set[str] = set(UNUSED_SYMBOLS)
+
     keymaps: List[Any] = extract_keymaps(keylayout_data)
     actions_body = extract_actions_body(keylayout_data)
 
@@ -64,6 +65,8 @@ def generate_xkb(
             macos_code,
             keymaps,
             actions_body,
+            mapped_symbols,
+            available_symbols,
         )
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         comment = " // " + " ".join(comment_symbols)
@@ -105,6 +108,8 @@ def generate_symbols_and_comments(
     macos_code: str,
     keymaps: List[Any],
     actions_body: str,
+    mapped_symbols: Dict[str, str],
+    available_symbols: set[str],
 ) -> Tuple[List[str], List[str]]:
     """Generates the list of XKB symbols and comments for a given key.
 
@@ -126,6 +131,8 @@ def generate_symbols_and_comments(
         linux_name = get_linux_name_from_output(
             symbol,
             layer,
+            mapped_symbols,
+            available_symbols,
         )
         symbols.append(linux_name)
         if len(symbol) >= 2:
@@ -138,6 +145,8 @@ def generate_symbols_and_comments(
 def get_linux_name_from_output(
     symbol: str,
     layer: int,
+    mapped_symbols: Dict[str, str],
+    available_symbols: set[str],
 ) -> str:
     """Converts a symbol to XKB keysym name using YAML mapping and deadkey rules.
 

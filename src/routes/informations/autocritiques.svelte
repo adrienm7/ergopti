@@ -89,12 +89,14 @@
 		Certains claviers ont moins de touches, par exemple en n’ayant que 6 colonnes, voire seulement
 		5, par main. <Ergopti></Ergopti> a été conçue pour exploiter toutes les touches d’un clavier standard,
 		donc 6 colonnes à gauche et 7 à droite. Sur la dernière colonne de droite, il n’y a cependant que
-		les touches mortes <kbd class="morte">◌̂</kbd> et <kbd class="morte">◌̈</kbd> qui seront beaucoup
-		plus rarement utilisées. Ces touches mortes sont en accès direct sur la septième colonne, mais
-		peuvent également être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec <kbd>Shift</kbd> +
-		<kbd>AltGr</kbd> + <kbd>Ê</kbd> pour <kbd-output class="morte">◌̂</kbd-output> et
+		les touches mortes <kbd class="deadkey">◌̂</kbd> et <kbd class="deadkey">◌̈</kbd> qui seront
+		beaucoup plus rarement utilisées. Ces touches mortes sont en accès direct sur la septième
+		colonne, mais peuvent également être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec
 		<kbd>Shift</kbd>
-		+ <kbd>AltGr</kbd> + <kbd>T</kbd> pour le Tréma <kbd-output class="morte">◌̈</kbd-output>.
+		+
+		<kbd>AltGr</kbd> + <kbd>Ê</kbd> pour <kbd-output class="deadkey">◌̂</kbd-output> et
+		<kbd>Shift</kbd>
+		+ <kbd>AltGr</kbd> + <kbd>T</kbd> pour le Tréma <kbd-output class="deadkey">◌̈</kbd-output>.
 	</p>
 	<p>
 		Il n’en demeure pas moins qu’<Ergopti></Ergopti> n’est pas 1DFH (1u Distance From Home). Les lettres

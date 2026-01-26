@@ -7,7 +7,6 @@
                         "description": "Tab: Cmd+Tab when tapped, Fn when held",
                         "manipulators": [
                             {
-                                "type": "basic",
                                 "from": {
                                     "key_code": "tab",
                                     "modifiers": {
@@ -28,7 +27,8 @@
                                             "left_command"
                                         ]
                                     }
-                                ]
+                                ],
+                                "type": "basic"
                             }
                         ]
                     },
@@ -5204,7 +5204,7 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -5972,7 +5972,7 @@
                                     {
                                         "set_variable": {
                                             "name": "previous_key",
-                                            "value": "_"
+                                            "value": "-"
                                         }
                                     },
                                     {
@@ -6003,7 +6003,7 @@
                                     {
                                         "set_variable": {
                                             "name": "previous_key",
-                                            "value": "-"
+                                            "value": "_"
                                         }
                                     },
                                     {
@@ -24850,7 +24850,7 @@
                                         "key_code": "open_bracket"
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -24975,7 +24975,7 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -25240,7 +25240,7 @@
                                         "key_code": "open_bracket"
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -25349,7 +25349,7 @@
                                         "key_code": "open_bracket"
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -26882,7 +26882,7 @@
                                         ]
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -34413,7 +34413,7 @@
                                         "key_code": "spacebar"
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
@@ -34472,7 +34472,7 @@
                                         "key_code": "spacebar"
                                     },
                                     {
-                                        "key_code": "close_bracket",
+                                        "key_code": "spacebar",
                                         "modifiers": [
                                             "shift"
                                         ]
