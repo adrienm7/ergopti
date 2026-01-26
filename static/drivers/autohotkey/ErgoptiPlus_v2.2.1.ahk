@@ -5443,8 +5443,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "oeuf", "œuf")
     CreateCaseSensitiveHotstrings("*", "oeuvre", "œuvre")
     CreateCaseSensitiveHotstrings("*?", "oiaque", "oïaque") ; Suffixes like paran-oïaque
-    CreateCaseSensitiveHotstrings("*?", "oide", "oïde") ; Suffixes like ov-oïde
     CreateCaseSensitiveHotstrings("*?", "froide", "froide") ; Fixes this particular word to not get froïde
+    CreateCaseSensitiveHotstrings("*?", "oide", "oïde") ; Suffixes like ov-oïde
     CreateCaseSensitiveHotstrings("*", "opiniatre", "opiniâtre")
     CreateCaseSensitiveHotstrings("*", "ouie", "ouïe")
     CreateCaseSensitiveHotstrings("", "oter", "ôter")
