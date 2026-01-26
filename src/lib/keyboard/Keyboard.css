@@ -9,7 +9,6 @@ keyboard {
 	--keyboard-width: calc(var(--main-width) * var(--keyboard-percentage));
 	--keyboard-padding: clamp(7px, calc(var(--keyboard-width) / 50), 50px);
 	--keyboard-border-radius: var(--keyboard-padding);
-	backdrop-filter: blur(600px);
 	background-color: rgba(60, 60, 60, 0.15);
 	border: 1px solid hsla(225, 100%, 8%, 0.8);
 	border-radius: var(--keyboard-border-radius);
