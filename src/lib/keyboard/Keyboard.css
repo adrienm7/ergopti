@@ -626,7 +626,7 @@ keyboard-key[data-content='<nbsp></nbsp>%'] {
 	#keyboard_reference,
 	#keyboard_presentation,
 	#keyboard_presentation_plus,
-	#keyboard_presentation_emulation {
+	#keyboard_emulation {
 		--keyboard-width: 90vw;
 	}
 }
