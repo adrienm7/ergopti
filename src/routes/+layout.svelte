@@ -76,6 +76,10 @@
 	}
 
 	const isDev = detectDev();
+
+	let devHref = '/';
+	$: devHref =
+		($page.url && $page.url.pathname ? $page.url.pathname.replace(/^\/dev/, '') : '/') || '/';
 </script>
 
 <svelte:head>
@@ -121,7 +125,7 @@
 
 <div class="banner">
 	{#if isDev}
-		<a href="/">
+		<a href={devHref}>
 			<div class="dev-banner-content">
 				<p>🚧 VERSION DE DEV 🚧</p>
 				<p class="subtitle">
