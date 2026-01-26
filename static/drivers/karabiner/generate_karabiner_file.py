@@ -15,7 +15,7 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 sys.path.append(str(Path(__file__).parent.parent.resolve()))
 from utilities.keylayout_extraction import extract_keymap_body
@@ -29,10 +29,6 @@ from utilities.rolls_mappings import (
 
 REPEAT_KEY = False
 plus_mappings = add_case_sensitive_mappings(PLUS_MAPPINGS_CONFIG)
-# Save plus_mappings to a file named 'plus_mappings' in the current directory
-plus_mappings_path = Path(__file__).parent / "plus_mappings.json"
-with open(plus_mappings_path, "w", encoding="utf-8") as f:
-    json.dump(plus_mappings, f, ensure_ascii=False, indent=2)
 
 
 def is_trigger_shifted(trigger: str) -> bool:
@@ -1044,9 +1040,6 @@ if REPEAT_KEY:
         }
     )
 
-# Écriture finale de rolls.json avec toutes les règles (y compris spéciales et repeat)
-with open(output_path, "w", encoding="utf-8") as f:
-    json.dump(rolls, f, ensure_ascii=False, indent=2)
 
 # Group manipulators by physical key into rolls_grouped.json
 rolls_grouped_path = Path(__file__).parent / "rolls_grouped.json"
@@ -1116,38 +1109,48 @@ for key, manips in manipulators_by_key.items():
 # Sort grouped list alphabetically by description
 grouped.sort(key=lambda x: x["description"])
 
-with open(rolls_grouped_path, "w", encoding="utf-8") as f:
-    json.dump(grouped, f, ensure_ascii=False, indent=2)
-
 
 def merge_rolls_into_karabiner(
-    karabiner_path: str, rolls_path: str, output_path: str
+    karabiner_path: str,
+    rolls_data: list,
+    output_path: str,
+    layer_rules: Optional[List[dict]] = None,
 ) -> None:
-    """Merge rolls.json rules into karabiner0.json and write to karabiner.json.
+    """Merge in-memory rolls data into karabiner_tap_hold.json and write to karabiner.json.
+
+    The `layer_rules` if provided are placed at the very beginning of the
+    resulting `rules` list, before the base file's rules and before `rolls_data`.
 
     Args:
         karabiner_path: Path to the base Karabiner JSON file.
-        rolls_path: Path to the generated rolls JSON file.
+        rolls_data: List of roll rules (in-memory).
         output_path: Path to write the merged Karabiner JSON file.
+        layer_rules: Optional list of rules to prefix in the final file.
 
     Raises:
-        FileNotFoundError: If any input file is missing.
+        FileNotFoundError: If karabiner_path is missing.
         ValueError: If the JSON structure is invalid.
     """
     with open(karabiner_path, "r", encoding="utf-8") as f:
         karabiner_data: dict = json.load(f)
 
-    with open(rolls_path, "r", encoding="utf-8") as f:
-        rolls_data: list = json.load(f)
-
     try:
-        rules: list = karabiner_data["profiles"][0]["complex_modifications"][
-            "rules"
-        ]
-        for roll in rolls_data:
-            rules.append(roll)
+        existing_rules: list = karabiner_data["profiles"][0][
+            "complex_modifications"
+        ]["rules"]
     except (KeyError, IndexError) as exc:
-        raise ValueError("Invalid Karabiner or rolls JSON structure") from exc
+        raise ValueError("Invalid Karabiner JSON structure") from exc
+
+    # Build the final rules list with layer_rules first, then existing, then rolls
+    final_rules: List[dict] = []
+    if layer_rules:
+        final_rules.extend(layer_rules)
+    final_rules.extend(existing_rules)
+    final_rules.extend(rolls_data)
+
+    karabiner_data["profiles"][0]["complex_modifications"]["rules"] = (
+        final_rules
+    )
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(karabiner_data, f, indent=4, ensure_ascii=False)
@@ -1155,9 +1158,26 @@ def merge_rolls_into_karabiner(
 
 if __name__ == "__main__":
     base_dir = Path(__file__).parent
+    # If a karabiner layer file exists, load it and ensure its rules are
+    # placed at the very top of the final Karabiner rules list.
+    layer_file = base_dir / "data" / "karabiner_layer.json"
+    layer_rules: List[dict] = []
+    if layer_file.is_file():
+        try:
+            with open(layer_file, "r", encoding="utf-8") as lf:
+                layer_obj = json.load(lf)
+            # The layer file may contain a single rule (dict) or a list of rules
+            if isinstance(layer_obj, dict):
+                layer_rules = [layer_obj]
+            elif isinstance(layer_obj, list):
+                layer_rules = layer_obj
+        except Exception:
+            # Fail silently to avoid breaking generation
+            layer_rules = []
 
     merge_rolls_into_karabiner(
-        karabiner_path=str(base_dir / "data" / "karabiner0.json"),
-        rolls_path=str(base_dir / "rolls_grouped.json"),
+        karabiner_path=str(base_dir / "data" / "karabiner_tap_hold.json"),
+        rolls_data=grouped,
         output_path=str(base_dir / "karabiner.json"),
+        layer_rules=layer_rules,
     )

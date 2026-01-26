@@ -1,9 +1,12 @@
+-- What this script does:
+-- 1) Three-finger tap to toggle selection mode (click-and-drag)
+-- 2) Three-finger gestures for tab navigation
+-- 3) Change volume with left Option + scroll
 
--- Three-finger gestures for tab navigation
 local Swipe3 = hs.loadSpoon("Swipe")
 local current_id_3f, threshold_horizontal, threshold_vertical
-local HORIZONTAL_DEFAULT = 0.02 -- 2% for left/right
-local VERTICAL_DEFAULT = 0.07   -- 7% for up/down
+local HORIZONTAL_DEFAULT = 0.02 -- 2% of the trapckpad width for left/right
+local VERTICAL_DEFAULT = 0.08   -- 8% of the trackpad height for up/down to prevent accidental triggers
 
 threshold_horizontal = HORIZONTAL_DEFAULT
 threshold_vertical = VERTICAL_DEFAULT
@@ -15,35 +18,42 @@ local mouseEventTap = nil
 
 -- Function to force cleanup of selection state
 local function forceCleanup()
-	if mouseEventTap then
-		pcall(function() mouseEventTap:stop() end)
-		mouseEventTap = nil
-	end
-	leftClickPressed = false
+    -- Simplified cleanup: stop any mouseEventTap and reload Hammerspoon
+    if mouseEventTap then
+        pcall(function() mouseEventTap:stop() end)
+        mouseEventTap = nil
+    end
+    leftClickPressed = false
+    -- Force a clean state by reloading the Hammerspoon config
+    pcall(function() hs.reload() end)
 end
 
 -- Timer to periodically check and cleanup stuck state
 hs.timer.doEvery(5, function()
-	if leftClickPressed and not mouseEventTap then
-		-- State is inconsistent, force cleanup
-		forceCleanup()
-	end
+    if leftClickPressed and not mouseEventTap then
+        -- State is inconsistent, force cleanup
+        forceCleanup()
+    end
 end)
 
 -- Function to toggle selection mode
 local function toggleSelection()
-	-- Force cleanup first to ensure clean state
-	forceCleanup()
-	
-	local pos = hs.mouse.absolutePosition()
-	
-	-- hs.alert.show("🖱️ TAP DÉTECTÉ - Sélection ACTIVÉE", 1)
+    -- If selection is already active, deactivate it (toggle behavior)
+    if leftClickPressed then
+        forceCleanup()
+        return
+    end
 
-	-- Activate selection mode
-	leftClickPressed = true
-	
-	-- Post initial mouseDown event
-	hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
+    -- Force cleanup first to ensure clean state
+    forceCleanup()
+
+    local pos = hs.mouse.absolutePosition()
+
+    -- Activate selection mode
+    leftClickPressed = true
+
+    -- Post initial mouseDown event
+    hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
 	
 	-- Create eventtap to intercept mouse events
 	mouseEventTap = hs.eventtap.new({
@@ -159,9 +169,42 @@ Swipe3:start(3, function(direction, distance, id)
 end)
 
 -- Cmd + Scroll for zoom/dezoom
+-- Track a physical 'left Option' signal sent as F19 by Karabiner (see instructions below)
+local leftOptionPhysical = false
+-- fallback to 80 which matches observed kc for F19 in console
+local f19_keycode = hs.keycodes.map["f19"] or 80
+local f19_keycode = hs.keycodes.map["f19"] or 80
+
+
+local physicalOptionTap = hs.eventtap.new({hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp}, function(event)
+    local kc = event:getKeyCode()
+    if kc == f19_keycode then
+        if event:getType() == hs.eventtap.event.types.keyDown then
+            if leftClickPressed then
+                forceCleanup()
+            end
+            leftOptionPhysical = true
+        else
+            leftOptionPhysical = false
+        end
+    end
+    return false
+end):start()
+
+-- Supervisory timer: keep `leftOptionPhysical` true while recent F19 Down events
+-- No supervisory timer: handle leftOptionPhysical directly on keyDown/keyUp events
+
 local scrollZoom = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
     local flags = event:getFlags()
+    local function flagsToStr(f)
+        local s = ""
+        for k,v in pairs(f) do s = s .. k .. ":" .. tostring(v) .. " " end
+        return s
+    end
+    local scrollDebugY = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
+    local effectiveLeft = leftOptionPhysical
     
+
     -- Check if cmd key is pressed
     if flags.cmd then
         local scrollY = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
@@ -176,6 +219,47 @@ local scrollZoom = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, functi
         
         return true -- Consume the event
     end
-    
+
+    -- If Left Option (physical) is pressed (detected via F19 forwarded by Karabiner), change system volume
+    if effectiveLeft then
+        local scrollY = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
+        -- If selection mode is active (from three-finger tap) it may intercept
+        -- mouse/trackpad events; ensure it's cleaned up so scroll events work.
+        if leftClickPressed then
+            forceCleanup()
+            -- Also post a synthetic mouseMoved to further ensure the system releases any drag state
+            pcall(function()
+                local pos = hs.mouse.absolutePosition()
+                hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.mouseMoved, pos):post()
+            end)
+        end
+        local dev = hs.audiodevice.defaultOutputDevice()
+        local oldVol = nil
+        if dev then oldVol = dev:volume() end
+        local vol = (oldVol ~= nil) and oldVol or 0
+        local step = 2 -- percent per notch
+        if scrollY > 0 then
+            vol = math.min(100, vol + step)
+        elseif scrollY < 0 then
+            vol = math.max(0, vol - step)
+        end
+        if vol ~= oldVol then
+                -- Use system multimedia keys to adjust volume so macOS shows the HUD
+                local steps = math.max(1, math.floor(math.abs(scrollY)))
+                if scrollY > 0 then
+                    for i = 1, steps do
+                        hs.eventtap.event.newSystemKeyEvent("SOUND_UP", true):post()
+                        hs.eventtap.event.newSystemKeyEvent("SOUND_UP", false):post()
+                    end
+                elseif scrollY < 0 then
+                    for i = 1, steps do
+                        hs.eventtap.event.newSystemKeyEvent("SOUND_DOWN", true):post()
+                        hs.eventtap.event.newSystemKeyEvent("SOUND_DOWN", false):post()
+                    end
+                end
+        end
+        return true -- Consume the event
+    end
+
     return false -- Let the event through
 end):start()
