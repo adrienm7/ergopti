@@ -4,20 +4,6 @@
 			"complex_modifications": {
 				"rules": [
 					{
-						"description": "Spacebar: Left Command when held, Spacebar when tapped",
-						"manipulators": [
-							{
-								"from": {
-									"key_code": "spacebar",
-									"modifiers": { "optional": ["any"] }
-								},
-								"to": [{ "key_code": "left_command" }],
-								"to_if_alone": [{ "key_code": "spacebar" }],
-								"type": "basic"
-							}
-						]
-					},
-					{
 						"description": "Tab: Cmd+Tab when tapped, Fn when held",
 						"manipulators": [
 							{
@@ -105,6 +91,20 @@
 										"key_code": "delete_forward"
 									}
 								]
+							}
+						]
+					},
+					{
+						"description": "Spacebar: Left Command when held, Spacebar when tapped",
+						"manipulators": [
+							{
+								"from": {
+									"key_code": "spacebar",
+									"modifiers": { "optional": ["any"] }
+								},
+								"to": [{ "key_code": "left_command" }],
+								"to_if_alone": [{ "key_code": "spacebar" }],
+								"type": "basic"
 							}
 						]
 					},
