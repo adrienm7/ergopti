@@ -4,6 +4,20 @@
 			"complex_modifications": {
 				"rules": [
 					{
+						"description": "Spacebar: Left Command when held, Spacebar when tapped",
+						"manipulators": [
+							{
+								"from": {
+									"key_code": "spacebar",
+									"modifiers": { "optional": ["any"] }
+								},
+								"to": [{ "key_code": "left_command" }],
+								"to_if_alone": [{ "key_code": "spacebar" }],
+								"type": "basic"
+							}
+						]
+					},
+					{
 						"description": "Tab: Cmd+Tab when tapped, Fn when held",
 						"manipulators": [
 							{
@@ -23,7 +37,7 @@
 						]
 					},
 					{
-						"description": "Tap-hold: left_shift = copy, fn = paste, left_control = cut",
+						"description": "Left Shift: Copy when tapped, Shift when held",
 						"manipulators": [
 							{
 								"type": "basic",
@@ -38,21 +52,31 @@
 										"modifiers": ["left_command"]
 									}
 								]
-							},
+							}
+						]
+					},
+					{
+						"description": "Fn: Paste when tapped, Left Command when held",
+						"manipulators": [
 							{
 								"type": "basic",
 								"from": {
 									"key_code": "fn",
 									"modifiers": { "optional": ["any"] }
 								},
+								"to": [{ "key_code": "left_command" }],
 								"to_if_alone": [
 									{
 										"key_code": "h",
 										"modifiers": ["left_command"]
 									}
-								],
-								"to_if_held_down": [{ "key_code": "fn" }]
-							},
+								]
+							}
+						]
+					},
+					{
+						"description": "Left Control: Cut when tapped, Left Control when held",
+						"manipulators": [
 							{
 								"type": "basic",
 								"from": { "key_code": "left_control" },
@@ -67,17 +91,17 @@
 						]
 					},
 					{
-						"description": "Mod-tap: left_command = backspace (tap), left_command (hold with other key)",
+						"description": "Left Option: Delete when tapped, Command + Shift when held",
 						"manipulators": [
 							{
 								"type": "basic",
-								"from": {
-									"key_code": "left_command",
-									"modifiers": { "optional": ["any"] }
-								},
-								"parameters": { "basic.to_if_alone_timeout_milliseconds": 200 },
-								"to": [{ "key_code": "left_command" }],
-								"to_if_alone": [{ "key_code": "delete_or_backspace" }]
+								"from": { "key_code": "left_option" },
+								"to": [{ "key_code": "left_command", "modifiers": ["left_shift"] }],
+								"to_if_alone": [
+									{
+										"key_code": "delete_forward"
+									}
+								]
 							}
 						]
 					},
@@ -92,6 +116,28 @@
 								},
 								"to": [{ "key_code": "right_option" }],
 								"to_if_alone": [{ "key_code": "tab" }]
+							}
+						]
+					},
+					{
+						"description": "Right Command + Left Option: move one word right then delete one word left",
+						"manipulators": [
+							{
+								"from": {
+									"modifiers": { "optional": ["any"] },
+									"simultaneous": [{ "key_code": "left_option" }, { "key_code": "left_option" }]
+								},
+								"to": [
+									{
+										"key_code": "right_arrow",
+										"modifiers": ["left_option"]
+									},
+									{
+										"key_code": "delete_or_backspace",
+										"modifiers": ["left_option"]
+									}
+								],
+								"type": "basic"
 							}
 						]
 					}
