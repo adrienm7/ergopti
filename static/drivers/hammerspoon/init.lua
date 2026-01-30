@@ -15,6 +15,8 @@ threshold_vertical = VERTICAL_DEFAULT
 local touchdevice = require("hs._asm.undocumented.touchdevice")
 local leftClickPressed = false
 local mouseEventTap = nil
+-- Keep references to touchdevice watchers to avoid garbage collection
+local touch_watchers = {}
 
 -- Function to force cleanup of selection state
 local function forceCleanup()
@@ -24,8 +26,6 @@ local function forceCleanup()
         mouseEventTap = nil
     end
     leftClickPressed = false
-    -- Force a clean state by reloading the Hammerspoon config
-    pcall(function() hs.reload() end)
 end
 
 -- Timer to periodically check and cleanup stuck state
@@ -76,9 +76,12 @@ local function toggleSelection()
 		
 		-- If real leftMouseUp is detected, deactivate selection mode
 		if eventType == hs.eventtap.event.types.leftMouseUp then
-			-- hs.alert.show("🖱️ Sélection DÉSACTIVÉE", 0.5)
-			forceCleanup()
-			return false -- Let the mouseUp event propagate
+            -- Schedule cleanup asynchronously so we don't stop the eventtap
+            -- while we're still processing the mouseUp event.
+            hs.timer.doAfter(0, function()
+                pcall(forceCleanup)
+            end)
+            return false -- Let the mouseUp event propagate
 		end
 		
 		return false -- Let other events propagate
@@ -94,54 +97,64 @@ local _tapDelta = 2.0
 local _lastDebugTime = 0
 
 for _, deviceID in ipairs(touchdevice.devices()) do
-    touchdevice.forDeviceID(deviceID):frameCallback(function(_, touches, _, _)
-        local nFingers = #touches
-        local now = hs.timer.secondsSinceEpoch()
+    local watcher = touchdevice.forDeviceID(deviceID):frameCallback(function(_, touches, _, _)
+        local ok, err = pcall(function()
+            local nFingers = #touches
+            local now = hs.timer.secondsSinceEpoch()
 
-        if nFingers == 0 then
-            -- Fingers lifted - check if it was a tap
-            if _tapStartPoint and _tapEndPoint then
-                local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) +
-                              math.abs(_tapStartPoint.y - _tapEndPoint.y)
-                if _maybeTap and delta < _tapDelta then
-                    toggleSelection()
+            if nFingers == 0 then
+                -- Fingers lifted - check if it was a tap
+                if _tapStartPoint and _tapEndPoint then
+                    local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) +
+                                  math.abs(_tapStartPoint.y - _tapEndPoint.y)
+                    if _maybeTap and delta < _tapDelta then
+                        toggleSelection()
+                    end
                 end
+                _touchStartTime = nil
+                _tapStartPoint = nil
+                _tapEndPoint = nil
+                _maybeTap = false
+            elseif nFingers > 0 and not _touchStartTime then
+                _touchStartTime = now
+                _maybeTap = true
+            elseif _touchStartTime and _maybeTap and (now - _touchStartTime > 0.5) then
+                -- Too long to be a tap
+                _maybeTap = false
+                _tapStartPoint = nil
+                _tapEndPoint = nil
             end
-            _touchStartTime = nil
-            _tapStartPoint = nil
-            _tapEndPoint = nil
-            _maybeTap = false
-        elseif nFingers > 0 and not _touchStartTime then
-            _touchStartTime = now
-            _maybeTap = true
-        elseif _touchStartTime and _maybeTap and (now - _touchStartTime > 0.5) then
-            -- Too long to be a tap
-            _maybeTap = false
-            _tapStartPoint = nil
-            _tapEndPoint = nil
-        end
 
-        if nFingers == 3 then
-            local xAvg = (touches[1].absoluteVector.position.x +
-                         touches[2].absoluteVector.position.x +
-                         touches[3].absoluteVector.position.x) / 3
-            local yAvg = (touches[1].absoluteVector.position.y +
-                         touches[2].absoluteVector.position.y +
-                         touches[3].absoluteVector.position.y) / 3
+            if nFingers == 3 then
+                local xAvg = (touches[1].absoluteVector.position.x +
+                             touches[2].absoluteVector.position.x +
+                             touches[3].absoluteVector.position.x) / 3
+                local yAvg = (touches[1].absoluteVector.position.y +
+                             touches[2].absoluteVector.position.y +
+                             touches[3].absoluteVector.position.y) / 3
 
-            if _maybeTap and not _tapStartPoint then
-                _tapStartPoint = { x = xAvg, y = yAvg }
+                if _maybeTap and not _tapStartPoint then
+                    _tapStartPoint = { x = xAvg, y = yAvg }
+                end
+                if _maybeTap then
+                    _tapEndPoint = { x = xAvg, y = yAvg }
+                end
+            elseif nFingers > 3 then
+                -- More than 3 fingers - cancel tap detection
+                _maybeTap = false
+                _tapStartPoint = nil
+                _tapEndPoint = nil
             end
-            if _maybeTap then
-                _tapEndPoint = { x = xAvg, y = yAvg }
-            end
-        elseif nFingers > 3 then
-            -- More than 3 fingers - cancel tap detection
-            _maybeTap = false
-            _tapStartPoint = nil
-            _tapEndPoint = nil
+        end)
+        if not ok then
+            -- Show an alert so we notice errors that would stop the watcher
+            hs.timer.doAfter(0, function()
+                hs.alert.show("touchdevice callback error: " .. tostring(err), 3)
+            end)
         end
-    end):start()
+    end)
+    touch_watchers[deviceID] = watcher
+    watcher:start()
 end
 
 Swipe3:start(3, function(direction, distance, id)
@@ -172,7 +185,6 @@ end)
 -- Track a physical 'left Option' signal sent as F19 by Karabiner (see instructions below)
 local leftOptionPhysical = false
 -- fallback to 80 which matches observed kc for F19 in console
-local f19_keycode = hs.keycodes.map["f19"] or 80
 local f19_keycode = hs.keycodes.map["f19"] or 80
 
 
