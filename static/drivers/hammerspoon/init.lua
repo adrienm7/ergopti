@@ -231,23 +231,23 @@ Swipe3:start(3, function(direction, distance, id)
 end)
 
 -- Physical left Option forwarded by Karabiner as F19
-local leftOptionPhysical = false
-local f19_keycode = hs.keycodes.map["f19"] or 80
+local leftCommandPhysical = false
+local f19_keycode = hs.keycodes.map["f19"] or hs.keycodes.map["leftcmd"] or hs.keycodes.map["cmd"]
 
 local physicalOptionTap = hs.eventtap.new({hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp}, function(event)
     local kc = event:getKeyCode()
     if kc == f19_keycode then
         if event:getType() == hs.eventtap.event.types.keyDown then
             if leftClickPressed then forceCleanup() end
-            leftOptionPhysical = true
+            leftCommandPhysical = true
         else
-            leftOptionPhysical = false
+            leftCommandPhysical = false
         end
     end
     return false
 end):start()
 
--- Scroll handler: with cmd -> zoom, with leftOptionPhysical -> volume
+-- Scroll handler: with cmd -> zoom, with leftCommandPhysical -> volume
 local scrollZoom = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
     local flags = event:getFlags()
     local scrollY = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
@@ -261,7 +261,7 @@ local scrollZoom = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, functi
         return true
     end
 
-    if leftOptionPhysical then
+    if leftCommandPhysical then
         if leftClickPressed then forceCleanup() end
         if scrollY > 0 then
             for i=1, math.max(1, math.floor(scrollY)) do
