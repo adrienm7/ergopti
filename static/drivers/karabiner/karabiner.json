@@ -4,12 +4,12 @@
             "complex_modifications": {
                 "rules": [
                     {
-                        "description": "Left Option becomes a navigation layer",
+                        "description": "Left Command becomes a navigation layer",
                         "manipulators": [
                             {
-                                "description": "Hold: activate layer temporarily | Tap: send Delete",
+                                "description": "Hold: activate layer temporarily | Tap: send BackSpace",
                                 "from": {
-                                    "key_code": "left_option"
+                                    "key_code": "left_command"
                                 },
                                 "to": [
                                     {
@@ -54,20 +54,20 @@
                                 ],
                                 "to_if_alone": [
                                     {
-                                        "key_code": "delete_forward"
+                                        "key_code": "delete_or_backspace"
                                     }
                                 ],
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Top row: È - Select to beginning of document",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Top row: È - Select to beginning of document",
                                 "from": {
                                     "key_code": "q",
                                     "modifiers": {
@@ -88,14 +88,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Top row: Y - Go to beginning of document",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Top row: Y - Go to beginning of document",
                                 "from": {
                                     "key_code": "w",
                                     "modifiers": {
@@ -115,14 +115,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Top row: O - Go to end of document",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Top row: O - Go to end of document",
                                 "from": {
                                     "key_code": "e",
                                     "modifiers": {
@@ -142,14 +142,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Top row: W - Select to end of document",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Top row: W - Select to end of document",
                                 "from": {
                                     "key_code": "r",
                                     "modifiers": {
@@ -170,14 +170,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Top row: B - F2",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Top row: B - F2",
                                 "from": {
                                     "key_code": "t",
                                     "modifiers": {
@@ -194,14 +194,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Middle row: CapsLock - Delete",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Middle row: CapsLock - Delete",
                                 "from": {
                                     "key_code": "return_or_enter",
                                     "modifiers": {
@@ -218,14 +218,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Middle row: A - Select paragraph up",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Middle row: A - Select paragraph up",
                                 "from": {
                                     "key_code": "a",
                                     "modifiers": {
@@ -247,14 +247,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Middle row: S - Up arrow",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Middle row: S - Up arrow",
                                 "from": {
                                     "key_code": "s",
                                     "modifiers": {
@@ -271,14 +271,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Middle row: D - Down arrow",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Middle row: D - Down arrow",
                                 "from": {
                                     "key_code": "d",
                                     "modifiers": {
@@ -295,14 +295,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Middle row: F - Select paragraph down",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Middle row: F - Select paragraph down",
                                 "from": {
                                     "key_code": "f",
                                     "modifiers": {
@@ -324,14 +324,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Middle row: G - F12 (Go to definition)",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Middle row: G - F12 (Go to definition)",
                                 "from": {
                                     "key_code": "g",
                                     "modifiers": {
@@ -348,14 +348,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Bottom row: Ê - Duplicate line up",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Bottom row: Ê - Duplicate line up",
                                 "from": {
                                     "key_code": "grave_accent_and_tilde",
                                     "modifiers": {
@@ -376,14 +376,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Bottom row: E - Move line up",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Bottom row: E - Move line up",
                                 "from": {
                                     "key_code": "z",
                                     "modifiers": {
@@ -403,14 +403,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Bottom row: À - Move line down",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Bottom row: À - Move line down",
                                 "from": {
                                     "key_code": "x",
                                     "modifiers": {
@@ -430,14 +430,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Bottom row: J - Duplicate line down",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Bottom row: J - Duplicate line down",
                                 "from": {
                                     "key_code": "c",
                                     "modifiers": {
@@ -458,14 +458,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "LEFT HAND - Bottom row: Comma - New line below",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "LEFT HAND - Bottom row: Comma - New line below",
                                 "from": {
                                     "key_code": "v",
                                     "modifiers": {
@@ -488,14 +488,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Top row: Y - Select to beginning of line",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Top row: Y - Select to beginning of line",
                                 "from": {
                                     "key_code": "y",
                                     "modifiers": {
@@ -516,14 +516,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Top row: G - Select previous word",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Top row: G - Select previous word",
                                 "from": {
                                     "key_code": "u",
                                     "modifiers": {
@@ -544,14 +544,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Top row: H - Select previous character",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Top row: H - Select previous character",
                                 "from": {
                                     "key_code": "i",
                                     "modifiers": {
@@ -571,14 +571,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Top row: C - Select next character",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Top row: C - Select next character",
                                 "from": {
                                     "key_code": "o",
                                     "modifiers": {
@@ -598,14 +598,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Top row: X - Select next word",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Top row: X - Select next word",
                                 "from": {
                                     "key_code": "p",
                                     "modifiers": {
@@ -626,14 +626,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Top row: Open bracket - Select to end of line",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Top row: Open bracket - Select to end of line",
                                 "from": {
                                     "key_code": "open_bracket",
                                     "modifiers": {
@@ -654,14 +654,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Middle row: V - Move window to left monitor",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Middle row: V - Move window to left monitor",
                                 "from": {
                                     "key_code": "h",
                                     "modifiers": {
@@ -683,14 +683,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Middle row: S - Previous word",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Middle row: S - Previous word",
                                 "from": {
                                     "key_code": "j",
                                     "modifiers": {
@@ -710,14 +710,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Middle row: N - Left arrow",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Middle row: N - Left arrow",
                                 "from": {
                                     "key_code": "k",
                                     "modifiers": {
@@ -734,14 +734,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Middle row: T - Right arrow",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Middle row: T - Right arrow",
                                 "from": {
                                     "key_code": "l",
                                     "modifiers": {
@@ -758,14 +758,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Middle row: R - Next word",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Middle row: R - Next word",
                                 "from": {
                                     "key_code": "semicolon",
                                     "modifiers": {
@@ -785,14 +785,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Middle row: Q - Move window to right monitor",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Middle row: Q - Move window to right monitor",
                                 "from": {
                                     "key_code": "quote",
                                     "modifiers": {
@@ -814,14 +814,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Bottom row: M - Maximize window",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Bottom row: M - Maximize window",
                                 "from": {
                                     "key_code": "n",
                                     "modifiers": {
@@ -843,14 +843,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Bottom row: D - Go to the beginning of line",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Bottom row: D - Go to the beginning of line",
                                 "from": {
                                     "key_code": "m",
                                     "modifiers": {
@@ -870,14 +870,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Bottom row: L - Move window to left",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Bottom row: L - Move window to left",
                                 "from": {
                                     "key_code": "comma",
                                     "modifiers": {
@@ -898,14 +898,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Bottom row: P - Move window to right",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Bottom row: P - Move window to right",
                                 "from": {
                                     "key_code": "period",
                                     "modifiers": {
@@ -926,14 +926,14 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "RIGHT HAND - Bottom row: Apostrophe - Go to the end of line",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "layer_active",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
+                                "description": "RIGHT HAND - Bottom row: Apostrophe - Go to the end of line",
                                 "from": {
                                     "key_code": "slash",
                                     "modifiers": {
@@ -948,6 +948,764 @@
                                         "modifiers": [
                                             "command"
                                         ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 1 -> F1 (send fn+F1 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "1",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f1",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 1 -> F1 (send F1 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "1",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f1"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 2 -> F2 (send fn+F2 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "2",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f2",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 2 -> F2 (send F2 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "2",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f2"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 3 -> F3 (send fn+F3 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "3",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f3",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 3 -> F3 (send F3 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "3",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f3"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 4 -> F4 (send fn+F4 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "4",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f4",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 4 -> F4 (send F4 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "4",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f4"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 5 -> F5 (send fn+F5 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "5",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f5",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 5 -> F5 (send F5 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "5",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f5"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 6 -> F6 (send fn+F6 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "6",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f6",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 6 -> F6 (send F6 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "6",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f6"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 7 -> F7 (send fn+F7 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "7",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f7",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 7 -> F7 (send F7 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "7",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f7"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 8 -> F8 (send fn+F8 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f8",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 8 -> F8 (send F8 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "8",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f8"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 9 -> F9 (send fn+F9 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "9",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f9",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 9 -> F9 (send F9 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "9",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f9"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 0 -> F10 (send fn+F10 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "0",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f10",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + 0 -> F10 (send F10 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "0",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f10"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + hyphen -> F11 (send fn+F11 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "hyphen",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f11",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + hyphen -> F11 (send F11 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "hyphen",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f11"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + equal_sign -> F12 (send fn+F12 when system F-keys are media)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_unless",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "equal_sign",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f12",
+                                        "modifiers": [
+                                            "fn"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "NUMBER ROW: Layer + equal_sign -> F12 (send F12 when system F-keys are standard)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "variable_if",
+                                        "name": "system.use_fkeys_as_standard_function_keys",
+                                        "value": true
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "equal_sign",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "f12"
+                                    }
+                                ],
+                                "type": "basic"
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Spacebar: Left Command when held, Spacebar when tapped",
+                        "manipulators": [
+                            {
+                                "from": {
+                                    "key_code": "spacebar",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "left_command"
+                                    }
+                                ],
+                                "to_if_alone": [
+                                    {
+                                        "key_code": "spacebar"
                                     }
                                 ],
                                 "type": "basic"
@@ -984,7 +1742,7 @@
                         ]
                     },
                     {
-                        "description": "Tap-hold: left_shift = copy, fn = paste, left_control = cut",
+                        "description": "Left Shift: Copy when tapped, Shift when held",
                         "manipulators": [
                             {
                                 "type": "basic",
@@ -1009,7 +1767,12 @@
                                         ]
                                     }
                                 ]
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Fn: Paste when tapped, Left Command when held",
+                        "manipulators": [
                             {
                                 "type": "basic",
                                 "from": {
@@ -1020,6 +1783,11 @@
                                         ]
                                     }
                                 },
+                                "to": [
+                                    {
+                                        "key_code": "left_command"
+                                    }
+                                ],
                                 "to_if_alone": [
                                     {
                                         "key_code": "h",
@@ -1027,13 +1795,13 @@
                                             "left_command"
                                         ]
                                     }
-                                ],
-                                "to_if_held_down": [
-                                    {
-                                        "key_code": "fn"
-                                    }
                                 ]
-                            },
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Left Control: Cut when tapped, Left Control when held",
+                        "manipulators": [
                             {
                                 "type": "basic",
                                 "from": {
@@ -1056,29 +1824,29 @@
                         ]
                     },
                     {
-                        "description": "Mod-tap: left_command = backspace (tap), left_command (hold with other key)",
+                        "description": "Left Option: Delete when tapped, Command + Shift when held",
                         "manipulators": [
                             {
                                 "type": "basic",
                                 "from": {
-                                    "key_code": "left_command",
+                                    "key_code": "left_option",
                                     "modifiers": {
                                         "optional": [
                                             "any"
                                         ]
                                     }
                                 },
-                                "parameters": {
-                                    "basic.to_if_alone_timeout_milliseconds": 200
-                                },
                                 "to": [
                                     {
-                                        "key_code": "left_command"
+                                        "key_code": "left_command",
+                                        "modifiers": [
+                                            "left_shift"
+                                        ]
                                     }
                                 ],
                                 "to_if_alone": [
                                     {
-                                        "key_code": "delete_or_backspace"
+                                        "key_code": "delete_forward"
                                     }
                                 ]
                             }
@@ -1107,6 +1875,43 @@
                                         "key_code": "tab"
                                     }
                                 ]
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Right Command + Left Option: move one word right then delete one word left",
+                        "manipulators": [
+                            {
+                                "from": {
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    },
+                                    "simultaneous": [
+                                        {
+                                            "key_code": "left_option"
+                                        },
+                                        {
+                                            "key_code": "left_option"
+                                        }
+                                    ]
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "right_arrow",
+                                        "modifiers": [
+                                            "left_option"
+                                        ]
+                                    },
+                                    {
+                                        "key_code": "delete_or_backspace",
+                                        "modifiers": [
+                                            "left_option"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
                             }
                         ]
                     },
