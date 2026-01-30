@@ -704,12 +704,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 1 -> F1",
+			"description": "NUMBER ROW: Layer + 1 -> F1 (send fn+F1 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "1", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f1", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 1 -> F1 (send F1 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "1", "modifiers": { "optional": ["any"] } },
@@ -717,12 +732,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 2 -> F2",
+			"description": "NUMBER ROW: Layer + 2 -> F2 (send fn+F2 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "2", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f2", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 2 -> F2 (send F2 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "2", "modifiers": { "optional": ["any"] } },
@@ -730,12 +760,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 3 -> F3",
+			"description": "NUMBER ROW: Layer + 3 -> F3 (send fn+F3 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "3", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f3", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 3 -> F3 (send F3 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "3", "modifiers": { "optional": ["any"] } },
@@ -743,12 +788,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 4 -> F4",
+			"description": "NUMBER ROW: Layer + 4 -> F4 (send fn+F4 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "4", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f4", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 4 -> F4 (send F4 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "4", "modifiers": { "optional": ["any"] } },
@@ -756,12 +816,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 5 -> F5",
+			"description": "NUMBER ROW: Layer + 5 -> F5 (send fn+F5 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "5", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f5", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 5 -> F5 (send F5 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "5", "modifiers": { "optional": ["any"] } },
@@ -769,12 +844,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 6 -> F6",
+			"description": "NUMBER ROW: Layer + 6 -> F6 (send fn+F6 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "6", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f6", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 6 -> F6 (send F6 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "6", "modifiers": { "optional": ["any"] } },
@@ -782,12 +872,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 7 -> F7",
+			"description": "NUMBER ROW: Layer + 7 -> F7 (send fn+F7 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "7", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f7", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 7 -> F7 (send F7 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "7", "modifiers": { "optional": ["any"] } },
@@ -795,12 +900,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 8 -> F8",
+			"description": "NUMBER ROW: Layer + 8 -> F8 (send fn+F8 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "8", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f8", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 8 -> F8 (send F8 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "8", "modifiers": { "optional": ["any"] } },
@@ -808,12 +928,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 9 -> F9",
+			"description": "NUMBER ROW: Layer + 9 -> F9 (send fn+F9 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "9", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f9", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 9 -> F9 (send F9 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "9", "modifiers": { "optional": ["any"] } },
@@ -821,12 +956,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + 0 -> F10",
+			"description": "NUMBER ROW: Layer + 0 -> F10 (send fn+F10 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "0", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f10", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + 0 -> F10 (send F10 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "0", "modifiers": { "optional": ["any"] } },
@@ -834,12 +984,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + hyphen -> F11",
+			"description": "NUMBER ROW: Layer + hyphen -> F11 (send fn+F11 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "hyphen", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f11", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + hyphen -> F11 (send F11 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "hyphen", "modifiers": { "optional": ["any"] } },
@@ -847,12 +1012,27 @@
 			"type": "basic"
 		},
 		{
-			"description": "NUMBER ROW: Layer + equal_sign -> F12",
+			"description": "NUMBER ROW: Layer + equal_sign -> F12 (send fn+F12 when system F-keys are media)",
 			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
 				{
-					"name": "layer_active",
+					"type": "variable_unless",
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
+				}
+			],
+			"from": { "key_code": "equal_sign", "modifiers": { "optional": ["any"] } },
+			"to": [{ "key_code": "f12", "modifiers": ["fn"] }],
+			"type": "basic"
+		},
+		{
+			"description": "NUMBER ROW: Layer + equal_sign -> F12 (send F12 when system F-keys are standard)",
+			"conditions": [
+				{ "name": "layer_active", "type": "variable_if", "value": 1 },
+				{
 					"type": "variable_if",
-					"value": 1
+					"name": "system.use_fkeys_as_standard_function_keys",
+					"value": true
 				}
 			],
 			"from": { "key_code": "equal_sign", "modifiers": { "optional": ["any"] } },
