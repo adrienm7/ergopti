@@ -1877,6 +1877,12 @@
                                 ],
                                 "to_if_alone": [
                                     {
+                                        "set_variable": {
+                                            "name": "previous_key",
+                                            "value": " "
+                                        }
+                                    },
+                                    {
                                         "key_code": "spacebar"
                                     }
                                 ],
