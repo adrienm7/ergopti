@@ -1835,7 +1835,7 @@
                                 "type": "basic"
                             },
                             {
-                                "description": "Layer active: Space -> Command+Space (Spotlight/launcher)",
+                                "description": "Space -> Command+Space (Spotlight/launcher)",
                                 "conditions": [
                                     {
                                         "name": "layer_active",
@@ -1857,6 +1857,30 @@
                                         "modifiers": [
                                             "command"
                                         ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "Right Command -> Escape",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "right_command",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "escape"
                                     }
                                 ],
                                 "type": "basic"
