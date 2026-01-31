@@ -1835,6 +1835,72 @@
                                 "type": "basic"
                             },
                             {
+                                "description": "Capsword: disable on Enter",
+                                "conditions": [
+                                    {
+                                        "name": "capsword",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "return_or_enter",
+                                    "modifiers": {
+                                        "optional": [
+                                            "caps_lock"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "caps_lock"
+                                    },
+                                    {
+                                        "set_variable": {
+                                            "name": "capsword",
+                                            "value": 0
+                                        }
+                                    },
+                                    {
+                                        "key_code": "return_or_enter"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "description": "Capsword: disable on CapsLock",
+                                "conditions": [
+                                    {
+                                        "name": "capsword",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "caps_lock",
+                                    "modifiers": {
+                                        "optional": [
+                                            "caps_lock"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "caps_lock"
+                                    },
+                                    {
+                                        "set_variable": {
+                                            "name": "capsword",
+                                            "value": 0
+                                        }
+                                    },
+                                    {
+                                        "key_code": "return_or_enter"
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
                                 "description": "Space -> Command+Space (Spotlight/launcher)",
                                 "conditions": [
                                     {
