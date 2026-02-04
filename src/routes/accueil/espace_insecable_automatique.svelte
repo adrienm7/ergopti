@@ -7,31 +7,32 @@
 <section>
 	<h2>Ponctuations avec espace insécable automatique</h2>
 	<p>
-		Les ponctuations <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> ont une particularité.
-		En effet, lors de l’utilisation de <kbd>Shift</kbd>, elles sont
-		<strong>automatiquement envoyées avec un espace insécable</strong> qui les précède.
-		Les espaces insécables ne sont pas disponibles en AZERTY, et c’est très dommage. Ce sont des espaces
-		qui ont pour comportement de toujours rester collés au texte qui les précède et les suit.
+		Les signes <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> bénéficient d'un traitement
+		intelligent. Saisis sur la couche <kbd>Shift</kbd>, ils sont
+		<strong>automatiquement insérés précédés d’une espace insécable</strong>. Contrairement à une
+		espace classique, ce caractère spécial garantit que la ponctuation reste toujours solidaire du
+		mot qui la précède. Résultat : fini les <kbd-output>?</kbd-output> orphelins rejetés seuls en début
+		de ligne ! Tous vos documents, e-mails, messages sur les réseaux sociaux et autres textes gagneront
+		instantanément en professionnalisme.
 	</p>
 	<p>
-		Ainsi, vous n’aurez plus jamais de <kbd-output>?</kbd-output> qui se balade au début d’une ligne
-		parce qu’il n’y avait plus de place sur la ligne précédente. Cela donne des documents avec un
-		rendu bien plus professionnel. Attention cependant :
-		<strong>ne les utilisez pas dans d’autres situations que l'écriture de texte</strong>. Par exemple, en programmation, un espace insécable peut causer des erreurs, sans forcément
-		être visible (vous ne verrez qu’un simple espace, qui pourtant sera la cause du problème).
-	</p>
-	<p>
-		En revanche, en utilisant <kbd>AltGr</kbd>, la ponctuation seule est renvoyée. Cette méthode
-		permet d’écrire dans un français impeccable en
-		<kbd>Shift</kbd>, tout en programmant normalement avec la couche <kbd>AltGr</kbd>, qui contient
-		d’ailleurs tout le reste des symboles nécessaires à l’écriture de code.
+		⚠ <strong>Attention toutefois :</strong> ce raccourci est à réserver uniquement à la rédaction
+		de texte courant — et uniquement pour le français d’ailleurs, car en anglais la convention est
+		de ne pas mettre d’espace avant les ponctuations. En revanche, lors de l’écriture de code
+		informatique, cette espace — souvent non distinguable visuellement d’une espace classique — sera
+		considérée comme un caractère invalide et provoquera des erreurs de syntaxe. Pour coder, il
+		faudra donc plutôt utiliser la couche
+		<kbd>AltGr</kbd>, car celle-ci envoie la
+		<strong>ponctuation brute</strong> (sans espace automatique). Cela permet de programmer
+		sereinement tout en conservant la possibilité d'écrire un français typographiquement impeccable
+		avec <kbd>Shift</kbd>.
 	</p>
 	<tiny-space></tiny-space>
 	<div class="encadre">
-		<p class="important margin0">Ainsi, il est facile de se rappeler où est quoi :</p>
+		<p class="important margin0">La règle est donc simple à mémoriser :</p>
 		<ul class="margin0">
-			<li>le français est en <kbd>Shift</kbd> ;</li>
-			<li class="margin0">la programmation est en <kbd>AltGr</kbd>.</li>
+			<li><kbd>Shift</kbd> pour le français (typographie soignée) ;</li>
+			<li class="margin0"><kbd>AltGr</kbd> pour la programmation (code brut) et l’anglais.</li>
 		</ul>
 	</div>
 </section>
