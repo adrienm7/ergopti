@@ -1175,9 +1175,28 @@ if __name__ == "__main__":
             # Fail silently to avoid breaking generation
             layer_rules = []
 
+    # Load capsword rules
+    capsword_file = base_dir / "data" / "karabiner_capsword.json"
+    capsword_rules: List[dict] = []
+    if capsword_file.is_file():
+        try:
+            with open(capsword_file, "r", encoding="utf-8") as cf:
+                capsword_obj = json.load(cf)
+            # The capsword file may contain a single rule (dict) or a list of rules
+            if isinstance(capsword_obj, dict):
+                capsword_rules = [capsword_obj]
+            elif isinstance(capsword_obj, list):
+                capsword_rules = capsword_obj
+        except Exception:
+            # Fail silently to avoid breaking generation
+            capsword_rules = []
+
+    # Merge layer_rules and capsword_rules
+    all_layer_rules = layer_rules + capsword_rules
+
     merge_rolls_into_karabiner(
         karabiner_path=str(base_dir / "data" / "karabiner_tap_hold.json"),
         rolls_data=grouped,
         output_path=str(base_dir / "karabiner.json"),
-        layer_rules=layer_rules,
+        layer_rules=all_layer_rules,
     )
