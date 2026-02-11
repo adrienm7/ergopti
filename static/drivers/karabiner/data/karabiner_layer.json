@@ -555,7 +555,7 @@
 			"to": [
 				{
 					"key_code": "left_arrow",
-					"modifiers": ["command", "option", "control"]
+					"modifiers": ["control", "option", "command"]
 				}
 			],
 			"type": "basic"
@@ -668,7 +668,7 @@
 			"to": [
 				{
 					"key_code": "right_arrow",
-					"modifiers": ["command", "option", "control"]
+					"modifiers": ["control", "option", "command"]
 				}
 			],
 			"type": "basic"
