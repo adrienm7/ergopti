@@ -655,9 +655,9 @@
                                     {
                                         "key_code": "left_arrow",
                                         "modifiers": [
-                                            "command",
+                                            "control",
                                             "option",
-                                            "control"
+                                            "command"
                                         ]
                                     }
                                 ],
@@ -786,9 +786,9 @@
                                     {
                                         "key_code": "right_arrow",
                                         "modifiers": [
-                                            "command",
+                                            "control",
                                             "option",
-                                            "control"
+                                            "command"
                                         ]
                                     }
                                 ],
