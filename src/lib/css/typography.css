@@ -74,6 +74,7 @@ strong,
 	-webkit-background-clip: text;
 	background-clip: text;
 	display: inline-block; /* nécessaire pour positionner les pseudo-éléments */
+	text-decoration: none;
 	-webkit-text-fill-color: transparent;
 	color: transparent;
 	position: relative;
