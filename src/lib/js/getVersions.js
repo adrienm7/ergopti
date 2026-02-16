@@ -1,9 +1,22 @@
 export function getLatestVersion(name, versionPrefix = null) {
-	const extractedVersions = getFilteredFileVersions(name, versionPrefix);
+	let extractedVersions = getFilteredFileVersions(name, versionPrefix);
+	// Si aucun résultat pour le préfixe demandé, essayer des fallback
+	if ((!extractedVersions || extractedVersions.length === 0) && versionPrefix) {
+		let prefix = versionPrefix;
+		while (prefix.indexOf('.') !== -1) {
+			prefix = prefix.substring(0, prefix.lastIndexOf('.'));
+			extractedVersions = getFilteredFileVersions(name, prefix);
+			if (extractedVersions && extractedVersions.length > 0) break;
+		}
+		// Enfin, si toujours rien, récupérer toutes les versions disponibles
+		if (!extractedVersions || extractedVersions.length === 0) {
+			extractedVersions = getFilteredFileVersions(name, null);
+		}
+	}
 	// Trier les versions
-	const sortedVersions = sortVersions(extractedVersions);
-	// Retourner la dernière version (la plus élevée)
-	return sortedVersions[sortedVersions.length - 1];
+	const sortedVersions = sortVersions(extractedVersions || []);
+	// Retourner la dernière version (la plus élevée) ou null si aucune
+	return sortedVersions.length ? sortedVersions[sortedVersions.length - 1] : null;
 }
 
 export function getFilteredFileVersions(name, versionPrefix = null) {
@@ -22,6 +35,9 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			break;
 		case 'autohotkey':
 			files = import.meta.glob('/static/drivers/autohotkey/*.ahk', { as: 'url' });
+			break;
+		case 'autohotkey_exe':
+			files = import.meta.glob('/static/drivers/autohotkey/compiled/*.exe', { as: 'url' });
 			break;
 		case 'kla_iso':
 			files = import.meta.glob('/static/layouts/kla_iso/*.json');
