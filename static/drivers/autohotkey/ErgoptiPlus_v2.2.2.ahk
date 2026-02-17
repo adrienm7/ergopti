@@ -1135,6 +1135,21 @@ global PersonalInformation := Map(
     "CreditCard", "1234 5678 9012 3456",
     "SocialSecurityNumber", "1 99 99 99 999 999 99",
 )
+global PersonalInformationLetters := Map(
+    "a", "StreetAddress",
+    "b", "BIC",
+    "c", "CreditCard",
+    "d", "DateOfBirth",
+    "e", "EmailAddress",
+    "f", "PhoneNumberClean",
+    "i", "IBAN",
+    "m", "EmailAddress",
+    "n", "LastName",
+    "p", "FirstName",
+    "s", "SocialSecurityNumber",
+    "t", "PhoneNumber",
+    "w", "WorkEmailAddress",
+)
 
 ; ======================================================================
 ; ======= 1.2) Variables update if there is a configuration file =======
@@ -1433,13 +1448,23 @@ PersonalInformationEditor(*) {
     GuiToShow := Gui(, "Modifier les coordonnées personnelles")
     UpdatedPersonalInformation := Map()
 
-    ; Génère dynamiquement un champ par élément de la Map
-    for key, OldValue in PersonalInformation {
+    ReverseLetters := Map()
+    for k, v in PersonalInformationLetters
+        ReverseLetters[v] := k
+
+    ; Dynamically generate a field for each element in the Map
+    for PersonalInformationKey, OldValue in PersonalInformation {
+        TextToAdd := ""
+        if ReverseLetters.Has(PersonalInformationKey) {
+            TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation[
+                "MagicKey"] .
+                ")"
+        }
         GuiToShow.SetFont("bold")
-        GuiToShow.Add("Text", , key)
+        GuiToShow.Add("Text", , PersonalInformationKey . TextToAdd)
         GuiToShow.SetFont("norm")
         NewValue := GuiToShow.Add("Edit", "w300", OldValue)
-        UpdatedPersonalInformation[key] := NewValue
+        UpdatedPersonalInformation[PersonalInformationKey] := NewValue
     }
 
     ; OK button
@@ -4928,7 +4953,7 @@ if Features["Autocorrection"]["Errors"].Enabled {
 
     ; === Caps correction ===
     CreateHotstring(
-        "?:C", "OUi", "Oui",
+        "*C", "OUi", "Oui",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
 
@@ -5700,25 +5725,18 @@ if Features["DistancesReduction"]["SuffixesA"].Enabled {
 ; ==========================================================
 
 if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
-    CreateHotstring("*", "@b" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult", True))
     CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult",
         True))
-    CreateHotstring("*", "@c" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumberClean"], Map(
-        "FinalResult", True))
     CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
         "FinalResult",
         True))
     CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
         "FinalResult",
         True))
-    CreateHotstring("*", "@i" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult", True
-    ))
     CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
         True))
     CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
         True))
-    CreateHotstring("*", "@s" . ScriptInformation["MagicKey"], PersonalInformation["SocialSecurityNumber"], Map(
-        "FinalResult", True))
     CreateHotstring("*", "@ss" . ScriptInformation["MagicKey"], PersonalInformation["SocialSecurityNumber"], Map(
         "FinalResult", True))
     CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map(
@@ -5728,15 +5746,11 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
         "FinalResult",
         True))
 
-    global PersonalInformationHotstrings := Map(
-        "a", PersonalInformation["StreetAddress"],
-        "d", PersonalInformation["DateOfBirth"],
-        "m", PersonalInformation["EmailAddress"],
-        "n", PersonalInformation["LastName"],
-        "p", PersonalInformation["FirstName"],
-        "t", PersonalInformation["PhoneNumber"],
-        "w", PersonalInformation["WorkEmailAddress"]
-    )
+    ; Map a letter to a value (n ➜ Nom, t ➜ 0606060606, etc.)
+    global PersonalInformationHotstrings := Map()
+    for InfoKey, InfoValue in PersonalInformationLetters {
+        PersonalInformationHotstrings[InfoKey] := PersonalInformation[InfoValue]
+    }
 
     ; Generate all possible combinations of letters between 1 and PatternMaxLength characters
     GeneratePersonalInformationHotstrings(
@@ -5752,6 +5766,18 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
             Generate(keys, hotstrings, "", A_Index)
     }
 
+    ; In case email is "^a" we want to send raw string and not Ctrl + A
+    EscapeSpecialChars(text) {
+        text := StrReplace(text, "{", "{{}")
+        text := StrReplace(text, "}", "{}}")
+        text := StrReplace(text, "^", "{Asc 94}")
+        text := StrReplace(text, "~", "{Asc 126}")
+        text := StrReplace(text, "+", "{+}")
+        text := StrReplace(text, "!", "{!}")
+        text := StrReplace(text, "#", "{#}")
+        return text
+    }
+
     Generate(keys, hotstrings, combo, len) {
         if (len == 0) {
             value := ""
@@ -5765,7 +5791,7 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
                 }
             }
             if (value != "") {
-                CreateHotstringCombo(combo, value)
+                CreateHotstringCombo(combo, EscapeSpecialChars(value))
             }
             return
         }
