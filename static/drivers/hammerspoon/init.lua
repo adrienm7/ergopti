@@ -1,12 +1,13 @@
 -- What this script does:
--- 1) Three-finger tap to toggle selection mode (click-and-drag)
--- 2) Three-finger gestures for tab navigation
--- 3) Change volume with left Option + scroll
+-- • Three-finger tap to toggle selection mode (click-and-drag)
+-- • Three-finger gestures for tab navigation
+-- • Change volume with left Option + scroll
+-- • Four-finger tap to trigger "Look Up" (Ctrl+Cmd+D)
 
 local Swipe3 = hs.loadSpoon("Swipe")
 local current_id_3f, threshold_horizontal, threshold_vertical
-local HORIZONTAL_DEFAULT = 0.02 -- 2% of the trackpad width for left/right
-local VERTICAL_DEFAULT = 0.08   -- 8% of the trackpad height for up/down
+local HORIZONTAL_DEFAULT = 0.04 -- 4% of the trackpad width for left/right
+local VERTICAL_DEFAULT = 0.12   -- 12% of the trackpad height for up/down to prevent accidental triggers
 
 threshold_horizontal = HORIZONTAL_DEFAULT
 threshold_vertical = VERTICAL_DEFAULT
@@ -21,6 +22,7 @@ local _touchStartTime = nil
 local _tapStartPoint = nil
 local _tapEndPoint = nil
 local _maybeTap = false
+local _tapFingerCount = nil
 local _tapDelta = 2.0 -- tolerance for movement to still consider a tap
 local _lastDebugTime = 0
 
@@ -56,6 +58,7 @@ local function forceCleanup()
     _touchStartTime = nil
     _tapStartPoint = nil
     _tapEndPoint = nil
+    _tapFingerCount = nil
     _maybeTap = false
 end
 
@@ -91,6 +94,13 @@ local function toggleSelection()
     debugLog("toggleSelection: mouseEventTap started")
 end
 
+-- triggerLookup: emulate macOS "Look Up" (usually three-finger tap) via Ctrl+Cmd+D
+local function triggerLookup()
+    debugLog("triggerLookup: activating")
+    -- send Ctrl+Cmd+D which is the common keyboard shortcut for Look Up
+    pcall(function() hs.eventtap.keyStroke({"ctrl", "cmd"}, "d", 0) end)
+end
+
 -- Create a touchdevice watcher for a deviceID
 local function create_watcher(deviceID)
     if touch_watchers[deviceID] and touch_watchers[deviceID].watcher then
@@ -105,24 +115,39 @@ local function create_watcher(deviceID)
 
     local lastSeen = hs.timer.secondsSinceEpoch()
 
+    local lastNFingers = nil
+    local stableFrames = 0
     local watcher = touchdevice.forDeviceID(deviceID):frameCallback(function(_, touches, _, _)
         local ok, err = pcall(function()
             local nFingers = #touches
+            if lastNFingers ~= nFingers then
+                debugLog("watcher:", deviceID, "nFingers=", nFingers)
+                lastNFingers = nFingers
+                stableFrames = 1
+            else
+                stableFrames = stableFrames + 1
+            end
             local now = hs.timer.secondsSinceEpoch()
 
             if touch_watchers[deviceID] then touch_watchers[deviceID].lastSeen = now end
 
             if nFingers == 0 then
-                if _tapStartPoint and _tapEndPoint and _maybeTap then
+                if _tapStartPoint and _tapEndPoint and _maybeTap and _tapFingerCount then
                     local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) + math.abs(_tapStartPoint.y - _tapEndPoint.y)
                     if delta < _tapDelta then
-                        debugLog("watcher:", deviceID, "detected 3-finger tap (delta=", delta, ") -> toggleSelection")
-                        toggleSelection()
+                        if _tapFingerCount == 3 then
+                            debugLog("watcher:", deviceID, "detected 3-finger tap (delta=", delta, ") -> toggleSelection")
+                            toggleSelection()
+                        elseif _tapFingerCount == 4 then
+                            debugLog("watcher:", deviceID, "detected 4-finger tap (delta=", delta, ") -> triggerLookup")
+                            triggerLookup()
+                        end
                     end
                 end
                 _touchStartTime = nil
                 _tapStartPoint = nil
                 _tapEndPoint = nil
+                _tapFingerCount = nil
                 _maybeTap = false
                 return
             end
@@ -136,13 +161,19 @@ local function create_watcher(deviceID)
                 _tapEndPoint = nil
             end
 
-            if nFingers == 3 then
-                local xAvg = (touches[1].absoluteVector.position.x + touches[2].absoluteVector.position.x + touches[3].absoluteVector.position.x) / 3
-                local yAvg = (touches[1].absoluteVector.position.y + touches[2].absoluteVector.position.y + touches[3].absoluteVector.position.y) / 3
+            if (nFingers == 3 or nFingers == 4) and stableFrames >= 2 then
+                local xSum, ySum = 0, 0
+                for i=1,#touches do
+                    xSum = xSum + touches[i].absoluteVector.position.x
+                    ySum = ySum + touches[i].absoluteVector.position.y
+                end
+                local xAvg = xSum / #touches
+                local yAvg = ySum / #touches
 
                 if _maybeTap and not _tapStartPoint then
                     _tapStartPoint = { x = xAvg, y = yAvg }
-                    debugLog("watcher:", deviceID, "tap start at", xAvg, yAvg)
+                    _tapFingerCount = nFingers
+                    debugLog("watcher:", deviceID, "tap start at", xAvg, yAvg, "fingers=", _tapFingerCount, "stableFrames=", stableFrames)
                 end
                 if _maybeTap then
                     _tapEndPoint = { x = xAvg, y = yAvg }
@@ -151,10 +182,11 @@ local function create_watcher(deviceID)
                         debugLog("watcher:", deviceID, "tap update at", xAvg, yAvg)
                     end
                 end
-            elseif nFingers > 3 then
+            elseif nFingers > 4 then
                 _maybeTap = false
                 _tapStartPoint = nil
                 _tapEndPoint = nil
+                _tapFingerCount = nil
             end
         end)
         if not ok then
