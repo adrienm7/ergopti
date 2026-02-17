@@ -88,7 +88,7 @@ main,
 		padding-left: var(--marge-fenetre);
 	}
 }
-@media (min-width: 1280px) {
+@media (min-width: 1281px) {
 	#menu-page-content {
 		display: none;
 	}

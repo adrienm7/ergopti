@@ -477,7 +477,7 @@
 	}
 
 	/* Menu on large screens */
-	@media (min-width: 1280px) {
+	@media (min-width: 1281px) {
 		#menu-pages {
 			flex-direction: row;
 			padding-right: var(--marge-bords-menu);
