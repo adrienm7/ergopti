@@ -916,7 +916,7 @@ global Features := Map(
         },
         "Move", {
             Enabled: True,
-            Description: "Win + M(ove) = Simulation d’une activité en bougeant la souris aléatoirement. Pour désactiver, rRéitérer le raccourci ou recharger le script",
+            Description: "Win + M(ove) = Simulation d’une activité en bougeant la souris aléatoirement. Pour désactiver, réitérer le raccourci ou recharger le script",
         },
         "Search", {
             Enabled: True,
@@ -1033,14 +1033,19 @@ global Features := Map(
             },
         ),
         "Space", Map(
+            "Ctrl", {
+                Enabled: False,
+                Description: "`"Espace`" : Espace en tap, Ctrl en hold",
+                TimeActivationSeconds: 0.15,
+            },
             "Layer", {
                 Enabled: False,
                 Description: "`"Espace`" : Espace en tap, layer de navigation en hold",
                 TimeActivationSeconds: 0.15,
             },
-            "Ctrl", {
+            "Shift", {
                 Enabled: False,
-                Description: "`"Espace`" : Espace en tap, Ctrl en hold",
+                Description: "`"Espace`" : Espace en tap, Shift en hold",
                 TimeActivationSeconds: 0.15,
             },
         ),
@@ -1129,6 +1134,21 @@ global PersonalInformation := Map(
     "BIC", "ABCDFRPP",
     "CreditCard", "1234 5678 9012 3456",
     "SocialSecurityNumber", "1 99 99 99 999 999 99",
+)
+global PersonalInformationLetters := Map(
+    "a", "StreetAddress",
+    "b", "BIC",
+    "c", "CreditCard",
+    "d", "DateOfBirth",
+    "e", "EmailAddress",
+    "f", "PhoneNumberClean",
+    "i", "IBAN",
+    "m", "EmailAddress",
+    "n", "LastName",
+    "p", "FirstName",
+    "s", "SocialSecurityNumber",
+    "t", "PhoneNumber",
+    "w", "WorkEmailAddress",
 )
 
 ; ======================================================================
@@ -1428,13 +1448,23 @@ PersonalInformationEditor(*) {
     GuiToShow := Gui(, "Modifier les coordonnées personnelles")
     UpdatedPersonalInformation := Map()
 
-    ; Génère dynamiquement un champ par élément de la Map
-    for key, OldValue in PersonalInformation {
+    ReverseLetters := Map()
+    for k, v in PersonalInformationLetters
+        ReverseLetters[v] := k
+
+    ; Dynamically generate a field for each element in the Map
+    for PersonalInformationKey, OldValue in PersonalInformation {
+        TextToAdd := ""
+        if ReverseLetters.Has(PersonalInformationKey) {
+            TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation[
+                "MagicKey"] .
+                ")"
+        }
         GuiToShow.SetFont("bold")
-        GuiToShow.Add("Text", , key)
+        GuiToShow.Add("Text", , PersonalInformationKey . TextToAdd)
         GuiToShow.SetFont("norm")
         NewValue := GuiToShow.Add("Edit", "w300", OldValue)
-        UpdatedPersonalInformation[key] := NewValue
+        UpdatedPersonalInformation[PersonalInformationKey] := NewValue
     }
 
     ; OK button
@@ -3761,6 +3791,40 @@ BackSpaceLogic() {
 ; ======= 5.4) Space =======
 ; ==========================
 
+#HotIf Features["TapHolds"]["Space"]["Ctrl"].Enabled and not LayerEnabled
+; Tap-hold on "Space" : Space on tap, Ctrl on hold
+SC039::
+{
+    ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds)
+    ih.Start()
+    ih.Wait()
+    if ih.EndReason != "Timeout" {
+        Text := ih.Input
+        if ih.Input == " " {
+            Text := "" ; To not send a double space
+        }
+        SendEvent("{Space}" Text)
+        ; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
+        ; Otherwise, SendInput resets the hotstrings search
+        UpdateLastSentCharacter(" ")
+        return
+    }
+
+    SendEvent("{LCtrl Down}")
+    KeyWait("SC039")
+    SendEvent("{LCtrl Up}")
+}
+SC039 Up:: {
+    if (
+        A_PriorHotkey == "SC039"
+        and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds
+    ) {
+        SendEvent("{Space}")
+    }
+}
+#HotIf
+
 #HotIf Features["TapHolds"]["Space"]["Layer"].Enabled and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Layer on hold
 SC039::
@@ -3796,11 +3860,11 @@ SC039 Up:: {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["Space"]["Ctrl"].Enabled and not LayerEnabled
-; Tap-hold on "Space" : Space on tap, Ctrl on hold
+#HotIf Features["TapHolds"]["Space"]["Shift"].Enabled and not LayerEnabled
+; Tap-hold on "Space" : Space on tap, Shift on hold
 SC039::
 {
-    ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds)
+    ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Shift"].TimeActivationSeconds)
     ih.Start()
     ih.Wait()
     if ih.EndReason != "Timeout" {
@@ -3815,15 +3879,15 @@ SC039::
         return
     }
 
-    SendEvent("{LCtrl Down}")
+    SendEvent("{LShift Down}")
     KeyWait("SC039")
-    SendEvent("{LCtrl Up}")
+    SendEvent("{LShift Up}")
 }
 SC039 Up:: {
     if (
         A_PriorHotkey == "SC039"
         and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
-        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Shift"].TimeActivationSeconds
     ) {
         SendEvent("{Space}")
     }
@@ -4170,7 +4234,6 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 #HotIf LayerEnabled
 ; The base layer will become this one when the navigation layer variable is set to True
 
-SC039:: ActionLayer("{Escape}")
 *WheelUp:: {
     A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
     ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
@@ -4890,7 +4953,7 @@ if Features["Autocorrection"]["Errors"].Enabled {
 
     ; === Caps correction ===
     CreateHotstring(
-        "?:C", "OUi", "Oui",
+        "*C", "OUi", "Oui",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
 
@@ -5662,25 +5725,18 @@ if Features["DistancesReduction"]["SuffixesA"].Enabled {
 ; ==========================================================
 
 if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
-    CreateHotstring("*", "@b" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult", True))
     CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult",
         True))
-    CreateHotstring("*", "@c" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumberClean"], Map(
-        "FinalResult", True))
     CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
         "FinalResult",
         True))
     CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
         "FinalResult",
         True))
-    CreateHotstring("*", "@i" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult", True
-    ))
     CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
         True))
     CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
         True))
-    CreateHotstring("*", "@s" . ScriptInformation["MagicKey"], PersonalInformation["SocialSecurityNumber"], Map(
-        "FinalResult", True))
     CreateHotstring("*", "@ss" . ScriptInformation["MagicKey"], PersonalInformation["SocialSecurityNumber"], Map(
         "FinalResult", True))
     CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map(
@@ -5690,15 +5746,11 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
         "FinalResult",
         True))
 
-    global PersonalInformationHotstrings := Map(
-        "a", PersonalInformation["StreetAddress"],
-        "d", PersonalInformation["DateOfBirth"],
-        "m", PersonalInformation["EmailAddress"],
-        "n", PersonalInformation["LastName"],
-        "p", PersonalInformation["FirstName"],
-        "t", PersonalInformation["PhoneNumber"],
-        "w", PersonalInformation["WorkEmailAddress"]
-    )
+    ; Map a letter to a value (n ➜ Nom, t ➜ 0606060606, etc.)
+    global PersonalInformationHotstrings := Map()
+    for InfoKey, InfoValue in PersonalInformationLetters {
+        PersonalInformationHotstrings[InfoKey] := PersonalInformation[InfoValue]
+    }
 
     ; Generate all possible combinations of letters between 1 and PatternMaxLength characters
     GeneratePersonalInformationHotstrings(
@@ -5714,6 +5766,18 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
             Generate(keys, hotstrings, "", A_Index)
     }
 
+    ; In case email is "^a" we want to send raw string and not Ctrl + A
+    EscapeSpecialChars(text) {
+        text := StrReplace(text, "{", "{{}")
+        text := StrReplace(text, "}", "{}}")
+        text := StrReplace(text, "^", "{Asc 94}")
+        text := StrReplace(text, "~", "{Asc 126}")
+        text := StrReplace(text, "+", "{+}")
+        text := StrReplace(text, "!", "{!}")
+        text := StrReplace(text, "#", "{#}")
+        return text
+    }
+
     Generate(keys, hotstrings, combo, len) {
         if (len == 0) {
             value := ""
@@ -5727,7 +5791,7 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
                 }
             }
             if (value != "") {
-                CreateHotstringCombo(combo, value)
+                CreateHotstringCombo(combo, EscapeSpecialChars(value))
             }
             return
         }
@@ -6101,7 +6165,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "mr" . ScriptInformation["MagicKey"], "monsieur")
     CreateCaseSensitiveHotstrings("*", "mrc" . ScriptInformation["MagicKey"], "merci")
     CreateCaseSensitiveHotstrings("*", "msg" . ScriptInformation["MagicKey"], "message")
-    CreateCaseSensitiveHotstrings("*", "mt" . ScriptInformation["MagicKey"], "montant")
     CreateCaseSensitiveHotstrings("*", "mtn" . ScriptInformation["MagicKey"], "maintenant")
     CreateCaseSensitiveHotstrings("*", "moy" . ScriptInformation["MagicKey"], "moyenne")
     CreateCaseSensitiveHotstrings("*", "mutu" . ScriptInformation["MagicKey"], "mutualiser")
@@ -6443,6 +6506,7 @@ if Features["MagicKey"]["TextExpansionEmojis"].Enabled {
     CreateHotstring("*", "cloche" . ScriptInformation["MagicKey"], "🔔")
     CreateHotstring("*", "couronne" . ScriptInformation["MagicKey"], "👑")
     CreateHotstring("*", "croix" . ScriptInformation["MagicKey"], "❌")
+    CreateHotstring("*", "danse" . ScriptInformation["MagicKey"], "💃")
     CreateHotstring("*", "dé" . ScriptInformation["MagicKey"], "🎲")
     CreateHotstring("*", "diamant" . ScriptInformation["MagicKey"], "💎")
     CreateHotstring("*", "drapeau" . ScriptInformation["MagicKey"], "🏁")
@@ -6458,6 +6522,7 @@ if Features["MagicKey"]["TextExpansionEmojis"].Enabled {
     CreateHotstring("*", "fête" . ScriptInformation["MagicKey"], "🎉")
     CreateHotstring("*", "film" . ScriptInformation["MagicKey"], "🎬")
     CreateHotstring("*", "fleur" . ScriptInformation["MagicKey"], "🌸")
+    CreateHotstring("*", "fusée" . ScriptInformation["MagicKey"], "🚀")
     CreateHotstring("*", "guitare" . ScriptInformation["MagicKey"], "🎸")
     CreateHotstring("*", "idée" . ScriptInformation["MagicKey"], "💡")
     CreateHotstring("*", "idee" . ScriptInformation["MagicKey"], "💡")
@@ -6487,6 +6552,7 @@ if Features["MagicKey"]["TextExpansionEmojis"].Enabled {
     CreateHotstring("*", "radioactif" . ScriptInformation["MagicKey"], "☢️")
     CreateHotstring("*", "regard" . ScriptInformation["MagicKey"], "👀")
     CreateHotstring("*", "robot" . ScriptInformation["MagicKey"], "🤖")
+    CreateHotstring("*", "rocket" . ScriptInformation["MagicKey"], "🚀")
     CreateHotstring("*", "sacoche" . ScriptInformation["MagicKey"], "💼")
     CreateHotstring("*", "smartphone" . ScriptInformation["MagicKey"], "📱")
     CreateHotstring("*", "soleil" . ScriptInformation["MagicKey"], "☀️")
@@ -6526,6 +6592,7 @@ if Features["MagicKey"]["TextExpansionEmojis"].Enabled {
     CreateHotstring("*", "glace" . ScriptInformation["MagicKey"], "🍦")
     CreateHotstring("*", "hamburger" . ScriptInformation["MagicKey"], "🍔")
     CreateHotstring("*", "hotdog" . ScriptInformation["MagicKey"], "🌭")
+    CreateHotstring("*", "kebab" . ScriptInformation["MagicKey"], "🥙")
     CreateHotstring("*", "kiwi" . ScriptInformation["MagicKey"], "🥝")
     CreateHotstring("*", "lait" . ScriptInformation["MagicKey"], "🥛")
     CreateHotstring("*", "maïs" . ScriptInformation["MagicKey"], "🌽")
