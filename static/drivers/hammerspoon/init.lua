@@ -579,5 +579,9 @@ keymap.add("w★", "ww", true)
 keymap.add("x★", "xx", true)
 keymap.add("y★", "yy", true)
 keymap.add("z★", "zz", true)
+
+keymap.add("sx", "sk", true)
 -- Give `pb★` precedence over `b★` (single-letter `b★` maps to "bb")
 keymap.add("pb★", "problème")
+keymap.add("ask★", "problème")
+
