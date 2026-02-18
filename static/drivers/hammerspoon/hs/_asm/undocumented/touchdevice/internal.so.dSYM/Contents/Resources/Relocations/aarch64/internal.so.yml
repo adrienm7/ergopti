@@ -1,0 +1,60 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     'obj_arm64/internal.so'
+relocations:
+  - { offset: 0x27, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice initWithDevice:]', symObjAddr: 0x0, symBinAddr: 0xCB8, symSize: 0xD0 }
+  - { offset: 0x58, size: 0x8, addend: 0x0, symName: _pathStageNames, symObjAddr: 0xCC00, symBinAddr: 0xC5A8, symSize: 0x0 }
+  - { offset: 0xD1, size: 0x8, addend: 0x0, symName: _moduleLib, symObjAddr: 0x4A78, symBinAddr: 0xC538, symSize: 0x0 }
+  - { offset: 0xD2F, size: 0x8, addend: 0x0, symName: _userdata_metaLib, symObjAddr: 0x4AE0, symBinAddr: 0x8040, symSize: 0x0 }
+  - { offset: 0xD55, size: 0x8, addend: 0x0, symName: _refTable, symObjAddr: 0x4AD8, symBinAddr: 0xC598, symSize: 0x0 }
+  - { offset: 0xECB, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice initWithDevice:]', symObjAddr: 0x0, symBinAddr: 0xCB8, symSize: 0xD0 }
+  - { offset: 0xF0F, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice touchDevice]', symObjAddr: 0xD0, symBinAddr: 0xD88, symSize: 0x24 }
+  - { offset: 0xF45, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice frameCallbackRef]', symObjAddr: 0xF4, symBinAddr: 0xDAC, symSize: 0x1C }
+  - { offset: 0xF7B, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice setFrameCallbackRef:]', symObjAddr: 0x110, symBinAddr: 0xDC8, symSize: 0x24 }
+  - { offset: 0xFB9, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice pathCallbackRef]', symObjAddr: 0x134, symBinAddr: 0xDEC, symSize: 0x1C }
+  - { offset: 0xFEF, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice setPathCallbackRef:]', symObjAddr: 0x150, symBinAddr: 0xE08, symSize: 0x24 }
+  - { offset: 0x102D, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice selfRefCount]', symObjAddr: 0x174, symBinAddr: 0xE2C, symSize: 0x1C }
+  - { offset: 0x1063, size: 0x8, addend: 0x0, symName: '-[ASMTouchDevice setSelfRefCount:]', symObjAddr: 0x190, symBinAddr: 0xE48, symSize: 0x24 }
+  - { offset: 0x10A1, size: 0x8, addend: 0x0, symName: _luaopen_hs__asm_undocumented_touchdevice_internal, symObjAddr: 0x1B4, symBinAddr: 0xE6C, symSize: 0xD8 }
+  - { offset: 0x10DA, size: 0x8, addend: 0x0, symName: _pushASMTouchDevice, symObjAddr: 0x28C, symBinAddr: 0xF44, symSize: 0xE8 }
+  - { offset: 0x1131, size: 0x8, addend: 0x0, symName: _toASMTouchDeviceFromLua, symObjAddr: 0x374, symBinAddr: 0x102C, symSize: 0x154 }
+  - { offset: 0x1188, size: 0x8, addend: 0x0, symName: _touchdevice_absoluteTime, symObjAddr: 0x4C8, symBinAddr: 0x1180, symSize: 0x78 }
+  - { offset: 0x11BE, size: 0x8, addend: 0x0, symName: _touchdevice_isAvailable, symObjAddr: 0x540, symBinAddr: 0x11F8, symSize: 0x7C }
+  - { offset: 0x11F4, size: 0x8, addend: 0x0, symName: _touchdevice_devices, symObjAddr: 0x5BC, symBinAddr: 0x1274, symSize: 0x280 }
+  - { offset: 0x128C, size: 0x8, addend: 0x0, symName: _touchdevice_default, symObjAddr: 0x83C, symBinAddr: 0x14F4, symSize: 0x11C }
+  - { offset: 0x12D4, size: 0x8, addend: 0x0, symName: _touchdevice_forDeviceID, symObjAddr: 0x958, symBinAddr: 0x1610, symSize: 0x150 }
+  - { offset: 0x132B, size: 0x8, addend: 0x0, symName: _touchdevice_ioserviceDetails, symObjAddr: 0xAA8, symBinAddr: 0x1760, symSize: 0x108 }
+  - { offset: 0x13A0, size: 0x8, addend: 0x0, symName: _touchdevice_frameCallback, symObjAddr: 0xBB0, symBinAddr: 0x1868, symSize: 0x268 }
+  - { offset: 0x13F7, size: 0x8, addend: 0x0, symName: _touchdevice_pathCallback, symObjAddr: 0xE18, symBinAddr: 0x1AD0, symSize: 0x268 }
+  - { offset: 0x144E, size: 0x8, addend: 0x0, symName: _touchdevice_start, symObjAddr: 0x1080, symBinAddr: 0x1D38, symSize: 0x290 }
+  - { offset: 0x14B4, size: 0x8, addend: 0x0, symName: _touchdevice_stop, symObjAddr: 0x1310, symBinAddr: 0x1FC8, symSize: 0x1A8 }
+  - { offset: 0x150B, size: 0x8, addend: 0x0, symName: _touchdevice_deviceID, symObjAddr: 0x14B8, symBinAddr: 0x2170, symSize: 0x140 }
+  - { offset: 0x1571, size: 0x8, addend: 0x0, symName: _touchdevice_builtin, symObjAddr: 0x15F8, symBinAddr: 0x22B0, symSize: 0xE0 }
+  - { offset: 0x15C8, size: 0x8, addend: 0x0, symName: _touchdevice_supportsForce, symObjAddr: 0x16D8, symBinAddr: 0x2390, symSize: 0xE0 }
+  - { offset: 0x161F, size: 0x8, addend: 0x0, symName: _touchdevice_supportsActuation, symObjAddr: 0x17B8, symBinAddr: 0x2470, symSize: 0xE0 }
+  - { offset: 0x1676, size: 0x8, addend: 0x0, symName: _touchdevice_isOpaqueSurface, symObjAddr: 0x1898, symBinAddr: 0x2550, symSize: 0xE0 }
+  - { offset: 0x16CD, size: 0x8, addend: 0x0, symName: _touchdevice_isRunning, symObjAddr: 0x1978, symBinAddr: 0x2630, symSize: 0xE0 }
+  - { offset: 0x1724, size: 0x8, addend: 0x0, symName: _touchdevice_isAlive, symObjAddr: 0x1A58, symBinAddr: 0x2710, symSize: 0xE0 }
+  - { offset: 0x177B, size: 0x8, addend: 0x0, symName: _touchdevice_isMTHIDDevice, symObjAddr: 0x1B38, symBinAddr: 0x27F0, symSize: 0xE0 }
+  - { offset: 0x17D2, size: 0x8, addend: 0x0, symName: _touchdevice_powerControlSupported, symObjAddr: 0x1C18, symBinAddr: 0x28D0, symSize: 0xE0 }
+  - { offset: 0x1829, size: 0x8, addend: 0x0, symName: _touchdevice_sensorDimensions, symObjAddr: 0x1CF8, symBinAddr: 0x29B0, symSize: 0x218 }
+  - { offset: 0x18BC, size: 0x8, addend: 0x0, symName: _touchdevice_familyID, symObjAddr: 0x1F10, symBinAddr: 0x2BC8, symSize: 0x140 }
+  - { offset: 0x1922, size: 0x8, addend: 0x0, symName: _touchdevice_driverType, symObjAddr: 0x2050, symBinAddr: 0x2D08, symSize: 0x140 }
+  - { offset: 0x1988, size: 0x8, addend: 0x0, symName: _touchdevice_GUID, symObjAddr: 0x2190, symBinAddr: 0x2E48, symSize: 0x244 }
+  - { offset: 0x1A03, size: 0x8, addend: 0x0, symName: _touchdevice_driverReady, symObjAddr: 0x23D4, symBinAddr: 0x308C, symSize: 0xE0 }
+  - { offset: 0x1A5A, size: 0x8, addend: 0x0, symName: _touchdevice_serialNumber, symObjAddr: 0x24B4, symBinAddr: 0x316C, symSize: 0x168 }
+  - { offset: 0x1AC0, size: 0x8, addend: 0x0, symName: _touchdevice_version, symObjAddr: 0x261C, symBinAddr: 0x32D4, symSize: 0x140 }
+  - { offset: 0x1B26, size: 0x8, addend: 0x0, symName: _touchdevice_supportsSilentClick, symObjAddr: 0x275C, symBinAddr: 0x3414, symSize: 0x144 }
+  - { offset: 0x1B8C, size: 0x8, addend: 0x0, symName: _touchdevice_forceResponseEnabled, symObjAddr: 0x28A0, symBinAddr: 0x3558, symSize: 0x128 }
+  - { offset: 0x1BE3, size: 0x8, addend: 0x0, symName: _touchdevice_productName, symObjAddr: 0x29C8, symBinAddr: 0x3680, symSize: 0x120 }
+  - { offset: 0x1C49, size: 0x8, addend: 0x0, symName: _userdata_tostring, symObjAddr: 0x2AE8, symBinAddr: 0x37A0, symSize: 0x1A8 }
+  - { offset: 0x1CBE, size: 0x8, addend: 0x0, symName: _userdata_eq, symObjAddr: 0x2C90, symBinAddr: 0x3948, symSize: 0x138 }
+  - { offset: 0x1D1B, size: 0x8, addend: 0x0, symName: _userdata_gc, symObjAddr: 0x2DC8, symBinAddr: 0x3A80, symSize: 0x218 }
+  - { offset: 0x1D86, size: 0x8, addend: 0x0, symName: _frameCallbackFunction, symObjAddr: 0x2FE0, symBinAddr: 0x3C98, symSize: 0x1FC }
+  - { offset: 0x1E35, size: 0x8, addend: 0x0, symName: ___frameCallbackFunction_block_invoke, symObjAddr: 0x31DC, symBinAddr: 0x3E94, symSize: 0x24C }
+  - { offset: 0x1EF0, size: 0x8, addend: 0x0, symName: _pushMTTouch, symObjAddr: 0x3428, symBinAddr: 0x40E0, symSize: 0x554 }
+  - { offset: 0x1F34, size: 0x8, addend: 0x0, symName: ___copy_helper_block_e8_32s, symObjAddr: 0x397C, symBinAddr: 0x4634, symSize: 0x38 }
+  - { offset: 0x1F58, size: 0x8, addend: 0x0, symName: ___destroy_helper_block_e8_32s, symObjAddr: 0x39B4, symBinAddr: 0x466C, symSize: 0x2C }
+  - { offset: 0x1F74, size: 0x8, addend: 0x0, symName: _pathCallbackFunction, symObjAddr: 0x39E0, symBinAddr: 0x4698, symSize: 0x1BC }
+  - { offset: 0x2000, size: 0x8, addend: 0x0, symName: ___pathCallbackFunction_block_invoke, symObjAddr: 0x3B9C, symBinAddr: 0x4854, symSize: 0x28C }
+...

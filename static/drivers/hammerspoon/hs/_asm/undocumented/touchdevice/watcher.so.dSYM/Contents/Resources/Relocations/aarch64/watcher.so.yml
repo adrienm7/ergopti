@@ -1,0 +1,42 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     'obj_arm64/watcher.so'
+relocations:
+  - { offset: 0x27, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice initWithOwner:forID:]', symObjAddr: 0x0, symBinAddr: 0xBC8, symSize: 0x104 }
+  - { offset: 0x58, size: 0x8, addend: 0x0, symName: _refTable, symObjAddr: 0x23D8, symBinAddr: 0x8678, symSize: 0x0 }
+  - { offset: 0x80, size: 0x8, addend: 0x0, symName: _moduleLib, symObjAddr: 0x23E0, symBinAddr: 0x8680, symSize: 0x0 }
+  - { offset: 0xCDE, size: 0x8, addend: 0x0, symName: _userdata_metaLib, symObjAddr: 0x2400, symBinAddr: 0x4038, symSize: 0x0 }
+  - { offset: 0x1021, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice initWithOwner:forID:]', symObjAddr: 0x0, symBinAddr: 0xBC8, symSize: 0x104 }
+  - { offset: 0x1073, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice notificationPointer]', symObjAddr: 0x104, symBinAddr: 0xCCC, symSize: 0x1C }
+  - { offset: 0x10A9, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice owner]', symObjAddr: 0x120, symBinAddr: 0xCE8, symSize: 0x2C }
+  - { offset: 0x10DF, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice setOwner:]', symObjAddr: 0x14C, symBinAddr: 0xD14, symSize: 0x34 }
+  - { offset: 0x111D, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice multitouchID]', symObjAddr: 0x180, symBinAddr: 0xD48, symSize: 0x28 }
+  - { offset: 0x1153, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice setMultitouchID:]', symObjAddr: 0x1A8, symBinAddr: 0xD70, symSize: 0x38 }
+  - { offset: 0x1191, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice notification]', symObjAddr: 0x1E0, symBinAddr: 0xDA8, symSize: 0x1C }
+  - { offset: 0x11C7, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice setNotification:]', symObjAddr: 0x1FC, symBinAddr: 0xDC4, symSize: 0x24 }
+  - { offset: 0x1205, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceDevice .cxx_destruct]', symObjAddr: 0x220, symBinAddr: 0xDE8, symSize: 0x40 }
+  - { offset: 0x1237, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher init]', symObjAddr: 0x260, symBinAddr: 0xE28, symSize: 0x128 }
+  - { offset: 0x126D, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher dealloc]', symObjAddr: 0x388, symBinAddr: 0xF50, symSize: 0x80 }
+  - { offset: 0x129F, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher startWithFirstRun:]', symObjAddr: 0x408, symBinAddr: 0xFD0, symSize: 0x158 }
+  - { offset: 0x12FB, size: 0x8, addend: 0x0, symName: _deviceAddedCallback, symObjAddr: 0x560, symBinAddr: 0x1128, symSize: 0x74 }
+  - { offset: 0x1349, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher stop]', symObjAddr: 0x5D4, symBinAddr: 0x119C, symSize: 0x74 }
+  - { offset: 0x137B, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher addDevice:]', symObjAddr: 0x648, symBinAddr: 0x1210, symSize: 0x300 }
+  - { offset: 0x1425, size: 0x8, addend: 0x0, symName: _deviceChangeCallback, symObjAddr: 0x948, symBinAddr: 0x1510, symSize: 0xB8 }
+  - { offset: 0x1495, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher removeDevice:]', symObjAddr: 0xA00, symBinAddr: 0x15C8, symSize: 0x1D4 }
+  - { offset: 0x1505, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher selfRefCount]', symObjAddr: 0xBD4, symBinAddr: 0x179C, symSize: 0x1C }
+  - { offset: 0x153B, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher setSelfRefCount:]', symObjAddr: 0xBF0, symBinAddr: 0x17B8, symSize: 0x24 }
+  - { offset: 0x1579, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher callbackRef]', symObjAddr: 0xC14, symBinAddr: 0x17DC, symSize: 0x1C }
+  - { offset: 0x15AF, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher setCallbackRef:]', symObjAddr: 0xC30, symBinAddr: 0x17F8, symSize: 0x24 }
+  - { offset: 0x15ED, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher running]', symObjAddr: 0xC54, symBinAddr: 0x181C, symSize: 0x20 }
+  - { offset: 0x1623, size: 0x8, addend: 0x0, symName: '-[ASMTouchDeviceWatcher .cxx_destruct]', symObjAddr: 0xC74, symBinAddr: 0x183C, symSize: 0x30 }
+  - { offset: 0x1655, size: 0x8, addend: 0x0, symName: _luaopen_hs__asm_undocumented_touchdevice_watcher, symObjAddr: 0xCA4, symBinAddr: 0x186C, symSize: 0xC4 }
+  - { offset: 0x168E, size: 0x8, addend: 0x0, symName: _pushASMTouchDeviceWatcher, symObjAddr: 0xD68, symBinAddr: 0x1930, symSize: 0xE8 }
+  - { offset: 0x16E5, size: 0x8, addend: 0x0, symName: _toASMTouchDeviceWatcherFromLua, symObjAddr: 0xE50, symBinAddr: 0x1A18, symSize: 0x154 }
+  - { offset: 0x173C, size: 0x8, addend: 0x0, symName: _td_watcher_new, symObjAddr: 0xFA4, symBinAddr: 0x1B6C, symSize: 0xF8 }
+  - { offset: 0x1780, size: 0x8, addend: 0x0, symName: _td_watcher_start, symObjAddr: 0x109C, symBinAddr: 0x1C64, symSize: 0x128 }
+  - { offset: 0x17D7, size: 0x8, addend: 0x0, symName: _td_watcher_stop, symObjAddr: 0x11C4, symBinAddr: 0x1D8C, symSize: 0xCC }
+  - { offset: 0x181F, size: 0x8, addend: 0x0, symName: _td_watcher_isRunning, symObjAddr: 0x1290, symBinAddr: 0x1E58, symSize: 0xD4 }
+  - { offset: 0x1867, size: 0x8, addend: 0x0, symName: _td_watcher_callback, symObjAddr: 0x1364, symBinAddr: 0x1F2C, symSize: 0x1BC }
+  - { offset: 0x18AB, size: 0x8, addend: 0x0, symName: _userdata_tostring, symObjAddr: 0x1520, symBinAddr: 0x20E8, symSize: 0xCC }
+  - { offset: 0x18E4, size: 0x8, addend: 0x0, symName: _userdata_gc, symObjAddr: 0x15EC, symBinAddr: 0x21B4, symSize: 0x144 }
+...
