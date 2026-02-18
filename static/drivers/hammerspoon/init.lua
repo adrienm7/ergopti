@@ -1,313 +1,583 @@
+
 -- What this script does:
--- • Three-finger tap to toggle selection mode (click-and-drag)
--- • Three-finger gestures for tab navigation
--- • Change volume with left Option + scroll
--- • Four-finger tap to trigger "Look Up" (Ctrl+Cmd+D)
+-- 1) Three-finger tap to toggle selection mode (click-and-drag)
+-- 2) Three-finger gestures for tab navigation
+-- 3) Change volume with left Option + scroll
 
-local Swipe3 = hs.loadSpoon("Swipe")
-local current_id_3f, threshold_horizontal, threshold_vertical
-local HORIZONTAL_DEFAULT = 0.04 -- 4% of the trackpad width for left/right
-local VERTICAL_DEFAULT = 0.12   -- 12% of the trackpad height for up/down to prevent accidental triggers
+local gestures = require("gestures")
+local scroll = require("scroll")
 
-threshold_horizontal = HORIZONTAL_DEFAULT
-threshold_vertical = VERTICAL_DEFAULT
+gestures.start()
+scroll.start()
+local keymap = require("keymap")
 
--- Three-finger tap for selection toggle using touchdevice
-local touchdevice = require("hs._asm.undocumented.touchdevice")
-local leftClickPressed = false
-local mouseEventTap = nil
 
--- Tap-detection state
-local _touchStartTime = nil
-local _tapStartPoint = nil
-local _tapEndPoint = nil
-local _maybeTap = false
-local _tapFingerCount = nil
-local _tapDelta = 2.0 -- tolerance for movement to still consider a tap
-local _lastDebugTime = 0
+-- generated keymaps (do not edit manually)
+keymap.add("ae★", "æ", true)
+keymap.add("oe★", "œ", true)
 
--- Keep references to touchdevice watchers to avoid garbage collection
-local touch_watchers = {}
+keymap.add("1er★", "premier")
+keymap.add("1ere★", "première")
+keymap.add("2e★", "deuxième")
+keymap.add("3e★", "troisième")
+keymap.add("4e★", "quatrième")
+keymap.add("5e★", "cinquième")
+keymap.add("6e★", "sixième")
+keymap.add("7e★", "septième")
+keymap.add("8e★", "huitième")
+keymap.add("9e★", "neuvième")
+keymap.add("10e★", "dixième")
+keymap.add("11e★", "onzième")
+keymap.add("12e★", "douzième")
+keymap.add("20e★", "vingtième")
+keymap.add("100e★", "centième")
+keymap.add("1000e★", "millième")
+keymap.add("2s★", "2 secondes")
+keymap.add("//★", "rapport")
+keymap.add("+m★", "meilleur")
 
-local function debugLog(...)
-    local args = {...}
-    for i=1,#args do args[i] = tostring(args[i]) end
-    local msg = table.concat(args, " ")
-    pcall(function()
-        hs.console.printStyledtext("[tp] " .. os.date("%H:%M:%S") .. " " .. msg)
-    end)
-end
+-- a
+keymap.add("a★", "ainsi")
+keymap.add("abr★", "abréviation")
+keymap.add("actu★", "actualité")
+keymap.add("add★", "addresse")
+keymap.add("admin★", "administrateur")
+keymap.add("afr★", "à faire")
+keymap.add("ah★", "aujourd’hui")
+keymap.add("ahk★", "AutoHotkey")
+keymap.add("ajd★", "aujourd’hui")
+keymap.add("algo★", "algorithme")
+keymap.add("alpha★", "alphabétique")
+keymap.add("amé★", "amélioration")
+keymap.add("amélio★", "amélioration")
+keymap.add("anc★", "ancien")
+keymap.add("ano★", "anomalie")
+keymap.add("anniv★", "anniversaire")
+keymap.add("apm★", "après-midi")
+keymap.add("apad★", "à partir de")
+keymap.add("app★", "application")
+keymap.add("appart★", "appartement")
+keymap.add("appli★", "application")
+keymap.add("approx★", "approximation")
+keymap.add("archi★", "architecture")
+keymap.add("asso★", "association")
+keymap.add("asap★", "le plus rapidement possible")
+keymap.add("atd★", "attend")
+keymap.add("att★", "attention")
+keymap.add("aud★", "aujourd’hui")
+keymap.add("aug★", "augmentation")
+keymap.add("auj★", "aujourd’hui")
+keymap.add("auto★", "automatique")
+keymap.add("av★", "avant")
+keymap.add("avv★", "avez-vous")
+keymap.add("avvd★", "avez-vous déjà")
 
--- forceCleanup: stop mouseEventTap and reset state
-local function forceCleanup()
-    debugLog("forceCleanup: start mouseEventTap=", tostring(mouseEventTap), "leftClickPressed=", tostring(leftClickPressed))
-    if mouseEventTap then
-        debugLog("forceCleanup: stopping mouseEventTap")
-        pcall(function() mouseEventTap:stop() end)
-        mouseEventTap = nil
-    end
-    pcall(function()
-        if leftClickPressed then
-            local pos = hs.mouse.absolutePosition()
-            hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post()
-        end
-        local pos = hs.mouse.absolutePosition()
-        hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.mouseMoved, pos):post()
-    end)
-    leftClickPressed = false
-    _touchStartTime = nil
-    _tapStartPoint = nil
-    _tapEndPoint = nil
-    _tapFingerCount = nil
-    _maybeTap = false
-end
+-- b
+keymap.add("b★", "bonjour")
+keymap.add("bc★", "because")
+keymap.add("bcp★", "beaucoup")
+keymap.add("bdd★", "base de données")
+keymap.add("bdds★", "bases de données")
+keymap.add("bea★", "beaucoup")
+keymap.add("bec★", "because")
+keymap.add("bib★", "bibliographie")
+keymap.add("biblio★", "bibliographie")
+keymap.add("bjr★", "bonjour")
+keymap.add("brain★", "brainstorming")
+keymap.add("br★", "bonjour")
+keymap.add("bsr★", "bonsoir")
+keymap.add("bv★", "bravo")
+keymap.add("bvn★", "bienvenue")
+keymap.add("bwe★", "bon week-end")
+keymap.add("bwk★", "bon week-end")
 
--- toggleSelection: emulate left mouse down and start an eventtap to convert move->drag
-local function toggleSelection()
-    debugLog("toggleSelection: activating")
-    if leftClickPressed then
-        forceCleanup()
-        return
-    end
+-- c
+keymap.add("c★", "c’est")
+keymap.add("cad★", "c’est-à-dire")
+keymap.add("camp★", "campagne")
+keymap.add("carac★", "caractère")
+keymap.add("caract★", "caractéristique")
+keymap.add("cb★", "combien")
+keymap.add("cc★", "copier-coller")
+keymap.add("ccé★", "copié-collé")
+keymap.add("ccl★", "conclusion")
+keymap.add("cdg★", "Charles de Gaulle")
+keymap.add("cdt★", "cordialement")
+keymap.add("certif★", "certification")
+keymap.add("chg★", "charge")
+keymap.add("chap★", "chapitre")
+keymap.add("chr★", "chercher")
+keymap.add("ci★", "ci-joint")
+keymap.add("cj★", "ci-joint")
+keymap.add("coeff★", "coefficient")
+keymap.add("cog★", "cognition")
+keymap.add("cogv★", "cognitive")
+keymap.add("comp★", "comprendre")
+keymap.add("cond★", "condition")
+keymap.add("conds★", "conditions")
+keymap.add("config★", "configuration")
+keymap.add("chgt★", "changement")
+keymap.add("cnp★", "ce n’est pas")
+keymap.add("contrib★", "contribution")
+keymap.add("couv★", "couverture")
+keymap.add("cpd★", "cependant")
+keymap.add("cr★", "compte-rendu")
+keymap.add("ct★", "c’était")
+keymap.add("ctb★", "c’est très bien")
+keymap.add("cv★", "ça va ?")
+keymap.add("cvt★", "ça va toi ?")
+keymap.add("ctc★", "Est-ce que cela te convient ?")
+keymap.add("cvc★", "Est-ce que cela vous convient ?")
 
-    local pos = hs.mouse.absolutePosition()
-    hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
-    leftClickPressed = true
+-- d
+keymap.add("dac★", "d’accord")
+keymap.add("ddl★", "download")
+keymap.add("dé★", "déjà")
+keymap.add("dê★", "d’être")
+keymap.add("déc★", "décembre")
+keymap.add("dec★", "décembre")
+keymap.add("dedt★", "d’emploi du temps")
+keymap.add("déf★", "définition")
+keymap.add("def★", "définition")
+keymap.add("défs★", "définitions")
+keymap.add("démo★", "démonstration")
+keymap.add("demo★", "démonstration")
+keymap.add("dep★", "département")
+keymap.add("deux★", "deuxième")
+keymap.add("desc★", "description")
+keymap.add("dev★", "développeur")
+keymap.add("dév★", "développeur")
+keymap.add("devt★", "développement")
+keymap.add("dico★", "dictionnaire")
+keymap.add("diff★", "différence")
+keymap.add("difft★", "différent")
+keymap.add("dim★", "dimension")
+keymap.add("dimi★", "diminution")
+keymap.add("la dispo★", "la disposition")
+keymap.add("ta dispo★", "ta disposition")
+keymap.add("une dispo★", "une disposition")
+keymap.add("dispo★", "disponible")
+keymap.add("distri★", "distributeur")
+keymap.add("distrib★", "distributeur")
+keymap.add("dj★", "déjà")
+keymap.add("dm★", "donne-moi")
+keymap.add("la doc★", "la documentation")
+keymap.add("une doc★", "une documentation")
+keymap.add("doc★", "document")
+keymap.add("docs★", "documents")
+keymap.add("dp★", "de plus")
+keymap.add("dsl★", "désolé")
+keymap.add("dtm★", "détermine")
+keymap.add("dvlp★", "développe")
 
-    mouseEventTap = hs.eventtap.new({hs.eventtap.event.types.mouseMoved,
-                                     hs.eventtap.event.types.leftMouseDragged,
-                                     hs.eventtap.event.types.leftMouseUp},
-        function(e)
-            local t = e:getType()
-            if t == hs.eventtap.event.types.leftMouseDragged then
-                local p = e:location()
-                hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDragged, p):post()
-                return true
-            elseif t == hs.eventtap.event.types.leftMouseUp then
-                hs.timer.doAfter(0, function() forceCleanup() end)
-                return true
-            end
-            -- For mouseMoved, do not swallow the event (return false)
-            return false
-        end)
-    pcall(function() mouseEventTap:start() end)
-    debugLog("toggleSelection: mouseEventTap started")
-end
+-- e
+keymap.add("e★", "est")
+keymap.add("echant★", "échantillon")
+keymap.add("echants★", "échantillons")
+keymap.add("eco★", "économie")
+keymap.add("ecq★", "est-ce que")
+keymap.add("edt★", "emploi du temps")
+keymap.add("eef★", "en effet")
+keymap.add("elt★", "élément")
+keymap.add("elts★", "éléments")
+keymap.add("eo★", "en outre")
+keymap.add("enc★", "encore")
+keymap.add("eng★", "english")
+keymap.add("enft★", "en fait")
+keymap.add("ens★", "ensemble")
+keymap.add("ent★", "entreprise")
+keymap.add("env★", "environ")
+keymap.add("ep★", "épisode")
+keymap.add("eps★", "épisodes")
+keymap.add("eq★", "équation")
+keymap.add("ety★", "étymologie")
+keymap.add("eve★", "événement")
+keymap.add("evtl★", "éventuel")
+keymap.add("evtle★", "éventuelle")
+keymap.add("evtlt★", "éventuellement")
+keymap.add("ex★", "exemple")
+keymap.add("exo★", "exercice")
+keymap.add("exp★", "expérience")
+keymap.add("expo★", "exposition")
+keymap.add("é★", "écart")
+keymap.add("éco★", "économie")
+keymap.add("ém★", "écris-moi")
+keymap.add("éq★", "équation")
+keymap.add("ê★", "être")
+keymap.add("êt★", "es-tu")
 
--- triggerLookup: emulate macOS "Look Up" (usually three-finger tap) via Ctrl+Cmd+D
-local function triggerLookup()
-    debugLog("triggerLookup: activating")
-    -- send Ctrl+Cmd+D which is the common keyboard shortcut for Look Up
-    pcall(function() hs.eventtap.keyStroke({"ctrl", "cmd"}, "d", 0) end)
-end
+-- f
+keymap.add("f★", "faire")
+keymap.add("fam★", "famille")
+keymap.add("fb★", "Facebook")
+keymap.add("fc★", "fonction")
+keymap.add("fct★", "fonction")
+keymap.add("fea★", "feature")
+keymap.add("feat★", "feature")
+keymap.add("fev★", "février")
+keymap.add("fi★", "financier")
+keymap.add("fiè★", "financière")
+keymap.add("ff★", "Firefox")
+keymap.add("fig★", "figure")
+keymap.add("fl★", "falloir")
+keymap.add("freq★", "fréquence")
+keymap.add("fr★", "France")
+keymap.add("frs★", "français")
 
--- Create a touchdevice watcher for a deviceID
-local function create_watcher(deviceID)
-    if touch_watchers[deviceID] and touch_watchers[deviceID].watcher then
-        local ok, running = pcall(function() return touch_watchers[deviceID].watcher:isRunning() end)
-        if ok and running then return end
-    end
+-- g
+keymap.add("g★", "j’ai")
+keymap.add("g1r★", "j’ai une réunion")
+keymap.add("gar★", "garantie")
+keymap.add("gars★", "garanties")
+keymap.add("gd★", "grand")
+keymap.add("gg★", "Google")
+keymap.add("ges★", "gestion")
+keymap.add("gf★", "J’ai fait")
+keymap.add("gmag★", "J’ai mis à jour")
+keymap.add("gov★", "government")
+keymap.add("gouv★", "gouvernement")
+keymap.add("indiv★", "individuel")
+keymap.add("gpa★", "je n’ai pas")
+keymap.add("gt★", "j’étais")
+keymap.add("gvt★", "gouvernement")
 
-    if touch_watchers[deviceID] and touch_watchers[deviceID].watcher then
-        pcall(function() touch_watchers[deviceID].watcher:stop() end)
-        touch_watchers[deviceID] = nil
-    end
+-- h
+keymap.add("h★", "heure")
+keymap.add("his★", "historique")
+keymap.add("histo★", "historique")
+keymap.add("hyp★", "hypothèse")
 
-    local lastSeen = hs.timer.secondsSinceEpoch()
+-- i
+keymap.add("ia★", "intelligence artificielle")
+keymap.add("id★", "identifiant")
+keymap.add("idf★", "Île-de-France")
+keymap.add("idk★", "I don’t know")
+keymap.add("ids★", "identifiants")
+keymap.add("img★", "image")
+keymap.add("imgs★", "images")
+keymap.add("imm★", "immeuble")
+keymap.add("imo★", "in my opinion")
+keymap.add("imp★", "impossible")
+keymap.add("inf★", "inférieur")
+keymap.add("info★", "information")
+keymap.add("infos★", "informations")
+keymap.add("insta★", "Instagram")
+keymap.add("intart★", "intelligence artificielle")
+keymap.add("inter★", "international")
+keymap.add("intro★", "introduction")
 
-    local lastNFingers = nil
-    local stableFrames = 0
-    local watcher = touchdevice.forDeviceID(deviceID):frameCallback(function(_, touches, _, _)
-        local ok, err = pcall(function()
-            local nFingers = #touches
-            if lastNFingers ~= nFingers then
-                debugLog("watcher:", deviceID, "nFingers=", nFingers)
-                lastNFingers = nFingers
-                stableFrames = 1
-            else
-                stableFrames = stableFrames + 1
-            end
-            local now = hs.timer.secondsSinceEpoch()
+-- j
+keymap.add("j★", "bonjour")
+keymap.add("ja★", "jamais")
+keymap.add("janv★", "janvier")
+keymap.add("jm★", "j’aime")
+keymap.add("jms★", "jamais")
+keymap.add("jnsp★", "je ne sais pas")
+keymap.add("js★", "je suis")
+keymap.add("jsp★", "je ne sais pas")
+keymap.add("jtm★", "je t’aime")
+keymap.add("ju★", "jusque")
+keymap.add("ju'★", "jusqu’")
+keymap.add("jus★", "jusque")
+keymap.add("jusq★", "jusqu’")
+keymap.add("jus'★", "jusqu’")
+keymap.add("jui★", "juillet")
 
-            if touch_watchers[deviceID] then touch_watchers[deviceID].lastSeen = now end
+-- k
+keymap.add("k★", "contacter")
+keymap.add("kb★", "keyboard")
+keymap.add("kbd★", "keyboard")
+keymap.add("kn★", "construction")
+keymap.add("lê★", "l’être")
+keymap.add("ledt★", "l’emploi du temps")
+keymap.add("lex★", "l’exemple")
+keymap.add("lim★", "limite")
 
-            if nFingers == 0 then
-                if _tapStartPoint and _tapEndPoint and _maybeTap and _tapFingerCount then
-                    local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) + math.abs(_tapStartPoint.y - _tapEndPoint.y)
-                    if delta < _tapDelta then
-                        if _tapFingerCount == 3 then
-                            debugLog("watcher:", deviceID, "detected 3-finger tap (delta=", delta, ") -> toggleSelection")
-                            toggleSelection()
-                        elseif _tapFingerCount == 4 then
-                            debugLog("watcher:", deviceID, "detected 4-finger tap (delta=", delta, ") -> triggerLookup")
-                            triggerLookup()
-                        end
-                    end
-                end
-                _touchStartTime = nil
-                _tapStartPoint = nil
-                _tapEndPoint = nil
-                _tapFingerCount = nil
-                _maybeTap = false
-                return
-            end
+-- m
+keymap.add("m★", "mais")
+keymap.add("ma★", "madame")
+keymap.add("maj★", "mise à jour")
+keymap.add("màj★", "mise à jour")
+keymap.add("math★", "mathématique")
+keymap.add("manip★", "manipulation")
+keymap.add("maths★", "mathématiques")
+keymap.add("max★", "maximum")
+keymap.add("md★", "milliard")
+keymap.add("mds★", "milliards")
+keymap.add("mdav★", "merci d’avance")
+keymap.add("mdb★", "merci de bien vouloir")
+keymap.add("mdl★", "modèle")
+keymap.add("mdp★", "mot de passe")
+keymap.add("mdps★", "mots de passe")
+keymap.add("méthodo★", "méthodologie")
+keymap.add("min★", "minimum")
+keymap.add("mio★", "million")
+keymap.add("mios★", "millions")
+keymap.add("mjo★", "mettre à jour")
+keymap.add("ml★", "machine learning")
+keymap.add("mm★", "même")
+keymap.add("mme★", "madame")
+keymap.add("modif★", "modification")
+keymap.add("mom★", "moi-même")
+keymap.add("mq★", "montre que")
+keymap.add("mr★", "monsieur")
+keymap.add("mrc★", "merci")
+keymap.add("msg★", "message")
+keymap.add("mt★", "montant")
+keymap.add("mtn★", "maintenant")
+keymap.add("moy★", "moyenne")
+keymap.add("mutu★", "mutualiser")
+keymap.add("mvt★", "mouvement")
 
-            if nFingers > 0 and not _touchStartTime then
-                _touchStartTime = now
-                _maybeTap = true
-            elseif _touchStartTime and _maybeTap and (now - _touchStartTime > 0.5) then
-                _maybeTap = false
-                _tapStartPoint = nil
-                _tapEndPoint = nil
-            end
+-- n
+keymap.add("n★", "nouveau")
+keymap.add("nav★", "navigation")
+keymap.add("nb★", "nombre")
+keymap.add("nean★", "néanmoins")
+keymap.add("new★", "nouveau")
+keymap.add("newe★", "nouvelle")
+keymap.add("nimp★", "n’importe")
+keymap.add("niv★", "niveau")
+keymap.add("norm★", "normalement")
+keymap.add("nota★", "notamment")
+keymap.add("notm★", "notamment")
+keymap.add("nouv★", "nouvelle")
+keymap.add("nov★", "novembre")
+keymap.add("now★", "maintenant")
+keymap.add("np★", "ne pas")
+keymap.add("nrj★", "énergie")
+keymap.add("ns★", "nous")
+keymap.add("num★", "numéro")
 
-            if (nFingers == 3 or nFingers == 4) and stableFrames >= 2 then
-                local xSum, ySum = 0, 0
-                for i=1,#touches do
-                    xSum = xSum + touches[i].absoluteVector.position.x
-                    ySum = ySum + touches[i].absoluteVector.position.y
-                end
-                local xAvg = xSum / #touches
-                local yAvg = ySum / #touches
+-- o
+keymap.add("o-★", "au moins")
+keymap.add("o+★", "au plus")
+keymap.add("obj★", "objectif")
+keymap.add("obs★", "observation")
+keymap.add("oct★", "octobre")
+keymap.add("odj★", "ordre du jour")
+keymap.add("opé★", "opération")
+keymap.add("oqp★", "occupé")
+keymap.add("ordi★", "ordinateur")
+keymap.add("org★", "organisation")
+keymap.add("orga★", "organisation")
+keymap.add("ortho★", "orthographe")
+keymap.add("out★", "Où es-tu ?")
+keymap.add("outv★", "Où êtes-vous ?")
+keymap.add("ouv★", "ouverture")
 
-                if _maybeTap and not _tapStartPoint then
-                    _tapStartPoint = { x = xAvg, y = yAvg }
-                    _tapFingerCount = nFingers
-                    debugLog("watcher:", deviceID, "tap start at", xAvg, yAvg, "fingers=", _tapFingerCount, "stableFrames=", stableFrames)
-                end
-                if _maybeTap then
-                    _tapEndPoint = { x = xAvg, y = yAvg }
-                    if (now - (_lastDebugTime or 0)) > 2 then
-                        _lastDebugTime = now
-                        debugLog("watcher:", deviceID, "tap update at", xAvg, yAvg)
-                    end
-                end
-            elseif nFingers > 4 then
-                _maybeTap = false
-                _tapStartPoint = nil
-                _tapEndPoint = nil
-                _tapFingerCount = nil
-            end
-        end)
-        if not ok then
-            hs.timer.doAfter(0, function()
-                hs.alert.show("touchdevice callback error: " .. tostring(err), 3)
-            end)
-        end
-    end)
+-- p
+keymap.add("p★", "prendre")
+keymap.add("p//★", "par rapport")
+keymap.add("par★", "paragraphe")
+keymap.add("param★", "paramètre")
+keymap.add("pb★", "problème")
+keymap.add("pcq★", "parce que")
+keymap.add("pck★", "parce que")
+keymap.add("pckil★", "parce qu’il")
+keymap.add("pcquil★", "parce qu’il")
+keymap.add("pcquon★", "parce qu’on")
+keymap.add("pckon★", "parce qu’on")
+keymap.add("pd★", "pendant")
+keymap.add("pdt★", "pendant")
+keymap.add("pdv★", "point de vue")
+keymap.add("pdvs★", "points de vue")
+keymap.add("perf★", "performance")
+keymap.add("perso★", "personne")
+keymap.add("pê★", "peut-être")
+keymap.add("péri★", "périmètre")
+keymap.add("périm★", "périmètre")
+keymap.add("peut-ê★", "peut-être")
+keymap.add("pex★", "par exemple")
+keymap.add("pf★", "portefeuille")
+keymap.add("pg★", "pas grave")
+keymap.add("pgm★", "programme")
+keymap.add("pi★", "pour information")
+keymap.add("pic★", "picture")
+keymap.add("pics★", "pictures")
+keymap.add("piè★", "pièce jointe")
+keymap.add("pj★", "pièce jointe")
+keymap.add("pjs★", "pièces jointes")
+keymap.add("pk★", "pourquoi")
+keymap.add("pls★", "please")
+keymap.add("poum★", "plus ou moins")
+keymap.add("poss★", "possible")
+keymap.add("pourcent★", "pourcentage")
+keymap.add("ppt★", "PowerPoint")
+keymap.add("pq★", "pourquoi")
+keymap.add("prd★", "produit")
+keymap.add("prem★", "premier")
+keymap.add("prez★", "présentation")
+keymap.add("prg★", "programme")
+keymap.add("prio★", "priorité")
+keymap.add("pro★", "professionnel")
+keymap.add("prob★", "problème")
+keymap.add("proba★", "probabilité")
+keymap.add("prod★", "production")
+keymap.add("prof★", "professeur")
+keymap.add("prog★", "programme")
+keymap.add("prop★", "propriété")
+keymap.add("propo★", "proposition")
+keymap.add("props★", "propriétés")
+keymap.add("pros★", "professionnels")
+keymap.add("prot★", "professionnellement")
+keymap.add("prov★", "provision")
+keymap.add("psycha★", "psychanalyse")
+keymap.add("psycho★", "psychologie")
+keymap.add("psb★", "possible")
+keymap.add("psy★", "psychologie")
+keymap.add("pt★", "point")
+keymap.add("ptf★", "portefeuille")
+keymap.add("pts★", "points")
+keymap.add("pub★", "publicité")
+keymap.add("pvv★", "pouvez-vous")
+keymap.add("py★", "python")
 
-    touch_watchers[deviceID] = { watcher = watcher, lastSeen = lastSeen }
-    pcall(function() watcher:start() end)
-    debugLog("created watcher for", deviceID)
-end
+-- q
+keymap.add("q★", "question")
+keymap.add("qc★", "qu’est-ce")
+keymap.add("qcq★", "qu’est-ce que")
+keymap.add("qcq'★", "qu’est-ce qu’")
+keymap.add("qq★", "quelque")
+keymap.add("qqch★", "quelque chose")
+keymap.add("qqs★", "quelques")
+keymap.add("qqn★", "quelqu’un")
+keymap.add("quasi★", "quasiment")
+keymap.add("ques★", "question")
+keymap.add("quid★", "qu’en est-il de")
 
-local function ensure_watchers()
-    for _, deviceID in ipairs(touchdevice.devices()) do
-        pcall(function() create_watcher(deviceID) end)
-    end
-end
+-- r
+keymap.add("r★", "rien")
+keymap.add("rapidt★", "rapidement")
+keymap.add("rdv★", "rendez-vous")
+keymap.add("ré★", "réunion")
+keymap.add("rés★", "réunions")
+keymap.add("rép★", "répertoire")
+keymap.add("résil★", "résiliation")
+keymap.add("reco★", "recommandation")
+keymap.add("ref★", "référence")
+keymap.add("rep★", "répertoire")
+keymap.add("rex★", "retour d’expérience")
+keymap.add("rmq★", "remarque")
+keymap.add("rpz★", "représente")
+keymap.add("rs★", "résultat")
 
--- Supervisor: restart watchers if they stop or if no frames seen recently
-hs.timer.doEvery(3, function()
-    for id, entry in pairs(touch_watchers) do
-        local ok, running = pcall(function() return entry.watcher and entry.watcher:isRunning() end)
-        local age = 9999
-        if entry.lastSeen then age = hs.timer.secondsSinceEpoch() - entry.lastSeen end
-        if not ok or not running or age > 2 then
-            debugLog("supervisor: restarting watcher", id, "running=", tostring(running), "age=", age)
-            pcall(function()
-                if entry.watcher then pcall(function() entry.watcher:stop() end) end
-                touch_watchers[id] = nil
-                create_watcher(id)
-            end)
-        end
-    end
-    pcall(ensure_watchers)
-end)
+-- s
+keymap.add("seg★", "segment")
+keymap.add("segm★", "segment")
+keymap.add("sep★", "septembre")
+keymap.add("sept★", "septembre")
+keymap.add("simpl★", "simplement")
+keymap.add("situ★", "situation")
+keymap.add("smth★", "something")
+keymap.add("srx★", "sérieux")
+keymap.add("sécu★", "sécurité")
+keymap.add("st★", "s’était")
+keymap.add("stat★", "statistique")
+keymap.add("sth★", "something")
+keymap.add("stp★", "s’il te plaît")
+keymap.add("strat★", "stratégique")
+keymap.add("stream★", "streaming")
+keymap.add("suff★", "suffisant")
+keymap.add("sufft★", "suffisament")
+keymap.add("supé★", "supérieur")
+keymap.add("surv★", "survenance")
+keymap.add("svp★", "s’il vous plaît")
+keymap.add("svt★", "souvent")
+keymap.add("sya★", "s’il y a")
+keymap.add("syn★", "synonyme")
+keymap.add("sync★", "synchronisation")
+keymap.add("syncro★", "synchronisation")
+keymap.add("sys★", "système")
 
--- Periodic status logger
-hs.timer.doEvery(5, function()
-    local running = 0
-    for id, w in pairs(touch_watchers) do
-        local ok, r = pcall(function() return w and w.watcher and w.watcher:isRunning() end)
-        if ok and r then running = running + 1 end
-    end
-    debugLog("status: watchers=", running, ", leftClickPressed=", tostring(leftClickPressed), ", mouseEventTap=", tostring(mouseEventTap ~= nil))
-end)
+-- t
+keymap.add("t★", "très")
+keymap.add("tb★", "très bien")
+keymap.add("temp★", "temporaire")
+keymap.add("tes★", "tu es")
+keymap.add("tél★", "téléphone")
+keymap.add("teq★", "telle que")
+keymap.add("teqs★", "telles que")
+keymap.add("tfk★", "qu’est-ce que tu fais ?")
+keymap.add("tgh★", "together")
+keymap.add("théo★", "théorie")
+keymap.add("thm★", "théorème")
+keymap.add("tj★", "toujours")
+keymap.add("tjr★", "toujours")
+keymap.add("tlm★", "tout le monde")
+keymap.add("tq★", "tel que")
+keymap.add("tqs★", "tels que")
+keymap.add("tout★", "toutefois")
+keymap.add("tra★", "travail")
+keymap.add("trad★", "traduction")
+keymap.add("trav★", "travail")
+keymap.add("trkl★", "tranquille")
+keymap.add("tt★", "télétravail")
+keymap.add("tv★", "télévision")
+keymap.add("ty★", "thank you")
+keymap.add("typo★", "typographie")
 
--- Start watchers at load
-ensure_watchers()
+-- u
+keymap.add("une amé★", "une amélioration")
+keymap.add("uniq★", "uniquement")
+keymap.add("usa★", "États-Unis")
 
--- Three-finger swipe handling (Spoon)
-Swipe3:start(3, function(direction, distance, id)
-    if id == current_id_3f then
-        local threshold = (direction == "left" or direction == "right") and threshold_horizontal or threshold_vertical
-        if distance > threshold then
-            threshold_horizontal = math.huge
-            threshold_vertical = math.huge
-            if direction == "left" then
-                hs.eventtap.keyStroke({"ctrl", "shift"}, "tab")
-            elseif direction == "right" then
-                hs.eventtap.keyStroke({"ctrl"}, "tab")
-            elseif direction == "up" then
-                hs.eventtap.keyStroke({"cmd"}, "t")
-            elseif direction == "down" then
-                hs.eventtap.keyStroke({"cmd"}, "w")
-            end
-        end
-    else
-        current_id_3f = id
-        threshold_horizontal = HORIZONTAL_DEFAULT
-        threshold_vertical = VERTICAL_DEFAULT
-    end
-end)
+-- v
+keymap.add("v★", "version")
+keymap.add("var★", "variable")
+keymap.add("vav★", "vis-à-vis")
+keymap.add("verif★", "vérification")
+keymap.add("vérif★", "vérification")
+keymap.add("vocab★", "vocabulaire")
+keymap.add("volat★", "volatilité")
+keymap.add("vrm★", "vraiment")
+keymap.add("vrmt★", "vraiment")
+keymap.add("vs★", "vous êtes")
 
--- Physical left Option forwarded by Karabiner as F19
-local leftCommandPhysical = false
-local f19_keycode = hs.keycodes.map["f19"] or hs.keycodes.map["leftcmd"] or hs.keycodes.map["cmd"]
+-- w
+keymap.add("w★", "with")
+keymap.add("wd★", "Windows")
+keymap.add("wk★", "week-end")
+keymap.add("wknd★", "week-end")
+keymap.add("wiki★", "Wikipédia")
 
-local physicalOptionTap = hs.eventtap.new({hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp}, function(event)
-    local kc = event:getKeyCode()
-    if kc == f19_keycode then
-        if event:getType() == hs.eventtap.event.types.keyDown then
-            if leftClickPressed then forceCleanup() end
-            leftCommandPhysical = true
-        else
-            leftCommandPhysical = false
-        end
-    end
-    return false
-end):start()
+-- x
+keymap.add("x★", "exemple")
 
--- Scroll handler: with cmd -> zoom, with leftCommandPhysical -> volume
-local scrollZoom = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
-    local flags = event:getFlags()
-    local scrollY = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
+-- y
+keymap.add("ya★", "il y a")
+keymap.add("yapa★", "il n’y a pas")
+keymap.add("yatil★", "y a-t-il")
+keymap.add("yc★", "y compris")
+keymap.add("yt★", "YouTube")
 
-    if flags.cmd then
-        if scrollY > 0 then
-            hs.eventtap.keyStroke({"cmd"}, "pad+", 0)
-        elseif scrollY < 0 then
-            hs.eventtap.keyStroke({"cmd"}, "pad-", 0)
-        end
-        return true
-    end
+-- end generated
 
-    if leftCommandPhysical then
-        if leftClickPressed then forceCleanup() end
-        if scrollY > 0 then
-            for i=1, math.max(1, math.floor(scrollY)) do
-                hs.eventtap.event.newSystemKeyEvent("SOUND_UP", true):post()
-                hs.eventtap.event.newSystemKeyEvent("SOUND_UP", false):post()
-            end
-        elseif scrollY < 0 then
-            for i=1, math.max(1, math.floor(-scrollY)) do
-                hs.eventtap.event.newSystemKeyEvent("SOUND_DOWN", true):post()
-                hs.eventtap.event.newSystemKeyEvent("SOUND_DOWN", false):post()
-            end
-        end
-        return true
-    end
-
-    return false
-end):start()
+keymap.add("a★", "aa", true)
+keymap.add("b★", "bb", true)
+keymap.add("c★", "cc", true)
+keymap.add("d★", "dd", true)
+keymap.add("e★", "ee", true)
+keymap.add("f★", "ff", true)
+keymap.add("g★", "gg", true)
+keymap.add("h★", "hh", true)
+keymap.add("i★", "ii", true)
+keymap.add("j★", "jj", true)
+keymap.add("k★", "kk", true)
+keymap.add("l★", "ll", true)
+keymap.add("m★", "mm", true)
+keymap.add("n★", "nn", true)
+keymap.add("o★", "oo", true)
+keymap.add("p★", "pp", true)
+keymap.add("q★", "qq", true)
+keymap.add("r★", "rr", true)
+keymap.add("s★", "ss", true)
+keymap.add("t★", "tt", true)
+keymap.add("u★", "uu", true)
+keymap.add("v★", "vv", true)
+keymap.add("w★", "ww", true)
+keymap.add("x★", "xx", true)
+keymap.add("y★", "yy", true)
+keymap.add("z★", "zz", true)
+-- Give `pb★` precedence over `b★` (single-letter `b★` maps to "bb")
+keymap.add("pb★", "problème")
