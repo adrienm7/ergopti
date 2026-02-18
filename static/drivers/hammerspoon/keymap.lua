@@ -97,13 +97,13 @@ function M.add(trigger, replacement, mode)
     return string.upper(first) .. string.lower(rest)
   end
 
-  -- Determine original star char (if any) to re-append to generated triggers
-  local star_char = ""
+  -- Remember whether the original trigger ended with a star
+  local had_star = false
   do
     local ok, offs = pcall(utf8.offset, trigger, -1)
     if ok and offs then
       local last = trigger:sub(offs)
-      if STAR_CHARS[last] then star_char = last end
+      if STAR_CHARS[last] then had_star = true end
     end
   end
 
@@ -115,16 +115,16 @@ function M.add(trigger, replacement, mode)
   local capRepl   = capitalize_first(replacement)
   local upperRepl = string.upper(replacement)
 
-  local function mapping_exists(k, mid)
+  local function mapping_exists(k, mid, req_star)
     for _, m in ipairs(mappings) do
-      if m.key == k and m.mid == mid then return true end
+      if m.key == k and m.mid == mid and m.requires_star == req_star then return true end
     end
     return false
   end
 
   local function insert_mapping(k, repl, mid)
-    if not mapping_exists(k, mid) then
-      table.insert(mappings, { trigger = k .. star_char, key = k, repl = repl, mid = mid })
+    if not mapping_exists(k, mid, had_star) then
+      table.insert(mappings, { trigger = k, key = k, repl = repl, mid = mid, requires_star = had_star })
     end
   end
 
@@ -185,8 +185,9 @@ end
 --   4. Restart the tap after a short timer (10 ms) so the system event queue
 --      has time to drain the synthetic events before the tap sees new ones.
 ---------------------------------------------------------------------------
-local function perform_replace(matchKey, text)
+local function perform_replace(matchKey, text, had_star)
   local delCount = utf8_len(matchKey)
+  if not had_star then delCount = delCount - 1 end
   replacing = true
   if tap then tap:stop() end
 
@@ -221,29 +222,31 @@ local function onKeyDown(e)
 
   if DEBUG then hs.printf("keymap: char='%s' token='%s'", chars, token) end
 
-  -- ── Star trigger: attempt expansion ──────────────────────────────────
+  -- ── Star trigger: attempt expansion only for mappings that require the star ─
   if STAR_CHARS[chars] then
     for _, m in ipairs(mappings) do
-      if m.mid then
-        -- Mid-word: trigger matches suffix of token
-        if #m.key > 0 and token:sub(-#m.key) == m.key then
-          if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
-          perform_replace(m.key, m.repl)
-          local prefix = token:sub(1, #token - #m.key)
-          token = token_after_text(prefix .. m.repl)
-          return true
-        end
-      else
-        -- Start-only: the whole token must equal the key
-        if token == m.key then
-          if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
-          perform_replace(m.key, m.repl)
-          token = token_after_text(m.repl)
-          return true
+      if m.requires_star then
+        if m.mid then
+          -- Mid-word: trigger matches suffix of token
+          if #m.key > 0 and token:sub(-#m.key) == m.key then
+            if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
+            perform_replace(m.key, m.repl, m.requires_star)
+            local prefix = token:sub(1, #token - #m.key)
+            token = token_after_text(prefix .. m.repl)
+            return true
+          end
+        else
+          -- Start-only: the whole token must equal the key
+          if token == m.key then
+            if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
+            perform_replace(m.key, m.repl, m.requires_star)
+            token = token_after_text(m.repl)
+            return true
+          end
         end
       end
     end
-    -- No match: swallow the star, reset token
+    -- No match: swallow the star and reset token
     token = ""
     return true
   end
@@ -254,8 +257,32 @@ local function onKeyDown(e)
     return false
   end
 
-  -- ── Regular character: append to token ───────────────────────────────
+  -- ── Regular character: append to token and attempt immediate expansion
   token = token .. chars
+
+  -- Attempt expansion immediately after each typed character for mappings
+  -- that do NOT require the trailing star.
+  for _, m in ipairs(mappings) do
+    if not m.requires_star then
+      if m.mid then
+        if #m.key > 0 and token:sub(-#m.key) == m.key then
+          if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
+          perform_replace(m.key, m.repl, m.requires_star)
+          local prefix = token:sub(1, #token - #m.key)
+          token = token_after_text(prefix .. m.repl)
+          return true
+        end
+      else
+        if token == m.key then
+          if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
+          perform_replace(m.key, m.repl, m.requires_star)
+          token = token_after_text(m.repl)
+          return true
+        end
+      end
+    end
+  end
+
   return false
 end
 

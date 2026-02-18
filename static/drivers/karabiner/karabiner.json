@@ -2255,7 +2255,7 @@
                         ]
                     },
                     {
-                        "description": "Spacebar: Left Command when held, Spacebar when tapped",
+                        "description": "Spacebar fix with rolls",
                         "manipulators": [
                             {
                                 "from": {
@@ -2267,11 +2267,6 @@
                                     }
                                 },
                                 "to": [
-                                    {
-                                        "key_code": "left_command"
-                                    }
-                                ],
-                                "to_if_alone": [
                                     {
                                         "set_variable": {
                                             "name": "previous_key",
