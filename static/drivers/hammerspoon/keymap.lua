@@ -333,6 +333,13 @@ local function onKeyDown(e)
 
   -- ── Star trigger: attempt expansion only for mappings that require the star ─
   if STAR_CHARS[chars] then
+    -- If modifier keys are held (AltGr, Alt, Ctrl, Cmd, Fn), let the event
+    -- through so AltGr+* (or modified stars) produce the expected character.
+    local flags = e:getFlags()
+    if flags.alt or flags.ctrl or flags.cmd or flags.fn then
+      return false
+    end
+
     for _, m in ipairs(mappings) do
       if m.requires_star then
         if m.mid then
@@ -364,7 +371,14 @@ local function onKeyDown(e)
         end
       end
     end
-    -- No match: swallow the star and reset token
+    -- No match: if token is empty (e.g. user typed a separator like space
+    -- just before the star), let the star through. Otherwise swallow it
+    -- and reset token state.
+    if token == "" then
+      token = ""
+      token_timestamps = {}
+      return false
+    end
     token = ""
     token_timestamps = {}
     return true
