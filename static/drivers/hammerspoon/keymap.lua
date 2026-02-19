@@ -92,9 +92,56 @@ function M.add(trigger, replacement, mode)
     end
   end
 
+  -- Unicode-aware case mapping for common Latin accented characters.
+  local UNICODE_UPPER = {
+    ['à'] = 'À', ['â'] = 'Â', ['ä'] = 'Ä', ['á'] = 'Á', ['ã'] = 'Ã', ['å'] = 'Å',
+    ['ç'] = 'Ç', ['è'] = 'È', ['é'] = 'É', ['ê'] = 'Ê', ['ë'] = 'Ë',
+    ['ì'] = 'Ì', ['í'] = 'Í', ['î'] = 'Î', ['ï'] = 'Ï',
+    ['ò'] = 'Ò', ['ó'] = 'Ó', ['ô'] = 'Ô', ['ö'] = 'Ö', ['õ'] = 'Õ',
+    ['ù'] = 'Ù', ['ú'] = 'Ú', ['û'] = 'Û', ['ü'] = 'Ü', ['ÿ'] = 'Ÿ',
+    ['ñ'] = 'Ñ'
+  }
+  local UNICODE_LOWER = {}
+  for k, v in pairs(UNICODE_UPPER) do UNICODE_LOWER[v] = k end
+
+  local function unicode_upper_char(c)
+    if UNICODE_UPPER[c] then return UNICODE_UPPER[c] end
+    return string.upper(c)
+  end
+
+  local function unicode_lower_char(c)
+    if UNICODE_LOWER[c] then return UNICODE_LOWER[c] end
+    return string.lower(c)
+  end
+
+  local function unicode_map_str(s, map)
+    if not s or s == "" then return s end
+    local out = {}
+    local i = 1
+    local n = #s
+    while i <= n do
+      local b = s:byte(i)
+      local char
+      if b >= 240 then
+        char = s:sub(i, i+3); i = i + 4
+      elseif b >= 224 then
+        char = s:sub(i, i+2); i = i + 3
+      elseif b >= 192 then
+        char = s:sub(i, i+1); i = i + 2
+      else
+        char = s:sub(i, i); i = i + 1
+      end
+      table.insert(out, map(char) )
+    end
+    return table.concat(out)
+  end
+
+  local function unicode_upper_str(s) return unicode_map_str(s, unicode_upper_char) end
+  local function unicode_lower_str(s) return unicode_map_str(s, unicode_lower_char) end
+
   local function capitalize_first(s)
     local first, rest = split_first_char(s)
-    return string.upper(first) .. string.lower(rest)
+    return unicode_upper_str(first) .. unicode_lower_str(rest)
   end
 
   -- Remember whether the original trigger ended with a star
@@ -111,9 +158,19 @@ function M.add(trigger, replacement, mode)
   local capKey   = capitalize_first(lowerKey)
   local upperKey = string.upper(key)
 
-  local lowerRepl = string.lower(replacement)
+  -- If the trigger starts with a comma, make the "Cap" variant start with
+  -- a semicolon instead of a comma (e.g. ",f" -> ";F"). Preserve the
+  -- capitalization semantics for the remainder of the key.
+  do
+    local first_char, rest = split_first_char(lowerKey)
+    if first_char == ',' then
+      capKey = ';' .. capitalize_first(rest)
+    end
+  end
+
+  local lowerRepl = unicode_lower_str(replacement)
   local capRepl   = capitalize_first(replacement)
-  local upperRepl = string.upper(replacement)
+  local upperRepl = unicode_upper_str(replacement)
 
   local function mapping_exists(k, mid, req_star)
     for _, m in ipairs(mappings) do
@@ -132,6 +189,17 @@ function M.add(trigger, replacement, mode)
   insert_mapping(lowerKey, lowerRepl, allow_mid)
   insert_mapping(capKey,   capRepl,   allow_mid)
   insert_mapping(upperKey, upperRepl, allow_mid)
+
+  -- If trigger starts with a comma, also create semicolon-prefixed
+  -- variants so that `;f` produces the Cap replacement and `;F`
+  -- produces the UPPER replacement.
+  do
+    local first_char, rest = split_first_char(lowerKey)
+    if first_char == ',' and rest ~= '' then
+      insert_mapping(';' .. rest, capRepl, allow_mid)
+      insert_mapping(';' .. string.upper(rest), upperRepl, allow_mid)
+    end
+  end
 
   -- Sort: longest key first; for same length, start-only before mid-word
   table.sort(mappings, function(a, b)
@@ -158,6 +226,7 @@ local separators = {
 
 local tap
 local replacing = false   -- true while we are emitting synthetic events
+local last_separator_char = nil -- most recent separator typed (if any)
 
 ---------------------------------------------------------------------------
 -- After replacement text is inserted, compute the token as the part after
@@ -182,6 +251,30 @@ local function set_token_from_text(text)
   local now = hs.timer.secondsSinceEpoch()
   local count = utf8_len(token)
   for i = 1, count do table.insert(token_timestamps, now) end
+  last_separator_char = nil
+end
+
+-- Return the last `n` UTF-8 characters of `s` (as a string)
+local function utf8_sub_tail(s, n)
+  if n == 0 then return "" end
+  local ok, offs = pcall(utf8.offset, s, -n)
+  if ok and offs then
+    return s:sub(offs)
+  end
+  -- Fallback: naive byte-scan backwards
+  local i = #s
+  local cnt = 0
+  while i > 0 and cnt < n do
+    local b = s:byte(i)
+    while i > 1 and b >= 128 and b < 192 do
+      i = i - 1
+      b = s:byte(i)
+    end
+    cnt = cnt + 1
+    if cnt < n then i = i - 1 end
+  end
+  if i < 1 then return s end
+  return s:sub(i)
 end
 
 ---------------------------------------------------------------------------
@@ -196,6 +289,11 @@ end
 ---------------------------------------------------------------------------
 local function perform_replace(matchKey, text, had_star)
   local delCount = utf8_len(matchKey)
+  -- If the trigger does not require a trailing star, we used to delete
+  -- one fewer character. However for triggers that start with a
+  -- separator (e.g. ";f"), we must delete the entire trigger so the
+  -- separator does not remain. Detect the first UTF-8 character and
+  -- only subtract 1 when that first character is NOT a separator.
   if not had_star then delCount = delCount - 1 end
   replacing = true
   if tap then tap:stop() end
@@ -224,6 +322,7 @@ local function onKeyDown(e)
   if keyCode == 51 then
     token = utf8_remove_last(token)
     if #token_timestamps > 0 then table.remove(token_timestamps) end
+    if token == "" then last_separator_char = nil end
     return false
   end
 
@@ -271,8 +370,9 @@ local function onKeyDown(e)
     return true
   end
 
-  -- ── Separator: reset token ───────────────────────────────────────────
+  -- ── Separator: remember it and reset token ───────────────────────────
   if separators[chars] then
+    last_separator_char = chars
     token = ""
     token_timestamps = {}
     return false
@@ -286,12 +386,21 @@ local function onKeyDown(e)
   -- that do NOT require the trailing star.
   for _, m in ipairs(mappings) do
     if not m.requires_star then
+      -- Support mappings whose first char is a separator (e.g. ",f") by
+      -- treating the separator as a prefix that was typed just before the
+      -- current token (tracked in last_separator_char). The `body` is the
+      -- mapping without that leading separator.
+      local first_char = m.key:sub(1,1)
+      local body = m.key
+      local has_leading_sep = separators[first_char]
+      if has_leading_sep then body = m.key:sub(2) end
+      local body_len = utf8_len(body)
+
       if m.mid then
-        if #m.key > 0 and token:sub(-#m.key) == m.key then
-          -- require the last letter of the matched key to have been typed
-          -- within 500ms after the preceding letter of that key
+        if body_len > 0 and utf8_sub_tail(token, body_len) == body then
+          -- require the last letter timing for the body
           local idx_last = #token_timestamps
-          local key_len = utf8_len(m.key)
+          local key_len = body_len
           local ok_time = false
           if idx_last >= 1 then
             if key_len >= 2 then
@@ -307,18 +416,19 @@ local function onKeyDown(e)
               end
             end
           end
-          if ok_time then
+          if ok_time and (not has_leading_sep or last_separator_char == first_char) then
             if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
-            local prefix = token:sub(1, #token - #m.key)
+            local prefix = token:sub(1, #token - #body)
             set_token_from_text(prefix .. m.repl)
             perform_replace(m.key, m.repl, m.requires_star)
+            last_separator_char = nil
             return true
           end
         end
       else
-        if token == m.key then
+        if token == body then
           local idx_last = #token_timestamps
-          local key_len = utf8_len(m.key)
+          local key_len = body_len
           local ok_time = false
           if idx_last >= 1 then
             if key_len >= 2 then
@@ -334,10 +444,11 @@ local function onKeyDown(e)
               end
             end
           end
-          if ok_time then
+          if ok_time and (not has_leading_sep or last_separator_char == first_char) then
             if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
             set_token_from_text(m.repl)
             perform_replace(m.key, m.repl, m.requires_star)
+            last_separator_char = nil
             return true
           end
         end
