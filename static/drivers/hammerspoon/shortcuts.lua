@@ -5,37 +5,40 @@ local pasteboard = hs.pasteboard
 local notify = hs.notify
 local http = hs.http
 local urlevent = hs.urlevent
+local uielement = hs.uielement
 
 local function trim(s)
     return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
-local function copy_selection()
+local function get_selection()
     local prior = pasteboard.getContents()
-    local marker = "HS_MARK_TXT_" .. timer.secondsSinceEpoch()
     
-    -- 1. On injecte le marqueur
-    pasteboard.setContents(marker)
-    
-    -- 2. On attend que le marqueur soit bien en place
-    for i = 1, 20 do
-        if pasteboard.getContents() == marker then break end
-        timer.usleep(10000)
+    -- 1. Tentative douce via l'API macOS (rapide, sans toucher au presse-papier)
+    local elem = uielement.focusedElement()
+    if elem then
+        local ok, text = pcall(function() return elem:selectedText() end)
+        if ok and text and text ~= "" then
+            return text, prior
+        end
     end
-    
-    -- 3. On lance la copie
+
+    -- 2. Méthode forte : Cmd+C avec une pause fixe
+    local priorCount = pasteboard.changeCount()
     eventtap.keyStroke({"cmd"}, "c")
     
-    -- 4. On attend le nouveau texte
+    -- PAUSE FIXE. On arrête d'essayer de lire trop vite, on laisse l'appli respirer.
+    timer.usleep(200000) -- 200 millisecondes
+    
     local sel = ""
-    for i = 1, 50 do
-        timer.usleep(20000)
-        local current = pasteboard.getContents()
+    -- Si macOS confirme que le presse-papier a bien été modifié
+    if pasteboard.changeCount() ~= priorCount then
+        sel = pasteboard.getContents() or ""
         
-        -- LA CORRECTION EST ICI : on s'assure que current n'est pas nil (vide)
-        if current ~= nil and current ~= marker then
-            sel = current
-            break
+        -- Ultime sécurité si on tombe pile sur le micro-vide de transition
+        if sel == "" then
+            timer.usleep(100000)
+            sel = pasteboard.getContents() or ""
         end
     end
     
@@ -44,11 +47,7 @@ end
 
 local function paste_and_restore(newtext, prior)
     pasteboard.setContents(newtext)
-    
-    for i = 1, 20 do
-        if pasteboard.getContents() == newtext then break end
-        timer.usleep(10000)
-    end
+    timer.usleep(50000) 
     
     eventtap.keyStroke({"cmd"}, "v")
     timer.usleep(200000) 
@@ -72,11 +71,10 @@ end)
 
 -- Ctrl + U : toggle uppercase / lowercase for selection
 hs.hotkey.bind({"ctrl"}, "u", function()
-    local sel, prior = copy_selection()
+    local sel, prior = get_selection()
     
     if sel == "" then 
         notify_short("Aucune sélection")
-        if prior then pasteboard.setContents(prior) end
         return 
     end
     
@@ -100,11 +98,10 @@ end
 
 -- Ctrl + T : titlecase / lowercase toggle
 hs.hotkey.bind({"ctrl"}, "t", function()
-    local sel, prior = copy_selection()
+    local sel, prior = get_selection()
     
     if sel == "" then 
         notify_short("Aucune sélection")
-        if prior then pasteboard.setContents(prior) end
         return 
     end
     
@@ -133,11 +130,10 @@ end
 
 -- Ctrl + S : search selection
 hs.hotkey.bind({"ctrl"}, "s", function()
-    local sel, prior = copy_selection()
+    local sel, prior = get_selection()
     
     if sel == "" then 
         notify_short("Aucune sélection")
-        if prior then pasteboard.setContents(prior) end
         return 
     end
     
