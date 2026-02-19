@@ -146,6 +146,7 @@ end
 ---------------------------------------------------------------------------
 
 local token = "" -- characters since last separator
+local token_timestamps = {} -- per-character timestamps (seconds)
 
 local separators = {
   [' '] = true, ['\t'] = true, ['\n'] = true,
@@ -173,6 +174,14 @@ local function token_after_text(text)
     return text:sub(last_sep + 1)
   end
   return text
+end
+
+local function set_token_from_text(text)
+  token = token_after_text(text)
+  token_timestamps = {}
+  local now = hs.timer.secondsSinceEpoch()
+  local count = utf8_len(token)
+  for i = 1, count do table.insert(token_timestamps, now) end
 end
 
 ---------------------------------------------------------------------------
@@ -214,6 +223,7 @@ local function onKeyDown(e)
   -- Backspace: remove last UTF-8 char from token
   if keyCode == 51 then
     token = utf8_remove_last(token)
+    if #token_timestamps > 0 then table.remove(token_timestamps) end
     return false
   end
 
@@ -229,36 +239,48 @@ local function onKeyDown(e)
         if m.mid then
           -- Mid-word: trigger matches suffix of token
           if #m.key > 0 and token:sub(-#m.key) == m.key then
-            if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
-            perform_replace(m.key, m.repl, m.requires_star)
-            local prefix = token:sub(1, #token - #m.key)
-            token = token_after_text(prefix .. m.repl)
-            return true
+            -- require last char typed within 500ms
+            local now = hs.timer.secondsSinceEpoch()
+            local last_ts = token_timestamps[#token_timestamps] or 0
+            if now - last_ts <= 0.5 then
+              if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
+              local prefix = token:sub(1, #token - #m.key)
+              set_token_from_text(prefix .. m.repl)
+              perform_replace(m.key, m.repl, m.requires_star)
+              return true
+            end
           end
         else
           -- Start-only: the whole token must equal the key
           if token == m.key then
-            if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
-            perform_replace(m.key, m.repl, m.requires_star)
-            token = token_after_text(m.repl)
-            return true
+            local now = hs.timer.secondsSinceEpoch()
+            local last_ts = token_timestamps[#token_timestamps] or 0
+            if now - last_ts <= 0.5 then
+              if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
+              set_token_from_text(m.repl)
+              perform_replace(m.key, m.repl, m.requires_star)
+              return true
+            end
           end
         end
       end
     end
     -- No match: swallow the star and reset token
     token = ""
+    token_timestamps = {}
     return true
   end
 
   -- ── Separator: reset token ───────────────────────────────────────────
   if separators[chars] then
     token = ""
+    token_timestamps = {}
     return false
   end
 
   -- ── Regular character: append to token and attempt immediate expansion
   token = token .. chars
+  table.insert(token_timestamps, hs.timer.secondsSinceEpoch())
 
   -- Attempt expansion immediately after each typed character for mappings
   -- that do NOT require the trailing star.
@@ -266,18 +288,58 @@ local function onKeyDown(e)
     if not m.requires_star then
       if m.mid then
         if #m.key > 0 and token:sub(-#m.key) == m.key then
-          if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
-          perform_replace(m.key, m.repl, m.requires_star)
-          local prefix = token:sub(1, #token - #m.key)
-          token = token_after_text(prefix .. m.repl)
-          return true
+          -- require the last letter of the matched key to have been typed
+          -- within 500ms after the preceding letter of that key
+          local idx_last = #token_timestamps
+          local key_len = utf8_len(m.key)
+          local ok_time = false
+          if idx_last >= 1 then
+            if key_len >= 2 then
+              local prev_idx = idx_last - 1
+              if prev_idx >= 1 then
+                ok_time = (token_timestamps[idx_last] - token_timestamps[prev_idx]) <= 0.5
+              end
+            else
+              if idx_last >= 2 then
+                ok_time = (token_timestamps[idx_last] - token_timestamps[idx_last - 1]) <= 0.5
+              else
+                ok_time = (hs.timer.secondsSinceEpoch() - token_timestamps[idx_last]) <= 0.5
+              end
+            end
+          end
+          if ok_time then
+            if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
+            local prefix = token:sub(1, #token - #m.key)
+            set_token_from_text(prefix .. m.repl)
+            perform_replace(m.key, m.repl, m.requires_star)
+            return true
+          end
         end
       else
         if token == m.key then
-          if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
-          perform_replace(m.key, m.repl, m.requires_star)
-          token = token_after_text(m.repl)
-          return true
+          local idx_last = #token_timestamps
+          local key_len = utf8_len(m.key)
+          local ok_time = false
+          if idx_last >= 1 then
+            if key_len >= 2 then
+              local prev_idx = idx_last - 1
+              if prev_idx >= 1 then
+                ok_time = (token_timestamps[idx_last] - token_timestamps[prev_idx]) <= 0.5
+              end
+            else
+              if idx_last >= 2 then
+                ok_time = (token_timestamps[idx_last] - token_timestamps[idx_last - 1]) <= 0.5
+              else
+                ok_time = (hs.timer.secondsSinceEpoch() - token_timestamps[idx_last]) <= 0.5
+              end
+            end
+          end
+          if ok_time then
+            if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
+            set_token_from_text(m.repl)
+            perform_replace(m.key, m.repl, m.requires_star)
+            return true
+          end
         end
       end
     end
