@@ -1109,6 +1109,9 @@ for key, manips in manipulators_by_key.items():
 # Sort grouped list alphabetically by description
 grouped.sort(key=lambda x: x["description"])
 
+# Discard all rolls
+grouped = {}
+
 
 def merge_rolls_into_karabiner(
     karabiner_path: str,
