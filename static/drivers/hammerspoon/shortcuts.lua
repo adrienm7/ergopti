@@ -11,36 +11,39 @@ local function trim(s)
 end
 
 local function copy_selection()
-    -- 1. Sauvegarder l'ancien contenu
     local prior = pasteboard.getContents()
     
-    -- 2. Vider le presse-papiers pour être sûr de détecter la nouvelle copie
-    pasteboard.clearContents()
+    -- L'astuce ultime : on mémorise le numéro de version actuel du presse-papiers
+    local priorCount = pasteboard.changeCount()
     
-    -- 3. Lancer la copie
+    -- Lancer la copie
     eventtap.keyStroke({"cmd"}, "c")
     
-    -- 4. Attendre que le presse-papiers se remplisse (max ~0.25 seconde)
-    local sel = nil
+    -- Attendre que le compteur change (signe que la copie a bien eu lieu)
+    local sel = ""
     for i = 1, 25 do
-        timer.usleep(10000) -- 10ms
-        sel = pasteboard.getContents()
-        if sel then break end
+        timer.usleep(20000) -- Attente de 20 millisecondes (max 500ms au total)
+        if pasteboard.changeCount() ~= priorCount then
+            sel = pasteboard.getContents() or ""
+            break
+        end
     end
     
-    return sel or "", prior
+    return sel, prior
 end
 
 local function paste_and_restore(newtext, prior)
-    -- Mettre le nouveau texte dans le presse-papiers
+    -- 1. On injecte le nouveau texte
     pasteboard.setContents(newtext)
-    timer.usleep(50000) -- Attendre 50ms que le système enregistre le presse-papiers
+    timer.usleep(100000) -- Attente de 100ms pour que macOS enregistre bien la modification
     
-    -- Coller (cela écrase automatiquement le texte sélectionné, pas besoin de "delete")
+    -- 2. On colle
     eventtap.keyStroke({"cmd"}, "v")
-    timer.usleep(50000) -- Attendre 50ms que l'action de coller s'effectue
     
-    -- Restaurer l'ancien presse-papiers
+    -- 3. Attente CRITIQUE : laisser le temps à l'application de recevoir et d'afficher le texte
+    timer.usleep(200000) -- 200ms
+    
+    -- 4. On restaure l'ancien texte discrètement
     if prior then 
         pasteboard.setContents(prior) 
     else
@@ -52,10 +55,10 @@ local function notify_short(msg)
     notify.new({title = "Shortcuts", informativeText = msg}):send()
 end
 
--- Ctrl + a : select entire line
+-- Ctrl + A : select entire line
 hs.hotkey.bind({"ctrl"}, "a", function()
-    eventtap.keyStroke({"cmd"}, "left") -- Aller au début de la ligne (sur Mac c'est Cmd+Left, pas Home)
-    eventtap.keyStroke({"cmd", "shift"}, "right") -- Sélectionner jusqu'à la fin
+    eventtap.keyStroke({"cmd"}, "left")
+    eventtap.keyStroke({"cmd", "shift"}, "right")
 end)
 
 -- Ctrl + U : toggle uppercase / lowercase for selection
@@ -71,7 +74,6 @@ hs.hotkey.bind({"ctrl"}, "u", function()
     local has_lower = sel:match("%l") ~= nil
     local transformed = has_lower and sel:upper() or sel:lower()
     
-    -- Utilisation de paste_and_restore au lieu de keyStrokes
     paste_and_restore(transformed, prior)
     notify_short('Transformé')
 end)
@@ -100,7 +102,6 @@ hs.hotkey.bind({"ctrl"}, "t", function()
     local t = titlecase(sel)
     local transformed = (sel == t) and sel:lower() or t
     
-    -- Utilisation de paste_and_restore au lieu de keyStrokes
     paste_and_restore(transformed, prior)
     notify_short('Transformé')
 end)
@@ -111,7 +112,7 @@ hs.hotkey.bind({"ctrl"}, "h", function()
     local filename = string.format('%s/Desktop/screenshot_%s.png', home, os.date('%Y%m%d%H%M%S'))
     local cmd = 'screencapture -i "' .. filename .. '"'
     hs.execute(cmd)
-    notify_short('Capture enregistrée')
+    notify_short('Capture enregistrée : ' .. filename)
 end)
 
 local function is_probable_url(s)
@@ -142,6 +143,5 @@ hs.hotkey.bind({"ctrl"}, "s", function()
         urlevent.openURL(search)
     end
     
-    -- On restaure le presse-papiers car on a juste fait une recherche
     if prior then pasteboard.setContents(prior) end
 end)
