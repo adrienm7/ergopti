@@ -17,24 +17,24 @@ local function copy_selection()
     -- 1. On injecte le marqueur
     pasteboard.setContents(marker)
     
-    -- 2. PAUSE CRITIQUE : On attend que le marqueur soit *réellement* dans le presse-papiers
+    -- 2. On attend que le marqueur soit bien en place
     for i = 1, 20 do
         if pasteboard.getContents() == marker then break end
-        timer.usleep(10000) -- Attente de 10ms
+        timer.usleep(10000)
     end
     
-    -- 3. Maintenant on est sûr, on peut lancer la copie
+    -- 3. On lance la copie
     eventtap.keyStroke({"cmd"}, "c")
     
-    -- 4. On attend que le texte change (qu'il ne soit plus le marqueur)
+    -- 4. On attend le nouveau texte
     local sel = ""
     for i = 1, 50 do
-        timer.usleep(20000) -- Attente de 20ms
+        timer.usleep(20000)
         local current = pasteboard.getContents()
         
-        -- Si le contenu a changé et n'est plus le marqueur, la copie a réussi !
-        if current ~= marker then
-            sel = current or ""
+        -- LA CORRECTION EST ICI : on s'assure que current n'est pas nil (vide)
+        if current ~= nil and current ~= marker then
+            sel = current
             break
         end
     end
@@ -43,22 +43,16 @@ local function copy_selection()
 end
 
 local function paste_and_restore(newtext, prior)
-    -- 1. On injecte le nouveau texte
     pasteboard.setContents(newtext)
     
-    -- 2. PAUSE CRITIQUE : On attend que le nouveau texte soit bien prêt à être collé
     for i = 1, 20 do
         if pasteboard.getContents() == newtext then break end
         timer.usleep(10000)
     end
     
-    -- 3. On colle
     eventtap.keyStroke({"cmd"}, "v")
+    timer.usleep(200000) 
     
-    -- 4. On laisse le temps à l'application (Word, Chrome, etc.) d'afficher le texte collé
-    timer.usleep(200000) -- 200ms
-    
-    -- 5. On restaure l'ancien texte en douceur
     if prior then 
         pasteboard.setContents(prior) 
     else
