@@ -11,6 +11,14 @@ local keymap = require("keymap")
 gestures.start()
 scroll.start()
 
+-- Select entire line with left Ctrl + a
+hs.hotkey.bind({"ctrl"}, "a", function()
+	pcall(function()
+		hs.eventtap.keyStroke({}, "home", 0)
+		hs.eventtap.keyStroke({"shift"}, "end", 0)
+	end)
+end)
+
 keymap.add("ae★", "æ", true)
 keymap.add("oe★", "œ", true)
 keymap.add("1er★", "premier", false)
