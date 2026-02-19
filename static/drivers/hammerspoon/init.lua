@@ -91,3 +91,5 @@ keymap.add("w★", "ww", true)
 keymap.add("x★", "xx", true)
 keymap.add("y★", "yy", true)
 keymap.add("z★", "zz", true)
+
+
