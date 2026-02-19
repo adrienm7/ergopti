@@ -13,18 +13,26 @@ end
 local function copy_selection()
     local prior = pasteboard.getContents()
     
-    -- L'astuce ultime : on mémorise le numéro de version actuel du presse-papiers
-    local priorCount = pasteboard.changeCount()
+    -- 1. Astuce du marqueur : On injecte un texte unique
+    local marker = "HS_MARK_TXT_" .. timer.secondsSinceEpoch()
+    pasteboard.setContents(marker)
     
-    -- Lancer la copie
-    eventtap.keyStroke({"cmd"}, "c")
+    -- 2. Pause indispensable pour que le système valide ce marqueur
+    timer.usleep(50000) 
     
-    -- Attendre que le compteur change (signe que la copie a bien eu lieu)
+    -- 3. Lancer Cmd+C. Le "5000" (5ms) est crucial : il force macOS à 
+    -- bien ignorer la touche "Ctrl" que vous êtes en train de maintenir.
+    eventtap.keyStroke({"cmd"}, "c", 5000)
+    
+    -- 4. Boucle d'attente : tant que c'est le marqueur, la copie n'a pas eu lieu
     local sel = ""
-    for i = 1, 25 do
-        timer.usleep(20000) -- Attente de 20 millisecondes (max 500ms au total)
-        if pasteboard.changeCount() ~= priorCount then
-            sel = pasteboard.getContents() or ""
+    for i = 1, 40 do -- Attente maximale de 0.8 seconde
+        timer.usleep(20000)
+        local current = pasteboard.getContents()
+        
+        -- Si le contenu est différent du marqueur, la copie a réussi !
+        if current ~= marker then
+            sel = current or ""
             break
         end
     end
@@ -33,17 +41,15 @@ local function copy_selection()
 end
 
 local function paste_and_restore(newtext, prior)
-    -- 1. On injecte le nouveau texte
     pasteboard.setContents(newtext)
-    timer.usleep(100000) -- Attente de 100ms pour que macOS enregistre bien la modification
+    timer.usleep(50000) 
     
-    -- 2. On colle
-    eventtap.keyStroke({"cmd"}, "v")
+    -- Coller avec le micro-délai pour la même raison
+    eventtap.keyStroke({"cmd"}, "v", 5000)
     
-    -- 3. Attente CRITIQUE : laisser le temps à l'application de recevoir et d'afficher le texte
-    timer.usleep(200000) -- 200ms
+    -- Pause VITALE : laisser à l'appli le temps de coller avant de restaurer l'historique
+    timer.usleep(250000) 
     
-    -- 4. On restaure l'ancien texte discrètement
     if prior then 
         pasteboard.setContents(prior) 
     else
@@ -57,8 +63,8 @@ end
 
 -- Ctrl + A : select entire line
 hs.hotkey.bind({"ctrl"}, "a", function()
-    eventtap.keyStroke({"cmd"}, "left")
-    eventtap.keyStroke({"cmd", "shift"}, "right")
+    eventtap.keyStroke({"cmd"}, "left", 5000)
+    eventtap.keyStroke({"cmd", "shift"}, "right", 5000)
 end)
 
 -- Ctrl + U : toggle uppercase / lowercase for selection
@@ -112,7 +118,7 @@ hs.hotkey.bind({"ctrl"}, "h", function()
     local filename = string.format('%s/Desktop/screenshot_%s.png', home, os.date('%Y%m%d%H%M%S'))
     local cmd = 'screencapture -i "' .. filename .. '"'
     hs.execute(cmd)
-    notify_short('Capture enregistrée : ' .. filename)
+    notify_short('Capture enregistrée: ' .. filename)
 end)
 
 local function is_probable_url(s)
