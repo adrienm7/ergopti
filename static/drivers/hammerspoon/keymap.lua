@@ -20,6 +20,9 @@ local mappings = {}
 
 local DEBUG = true
 
+-- Configuration: délai (secondes) utilisé pour les vérifications de timing
+local EXPAND_TIMEOUT = 0.8
+
 -- Accept both the star character and the asterisk key as trigger
 local STAR_CHARS = { ["★"] = true, ["*"] = true }
 
@@ -404,7 +407,7 @@ local function onKeyDown(e)
             -- require last char typed within 500ms
             local now = hs.timer.secondsSinceEpoch()
             local last_ts = token_timestamps[#token_timestamps] or 0
-            if now - last_ts <= 0.5 then
+            if now - last_ts <= EXPAND_TIMEOUT then
               if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
               local prefix = token:sub(1, #token - #m.key)
               local delKey = m.key
@@ -425,7 +428,7 @@ local function onKeyDown(e)
           if token == m.key then
             local now = hs.timer.secondsSinceEpoch()
             local last_ts = token_timestamps[#token_timestamps] or 0
-            if now - last_ts <= 0.5 then
+            if now - last_ts <= EXPAND_TIMEOUT then
               if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
               local delKey = m.key
               local match_len = utf8_len(delKey)
@@ -499,13 +502,13 @@ local function onKeyDown(e)
                 if key_len >= 2 then
                   local prev_idx = idx_last - 1
                   if prev_idx >= 1 then
-                    ok_time = (temp_ts[idx_last] - temp_ts[prev_idx]) <= 0.5
+                    ok_time = (temp_ts[idx_last] - temp_ts[prev_idx]) <= EXPAND_TIMEOUT
                   end
                 else
                   if idx_last >= 2 then
-                    ok_time = (temp_ts[idx_last] - temp_ts[idx_last - 1]) <= 0.5
+                    ok_time = (temp_ts[idx_last] - temp_ts[idx_last - 1]) <= EXPAND_TIMEOUT
                   else
-                    ok_time = (hs.timer.secondsSinceEpoch() - temp_ts[idx_last]) <= 0.5
+                    ok_time = (hs.timer.secondsSinceEpoch() - temp_ts[idx_last]) <= EXPAND_TIMEOUT
                   end
                 end
               end
@@ -538,13 +541,13 @@ local function onKeyDown(e)
                 if key_len >= 2 then
                   local prev_idx = idx_last - 1
                   if prev_idx >= 1 then
-                    ok_time = (temp_ts[idx_last] - temp_ts[prev_idx]) <= 0.5
+                    ok_time = (temp_ts[idx_last] - temp_ts[prev_idx]) <= EXPAND_TIMEOUT
                   end
                 else
                   if idx_last >= 2 then
-                    ok_time = (temp_ts[idx_last] - temp_ts[idx_last - 1]) <= 0.5
+                    ok_time = (temp_ts[idx_last] - temp_ts[idx_last - 1]) <= EXPAND_TIMEOUT
                   else
-                    ok_time = (hs.timer.secondsSinceEpoch() - temp_ts[idx_last]) <= 0.5
+                    ok_time = (hs.timer.secondsSinceEpoch() - temp_ts[idx_last]) <= EXPAND_TIMEOUT
                   end
                 end
               end
@@ -604,13 +607,13 @@ local function onKeyDown(e)
             if key_len >= 2 then
               local prev_idx = idx_last - 1
               if prev_idx >= 1 then
-                ok_time = (token_timestamps[idx_last] - token_timestamps[prev_idx]) <= 0.5
+                ok_time = (token_timestamps[idx_last] - token_timestamps[prev_idx]) <= EXPAND_TIMEOUT
               end
             else
               if idx_last >= 2 then
-                ok_time = (token_timestamps[idx_last] - token_timestamps[idx_last - 1]) <= 0.5
+                ok_time = (token_timestamps[idx_last] - token_timestamps[idx_last - 1]) <= EXPAND_TIMEOUT
               else
-                ok_time = (hs.timer.secondsSinceEpoch() - token_timestamps[idx_last]) <= 0.5
+                ok_time = (hs.timer.secondsSinceEpoch() - token_timestamps[idx_last]) <= EXPAND_TIMEOUT
               end
             end
           end
@@ -648,13 +651,13 @@ local function onKeyDown(e)
             if key_len >= 2 then
               local prev_idx = idx_last - 1
               if prev_idx >= 1 then
-                ok_time = (token_timestamps[idx_last] - token_timestamps[prev_idx]) <= 0.5
+                ok_time = (token_timestamps[idx_last] - token_timestamps[prev_idx]) <= EXPAND_TIMEOUT
               end
             else
               if idx_last >= 2 then
-                ok_time = (token_timestamps[idx_last] - token_timestamps[idx_last - 1]) <= 0.5
+                ok_time = (token_timestamps[idx_last] - token_timestamps[idx_last - 1]) <= EXPAND_TIMEOUT
               else
-                ok_time = (hs.timer.secondsSinceEpoch() - token_timestamps[idx_last]) <= 0.5
+                ok_time = (hs.timer.secondsSinceEpoch() - token_timestamps[idx_last]) <= EXPAND_TIMEOUT
               end
             end
           end
