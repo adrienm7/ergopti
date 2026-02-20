@@ -18,7 +18,7 @@ local M = {}
 
 local mappings = {}
 
-local DEBUG = false
+local DEBUG = true
 
 -- Accept both the star character and the asterisk key as trigger
 local STAR_CHARS = { ["★"] = true, ["*"] = true }
@@ -58,6 +58,15 @@ local function utf8_remove_last(s)
     i = i - 1
   end
   if i > 1 then return s:sub(1, i - 1) else return "" end
+end
+
+-- Return first UTF-8 character and the remainder
+local function utf8_first_char(s)
+  local ok, offs = pcall(utf8.offset, s, 2)
+  if ok and offs then
+    return s:sub(1, offs - 1), s:sub(offs)
+  end
+  return s, ""
 end
 
 -- Strip trailing star char if present (UTF-8 aware)
@@ -227,6 +236,7 @@ local separators = {
 local tap
 local replacing = false   -- true while we are emitting synthetic events
 local last_separator_char = nil -- most recent separator typed (if any)
+local next_reset_at = 0
 
 ---------------------------------------------------------------------------
 -- After replacement text is inserted, compute the token as the part after
@@ -287,14 +297,37 @@ end
 --   4. Restart the tap after a short timer (10 ms) so the system event queue
 --      has time to drain the synthetic events before the tap sees new ones.
 ---------------------------------------------------------------------------
-local function perform_replace(matchKey, text, had_star)
-  local delCount = utf8_len(matchKey)
-  -- If the trigger does not require a trailing star, we used to delete
-  -- one fewer character. However for triggers that start with a
-  -- separator (e.g. ";f"), we must delete the entire trigger so the
-  -- separator does not remain. Detect the first UTF-8 character and
-  -- only subtract 1 when that first character is NOT a separator.
-  if not had_star then delCount = delCount - 1 end
+local function perform_replace(matchKey, text, had_star, override_del, available_before)
+  local delCount
+  if override_del then
+    -- Use the provided pre-change available deletion count when present;
+    -- otherwise fall back to computing from current state. This avoids
+    -- relying on `token` after it was updated by set_token_from_text.
+    local max_del = available_before or (utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0))
+    if override_del > max_del then
+      delCount = max_del
+    else
+      delCount = override_del
+    end
+  else
+    delCount = utf8_len(matchKey)
+    -- If the trigger does not require a trailing star, delete one fewer
+    -- character, except when the first character of the trigger is a
+    -- separator/punctuation (in which case delete the full trigger so
+    -- the separator doesn't remain).
+    if not had_star then
+      local first_char = utf8_first_char(matchKey)
+      if not (separators[first_char] or first_char:match("%p")) then
+        delCount = delCount - 1
+      end
+    end
+    -- Don't delete more characters than were actually typed (token + possibly
+    -- a remembered leading separator). This prevents over-deleting when the
+    -- matchKey includes characters that aren't present at the cursor.
+    local max_del = utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0)
+    if delCount > max_del then delCount = max_del end
+  end
+
   replacing = true
   if tap then tap:stop() end
 
@@ -317,16 +350,35 @@ local function onKeyDown(e)
   if replacing then return false end
 
   local keyCode = e:getKeyCode()
+  local now = hs.timer.secondsSinceEpoch()
+  -- Reset token state after inactivity so the first typed word behaves
+  -- like it just started (fixes missing expansions right after reload).
+  if now > next_reset_at then
+    token = ""
+    token_timestamps = {}
+    last_separator_char = nil
+  end
+  local flags = e:getFlags()
 
   -- Backspace: remove last UTF-8 char from token
   if keyCode == 51 then
     token = utf8_remove_last(token)
     if #token_timestamps > 0 then table.remove(token_timestamps) end
     if token == "" then last_separator_char = nil end
+    next_reset_at = now + 1.5
     return false
   end
 
   local chars = e:getCharacters(true)
+  -- If Alt/AltGr is held, try the alternate characters API to get the
+  -- actual produced character (e.g. '+' instead of base 'p'). Use this
+  -- only when it returns something different.
+  if flags.alt then
+    local altchars = e:getCharacters(false)
+    if altchars and altchars ~= "" and altchars ~= chars then
+      chars = altchars
+    end
+  end
   if not chars or #chars == 0 then return false end
 
   if DEBUG then hs.printf("keymap: char='%s' token='%s'", chars, token) end
@@ -342,6 +394,10 @@ local function onKeyDown(e)
 
     for _, m in ipairs(mappings) do
       if m.requires_star then
+        local first_char, rest = utf8_first_char(m.key)
+        local body = m.key
+        local has_leading_sep = separators[first_char] or (first_char:match("%p") ~= nil)
+        if has_leading_sep then body = rest end
         if m.mid then
           -- Mid-word: trigger matches suffix of token
           if #m.key > 0 and token:sub(-#m.key) == m.key then
@@ -351,8 +407,16 @@ local function onKeyDown(e)
             if now - last_ts <= 0.5 then
               if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
               local prefix = token:sub(1, #token - #m.key)
+              local delKey = m.key
+              local match_len = utf8_len(delKey)
+              if not m.requires_star then
+                if not (separators[first_char] or first_char:match("%p")) then
+                  match_len = math.max(0, match_len - 1)
+                end
+              end
+              local available_before = utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0)
               set_token_from_text(prefix .. m.repl)
-              perform_replace(m.key, m.repl, m.requires_star)
+              perform_replace(delKey, m.repl, m.requires_star, match_len, available_before)
               return true
             end
           end
@@ -363,8 +427,16 @@ local function onKeyDown(e)
             local last_ts = token_timestamps[#token_timestamps] or 0
             if now - last_ts <= 0.5 then
               if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
+              local delKey = m.key
+              local match_len = utf8_len(delKey)
+              if not m.requires_star then
+                if not (separators[first_char] or first_char:match("%p")) then
+                  match_len = math.max(0, match_len - 1)
+                end
+              end
+              local available_before = utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0)
               set_token_from_text(m.repl)
-              perform_replace(m.key, m.repl, m.requires_star)
+              perform_replace(delKey, m.repl, m.requires_star, match_len, available_before)
               return true
             end
           end
@@ -386,6 +458,117 @@ local function onKeyDown(e)
 
   -- ── Separator: remember it and reset token ───────────────────────────
   if separators[chars] then
+    -- If modifier keys are held (AltGr, Alt, Ctrl, Cmd, Fn), let the
+    -- event through so AltGr+<sep> (or modified separators) produce
+    -- the expected character and do not trigger hotstring expansion.
+    local flags = e:getFlags()
+    local had_modifier = flags.alt or flags.ctrl or flags.cmd or flags.fn
+    -- Do NOT bail early when modifier keys are held: allow matching logic
+    -- to run so sequences typed with AltGr (e.g. AltGr+p then AltGr+') can
+    -- still trigger mappings like "+?". If no mapping matches, we'll
+    -- fall through and let the character through as usual.
+    -- Before resetting, check for mappings that include the separator
+    -- as the last character (e.g. "p'"). We simulate the token as if
+    -- the separator were appended and reuse the timing checks.
+    local sep = chars
+    local now = hs.timer.secondsSinceEpoch()
+    for _, m in ipairs(mappings) do
+      if not m.requires_star then
+        local first_char, rest = utf8_first_char(m.key)
+        local body = m.key
+        local has_leading_sep = separators[first_char] or (first_char:match("%p") ~= nil)
+        if has_leading_sep then body = rest end
+        local body_len = utf8_len(body)
+
+        -- Only consider mappings where the body actually ends with this separator
+        if body_len > 0 and utf8_sub_tail(body, 1) == sep then
+          if m.mid then
+            -- For mid mappings, require the token (before sep) to end with
+            -- the body without its final separator character.
+            local body_without_last = utf8_remove_last(body)
+            local needed = utf8_len(body_without_last)
+            if needed == 0 or utf8_sub_tail(token, needed) == body_without_last then
+              -- timing: simulate timestamps with `now` appended
+              local temp_ts = {}
+              for i = 1, #token_timestamps do table.insert(temp_ts, token_timestamps[i]) end
+              table.insert(temp_ts, now)
+              local idx_last = #temp_ts
+              local key_len = body_len
+              local ok_time = false
+              if idx_last >= 1 then
+                if key_len >= 2 then
+                  local prev_idx = idx_last - 1
+                  if prev_idx >= 1 then
+                    ok_time = (temp_ts[idx_last] - temp_ts[prev_idx]) <= 0.5
+                  end
+                else
+                  if idx_last >= 2 then
+                    ok_time = (temp_ts[idx_last] - temp_ts[idx_last - 1]) <= 0.5
+                  else
+                    ok_time = (hs.timer.secondsSinceEpoch() - temp_ts[idx_last]) <= 0.5
+                  end
+                end
+              end
+              if ok_time and (not has_leading_sep or last_separator_char == first_char) then
+                if DEBUG then hs.printf("keymap: sep-mid '%s' -> '%s'", m.key, m.repl) end
+                local prefix = token:sub(1, #token - needed)
+                -- Compute deletion length: characters actually typed before the
+                -- separator (body_without_last) plus a remembered leading
+                -- separator if present.
+                local del_len = needed
+                if has_leading_sep and last_separator_char == first_char then del_len = del_len + 1 end
+                local available_before = utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0)
+                set_token_from_text(prefix .. m.repl)
+                perform_replace(m.key, m.repl, m.requires_star, del_len, available_before)
+                last_separator_char = nil
+                return true
+              end
+            end
+          else
+            -- Start-only: token + sep must equal the body
+            if token .. sep == body then
+              -- simulate timestamps
+              local temp_ts = {}
+              for i = 1, #token_timestamps do table.insert(temp_ts, token_timestamps[i]) end
+              table.insert(temp_ts, now)
+              local idx_last = #temp_ts
+              local key_len = body_len
+              local ok_time = false
+              if idx_last >= 1 then
+                if key_len >= 2 then
+                  local prev_idx = idx_last - 1
+                  if prev_idx >= 1 then
+                    ok_time = (temp_ts[idx_last] - temp_ts[prev_idx]) <= 0.5
+                  end
+                else
+                  if idx_last >= 2 then
+                    ok_time = (temp_ts[idx_last] - temp_ts[idx_last - 1]) <= 0.5
+                  else
+                    ok_time = (hs.timer.secondsSinceEpoch() - temp_ts[idx_last]) <= 0.5
+                  end
+                end
+              end
+              if ok_time and (not has_leading_sep or last_separator_char == first_char) then
+                if DEBUG then hs.printf("keymap: sep-start '%s' -> '%s'", m.key, m.repl) end
+                -- For a start-only mapping triggered by a separator, delete
+                -- only the characters that were present before the separator
+                -- (i.e. body without its trailing separator), plus any
+                -- remembered leading separator.
+                local body_without_last = utf8_remove_last(body)
+                local del_len = utf8_len(body_without_last)
+                if has_leading_sep and last_separator_char == first_char then del_len = del_len + 1 end
+                local available_before = utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0)
+                set_token_from_text(m.repl)
+                perform_replace(m.key, m.repl, m.requires_star, del_len, available_before)
+                last_separator_char = nil
+                return true
+              end
+            end
+          end
+        end
+      end
+    end
+
     last_separator_char = chars
     token = ""
     token_timestamps = {}
@@ -404,10 +587,11 @@ local function onKeyDown(e)
       -- treating the separator as a prefix that was typed just before the
       -- current token (tracked in last_separator_char). The `body` is the
       -- mapping without that leading separator.
-      local first_char = m.key:sub(1,1)
+      local first_char, rest = utf8_first_char(m.key)
       local body = m.key
-      local has_leading_sep = separators[first_char]
-      if has_leading_sep then body = m.key:sub(2) end
+      -- Treat explicit separators and punctuation as a leading separator
+      local has_leading_sep = separators[first_char] or (first_char:match("%p") ~= nil)
+      if has_leading_sep then body = rest end
       local body_len = utf8_len(body)
 
       if m.mid then
@@ -430,13 +614,29 @@ local function onKeyDown(e)
               end
             end
           end
-          if ok_time and (not has_leading_sep or last_separator_char == first_char) then
-            if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
-            local prefix = token:sub(1, #token - #body)
-            set_token_from_text(prefix .. m.repl)
-            perform_replace(m.key, m.repl, m.requires_star)
-            last_separator_char = nil
-            return true
+            if ok_time then
+            local leading_ok = (not has_leading_sep) or (last_separator_char == first_char)
+            if not leading_ok and has_leading_sep then
+              local needed = body_len + utf8_len(first_char)
+              if DEBUG then hs.printf("keymap: check leading token='%s' first='%s' body='%s' needed=%d tail='%s'", token, first_char, body, needed, utf8_sub_tail(token, needed)) end
+              if utf8_sub_tail(token, needed) == first_char .. body then leading_ok = true end
+            end
+            if leading_ok then
+              if DEBUG then hs.printf("keymap: mid '%s' -> '%s'", m.key, m.repl) end
+              local prefix = token:sub(1, #token - #body)
+              local delKey = m.key
+              local match_len = utf8_len(delKey)
+              if not m.requires_star then
+                if not (separators[first_char] or first_char:match("%p")) then
+                  match_len = math.max(0, match_len - 1)
+                end
+              end
+              local available_before = utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0)
+              set_token_from_text(prefix .. m.repl)
+              perform_replace(delKey, m.repl, m.requires_star, match_len, available_before)
+              last_separator_char = nil
+              return true
+            end
           end
         end
       else
@@ -460,8 +660,16 @@ local function onKeyDown(e)
           end
           if ok_time and (not has_leading_sep or last_separator_char == first_char) then
             if DEBUG then hs.printf("keymap: start '%s' -> '%s'", m.key, m.repl) end
+            local delKey = m.key
+            local match_len = utf8_len(delKey)
+            if not m.requires_star then
+              if not (separators[first_char] or first_char:match("%p")) then
+                match_len = math.max(0, match_len - 1)
+              end
+            end
+            local available_before = utf8_len(token) + ((last_separator_char ~= nil) and 1 or 0)
             set_token_from_text(m.repl)
-            perform_replace(m.key, m.repl, m.requires_star)
+            perform_replace(delKey, m.repl, m.requires_star, match_len, available_before)
             last_separator_char = nil
             return true
           end
@@ -469,6 +677,8 @@ local function onKeyDown(e)
       end
     end
   end
+
+  next_reset_at = now + 1.5
 
   return false
 end
