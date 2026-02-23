@@ -5,7 +5,7 @@
 
 [metadata]
 block = "TextExpansionSymbols"
-description = "Expansion de texte Symboles : -->"
+description = "Expansion de texte Symboles : -->★  = ➜, (v)★  = ✓, …"
 
 [[fractions]]
 "1/★" = { output = "⅟", is_word = true, auto_expand = true }

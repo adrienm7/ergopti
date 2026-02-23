@@ -263,7 +263,12 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
             for section_name, entries in deduplicated_hotstrings.items():
                 filtered_entries = []
                 for trigger, output, is_word, auto_expand in entries:
-                    if trigger not in global_seen_triggers:
+                    # Always include emoji triggers (emojis file) to avoid them being
+                    # filtered by earlier files. For other files, keep global dedupe.
+                    if (
+                        output_name == "emojis"
+                        or trigger not in global_seen_triggers
+                    ):
                         global_seen_triggers.add(trigger)
                         filtered_entries.append(
                             (trigger, output, is_word, auto_expand)
@@ -716,11 +721,67 @@ def find_description_in_content(content: str, section_name: str) -> str:
     if not block_text:
         return ""
 
-    desc_match = re.search(r'Description\s*:\s*"([^\"]*)"', block_text)
-    if desc_match:
-        return process_autohotkey_escapes(desc_match.group(1))
+    # Accept AHK-escaped quotes like `" inside the Description string
+    # More robust: after 'Description', concatenate all adjacent quoted string literals
+    # Example handled: Description: "A " . ScriptInformation[...] . " B",
+    m = re.search(r"Description\s*:\s*", block_text)
+    if not m:
+        return ""
+    idx = m.end()
+    length = len(block_text)
+    parts: list[str] = []
+    in_literal = False
+    # Scan forward collecting double-quoted string literals
+    while idx < length:
+        ch = block_text[idx]
+        if ch.isspace() or ch == ".":
+            idx += 1
+            continue
+        if ch == '"':
+            # parse quoted string supporting AHK `" escapes and doubled quotes
+            idx += 1
+            start = idx
+            literal_chars: list[str] = []
+            while idx < length:
+                c = block_text[idx]
+                # handle backtick-escaped quote
+                if c == "`" and idx + 1 < length and block_text[idx + 1] == '"':
+                    literal_chars.append('"')
+                    idx += 2
+                    continue
+                if c == '"':
+                    idx += 1
+                    break
+                literal_chars.append(c)
+                idx += 1
+            parts.append(process_autohotkey_escapes("".join(literal_chars)))
+            # after closing quote, continue to look for more literals or stop at comma
+            # skip spaces
+            while idx < length and block_text[idx].isspace():
+                idx += 1
+            if idx < length and block_text[idx] == ",":
+                break
+            continue
+        # if we hit a comma before any literal, stop
+        if ch == ",":
+            break
+        # otherwise skip non-literal tokens (variables, concatenation, etc.)
+        # try to capture ScriptInformation["Key"] and insert the key name
+        rem = block_text[idx:]
+        si = re.match(
+            r"\s*\.\s*ScriptInformation\s*\[\s*\"([^\"]+)\"\s*\]", rem
+        )
+        if not si:
+            si = re.match(r"\s*ScriptInformation\s*\[\s*\"([^\"]+)\"\s*\]", rem)
+        if si:
+            # replace ScriptInformation[...] occurrences by the MagicKey symbol
+            # place the star without a leading space to avoid double spacing
+            parts.append("★ ")
+            idx += si.end()
+            continue
+        idx += 1
 
-    return ""
+    return "".join(parts)
 
 
 def extract_hotstrings(

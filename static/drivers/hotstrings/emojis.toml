@@ -5,7 +5,7 @@
 
 [metadata]
 block = "TextExpansionEmojis"
-description = "Expansion de texte Emojis : voiture"
+description = "Expansion de texte Emojis : voiture★  = 🚗, koala★  = 🐨, …"
 
 [[basic_smileys]]
 ":)★" = { output = "😀", is_word = true, auto_expand = true }
@@ -110,6 +110,7 @@ description = "Expansion de texte Emojis : voiture"
 "couronne★" = { output = "👑", is_word = true, auto_expand = true }
 "croix★" = { output = "❌", is_word = true, auto_expand = true }
 "danse★" = { output = "💃", is_word = true, auto_expand = true }
+"dé★" = { output = "🎲", is_word = true, auto_expand = true }
 "diamant★" = { output = "💎", is_word = true, auto_expand = true }
 "drapeau★" = { output = "🏁", is_word = true, auto_expand = true }
 "douche★" = { output = "🛁", is_word = true, auto_expand = true }
@@ -143,6 +144,7 @@ description = "Expansion de texte Emojis : voiture"
 "nuage★" = { output = "☁️", is_word = true, auto_expand = true }
 "ok★" = { output = "✅", is_word = true, auto_expand = true }
 "olaf★" = { output = "⛄", is_word = true, auto_expand = true }
+"ordi★" = { output = "💻", is_word = true, auto_expand = true }
 "ordinateur★" = { output = "💻", is_word = true, auto_expand = true }
 "parapluie★" = { output = "☂️", is_word = true, auto_expand = true }
 "pc★" = { output = "💻", is_word = true, auto_expand = true }

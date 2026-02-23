@@ -5,7 +5,7 @@
 
 [metadata]
 block = "MultiplePunctuationMarks"
-description = "Taper `"
+description = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère"
 
 [[general]]
 " ! !" = { output = " !!", is_word = true, auto_expand = true }
