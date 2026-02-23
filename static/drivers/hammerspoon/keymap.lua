@@ -7,12 +7,49 @@ local keyStroke = hs.eventtap.keyStroke
 
 local M = {}
 
+-- Gestion des groupes de mappings (pour permettre enable/disable par fichier)
+local groups = {}
+local current_group = nil
+local mappings = {}
+
+local function record_group(name, path)
+    local seqs = {}
+    for _, m in ipairs(mappings) do
+        if m.group == name then table.insert(seqs, m.seq) end
+    end
+    groups[name] = { path = path, seqs = seqs, enabled = true }
+end
+
+function M.load_file(name, path)
+    current_group = name
+    dofile(path)
+    current_group = nil
+    record_group(name, path)
+end
+
+function M.disable_group(name)
+    if not groups[name] or not groups[name].enabled then return end
+    groups[name].enabled = false
+    local new_mappings = {}
+    for _, m in ipairs(mappings) do
+        if m.group ~= name then table.insert(new_mappings, m) end
+    end
+    mappings = new_mappings
+end
+
+function M.enable_group(name)
+    local g = groups[name]
+    if not g then return end
+    if g.enabled then return end
+    -- re-load the file to re-add mappings under the same group name
+    M.load_file(name, g.path)
+end
+
 ---------------------------------------------------------------------------
 -- Configuration
 ---------------------------------------------------------------------------
 local BASE_DELAY_SEC = 0.5 
 
-local mappings = {}
 local buffer = ""
 local is_replacing = false
 local last_key_time = 0
@@ -108,7 +145,9 @@ function M.add(trigger, replacement, mid_word)
             if m.trigger == t and m.repl == r and m.mid == is_mid then return end
         end
         seq_counter = seq_counter + 1
-        table.insert(mappings, { trigger = t, repl = r, mid = is_mid, seq = seq_counter })
+        local entry = { trigger = t, repl = r, mid = is_mid, seq = seq_counter }
+        if current_group then entry.group = current_group end
+        table.insert(mappings, entry)
     end
 
     local function set_spaces(str, space_char)
