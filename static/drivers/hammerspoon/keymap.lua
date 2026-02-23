@@ -37,6 +37,18 @@ function M.disable_group(name)
     mappings = new_mappings
 end
 
+-- Return whether a group is currently enabled
+function M.is_group_enabled(name)
+    return groups[name] and groups[name].enabled or false
+end
+
+-- Return a shallow copy of known groups and their enabled state
+function M.list_groups()
+    local out = {}
+    for name, g in pairs(groups) do out[name] = g.enabled end
+    return out
+end
+
 function M.enable_group(name)
     local g = groups[name]
     if not g then return end
