@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "TextExpansionEmojis"
+description = "Expansion de texte Emojis : voiture"
+
 [[basic_smileys]]
 ":)★" = { output = "😀", is_word = true, auto_expand = true }
 ":))★" = { output = "😁", is_word = true, auto_expand = true }
@@ -105,6 +109,7 @@
 "cloche★" = { output = "🔔", is_word = true, auto_expand = true }
 "couronne★" = { output = "👑", is_word = true, auto_expand = true }
 "croix★" = { output = "❌", is_word = true, auto_expand = true }
+"danse★" = { output = "💃", is_word = true, auto_expand = true }
 "diamant★" = { output = "💎", is_word = true, auto_expand = true }
 "drapeau★" = { output = "🏁", is_word = true, auto_expand = true }
 "douche★" = { output = "🛁", is_word = true, auto_expand = true }
@@ -119,6 +124,7 @@
 "fête★" = { output = "🎉", is_word = true, auto_expand = true }
 "film★" = { output = "🎬", is_word = true, auto_expand = true }
 "fleur★" = { output = "🌸", is_word = true, auto_expand = true }
+"fusée★" = { output = "🚀", is_word = true, auto_expand = true }
 "guitare★" = { output = "🎸", is_word = true, auto_expand = true }
 "idée★" = { output = "💡", is_word = true, auto_expand = true }
 "idee★" = { output = "💡", is_word = true, auto_expand = true }
@@ -146,6 +152,7 @@
 "radioactif★" = { output = "☢️", is_word = true, auto_expand = true }
 "regard★" = { output = "👀", is_word = true, auto_expand = true }
 "robot★" = { output = "🤖", is_word = true, auto_expand = true }
+"rocket★" = { output = "🚀", is_word = true, auto_expand = true }
 "sacoche★" = { output = "💼", is_word = true, auto_expand = true }
 "smartphone★" = { output = "📱", is_word = true, auto_expand = true }
 "soleil★" = { output = "☀️", is_word = true, auto_expand = true }
@@ -185,6 +192,7 @@
 "glace★" = { output = "🍦", is_word = true, auto_expand = true }
 "hamburger★" = { output = "🍔", is_word = true, auto_expand = true }
 "hotdog★" = { output = "🌭", is_word = true, auto_expand = true }
+"kebab★" = { output = "🥙", is_word = true, auto_expand = true }
 "kiwi★" = { output = "🥝", is_word = true, auto_expand = true }
 "lait★" = { output = "🥛", is_word = true, auto_expand = true }
 "maïs★" = { output = "🌽", is_word = true, auto_expand = true }

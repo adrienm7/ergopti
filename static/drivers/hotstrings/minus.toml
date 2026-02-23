@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "Minus"
+description = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
+
 [[general]]
 "aije" = { output = "ai-je", is_word = true, auto_expand = false }
 "astu" = { output = "as-tu", is_word = true, auto_expand = false }

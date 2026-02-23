@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "MultiplePunctuationMarks"
+description = "Taper `"
+
 [[general]]
 " ! !" = { output = " !!", is_word = true, auto_expand = true }
 "! !" = { output = "!!", is_word = true, auto_expand = true }

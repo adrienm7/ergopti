@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "Errors"
+description = "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …"
+
 [[general]]
 "(_" = { output = "( ", is_word = true, auto_expand = true }
 ")_" = { output = ") ", is_word = true, auto_expand = true }
@@ -16,7 +20,7 @@
 "*_" = { output = "* ", is_word = true, auto_expand = true }
 
 [[caps_correction]]
-"OUi" = { output = "Oui", is_word = false, auto_expand = false }
+"OUi" = { output = "Oui", is_word = true, auto_expand = true }
 
 [[letters_chaining_correction]]
 "eua" = { output = "eau", is_word = false, auto_expand = true }
