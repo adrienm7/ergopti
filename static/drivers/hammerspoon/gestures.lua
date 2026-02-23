@@ -26,6 +26,17 @@ local VERTICAL_DEFAULT = 0.12
 threshold_horizontal = HORIZONTAL_DEFAULT
 threshold_vertical = VERTICAL_DEFAULT
 
+-- Feature flags for gestures (can be toggled at runtime)
+local feature_flags = {
+    tap_selection = true,
+    tap_lookup = true,
+    -- split swipe into four directions
+    swipe_left = true,
+    swipe_right = true,
+    swipe_up = true,
+    swipe_down = true,
+}
+
 local function forceCleanup()
     utils.debugLog("forceCleanup: start mouseEventTap=", tostring(mouseEventTap), "leftClickPressed=", tostring(leftClickPressed))
     if mouseEventTap then
@@ -112,13 +123,13 @@ local function create_watcher(deviceID)
                 if _tapStartPoint and _tapEndPoint and _maybeTap and _tapFingerCount then
                     local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) + math.abs(_tapStartPoint.y - _tapEndPoint.y)
                     if delta < _tapDelta then
-                        if _tapFingerCount == 3 then
-                            utils.debugLog("watcher:", deviceID, "detected 3-finger tap (delta=", delta, ") -> toggleSelection")
-                            toggleSelection()
-                        elseif _tapFingerCount == 4 then
-                            utils.debugLog("watcher:", deviceID, "detected 4-finger tap (delta=", delta, ") -> triggerLookup")
-                            triggerLookup()
-                        end
+                            if _tapFingerCount == 3 then
+                                utils.debugLog("watcher:", deviceID, "detected 3-finger tap (delta=", delta, ") -> toggleSelection")
+                                if feature_flags.tap_selection then toggleSelection() end
+                            elseif _tapFingerCount == 4 then
+                                utils.debugLog("watcher:", deviceID, "detected 4-finger tap (delta=", delta, ") -> triggerLookup")
+                                if feature_flags.tap_lookup then triggerLookup() end
+                            end
                     end
                 end
                 _touchStartTime = nil
@@ -229,13 +240,21 @@ local function start_swipe()
                 threshold_horizontal = math.huge
                 threshold_vertical = math.huge
                 if direction == "left" then
-                    hs.eventtap.keyStroke({"ctrl", "shift"}, "tab")
+                    if feature_flags.swipe_left then
+                        hs.eventtap.keyStroke({"ctrl", "shift"}, "tab")
+                    end
                 elseif direction == "right" then
-                    hs.eventtap.keyStroke({"ctrl"}, "tab")
+                    if feature_flags.swipe_right then
+                        hs.eventtap.keyStroke({"ctrl"}, "tab")
+                    end
                 elseif direction == "up" then
-                    hs.eventtap.keyStroke({"cmd"}, "t")
+                    if feature_flags.swipe_up then
+                        hs.eventtap.keyStroke({"cmd"}, "t")
+                    end
                 elseif direction == "down" then
-                    hs.eventtap.keyStroke({"cmd"}, "w")
+                    if feature_flags.swipe_down then
+                        hs.eventtap.keyStroke({"cmd"}, "w")
+                    end
                 end
             end
         else
@@ -247,11 +266,99 @@ local function start_swipe()
     utils.debugLog("gestures: swipe started")
 end
 
+local function stop_swipe()
+    if Swipe3 and Swipe3.stop then
+        pcall(function() Swipe3:stop() end)
+    end
+    Swipe3 = nil
+    utils.debugLog("gestures: swipe stopped")
+end
+
 function M.start()
     ensure_watchers()
     start_supervisor()
     start_status_logger()
-    start_swipe()
+    if feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down then
+        start_swipe()
+    end
+end
+
+-- Enable a specific gesture feature at runtime
+function M.enable(name)
+    if name == "all" then
+        feature_flags.tap_selection = true
+        feature_flags.tap_lookup = true
+        feature_flags.swipe_left = true
+        feature_flags.swipe_right = true
+        feature_flags.swipe_up = true
+        feature_flags.swipe_down = true
+        start_swipe()
+        return
+    end
+
+    if name == "swipe" then
+        feature_flags.swipe_left = true
+        feature_flags.swipe_right = true
+        feature_flags.swipe_up = true
+        feature_flags.swipe_down = true
+        start_swipe()
+        return
+    end
+
+    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" then
+        feature_flags[name] = true
+        -- ensure swipe subsystem is running
+        if not Swipe3 then start_swipe() end
+        return
+    end
+
+    if name == "tap_selection" then
+        feature_flags.tap_selection = true
+    elseif name == "tap_lookup" then
+        feature_flags.tap_lookup = true
+    end
+end
+
+-- Disable a specific gesture feature at runtime
+function M.disable(name)
+    if name == "all" then
+        feature_flags.tap_selection = false
+        feature_flags.tap_lookup = false
+        feature_flags.swipe_left = false
+        feature_flags.swipe_right = false
+        feature_flags.swipe_up = false
+        feature_flags.swipe_down = false
+        stop_swipe()
+        return
+    end
+
+    if name == "swipe" then
+        feature_flags.swipe_left = false
+        feature_flags.swipe_right = false
+        feature_flags.swipe_up = false
+        feature_flags.swipe_down = false
+        stop_swipe()
+        return
+    end
+
+    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" then
+        feature_flags[name] = false
+        -- if no swipe directions left enabled, stop the swipe subsystem
+        if not (feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down) then
+            stop_swipe()
+        end
+        return
+    end
+
+    if name == "tap_selection" then
+        feature_flags.tap_selection = false
+    elseif name == "tap_lookup" then
+        feature_flags.tap_lookup = false
+    end
+end
+
+function M.is_enabled(name)
+    return feature_flags[name] == true
 end
 
 M.forceCleanup = forceCleanup
