@@ -57,74 +57,7 @@ local function do_transform(transform_func)
     end)
 end
 
--- Récupère le chemin POSIX de la sélection dans le Finder (string) ou nil
-local function get_selection_path()
-    local front = hs.application.frontmostApplication()
-    local name = (front and front:name()) or "Finder"
-
-    local function try_app(appname)
-        local script = string.format([[
-            tell application "%s"
-                try
-                    set sel to selection
-                    if sel = {} then return "" end if
-                    set pths to {}
-                    repeat with i from 1 to count of sel
-                        set theItem to item i of sel
-                        set end of pths to POSIX path of (theItem as alias)
-                    end repeat
-                    return pths as string
-                on error
-                    return ""
-                end try
-            end tell
-        ]], appname)
-        local ok, result = hs.osascript.applescript(script)
-        if ok and result and result ~= "" then return result end
-        return nil
-    end
-
-    -- Try the frontmost app first (works if it implements Finder-like selection API)
-    local res = try_app(name)
-    if res then return res end
-
-    -- Try using Accessibility API to extract selected items (works for some file managers)
-    local function try_ax(app)
-        if not app then return nil end
-        local ok, axapp = pcall(hs.axuielement.applicationElement, app:pid())
-        if not ok or not axapp then return nil end
-        local win = axapp:attributeValue("AXFocusedWindow") or axapp:attributeValue("AXMainWindow")
-        if not win then return nil end
-        local sel = win:attributeValue("AXSelectedRows") or win:attributeValue("AXSelectedChildren") or win:attributeValue("AXSelectedItems")
-        if not sel or type(sel) ~= "table" then return nil end
-        local paths = {}
-        for _, item in ipairs(sel) do
-            if item then
-                local p = item:attributeValue("AXDocument") or item:attributeValue("AXURL") or item:attributeValue("AXTitle") or item:attributeValue("AXValue")
-                if p and type(p) == "string" then
-                    if p:match("^file://") then
-                        p = p:gsub("^file://", "")
-                        p = p:gsub("%%20", " ")
-                    end
-                    table.insert(paths, p)
-                end
-            end
-        end
-        if #paths > 0 then return table.concat(paths, ", ") end
-        return nil
-    end
-
-    local axres = try_ax(front)
-    if axres then return axres end
-
-    -- Fallback to Finder selection if front app didn't respond
-    if name ~= "Finder" then
-        local res2 = try_app("Finder")
-        if res2 then return res2 end
-    end
-
-    return nil
-end
+-- get_selection_path removed: simplified approach uses Cmd+Option+C for Finder-like apps
 
 -- Centre les fenêtres standard visibles d'une application
 local function center_windows_of_app(app)
@@ -151,6 +84,18 @@ local function center_frontmost_after(delay)
     end)
 end
 
+-- List of Finder-like file managers and helper to detect them (supports variants like "qspace pro")
+local fm_list = {"finder", "qspace", "path finder", "forklift", "commander one", "totalfinder", "xtrafinder"}
+
+local function is_finder_like(appname)
+    if not appname then return false end
+    local ln = appname:lower()
+    for _, v in ipairs(fm_list) do
+        if ln:find(v, 1, true) then return true end
+    end
+    return false
+end
+
 --------------------------------------------------------------------------------
 -- HOTKEYS (Classés par ordre alphabétique)
 --------------------------------------------------------------------------------
@@ -159,58 +104,118 @@ end
 -- et `hs.pasteboard` pour préserver/restaurer le presse-papiers.
 local M = {}
 local hotkeys = {}
+local hotkey_defs = {}
+local hotkey_labels = {}
 local started = false
 
-function M.start()
-    if started then return end
-    started = true
-
-    -- Ctrl + A : sélectionner toute la ligne (début -> fin)
-    hotkeys.ctrl_a = hs.hotkey.bind({"ctrl"}, "a", function()
+-- Definitions des raccourcis (créent et retournent l'objet hotkey quand appelés)
+hotkey_labels.ctrl_a = "Sélectionner la ligne (Ctrl+A)"
+hotkey_defs.ctrl_a = function()
+    return hs.hotkey.bind({"ctrl"}, "a", function()
         eventtap.keyStroke({"cmd"}, "left")
         eventtap.keyStroke({"cmd", "shift"}, "right")
     end)
+end
 
-    -- Ctrl + D : ouvrir le dossier Téléchargements
-    hotkeys.ctrl_d = hs.hotkey.bind({"ctrl"}, "d", function()
-        local home = os.getenv("HOME") or "~"
-        hs.execute('open "' .. home .. '/Downloads"')
-        center_frontmost_after(0.3)
-    end)
-
-    -- Ctrl + E : ouvrir le Finder
-    hotkeys.ctrl_e = hs.hotkey.bind({"ctrl"}, "e", function()
-        hs.application.launchOrFocus("Finder")
-        center_frontmost_after(0.3)
-    end)
-
-    -- Ctrl + H : capture d'écran interactive (enregistre sur le Bureau)
-    hotkeys.ctrl_h = hs.hotkey.bind({"ctrl"}, "h", function()
+hotkey_labels.ctrl_h = "Capture interactive (Ctrl+H)"
+hotkey_defs.ctrl_h = function()
+    return hs.hotkey.bind({"ctrl"}, "h", function()
         local home = os.getenv("HOME") or "~"
         local filename = string.format('%s/Desktop/screenshot_%s.png', home, os.date('%Y%m%d%H%M%S'))
         local cmd = 'screencapture -i "' .. filename .. '"'
         hs.execute(cmd)
     end)
-    
-    -- Ctrl + I : ouvrir les Réglages macOS (System Settings / Preferences)
-    hotkeys.ctrl_i = hs.hotkey.bind({"ctrl"}, "i", function()
+end
+
+hotkey_labels.ctrl_e = "Ouvrir Finder (Ctrl+E)"
+hotkey_defs.ctrl_e = function()
+    return hs.hotkey.bind({"ctrl"}, "e", function()
+        hs.application.launchOrFocus("Finder")
+        center_frontmost_after(0.3)
+    end)
+end
+
+hotkey_labels.ctrl_d = "Ouvrir Téléchargements (Ctrl+D)"
+hotkey_defs.ctrl_d = function()
+    return hs.hotkey.bind({"ctrl"}, "d", function()
+        local home = os.getenv("HOME") or "~"
+        hs.execute('open "' .. home .. '/Downloads"')
+        center_frontmost_after(0.3)
+    end)
+end
+
+hotkey_labels.ctrl_i = "Ouvrir Réglages (Ctrl+I)"
+hotkey_defs.ctrl_i = function()
+    return hs.hotkey.bind({"ctrl"}, "i", function()
         if not hs.application.launchOrFocus("System Settings") then
             hs.application.launchOrFocus("System Preferences")
         end
         center_frontmost_after(0.3)
     end)
+end
 
-    -- Ctrl + S : ouvrir la sélection
-    -- - si c'est une URL probable, l'ouvre directement
-    -- - sinon ouvre une recherche Google de la sélection
-    hotkeys.ctrl_s = hs.hotkey.bind({"ctrl"}, "s", function()
-        local path = get_selection_path()
-        if path then
-            pasteboard.setContents(path)
-            hs.alert.show("Chemin copié dans le presse-papiers")
+hotkey_labels.ctrl_t = "Title Case toggle (Ctrl+T)"
+hotkey_defs.ctrl_t = function()
+    return hs.hotkey.bind({"ctrl"}, "t", function()
+        do_transform(function(sel)
+            local t = titlecase(sel)
+            return (sel == t) and sel:lower() or t
+        end)
+    end)
+end
+
+hotkey_labels.ctrl_u = "Upper/Lower toggle (Ctrl+U)"
+hotkey_defs.ctrl_u = function()
+    return hs.hotkey.bind({"ctrl"}, "u", function()
+        do_transform(function(sel)
+            local has_lower = sel:match("%l") ~= nil
+            return has_lower and sel:upper() or sel:lower()
+        end)
+    end)
+end
+
+hotkey_labels.ctrl_s = "Ouvrir / Copier chemin (Ctrl+S)"
+hotkey_defs.ctrl_s = function()
+    return hs.hotkey.bind({"ctrl"}, "s", function()
+        local front = hs.application.frontmostApplication()
+        local name = front and front:name() or ""
+
+        -- If front app looks like a Finder-like file manager, always send Cmd+Alt+C to copy path
+        if is_finder_like(name) then
+            eventtap.keyStroke({"cmd", "alt"}, "c")
+            timer.doAfter(0.15, function()
+                local p = pasteboard.getContents()
+                if p and p ~= "" then
+                    hs.alert.show("Chemin [" .. p .. "] copié dans le presse-papiers")
+                    return
+                end
+                -- fallback: copier la sélection et faire une recherche
+                local prior = pasteboard.getContents()
+                pasteboard.clearContents()
+                eventtap.keyStroke({"cmd"}, "c")
+                timer.doAfter(0.2, function()
+                    local sel = pasteboard.getContents()
+                    if prior then
+                        pasteboard.setContents(prior)
+                    else
+                        pasteboard.clearContents()
+                    end
+                    if not sel or sel == "" then return end
+                    local trimmed = trim(sel)
+                    local url = is_probable_url(trimmed)
+                    if url then
+                        urlevent.openURL(url)
+                    else
+                        local q = http.encodeForQuery(trimmed)
+                        local search = 'https://www.google.com/search?q=' .. q
+                        urlevent.openURL(search)
+                    end
+                end)
+            end)
             return
         end
 
+        -- Par défaut: copier la sélection et lancer la recherche/URL
         local prior = pasteboard.getContents()
         pasteboard.clearContents()
         eventtap.keyStroke({"cmd"}, "c")
@@ -233,22 +238,18 @@ function M.start()
             end
         end)
     end)
+end
 
-    -- Ctrl + T : bascule Title Case / lowercase pour la sélection
-    hotkeys.ctrl_t = hs.hotkey.bind({"ctrl"}, "t", function()
-        do_transform(function(sel)
-            local t = titlecase(sel)
-            return (sel == t) and sel:lower() or t
-        end)
-    end)
-
-    -- Ctrl + U : bascule Majuscules / Minuscules pour la sélection
-    hotkeys.ctrl_u = hs.hotkey.bind({"ctrl"}, "u", function()
-        do_transform(function(sel)
-            local has_lower = sel:match("%l") ~= nil
-            return has_lower and sel:upper() or sel:lower()
-        end)
-    end)
+function M.start()
+    if started then return end
+    started = true
+    -- create all bindings from definitions
+    for name, def in pairs(hotkey_defs) do
+        if not hotkeys[name] then
+            hotkeys[name] = def()
+        end
+    end
+    -- bindings created from hotkey_defs above
 end
 
 function M.stop()
@@ -258,6 +259,33 @@ function M.stop()
     end
     hotkeys = {}
     started = false
+end
+
+-- Enable a single named hotkey
+function M.enable(name)
+    if hotkeys[name] then return end
+    local def = hotkey_defs[name]
+    if def then hotkeys[name] = def() end
+end
+
+-- Disable a single named hotkey
+function M.disable(name)
+    local h = hotkeys[name]
+    if h and h.delete then h:delete() end
+    hotkeys[name] = nil
+end
+
+function M.is_enabled(name)
+    return hotkeys[name] ~= nil
+end
+
+function M.list_shortcuts()
+    local out = {}
+    for name, _ in pairs(hotkey_defs) do
+        table.insert(out, {id = name, label = hotkey_labels[name] or name, enabled = hotkeys[name] ~= nil})
+    end
+    table.sort(out, function(a,b) return a.id < b.id end)
+    return out
 end
 
 return M
