@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "Brands"
+description = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
+
 [[general]]
 "autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false }
 "citroen" = { output = "Citroën", is_word = true, auto_expand = false }

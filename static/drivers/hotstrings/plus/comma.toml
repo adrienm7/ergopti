@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "Comma"
+description = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"
+
 [[comma_top_row]]
 ",f" = { output = "fl", is_word = false, auto_expand = true }
 ",g" = { output = "gl", is_word = false, auto_expand = true }

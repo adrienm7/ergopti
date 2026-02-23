@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "Accents"
+description = "Autocorrection des accents de très nombreux mots"
+
 [[a]]
 "abim" = { output = "abîm", is_word = true, auto_expand = true }
 "accroit" = { output = "accroît", is_word = true, auto_expand = true }
@@ -13,6 +17,7 @@
 "agées" = { output = "âgées", is_word = true, auto_expand = false }
 "aieul" = { output = "aïeul", is_word = true, auto_expand = true }
 "aieux" = { output = "aïeux", is_word = true, auto_expand = true }
+"aigue" = { output = "aiguë", is_word = true, auto_expand = true }
 "aikido" = { output = "aïkido", is_word = true, auto_expand = true }
 "ainé" = { output = "aîné", is_word = true, auto_expand = true }
 "ambigue" = { output = "ambiguë", is_word = true, auto_expand = true }
@@ -259,8 +264,8 @@
 "oeuf" = { output = "œuf", is_word = true, auto_expand = true }
 "oeuvre" = { output = "œuvre", is_word = true, auto_expand = true }
 "oiaque" = { output = "oïaque", is_word = false, auto_expand = true }
-"oide" = { output = "oïde", is_word = false, auto_expand = true }
 "froide" = { output = "froide", is_word = false, auto_expand = true }
+"oide" = { output = "oïde", is_word = false, auto_expand = true }
 "opiniatre" = { output = "opiniâtre", is_word = true, auto_expand = true }
 "ouie" = { output = "ouïe", is_word = true, auto_expand = true }
 "oter" = { output = "ôter", is_word = true, auto_expand = false }

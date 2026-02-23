@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "TextExpansionSymbolsTypst"
+description = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …"
+
 [[control]]
 "$wj$" = { output = "{U+2060}", is_word = true, auto_expand = true }
 "$zwj$" = { output = "{U+200D}", is_word = true, auto_expand = true }

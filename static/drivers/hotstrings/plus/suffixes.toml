@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "SuffixesA"
+description = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …"
+
 [[general]]
 "àa" = { output = "aire", is_word = false, auto_expand = true }
 "àc" = { output = "ction", is_word = false, auto_expand = true }

@@ -3,6 +3,10 @@
 # Format: [[section]]
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
+[metadata]
+block = "TextExpansion"
+description = "Expansion de texte : c"
+
 [[alphabetic_ligatures]]
 "ae★" = { output = "æ", is_word = false, auto_expand = true }
 "oe★" = { output = "œ", is_word = false, auto_expand = true }
@@ -315,7 +319,6 @@
 "mr★" = { output = "monsieur", is_word = true, auto_expand = true }
 "mrc★" = { output = "merci", is_word = true, auto_expand = true }
 "msg★" = { output = "message", is_word = true, auto_expand = true }
-"mt★" = { output = "montant", is_word = true, auto_expand = true }
 "mtn★" = { output = "maintenant", is_word = true, auto_expand = true }
 "moy★" = { output = "moyenne", is_word = true, auto_expand = true }
 "mutu★" = { output = "mutualiser", is_word = true, auto_expand = true }
@@ -471,7 +474,7 @@
 "strat★" = { output = "stratégique", is_word = true, auto_expand = true }
 "stream★" = { output = "streaming", is_word = true, auto_expand = true }
 "suff★" = { output = "suffisant", is_word = true, auto_expand = true }
-"sufft★" = { output = "suffisament", is_word = true, auto_expand = true }
+"sufft★" = { output = "suffisamment", is_word = true, auto_expand = true }
 "supé★" = { output = "supérieur", is_word = true, auto_expand = true }
 "surv★" = { output = "survenance", is_word = true, auto_expand = true }
 "svp★" = { output = "s’il vous plaît", is_word = true, auto_expand = true }

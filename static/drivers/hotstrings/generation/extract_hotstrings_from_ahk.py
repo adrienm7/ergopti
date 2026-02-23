@@ -283,8 +283,21 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
             else:
                 block_name_for_toml = first_block
 
+            # Try to extract a menu description for the primary block and include it in the TOML header
+            menu_desc = None
+            try:
+                menu_desc = find_description_in_content(
+                    content, block_name_for_toml
+                )
+            except Exception:
+                menu_desc = None
+
+            descriptions_param = (
+                {block_name_for_toml: menu_desc} if menu_desc else None
+            )
+
             toml_content = convert_to_toml(
-                filtered_hotstrings, block_name_for_toml
+                filtered_hotstrings, block_name_for_toml, descriptions_param
             )
 
             # Write the TOML file
@@ -425,7 +438,22 @@ def extract_multiple_ahk_blocks_to_toml(
     else:
         block_name_for_toml = first_block
 
-    toml_content = convert_to_toml(deduplicated_hotstrings, block_name_for_toml)
+    # Collect descriptions for each block pattern found (use block names as in AHK)
+    descriptions: dict[str, str] = {}
+    for bp in found_blocks:
+        if isinstance(bp, tuple):
+            _, block_name = bp
+        else:
+            block_name = bp
+        desc = find_description_in_content(content, block_name)
+        if desc:
+            descriptions[block_name] = desc
+
+    toml_content = convert_to_toml(
+        deduplicated_hotstrings,
+        block_name_for_toml,
+        descriptions if descriptions else None,
+    )
 
     # Write the TOML file
     try:
@@ -538,7 +566,12 @@ def extract_ahk_block_to_toml(
     deduplicated_hotstrings = deduplicate_hotstrings(hotstrings)
 
     # Convert to TOML format
-    toml_content = convert_to_toml(deduplicated_hotstrings, block_pattern)
+    # Try to extract description for this block from the source AHK content
+    desc = find_description_in_content(content, block_pattern)
+    descriptions = {block_pattern: desc} if desc else None
+    toml_content = convert_to_toml(
+        deduplicated_hotstrings, block_pattern, descriptions
+    )
 
     # Write the TOML file
     try:
@@ -654,6 +687,40 @@ def extract_all_blocks_from_category(content: str, category: str) -> str:
             merged_content.append(block_content)
 
     return "\n".join(merged_content)
+
+
+def find_description_in_content(content: str, section_name: str) -> str:
+    """
+    Find a Description value for a given section/block name inside the Features map.
+
+    Returns the unescaped description string, or empty string if not found.
+    """
+    # Search for the block definition like: "SectionName", { ... Description: "...",
+    pattern = rf'"{re.escape(section_name)}"\s*,\s*\{{'
+    m = re.search(pattern, content)
+    if not m:
+        return ""
+
+    # Find matching closing brace for this block definition
+    start_idx = m.end()
+    brace_count = 1
+    end_idx = start_idx
+    while end_idx < len(content) and brace_count > 0:
+        if content[end_idx] == "{":
+            brace_count += 1
+        elif content[end_idx] == "}":
+            brace_count -= 1
+        end_idx += 1
+
+    block_text = content[start_idx : end_idx - 1] if brace_count == 0 else ""
+    if not block_text:
+        return ""
+
+    desc_match = re.search(r'Description\s*:\s*"([^\"]*)"', block_text)
+    if desc_match:
+        return process_autohotkey_escapes(desc_match.group(1))
+
+    return ""
 
 
 def extract_hotstrings(
@@ -1110,7 +1177,9 @@ def extract_hotstring_from_line(
 
 
 def convert_to_toml(
-    hotstrings: dict[str, list[tuple[str, str, bool, bool]]], block_name: str
+    hotstrings: dict[str, list[tuple[str, str, bool, bool]]],
+    block_name: str,
+    descriptions: dict[str, str] | None = None,
 ) -> str:
     """
     Convert hotstrings dictionary to TOML format.
@@ -1126,12 +1195,35 @@ def convert_to_toml(
     header_lines = TOML_HEADER.copy()
     header_lines.insert(2, "# Format: [[section]]")  # Add section format info
 
-    # Cas général
     toml_lines = header_lines.copy()
+
+    # If a menu/block description was provided for this file, add it as
+    # structured metadata for easy programmatic retrieval.
+    file_description = None
+    if descriptions and block_name in descriptions:
+        file_description = descriptions.pop(block_name)
+
+    if file_description:
+        toml_lines.append("[metadata]")
+        toml_lines.append(f'block = "{escape_toml_string(block_name)}"')
+        toml_lines.append(
+            f'description = "{escape_toml_string(file_description)}"'
+        )
+        toml_lines.append("")
+
+    # Main sections
     for section_name, entries in hotstrings.items():
         if not entries:
             continue
         toml_lines.append(f"[[{section_name}]]")
+        # If we have a description for this precise section name, add it
+        # inside the section table for structured retrieval.
+        if descriptions and section_name in descriptions:
+            sec_desc = descriptions[section_name].replace("\n", " ").strip()
+            if sec_desc:
+                toml_lines.append(
+                    f'description = "{escape_toml_string(sec_desc)}"'
+                )
         for trigger, output, is_word, auto_expand in entries:
             # Always escape both trigger and output for valid TOML
             trigger_escaped = escape_toml_string(trigger)
@@ -1142,6 +1234,7 @@ def convert_to_toml(
                 f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()} }}'
             )
         toml_lines.append("")
+
     return "\n".join(toml_lines)
 
 
@@ -1352,7 +1445,18 @@ def generate_rolls_toml(ahk_file_path: str) -> None:
         return
 
     # Convert to TOML format
-    toml_content = convert_to_toml(all_hotstrings, "Rolls")
+    # Collect descriptions for each Rolls block found
+    descriptions: dict[str, str] = {}
+    block_name_pattern = r'if Features\["[^\"]+"\]\["([^\"]+)"\]\.?Enabled\s*\{'
+    for m in re.finditer(block_name_pattern, content):
+        block_name = m.group(1)
+        desc = find_description_in_content(content, block_name)
+        if desc:
+            descriptions[block_name] = desc
+
+    toml_content = convert_to_toml(
+        all_hotstrings, "Rolls", descriptions if descriptions else None
+    )
 
     # Write the TOML file
     with open(output_file, "w", encoding="utf-8") as f:
