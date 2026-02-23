@@ -11,6 +11,8 @@ local shortcuts = require("shortcuts")
 -- Démarrage initial des modules
 gestures.start()
 scroll.start()
+-- Démarrer aussi les raccourcis (module `shortcuts`)
+shortcuts.start()
 -- (keymap démarre déjà tout seul grâce à ton keymap.lua)
 
 
@@ -49,23 +51,32 @@ keymap.add("z★", "zz", true)
 local base_dir = "/Users/b519hs/Documents/perso/ergopti/static/drivers/hammerspoon/"
 local gen_dir = base_dir .. "generated_hotstrings/"
 
-dofile(gen_dir .. "accents.lua")
-dofile(gen_dir .. "brands.lua")
-dofile(gen_dir .. "emojis.lua")
-dofile(gen_dir .. "errors.lua")
-dofile(gen_dir .. "magic.lua")
-dofile(gen_dir .. "minus.lua")
-dofile(gen_dir .. "names.lua")
-dofile(gen_dir .. "plus_apostrophe.lua")
-dofile(gen_dir .. "plus_comma.lua")
-dofile(gen_dir .. "plus_e_deadkey.lua")
-dofile(gen_dir .. "plus_qu.lua")
-dofile(gen_dir .. "plus_rolls.lua")
-dofile(gen_dir .. "plus_sfb_reduction.lua")
-dofile(gen_dir .. "plus_suffixes.lua")
-dofile(gen_dir .. "punctuation.lua")
-dofile(gen_dir .. "symbols.lua")
-dofile(gen_dir .. "symbols_typst.lua")
+-- Liste des fichiers hotstrings générés
+local hotfiles = {
+    "accents.lua",
+    "brands.lua",
+    "emojis.lua",
+    "errors.lua",
+    "magic.lua",
+    "minus.lua",
+    "names.lua",
+    "plus_apostrophe.lua",
+    "plus_comma.lua",
+    "plus_e_deadkey.lua",
+    "plus_qu.lua",
+    "plus_rolls.lua",
+    "plus_sfb_reduction.lua",
+    "plus_suffixes.lua",
+    "punctuation.lua",
+    "symbols.lua",
+    "symbols_typst.lua",
+}
+
+-- Charger chaque fichier via keymap.load_file (permet toggle par groupe)
+for _, f in ipairs(hotfiles) do
+    local name = f:match("^(.*)%.lua$") or f
+    keymap.load_file(name, gen_dir .. f)
+end
 
 
 ---------------------------------------------------------------------------
@@ -73,14 +84,52 @@ dofile(gen_dir .. "symbols_typst.lua")
 ---------------------------------------------------------------------------
 -- Création de l'icône dans la barre des menus
 local myMenu = hs.menubar.new()
-myMenu:setTitle("🔨") -- Tu peux mettre l'émoji ou le texte de ton choix
+-- Charger une icône PNG adaptée au thème (noir pour thème sombre, blanc sinon)
+local function isDarkMode()
+    local ok, out = pcall(function()
+        return hs.execute('defaults read -g AppleInterfaceStyle 2>/dev/null')
+    end)
+    if not ok or not out then return false end
+    return out:match("Dark") ~= nil
+end
+
+local logo_file = isDarkMode() and "logo_black.png" or "logo_white.png"
+local icon_path = base_dir .. logo_file
+local icon = hs.image.imageFromPath(icon_path)
+if icon then
+    -- Try to force the icon to a small size suitable for macOS menubar
+    local ok, err = pcall(function()
+        if icon.setSize then
+            icon:setSize({w=18, h=18})
+        elseif icon.setSize then
+            icon:setSize({w=18, h=18})
+        end
+    end)
+    if not ok then
+        print("warning: failed to call setSize on icon:", err)
+    end
+    myMenu:setIcon(icon, false)
+    print("menu icon loaded:", icon_path)
+else
+    myMenu:setTitle("🔨") -- fallback emoji
+    print("menu icon NOT loaded, tried:", icon_path)
+end
 
 -- État actuel de tes modules
 local state = {
     keymap = true,
     gestures = true,
     scroll = true
+    ,
+    shortcuts = true
 }
+
+-- État des hotstrings (par fichier)
+state.hotstrings = {}
+for _, f in ipairs(hotfiles) do
+    local name = f:match("^(.*)%.lua$") or f
+    state.hotstrings[name] = true
+end
 
 -- Fonction pour rafraîchir le menu et ses coches
 local function updateMenu()
@@ -94,12 +143,45 @@ local function updateMenu()
                 updateMenu() -- Rafraîchit la coche
             end
         },
+        -- Sous-menu pour activer/désactiver chaque fichier de hotstrings
+        {
+            title = "Hotstrings",
+            menu = (function()
+                local hot_menu = {}
+                for _, f in ipairs(hotfiles) do
+                    local name = f:match("^(.*)%.lua$") or f
+                    table.insert(hot_menu, {
+                        title = name,
+                        checked = state.hotstrings[name],
+                        fn = function()
+                            state.hotstrings[name] = not state.hotstrings[name]
+                            if state.hotstrings[name] then
+                                keymap.enable_group(name)
+                            else
+                                keymap.disable_group(name)
+                            end
+                            updateMenu()
+                        end
+                    })
+                end
+                return hot_menu
+            end)()
+        },
         {
             title = "Gestes à 3 doigts",
             checked = state.gestures,
             fn = function()
                 state.gestures = not state.gestures
                 if state.gestures then gestures.start() else gestures.stop() end
+                updateMenu()
+            end
+        },
+        {
+            title = "Raccourcis (Shortcuts)",
+            checked = state.shortcuts,
+            fn = function()
+                state.shortcuts = not state.shortcuts
+                if state.shortcuts then shortcuts.start() else shortcuts.stop() end
                 updateMenu()
             end
         },
@@ -112,11 +194,18 @@ local function updateMenu()
                 updateMenu()
             end
         },
+        { title = "Ouvrir la configuration" , fn = function()
+            -- Ouvre le fichier `init.lua` avec l'application par défaut
+            hs.execute('open "' .. base_dir .. 'init.lua"')
+        end },
+        { title = "Afficher la console", fn = function() hs.openConsole() end },
+        { title = "Préférences Hammerspoon", fn = function() hs.openPreferences() end },
         { title = "-" }, -- Ligne de séparation
         { 
             title = "Recharger la configuration", 
             fn = function() hs.reload() end 
-        }
+        },
+        { title = "Quitter Hammerspoon", fn = function() hs.quit() end }
     })
 end
 
