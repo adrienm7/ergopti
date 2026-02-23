@@ -1,38 +1,43 @@
-local hs = hs
-
 local M = {}
-
-local function isDarkMode()
-    local ok, out = pcall(function()
-        return hs.execute('defaults read -g AppleInterfaceStyle 2>/dev/null')
-    end)
-    if not ok or not out then return false end
-    return out:match("Dark") ~= nil
-end
-
-local function make_icon(base_dir)
-    local logo_file = isDarkMode() and "logo_black.png" or "logo_white.png"
-    local icon_path = base_dir .. logo_file
-    local icon = hs.image.imageFromPath(icon_path)
-    if icon then
-        pcall(function()
-            if icon.setSize then icon:setSize({w=18, h=18}) end
-        end)
-        return icon, icon_path
-    end
-    return nil, icon_path
-end
+local hs = hs
+local image = hs.image
+local menubar = hs.menubar
+local pathwatcher = hs.pathwatcher
 
 function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
-    local myMenu = hs.menubar.new()
-    local icon, icon_path = make_icon(base_dir)
-    if icon then
-        myMenu:setIcon(icon, false)
-        print("menu icon loaded:", icon_path)
-    else
-        myMenu:setTitle("🔨")
-        print("menu icon NOT loaded, tried:", icon_path)
-    end
+    base_dir = base_dir or (hs.configdir .. "/")
+
+    local myMenu = menubar.new()
+
+    local function isDarkMode()
+            local ok, out = pcall(function()
+                return hs.execute('defaults read -g AppleInterfaceStyle 2>/dev/null')
+            end)
+            if not ok or not out then return false end
+            return out:match("Dark") ~= nil
+        end
+
+        local function make_icon(base_dir)
+            local logo_file = isDarkMode() and "logo_black.png" or "logo_white.png"
+            local icon_path = base_dir .. "images/" .. logo_file
+            local icon = image.imageFromPath(icon_path)
+            if icon then
+                pcall(function()
+                    if icon.setSize then icon:setSize({w=18, h=18}) end
+                end)
+                return icon, icon_path
+            end
+            return nil, icon_path
+        end
+
+        local icon, icon_path = make_icon(base_dir)
+        if icon then
+            myMenu:setIcon(icon, false)
+            print("menu icon loaded:", icon_path)
+        else
+            myMenu:setTitle("🔨")
+            print("menu icon NOT loaded, tried:", icon_path)
+        end
 
     -- État actuel des modules
     local state = {
@@ -43,105 +48,163 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
     }
 
     state.hotstrings = {}
-    for _, f in ipairs(hotfiles) do
+    for _, f in ipairs(hotfiles or {}) do
         local name = f:match("^(.*)%.lua$") or f
         state.hotstrings[name] = true
     end
+    -- fonctions utilitaires pour construire les items
+    local function buildHotstringsItem()
+        local item = {
+            title = "Expansion de texte",
+            checked = state.keymap,
+            fn = function()
+                state.keymap = not state.keymap
+                if state.keymap then keymap.start() else keymap.stop() end
+                updateMenu()
+            end
+        }
+        if state.keymap then
+            item.menu = (function()
+                local normal_menu = {}
+                local plus_menu = {}
+                for _, f in ipairs(hotfiles or {}) do
+                    local name = f:match("^(.*)%.lua$") or f
+                    local pretty = (name:gsub("_"," "))
+                    local entry = {
+                        title = pretty,
+                        checked = state.hotstrings[name],
+                        fn = function()
+                            state.hotstrings[name] = not state.hotstrings[name]
+                            if state.hotstrings[name] then keymap.enable_group(name) else keymap.disable_group(name) end
+                            updateMenu()
+                        end
+                    }
+                    if name:match("^plus") then
+                        table.insert(plus_menu, entry)
+                    else
+                        table.insert(normal_menu, entry)
+                    end
+                end
+                local out = {}
+                for _, it in ipairs(normal_menu) do table.insert(out, it) end
+                if #plus_menu > 0 then
+                    table.insert(out, { title = "-" })
+                    for _, it in ipairs(plus_menu) do table.insert(out, it) end
+                end
+                return out
+            end)()
+        end
+        return item
+    end
+
+    local function buildGestesItem()
+        local item = {
+            title = "Gestes",
+            checked = state.gestures,
+            fn = function()
+                state.gestures = not state.gestures
+                if state.gestures then gestures.enable("all") else gestures.disable("all") end
+                updateMenu()
+            end
+        }
+        if state.gestures then
+                item.menu = (function()
+                local g_menu = {}
+                -- per-feature toggles, titre normalisé en "commande : action"
+                table.insert(g_menu, { title = "Tap (3 doigts) : Toggle sélection", checked = gestures.is_enabled("tap_selection"), fn = function()
+                    if gestures.is_enabled("tap_selection") then gestures.disable("tap_selection") else gestures.enable("tap_selection") end; updateMenu() end })
+                table.insert(g_menu, { title = "Tap (4 doigts) : Recherche du mot", checked = gestures.is_enabled("tap_lookup"), fn = function()
+                    if gestures.is_enabled("tap_lookup") then gestures.disable("tap_lookup") else gestures.enable("tap_lookup") end; updateMenu() end })
+                table.insert(g_menu, { title = "Swipe gauche : Onglet précédent", checked = gestures.is_enabled("swipe_left"), fn = function()
+                    if gestures.is_enabled("swipe_left") then gestures.disable("swipe_left") else gestures.enable("swipe_left") end; updateMenu() end })
+                table.insert(g_menu, { title = "Swipe droite : Onglet suivant", checked = gestures.is_enabled("swipe_right"), fn = function()
+                    if gestures.is_enabled("swipe_right") then gestures.disable("swipe_right") else gestures.enable("swipe_right") end; updateMenu() end })
+                table.insert(g_menu, { title = "Swipe haut : Nouvel onglet", checked = gestures.is_enabled("swipe_up"), fn = function()
+                    if gestures.is_enabled("swipe_up") then gestures.disable("swipe_up") else gestures.enable("swipe_up") end; updateMenu() end })
+                table.insert(g_menu, { title = "Swipe bas : Fermer onglet", checked = gestures.is_enabled("swipe_down"), fn = function()
+                    if gestures.is_enabled("swipe_down") then gestures.disable("swipe_down") else gestures.enable("swipe_down") end; updateMenu() end })
+                return g_menu
+            end)()
+        end
+        return item
+    end
+
+    local function buildRaccourcisItem()
+        local item = {
+            title = "Raccourcis",
+            checked = state.shortcuts,
+            fn = function()
+                state.shortcuts = not state.shortcuts
+                if state.shortcuts then shortcuts.start() else shortcuts.stop() end
+                updateMenu()
+            end
+        }
+        if state.shortcuts then
+            item.menu = (function()
+                local s_menu = {}
+                local list = shortcuts.list_shortcuts()
+
+                local function pretty_key_from_id(id)
+                    local parts = {}
+                    for part in id:gmatch("[^_]+") do table.insert(parts, part) end
+                    if #parts == 0 then return id end
+                    local key = parts[#parts]
+                    local modifiers = {}
+                    for i = 1, #parts - 1 do
+                        local p = parts[i]
+                        if p == "ctrl" then table.insert(modifiers, "Ctrl")
+                        elseif p == "cmd" then table.insert(modifiers, "Cmd")
+                        elseif p == "alt" or p == "option" then table.insert(modifiers, "Alt")
+                        elseif p == "shift" then table.insert(modifiers, "Shift")
+                        else table.insert(modifiers, p:sub(1,1):upper() .. p:sub(2)) end
+                    end
+                    local keyname = key:upper()
+                    if #modifiers > 0 then return table.concat(modifiers, " + ") .. " + " .. keyname end
+                    return keyname
+                end
+
+                local function trim(s) return (s:gsub("^%s*(.-)%s*$","%1")) end
+
+                for _, s in ipairs(list) do
+                    local key = pretty_key_from_id(s.id)
+                    local desc = trim((s.label or ""):gsub("%s*%b()",""))
+                    local title = key .. " : " .. (desc ~= "" and desc or s.id)
+                    table.insert(s_menu, { title = title, checked = s.enabled, fn = (function(id)
+                        return function()
+                            if shortcuts.is_enabled(id) then shortcuts.disable(id) else shortcuts.enable(id) end
+                            updateMenu()
+                        end
+                    end)(s.id) })
+                end
+                return s_menu
+            end)()
+        end
+        return item
+    end
+
+    local function buildUtilityItems()
+        local items = {}
+        table.insert(items, { title = "Option + Scroll : Volume", checked = state.scroll, fn = function()
+            state.scroll = not state.scroll
+            if state.scroll then scroll.start() else scroll.stop() end
+            updateMenu()
+        end })
+        table.insert(items, { title = "-" })
+        table.insert(items, { title = "Ouvrir la configuration : ouvrir init.lua" , fn = function() hs.execute('open "' .. base_dir .. 'init.lua"') end })
+        table.insert(items, { title = "Afficher la console : ouvrir la console", fn = function() hs.openConsole() end })
+        table.insert(items, { title = "Préférences Hammerspoon : ouvrir préférences", fn = function() hs.openPreferences() end })
+        table.insert(items, { title = "Recharger la configuration : recharger", fn = function() hs.reload() end })
+        table.insert(items, { title = "Quitter Hammerspoon : quitter", fn = function() hs.quit() end })
+        return items
+    end
 
     local function updateMenu()
-        myMenu:setMenu({
-            {
-                title = "Hotstrings (Keymap)",
-                checked = state.keymap,
-                fn = function()
-                    state.keymap = not state.keymap
-                    if state.keymap then keymap.start() else keymap.stop() end
-                    updateMenu()
-                end
-            },
-            {
-                title = "Hotstrings",
-                menu = (function()
-                    local hot_menu = {}
-                    for _, f in ipairs(hotfiles) do
-                        local name = f:match("^(.*)%.lua$") or f
-                        table.insert(hot_menu, {
-                            title = name,
-                            checked = state.hotstrings[name],
-                            fn = function()
-                                state.hotstrings[name] = not state.hotstrings[name]
-                                if state.hotstrings[name] then
-                                    keymap.enable_group(name)
-                                else
-                                    keymap.disable_group(name)
-                                end
-                                updateMenu()
-                            end
-                        })
-                    end
-                    return hot_menu
-                end)()
-            },
-            {
-                title = "Gestes à 3 doigts",
-                checked = state.gestures,
-                fn = function()
-                    state.gestures = not state.gestures
-                    if state.gestures then gestures.start() else gestures.stop() end
-                    updateMenu()
-                end
-            },
-            {
-                title = "Raccourcis (Shortcuts)",
-                checked = state.shortcuts,
-                fn = function()
-                    state.shortcuts = not state.shortcuts
-                    if state.shortcuts then shortcuts.start() else shortcuts.stop() end
-                    updateMenu()
-                end
-            },
-            {
-                title = "Shortcuts",
-                menu = (function()
-                    local s_menu = {}
-                    local list = shortcuts.list_shortcuts()
-                    for _, s in ipairs(list) do
-                        table.insert(s_menu, {
-                            title = s.label,
-                            checked = s.enabled,
-                            fn = (function(id)
-                                return function()
-                                    if shortcuts.is_enabled(id) then
-                                        shortcuts.disable(id)
-                                    else
-                                        shortcuts.enable(id)
-                                    end
-                                    updateMenu()
-                                end
-                            end)(s.id)
-                        })
-                    end
-                    return s_menu
-                end)()
-            },
-            {
-                title = "Option + Scroll (Volume)",
-                checked = state.scroll,
-                fn = function()
-                    state.scroll = not state.scroll
-                    if state.scroll then scroll.start() else scroll.stop() end
-                    updateMenu()
-                end
-            },
-            { title = "Ouvrir la configuration" , fn = function()
-                hs.execute('open "' .. base_dir .. 'init.lua"')
-            end },
-            { title = "Afficher la console", fn = function() hs.openConsole() end },
-            { title = "Préférences Hammerspoon", fn = function() hs.openPreferences() end },
-            { title = "-" },
-            { title = "Recharger la configuration", fn = function() hs.reload() end },
-            { title = "Quitter Hammerspoon", fn = function() hs.quit() end }
-        })
+        local menu_items = {}
+        table.insert(menu_items, buildHotstringsItem())
+        table.insert(menu_items, buildGestesItem())
+        table.insert(menu_items, buildRaccourcisItem())
+        for _, it in ipairs(buildUtilityItems()) do table.insert(menu_items, it) end
+        myMenu:setMenu(menu_items)
     end
 
     updateMenu()
@@ -157,7 +220,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         end
         if doReload then hs.reload() end
     end
-    local configWatcher = hs.pathwatcher.new(base_dir, reloadConfig):start()
+    local configWatcher = pathwatcher.new(base_dir, reloadConfig):start()
+
+    -- conserver des références pour éviter la collecte GC qui ferme le menu
+    M._menu = myMenu
+    M._watcher = configWatcher
+    M._icon = icon
 
     hs.alert.show("Hammerspoon prêt ! 🚀")
 

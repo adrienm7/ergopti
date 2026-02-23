@@ -240,6 +240,22 @@ hotkey_defs.ctrl_s = function()
     end)
 end
 
+hotkey_labels.cmd_shift_v = "Coller sans mise en forme (Cmd+Shift+V)"
+hotkey_defs.cmd_shift_v = function()
+    return hs.hotkey.bind({"cmd","shift"}, "v", function()
+        local prior = pasteboard.getContents()
+        local plain = pasteboard.getContents() or ""
+        pasteboard.clearContents()
+        pasteboard.setContents(plain)
+        timer.doAfter(0.02, function()
+            eventtap.keyStroke({"cmd"}, "v")
+            timer.doAfter(0.15, function()
+                if prior and prior ~= "" then pasteboard.setContents(prior) else pasteboard.clearContents() end
+            end)
+        end)
+    end)
+end
+
 function M.start()
     if started then return end
     started = true
