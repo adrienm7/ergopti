@@ -5,7 +5,7 @@
 
 [metadata]
 block = "TextExpansion"
-description = "Expansion de texte : c"
+description = "Expansion de texte : c★  = c’est, gt★  = j’étais, pex★  = par exemple, …"
 
 [[alphabetic_ligatures]]
 "ae★" = { output = "æ", is_word = false, auto_expand = true }
