@@ -45,6 +45,29 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             print("menu icon NOT loaded, tried:", icon_path)
         end
 
+    -- helper to show notification before reloading Hammerspoon
+    local function do_reload(source)
+        -- source == "watcher" -> show a system notification
+        if source == "watcher" then
+            if hs and hs.notify and hs.notify.new then
+                pcall(function()
+                    hs.notify.new({title = "Hammerspoon", informativeText = "Fichiers modifiés — rechargement de la config"}):send()
+                end)
+            else
+                if hs and hs.alert and hs.alert.show then hs.alert.show("Fichiers modifiés — rechargement…", 1.0) end
+            end
+        else
+            if hs and hs.alert and hs.alert.show then
+                hs.alert.show("Rechargement Hammerspoon…", 1.0)
+            end
+        end
+        if hs and hs.timer and hs.timer.doAfter then
+            hs.timer.doAfter(0.25, function() hs.reload() end)
+        else
+            hs.reload()
+        end
+    end
+
     -- État actuel des modules
     local state = {
         keymap = true,
@@ -58,15 +81,109 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         local name = f:match("^(.*)%.lua$") or f
         state.hotstrings[name] = true
     end
+    -- Preferences persistence
+    local prefs_file = base_dir .. "ergopti_prefs.json"
+
+    local function load_prefs()
+        local fh = io.open(prefs_file, "r")
+        if not fh then return {} end
+        local content = fh:read("*a")
+        fh:close()
+        local ok, tbl = pcall(function() return hs.json.decode(content) end)
+        if ok and type(tbl) == "table" then return tbl end
+        return {}
+    end
+
+    local function save_prefs()
+        local prefs = {
+            keymap = state.keymap,
+            gestures = state.gestures,
+            scroll = state.scroll,
+            shortcuts = state.shortcuts,
+            hotstrings = state.hotstrings,
+            shortcut_keys = {},
+            gesture_map = {}
+        }
+        -- collect current shortcut key states if module available
+        if shortcuts and type(shortcuts.list_shortcuts) == "function" then
+            local list = shortcuts.list_shortcuts()
+            for _, s in ipairs(list) do
+                prefs.shortcut_keys[s.id] = s.enabled
+            end
+        end
+        -- collect gesture states for known gestures
+        local known_gestures = {"tap_selection","tap_lookup","swipe_left","swipe_right","swipe_up","swipe_down"}
+        if gestures and type(gestures.is_enabled) == "function" then
+            for _, g in ipairs(known_gestures) do prefs.gesture_map[g] = gestures.is_enabled(g) end
+        end
+        local ok, encoded = pcall(function() return hs.json.encode(prefs) end)
+        if not ok or not encoded then return end
+        local fh = io.open(prefs_file, "w")
+        if not fh then return end
+        fh:write(encoded)
+        fh:close()
+    end
+
+    -- Apply saved preferences (if any)
+    do
+        local saved = load_prefs()
+        if type(saved) == "table" then
+            if saved.keymap ~= nil then state.keymap = saved.keymap end
+            if saved.gestures ~= nil then state.gestures = saved.gestures end
+            if saved.scroll ~= nil then state.scroll = saved.scroll end
+            if saved.shortcuts ~= nil then state.shortcuts = saved.shortcuts end
+            if type(saved.hotstrings) == "table" then
+                for name, _ in pairs(state.hotstrings) do
+                    if saved.hotstrings[name] ~= nil then state.hotstrings[name] = saved.hotstrings[name] end
+                end
+            end
+        end
+    end
+    -- Note: do NOT overwrite saved `state.hotstrings` with runtime groups here.
+    -- The saved preferences are the source of truth on startup; the menu will
+    -- read runtime state dynamically when rendering items.
+    -- Start/stop modules according to state and apply per-feature prefs
+    do
+        -- keymap
+        if state.keymap then keymap.start() else keymap.stop() end
+        -- gestures: if saved gesture map exists we apply per-gesture, otherwise use enable/disable all
+        local saved = load_prefs()
+        if type(saved) == "table" and type(saved.gesture_map) == "table" then
+            -- ensure gestures module is in a known state before applying individual toggles
+            for _, g in ipairs({"tap_selection","tap_lookup","swipe_left","swipe_right","swipe_up","swipe_down"}) do
+                if saved.gesture_map[g] then gestures.enable(g) else gestures.disable(g) end
+            end
+        else
+            if state.gestures then gestures.enable("all") else gestures.disable("all") end
+        end
+        -- scroll
+        if state.scroll then scroll.start() else scroll.stop() end
+        -- shortcuts
+        if state.shortcuts then shortcuts.start() else shortcuts.stop() end
+        -- apply hotstrings groups
+        for name, enabled in pairs(state.hotstrings) do
+            if enabled then keymap.enable_group(name) else keymap.disable_group(name) end
+        end
+        -- apply saved shortcut keys if present
+        if type(saved) == "table" and type(saved.shortcut_keys) == "table" then
+            for id, enabled in pairs(saved.shortcut_keys) do
+                if enabled then shortcuts.enable(id) else shortcuts.disable(id) end
+            end
+        end
+        -- persist current state after applying
+        save_prefs()
+    end
     -- fonctions utilitaires pour construire les items
+
     local function buildHotstringsItem()
         local item = {
             title = "Expansion de texte",
-            checked = state.keymap,
-            fn = function()
+            checked = state.keymap or nil,
+                fn = function()
                 state.keymap = not state.keymap
                 if state.keymap then keymap.start() else keymap.stop() end
-                updateMenu()
+                save_prefs()
+                do_reload()
             end
         }
         if state.keymap then
@@ -81,11 +198,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
                     end
                     local entry = {
                         title = pretty,
-                        checked = state.hotstrings[name],
+                        checked = (keymap and type(keymap.is_group_enabled) == "function" and keymap.is_group_enabled(name)) or state.hotstrings[name] or nil,
                         fn = function()
                             state.hotstrings[name] = not state.hotstrings[name]
                             if state.hotstrings[name] then keymap.enable_group(name) else keymap.disable_group(name) end
-                            updateMenu()
+                            save_prefs()
+                            do_reload()
                         end
                     }
                     if name:match("^plus") then
@@ -109,29 +227,30 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
     local function buildGestesItem()
         local item = {
             title = "Gestes",
-            checked = state.gestures,
-            fn = function()
+            checked = state.gestures or nil,
+                fn = function()
                 state.gestures = not state.gestures
                 if state.gestures then gestures.enable("all") else gestures.disable("all") end
-                updateMenu()
+                save_prefs()
+                do_reload()
             end
         }
         if state.gestures then
                 item.menu = (function()
                 local g_menu = {}
                 -- per-feature toggles, titre normalisé en "commande : action"
-                table.insert(g_menu, { title = "Tap (3 doigts) : Toggle sélection", checked = gestures.is_enabled("tap_selection"), fn = function()
-                    if gestures.is_enabled("tap_selection") then gestures.disable("tap_selection") else gestures.enable("tap_selection") end; updateMenu() end })
-                table.insert(g_menu, { title = "Tap (4 doigts) : Recherche du mot", checked = gestures.is_enabled("tap_lookup"), fn = function()
-                    if gestures.is_enabled("tap_lookup") then gestures.disable("tap_lookup") else gestures.enable("tap_lookup") end; updateMenu() end })
-                table.insert(g_menu, { title = "Swipe gauche : Onglet précédent", checked = gestures.is_enabled("swipe_left"), fn = function()
-                    if gestures.is_enabled("swipe_left") then gestures.disable("swipe_left") else gestures.enable("swipe_left") end; updateMenu() end })
-                table.insert(g_menu, { title = "Swipe droite : Onglet suivant", checked = gestures.is_enabled("swipe_right"), fn = function()
-                    if gestures.is_enabled("swipe_right") then gestures.disable("swipe_right") else gestures.enable("swipe_right") end; updateMenu() end })
-                table.insert(g_menu, { title = "Swipe haut : Nouvel onglet", checked = gestures.is_enabled("swipe_up"), fn = function()
-                    if gestures.is_enabled("swipe_up") then gestures.disable("swipe_up") else gestures.enable("swipe_up") end; updateMenu() end })
-                table.insert(g_menu, { title = "Swipe bas : Fermer onglet", checked = gestures.is_enabled("swipe_down"), fn = function()
-                    if gestures.is_enabled("swipe_down") then gestures.disable("swipe_down") else gestures.enable("swipe_down") end; updateMenu() end })
+                        table.insert(g_menu, { title = "Tap (3 doigts) : Toggle sélection", checked = gestures.is_enabled("tap_selection") or nil, fn = function()
+                            if gestures.is_enabled("tap_selection") then gestures.disable("tap_selection") else gestures.enable("tap_selection") end; save_prefs(); do_reload() end })
+                        table.insert(g_menu, { title = "Tap (4 doigts) : Recherche du mot", checked = gestures.is_enabled("tap_lookup") or nil, fn = function()
+                            if gestures.is_enabled("tap_lookup") then gestures.disable("tap_lookup") else gestures.enable("tap_lookup") end; save_prefs(); do_reload() end })
+                        table.insert(g_menu, { title = "Swipe gauche : Onglet précédent", checked = gestures.is_enabled("swipe_left") or nil, fn = function()
+                            if gestures.is_enabled("swipe_left") then gestures.disable("swipe_left") else gestures.enable("swipe_left") end; save_prefs(); do_reload() end })
+                        table.insert(g_menu, { title = "Swipe droite : Onglet suivant", checked = gestures.is_enabled("swipe_right") or nil, fn = function()
+                            if gestures.is_enabled("swipe_right") then gestures.disable("swipe_right") else gestures.enable("swipe_right") end; save_prefs(); do_reload() end })
+                        table.insert(g_menu, { title = "Swipe haut : Nouvel onglet", checked = gestures.is_enabled("swipe_up") or nil, fn = function()
+                            if gestures.is_enabled("swipe_up") then gestures.disable("swipe_up") else gestures.enable("swipe_up") end; save_prefs(); do_reload() end })
+                        table.insert(g_menu, { title = "Swipe bas : Fermer onglet", checked = gestures.is_enabled("swipe_down") or nil, fn = function()
+                            if gestures.is_enabled("swipe_down") then gestures.disable("swipe_down") else gestures.enable("swipe_down") end; save_prefs(); do_reload() end })
                 return g_menu
             end)()
         end
@@ -141,11 +260,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
     local function buildRaccourcisItem()
         local item = {
             title = "Raccourcis",
-            checked = state.shortcuts,
+            checked = state.shortcuts or nil,
             fn = function()
                 state.shortcuts = not state.shortcuts
                 if state.shortcuts then shortcuts.start() else shortcuts.stop() end
-                updateMenu()
+                save_prefs()
+                do_reload()
             end
         }
         if state.shortcuts then
@@ -178,10 +298,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
                     local key = pretty_key_from_id(s.id)
                     local desc = trim((s.label or ""):gsub("%s*%b()",""))
                     local title = key .. " : " .. (desc ~= "" and desc or s.id)
-                    table.insert(s_menu, { title = title, checked = s.enabled, fn = (function(id)
+                    local is_enabled = (shortcuts and type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(s.id)) or s.enabled
+                    table.insert(s_menu, { title = title, checked = is_enabled or nil, fn = (function(id)
                         return function()
                             if shortcuts.is_enabled(id) then shortcuts.disable(id) else shortcuts.enable(id) end
-                            updateMenu()
+                            save_prefs()
+                            do_reload()
                         end
                     end)(s.id) })
                 end
@@ -193,16 +315,17 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
 
     local function buildUtilityItems()
         local items = {}
-        table.insert(items, { title = "Option + Scroll : Volume", checked = state.scroll, fn = function()
+        table.insert(items, { title = "Option + Scroll : Volume", checked = state.scroll or nil, fn = function()
             state.scroll = not state.scroll
             if state.scroll then scroll.start() else scroll.stop() end
-            updateMenu()
+            save_prefs()
+                do_reload()
         end })
         table.insert(items, { title = "-" })
         table.insert(items, { title = "Ouvrir la configuration : ouvrir init.lua" , fn = function() hs.execute('open "' .. base_dir .. 'init.lua"') end })
         table.insert(items, { title = "Afficher la console : ouvrir la console", fn = function() hs.openConsole() end })
         table.insert(items, { title = "Préférences Hammerspoon : ouvrir préférences", fn = function() hs.openPreferences() end })
-        table.insert(items, { title = "Recharger la configuration : recharger", fn = function() hs.reload() end })
+        table.insert(items, { title = "Recharger la configuration : recharger", fn = function() do_reload() end })
         table.insert(items, { title = "Quitter Hammerspoon : quitter", fn = function() hs.quit() end })
         return items
     end
@@ -213,7 +336,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         table.insert(menu_items, buildGestesItem())
         table.insert(menu_items, buildRaccourcisItem())
         for _, it in ipairs(buildUtilityItems()) do table.insert(menu_items, it) end
-        myMenu:setMenu(menu_items)
+        -- Force a brief clear before setting the menu to ensure UI redraw
+        myMenu:setMenu({})
+        if hs and hs.timer and hs.timer.doAfter then
+            hs.timer.doAfter(0.02, function() myMenu:setMenu(menu_items) end)
+        else
+            myMenu:setMenu(menu_items)
+        end
     end
 
     updateMenu()
@@ -227,7 +356,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
                 break
             end
         end
-        if doReload then hs.reload() end
+        if doReload then do_reload("watcher") end
     end
     local configWatcher = pathwatcher.new(base_dir, reloadConfig):start()
 

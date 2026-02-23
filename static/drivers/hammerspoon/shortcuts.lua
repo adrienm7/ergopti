@@ -247,9 +247,11 @@ hotkey_defs.cmd_shift_v = function()
         local plain = pasteboard.getContents() or ""
         pasteboard.clearContents()
         pasteboard.setContents(plain)
-        timer.doAfter(0.02, function()
-            eventtap.keyStroke({"cmd"}, "v")
-            timer.doAfter(0.15, function()
+        timer.doAfter(0.08, function()
+            -- perform paste with a small key delay
+            eventtap.keyStroke({"cmd"}, "v", 0.02)
+
+            timer.doAfter(0.25, function()
                 if prior and prior ~= "" then pasteboard.setContents(prior) else pasteboard.clearContents() end
             end)
         end)
