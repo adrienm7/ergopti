@@ -111,6 +111,7 @@ def main():
     out_dir.mkdir(exist_ok=True)
 
     toml_files = list(hotstrings_dir.rglob("*.toml"))
+    descriptions: dict[str, str] = {}
     for toml_path in toml_files:
         try:
             text = toml_path.read_text(encoding="utf-8")
@@ -138,6 +139,52 @@ def main():
 
         out_file.write_text("\n".join(lines), encoding="utf-8")
         print("Wrote", out_file)
+        # extract description: top-level or common nested sections (metadata, meta, info)
+        desc = None
+        if isinstance(parsed, dict):
+            for key in ("description", "desc", "title"):
+                v = parsed.get(key)
+                if isinstance(v, str) and v.strip():
+                    desc = v.strip()
+                    break
+            if not desc:
+                # common nested containers
+                for container in ("metadata", "meta", "info", "header"):
+                    c = parsed.get(container)
+                    if isinstance(c, dict):
+                        for key in ("description", "desc", "title"):
+                            v = c.get(key)
+                            if isinstance(v, str) and v.strip():
+                                desc = v.strip()
+                                break
+                    if desc:
+                        break
+            if not desc:
+                # scan first-level child tables for a description
+                for v in parsed.values():
+                    if isinstance(v, dict):
+                        for key in ("description", "desc", "title"):
+                            dv = v.get(key)
+                            if isinstance(dv, str) and dv.strip():
+                                desc = dv.strip()
+                                break
+                    if desc:
+                        break
+        if desc:
+            descriptions[name] = desc
+
+    # write descriptions table for menu consumption
+    if descriptions:
+        desc_file = out_dir / "_descriptions.lua"
+        desc_lines = []
+        desc_lines.append("-- Generated descriptions for hotstrings")
+        desc_lines.append("return {")
+        for k in sorted(descriptions.keys()):
+            v = descriptions[k]
+            desc_lines.append(f"  {k} = {escape_lua(v)},")
+        desc_lines.append("}")
+        desc_file.write_text("\n".join(desc_lines), encoding="utf-8")
+        print("Wrote", desc_file)
 
 
 if __name__ == "__main__":
