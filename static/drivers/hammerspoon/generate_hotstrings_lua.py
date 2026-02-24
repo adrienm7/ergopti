@@ -31,6 +31,7 @@ def extract_entries(data):
                         item["input"],
                         item["output"],
                         bool(item.get("is_word", False)),
+                        bool(item.get("auto_expand", False)),
                     )
                 )
             elif isinstance(item, dict):
@@ -42,6 +43,7 @@ def extract_entries(data):
                                 tk,
                                 tv.get("output"),
                                 bool(tv.get("is_word", False)),
+                                bool(tv.get("auto_expand", False)),
                             )
                         )
         return entries
@@ -50,20 +52,32 @@ def extract_entries(data):
         # simple mapping: key -> string
         if all(isinstance(v, str) for v in data.values()):
             for k, v in data.items():
-                entries.append((k, v, False))
+                entries.append((k, v, False, False))
             return entries
 
         # mixed: keys may map to dicts or lists
         for k, v in data.items():
             if isinstance(v, str):
-                entries.append((k, v, False))
+                entries.append((k, v, False, False))
             elif isinstance(v, dict):
                 out = v.get("output") or v.get("value")
                 if out is not None:
-                    entries.append((k, out, bool(v.get("is_word", False))))
+                    entries.append(
+                        (
+                            k,
+                            out,
+                            bool(v.get("is_word", False)),
+                            bool(v.get("auto_expand", False)),
+                        )
+                    )
                 elif "input" in v and "output" in v:
                     entries.append(
-                        (v["input"], v["output"], bool(v.get("is_word", False)))
+                        (
+                            v["input"],
+                            v["output"],
+                            bool(v.get("is_word", False)),
+                            bool(v.get("auto_expand", False)),
+                        )
                     )
                 else:
                     # v may be a mapping of triggers -> {output=..., is_word=...}
@@ -74,6 +88,7 @@ def extract_entries(data):
                                     tk,
                                     tv.get("output"),
                                     bool(tv.get("is_word", False)),
+                                    bool(tv.get("auto_expand", False)),
                                 )
                             )
             elif isinstance(v, list):
@@ -88,6 +103,7 @@ def extract_entries(data):
                                 item["input"],
                                 item["output"],
                                 bool(item.get("is_word", False)),
+                                bool(item.get("auto_expand", False)),
                             )
                         )
                     elif isinstance(item, dict):
@@ -99,6 +115,7 @@ def extract_entries(data):
                                         tk,
                                         tv.get("output"),
                                         bool(tv.get("is_word", False)),
+                                        bool(tv.get("auto_expand", False)),
                                     )
                                 )
     return entries
@@ -132,9 +149,12 @@ def main():
         lines.append("-- Generated from " + str(toml_path))
         lines.append('local keymap = require("keymap")')
         lines.append("")
-        for inp, out, is_word in entries:
+        for inp, out, is_word, auto_expand in entries:
+            # note: the third arg in keymap.add is `mid_word` (true means allow replacement mid-word)
+            mid_arg = "false" if is_word else "true"
+            auto_arg = "true" if auto_expand else "false"
             lines.append(
-                f"keymap.add({escape_lua(inp)}, {escape_lua(out)}, {'false' if is_word else 'true'})"
+                f"keymap.add({escape_lua(inp)}, {escape_lua(out)}, {mid_arg}, {auto_arg})"
             )
 
         out_file.write_text("\n".join(lines), encoding="utf-8")
