@@ -410,6 +410,19 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
             logger.error("Error extracting blocks %s: %s", block_patterns, e)
             errors += 1
 
+    # Generate some files that are produced by custom generators
+    try:
+        # e_deadkey goes into the 'plus' subfolder
+        generate_e_deadkey_toml(str(source_file), subfolder="plus")
+    except Exception as e:
+        logger.warning("Failed to generate e_deadkey.toml: %s", e)
+
+    try:
+        # apostrophe TOML also goes into the plus folder
+        generate_apostrophe_toml(subfolder="plus")
+    except Exception as e:
+        logger.warning("Failed to generate apostrophe.toml: %s", e)
+
     show_execution_summary(processed, errors)
 
     #
