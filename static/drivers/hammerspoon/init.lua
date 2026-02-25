@@ -42,7 +42,7 @@ local hotfiles = {
     "plus_e_deadkey.lua",
     "plus_qu.lua",
     "plus_rolls.lua",
-    "plus_sfb_reduction.lua",
+    "sfb_reduction.lua",
     "plus_suffixes.lua",
     "punctuation.lua",
     "symbols.lua",

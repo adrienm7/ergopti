@@ -22,7 +22,7 @@ keymap.add("sx", "sk", {is_word = false, auto_expand = true, is_case_sensitive =
 keymap.add("cx", "ck", {is_word = false, auto_expand = true, is_case_sensitive = false})
 keymap.add(" [)", " = \"", {is_word = false, auto_expand = true, is_case_sensitive = true})
 keymap.add("[)", " = \"", {is_word = false, auto_expand = true, is_case_sensitive = true})
-keymap.add("nt'", "n't", {is_word = false, auto_expand = true, is_case_sensitive = true})
+keymap.add("nt'", "n’t", {is_word = false, auto_expand = true, is_case_sensitive = true})
 keymap.add(" =+", " ➜ ", {is_word = false, auto_expand = true, is_case_sensitive = true})
 keymap.add("=+", " ➜ ", {is_word = false, auto_expand = true, is_case_sensitive = true})
 keymap.add(" $=", " => ", {is_word = false, auto_expand = true, is_case_sensitive = true})

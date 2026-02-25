@@ -9,7 +9,6 @@ return {
   names = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …",
   plus_comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …",
   plus_qu = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …",
-  plus_sfb_reduction = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u.",
   plus_suffixes = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …",
   punctuation = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère",
   symbols = "Expansion de texte Symboles : -->★  = ➜, (v)★  = ✓, …",

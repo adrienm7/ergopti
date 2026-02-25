@@ -130,11 +130,10 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
             ("DistancesReduction", "CommaJ"),
             ("DistancesReduction", "CommaFarLetters"),
         ],
-        "sfb_reduction": [
-            ("SFBsReduction", "ECirc"),
-            ("SFBsReduction", "IÉ"),
-            ("SFBsReduction", "EGrave"),
-        ],
+        # All SFBsReduction blocks are aggregated into a single output file
+        # (see 'sfbreduction' below). Remove the older separate grouping.
+        # New: extract all blocks under the SFBsReduction category into a dedicated file
+        "sfb_reduction": ["SFBsReduction"],
         "suffixes": [("DistancesReduction", "SuffixesA")],
         "magic": [("MagicKey", "TextExpansion")],
         "accents": [("Autocorrection", "Accents")],
@@ -159,7 +158,7 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
         "e_deadkey",
         "qu",
         "rolls",
-        "sfb_reduction",
+        "sfbreduction",
         "suffixes",
     }
 
@@ -242,6 +241,69 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
                 logger.warning(
                     "No hotstrings found in blocks %s", block_patterns
                 )
+
+            # Fallback: sometimes some CreateCaseSensitiveHotstrings/Hotstring
+            # calls are not captured by block-based extraction (e.g. blocks
+            # without .Enabled or unusual formatting). For the 'sfbreduction'
+            # aggregate we scan the whole AHK content for any remaining
+            # Create*Hotstring calls and add them if missing.
+            if output_name == "sfbreduction":
+                # Fallback: limit the scan to SFBsReduction blocks only so we don't
+                # accidentally capture hotstrings from other categories (e.g. SuffixesA).
+                sfb_content = extract_all_blocks_from_category(
+                    content, "SFBsReduction"
+                )
+                if sfb_content:
+                    all_calls = re.finditer(
+                        r"(?:CreateCaseSensitiveHotstrings|CreateHotstring|Hotstring)\s*\(.*?\)",
+                        sfb_content,
+                        re.DOTALL,
+                    )
+                    added = 0
+                    for call in all_calls:
+                        line_call = call.group(0)
+                        trig, outp, is_w, auto_e, case_s = (
+                            extract_hotstring_from_line(line_call)
+                        )
+                        # If parsing failed, try a simpler quoted-args fallback
+                        if not trig or not outp:
+                            # capture quoted string literals inside the call
+                            q = re.findall(r'"((?:[^"\\]|\\.)*)"', line_call)
+                            if len(q) >= 3:
+                                options = q[0]
+                                trig = process_autohotkey_escapes(q[1])
+                                outp = process_autohotkey_escapes(q[2])
+                                auto_e = "*" in options
+                                is_w = "?" not in options
+                                # keep case_s as previously-detected default
+                                case_s = case_s
+
+                        if trig and outp:
+                            # check if already present
+                            exists = False
+                            for entries in merged_hotstrings.values():
+                                for t, *_ in entries:
+                                    if t == trig:
+                                        exists = True
+                                        break
+                                if exists:
+                                    break
+                            if not exists:
+                                if "general" not in merged_hotstrings:
+                                    merged_hotstrings["general"] = []
+                                merged_hotstrings["general"].append(
+                                    (trig, outp, is_w, auto_e, case_s)
+                                )
+                                added += 1
+                                logger.info(
+                                    "Fallback: added trigger '%s' to sfbreduction",
+                                    trig,
+                                )
+                    if added > 0:
+                        logger.info(
+                            "Fallback added %d missing sfbreduction hotstring(s)",
+                            added,
+                        )
 
             # Add hardcoded entries if this is the 'rolls' file
             if output_name == "rolls":
@@ -627,11 +689,10 @@ def extract_block_content(
     if isinstance(block_pattern, tuple):
         category, block_name = block_pattern
         # Try both patterns: with and without .Enabled suffix
-        start_pattern_enabled = (
-            rf'if Features\["{category}"\]\["{block_name}"\]\.Enabled\s*\{{'
-        )
+        # Accept additional boolean conditions before the opening brace (e.g. "and Features[...]...")
+        start_pattern_enabled = rf'if Features\["{category}"\]\["{block_name}"\]\.Enabled\b[^{{]*\{{'
         start_pattern_simple = (
-            rf'if Features\["{category}"\]\["{block_name}"\]\s*\{{'
+            rf'if Features\["{category}"\]\["{block_name}"\]\b[^{{]*\{{'
         )
     else:
         # Backward compatibility: general pattern to match any Features[...][block_pattern] block
@@ -677,8 +738,11 @@ def extract_all_blocks_from_category(content: str, category: str) -> str:
         The merged content of all blocks in the category
     """
     # Find all Features["category"]["..."] blocks (with or without .Enabled)
-    pattern_enabled = rf'if Features\["{category}"\]\["[^"]+"\]\.Enabled\s*\{{'
-    pattern_simple = rf'if Features\["{category}"\]\["[^"]+"\]\s*\{{'
+    # Accept additional boolean conditions before the opening brace (e.g. "and Features[...]...")
+    pattern_enabled = (
+        rf'if Features\["{category}"\]\["[^\"]+"\]\.Enabled\b[^{{]*\{{'
+    )
+    pattern_simple = rf'if Features\["{category}"\]\["[^\"]+"\]\b[^{{]*\{{'
 
     matches = list(re.finditer(pattern_enabled, content))
     matches.extend(re.finditer(pattern_simple, content))
