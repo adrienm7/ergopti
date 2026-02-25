@@ -8,1225 +8,1225 @@ block = "TextExpansionSymbolsTypst"
 description = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …"
 
 [[control]]
-"$wj$" = { output = "{U+2060}", is_word = true, auto_expand = true }
-"$zwj$" = { output = "{U+200D}", is_word = true, auto_expand = true }
-"$zwnj$" = { output = "{U+200C}", is_word = true, auto_expand = true }
-"$zws$" = { output = "{U+200B}", is_word = true, auto_expand = true }
-"$lrm$" = { output = "{U+200E}", is_word = true, auto_expand = true }
-"$rlm$" = { output = "{U+200F}", is_word = true, auto_expand = true }
+"$wj$" = { output = "{U+2060}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$zwj$" = { output = "{U+200D}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$zwnj$" = { output = "{U+200C}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$zws$" = { output = "{U+200B}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lrm$" = { output = "{U+200E}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rlm$" = { output = "{U+200F}", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[spaces]]
-"$space$" = { output = "{U+0020}", is_word = true, auto_expand = true }
-"$space.nobreak$" = { output = "{U+00A0}", is_word = true, auto_expand = true }
-"$space.nobreak.narrow$" = { output = "{U+202F}", is_word = true, auto_expand = true }
-"$space.en$" = { output = "{U+2002}", is_word = true, auto_expand = true }
-"$space.quad$" = { output = "{U+2003}", is_word = true, auto_expand = true }
-"$space.third$" = { output = "{U+2004}", is_word = true, auto_expand = true }
-"$space.quarter$" = { output = "{U+2005}", is_word = true, auto_expand = true }
-"$space.sixth$" = { output = "{U+2006}", is_word = true, auto_expand = true }
-"$space.med$" = { output = "{U+205F}", is_word = true, auto_expand = true }
-"$space.fig$" = { output = "{U+2007}", is_word = true, auto_expand = true }
-"$space.punct$" = { output = "{U+2008}", is_word = true, auto_expand = true }
-"$space.thin$" = { output = "{U+2009}", is_word = true, auto_expand = true }
-"$space.hair$" = { output = "{U+200A}", is_word = true, auto_expand = true }
+"$space$" = { output = "{U+0020}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.nobreak$" = { output = "{U+00A0}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.nobreak.narrow$" = { output = "{U+202F}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.en$" = { output = "{U+2002}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.quad$" = { output = "{U+2003}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.third$" = { output = "{U+2004}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.quarter$" = { output = "{U+2005}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.sixth$" = { output = "{U+2006}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.med$" = { output = "{U+205F}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.fig$" = { output = "{U+2007}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.punct$" = { output = "{U+2008}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.thin$" = { output = "{U+2009}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$space.hair$" = { output = "{U+200A}", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[delimiters]]
-"$paren.l$" = { output = "(", is_word = true, auto_expand = true }
-"$paren.l.flat$" = { output = "⟮", is_word = true, auto_expand = true }
-"$paren.l.closed$" = { output = "⦇", is_word = true, auto_expand = true }
-"$paren.l.stroked$" = { output = "⦅", is_word = true, auto_expand = true }
-"$paren.l.double$" = { output = "⦅", is_word = true, auto_expand = true }
-"$paren.r$" = { output = ")", is_word = true, auto_expand = true }
-"$paren.r.flat$" = { output = "⟯", is_word = true, auto_expand = true }
-"$paren.r.closed$" = { output = "⦈", is_word = true, auto_expand = true }
-"$paren.r.stroked$" = { output = "⦆", is_word = true, auto_expand = true }
-"$paren.r.double$" = { output = "⦆", is_word = true, auto_expand = true }
-"$paren.t$" = { output = "⏜", is_word = true, auto_expand = true }
-"$paren.b$" = { output = "⏝", is_word = true, auto_expand = true }
-"$brace.l$" = { output = "{", is_word = true, auto_expand = true }
-"$brace.l.stroked$" = { output = "{U+27C3}", is_word = true, auto_expand = true }
-"$brace.l.double$" = { output = "{U+27C3}", is_word = true, auto_expand = true }
-"$brace.r$" = { output = "}", is_word = true, auto_expand = true }
-"$brace.r.stroked$" = { output = "⦄", is_word = true, auto_expand = true }
-"$brace.r.double$" = { output = "⦄", is_word = true, auto_expand = true }
-"$brace.t$" = { output = "⏞", is_word = true, auto_expand = true }
-"$brace.b$" = { output = "⏟", is_word = true, auto_expand = true }
-"$bracket.l$" = { output = "[", is_word = true, auto_expand = true }
-"$bracket.l.tick.t$" = { output = "⦍", is_word = true, auto_expand = true }
-"$bracket.l.tick.b$" = { output = "⦏", is_word = true, auto_expand = true }
-"$bracket.l.stroked$" = { output = "⟦", is_word = true, auto_expand = true }
-"$bracket.l.double$" = { output = "⟦", is_word = true, auto_expand = true }
-"$bracket.r$" = { output = "]", is_word = true, auto_expand = true }
-"$bracket.r.tick.t$" = { output = "⦐", is_word = true, auto_expand = true }
-"$bracket.r.tick.b$" = { output = "⦎", is_word = true, auto_expand = true }
-"$bracket.r.stroked$" = { output = "⟧", is_word = true, auto_expand = true }
-"$bracket.r.double$" = { output = "⟧", is_word = true, auto_expand = true }
-"$bracket.t$" = { output = "⎴", is_word = true, auto_expand = true }
-"$bracket.b$" = { output = "⎵", is_word = true, auto_expand = true }
-"$shell.l$" = { output = "❲", is_word = true, auto_expand = true }
-"$shell.l.stroked$" = { output = "⟬", is_word = true, auto_expand = true }
-"$shell.l.filled$" = { output = "⦗", is_word = true, auto_expand = true }
-"$shell.l.double$" = { output = "⟬", is_word = true, auto_expand = true }
-"$shell.r$" = { output = "❳", is_word = true, auto_expand = true }
-"$shell.r.stroked$" = { output = "⟭", is_word = true, auto_expand = true }
-"$shell.r.filled$" = { output = "⦘", is_word = true, auto_expand = true }
-"$shell.r.double$" = { output = "⟭", is_word = true, auto_expand = true }
-"$shell.t$" = { output = "⏠", is_word = true, auto_expand = true }
-"$shell.b$" = { output = "⏡", is_word = true, auto_expand = true }
-"$bag.l$" = { output = "⟅", is_word = true, auto_expand = true }
-"$bag.r$" = { output = "⟆", is_word = true, auto_expand = true }
-"$mustache.l$" = { output = "⎰", is_word = true, auto_expand = true }
-"$mustache.r$" = { output = "⎱", is_word = true, auto_expand = true }
-"$bar.v$" = { output = "|", is_word = true, auto_expand = true }
-"$bar.v.double$" = { output = "‖", is_word = true, auto_expand = true }
-"$bar.v.triple$" = { output = "⦀", is_word = true, auto_expand = true }
-"$bar.v.broken$" = { output = "¦", is_word = true, auto_expand = true }
-"$bar.v.o$" = { output = "⦶", is_word = true, auto_expand = true }
-"$bar.v.circle$" = { output = "⦶", is_word = true, auto_expand = true }
-"$bar.h$" = { output = "―", is_word = true, auto_expand = true }
-"$fence.l$" = { output = "⧘", is_word = true, auto_expand = true }
-"$fence.l.double$" = { output = "⧚", is_word = true, auto_expand = true }
-"$fence.r$" = { output = "⧙", is_word = true, auto_expand = true }
-"$fence.r.double$" = { output = "⧛", is_word = true, auto_expand = true }
-"$fence.dotted$" = { output = "⦙", is_word = true, auto_expand = true }
-"$chevron.l$" = { output = "⟨", is_word = true, auto_expand = true }
-"$chevron.l.curly$" = { output = "⧼", is_word = true, auto_expand = true }
-"$chevron.l.dot$" = { output = "⦑", is_word = true, auto_expand = true }
-"$chevron.l.closed$" = { output = "⦉", is_word = true, auto_expand = true }
-"$chevron.l.double$" = { output = "⟪", is_word = true, auto_expand = true }
-"$chevron.r$" = { output = "⟩", is_word = true, auto_expand = true }
-"$chevron.r.curly$" = { output = "⧽", is_word = true, auto_expand = true }
-"$chevron.r.dot$" = { output = "⦒", is_word = true, auto_expand = true }
-"$chevron.r.closed$" = { output = "⦊", is_word = true, auto_expand = true }
-"$chevron.r.double$" = { output = "⟫", is_word = true, auto_expand = true }
-"$ceil.l$" = { output = "⌈", is_word = true, auto_expand = true }
-"$ceil.r$" = { output = "⌉", is_word = true, auto_expand = true }
-"$floor.l$" = { output = "⌊", is_word = true, auto_expand = true }
-"$floor.r$" = { output = "⌋", is_word = true, auto_expand = true }
-"$corner.l.t$" = { output = "⌜", is_word = true, auto_expand = true }
-"$corner.l.b$" = { output = "⌞", is_word = true, auto_expand = true }
-"$corner.r.t$" = { output = "⌝", is_word = true, auto_expand = true }
-"$corner.r.b$" = { output = "⌟", is_word = true, auto_expand = true }
+"$paren.l$" = { output = "(", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.l.flat$" = { output = "⟮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.l.closed$" = { output = "⦇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.l.stroked$" = { output = "⦅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.l.double$" = { output = "⦅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.r$" = { output = ")", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.r.flat$" = { output = "⟯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.r.closed$" = { output = "⦈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.r.stroked$" = { output = "⦆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.r.double$" = { output = "⦆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.t$" = { output = "⏜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$paren.b$" = { output = "⏝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.l$" = { output = "{", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.l.stroked$" = { output = "{U+27C3}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.l.double$" = { output = "{U+27C3}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.r$" = { output = "}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.r.stroked$" = { output = "⦄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.r.double$" = { output = "⦄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.t$" = { output = "⏞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$brace.b$" = { output = "⏟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.l$" = { output = "[", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.l.tick.t$" = { output = "⦍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.l.tick.b$" = { output = "⦏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.l.stroked$" = { output = "⟦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.l.double$" = { output = "⟦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.r$" = { output = "]", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.r.tick.t$" = { output = "⦐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.r.tick.b$" = { output = "⦎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.r.stroked$" = { output = "⟧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.r.double$" = { output = "⟧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.t$" = { output = "⎴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bracket.b$" = { output = "⎵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.l$" = { output = "❲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.l.stroked$" = { output = "⟬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.l.filled$" = { output = "⦗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.l.double$" = { output = "⟬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.r$" = { output = "❳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.r.stroked$" = { output = "⟭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.r.filled$" = { output = "⦘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.r.double$" = { output = "⟭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.t$" = { output = "⏠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shell.b$" = { output = "⏡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bag.l$" = { output = "⟅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bag.r$" = { output = "⟆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$mustache.l$" = { output = "⎰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$mustache.r$" = { output = "⎱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bar.v$" = { output = "|", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bar.v.double$" = { output = "‖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bar.v.triple$" = { output = "⦀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bar.v.broken$" = { output = "¦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bar.v.o$" = { output = "⦶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bar.v.circle$" = { output = "⦶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bar.h$" = { output = "―", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$fence.l$" = { output = "⧘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$fence.l.double$" = { output = "⧚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$fence.r$" = { output = "⧙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$fence.r.double$" = { output = "⧛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$fence.dotted$" = { output = "⦙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.l$" = { output = "⟨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.l.curly$" = { output = "⧼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.l.dot$" = { output = "⦑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.l.closed$" = { output = "⦉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.l.double$" = { output = "⟪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.r$" = { output = "⟩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.r.curly$" = { output = "⧽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.r.dot$" = { output = "⦒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.r.closed$" = { output = "⦊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chevron.r.double$" = { output = "⟫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ceil.l$" = { output = "⌈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ceil.r$" = { output = "⌉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$floor.l$" = { output = "⌊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$floor.r$" = { output = "⌋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$corner.l.t$" = { output = "⌜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$corner.l.b$" = { output = "⌞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$corner.r.t$" = { output = "⌝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$corner.r.b$" = { output = "⌟", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[punctuation]]
-"$amp$" = { output = "&", is_word = true, auto_expand = true }
-"$amp.inv$" = { output = "⅋", is_word = true, auto_expand = true }
-"$ast.op$" = { output = "∗", is_word = true, auto_expand = true }
-"$ast.op.o$" = { output = "⊛", is_word = true, auto_expand = true }
-"$ast.basic$" = { output = "*", is_word = true, auto_expand = true }
-"$ast.low$" = { output = "⁎", is_word = true, auto_expand = true }
-"$ast.double$" = { output = "⁑", is_word = true, auto_expand = true }
-"$ast.triple$" = { output = "⁂", is_word = true, auto_expand = true }
-"$ast.small$" = { output = "﹡", is_word = true, auto_expand = true }
-"$ast.circle$" = { output = "⊛", is_word = true, auto_expand = true }
-"$ast.square$" = { output = "⧆", is_word = true, auto_expand = true }
-"$at$" = { output = "@", is_word = true, auto_expand = true }
-"$backslash$" = { output = "\\", is_word = true, auto_expand = true }
-"$backslash.o$" = { output = "⦸", is_word = true, auto_expand = true }
-"$backslash.circle$" = { output = "⦸", is_word = true, auto_expand = true }
-"$backslash.not$" = { output = "⧷", is_word = true, auto_expand = true }
-"$co$" = { output = "℅", is_word = true, auto_expand = true }
-"$colon$" = { output = ":", is_word = true, auto_expand = true }
-"$colon.currency$" = { output = "₡", is_word = true, auto_expand = true }
-"$colon.double$" = { output = "∷", is_word = true, auto_expand = true }
-"$colon.tri$" = { output = "⁝", is_word = true, auto_expand = true }
-"$colon.tri.op$" = { output = "⫶", is_word = true, auto_expand = true }
-"$colon.eq$" = { output = "≔", is_word = true, auto_expand = true }
-"$colon.double.eq$" = { output = "⩴", is_word = true, auto_expand = true }
-"$comma$" = { output = ",", is_word = true, auto_expand = true }
-"$comma.inv$" = { output = "⸲", is_word = true, auto_expand = true }
-"$comma.rev$" = { output = "⹁", is_word = true, auto_expand = true }
-"$dagger$" = { output = "†", is_word = true, auto_expand = true }
-"$dagger.double$" = { output = "‡", is_word = true, auto_expand = true }
-"$dagger.triple$" = { output = "⹋", is_word = true, auto_expand = true }
-"$dagger.l$" = { output = "⸶", is_word = true, auto_expand = true }
-"$dagger.r$" = { output = "⸷", is_word = true, auto_expand = true }
-"$dagger.inv$" = { output = "⸸", is_word = true, auto_expand = true }
-"$dash.en$" = { output = "–", is_word = true, auto_expand = true }
-"$dash.em$" = { output = "—", is_word = true, auto_expand = true }
-"$dash.em.two$" = { output = "⸺", is_word = true, auto_expand = true }
-"$dash.em.three$" = { output = "⸻", is_word = true, auto_expand = true }
-"$dash.fig$" = { output = "‒", is_word = true, auto_expand = true }
-"$dash.wave$" = { output = "〜", is_word = true, auto_expand = true }
-"$dash.colon$" = { output = "∹", is_word = true, auto_expand = true }
-"$dash.o$" = { output = "⊝", is_word = true, auto_expand = true }
-"$dash.circle$" = { output = "⊝", is_word = true, auto_expand = true }
-"$dash.wave.double$" = { output = "〰", is_word = true, auto_expand = true }
-"$dot.op$" = { output = "⋅", is_word = true, auto_expand = true }
-"$dot.basic$" = { output = ".", is_word = true, auto_expand = true }
-"$dot.c$" = { output = "·", is_word = true, auto_expand = true }
-"$dot.o$" = { output = "⊙", is_word = true, auto_expand = true }
-"$dot.o.big$" = { output = "⨀", is_word = true, auto_expand = true }
-"$dot.circle$" = { output = "⊙", is_word = true, auto_expand = true }
-"$dot.circle.big$" = { output = "⨀", is_word = true, auto_expand = true }
-"$dot.square$" = { output = "⊡", is_word = true, auto_expand = true }
-"$dot.double$" = { output = "¨", is_word = true, auto_expand = true }
-"$dot.triple$" = { output = "{U+20DB}", is_word = true, auto_expand = true }
-"$dot.quad$" = { output = "{U+20DC}", is_word = true, auto_expand = true }
-"$excl$" = { output = "!", is_word = true, auto_expand = true }
-"$excl.double$" = { output = "‼", is_word = true, auto_expand = true }
-"$excl.inv$" = { output = "¡", is_word = true, auto_expand = true }
-"$excl.quest$" = { output = "⁉", is_word = true, auto_expand = true }
-"$quest$" = { output = "?", is_word = true, auto_expand = true }
-"$quest.double$" = { output = "⁇", is_word = true, auto_expand = true }
-"$quest.excl$" = { output = "⁈", is_word = true, auto_expand = true }
-"$quest.inv$" = { output = "¿", is_word = true, auto_expand = true }
-"$interrobang$" = { output = "‽", is_word = true, auto_expand = true }
-"$interrobang.inv$" = { output = "⸘", is_word = true, auto_expand = true }
-"$hash$" = { output = "#", is_word = true, auto_expand = true }
-"$hyph$" = { output = "‐", is_word = true, auto_expand = true }
-"$hyph.minus$" = { output = "-", is_word = true, auto_expand = true }
-"$hyph.nobreak$" = { output = "{U+2011}", is_word = true, auto_expand = true }
-"$hyph.point$" = { output = "‧", is_word = true, auto_expand = true }
-"$hyph.soft$" = { output = "{U+00AD}", is_word = true, auto_expand = true }
-"$numero$" = { output = "№", is_word = true, auto_expand = true }
-"$percent$" = { output = "%", is_word = true, auto_expand = true }
-"$permille$" = { output = "‰", is_word = true, auto_expand = true }
-"$permyriad$" = { output = "‱", is_word = true, auto_expand = true }
-"$pilcrow$" = { output = "¶", is_word = true, auto_expand = true }
-"$pilcrow.rev$" = { output = "⁋", is_word = true, auto_expand = true }
-"$section$" = { output = "§", is_word = true, auto_expand = true }
-"$semi$" = { output = ";", is_word = true, auto_expand = true }
-"$semi.inv$" = { output = "⸵", is_word = true, auto_expand = true }
-"$semi.rev$" = { output = "⁏", is_word = true, auto_expand = true }
-"$slash$" = { output = "/", is_word = true, auto_expand = true }
-"$slash.o$" = { output = "⊘", is_word = true, auto_expand = true }
-"$slash.double$" = { output = "⫽", is_word = true, auto_expand = true }
-"$slash.triple$" = { output = "⫻", is_word = true, auto_expand = true }
-"$slash.big$" = { output = "⧸", is_word = true, auto_expand = true }
-"$dots.h.c$" = { output = "⋯", is_word = true, auto_expand = true }
-"$dots.h$" = { output = "…", is_word = true, auto_expand = true }
-"$dots.v$" = { output = "⋮", is_word = true, auto_expand = true }
-"$dots.down$" = { output = "⋱", is_word = true, auto_expand = true }
-"$dots.up$" = { output = "⋰", is_word = true, auto_expand = true }
-"$tilde.op$" = { output = "∼", is_word = true, auto_expand = true }
-"$tilde.basic$" = { output = "~", is_word = true, auto_expand = true }
-"$tilde.dot$" = { output = "⩪", is_word = true, auto_expand = true }
-"$tilde.eq$" = { output = "≃", is_word = true, auto_expand = true }
-"$tilde.eq.not$" = { output = "≄", is_word = true, auto_expand = true }
-"$tilde.eq.rev$" = { output = "⋍", is_word = true, auto_expand = true }
-"$tilde.equiv$" = { output = "≅", is_word = true, auto_expand = true }
-"$tilde.equiv.not$" = { output = "≇", is_word = true, auto_expand = true }
-"$tilde.nequiv$" = { output = "≆", is_word = true, auto_expand = true }
-"$tilde.not$" = { output = "≁", is_word = true, auto_expand = true }
-"$tilde.rev$" = { output = "∽", is_word = true, auto_expand = true }
-"$tilde.rev.equiv$" = { output = "≌", is_word = true, auto_expand = true }
-"$tilde.triple$" = { output = "≋", is_word = true, auto_expand = true }
+"$amp$" = { output = "&", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$amp.inv$" = { output = "⅋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.op$" = { output = "∗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.op.o$" = { output = "⊛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.basic$" = { output = "*", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.low$" = { output = "⁎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.double$" = { output = "⁑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.triple$" = { output = "⁂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.small$" = { output = "﹡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.circle$" = { output = "⊛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ast.square$" = { output = "⧆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$at$" = { output = "@", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$backslash$" = { output = "\\", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$backslash.o$" = { output = "⦸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$backslash.circle$" = { output = "⦸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$backslash.not$" = { output = "⧷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$co$" = { output = "℅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$colon$" = { output = ":", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$colon.currency$" = { output = "₡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$colon.double$" = { output = "∷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$colon.tri$" = { output = "⁝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$colon.tri.op$" = { output = "⫶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$colon.eq$" = { output = "≔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$colon.double.eq$" = { output = "⩴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$comma$" = { output = ",", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$comma.inv$" = { output = "⸲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$comma.rev$" = { output = "⹁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dagger$" = { output = "†", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dagger.double$" = { output = "‡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dagger.triple$" = { output = "⹋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dagger.l$" = { output = "⸶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dagger.r$" = { output = "⸷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dagger.inv$" = { output = "⸸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.en$" = { output = "–", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.em$" = { output = "—", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.em.two$" = { output = "⸺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.em.three$" = { output = "⸻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.fig$" = { output = "‒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.wave$" = { output = "〜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.colon$" = { output = "∹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.o$" = { output = "⊝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.circle$" = { output = "⊝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dash.wave.double$" = { output = "〰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.op$" = { output = "⋅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.basic$" = { output = ".", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.c$" = { output = "·", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.o$" = { output = "⊙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.o.big$" = { output = "⨀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.circle$" = { output = "⊙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.circle.big$" = { output = "⨀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.square$" = { output = "⊡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.double$" = { output = "¨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.triple$" = { output = "{U+20DB}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dot.quad$" = { output = "{U+20DC}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$excl$" = { output = "!", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$excl.double$" = { output = "‼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$excl.inv$" = { output = "¡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$excl.quest$" = { output = "⁉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quest$" = { output = "?", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quest.double$" = { output = "⁇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quest.excl$" = { output = "⁈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quest.inv$" = { output = "¿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$interrobang$" = { output = "‽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$interrobang.inv$" = { output = "⸘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hash$" = { output = "#", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hyph$" = { output = "‐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hyph.minus$" = { output = "-", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hyph.nobreak$" = { output = "{U+2011}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hyph.point$" = { output = "‧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hyph.soft$" = { output = "{U+00AD}", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$numero$" = { output = "№", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$percent$" = { output = "%", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$permille$" = { output = "‰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$permyriad$" = { output = "‱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$pilcrow$" = { output = "¶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$pilcrow.rev$" = { output = "⁋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$section$" = { output = "§", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$semi$" = { output = ";", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$semi.inv$" = { output = "⸵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$semi.rev$" = { output = "⁏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$slash$" = { output = "/", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$slash.o$" = { output = "⊘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$slash.double$" = { output = "⫽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$slash.triple$" = { output = "⫻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$slash.big$" = { output = "⧸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dots.h.c$" = { output = "⋯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dots.h$" = { output = "…", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dots.v$" = { output = "⋮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dots.down$" = { output = "⋱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dots.up$" = { output = "⋰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.op$" = { output = "∼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.basic$" = { output = "~", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.dot$" = { output = "⩪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.eq$" = { output = "≃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.eq.not$" = { output = "≄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.eq.rev$" = { output = "⋍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.equiv$" = { output = "≅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.equiv.not$" = { output = "≇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.nequiv$" = { output = "≆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.not$" = { output = "≁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.rev$" = { output = "∽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.rev.equiv$" = { output = "≌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tilde.triple$" = { output = "≋", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[accents_quotes_and_primes]]
-"$acute$" = { output = "´", is_word = true, auto_expand = true }
-"$acute.double$" = { output = "˝", is_word = true, auto_expand = true }
-"$breve$" = { output = "˘", is_word = true, auto_expand = true }
-"$caret$" = { output = "‸", is_word = true, auto_expand = true }
-"$caron$" = { output = "ˇ", is_word = true, auto_expand = true }
-"$hat$" = { output = "^", is_word = true, auto_expand = true }
-"$diaer$" = { output = "¨", is_word = true, auto_expand = true }
-"$grave$" = { output = "`", is_word = true, auto_expand = true }
-"$macron$" = { output = "¯", is_word = true, auto_expand = true }
-"$quote.double$" = { output = "\"", is_word = true, auto_expand = true }
-"$quote.single$" = { output = "'", is_word = true, auto_expand = true }
-"$quote.l.double$" = { output = "“", is_word = true, auto_expand = true }
-"$quote.l.single$" = { output = "‘", is_word = true, auto_expand = true }
-"$quote.r.double$" = { output = "”", is_word = true, auto_expand = true }
-"$quote.r.single$" = { output = "’", is_word = true, auto_expand = true }
-"$quote.chevron.l.double$" = { output = "«", is_word = true, auto_expand = true }
-"$quote.chevron.l.single$" = { output = "‹", is_word = true, auto_expand = true }
-"$quote.chevron.r.double$" = { output = "»", is_word = true, auto_expand = true }
-"$quote.chevron.r.single$" = { output = "›", is_word = true, auto_expand = true }
-"$quote.angle.l.double$" = { output = "«", is_word = true, auto_expand = true }
-"$quote.angle.l.single$" = { output = "‹", is_word = true, auto_expand = true }
-"$quote.angle.r.double$" = { output = "»", is_word = true, auto_expand = true }
-"$quote.angle.r.single$" = { output = "›", is_word = true, auto_expand = true }
-"$quote.high.double$" = { output = "‟", is_word = true, auto_expand = true }
-"$quote.high.single$" = { output = "‛", is_word = true, auto_expand = true }
-"$quote.low.double$" = { output = "„", is_word = true, auto_expand = true }
-"$quote.low.single$" = { output = "‚", is_word = true, auto_expand = true }
-"$prime$" = { output = "′", is_word = true, auto_expand = true }
-"$prime.rev$" = { output = "‵", is_word = true, auto_expand = true }
-"$prime.double$" = { output = "″", is_word = true, auto_expand = true }
-"$prime.double.rev$" = { output = "‶", is_word = true, auto_expand = true }
-"$prime.triple$" = { output = "‴", is_word = true, auto_expand = true }
-"$prime.triple.rev$" = { output = "‷", is_word = true, auto_expand = true }
-"$prime.quad$" = { output = "⁗", is_word = true, auto_expand = true }
+"$acute$" = { output = "´", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$acute.double$" = { output = "˝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$breve$" = { output = "˘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$caret$" = { output = "‸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$caron$" = { output = "ˇ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hat$" = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diaer$" = { output = "¨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$grave$" = { output = "`", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$macron$" = { output = "¯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.double$" = { output = "\"", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.single$" = { output = "'", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.l.double$" = { output = "“", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.l.single$" = { output = "‘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.r.double$" = { output = "”", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.r.single$" = { output = "’", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.chevron.l.double$" = { output = "«", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.chevron.l.single$" = { output = "‹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.chevron.r.double$" = { output = "»", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.chevron.r.single$" = { output = "›", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.angle.l.double$" = { output = "«", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.angle.l.single$" = { output = "‹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.angle.r.double$" = { output = "»", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.angle.r.single$" = { output = "›", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.high.double$" = { output = "‟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.high.single$" = { output = "‛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.low.double$" = { output = "„", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$quote.low.single$" = { output = "‚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prime$" = { output = "′", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prime.rev$" = { output = "‵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prime.double$" = { output = "″", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prime.double.rev$" = { output = "‶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prime.triple$" = { output = "‴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prime.triple.rev$" = { output = "‷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prime.quad$" = { output = "⁗", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[arithmetic]]
-"$plus$" = { output = "+", is_word = true, auto_expand = true }
-"$plus.o$" = { output = "⊕", is_word = true, auto_expand = true }
-"$plus.o.l$" = { output = "⨭", is_word = true, auto_expand = true }
-"$plus.o.r$" = { output = "⨮", is_word = true, auto_expand = true }
-"$plus.o.arrow$" = { output = "⟴", is_word = true, auto_expand = true }
-"$plus.o.big$" = { output = "⨁", is_word = true, auto_expand = true }
-"$plus.circle$" = { output = "⊕", is_word = true, auto_expand = true }
-"$plus.circle.arrow$" = { output = "⟴", is_word = true, auto_expand = true }
-"$plus.circle.big$" = { output = "⨁", is_word = true, auto_expand = true }
-"$plus.dot$" = { output = "∔", is_word = true, auto_expand = true }
-"$plus.double$" = { output = "⧺", is_word = true, auto_expand = true }
-"$plus.minus$" = { output = "±", is_word = true, auto_expand = true }
-"$plus.small$" = { output = "﹢", is_word = true, auto_expand = true }
-"$plus.square$" = { output = "⊞", is_word = true, auto_expand = true }
-"$plus.triangle$" = { output = "⨹", is_word = true, auto_expand = true }
-"$plus.triple$" = { output = "⧻", is_word = true, auto_expand = true }
-"$minus$" = { output = "−", is_word = true, auto_expand = true }
-"$minus.o$" = { output = "⊖", is_word = true, auto_expand = true }
-"$minus.circle$" = { output = "⊖", is_word = true, auto_expand = true }
-"$minus.dot$" = { output = "∸", is_word = true, auto_expand = true }
-"$minus.plus$" = { output = "∓", is_word = true, auto_expand = true }
-"$minus.square$" = { output = "⊟", is_word = true, auto_expand = true }
-"$minus.tilde$" = { output = "≂", is_word = true, auto_expand = true }
-"$minus.triangle$" = { output = "⨺", is_word = true, auto_expand = true }
-"$div$" = { output = "÷", is_word = true, auto_expand = true }
-"$div.o$" = { output = "⨸", is_word = true, auto_expand = true }
-"$div.slanted.o$" = { output = "⦼", is_word = true, auto_expand = true }
-"$div.circle$" = { output = "⨸", is_word = true, auto_expand = true }
-"$times$" = { output = "×", is_word = true, auto_expand = true }
-"$times.big$" = { output = "⨉", is_word = true, auto_expand = true }
-"$times.o$" = { output = "⊗", is_word = true, auto_expand = true }
-"$times.o.l$" = { output = "⨴", is_word = true, auto_expand = true }
-"$times.o.r$" = { output = "⨵", is_word = true, auto_expand = true }
-"$times.o.hat$" = { output = "⨶", is_word = true, auto_expand = true }
-"$times.o.big$" = { output = "⨂", is_word = true, auto_expand = true }
-"$times.circle$" = { output = "⊗", is_word = true, auto_expand = true }
-"$times.circle.big$" = { output = "⨂", is_word = true, auto_expand = true }
-"$times.div$" = { output = "⋇", is_word = true, auto_expand = true }
-"$times.three.l$" = { output = "⋋", is_word = true, auto_expand = true }
-"$times.three.r$" = { output = "⋌", is_word = true, auto_expand = true }
-"$times.l$" = { output = "⋉", is_word = true, auto_expand = true }
-"$times.r$" = { output = "⋊", is_word = true, auto_expand = true }
-"$times.square$" = { output = "⊠", is_word = true, auto_expand = true }
-"$times.triangle$" = { output = "⨻", is_word = true, auto_expand = true }
-"$ratio$" = { output = "∶", is_word = true, auto_expand = true }
+"$plus$" = { output = "+", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.o$" = { output = "⊕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.o.l$" = { output = "⨭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.o.r$" = { output = "⨮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.o.arrow$" = { output = "⟴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.o.big$" = { output = "⨁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.circle$" = { output = "⊕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.circle.arrow$" = { output = "⟴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.circle.big$" = { output = "⨁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.dot$" = { output = "∔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.double$" = { output = "⧺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.minus$" = { output = "±", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.small$" = { output = "﹢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.square$" = { output = "⊞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.triangle$" = { output = "⨹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$plus.triple$" = { output = "⧻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus$" = { output = "−", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus.o$" = { output = "⊖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus.circle$" = { output = "⊖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus.dot$" = { output = "∸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus.plus$" = { output = "∓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus.square$" = { output = "⊟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus.tilde$" = { output = "≂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$minus.triangle$" = { output = "⨺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$div$" = { output = "÷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$div.o$" = { output = "⨸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$div.slanted.o$" = { output = "⦼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$div.circle$" = { output = "⨸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times$" = { output = "×", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.big$" = { output = "⨉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.o$" = { output = "⊗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.o.l$" = { output = "⨴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.o.r$" = { output = "⨵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.o.hat$" = { output = "⨶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.o.big$" = { output = "⨂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.circle$" = { output = "⊗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.circle.big$" = { output = "⨂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.div$" = { output = "⋇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.three.l$" = { output = "⋋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.three.r$" = { output = "⋌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.l$" = { output = "⋉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.r$" = { output = "⋊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.square$" = { output = "⊠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$times.triangle$" = { output = "⨻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ratio$" = { output = "∶", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[relations]]
-"$eq$" = { output = "=", is_word = true, auto_expand = true }
-"$eq.star$" = { output = "≛", is_word = true, auto_expand = true }
-"$eq.o$" = { output = "⊜", is_word = true, auto_expand = true }
-"$eq.circle$" = { output = "⊜", is_word = true, auto_expand = true }
-"$eq.colon$" = { output = "≕", is_word = true, auto_expand = true }
-"$eq.dots$" = { output = "≑", is_word = true, auto_expand = true }
-"$eq.dots.down$" = { output = "≒", is_word = true, auto_expand = true }
-"$eq.dots.up$" = { output = "≓", is_word = true, auto_expand = true }
-"$eq.def$" = { output = "≝", is_word = true, auto_expand = true }
-"$eq.delta$" = { output = "≜", is_word = true, auto_expand = true }
-"$eq.equi$" = { output = "≚", is_word = true, auto_expand = true }
-"$eq.est$" = { output = "≙", is_word = true, auto_expand = true }
-"$eq.gt$" = { output = "⋝", is_word = true, auto_expand = true }
-"$eq.lt$" = { output = "⋜", is_word = true, auto_expand = true }
-"$eq.m$" = { output = "≞", is_word = true, auto_expand = true }
-"$eq.not$" = { output = "≠", is_word = true, auto_expand = true }
-"$eq.prec$" = { output = "⋞", is_word = true, auto_expand = true }
-"$eq.quest$" = { output = "≟", is_word = true, auto_expand = true }
-"$eq.small$" = { output = "﹦", is_word = true, auto_expand = true }
-"$eq.succ$" = { output = "⋟", is_word = true, auto_expand = true }
-"$eq.triple$" = { output = "≡", is_word = true, auto_expand = true }
-"$eq.triple.not$" = { output = "≢", is_word = true, auto_expand = true }
-"$eq.quad$" = { output = "≣", is_word = true, auto_expand = true }
-"$gt$" = { output = ">", is_word = true, auto_expand = true }
-"$gt.o$" = { output = "⧁", is_word = true, auto_expand = true }
-"$gt.circle$" = { output = "⧁", is_word = true, auto_expand = true }
-"$gt.dot$" = { output = "⋗", is_word = true, auto_expand = true }
-"$gt.approx$" = { output = "⪆", is_word = true, auto_expand = true }
-"$gt.double$" = { output = "≫", is_word = true, auto_expand = true }
-"$gt.eq$" = { output = "≥", is_word = true, auto_expand = true }
-"$gt.eq.slant$" = { output = "⩾", is_word = true, auto_expand = true }
-"$gt.eq.lt$" = { output = "⋛", is_word = true, auto_expand = true }
-"$gt.eq.not$" = { output = "≱", is_word = true, auto_expand = true }
-"$gt.equiv$" = { output = "≧", is_word = true, auto_expand = true }
-"$gt.lt$" = { output = "≷", is_word = true, auto_expand = true }
-"$gt.lt.not$" = { output = "≹", is_word = true, auto_expand = true }
-"$gt.neq$" = { output = "⪈", is_word = true, auto_expand = true }
-"$gt.napprox$" = { output = "⪊", is_word = true, auto_expand = true }
-"$gt.nequiv$" = { output = "≩", is_word = true, auto_expand = true }
-"$gt.not$" = { output = "≯", is_word = true, auto_expand = true }
-"$gt.ntilde$" = { output = "⋧", is_word = true, auto_expand = true }
-"$gt.small$" = { output = "﹥", is_word = true, auto_expand = true }
-"$gt.tilde$" = { output = "≳", is_word = true, auto_expand = true }
-"$gt.tilde.not$" = { output = "≵", is_word = true, auto_expand = true }
-"$gt.tri$" = { output = "⊳", is_word = true, auto_expand = true }
-"$gt.tri.eq$" = { output = "⊵", is_word = true, auto_expand = true }
-"$gt.tri.eq.not$" = { output = "⋭", is_word = true, auto_expand = true }
-"$gt.tri.not$" = { output = "⋫", is_word = true, auto_expand = true }
-"$gt.triple$" = { output = "⋙", is_word = true, auto_expand = true }
-"$gt.triple.nested$" = { output = "⫸", is_word = true, auto_expand = true }
-"$lt$" = { output = "<", is_word = true, auto_expand = true }
-"$lt.o$" = { output = "⧀", is_word = true, auto_expand = true }
-"$lt.circle$" = { output = "⧀", is_word = true, auto_expand = true }
-"$lt.dot$" = { output = "⋖", is_word = true, auto_expand = true }
-"$lt.approx$" = { output = "⪅", is_word = true, auto_expand = true }
-"$lt.double$" = { output = "≪", is_word = true, auto_expand = true }
-"$lt.eq$" = { output = "≤", is_word = true, auto_expand = true }
-"$lt.eq.slant$" = { output = "⩽", is_word = true, auto_expand = true }
-"$lt.eq.gt$" = { output = "⋚", is_word = true, auto_expand = true }
-"$lt.eq.not$" = { output = "≰", is_word = true, auto_expand = true }
-"$lt.equiv$" = { output = "≦", is_word = true, auto_expand = true }
-"$lt.gt$" = { output = "≶", is_word = true, auto_expand = true }
-"$lt.gt.not$" = { output = "≸", is_word = true, auto_expand = true }
-"$lt.neq$" = { output = "⪇", is_word = true, auto_expand = true }
-"$lt.napprox$" = { output = "⪉", is_word = true, auto_expand = true }
-"$lt.nequiv$" = { output = "≨", is_word = true, auto_expand = true }
-"$lt.not$" = { output = "≮", is_word = true, auto_expand = true }
-"$lt.ntilde$" = { output = "⋦", is_word = true, auto_expand = true }
-"$lt.small$" = { output = "﹤", is_word = true, auto_expand = true }
-"$lt.tilde$" = { output = "≲", is_word = true, auto_expand = true }
-"$lt.tilde.not$" = { output = "≴", is_word = true, auto_expand = true }
-"$lt.tri$" = { output = "⊲", is_word = true, auto_expand = true }
-"$lt.tri.eq$" = { output = "⊴", is_word = true, auto_expand = true }
-"$lt.tri.eq.not$" = { output = "⋬", is_word = true, auto_expand = true }
-"$lt.tri.not$" = { output = "⋪", is_word = true, auto_expand = true }
-"$lt.triple$" = { output = "⋘", is_word = true, auto_expand = true }
-"$lt.triple.nested$" = { output = "⫷", is_word = true, auto_expand = true }
-"$approx$" = { output = "≈", is_word = true, auto_expand = true }
-"$approx.eq$" = { output = "≊", is_word = true, auto_expand = true }
-"$approx.not$" = { output = "≉", is_word = true, auto_expand = true }
-"$prec$" = { output = "≺", is_word = true, auto_expand = true }
-"$prec.approx$" = { output = "⪷", is_word = true, auto_expand = true }
-"$prec.curly.eq$" = { output = "≼", is_word = true, auto_expand = true }
-"$prec.curly.eq.not$" = { output = "⋠", is_word = true, auto_expand = true }
-"$prec.double$" = { output = "⪻", is_word = true, auto_expand = true }
-"$prec.eq$" = { output = "⪯", is_word = true, auto_expand = true }
-"$prec.equiv$" = { output = "⪳", is_word = true, auto_expand = true }
-"$prec.napprox$" = { output = "⪹", is_word = true, auto_expand = true }
-"$prec.neq$" = { output = "⪱", is_word = true, auto_expand = true }
-"$prec.nequiv$" = { output = "⪵", is_word = true, auto_expand = true }
-"$prec.not$" = { output = "⊀", is_word = true, auto_expand = true }
-"$prec.ntilde$" = { output = "⋨", is_word = true, auto_expand = true }
-"$prec.tilde$" = { output = "≾", is_word = true, auto_expand = true }
-"$succ$" = { output = "≻", is_word = true, auto_expand = true }
-"$succ.approx$" = { output = "⪸", is_word = true, auto_expand = true }
-"$succ.curly.eq$" = { output = "≽", is_word = true, auto_expand = true }
-"$succ.curly.eq.not$" = { output = "⋡", is_word = true, auto_expand = true }
-"$succ.double$" = { output = "⪼", is_word = true, auto_expand = true }
-"$succ.eq$" = { output = "⪰", is_word = true, auto_expand = true }
-"$succ.equiv$" = { output = "⪴", is_word = true, auto_expand = true }
-"$succ.napprox$" = { output = "⪺", is_word = true, auto_expand = true }
-"$succ.neq$" = { output = "⪲", is_word = true, auto_expand = true }
-"$succ.nequiv$" = { output = "⪶", is_word = true, auto_expand = true }
-"$succ.not$" = { output = "⊁", is_word = true, auto_expand = true }
-"$succ.ntilde$" = { output = "⋩", is_word = true, auto_expand = true }
-"$succ.tilde$" = { output = "≿", is_word = true, auto_expand = true }
-"$equiv$" = { output = "≡", is_word = true, auto_expand = true }
-"$equiv.not$" = { output = "≢", is_word = true, auto_expand = true }
-"$smt$" = { output = "⪪", is_word = true, auto_expand = true }
-"$smt.eq$" = { output = "⪬", is_word = true, auto_expand = true }
-"$lat$" = { output = "⪫", is_word = true, auto_expand = true }
-"$lat.eq$" = { output = "⪭", is_word = true, auto_expand = true }
-"$prop$" = { output = "∝", is_word = true, auto_expand = true }
-"$original$" = { output = "⊶", is_word = true, auto_expand = true }
-"$image$" = { output = "⊷", is_word = true, auto_expand = true }
-"$asymp$" = { output = "≍", is_word = true, auto_expand = true }
-"$asymp.not$" = { output = "≭", is_word = true, auto_expand = true }
+"$eq$" = { output = "=", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.star$" = { output = "≛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.o$" = { output = "⊜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.circle$" = { output = "⊜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.colon$" = { output = "≕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.dots$" = { output = "≑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.dots.down$" = { output = "≒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.dots.up$" = { output = "≓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.def$" = { output = "≝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.delta$" = { output = "≜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.equi$" = { output = "≚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.est$" = { output = "≙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.gt$" = { output = "⋝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.lt$" = { output = "⋜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.m$" = { output = "≞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.not$" = { output = "≠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.prec$" = { output = "⋞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.quest$" = { output = "≟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.small$" = { output = "﹦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.succ$" = { output = "⋟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.triple$" = { output = "≡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.triple.not$" = { output = "≢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eq.quad$" = { output = "≣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt$" = { output = ">", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.o$" = { output = "⧁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.circle$" = { output = "⧁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.dot$" = { output = "⋗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.approx$" = { output = "⪆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.double$" = { output = "≫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.eq$" = { output = "≥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.eq.slant$" = { output = "⩾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.eq.lt$" = { output = "⋛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.eq.not$" = { output = "≱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.equiv$" = { output = "≧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.lt$" = { output = "≷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.lt.not$" = { output = "≹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.neq$" = { output = "⪈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.napprox$" = { output = "⪊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.nequiv$" = { output = "≩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.not$" = { output = "≯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.ntilde$" = { output = "⋧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.small$" = { output = "﹥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.tilde$" = { output = "≳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.tilde.not$" = { output = "≵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.tri$" = { output = "⊳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.tri.eq$" = { output = "⊵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.tri.eq.not$" = { output = "⋭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.tri.not$" = { output = "⋫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.triple$" = { output = "⋙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gt.triple.nested$" = { output = "⫸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt$" = { output = "<", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.o$" = { output = "⧀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.circle$" = { output = "⧀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.dot$" = { output = "⋖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.approx$" = { output = "⪅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.double$" = { output = "≪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.eq$" = { output = "≤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.eq.slant$" = { output = "⩽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.eq.gt$" = { output = "⋚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.eq.not$" = { output = "≰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.equiv$" = { output = "≦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.gt$" = { output = "≶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.gt.not$" = { output = "≸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.neq$" = { output = "⪇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.napprox$" = { output = "⪉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.nequiv$" = { output = "≨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.not$" = { output = "≮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.ntilde$" = { output = "⋦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.small$" = { output = "﹤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.tilde$" = { output = "≲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.tilde.not$" = { output = "≴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.tri$" = { output = "⊲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.tri.eq$" = { output = "⊴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.tri.eq.not$" = { output = "⋬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.tri.not$" = { output = "⋪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.triple$" = { output = "⋘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lt.triple.nested$" = { output = "⫷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$approx$" = { output = "≈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$approx.eq$" = { output = "≊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$approx.not$" = { output = "≉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec$" = { output = "≺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.approx$" = { output = "⪷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.curly.eq$" = { output = "≼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.curly.eq.not$" = { output = "⋠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.double$" = { output = "⪻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.eq$" = { output = "⪯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.equiv$" = { output = "⪳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.napprox$" = { output = "⪹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.neq$" = { output = "⪱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.nequiv$" = { output = "⪵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.not$" = { output = "⊀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.ntilde$" = { output = "⋨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prec.tilde$" = { output = "≾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ$" = { output = "≻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.approx$" = { output = "⪸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.curly.eq$" = { output = "≽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.curly.eq.not$" = { output = "⋡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.double$" = { output = "⪼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.eq$" = { output = "⪰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.equiv$" = { output = "⪴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.napprox$" = { output = "⪺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.neq$" = { output = "⪲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.nequiv$" = { output = "⪶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.not$" = { output = "⊁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.ntilde$" = { output = "⋩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$succ.tilde$" = { output = "≿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$equiv$" = { output = "≡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$equiv.not$" = { output = "≢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$smt$" = { output = "⪪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$smt.eq$" = { output = "⪬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lat$" = { output = "⪫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lat.eq$" = { output = "⪭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$prop$" = { output = "∝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$original$" = { output = "⊶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$image$" = { output = "⊷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$asymp$" = { output = "≍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$asymp.not$" = { output = "≭", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[set_theory]]
-"$emptyset$" = { output = "∅", is_word = true, auto_expand = true }
-"$emptyset.arrow.r$" = { output = "⦳", is_word = true, auto_expand = true }
-"$emptyset.arrow.l$" = { output = "⦴", is_word = true, auto_expand = true }
-"$emptyset.bar$" = { output = "⦱", is_word = true, auto_expand = true }
-"$emptyset.circle$" = { output = "⦲", is_word = true, auto_expand = true }
-"$emptyset.rev$" = { output = "⦰", is_word = true, auto_expand = true }
-"$nothing$" = { output = "∅", is_word = true, auto_expand = true }
-"$nothing.arrow.r$" = { output = "⦳", is_word = true, auto_expand = true }
-"$nothing.arrow.l$" = { output = "⦴", is_word = true, auto_expand = true }
-"$nothing.bar$" = { output = "⦱", is_word = true, auto_expand = true }
-"$nothing.circle$" = { output = "⦲", is_word = true, auto_expand = true }
-"$nothing.rev$" = { output = "⦰", is_word = true, auto_expand = true }
-"$without$" = { output = "∖", is_word = true, auto_expand = true }
-"$complement$" = { output = "∁", is_word = true, auto_expand = true }
-"$in$" = { output = "∈", is_word = true, auto_expand = true }
-"$in.not$" = { output = "∉", is_word = true, auto_expand = true }
-"$in.rev$" = { output = "∋", is_word = true, auto_expand = true }
-"$in.rev.not$" = { output = "∌", is_word = true, auto_expand = true }
-"$in.rev.small$" = { output = "∍", is_word = true, auto_expand = true }
-"$in.small$" = { output = "∊", is_word = true, auto_expand = true }
-"$subset$" = { output = "⊂", is_word = true, auto_expand = true }
-"$subset.dot$" = { output = "⪽", is_word = true, auto_expand = true }
-"$subset.double$" = { output = "⋐", is_word = true, auto_expand = true }
-"$subset.eq$" = { output = "⊆", is_word = true, auto_expand = true }
-"$subset.eq.not$" = { output = "⊈", is_word = true, auto_expand = true }
-"$subset.eq.sq$" = { output = "⊑", is_word = true, auto_expand = true }
-"$subset.eq.sq.not$" = { output = "⋢", is_word = true, auto_expand = true }
-"$subset.neq$" = { output = "⊊", is_word = true, auto_expand = true }
-"$subset.not$" = { output = "⊄", is_word = true, auto_expand = true }
-"$subset.sq$" = { output = "⊏", is_word = true, auto_expand = true }
-"$subset.sq.neq$" = { output = "⋤", is_word = true, auto_expand = true }
-"$supset$" = { output = "⊃", is_word = true, auto_expand = true }
-"$supset.dot$" = { output = "⪾", is_word = true, auto_expand = true }
-"$supset.double$" = { output = "⋑", is_word = true, auto_expand = true }
-"$supset.eq$" = { output = "⊇", is_word = true, auto_expand = true }
-"$supset.eq.not$" = { output = "⊉", is_word = true, auto_expand = true }
-"$supset.eq.sq$" = { output = "⊒", is_word = true, auto_expand = true }
-"$supset.eq.sq.not$" = { output = "⋣", is_word = true, auto_expand = true }
-"$supset.neq$" = { output = "⊋", is_word = true, auto_expand = true }
-"$supset.not$" = { output = "⊅", is_word = true, auto_expand = true }
-"$supset.sq$" = { output = "⊐", is_word = true, auto_expand = true }
-"$supset.sq.neq$" = { output = "⋥", is_word = true, auto_expand = true }
-"$union$" = { output = "∪", is_word = true, auto_expand = true }
-"$union.arrow$" = { output = "⊌", is_word = true, auto_expand = true }
-"$union.big$" = { output = "⋃", is_word = true, auto_expand = true }
-"$union.dot$" = { output = "⊍", is_word = true, auto_expand = true }
-"$union.dot.big$" = { output = "⨃", is_word = true, auto_expand = true }
-"$union.double$" = { output = "⋓", is_word = true, auto_expand = true }
-"$union.minus$" = { output = "⩁", is_word = true, auto_expand = true }
-"$union.or$" = { output = "⩅", is_word = true, auto_expand = true }
-"$union.plus$" = { output = "⊎", is_word = true, auto_expand = true }
-"$union.plus.big$" = { output = "⨄", is_word = true, auto_expand = true }
-"$union.sq$" = { output = "⊔", is_word = true, auto_expand = true }
-"$union.sq.big$" = { output = "⨆", is_word = true, auto_expand = true }
-"$union.sq.double$" = { output = "⩏", is_word = true, auto_expand = true }
-"$inter$" = { output = "∩", is_word = true, auto_expand = true }
-"$inter.and$" = { output = "⩄", is_word = true, auto_expand = true }
-"$inter.big$" = { output = "⋂", is_word = true, auto_expand = true }
-"$inter.dot$" = { output = "⩀", is_word = true, auto_expand = true }
-"$inter.double$" = { output = "⋒", is_word = true, auto_expand = true }
-"$inter.sq$" = { output = "⊓", is_word = true, auto_expand = true }
-"$inter.sq.big$" = { output = "⨅", is_word = true, auto_expand = true }
-"$inter.sq.double$" = { output = "⩎", is_word = true, auto_expand = true }
-"$sect$" = { output = "∩", is_word = true, auto_expand = true }
-"$sect.and$" = { output = "⩄", is_word = true, auto_expand = true }
-"$sect.big$" = { output = "⋂", is_word = true, auto_expand = true }
-"$sect.dot$" = { output = "⩀", is_word = true, auto_expand = true }
-"$sect.double$" = { output = "⋒", is_word = true, auto_expand = true }
-"$sect.sq$" = { output = "⊓", is_word = true, auto_expand = true }
-"$sect.sq.big$" = { output = "⨅", is_word = true, auto_expand = true }
-"$sect.sq.double$" = { output = "⩎", is_word = true, auto_expand = true }
+"$emptyset$" = { output = "∅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$emptyset.arrow.r$" = { output = "⦳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$emptyset.arrow.l$" = { output = "⦴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$emptyset.bar$" = { output = "⦱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$emptyset.circle$" = { output = "⦲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$emptyset.rev$" = { output = "⦰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nothing$" = { output = "∅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nothing.arrow.r$" = { output = "⦳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nothing.arrow.l$" = { output = "⦴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nothing.bar$" = { output = "⦱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nothing.circle$" = { output = "⦲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nothing.rev$" = { output = "⦰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$without$" = { output = "∖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$complement$" = { output = "∁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$in$" = { output = "∈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$in.not$" = { output = "∉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$in.rev$" = { output = "∋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$in.rev.not$" = { output = "∌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$in.rev.small$" = { output = "∍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$in.small$" = { output = "∊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset$" = { output = "⊂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.dot$" = { output = "⪽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.double$" = { output = "⋐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.eq$" = { output = "⊆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.eq.not$" = { output = "⊈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.eq.sq$" = { output = "⊑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.eq.sq.not$" = { output = "⋢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.neq$" = { output = "⊊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.not$" = { output = "⊄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.sq$" = { output = "⊏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$subset.sq.neq$" = { output = "⋤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset$" = { output = "⊃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.dot$" = { output = "⪾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.double$" = { output = "⋑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.eq$" = { output = "⊇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.eq.not$" = { output = "⊉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.eq.sq$" = { output = "⊒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.eq.sq.not$" = { output = "⋣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.neq$" = { output = "⊋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.not$" = { output = "⊅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.sq$" = { output = "⊐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$supset.sq.neq$" = { output = "⋥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union$" = { output = "∪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.arrow$" = { output = "⊌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.big$" = { output = "⋃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.dot$" = { output = "⊍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.dot.big$" = { output = "⨃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.double$" = { output = "⋓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.minus$" = { output = "⩁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.or$" = { output = "⩅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.plus$" = { output = "⊎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.plus.big$" = { output = "⨄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.sq$" = { output = "⊔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.sq.big$" = { output = "⨆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$union.sq.double$" = { output = "⩏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter$" = { output = "∩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter.and$" = { output = "⩄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter.big$" = { output = "⋂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter.dot$" = { output = "⩀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter.double$" = { output = "⋒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter.sq$" = { output = "⊓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter.sq.big$" = { output = "⨅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$inter.sq.double$" = { output = "⩎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect$" = { output = "∩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect.and$" = { output = "⩄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect.big$" = { output = "⋂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect.dot$" = { output = "⩀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect.double$" = { output = "⋒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect.sq$" = { output = "⊓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect.sq.big$" = { output = "⨅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sect.sq.double$" = { output = "⩎", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[calculus]]
-"$infinity$" = { output = "∞", is_word = true, auto_expand = true }
-"$infinity.bar$" = { output = "⧞", is_word = true, auto_expand = true }
-"$infinity.incomplete$" = { output = "⧜", is_word = true, auto_expand = true }
-"$infinity.tie$" = { output = "⧝", is_word = true, auto_expand = true }
-"$oo$" = { output = "∞", is_word = true, auto_expand = true }
-"$diff$" = { output = "∂", is_word = true, auto_expand = true }
-"$partial$" = { output = "∂", is_word = true, auto_expand = true }
-"$gradient$" = { output = "∇", is_word = true, auto_expand = true }
-"$nabla$" = { output = "∇", is_word = true, auto_expand = true }
-"$sum$" = { output = "∑", is_word = true, auto_expand = true }
-"$sum.integral$" = { output = "⨋", is_word = true, auto_expand = true }
-"$product$" = { output = "∏", is_word = true, auto_expand = true }
-"$product.co$" = { output = "∐", is_word = true, auto_expand = true }
-"$integral$" = { output = "∫", is_word = true, auto_expand = true }
-"$integral.arrow.hook$" = { output = "⨗", is_word = true, auto_expand = true }
-"$integral.ccw$" = { output = "⨑", is_word = true, auto_expand = true }
-"$integral.cont$" = { output = "∮", is_word = true, auto_expand = true }
-"$integral.cont.ccw$" = { output = "∳", is_word = true, auto_expand = true }
-"$integral.cont.cw$" = { output = "∲", is_word = true, auto_expand = true }
-"$integral.cw$" = { output = "∱", is_word = true, auto_expand = true }
-"$integral.dash$" = { output = "⨍", is_word = true, auto_expand = true }
-"$integral.dash.double$" = { output = "⨎", is_word = true, auto_expand = true }
-"$integral.double$" = { output = "∬", is_word = true, auto_expand = true }
-"$integral.quad$" = { output = "⨌", is_word = true, auto_expand = true }
-"$integral.inter$" = { output = "⨙", is_word = true, auto_expand = true }
-"$integral.sect$" = { output = "⨙", is_word = true, auto_expand = true }
-"$integral.slash$" = { output = "⨏", is_word = true, auto_expand = true }
-"$integral.square$" = { output = "⨖", is_word = true, auto_expand = true }
-"$integral.surf$" = { output = "∯", is_word = true, auto_expand = true }
-"$integral.times$" = { output = "⨘", is_word = true, auto_expand = true }
-"$integral.triple$" = { output = "∭", is_word = true, auto_expand = true }
-"$integral.union$" = { output = "⨚", is_word = true, auto_expand = true }
-"$integral.vol$" = { output = "∰", is_word = true, auto_expand = true }
-"$laplace$" = { output = "∆", is_word = true, auto_expand = true }
+"$infinity$" = { output = "∞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$infinity.bar$" = { output = "⧞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$infinity.incomplete$" = { output = "⧜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$infinity.tie$" = { output = "⧝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$oo$" = { output = "∞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diff$" = { output = "∂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$partial$" = { output = "∂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gradient$" = { output = "∇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nabla$" = { output = "∇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sum$" = { output = "∑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sum.integral$" = { output = "⨋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$product$" = { output = "∏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$product.co$" = { output = "∐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral$" = { output = "∫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.arrow.hook$" = { output = "⨗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.ccw$" = { output = "⨑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.cont$" = { output = "∮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.cont.ccw$" = { output = "∳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.cont.cw$" = { output = "∲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.cw$" = { output = "∱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.dash$" = { output = "⨍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.dash.double$" = { output = "⨎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.double$" = { output = "∬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.quad$" = { output = "⨌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.inter$" = { output = "⨙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.sect$" = { output = "⨙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.slash$" = { output = "⨏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.square$" = { output = "⨖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.surf$" = { output = "∯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.times$" = { output = "⨘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.triple$" = { output = "∭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.union$" = { output = "⨚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$integral.vol$" = { output = "∰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$laplace$" = { output = "∆", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[logic]]
-"$forall$" = { output = "∀", is_word = true, auto_expand = true }
-"$exists$" = { output = "∃", is_word = true, auto_expand = true }
-"$exists.not$" = { output = "∄", is_word = true, auto_expand = true }
-"$top$" = { output = "⊤", is_word = true, auto_expand = true }
-"$bot$" = { output = "⊥", is_word = true, auto_expand = true }
-"$not$" = { output = "¬", is_word = true, auto_expand = true }
-"$and$" = { output = "∧", is_word = true, auto_expand = true }
-"$and.big$" = { output = "⋀", is_word = true, auto_expand = true }
-"$and.curly$" = { output = "⋏", is_word = true, auto_expand = true }
-"$and.dot$" = { output = "⟑", is_word = true, auto_expand = true }
-"$and.double$" = { output = "⩓", is_word = true, auto_expand = true }
-"$or$" = { output = "∨", is_word = true, auto_expand = true }
-"$or.big$" = { output = "⋁", is_word = true, auto_expand = true }
-"$or.curly$" = { output = "⋎", is_word = true, auto_expand = true }
-"$or.dot$" = { output = "⟇", is_word = true, auto_expand = true }
-"$or.double$" = { output = "⩔", is_word = true, auto_expand = true }
-"$xor$" = { output = "⊕", is_word = true, auto_expand = true }
-"$xor.big$" = { output = "⨁", is_word = true, auto_expand = true }
-"$models$" = { output = "⊧", is_word = true, auto_expand = true }
-"$forces$" = { output = "⊩", is_word = true, auto_expand = true }
-"$forces.not$" = { output = "⊮", is_word = true, auto_expand = true }
-"$therefore$" = { output = "∴", is_word = true, auto_expand = true }
-"$because$" = { output = "∵", is_word = true, auto_expand = true }
-"$qed$" = { output = "∎", is_word = true, auto_expand = true }
+"$forall$" = { output = "∀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$exists$" = { output = "∃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$exists.not$" = { output = "∄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$top$" = { output = "⊤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bot$" = { output = "⊥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$not$" = { output = "¬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$and$" = { output = "∧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$and.big$" = { output = "⋀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$and.curly$" = { output = "⋏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$and.dot$" = { output = "⟑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$and.double$" = { output = "⩓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$or$" = { output = "∨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$or.big$" = { output = "⋁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$or.curly$" = { output = "⋎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$or.dot$" = { output = "⟇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$or.double$" = { output = "⩔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$xor$" = { output = "⊕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$xor.big$" = { output = "⨁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$models$" = { output = "⊧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$forces$" = { output = "⊩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$forces.not$" = { output = "⊮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$therefore$" = { output = "∴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$because$" = { output = "∵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$qed$" = { output = "∎", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[function_and_category_theory]]
-"$mapsto$" = { output = "↦", is_word = true, auto_expand = true }
-"$mapsto.long$" = { output = "⟼", is_word = true, auto_expand = true }
-"$compose$" = { output = "∘", is_word = true, auto_expand = true }
-"$compose.o$" = { output = "⊚", is_word = true, auto_expand = true }
-"$convolve$" = { output = "∗", is_word = true, auto_expand = true }
-"$convolve.o$" = { output = "⊛", is_word = true, auto_expand = true }
-"$multimap$" = { output = "⊸", is_word = true, auto_expand = true }
-"$multimap.double$" = { output = "⧟", is_word = true, auto_expand = true }
+"$mapsto$" = { output = "↦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$mapsto.long$" = { output = "⟼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$compose$" = { output = "∘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$compose.o$" = { output = "⊚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$convolve$" = { output = "∗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$convolve.o$" = { output = "⊛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$multimap$" = { output = "⊸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$multimap.double$" = { output = "⧟", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[game_theory]]
-"$tiny$" = { output = "⧾", is_word = true, auto_expand = true }
-"$miny$" = { output = "⧿", is_word = true, auto_expand = true }
+"$tiny$" = { output = "⧾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$miny$" = { output = "⧿", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[number_theory]]
-"$divides$" = { output = "∣", is_word = true, auto_expand = true }
-"$divides.not$" = { output = "∤", is_word = true, auto_expand = true }
-"$divides.not.rev$" = { output = "⫮", is_word = true, auto_expand = true }
-"$divides.struck$" = { output = "⟊", is_word = true, auto_expand = true }
+"$divides$" = { output = "∣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$divides.not$" = { output = "∤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$divides.not.rev$" = { output = "⫮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$divides.struck$" = { output = "⟊", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[algebra]]
-"$wreath$" = { output = "≀", is_word = true, auto_expand = true }
+"$wreath$" = { output = "≀", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[geometry]]
-"$angle$" = { output = "∠", is_word = true, auto_expand = true }
-"$angle.l$" = { output = "⟨", is_word = true, auto_expand = true }
-"$angle.l.curly$" = { output = "⧼", is_word = true, auto_expand = true }
-"$angle.l.dot$" = { output = "⦑", is_word = true, auto_expand = true }
-"$angle.l.double$" = { output = "⟪", is_word = true, auto_expand = true }
-"$angle.r$" = { output = "⟩", is_word = true, auto_expand = true }
-"$angle.r.curly$" = { output = "⧽", is_word = true, auto_expand = true }
-"$angle.r.dot$" = { output = "⦒", is_word = true, auto_expand = true }
-"$angle.r.double$" = { output = "⟫", is_word = true, auto_expand = true }
-"$angle.acute$" = { output = "⦟", is_word = true, auto_expand = true }
-"$angle.arc$" = { output = "∡", is_word = true, auto_expand = true }
-"$angle.arc.rev$" = { output = "⦛", is_word = true, auto_expand = true }
-"$angle.azimuth$" = { output = "⍼", is_word = true, auto_expand = true }
-"$angle.oblique$" = { output = "⦦", is_word = true, auto_expand = true }
-"$angle.rev$" = { output = "⦣", is_word = true, auto_expand = true }
-"$angle.right$" = { output = "∟", is_word = true, auto_expand = true }
-"$angle.right.rev$" = { output = "⯾", is_word = true, auto_expand = true }
-"$angle.right.arc$" = { output = "⊾", is_word = true, auto_expand = true }
-"$angle.right.dot$" = { output = "⦝", is_word = true, auto_expand = true }
-"$angle.right.sq$" = { output = "⦜", is_word = true, auto_expand = true }
-"$angle.s$" = { output = "⦞", is_word = true, auto_expand = true }
-"$angle.spatial$" = { output = "⟀", is_word = true, auto_expand = true }
-"$angle.spheric$" = { output = "∢", is_word = true, auto_expand = true }
-"$angle.spheric.rev$" = { output = "⦠", is_word = true, auto_expand = true }
-"$angle.spheric.t$" = { output = "⦡", is_word = true, auto_expand = true }
-"$angle.spheric.top$" = { output = "⦡", is_word = true, auto_expand = true }
-"$angzarr$" = { output = "⍼", is_word = true, auto_expand = true }
-"$parallel$" = { output = "∥", is_word = true, auto_expand = true }
-"$parallel.struck$" = { output = "⫲", is_word = true, auto_expand = true }
-"$parallel.o$" = { output = "⦷", is_word = true, auto_expand = true }
-"$parallel.circle$" = { output = "⦷", is_word = true, auto_expand = true }
-"$parallel.eq$" = { output = "⋕", is_word = true, auto_expand = true }
-"$parallel.equiv$" = { output = "⩨", is_word = true, auto_expand = true }
-"$parallel.not$" = { output = "∦", is_word = true, auto_expand = true }
-"$parallel.slanted.eq$" = { output = "⧣", is_word = true, auto_expand = true }
-"$parallel.slanted.eq.tilde$" = { output = "⧤", is_word = true, auto_expand = true }
-"$parallel.slanted.equiv$" = { output = "⧥", is_word = true, auto_expand = true }
-"$parallel.tilde$" = { output = "⫳", is_word = true, auto_expand = true }
-"$perp$" = { output = "⟂", is_word = true, auto_expand = true }
-"$perp.o$" = { output = "⦹", is_word = true, auto_expand = true }
-"$perp.circle$" = { output = "⦹", is_word = true, auto_expand = true }
+"$angle$" = { output = "∠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.l$" = { output = "⟨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.l.curly$" = { output = "⧼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.l.dot$" = { output = "⦑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.l.double$" = { output = "⟪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.r$" = { output = "⟩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.r.curly$" = { output = "⧽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.r.dot$" = { output = "⦒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.r.double$" = { output = "⟫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.acute$" = { output = "⦟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.arc$" = { output = "∡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.arc.rev$" = { output = "⦛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.azimuth$" = { output = "⍼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.oblique$" = { output = "⦦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.rev$" = { output = "⦣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.right$" = { output = "∟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.right.rev$" = { output = "⯾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.right.arc$" = { output = "⊾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.right.dot$" = { output = "⦝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.right.sq$" = { output = "⦜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.s$" = { output = "⦞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.spatial$" = { output = "⟀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.spheric$" = { output = "∢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.spheric.rev$" = { output = "⦠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.spheric.t$" = { output = "⦡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angle.spheric.top$" = { output = "⦡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$angzarr$" = { output = "⍼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel$" = { output = "∥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.struck$" = { output = "⫲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.o$" = { output = "⦷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.circle$" = { output = "⦷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.eq$" = { output = "⋕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.equiv$" = { output = "⩨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.not$" = { output = "∦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.slanted.eq$" = { output = "⧣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.slanted.eq.tilde$" = { output = "⧤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.slanted.equiv$" = { output = "⧥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallel.tilde$" = { output = "⫳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$perp$" = { output = "⟂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$perp.o$" = { output = "⦹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$perp.circle$" = { output = "⦹", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[astronomical]]
-"$earth$" = { output = "🜨", is_word = true, auto_expand = true }
-"$earth.alt$" = { output = "♁", is_word = true, auto_expand = true }
-"$jupiter$" = { output = "♃", is_word = true, auto_expand = true }
-"$mars$" = { output = "♂", is_word = true, auto_expand = true }
-"$mercury$" = { output = "☿", is_word = true, auto_expand = true }
-"$neptune$" = { output = "♆", is_word = true, auto_expand = true }
-"$neptune.alt$" = { output = "⯉", is_word = true, auto_expand = true }
-"$saturn$" = { output = "♄", is_word = true, auto_expand = true }
-"$sun$" = { output = "☉", is_word = true, auto_expand = true }
-"$uranus$" = { output = "⛢", is_word = true, auto_expand = true }
-"$uranus.alt$" = { output = "♅", is_word = true, auto_expand = true }
-"$venus$" = { output = "♀", is_word = true, auto_expand = true }
+"$earth$" = { output = "🜨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$earth.alt$" = { output = "♁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$jupiter$" = { output = "♃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$mars$" = { output = "♂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$mercury$" = { output = "☿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$neptune$" = { output = "♆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$neptune.alt$" = { output = "⯉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$saturn$" = { output = "♄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sun$" = { output = "☉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$uranus$" = { output = "⛢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$uranus.alt$" = { output = "♅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$venus$" = { output = "♀", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[miscellaneous_technical]]
-"$diameter$" = { output = "⌀", is_word = true, auto_expand = true }
-"$interleave$" = { output = "⫴", is_word = true, auto_expand = true }
-"$interleave.big$" = { output = "⫼", is_word = true, auto_expand = true }
-"$interleave.struck$" = { output = "⫵", is_word = true, auto_expand = true }
-"$join$" = { output = "⨝", is_word = true, auto_expand = true }
-"$join.r$" = { output = "⟖", is_word = true, auto_expand = true }
-"$join.l$" = { output = "⟕", is_word = true, auto_expand = true }
-"$join.l.r$" = { output = "⟗", is_word = true, auto_expand = true }
-"$hourglass.stroked$" = { output = "⧖", is_word = true, auto_expand = true }
-"$hourglass.filled$" = { output = "⧗", is_word = true, auto_expand = true }
-"$degree$" = { output = "°", is_word = true, auto_expand = true }
-"$smash$" = { output = "⨳", is_word = true, auto_expand = true }
-"$power.standby$" = { output = "⏻", is_word = true, auto_expand = true }
-"$power.on$" = { output = "⏽", is_word = true, auto_expand = true }
-"$power.off$" = { output = "⭘", is_word = true, auto_expand = true }
-"$power.on.off$" = { output = "⏼", is_word = true, auto_expand = true }
-"$power.sleep$" = { output = "⏾", is_word = true, auto_expand = true }
-"$smile$" = { output = "⌣", is_word = true, auto_expand = true }
-"$frown$" = { output = "⌢", is_word = true, auto_expand = true }
+"$diameter$" = { output = "⌀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$interleave$" = { output = "⫴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$interleave.big$" = { output = "⫼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$interleave.struck$" = { output = "⫵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$join$" = { output = "⨝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$join.r$" = { output = "⟖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$join.l$" = { output = "⟕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$join.l.r$" = { output = "⟗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hourglass.stroked$" = { output = "⧖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hourglass.filled$" = { output = "⧗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$degree$" = { output = "°", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$smash$" = { output = "⨳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$power.standby$" = { output = "⏻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$power.on$" = { output = "⏽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$power.off$" = { output = "⭘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$power.on.off$" = { output = "⏼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$power.sleep$" = { output = "⏾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$smile$" = { output = "⌣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$frown$" = { output = "⌢", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[currency]]
-"$afghani$" = { output = "؋", is_word = true, auto_expand = true }
-"$baht$" = { output = "฿", is_word = true, auto_expand = true }
-"$bitcoin$" = { output = "₿", is_word = true, auto_expand = true }
-"$cedi$" = { output = "₵", is_word = true, auto_expand = true }
-"$cent$" = { output = "¢", is_word = true, auto_expand = true }
-"$currency$" = { output = "¤", is_word = true, auto_expand = true }
-"$dollar$" = { output = "$", is_word = true, auto_expand = true }
-"$dong$" = { output = "₫", is_word = true, auto_expand = true }
-"$dorome$" = { output = "߾", is_word = true, auto_expand = true }
-"$dram$" = { output = "֏", is_word = true, auto_expand = true }
-"$euro$" = { output = "€", is_word = true, auto_expand = true }
-"$franc$" = { output = "₣", is_word = true, auto_expand = true }
-"$guarani$" = { output = "₲", is_word = true, auto_expand = true }
-"$hryvnia$" = { output = "₴", is_word = true, auto_expand = true }
-"$kip$" = { output = "₭", is_word = true, auto_expand = true }
-"$lari$" = { output = "₾", is_word = true, auto_expand = true }
-"$lira$" = { output = "₺", is_word = true, auto_expand = true }
-"$manat$" = { output = "₼", is_word = true, auto_expand = true }
-"$naira$" = { output = "₦", is_word = true, auto_expand = true }
-"$pataca$" = { output = "$", is_word = true, auto_expand = true }
-"$peso$" = { output = "$", is_word = true, auto_expand = true }
-"$peso.philippine$" = { output = "₱", is_word = true, auto_expand = true }
-"$pound$" = { output = "£", is_word = true, auto_expand = true }
-"$riel$" = { output = "៛", is_word = true, auto_expand = true }
-"$ruble$" = { output = "₽", is_word = true, auto_expand = true }
-"$rupee.indian$" = { output = "₹", is_word = true, auto_expand = true }
-"$rupee.generic$" = { output = "₨", is_word = true, auto_expand = true }
-"$rupee.tamil$" = { output = "௹", is_word = true, auto_expand = true }
-"$rupee.wancho$" = { output = "𞋿", is_word = true, auto_expand = true }
-"$shekel$" = { output = "₪", is_word = true, auto_expand = true }
-"$som$" = { output = "⃀", is_word = true, auto_expand = true }
-"$taka$" = { output = "৳", is_word = true, auto_expand = true }
-"$taman$" = { output = "߿", is_word = true, auto_expand = true }
-"$tenge$" = { output = "₸", is_word = true, auto_expand = true }
-"$togrog$" = { output = "₮", is_word = true, auto_expand = true }
-"$won$" = { output = "₩", is_word = true, auto_expand = true }
-"$yen$" = { output = "¥", is_word = true, auto_expand = true }
-"$yuan$" = { output = "¥", is_word = true, auto_expand = true }
+"$afghani$" = { output = "؋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$baht$" = { output = "฿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bitcoin$" = { output = "₿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cedi$" = { output = "₵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cent$" = { output = "¢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$currency$" = { output = "¤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dollar$" = { output = "$", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dong$" = { output = "₫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dorome$" = { output = "߾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dram$" = { output = "֏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$euro$" = { output = "€", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$franc$" = { output = "₣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$guarani$" = { output = "₲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hryvnia$" = { output = "₴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$kip$" = { output = "₭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lari$" = { output = "₾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lira$" = { output = "₺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$manat$" = { output = "₼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$naira$" = { output = "₦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$pataca$" = { output = "$", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$peso$" = { output = "$", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$peso.philippine$" = { output = "₱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$pound$" = { output = "£", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$riel$" = { output = "៛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ruble$" = { output = "₽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rupee.indian$" = { output = "₹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rupee.generic$" = { output = "₨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rupee.tamil$" = { output = "௹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rupee.wancho$" = { output = "𞋿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shekel$" = { output = "₪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$som$" = { output = "⃀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$taka$" = { output = "৳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$taman$" = { output = "߿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tenge$" = { output = "₸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$togrog$" = { output = "₮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$won$" = { output = "₩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$yen$" = { output = "¥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$yuan$" = { output = "¥", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[miscellaneous]]
-"$ballot$" = { output = "☐", is_word = true, auto_expand = true }
-"$ballot.cross$" = { output = "☒", is_word = true, auto_expand = true }
-"$ballot.check$" = { output = "☑", is_word = true, auto_expand = true }
-"$ballot.check.heavy$" = { output = "🗹", is_word = true, auto_expand = true }
-"$checkmark$" = { output = "✓", is_word = true, auto_expand = true }
-"$checkmark.light$" = { output = "🗸", is_word = true, auto_expand = true }
-"$checkmark.heavy$" = { output = "✔", is_word = true, auto_expand = true }
-"$crossmark$" = { output = "✗", is_word = true, auto_expand = true }
-"$crossmark.heavy$" = { output = "✘", is_word = true, auto_expand = true }
-"$floral$" = { output = "❦", is_word = true, auto_expand = true }
-"$floral.l$" = { output = "☙", is_word = true, auto_expand = true }
-"$floral.r$" = { output = "❧", is_word = true, auto_expand = true }
-"$refmark$" = { output = "※", is_word = true, auto_expand = true }
-"$cc$" = { output = "🅭", is_word = true, auto_expand = true }
-"$cc.by$" = { output = "🅯", is_word = true, auto_expand = true }
-"$cc.nc$" = { output = "🄏", is_word = true, auto_expand = true }
-"$cc.nd$" = { output = "⊜", is_word = true, auto_expand = true }
-"$cc.public$" = { output = "🅮", is_word = true, auto_expand = true }
-"$cc.sa$" = { output = "🄎", is_word = true, auto_expand = true }
-"$cc.zero$" = { output = "🄍", is_word = true, auto_expand = true }
-"$copyright$" = { output = "©", is_word = true, auto_expand = true }
-"$copyright.sound$" = { output = "℗", is_word = true, auto_expand = true }
-"$copyleft$" = { output = "🄯", is_word = true, auto_expand = true }
-"$trademark$" = { output = "™", is_word = true, auto_expand = true }
-"$trademark.registered$" = { output = "®", is_word = true, auto_expand = true }
-"$trademark.service$" = { output = "℠", is_word = true, auto_expand = true }
-"$maltese$" = { output = "✠", is_word = true, auto_expand = true }
-"$suit.club.filled$" = { output = "♣", is_word = true, auto_expand = true }
-"$suit.club.stroked$" = { output = "♧", is_word = true, auto_expand = true }
-"$suit.diamond.filled$" = { output = "♦", is_word = true, auto_expand = true }
-"$suit.diamond.stroked$" = { output = "♢", is_word = true, auto_expand = true }
-"$suit.heart.filled$" = { output = "♥", is_word = true, auto_expand = true }
-"$suit.heart.stroked$" = { output = "♡", is_word = true, auto_expand = true }
-"$suit.spade.filled$" = { output = "♠", is_word = true, auto_expand = true }
-"$suit.spade.stroked$" = { output = "♤", is_word = true, auto_expand = true }
+"$ballot$" = { output = "☐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ballot.cross$" = { output = "☒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ballot.check$" = { output = "☑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ballot.check.heavy$" = { output = "🗹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$checkmark$" = { output = "✓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$checkmark.light$" = { output = "🗸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$checkmark.heavy$" = { output = "✔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$crossmark$" = { output = "✗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$crossmark.heavy$" = { output = "✘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$floral$" = { output = "❦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$floral.l$" = { output = "☙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$floral.r$" = { output = "❧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$refmark$" = { output = "※", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cc$" = { output = "🅭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cc.by$" = { output = "🅯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cc.nc$" = { output = "🄏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cc.nd$" = { output = "⊜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cc.public$" = { output = "🅮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cc.sa$" = { output = "🄎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$cc.zero$" = { output = "🄍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$copyright$" = { output = "©", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$copyright.sound$" = { output = "℗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$copyleft$" = { output = "🄯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$trademark$" = { output = "™", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$trademark.registered$" = { output = "®", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$trademark.service$" = { output = "℠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$maltese$" = { output = "✠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.club.filled$" = { output = "♣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.club.stroked$" = { output = "♧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.diamond.filled$" = { output = "♦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.diamond.stroked$" = { output = "♢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.heart.filled$" = { output = "♥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.heart.stroked$" = { output = "♡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.spade.filled$" = { output = "♠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$suit.spade.stroked$" = { output = "♤", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[music]]
-"$note.up$" = { output = "🎜", is_word = true, auto_expand = true }
-"$note.down$" = { output = "🎝", is_word = true, auto_expand = true }
-"$note.whole$" = { output = "𝅝", is_word = true, auto_expand = true }
-"$note.half$" = { output = "𝅗𝅥", is_word = true, auto_expand = true }
-"$note.quarter$" = { output = "𝅘𝅥", is_word = true, auto_expand = true }
-"$note.quarter.alt$" = { output = "♩", is_word = true, auto_expand = true }
-"$note.eighth$" = { output = "𝅘𝅥𝅮", is_word = true, auto_expand = true }
-"$note.eighth.alt$" = { output = "♪", is_word = true, auto_expand = true }
-"$note.eighth.beamed$" = { output = "♫", is_word = true, auto_expand = true }
-"$note.sixteenth$" = { output = "𝅘𝅥𝅯", is_word = true, auto_expand = true }
-"$note.sixteenth.beamed$" = { output = "♬", is_word = true, auto_expand = true }
-"$note.grace$" = { output = "𝆕", is_word = true, auto_expand = true }
-"$note.grace.slash$" = { output = "𝆔", is_word = true, auto_expand = true }
-"$rest.whole$" = { output = "𝄻", is_word = true, auto_expand = true }
-"$rest.multiple$" = { output = "𝄺", is_word = true, auto_expand = true }
-"$rest.multiple.measure$" = { output = "𝄩", is_word = true, auto_expand = true }
-"$rest.half$" = { output = "𝄼", is_word = true, auto_expand = true }
-"$rest.quarter$" = { output = "𝄽", is_word = true, auto_expand = true }
-"$rest.eighth$" = { output = "𝄾", is_word = true, auto_expand = true }
-"$rest.sixteenth$" = { output = "𝄿", is_word = true, auto_expand = true }
-"$natural$" = { output = "♮", is_word = true, auto_expand = true }
-"$natural.t$" = { output = "𝄮", is_word = true, auto_expand = true }
-"$natural.b$" = { output = "𝄯", is_word = true, auto_expand = true }
-"$flat$" = { output = "♭", is_word = true, auto_expand = true }
-"$flat.t$" = { output = "𝄬", is_word = true, auto_expand = true }
-"$flat.b$" = { output = "𝄭", is_word = true, auto_expand = true }
-"$flat.double$" = { output = "𝄫", is_word = true, auto_expand = true }
-"$flat.quarter$" = { output = "𝄳", is_word = true, auto_expand = true }
-"$sharp$" = { output = "♯", is_word = true, auto_expand = true }
-"$sharp.t$" = { output = "𝄰", is_word = true, auto_expand = true }
-"$sharp.b$" = { output = "𝄱", is_word = true, auto_expand = true }
-"$sharp.double$" = { output = "𝄪", is_word = true, auto_expand = true }
-"$sharp.quarter$" = { output = "𝄲", is_word = true, auto_expand = true }
+"$note.up$" = { output = "🎜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.down$" = { output = "🎝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.whole$" = { output = "𝅝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.half$" = { output = "𝅗𝅥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.quarter$" = { output = "𝅘𝅥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.quarter.alt$" = { output = "♩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.eighth$" = { output = "𝅘𝅥𝅮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.eighth.alt$" = { output = "♪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.eighth.beamed$" = { output = "♫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.sixteenth$" = { output = "𝅘𝅥𝅯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.sixteenth.beamed$" = { output = "♬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.grace$" = { output = "𝆕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$note.grace.slash$" = { output = "𝆔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rest.whole$" = { output = "𝄻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rest.multiple$" = { output = "𝄺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rest.multiple.measure$" = { output = "𝄩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rest.half$" = { output = "𝄼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rest.quarter$" = { output = "𝄽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rest.eighth$" = { output = "𝄾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rest.sixteenth$" = { output = "𝄿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$natural$" = { output = "♮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$natural.t$" = { output = "𝄮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$natural.b$" = { output = "𝄯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$flat$" = { output = "♭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$flat.t$" = { output = "𝄬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$flat.b$" = { output = "𝄭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$flat.double$" = { output = "𝄫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$flat.quarter$" = { output = "𝄳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sharp$" = { output = "♯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sharp.t$" = { output = "𝄰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sharp.b$" = { output = "𝄱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sharp.double$" = { output = "𝄪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sharp.quarter$" = { output = "𝄲", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[shapes]]
-"$bullet$" = { output = "•", is_word = true, auto_expand = true }
-"$bullet.op$" = { output = "∙", is_word = true, auto_expand = true }
-"$bullet.o$" = { output = "⦿", is_word = true, auto_expand = true }
-"$bullet.stroked$" = { output = "◦", is_word = true, auto_expand = true }
-"$bullet.stroked.o$" = { output = "⦾", is_word = true, auto_expand = true }
-"$bullet.hole$" = { output = "◘", is_word = true, auto_expand = true }
-"$bullet.hyph$" = { output = "⁃", is_word = true, auto_expand = true }
-"$bullet.tri$" = { output = "‣", is_word = true, auto_expand = true }
-"$bullet.l$" = { output = "⁌", is_word = true, auto_expand = true }
-"$bullet.r$" = { output = "⁍", is_word = true, auto_expand = true }
-"$circle.stroked$" = { output = "○", is_word = true, auto_expand = true }
-"$circle.stroked.tiny$" = { output = "∘", is_word = true, auto_expand = true }
-"$circle.stroked.small$" = { output = "⚬", is_word = true, auto_expand = true }
-"$circle.stroked.big$" = { output = "◯", is_word = true, auto_expand = true }
-"$circle.filled$" = { output = "●", is_word = true, auto_expand = true }
-"$circle.filled.tiny$" = { output = "⦁", is_word = true, auto_expand = true }
-"$circle.filled.small$" = { output = "∙", is_word = true, auto_expand = true }
-"$circle.filled.big$" = { output = "⬤", is_word = true, auto_expand = true }
-"$circle.dotted$" = { output = "◌", is_word = true, auto_expand = true }
-"$circle.nested$" = { output = "⊚", is_word = true, auto_expand = true }
-"$ellipse.stroked.h$" = { output = "⬭", is_word = true, auto_expand = true }
-"$ellipse.stroked.v$" = { output = "⬯", is_word = true, auto_expand = true }
-"$ellipse.filled.h$" = { output = "⬬", is_word = true, auto_expand = true }
-"$ellipse.filled.v$" = { output = "⬮", is_word = true, auto_expand = true }
-"$triangle.stroked.t$" = { output = "△", is_word = true, auto_expand = true }
-"$triangle.stroked.b$" = { output = "▽", is_word = true, auto_expand = true }
-"$triangle.stroked.r$" = { output = "▷", is_word = true, auto_expand = true }
-"$triangle.stroked.l$" = { output = "◁", is_word = true, auto_expand = true }
-"$triangle.stroked.bl$" = { output = "◺", is_word = true, auto_expand = true }
-"$triangle.stroked.br$" = { output = "◿", is_word = true, auto_expand = true }
-"$triangle.stroked.tl$" = { output = "◸", is_word = true, auto_expand = true }
-"$triangle.stroked.tr$" = { output = "◹", is_word = true, auto_expand = true }
-"$triangle.stroked.small.t$" = { output = "▵", is_word = true, auto_expand = true }
-"$triangle.stroked.small.b$" = { output = "▿", is_word = true, auto_expand = true }
-"$triangle.stroked.small.r$" = { output = "▹", is_word = true, auto_expand = true }
-"$triangle.stroked.small.l$" = { output = "◃", is_word = true, auto_expand = true }
-"$triangle.stroked.rounded$" = { output = "🛆", is_word = true, auto_expand = true }
-"$triangle.stroked.nested$" = { output = "⟁", is_word = true, auto_expand = true }
-"$triangle.stroked.dot$" = { output = "◬", is_word = true, auto_expand = true }
-"$triangle.filled.t$" = { output = "▲", is_word = true, auto_expand = true }
-"$triangle.filled.b$" = { output = "▼", is_word = true, auto_expand = true }
-"$triangle.filled.r$" = { output = "▶", is_word = true, auto_expand = true }
-"$triangle.filled.l$" = { output = "◀", is_word = true, auto_expand = true }
-"$triangle.filled.bl$" = { output = "◣", is_word = true, auto_expand = true }
-"$triangle.filled.br$" = { output = "◢", is_word = true, auto_expand = true }
-"$triangle.filled.tl$" = { output = "◤", is_word = true, auto_expand = true }
-"$triangle.filled.tr$" = { output = "◥", is_word = true, auto_expand = true }
-"$triangle.filled.small.t$" = { output = "▴", is_word = true, auto_expand = true }
-"$triangle.filled.small.b$" = { output = "▾", is_word = true, auto_expand = true }
-"$triangle.filled.small.r$" = { output = "▸", is_word = true, auto_expand = true }
-"$triangle.filled.small.l$" = { output = "◂", is_word = true, auto_expand = true }
-"$square.stroked$" = { output = "□", is_word = true, auto_expand = true }
-"$square.stroked.tiny$" = { output = "▫", is_word = true, auto_expand = true }
-"$square.stroked.small$" = { output = "◽", is_word = true, auto_expand = true }
-"$square.stroked.medium$" = { output = "◻", is_word = true, auto_expand = true }
-"$square.stroked.big$" = { output = "⬜", is_word = true, auto_expand = true }
-"$square.stroked.dotted$" = { output = "⬚", is_word = true, auto_expand = true }
-"$square.stroked.rounded$" = { output = "▢", is_word = true, auto_expand = true }
-"$square.filled$" = { output = "■", is_word = true, auto_expand = true }
-"$square.filled.tiny$" = { output = "▪", is_word = true, auto_expand = true }
-"$square.filled.small$" = { output = "◾", is_word = true, auto_expand = true }
-"$square.filled.medium$" = { output = "◼", is_word = true, auto_expand = true }
-"$square.filled.big$" = { output = "⬛", is_word = true, auto_expand = true }
-"$rect.stroked.h$" = { output = "▭", is_word = true, auto_expand = true }
-"$rect.stroked.v$" = { output = "▯", is_word = true, auto_expand = true }
-"$rect.filled.h$" = { output = "▬", is_word = true, auto_expand = true }
-"$rect.filled.v$" = { output = "▮", is_word = true, auto_expand = true }
-"$penta.stroked$" = { output = "⬠", is_word = true, auto_expand = true }
-"$penta.filled$" = { output = "⬟", is_word = true, auto_expand = true }
-"$hexa.stroked$" = { output = "⬡", is_word = true, auto_expand = true }
-"$hexa.filled$" = { output = "⬢", is_word = true, auto_expand = true }
-"$diamond.stroked$" = { output = "◇", is_word = true, auto_expand = true }
-"$diamond.stroked.small$" = { output = "⋄", is_word = true, auto_expand = true }
-"$diamond.stroked.medium$" = { output = "⬦", is_word = true, auto_expand = true }
-"$diamond.stroked.dot$" = { output = "⟐", is_word = true, auto_expand = true }
-"$diamond.filled$" = { output = "◆", is_word = true, auto_expand = true }
-"$diamond.filled.medium$" = { output = "⬥", is_word = true, auto_expand = true }
-"$diamond.filled.small$" = { output = "⬩", is_word = true, auto_expand = true }
-"$lozenge.stroked$" = { output = "◊", is_word = true, auto_expand = true }
-"$lozenge.stroked.small$" = { output = "⬫", is_word = true, auto_expand = true }
-"$lozenge.stroked.medium$" = { output = "⬨", is_word = true, auto_expand = true }
-"$lozenge.filled$" = { output = "⧫", is_word = true, auto_expand = true }
-"$lozenge.filled.small$" = { output = "⬪", is_word = true, auto_expand = true }
-"$lozenge.filled.medium$" = { output = "⬧", is_word = true, auto_expand = true }
-"$parallelogram.stroked$" = { output = "▱", is_word = true, auto_expand = true }
-"$parallelogram.filled$" = { output = "▰", is_word = true, auto_expand = true }
-"$star.op$" = { output = "⋆", is_word = true, auto_expand = true }
-"$star.stroked$" = { output = "☆", is_word = true, auto_expand = true }
-"$star.filled$" = { output = "★", is_word = true, auto_expand = true }
+"$bullet$" = { output = "•", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.op$" = { output = "∙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.o$" = { output = "⦿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.stroked$" = { output = "◦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.stroked.o$" = { output = "⦾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.hole$" = { output = "◘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.hyph$" = { output = "⁃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.tri$" = { output = "‣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.l$" = { output = "⁌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bullet.r$" = { output = "⁍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.stroked$" = { output = "○", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.stroked.tiny$" = { output = "∘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.stroked.small$" = { output = "⚬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.stroked.big$" = { output = "◯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.filled$" = { output = "●", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.filled.tiny$" = { output = "⦁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.filled.small$" = { output = "∙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.filled.big$" = { output = "⬤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.dotted$" = { output = "◌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$circle.nested$" = { output = "⊚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ellipse.stroked.h$" = { output = "⬭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ellipse.stroked.v$" = { output = "⬯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ellipse.filled.h$" = { output = "⬬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ellipse.filled.v$" = { output = "⬮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.t$" = { output = "△", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.b$" = { output = "▽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.r$" = { output = "▷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.l$" = { output = "◁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.bl$" = { output = "◺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.br$" = { output = "◿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.tl$" = { output = "◸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.tr$" = { output = "◹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.small.t$" = { output = "▵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.small.b$" = { output = "▿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.small.r$" = { output = "▹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.small.l$" = { output = "◃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.rounded$" = { output = "🛆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.nested$" = { output = "⟁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.stroked.dot$" = { output = "◬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.t$" = { output = "▲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.b$" = { output = "▼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.r$" = { output = "▶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.l$" = { output = "◀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.bl$" = { output = "◣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.br$" = { output = "◢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.tl$" = { output = "◤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.tr$" = { output = "◥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.small.t$" = { output = "▴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.small.b$" = { output = "▾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.small.r$" = { output = "▸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$triangle.filled.small.l$" = { output = "◂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.stroked$" = { output = "□", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.stroked.tiny$" = { output = "▫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.stroked.small$" = { output = "◽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.stroked.medium$" = { output = "◻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.stroked.big$" = { output = "⬜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.stroked.dotted$" = { output = "⬚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.stroked.rounded$" = { output = "▢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.filled$" = { output = "■", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.filled.tiny$" = { output = "▪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.filled.small$" = { output = "◾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.filled.medium$" = { output = "◼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$square.filled.big$" = { output = "⬛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rect.stroked.h$" = { output = "▭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rect.stroked.v$" = { output = "▯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rect.filled.h$" = { output = "▬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rect.filled.v$" = { output = "▮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$penta.stroked$" = { output = "⬠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$penta.filled$" = { output = "⬟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hexa.stroked$" = { output = "⬡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$hexa.filled$" = { output = "⬢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diamond.stroked$" = { output = "◇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diamond.stroked.small$" = { output = "⋄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diamond.stroked.medium$" = { output = "⬦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diamond.stroked.dot$" = { output = "⟐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diamond.filled$" = { output = "◆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diamond.filled.medium$" = { output = "⬥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$diamond.filled.small$" = { output = "⬩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lozenge.stroked$" = { output = "◊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lozenge.stroked.small$" = { output = "⬫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lozenge.stroked.medium$" = { output = "⬨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lozenge.filled$" = { output = "⧫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lozenge.filled.small$" = { output = "⬪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lozenge.filled.medium$" = { output = "⬧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallelogram.stroked$" = { output = "▱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$parallelogram.filled$" = { output = "▰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$star.op$" = { output = "⋆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$star.stroked$" = { output = "☆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$star.filled$" = { output = "★", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[arrows_harpoons_and_tacks]]
-"$arrow.r$" = { output = "→", is_word = true, auto_expand = true }
-"$arrow.r.long.bar$" = { output = "⟼", is_word = true, auto_expand = true }
-"$arrow.r.bar$" = { output = "↦", is_word = true, auto_expand = true }
-"$arrow.r.curve$" = { output = "⤷", is_word = true, auto_expand = true }
-"$arrow.r.turn$" = { output = "⮎", is_word = true, auto_expand = true }
-"$arrow.r.dashed$" = { output = "⇢", is_word = true, auto_expand = true }
-"$arrow.r.dotted$" = { output = "⤑", is_word = true, auto_expand = true }
-"$arrow.r.double$" = { output = "⇒", is_word = true, auto_expand = true }
-"$arrow.r.double.bar$" = { output = "⤇", is_word = true, auto_expand = true }
-"$arrow.r.double.long$" = { output = "⟹", is_word = true, auto_expand = true }
-"$arrow.r.double.long.bar$" = { output = "⟾", is_word = true, auto_expand = true }
-"$arrow.r.double.not$" = { output = "⇏", is_word = true, auto_expand = true }
-"$arrow.r.double.struck$" = { output = "⤃", is_word = true, auto_expand = true }
-"$arrow.r.filled$" = { output = "➡", is_word = true, auto_expand = true }
-"$arrow.r.hook$" = { output = "↪", is_word = true, auto_expand = true }
-"$arrow.r.long$" = { output = "⟶", is_word = true, auto_expand = true }
-"$arrow.r.long.squiggly$" = { output = "⟿", is_word = true, auto_expand = true }
-"$arrow.r.loop$" = { output = "↬", is_word = true, auto_expand = true }
-"$arrow.r.not$" = { output = "↛", is_word = true, auto_expand = true }
-"$arrow.r.quad$" = { output = "⭆", is_word = true, auto_expand = true }
-"$arrow.r.squiggly$" = { output = "⇝", is_word = true, auto_expand = true }
-"$arrow.r.stop$" = { output = "⇥", is_word = true, auto_expand = true }
-"$arrow.r.stroked$" = { output = "⇨", is_word = true, auto_expand = true }
-"$arrow.r.struck$" = { output = "⇸", is_word = true, auto_expand = true }
-"$arrow.r.dstruck$" = { output = "⇻", is_word = true, auto_expand = true }
-"$arrow.r.tail$" = { output = "↣", is_word = true, auto_expand = true }
-"$arrow.r.tail.struck$" = { output = "⤔", is_word = true, auto_expand = true }
-"$arrow.r.tail.dstruck$" = { output = "⤕", is_word = true, auto_expand = true }
-"$arrow.r.tilde$" = { output = "⥲", is_word = true, auto_expand = true }
-"$arrow.r.triple$" = { output = "⇛", is_word = true, auto_expand = true }
-"$arrow.r.twohead$" = { output = "↠", is_word = true, auto_expand = true }
-"$arrow.r.twohead.bar$" = { output = "⤅", is_word = true, auto_expand = true }
-"$arrow.r.twohead.struck$" = { output = "⤀", is_word = true, auto_expand = true }
-"$arrow.r.twohead.dstruck$" = { output = "⤁", is_word = true, auto_expand = true }
-"$arrow.r.twohead.tail$" = { output = "⤖", is_word = true, auto_expand = true }
-"$arrow.r.twohead.tail.struck$" = { output = "⤗", is_word = true, auto_expand = true }
-"$arrow.r.twohead.tail.dstruck$" = { output = "⤘", is_word = true, auto_expand = true }
-"$arrow.r.open$" = { output = "⇾", is_word = true, auto_expand = true }
-"$arrow.r.wave$" = { output = "↝", is_word = true, auto_expand = true }
-"$arrow.l$" = { output = "←", is_word = true, auto_expand = true }
-"$arrow.l.bar$" = { output = "↤", is_word = true, auto_expand = true }
-"$arrow.l.curve$" = { output = "⤶", is_word = true, auto_expand = true }
-"$arrow.l.turn$" = { output = "⮌", is_word = true, auto_expand = true }
-"$arrow.l.dashed$" = { output = "⇠", is_word = true, auto_expand = true }
-"$arrow.l.dotted$" = { output = "⬸", is_word = true, auto_expand = true }
-"$arrow.l.double$" = { output = "⇐", is_word = true, auto_expand = true }
-"$arrow.l.double.bar$" = { output = "⤆", is_word = true, auto_expand = true }
-"$arrow.l.double.long$" = { output = "⟸", is_word = true, auto_expand = true }
-"$arrow.l.double.long.bar$" = { output = "⟽", is_word = true, auto_expand = true }
-"$arrow.l.double.not$" = { output = "⇍", is_word = true, auto_expand = true }
-"$arrow.l.double.struck$" = { output = "⤂", is_word = true, auto_expand = true }
-"$arrow.l.filled$" = { output = "⬅", is_word = true, auto_expand = true }
-"$arrow.l.hook$" = { output = "↩", is_word = true, auto_expand = true }
-"$arrow.l.long$" = { output = "⟵", is_word = true, auto_expand = true }
-"$arrow.l.long.bar$" = { output = "⟻", is_word = true, auto_expand = true }
-"$arrow.l.long.squiggly$" = { output = "⬳", is_word = true, auto_expand = true }
-"$arrow.l.loop$" = { output = "↫", is_word = true, auto_expand = true }
-"$arrow.l.not$" = { output = "↚", is_word = true, auto_expand = true }
-"$arrow.l.quad$" = { output = "⭅", is_word = true, auto_expand = true }
-"$arrow.l.squiggly$" = { output = "⇜", is_word = true, auto_expand = true }
-"$arrow.l.stop$" = { output = "⇤", is_word = true, auto_expand = true }
-"$arrow.l.stroked$" = { output = "⇦", is_word = true, auto_expand = true }
-"$arrow.l.struck$" = { output = "⇷", is_word = true, auto_expand = true }
-"$arrow.l.dstruck$" = { output = "⇺", is_word = true, auto_expand = true }
-"$arrow.l.tail$" = { output = "↢", is_word = true, auto_expand = true }
-"$arrow.l.tail.struck$" = { output = "⬹", is_word = true, auto_expand = true }
-"$arrow.l.tail.dstruck$" = { output = "⬺", is_word = true, auto_expand = true }
-"$arrow.l.tilde$" = { output = "⭉", is_word = true, auto_expand = true }
-"$arrow.l.triple$" = { output = "⇚", is_word = true, auto_expand = true }
-"$arrow.l.twohead$" = { output = "↞", is_word = true, auto_expand = true }
-"$arrow.l.twohead.bar$" = { output = "⬶", is_word = true, auto_expand = true }
-"$arrow.l.twohead.struck$" = { output = "⬴", is_word = true, auto_expand = true }
-"$arrow.l.twohead.dstruck$" = { output = "⬵", is_word = true, auto_expand = true }
-"$arrow.l.twohead.tail$" = { output = "⬻", is_word = true, auto_expand = true }
-"$arrow.l.twohead.tail.struck$" = { output = "⬼", is_word = true, auto_expand = true }
-"$arrow.l.twohead.tail.dstruck$" = { output = "⬽", is_word = true, auto_expand = true }
-"$arrow.l.open$" = { output = "⇽", is_word = true, auto_expand = true }
-"$arrow.l.wave$" = { output = "↜", is_word = true, auto_expand = true }
-"$arrow.t$" = { output = "↑", is_word = true, auto_expand = true }
-"$arrow.t.bar$" = { output = "↥", is_word = true, auto_expand = true }
-"$arrow.t.curve$" = { output = "⤴", is_word = true, auto_expand = true }
-"$arrow.t.turn$" = { output = "⮍", is_word = true, auto_expand = true }
-"$arrow.t.dashed$" = { output = "⇡", is_word = true, auto_expand = true }
-"$arrow.t.double$" = { output = "⇑", is_word = true, auto_expand = true }
-"$arrow.t.filled$" = { output = "⬆", is_word = true, auto_expand = true }
-"$arrow.t.quad$" = { output = "⟰", is_word = true, auto_expand = true }
-"$arrow.t.stop$" = { output = "⤒", is_word = true, auto_expand = true }
-"$arrow.t.stroked$" = { output = "⇧", is_word = true, auto_expand = true }
-"$arrow.t.struck$" = { output = "⤉", is_word = true, auto_expand = true }
-"$arrow.t.dstruck$" = { output = "⇞", is_word = true, auto_expand = true }
-"$arrow.t.triple$" = { output = "⤊", is_word = true, auto_expand = true }
-"$arrow.t.twohead$" = { output = "↟", is_word = true, auto_expand = true }
-"$arrow.b$" = { output = "↓", is_word = true, auto_expand = true }
-"$arrow.b.bar$" = { output = "↧", is_word = true, auto_expand = true }
-"$arrow.b.curve$" = { output = "⤵", is_word = true, auto_expand = true }
-"$arrow.b.turn$" = { output = "⮏", is_word = true, auto_expand = true }
-"$arrow.b.dashed$" = { output = "⇣", is_word = true, auto_expand = true }
-"$arrow.b.double$" = { output = "⇓", is_word = true, auto_expand = true }
-"$arrow.b.filled$" = { output = "⬇", is_word = true, auto_expand = true }
-"$arrow.b.quad$" = { output = "⟱", is_word = true, auto_expand = true }
-"$arrow.b.stop$" = { output = "⤓", is_word = true, auto_expand = true }
-"$arrow.b.stroked$" = { output = "⇩", is_word = true, auto_expand = true }
-"$arrow.b.struck$" = { output = "⤈", is_word = true, auto_expand = true }
-"$arrow.b.dstruck$" = { output = "⇟", is_word = true, auto_expand = true }
-"$arrow.b.triple$" = { output = "⤋", is_word = true, auto_expand = true }
-"$arrow.b.twohead$" = { output = "↡", is_word = true, auto_expand = true }
-"$arrow.l.r$" = { output = "↔", is_word = true, auto_expand = true }
-"$arrow.l.r.double$" = { output = "⇔", is_word = true, auto_expand = true }
-"$arrow.l.r.double.long$" = { output = "⟺", is_word = true, auto_expand = true }
-"$arrow.l.r.double.not$" = { output = "⇎", is_word = true, auto_expand = true }
-"$arrow.l.r.double.struck$" = { output = "⤄", is_word = true, auto_expand = true }
-"$arrow.l.r.filled$" = { output = "⬌", is_word = true, auto_expand = true }
-"$arrow.l.r.long$" = { output = "⟷", is_word = true, auto_expand = true }
-"$arrow.l.r.not$" = { output = "↮", is_word = true, auto_expand = true }
-"$arrow.l.r.stroked$" = { output = "⬄", is_word = true, auto_expand = true }
-"$arrow.l.r.struck$" = { output = "⇹", is_word = true, auto_expand = true }
-"$arrow.l.r.dstruck$" = { output = "⇼", is_word = true, auto_expand = true }
-"$arrow.l.r.open$" = { output = "⇿", is_word = true, auto_expand = true }
-"$arrow.l.r.wave$" = { output = "↭", is_word = true, auto_expand = true }
-"$arrow.t.b$" = { output = "↕", is_word = true, auto_expand = true }
-"$arrow.t.b.double$" = { output = "⇕", is_word = true, auto_expand = true }
-"$arrow.t.b.filled$" = { output = "⬍", is_word = true, auto_expand = true }
-"$arrow.t.b.stroked$" = { output = "⇳", is_word = true, auto_expand = true }
-"$arrow.tr$" = { output = "↗", is_word = true, auto_expand = true }
-"$arrow.tr.double$" = { output = "⇗", is_word = true, auto_expand = true }
-"$arrow.tr.filled$" = { output = "⬈", is_word = true, auto_expand = true }
-"$arrow.tr.hook$" = { output = "⤤", is_word = true, auto_expand = true }
-"$arrow.tr.stroked$" = { output = "⬀", is_word = true, auto_expand = true }
-"$arrow.br$" = { output = "↘", is_word = true, auto_expand = true }
-"$arrow.br.double$" = { output = "⇘", is_word = true, auto_expand = true }
-"$arrow.br.filled$" = { output = "⬊", is_word = true, auto_expand = true }
-"$arrow.br.hook$" = { output = "⤥", is_word = true, auto_expand = true }
-"$arrow.br.stroked$" = { output = "⬂", is_word = true, auto_expand = true }
-"$arrow.tl$" = { output = "↖", is_word = true, auto_expand = true }
-"$arrow.tl.double$" = { output = "⇖", is_word = true, auto_expand = true }
-"$arrow.tl.filled$" = { output = "⬉", is_word = true, auto_expand = true }
-"$arrow.tl.hook$" = { output = "⤣", is_word = true, auto_expand = true }
-"$arrow.tl.stroked$" = { output = "⬁", is_word = true, auto_expand = true }
-"$arrow.bl$" = { output = "↙", is_word = true, auto_expand = true }
-"$arrow.bl.double$" = { output = "⇙", is_word = true, auto_expand = true }
-"$arrow.bl.filled$" = { output = "⬋", is_word = true, auto_expand = true }
-"$arrow.bl.hook$" = { output = "⤦", is_word = true, auto_expand = true }
-"$arrow.bl.stroked$" = { output = "⬃", is_word = true, auto_expand = true }
-"$arrow.tl.br$" = { output = "⤡", is_word = true, auto_expand = true }
-"$arrow.tr.bl$" = { output = "⥢", is_word = true, auto_expand = true }
-"$arrow.ccw$" = { output = "↺", is_word = true, auto_expand = true }
-"$arrow.ccw.half$" = { output = "↶", is_word = true, auto_expand = true }
-"$arrow.cw$" = { output = "↻", is_word = true, auto_expand = true }
-"$arrow.cw.half$" = { output = "↷", is_word = true, auto_expand = true }
-"$arrow.zigzag$" = { output = "↯", is_word = true, auto_expand = true }
-"$arrows.rr$" = { output = "⇉", is_word = true, auto_expand = true }
-"$arrows.ll$" = { output = "⇇", is_word = true, auto_expand = true }
-"$arrows.tt$" = { output = "⇈", is_word = true, auto_expand = true }
-"$arrows.bb$" = { output = "⇊", is_word = true, auto_expand = true }
-"$arrows.lr$" = { output = "⇆", is_word = true, auto_expand = true }
-"$arrows.lr.stop$" = { output = "↹", is_word = true, auto_expand = true }
-"$arrows.rl$" = { output = "⇄", is_word = true, auto_expand = true }
-"$arrows.tb$" = { output = "⇅", is_word = true, auto_expand = true }
-"$arrows.bt$" = { output = "⇵", is_word = true, auto_expand = true }
-"$arrows.rrr$" = { output = "⇶", is_word = true, auto_expand = true }
-"$arrows.lll$" = { output = "⬱", is_word = true, auto_expand = true }
-"$arrowhead.t$" = { output = "⌃", is_word = true, auto_expand = true }
-"$arrowhead.b$" = { output = "⌄", is_word = true, auto_expand = true }
-"$harpoon.rt$" = { output = "⇀", is_word = true, auto_expand = true }
-"$harpoon.rt.bar$" = { output = "⥛", is_word = true, auto_expand = true }
-"$harpoon.rt.stop$" = { output = "⥓", is_word = true, auto_expand = true }
-"$harpoon.rb$" = { output = "⇁", is_word = true, auto_expand = true }
-"$harpoon.rb.bar$" = { output = "⥟", is_word = true, auto_expand = true }
-"$harpoon.rb.stop$" = { output = "⥗", is_word = true, auto_expand = true }
-"$harpoon.lt$" = { output = "↼", is_word = true, auto_expand = true }
-"$harpoon.lt.bar$" = { output = "⥚", is_word = true, auto_expand = true }
-"$harpoon.lt.stop$" = { output = "⥒", is_word = true, auto_expand = true }
-"$harpoon.lb$" = { output = "↽", is_word = true, auto_expand = true }
-"$harpoon.lb.bar$" = { output = "⥞", is_word = true, auto_expand = true }
-"$harpoon.lb.stop$" = { output = "⥖", is_word = true, auto_expand = true }
-"$harpoon.tl$" = { output = "↿", is_word = true, auto_expand = true }
-"$harpoon.tl.bar$" = { output = "⥠", is_word = true, auto_expand = true }
-"$harpoon.tl.stop$" = { output = "⥘", is_word = true, auto_expand = true }
-"$harpoon.tr$" = { output = "↾", is_word = true, auto_expand = true }
-"$harpoon.tr.bar$" = { output = "⥜", is_word = true, auto_expand = true }
-"$harpoon.tr.stop$" = { output = "⥔", is_word = true, auto_expand = true }
-"$harpoon.bl$" = { output = "⇃", is_word = true, auto_expand = true }
-"$harpoon.bl.bar$" = { output = "⥡", is_word = true, auto_expand = true }
-"$harpoon.bl.stop$" = { output = "⥙", is_word = true, auto_expand = true }
-"$harpoon.br$" = { output = "⇂", is_word = true, auto_expand = true }
-"$harpoon.br.bar$" = { output = "⥝", is_word = true, auto_expand = true }
-"$harpoon.br.stop$" = { output = "⥕", is_word = true, auto_expand = true }
-"$harpoon.lt.rt$" = { output = "⥎", is_word = true, auto_expand = true }
-"$harpoon.lb.rb$" = { output = "⥐", is_word = true, auto_expand = true }
-"$harpoon.lb.rt$" = { output = "⥋", is_word = true, auto_expand = true }
-"$harpoon.lt.rb$" = { output = "⥊", is_word = true, auto_expand = true }
-"$harpoon.tl.bl$" = { output = "⥑", is_word = true, auto_expand = true }
-"$harpoon.tr.br$" = { output = "⥏", is_word = true, auto_expand = true }
-"$harpoon.tl.br$" = { output = "⥍", is_word = true, auto_expand = true }
-"$harpoon.tr.bl$" = { output = "⥌", is_word = true, auto_expand = true }
-"$harpoons.rtrb$" = { output = "⥤", is_word = true, auto_expand = true }
-"$harpoons.blbr$" = { output = "⥥", is_word = true, auto_expand = true }
-"$harpoons.bltr$" = { output = "⥯", is_word = true, auto_expand = true }
-"$harpoons.lbrb$" = { output = "⥧", is_word = true, auto_expand = true }
-"$harpoons.ltlb$" = { output = "⥢", is_word = true, auto_expand = true }
-"$harpoons.ltrb$" = { output = "⇋", is_word = true, auto_expand = true }
-"$harpoons.ltrt$" = { output = "⥦", is_word = true, auto_expand = true }
-"$harpoons.rblb$" = { output = "⥩", is_word = true, auto_expand = true }
-"$harpoons.rtlb$" = { output = "⇌", is_word = true, auto_expand = true }
-"$harpoons.rtlt$" = { output = "⥨", is_word = true, auto_expand = true }
-"$harpoons.tlbr$" = { output = "⥮", is_word = true, auto_expand = true }
-"$harpoons.tltr$" = { output = "⥣", is_word = true, auto_expand = true }
-"$tack.r$" = { output = "⊢", is_word = true, auto_expand = true }
-"$tack.r.not$" = { output = "⊬", is_word = true, auto_expand = true }
-"$tack.r.long$" = { output = "⟝", is_word = true, auto_expand = true }
-"$tack.r.short$" = { output = "⊦", is_word = true, auto_expand = true }
-"$tack.r.double$" = { output = "⊨", is_word = true, auto_expand = true }
-"$tack.r.double.not$" = { output = "⊭", is_word = true, auto_expand = true }
-"$tack.l$" = { output = "⊣", is_word = true, auto_expand = true }
-"$tack.l.long$" = { output = "⟞", is_word = true, auto_expand = true }
-"$tack.l.short$" = { output = "⫞", is_word = true, auto_expand = true }
-"$tack.l.double$" = { output = "⫤", is_word = true, auto_expand = true }
-"$tack.t$" = { output = "⊥", is_word = true, auto_expand = true }
-"$tack.t.big$" = { output = "⟘", is_word = true, auto_expand = true }
-"$tack.t.double$" = { output = "⫫", is_word = true, auto_expand = true }
-"$tack.t.short$" = { output = "⫠", is_word = true, auto_expand = true }
-"$tack.b$" = { output = "⊤", is_word = true, auto_expand = true }
-"$tack.b.big$" = { output = "⟙", is_word = true, auto_expand = true }
-"$tack.b.double$" = { output = "⫪", is_word = true, auto_expand = true }
-"$tack.b.short$" = { output = "⫟", is_word = true, auto_expand = true }
-"$tack.l.r$" = { output = "⟛", is_word = true, auto_expand = true }
+"$arrow.r$" = { output = "→", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.long.bar$" = { output = "⟼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.bar$" = { output = "↦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.curve$" = { output = "⤷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.turn$" = { output = "⮎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.dashed$" = { output = "⇢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.dotted$" = { output = "⤑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.double$" = { output = "⇒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.double.bar$" = { output = "⤇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.double.long$" = { output = "⟹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.double.long.bar$" = { output = "⟾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.double.not$" = { output = "⇏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.double.struck$" = { output = "⤃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.filled$" = { output = "➡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.hook$" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.long$" = { output = "⟶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.long.squiggly$" = { output = "⟿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.loop$" = { output = "↬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.not$" = { output = "↛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.quad$" = { output = "⭆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.squiggly$" = { output = "⇝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.stop$" = { output = "⇥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.stroked$" = { output = "⇨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.struck$" = { output = "⇸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.dstruck$" = { output = "⇻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.tail$" = { output = "↣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.tail.struck$" = { output = "⤔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.tail.dstruck$" = { output = "⤕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.tilde$" = { output = "⥲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.triple$" = { output = "⇛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.twohead$" = { output = "↠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.twohead.bar$" = { output = "⤅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.twohead.struck$" = { output = "⤀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.twohead.dstruck$" = { output = "⤁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.twohead.tail$" = { output = "⤖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.twohead.tail.struck$" = { output = "⤗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.twohead.tail.dstruck$" = { output = "⤘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.open$" = { output = "⇾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.r.wave$" = { output = "↝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l$" = { output = "←", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.bar$" = { output = "↤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.curve$" = { output = "⤶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.turn$" = { output = "⮌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.dashed$" = { output = "⇠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.dotted$" = { output = "⬸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.double$" = { output = "⇐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.double.bar$" = { output = "⤆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.double.long$" = { output = "⟸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.double.long.bar$" = { output = "⟽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.double.not$" = { output = "⇍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.double.struck$" = { output = "⤂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.filled$" = { output = "⬅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.hook$" = { output = "↩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.long$" = { output = "⟵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.long.bar$" = { output = "⟻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.long.squiggly$" = { output = "⬳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.loop$" = { output = "↫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.not$" = { output = "↚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.quad$" = { output = "⭅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.squiggly$" = { output = "⇜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.stop$" = { output = "⇤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.stroked$" = { output = "⇦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.struck$" = { output = "⇷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.dstruck$" = { output = "⇺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.tail$" = { output = "↢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.tail.struck$" = { output = "⬹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.tail.dstruck$" = { output = "⬺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.tilde$" = { output = "⭉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.triple$" = { output = "⇚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.twohead$" = { output = "↞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.twohead.bar$" = { output = "⬶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.twohead.struck$" = { output = "⬴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.twohead.dstruck$" = { output = "⬵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.twohead.tail$" = { output = "⬻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.twohead.tail.struck$" = { output = "⬼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.twohead.tail.dstruck$" = { output = "⬽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.open$" = { output = "⇽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.wave$" = { output = "↜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t$" = { output = "↑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.bar$" = { output = "↥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.curve$" = { output = "⤴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.turn$" = { output = "⮍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.dashed$" = { output = "⇡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.double$" = { output = "⇑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.filled$" = { output = "⬆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.quad$" = { output = "⟰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.stop$" = { output = "⤒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.stroked$" = { output = "⇧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.struck$" = { output = "⤉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.dstruck$" = { output = "⇞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.triple$" = { output = "⤊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.twohead$" = { output = "↟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b$" = { output = "↓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.bar$" = { output = "↧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.curve$" = { output = "⤵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.turn$" = { output = "⮏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.dashed$" = { output = "⇣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.double$" = { output = "⇓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.filled$" = { output = "⬇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.quad$" = { output = "⟱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.stop$" = { output = "⤓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.stroked$" = { output = "⇩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.struck$" = { output = "⤈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.dstruck$" = { output = "⇟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.triple$" = { output = "⤋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.b.twohead$" = { output = "↡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r$" = { output = "↔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.double$" = { output = "⇔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.double.long$" = { output = "⟺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.double.not$" = { output = "⇎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.double.struck$" = { output = "⤄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.filled$" = { output = "⬌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.long$" = { output = "⟷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.not$" = { output = "↮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.stroked$" = { output = "⬄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.struck$" = { output = "⇹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.dstruck$" = { output = "⇼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.open$" = { output = "⇿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.l.r.wave$" = { output = "↭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.b$" = { output = "↕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.b.double$" = { output = "⇕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.b.filled$" = { output = "⬍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.t.b.stroked$" = { output = "⇳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tr$" = { output = "↗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tr.double$" = { output = "⇗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tr.filled$" = { output = "⬈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tr.hook$" = { output = "⤤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tr.stroked$" = { output = "⬀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.br$" = { output = "↘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.br.double$" = { output = "⇘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.br.filled$" = { output = "⬊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.br.hook$" = { output = "⤥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.br.stroked$" = { output = "⬂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tl$" = { output = "↖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tl.double$" = { output = "⇖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tl.filled$" = { output = "⬉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tl.hook$" = { output = "⤣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tl.stroked$" = { output = "⬁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.bl$" = { output = "↙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.bl.double$" = { output = "⇙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.bl.filled$" = { output = "⬋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.bl.hook$" = { output = "⤦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.bl.stroked$" = { output = "⬃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tl.br$" = { output = "⤡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.tr.bl$" = { output = "⥢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.ccw$" = { output = "↺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.ccw.half$" = { output = "↶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.cw$" = { output = "↻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.cw.half$" = { output = "↷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrow.zigzag$" = { output = "↯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.rr$" = { output = "⇉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.ll$" = { output = "⇇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.tt$" = { output = "⇈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.bb$" = { output = "⇊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.lr$" = { output = "⇆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.lr.stop$" = { output = "↹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.rl$" = { output = "⇄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.tb$" = { output = "⇅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.bt$" = { output = "⇵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.rrr$" = { output = "⇶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrows.lll$" = { output = "⬱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrowhead.t$" = { output = "⌃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$arrowhead.b$" = { output = "⌄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.rt$" = { output = "⇀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.rt.bar$" = { output = "⥛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.rt.stop$" = { output = "⥓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.rb$" = { output = "⇁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.rb.bar$" = { output = "⥟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.rb.stop$" = { output = "⥗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lt$" = { output = "↼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lt.bar$" = { output = "⥚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lt.stop$" = { output = "⥒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lb$" = { output = "↽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lb.bar$" = { output = "⥞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lb.stop$" = { output = "⥖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tl$" = { output = "↿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tl.bar$" = { output = "⥠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tl.stop$" = { output = "⥘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tr$" = { output = "↾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tr.bar$" = { output = "⥜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tr.stop$" = { output = "⥔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.bl$" = { output = "⇃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.bl.bar$" = { output = "⥡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.bl.stop$" = { output = "⥙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.br$" = { output = "⇂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.br.bar$" = { output = "⥝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.br.stop$" = { output = "⥕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lt.rt$" = { output = "⥎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lb.rb$" = { output = "⥐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lb.rt$" = { output = "⥋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.lt.rb$" = { output = "⥊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tl.bl$" = { output = "⥑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tr.br$" = { output = "⥏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tl.br$" = { output = "⥍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoon.tr.bl$" = { output = "⥌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.rtrb$" = { output = "⥤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.blbr$" = { output = "⥥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.bltr$" = { output = "⥯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.lbrb$" = { output = "⥧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.ltlb$" = { output = "⥢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.ltrb$" = { output = "⇋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.ltrt$" = { output = "⥦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.rblb$" = { output = "⥩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.rtlb$" = { output = "⇌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.rtlt$" = { output = "⥨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.tlbr$" = { output = "⥮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$harpoons.tltr$" = { output = "⥣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.r$" = { output = "⊢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.r.not$" = { output = "⊬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.r.long$" = { output = "⟝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.r.short$" = { output = "⊦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.r.double$" = { output = "⊨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.r.double.not$" = { output = "⊭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.l$" = { output = "⊣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.l.long$" = { output = "⟞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.l.short$" = { output = "⫞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.l.double$" = { output = "⫤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.t$" = { output = "⊥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.t.big$" = { output = "⟘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.t.double$" = { output = "⫫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.t.short$" = { output = "⫠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.b$" = { output = "⊤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.b.big$" = { output = "⟙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.b.double$" = { output = "⫪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.b.short$" = { output = "⫟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tack.l.r$" = { output = "⟛", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[lowercase_greek]]
-"$alpha$" = { output = "α", is_word = true, auto_expand = true }
-"$beta$" = { output = "β", is_word = true, auto_expand = true }
-"$beta.alt$" = { output = "ϐ", is_word = true, auto_expand = true }
-"$chi$" = { output = "χ", is_word = true, auto_expand = true }
-"$delta$" = { output = "δ", is_word = true, auto_expand = true }
-"$digamma$" = { output = "ϝ", is_word = true, auto_expand = true }
-"$epsilon$" = { output = "ε", is_word = true, auto_expand = true }
-"$epsilon.alt$" = { output = "ϵ", is_word = true, auto_expand = true }
-"$epsilon.alt.rev$" = { output = "϶", is_word = true, auto_expand = true }
-"$eta$" = { output = "η", is_word = true, auto_expand = true }
-"$gamma$" = { output = "γ", is_word = true, auto_expand = true }
-"$iota$" = { output = "ι", is_word = true, auto_expand = true }
-"$iota.inv$" = { output = "℩", is_word = true, auto_expand = true }
-"$kai$" = { output = "ϗ", is_word = true, auto_expand = true }
-"$kappa$" = { output = "κ", is_word = true, auto_expand = true }
-"$kappa.alt$" = { output = "ϰ", is_word = true, auto_expand = true }
-"$lambda$" = { output = "λ", is_word = true, auto_expand = true }
-"$mu$" = { output = "μ", is_word = true, auto_expand = true }
-"$nu$" = { output = "ν", is_word = true, auto_expand = true }
-"$omega$" = { output = "ω", is_word = true, auto_expand = true }
-"$omicron$" = { output = "ο", is_word = true, auto_expand = true }
-"$phi$" = { output = "φ", is_word = true, auto_expand = true }
-"$phi.alt$" = { output = "ϕ", is_word = true, auto_expand = true }
-"$pi$" = { output = "π", is_word = true, auto_expand = true }
-"$pi.alt$" = { output = "ϖ", is_word = true, auto_expand = true }
-"$psi$" = { output = "ψ", is_word = true, auto_expand = true }
-"$rho$" = { output = "ρ", is_word = true, auto_expand = true }
-"$rho.alt$" = { output = "ϱ", is_word = true, auto_expand = true }
-"$sigma$" = { output = "σ", is_word = true, auto_expand = true }
-"$sigma.alt$" = { output = "ς", is_word = true, auto_expand = true }
-"$tau$" = { output = "τ", is_word = true, auto_expand = true }
-"$theta$" = { output = "θ", is_word = true, auto_expand = true }
-"$theta.alt$" = { output = "ϑ", is_word = true, auto_expand = true }
-"$upsilon$" = { output = "υ", is_word = true, auto_expand = true }
-"$xi$" = { output = "ξ", is_word = true, auto_expand = true }
-"$zeta$" = { output = "ζ", is_word = true, auto_expand = true }
+"$alpha$" = { output = "α", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$beta$" = { output = "β", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$beta.alt$" = { output = "ϐ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$chi$" = { output = "χ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$delta$" = { output = "δ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$digamma$" = { output = "ϝ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$epsilon$" = { output = "ε", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$epsilon.alt$" = { output = "ϵ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$epsilon.alt.rev$" = { output = "϶", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$eta$" = { output = "η", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gamma$" = { output = "γ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$iota$" = { output = "ι", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$iota.inv$" = { output = "℩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$kai$" = { output = "ϗ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$kappa$" = { output = "κ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$kappa.alt$" = { output = "ϰ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$lambda$" = { output = "λ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$mu$" = { output = "μ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$nu$" = { output = "ν", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$omega$" = { output = "ω", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$omicron$" = { output = "ο", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$phi$" = { output = "φ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$phi.alt$" = { output = "ϕ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$pi$" = { output = "π", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$pi.alt$" = { output = "ϖ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$psi$" = { output = "ψ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rho$" = { output = "ρ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$rho.alt$" = { output = "ϱ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sigma$" = { output = "σ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$sigma.alt$" = { output = "ς", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$tau$" = { output = "τ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$theta$" = { output = "θ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$theta.alt$" = { output = "ϑ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$upsilon$" = { output = "υ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$xi$" = { output = "ξ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$zeta$" = { output = "ζ", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[uppercase_greek]]
-"$Alpha$" = { output = "Α", is_word = true, auto_expand = true }
-"$Beta$" = { output = "Β", is_word = true, auto_expand = true }
-"$Chi$" = { output = "Χ", is_word = true, auto_expand = true }
-"$Delta$" = { output = "Δ", is_word = true, auto_expand = true }
-"$Digamma$" = { output = "Ϝ", is_word = true, auto_expand = true }
-"$Epsilon$" = { output = "Ε", is_word = true, auto_expand = true }
-"$Eta$" = { output = "Η", is_word = true, auto_expand = true }
-"$Gamma$" = { output = "Γ", is_word = true, auto_expand = true }
-"$Iota$" = { output = "Ι", is_word = true, auto_expand = true }
-"$Kai$" = { output = "Ϗ", is_word = true, auto_expand = true }
-"$Kappa$" = { output = "Κ", is_word = true, auto_expand = true }
-"$Lambda$" = { output = "Λ", is_word = true, auto_expand = true }
-"$Mu$" = { output = "Μ", is_word = true, auto_expand = true }
-"$Nu$" = { output = "Ν", is_word = true, auto_expand = true }
-"$Omega$" = { output = "Ω", is_word = true, auto_expand = true }
-"$Omega.inv$" = { output = "℧", is_word = true, auto_expand = true }
-"$Omicron$" = { output = "Ο", is_word = true, auto_expand = true }
-"$Phi$" = { output = "Φ", is_word = true, auto_expand = true }
-"$Pi$" = { output = "Π", is_word = true, auto_expand = true }
-"$Psi$" = { output = "Ψ", is_word = true, auto_expand = true }
-"$Rho$" = { output = "Ρ", is_word = true, auto_expand = true }
-"$Sigma$" = { output = "Σ", is_word = true, auto_expand = true }
-"$Tau$" = { output = "Τ", is_word = true, auto_expand = true }
-"$Theta$" = { output = "Θ", is_word = true, auto_expand = true }
-"$Theta.alt$" = { output = "ϴ", is_word = true, auto_expand = true }
-"$Upsilon$" = { output = "Υ", is_word = true, auto_expand = true }
-"$Xi$" = { output = "Ξ", is_word = true, auto_expand = true }
-"$Zeta$" = { output = "Ζ", is_word = true, auto_expand = true }
+"$Alpha$" = { output = "Α", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Beta$" = { output = "Β", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Chi$" = { output = "Χ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Delta$" = { output = "Δ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Digamma$" = { output = "Ϝ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Epsilon$" = { output = "Ε", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Eta$" = { output = "Η", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Gamma$" = { output = "Γ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Iota$" = { output = "Ι", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Kai$" = { output = "Ϗ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Kappa$" = { output = "Κ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Lambda$" = { output = "Λ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Mu$" = { output = "Μ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Nu$" = { output = "Ν", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Omega$" = { output = "Ω", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Omega.inv$" = { output = "℧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Omicron$" = { output = "Ο", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Phi$" = { output = "Φ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Pi$" = { output = "Π", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Psi$" = { output = "Ψ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Rho$" = { output = "Ρ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Sigma$" = { output = "Σ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Tau$" = { output = "Τ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Theta$" = { output = "Θ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Theta.alt$" = { output = "ϴ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Upsilon$" = { output = "Υ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Xi$" = { output = "Ξ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Zeta$" = { output = "Ζ", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[lowercase_cyrillic]]
-"$sha$" = { output = "ш", is_word = true, auto_expand = true }
+"$sha$" = { output = "ш", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[uppercase_cyrillic]]
-"$Sha$" = { output = "Ш", is_word = true, auto_expand = true }
+"$Sha$" = { output = "Ш", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[hebrew]]
-"$aleph$" = { output = "א", is_word = true, auto_expand = true }
-"$alef$" = { output = "א", is_word = true, auto_expand = true }
-"$beth$" = { output = "ב", is_word = true, auto_expand = true }
-"$bet$" = { output = "ב", is_word = true, auto_expand = true }
-"$gimel$" = { output = "ג", is_word = true, auto_expand = true }
-"$gimmel$" = { output = "ג", is_word = true, auto_expand = true }
-"$daleth$" = { output = "ד", is_word = true, auto_expand = true }
-"$dalet$" = { output = "ד", is_word = true, auto_expand = true }
-"$shin$" = { output = "ש", is_word = true, auto_expand = true }
+"$aleph$" = { output = "א", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$alef$" = { output = "א", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$beth$" = { output = "ב", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$bet$" = { output = "ב", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gimel$" = { output = "ג", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gimmel$" = { output = "ג", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$daleth$" = { output = "ד", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dalet$" = { output = "ד", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$shin$" = { output = "ש", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[double_struck]]
-"$AA$" = { output = "𝔸", is_word = true, auto_expand = true }
-"$BB$" = { output = "𝔹", is_word = true, auto_expand = true }
-"$CC$" = { output = "ℂ", is_word = true, auto_expand = true }
-"$DD$" = { output = "𝔻", is_word = true, auto_expand = true }
-"$EE$" = { output = "𝔼", is_word = true, auto_expand = true }
-"$FF$" = { output = "𝔽", is_word = true, auto_expand = true }
-"$GG$" = { output = "𝔾", is_word = true, auto_expand = true }
-"$HH$" = { output = "ℍ", is_word = true, auto_expand = true }
-"$II$" = { output = "𝕀", is_word = true, auto_expand = true }
-"$JJ$" = { output = "𝕁", is_word = true, auto_expand = true }
-"$KK$" = { output = "𝕂", is_word = true, auto_expand = true }
-"$LL$" = { output = "𝕃", is_word = true, auto_expand = true }
-"$MM$" = { output = "𝕄", is_word = true, auto_expand = true }
-"$NN$" = { output = "ℕ", is_word = true, auto_expand = true }
-"$OO$" = { output = "𝕆", is_word = true, auto_expand = true }
-"$PP$" = { output = "ℙ", is_word = true, auto_expand = true }
-"$QQ$" = { output = "ℚ", is_word = true, auto_expand = true }
-"$RR$" = { output = "ℝ", is_word = true, auto_expand = true }
-"$SS$" = { output = "𝕊", is_word = true, auto_expand = true }
-"$TT$" = { output = "𝕋", is_word = true, auto_expand = true }
-"$UU$" = { output = "𝕌", is_word = true, auto_expand = true }
-"$VV$" = { output = "𝕍", is_word = true, auto_expand = true }
-"$WW$" = { output = "𝕎", is_word = true, auto_expand = true }
-"$XX$" = { output = "𝕏", is_word = true, auto_expand = true }
-"$YY$" = { output = "𝕐", is_word = true, auto_expand = true }
-"$ZZ$" = { output = "ℤ", is_word = true, auto_expand = true }
+"$AA$" = { output = "𝔸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$BB$" = { output = "𝔹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$CC$" = { output = "ℂ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$DD$" = { output = "𝔻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$EE$" = { output = "𝔼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$FF$" = { output = "𝔽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$GG$" = { output = "𝔾", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$HH$" = { output = "ℍ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$II$" = { output = "𝕀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$JJ$" = { output = "𝕁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$KK$" = { output = "𝕂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$LL$" = { output = "𝕃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$MM$" = { output = "𝕄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$NN$" = { output = "ℕ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$OO$" = { output = "𝕆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$PP$" = { output = "ℙ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$QQ$" = { output = "ℚ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$RR$" = { output = "ℝ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$SS$" = { output = "𝕊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$TT$" = { output = "𝕋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$UU$" = { output = "𝕌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$VV$" = { output = "𝕍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$WW$" = { output = "𝕎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$XX$" = { output = "𝕏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$YY$" = { output = "𝕐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ZZ$" = { output = "ℤ", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[miscellaneous_letter_likes]]
-"$angstrom$" = { output = "Å", is_word = true, auto_expand = true }
-"$ell$" = { output = "ℓ", is_word = true, auto_expand = true }
-"$planck$" = { output = "ħ", is_word = true, auto_expand = true }
-"$planck.reduce$" = { output = "ħ", is_word = true, auto_expand = true }
-"$Re$" = { output = "ℜ", is_word = true, auto_expand = true }
-"$Im$" = { output = "ℑ", is_word = true, auto_expand = true }
-"$dotless.i$" = { output = "ı", is_word = true, auto_expand = true }
-"$dotless.j$" = { output = "ȷ", is_word = true, auto_expand = true }
+"$angstrom$" = { output = "Å", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$ell$" = { output = "ℓ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$planck$" = { output = "ħ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$planck.reduce$" = { output = "ħ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Re$" = { output = "ℜ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$Im$" = { output = "ℑ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dotless.i$" = { output = "ı", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$dotless.j$" = { output = "ȷ", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[miscellany]]
-"$die.six$" = { output = "⚅", is_word = true, auto_expand = true }
-"$die.five$" = { output = "⚄", is_word = true, auto_expand = true }
-"$die.four$" = { output = "⚃", is_word = true, auto_expand = true }
-"$die.three$" = { output = "⚂", is_word = true, auto_expand = true }
-"$die.two$" = { output = "⚁", is_word = true, auto_expand = true }
-"$die.one$" = { output = "⚀", is_word = true, auto_expand = true }
-"$errorbar.square.stroked$" = { output = "⧮", is_word = true, auto_expand = true }
-"$errorbar.square.filled$" = { output = "⧯", is_word = true, auto_expand = true }
-"$errorbar.diamond.stroked$" = { output = "⧰", is_word = true, auto_expand = true }
-"$errorbar.diamond.filled$" = { output = "⧱", is_word = true, auto_expand = true }
-"$errorbar.circle.stroked$" = { output = "⧲", is_word = true, auto_expand = true }
-"$errorbar.circle.filled$" = { output = "⧳", is_word = true, auto_expand = true }
-"$gender.female$" = { output = "♀", is_word = true, auto_expand = true }
-"$gender.female.double$" = { output = "⚢", is_word = true, auto_expand = true }
-"$gender.female.male$" = { output = "⚤", is_word = true, auto_expand = true }
-"$gender.intersex$" = { output = "⚥", is_word = true, auto_expand = true }
-"$gender.male$" = { output = "♂", is_word = true, auto_expand = true }
-"$gender.male.double$" = { output = "⚣", is_word = true, auto_expand = true }
-"$gender.male.female$" = { output = "⚤", is_word = true, auto_expand = true }
-"$gender.male.stroke$" = { output = "⚦", is_word = true, auto_expand = true }
-"$gender.male.stroke.t$" = { output = "⚨", is_word = true, auto_expand = true }
-"$gender.male.stroke.r$" = { output = "⚩", is_word = true, auto_expand = true }
-"$gender.neuter$" = { output = "⚲", is_word = true, auto_expand = true }
-"$gender.trans$" = { output = "⚧", is_word = true, auto_expand = true }
+"$die.six$" = { output = "⚅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$die.five$" = { output = "⚄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$die.four$" = { output = "⚃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$die.three$" = { output = "⚂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$die.two$" = { output = "⚁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$die.one$" = { output = "⚀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$errorbar.square.stroked$" = { output = "⧮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$errorbar.square.filled$" = { output = "⧯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$errorbar.diamond.stroked$" = { output = "⧰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$errorbar.diamond.filled$" = { output = "⧱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$errorbar.circle.stroked$" = { output = "⧲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$errorbar.circle.filled$" = { output = "⧳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.female$" = { output = "♀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.female.double$" = { output = "⚢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.female.male$" = { output = "⚤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.intersex$" = { output = "⚥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.male$" = { output = "♂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.male.double$" = { output = "⚣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.male.female$" = { output = "⚤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.male.stroke$" = { output = "⚦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.male.stroke.t$" = { output = "⚨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.male.stroke.r$" = { output = "⚩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.neuter$" = { output = "⚲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$gender.trans$" = { output = "⚧", is_word = true, auto_expand = true, is_case_sensitive = true }

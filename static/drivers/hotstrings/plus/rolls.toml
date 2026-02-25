@@ -4,41 +4,41 @@
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
 [[general]]
-"<@" = { output = "</", is_word = false, auto_expand = true }
-"eé" = { output = "ez", is_word = false, auto_expand = true }
-"\\\"" = { output = "/*", is_word = false, auto_expand = true }
-"\"\\" = { output = "*/", is_word = false, auto_expand = true }
-"#(" = { output = "\")", is_word = false, auto_expand = true }
-"#[" = { output = "\"]", is_word = false, auto_expand = true }
-"#]" = { output = "\"]", is_word = false, auto_expand = true }
-"hc" = { output = "wh", is_word = false, auto_expand = true }
-" #ç" = { output = " := ", is_word = false, auto_expand = true }
-" #!" = { output = " := ", is_word = false, auto_expand = true }
-"#ç" = { output = " := ", is_word = false, auto_expand = true }
-"#!" = { output = " := ", is_word = false, auto_expand = true }
-" ç#" = { output = " != ", is_word = false, auto_expand = true }
-" !#" = { output = " != ", is_word = false, auto_expand = true }
-"ç#" = { output = " != ", is_word = false, auto_expand = true }
-"!#" = { output = " != ", is_word = false, auto_expand = true }
-"xlsx" = { output = "xlsx", is_word = false, auto_expand = true }
-"sx" = { output = "sk", is_word = false, auto_expand = true }
-"cx" = { output = "ck", is_word = false, auto_expand = true }
-" [)" = { output = " = \"", is_word = false, auto_expand = true }
-"[)" = { output = " = \"", is_word = false, auto_expand = true }
-"nt'" = { output = "n't", is_word = false, auto_expand = true }
-" =+" = { output = " ➜ ", is_word = false, auto_expand = true }
-"=+" = { output = " ➜ ", is_word = false, auto_expand = true }
-" $=" = { output = " => ", is_word = false, auto_expand = true }
-"$=" = { output = " => ", is_word = false, auto_expand = true }
-" =$" = { output = " <= ", is_word = false, auto_expand = true }
-"=$" = { output = " <= ", is_word = false, auto_expand = true }
-" +?" = { output = " -> ", is_word = false, auto_expand = true }
-"+?" = { output = " -> ", is_word = false, auto_expand = true }
-" ?+" = { output = " <- ", is_word = false, auto_expand = true }
-"?+" = { output = " <- ", is_word = false, auto_expand = true }
-"p ?" = { output = "p ?", is_word = false, auto_expand = true }
-"p'" = { output = "ct", is_word = false, auto_expand = true }
-"(#" = { output = "(\"", is_word = false, auto_expand = true }
-"[#" = { output = "[\"", is_word = false, auto_expand = true }
-"<%" = { output = "<=", is_word = false, auto_expand = true }
-">%" = { output = ">=", is_word = false, auto_expand = true }
+"<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true }
+"eé" = { output = "ez", is_word = false, auto_expand = true, is_case_sensitive = false }
+"\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true }
+"\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true }
+"#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true }
+"#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true }
+"#]" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true }
+"hc" = { output = "wh", is_word = false, auto_expand = true, is_case_sensitive = false }
+" #ç" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true }
+" #!" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"#ç" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"#!" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true }
+" ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
+" !#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"!#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"xlsx" = { output = "xlsx", is_word = false, auto_expand = true, is_case_sensitive = false }
+"sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false }
+"cx" = { output = "ck", is_word = false, auto_expand = true, is_case_sensitive = false }
+" [)" = { output = " = \"", is_word = false, auto_expand = true, is_case_sensitive = true }
+"[)" = { output = " = \"", is_word = false, auto_expand = true, is_case_sensitive = true }
+"nt'" = { output = "n't", is_word = false, auto_expand = true, is_case_sensitive = true }
+" =+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"=+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
+" $=" = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"$=" = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true }
+" =$" = { output = " <= ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"=$" = { output = " <= ", is_word = false, auto_expand = true, is_case_sensitive = true }
+" +?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"+?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true }
+" ?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"p ?" = { output = "p ?", is_word = false, auto_expand = true, is_case_sensitive = true }
+"p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false }
+"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true }
+"[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true }
+"<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true }
+">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true }

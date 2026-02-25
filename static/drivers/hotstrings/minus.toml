@@ -8,40 +8,40 @@ block = "Minus"
 description = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
 
 [[general]]
-"aije" = { output = "ai-je", is_word = true, auto_expand = false }
-"astu" = { output = "as-tu", is_word = true, auto_expand = false }
-"atil" = { output = "a-t-il", is_word = true, auto_expand = false }
-"aton" = { output = "a-t-on", is_word = true, auto_expand = false }
-"auratelle" = { output = "aura-t-elle", is_word = true, auto_expand = false }
-"auratil" = { output = "aura-t-il", is_word = true, auto_expand = false }
-"auraton" = { output = "aura-t-on", is_word = true, auto_expand = false }
-"dismoi" = { output = "dis-moi", is_word = true, auto_expand = false }
-"ditelle" = { output = "dit-elle", is_word = true, auto_expand = false }
-"ditil" = { output = "dit-il", is_word = true, auto_expand = false }
-"distu" = { output = "dis-tu", is_word = true, auto_expand = false }
-"diton" = { output = "dit-on", is_word = true, auto_expand = false }
-"doisje" = { output = "dois-je", is_word = true, auto_expand = false }
-"doitelle" = { output = "doit-elle", is_word = true, auto_expand = false }
-"doitil" = { output = "doit-il", is_word = true, auto_expand = false }
-"doiton" = { output = "doit-on", is_word = true, auto_expand = false }
-"estu" = { output = "es-tu", is_word = true, auto_expand = false }
-"estil" = { output = "est-il", is_word = true, auto_expand = false }
-"eston" = { output = "est-on", is_word = true, auto_expand = false }
-"fautelle" = { output = "faut-elle", is_word = true, auto_expand = false }
-"fautil" = { output = "faut-il", is_word = true, auto_expand = false }
-"fauton" = { output = "faut-on", is_word = true, auto_expand = false }
-"peutil" = { output = "peut-il", is_word = true, auto_expand = false }
-"peutelle" = { output = "peut-elle", is_word = true, auto_expand = false }
-"peuton" = { output = "peut-on", is_word = true, auto_expand = false }
-"peuxtu" = { output = "peux-tu", is_word = true, auto_expand = false }
-"puisje" = { output = "puis-je", is_word = true, auto_expand = false }
-"vatelle" = { output = "va-t-elle", is_word = true, auto_expand = false }
-"vatil" = { output = "va-t-il", is_word = true, auto_expand = false }
-"vaton" = { output = "va-t-on", is_word = true, auto_expand = false }
-"veutelle" = { output = "veut-elle", is_word = true, auto_expand = false }
-"veutil" = { output = "veut-il", is_word = true, auto_expand = false }
-"veuton" = { output = "veut-on", is_word = true, auto_expand = false }
-"veuxtu" = { output = "veux-tu", is_word = true, auto_expand = false }
-"yatil" = { output = "y a-t-il", is_word = true, auto_expand = false }
-"vonsn" = { output = "vons-n", is_word = false, auto_expand = true }
-"vezv" = { output = "vez-v", is_word = false, auto_expand = true }
+"aije" = { output = "ai-je", is_word = true, auto_expand = false, is_case_sensitive = false }
+"astu" = { output = "as-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
+"atil" = { output = "a-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"aton" = { output = "a-t-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"auratelle" = { output = "aura-t-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
+"auratil" = { output = "aura-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"auraton" = { output = "aura-t-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"dismoi" = { output = "dis-moi", is_word = true, auto_expand = false, is_case_sensitive = false }
+"ditelle" = { output = "dit-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
+"ditil" = { output = "dit-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"distu" = { output = "dis-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
+"diton" = { output = "dit-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"doisje" = { output = "dois-je", is_word = true, auto_expand = false, is_case_sensitive = false }
+"doitelle" = { output = "doit-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
+"doitil" = { output = "doit-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"doiton" = { output = "doit-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"estu" = { output = "es-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
+"estil" = { output = "est-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"eston" = { output = "est-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"fautelle" = { output = "faut-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
+"fautil" = { output = "faut-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"fauton" = { output = "faut-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"peutil" = { output = "peut-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"peutelle" = { output = "peut-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
+"peuton" = { output = "peut-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"peuxtu" = { output = "peux-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
+"puisje" = { output = "puis-je", is_word = true, auto_expand = false, is_case_sensitive = false }
+"vatelle" = { output = "va-t-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
+"vatil" = { output = "va-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"vaton" = { output = "va-t-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"veutelle" = { output = "veut-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
+"veutil" = { output = "veut-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"veuton" = { output = "veut-on", is_word = true, auto_expand = false, is_case_sensitive = false }
+"veuxtu" = { output = "veux-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
+"yatil" = { output = "y a-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
+"vonsn" = { output = "vons-n", is_word = false, auto_expand = true, is_case_sensitive = false }
+"vezv" = { output = "vez-v", is_word = false, auto_expand = true, is_case_sensitive = false }

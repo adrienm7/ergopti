@@ -8,11 +8,11 @@ block = "MultiplePunctuationMarks"
 description = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère"
 
 [[general]]
-" ! !" = { output = " !!", is_word = true, auto_expand = true }
-"! !" = { output = "!!", is_word = true, auto_expand = true }
-" ? ?" = { output = " ??", is_word = true, auto_expand = true }
-"? ?" = { output = "??", is_word = true, auto_expand = true }
-" ! ?" = { output = " !?", is_word = true, auto_expand = true }
-"! ?" = { output = "!?", is_word = true, auto_expand = true }
-" ? !" = { output = " ?!", is_word = true, auto_expand = true }
-"? !" = { output = "?!", is_word = true, auto_expand = true }
+" ! !" = { output = " !!", is_word = true, auto_expand = true, is_case_sensitive = true }
+"! !" = { output = "!!", is_word = true, auto_expand = true, is_case_sensitive = true }
+" ? ?" = { output = " ??", is_word = true, auto_expand = true, is_case_sensitive = true }
+"? ?" = { output = "??", is_word = true, auto_expand = true, is_case_sensitive = true }
+" ! ?" = { output = " !?", is_word = true, auto_expand = true, is_case_sensitive = true }
+"! ?" = { output = "!?", is_word = true, auto_expand = true, is_case_sensitive = true }
+" ? !" = { output = " ?!", is_word = true, auto_expand = true, is_case_sensitive = true }
+"? !" = { output = "?!", is_word = true, auto_expand = true, is_case_sensitive = true }

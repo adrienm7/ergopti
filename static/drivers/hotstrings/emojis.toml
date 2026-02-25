@@ -8,277 +8,277 @@ block = "TextExpansionEmojis"
 description = "Expansion de texte Emojis : voiture★  = 🚗, koala★  = 🐨, …"
 
 [[basic_smileys]]
-":)★" = { output = "😀", is_word = true, auto_expand = true }
-":))★" = { output = "😁", is_word = true, auto_expand = true }
-":/★" = { output = "🫤", is_word = true, auto_expand = true }
-":(★" = { output = "☹️", is_word = true, auto_expand = true }
-":3★" = { output = "😗", is_word = true, auto_expand = true }
-":D★" = { output = "😁", is_word = true, auto_expand = true }
-":O★" = { output = "😮", is_word = true, auto_expand = true }
-":P★" = { output = "😛", is_word = true, auto_expand = true }
+":)★" = { output = "😀", is_word = true, auto_expand = true, is_case_sensitive = true }
+":))★" = { output = "😁", is_word = true, auto_expand = true, is_case_sensitive = true }
+":/★" = { output = "🫤", is_word = true, auto_expand = true, is_case_sensitive = true }
+":(★" = { output = "☹️", is_word = true, auto_expand = true, is_case_sensitive = true }
+":3★" = { output = "😗", is_word = true, auto_expand = true, is_case_sensitive = true }
+":D★" = { output = "😁", is_word = true, auto_expand = true, is_case_sensitive = true }
+":O★" = { output = "😮", is_word = true, auto_expand = true, is_case_sensitive = true }
+":P★" = { output = "😛", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[animals]]
-"abeille★" = { output = "🐝", is_word = true, auto_expand = true }
-"aigle★" = { output = "🦅", is_word = true, auto_expand = true }
-"araignée★" = { output = "🕷️", is_word = true, auto_expand = true }
-"baleine★" = { output = "🐋", is_word = true, auto_expand = true }
-"canard★" = { output = "🦆", is_word = true, auto_expand = true }
-"cerf★" = { output = "🦌", is_word = true, auto_expand = true }
-"chameau★" = { output = "🐪", is_word = true, auto_expand = true }
-"chat★" = { output = "🐈", is_word = true, auto_expand = true }
-"chauve-souris★" = { output = "🦇", is_word = true, auto_expand = true }
-"chèvre★" = { output = "🐐", is_word = true, auto_expand = true }
-"cheval★" = { output = "🐎", is_word = true, auto_expand = true }
-"chien★" = { output = "🐕", is_word = true, auto_expand = true }
-"cochon★" = { output = "🐖", is_word = true, auto_expand = true }
-"coq★" = { output = "🐓", is_word = true, auto_expand = true }
-"crabe★" = { output = "🦀", is_word = true, auto_expand = true }
-"croco★" = { output = "🐊", is_word = true, auto_expand = true }
-"crocodile★" = { output = "🐊", is_word = true, auto_expand = true }
-"cygne★" = { output = "🦢", is_word = true, auto_expand = true }
-"dauphin★" = { output = "🐬", is_word = true, auto_expand = true }
-"dragon★" = { output = "🐉", is_word = true, auto_expand = true }
-"écureuil★" = { output = "🐿️", is_word = true, auto_expand = true }
-"éléphant★" = { output = "🐘", is_word = true, auto_expand = true }
-"escargot★" = { output = "🐌", is_word = true, auto_expand = true }
-"flamant★" = { output = "🦩", is_word = true, auto_expand = true }
-"fourmi★" = { output = "🐜", is_word = true, auto_expand = true }
-"girafe★" = { output = "🦒", is_word = true, auto_expand = true }
-"gorille★" = { output = "🦍", is_word = true, auto_expand = true }
-"grenouille★" = { output = "🐸", is_word = true, auto_expand = true }
-"hamster★" = { output = "🐹", is_word = true, auto_expand = true }
-"hérisson★" = { output = "🦔", is_word = true, auto_expand = true }
-"hibou★" = { output = "🦉", is_word = true, auto_expand = true }
-"hippopotame★" = { output = "🦛", is_word = true, auto_expand = true }
-"homard★" = { output = "🦞", is_word = true, auto_expand = true }
-"kangourou★" = { output = "🦘", is_word = true, auto_expand = true }
-"koala★" = { output = "🐨", is_word = true, auto_expand = true }
-"lama★" = { output = "🦙", is_word = true, auto_expand = true }
-"lapin★" = { output = "🐇", is_word = true, auto_expand = true }
-"léopard★" = { output = "🐆", is_word = true, auto_expand = true }
-"licorne★" = { output = "🦄", is_word = true, auto_expand = true }
-"lion★" = { output = "🦁", is_word = true, auto_expand = true }
-"loup★" = { output = "🐺", is_word = true, auto_expand = true }
-"mouton★" = { output = "🐑", is_word = true, auto_expand = true }
-"octopus★" = { output = "🐙", is_word = true, auto_expand = true }
-"ours★" = { output = "🐻", is_word = true, auto_expand = true }
-"panda★" = { output = "🐼", is_word = true, auto_expand = true }
-"papillon★" = { output = "🦋", is_word = true, auto_expand = true }
-"paresseux★" = { output = "🦥", is_word = true, auto_expand = true }
-"perroquet★" = { output = "🦜", is_word = true, auto_expand = true }
-"pingouin★" = { output = "🐧", is_word = true, auto_expand = true }
-"poisson★" = { output = "🐟", is_word = true, auto_expand = true }
-"poule★" = { output = "🐔", is_word = true, auto_expand = true }
-"poussin★" = { output = "🐣", is_word = true, auto_expand = true }
-"renard★" = { output = "🦊", is_word = true, auto_expand = true }
-"requin★" = { output = "🦈", is_word = true, auto_expand = true }
-"rhinocéros★" = { output = "🦏", is_word = true, auto_expand = true }
-"rhinoceros★" = { output = "🦏", is_word = true, auto_expand = true }
-"sanglier★" = { output = "🐗", is_word = true, auto_expand = true }
-"serpent★" = { output = "🐍", is_word = true, auto_expand = true }
-"singe★" = { output = "🐒", is_word = true, auto_expand = true }
-"souris★" = { output = "🐁", is_word = true, auto_expand = true }
-"tigre★" = { output = "🐅", is_word = true, auto_expand = true }
-"tortue★" = { output = "🐢", is_word = true, auto_expand = true }
-"trex★" = { output = "🦖", is_word = true, auto_expand = true }
-"vache★" = { output = "🐄", is_word = true, auto_expand = true }
-"zèbre★" = { output = "🦓", is_word = true, auto_expand = true }
+"abeille★" = { output = "🐝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"aigle★" = { output = "🦅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"araignée★" = { output = "🕷️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"baleine★" = { output = "🐋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"canard★" = { output = "🦆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cerf★" = { output = "🦌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"chameau★" = { output = "🐪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"chat★" = { output = "🐈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"chauve-souris★" = { output = "🦇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"chèvre★" = { output = "🐐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cheval★" = { output = "🐎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"chien★" = { output = "🐕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cochon★" = { output = "🐖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"coq★" = { output = "🐓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"crabe★" = { output = "🦀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"croco★" = { output = "🐊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"crocodile★" = { output = "🐊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cygne★" = { output = "🦢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"dauphin★" = { output = "🐬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"dragon★" = { output = "🐉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"écureuil★" = { output = "🐿️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"éléphant★" = { output = "🐘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"escargot★" = { output = "🐌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"flamant★" = { output = "🦩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fourmi★" = { output = "🐜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"girafe★" = { output = "🦒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"gorille★" = { output = "🦍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"grenouille★" = { output = "🐸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"hamster★" = { output = "🐹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"hérisson★" = { output = "🦔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"hibou★" = { output = "🦉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"hippopotame★" = { output = "🦛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"homard★" = { output = "🦞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"kangourou★" = { output = "🦘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"koala★" = { output = "🐨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"lama★" = { output = "🦙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"lapin★" = { output = "🐇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"léopard★" = { output = "🐆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"licorne★" = { output = "🦄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"lion★" = { output = "🦁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"loup★" = { output = "🐺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"mouton★" = { output = "🐑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"octopus★" = { output = "🐙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ours★" = { output = "🐻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"panda★" = { output = "🐼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"papillon★" = { output = "🦋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"paresseux★" = { output = "🦥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"perroquet★" = { output = "🦜", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pingouin★" = { output = "🐧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"poisson★" = { output = "🐟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"poule★" = { output = "🐔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"poussin★" = { output = "🐣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"renard★" = { output = "🦊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"requin★" = { output = "🦈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"rhinocéros★" = { output = "🦏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"rhinoceros★" = { output = "🦏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"sanglier★" = { output = "🐗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"serpent★" = { output = "🐍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"singe★" = { output = "🐒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"souris★" = { output = "🐁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"tigre★" = { output = "🐅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"tortue★" = { output = "🐢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"trex★" = { output = "🦖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"vache★" = { output = "🐄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"zèbre★" = { output = "🦓", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[objects_and_symbols]]
-"aimant★" = { output = "🧲", is_word = true, auto_expand = true }
-"ampoule★" = { output = "💡", is_word = true, auto_expand = true }
-"ancre★" = { output = "⚓", is_word = true, auto_expand = true }
-"arbre★" = { output = "🌲", is_word = true, auto_expand = true }
-"argent★" = { output = "💰", is_word = true, auto_expand = true }
-"attention★" = { output = "⚠️", is_word = true, auto_expand = true }
-"avion★" = { output = "✈️", is_word = true, auto_expand = true }
-"balance★" = { output = "⚖️", is_word = true, auto_expand = true }
-"ballon★" = { output = "🎈", is_word = true, auto_expand = true }
-"batterie★" = { output = "🔋", is_word = true, auto_expand = true }
-"blanc★" = { output = "🏳️", is_word = true, auto_expand = true }
-"bombe★" = { output = "💣", is_word = true, auto_expand = true }
-"boussole★" = { output = "🧭", is_word = true, auto_expand = true }
-"bougie★" = { output = "🕯️", is_word = true, auto_expand = true }
-"cadeau★" = { output = "🎁", is_word = true, auto_expand = true }
-"cadenas★" = { output = "🔒", is_word = true, auto_expand = true }
-"calendrier★" = { output = "📅", is_word = true, auto_expand = true }
-"caméra★" = { output = "📷", is_word = true, auto_expand = true }
-"clavier★" = { output = "⌨️", is_word = true, auto_expand = true }
-"check★" = { output = "✔️", is_word = true, auto_expand = true }
-"clé★" = { output = "🔑", is_word = true, auto_expand = true }
-"cloche★" = { output = "🔔", is_word = true, auto_expand = true }
-"couronne★" = { output = "👑", is_word = true, auto_expand = true }
-"croix★" = { output = "❌", is_word = true, auto_expand = true }
-"danse★" = { output = "💃", is_word = true, auto_expand = true }
-"dé★" = { output = "🎲", is_word = true, auto_expand = true }
-"diamant★" = { output = "💎", is_word = true, auto_expand = true }
-"drapeau★" = { output = "🏁", is_word = true, auto_expand = true }
-"douche★" = { output = "🛁", is_word = true, auto_expand = true }
-"éclair★" = { output = "⚡", is_word = true, auto_expand = true }
-"eau★" = { output = "💧", is_word = true, auto_expand = true }
-"email★" = { output = "📧", is_word = true, auto_expand = true }
-"épée★" = { output = "⚔️", is_word = true, auto_expand = true }
-"étoile★" = { output = "⭐", is_word = true, auto_expand = true }
-"faux★" = { output = "❌", is_word = true, auto_expand = true }
-"feu★" = { output = "🔥", is_word = true, auto_expand = true }
-"fete★" = { output = "🎉", is_word = true, auto_expand = true }
-"fête★" = { output = "🎉", is_word = true, auto_expand = true }
-"film★" = { output = "🎬", is_word = true, auto_expand = true }
-"fleur★" = { output = "🌸", is_word = true, auto_expand = true }
-"fusée★" = { output = "🚀", is_word = true, auto_expand = true }
-"guitare★" = { output = "🎸", is_word = true, auto_expand = true }
-"idée★" = { output = "💡", is_word = true, auto_expand = true }
-"idee★" = { output = "💡", is_word = true, auto_expand = true }
-"interdit★" = { output = "⛔", is_word = true, auto_expand = true }
-"journal★" = { output = "📰", is_word = true, auto_expand = true }
-"ko★" = { output = "❌", is_word = true, auto_expand = true }
-"livre★" = { output = "📖", is_word = true, auto_expand = true }
-"loupe★" = { output = "🔎", is_word = true, auto_expand = true }
-"lune★" = { output = "🌙", is_word = true, auto_expand = true }
-"médaille★" = { output = "🥇", is_word = true, auto_expand = true }
-"medaille★" = { output = "🥇", is_word = true, auto_expand = true }
-"microphone★" = { output = "🎤", is_word = true, auto_expand = true }
-"montre★" = { output = "⌚", is_word = true, auto_expand = true }
-"musique★" = { output = "🎵", is_word = true, auto_expand = true }
-"noel★" = { output = "🎄", is_word = true, auto_expand = true }
-"nuage★" = { output = "☁️", is_word = true, auto_expand = true }
-"ok★" = { output = "✅", is_word = true, auto_expand = true }
-"olaf★" = { output = "⛄", is_word = true, auto_expand = true }
-"ordi★" = { output = "💻", is_word = true, auto_expand = true }
-"ordinateur★" = { output = "💻", is_word = true, auto_expand = true }
-"parapluie★" = { output = "☂️", is_word = true, auto_expand = true }
-"pc★" = { output = "💻", is_word = true, auto_expand = true }
-"piano★" = { output = "🎹", is_word = true, auto_expand = true }
-"pirate★" = { output = "🏴‍☠️", is_word = true, auto_expand = true }
-"pluie★" = { output = "🌧️", is_word = true, auto_expand = true }
-"radioactif★" = { output = "☢️", is_word = true, auto_expand = true }
-"regard★" = { output = "👀", is_word = true, auto_expand = true }
-"robot★" = { output = "🤖", is_word = true, auto_expand = true }
-"rocket★" = { output = "🚀", is_word = true, auto_expand = true }
-"sacoche★" = { output = "💼", is_word = true, auto_expand = true }
-"smartphone★" = { output = "📱", is_word = true, auto_expand = true }
-"soleil★" = { output = "☀️", is_word = true, auto_expand = true }
-"terre★" = { output = "🌍", is_word = true, auto_expand = true }
-"thermomètre★" = { output = "🌡️", is_word = true, auto_expand = true }
-"timer★" = { output = "⏲️", is_word = true, auto_expand = true }
-"toilette★" = { output = "🧻", is_word = true, auto_expand = true }
-"telephone★" = { output = "☎️", is_word = true, auto_expand = true }
-"téléphone★" = { output = "☎️", is_word = true, auto_expand = true }
-"train★" = { output = "🚂", is_word = true, auto_expand = true }
-"vélo★" = { output = "🚲", is_word = true, auto_expand = true }
-"voiture★" = { output = "🚗", is_word = true, auto_expand = true }
-"yeux★" = { output = "👀", is_word = true, auto_expand = true }
+"aimant★" = { output = "🧲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ampoule★" = { output = "💡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ancre★" = { output = "⚓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"arbre★" = { output = "🌲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"argent★" = { output = "💰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"attention★" = { output = "⚠️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"avion★" = { output = "✈️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"balance★" = { output = "⚖️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ballon★" = { output = "🎈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"batterie★" = { output = "🔋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"blanc★" = { output = "🏳️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"bombe★" = { output = "💣", is_word = true, auto_expand = true, is_case_sensitive = true }
+"boussole★" = { output = "🧭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"bougie★" = { output = "🕯️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cadeau★" = { output = "🎁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cadenas★" = { output = "🔒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"calendrier★" = { output = "📅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"caméra★" = { output = "📷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"clavier★" = { output = "⌨️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"check★" = { output = "✔️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"clé★" = { output = "🔑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cloche★" = { output = "🔔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"couronne★" = { output = "👑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"croix★" = { output = "❌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"danse★" = { output = "💃", is_word = true, auto_expand = true, is_case_sensitive = true }
+"dé★" = { output = "🎲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"diamant★" = { output = "💎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"drapeau★" = { output = "🏁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"douche★" = { output = "🛁", is_word = true, auto_expand = true, is_case_sensitive = true }
+"éclair★" = { output = "⚡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"eau★" = { output = "💧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"email★" = { output = "📧", is_word = true, auto_expand = true, is_case_sensitive = true }
+"épée★" = { output = "⚔️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"étoile★" = { output = "⭐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"faux★" = { output = "❌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"feu★" = { output = "🔥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fete★" = { output = "🎉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fête★" = { output = "🎉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"film★" = { output = "🎬", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fleur★" = { output = "🌸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fusée★" = { output = "🚀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"guitare★" = { output = "🎸", is_word = true, auto_expand = true, is_case_sensitive = true }
+"idée★" = { output = "💡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"idee★" = { output = "💡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"interdit★" = { output = "⛔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"journal★" = { output = "📰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ko★" = { output = "❌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"livre★" = { output = "📖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"loupe★" = { output = "🔎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"lune★" = { output = "🌙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"médaille★" = { output = "🥇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"medaille★" = { output = "🥇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"microphone★" = { output = "🎤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"montre★" = { output = "⌚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"musique★" = { output = "🎵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"noel★" = { output = "🎄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"nuage★" = { output = "☁️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ok★" = { output = "✅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"olaf★" = { output = "⛄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ordi★" = { output = "💻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ordinateur★" = { output = "💻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"parapluie★" = { output = "☂️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pc★" = { output = "💻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"piano★" = { output = "🎹", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pirate★" = { output = "🏴‍☠️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pluie★" = { output = "🌧️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"radioactif★" = { output = "☢️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"regard★" = { output = "👀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"robot★" = { output = "🤖", is_word = true, auto_expand = true, is_case_sensitive = true }
+"rocket★" = { output = "🚀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"sacoche★" = { output = "💼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"smartphone★" = { output = "📱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"soleil★" = { output = "☀️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"terre★" = { output = "🌍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"thermomètre★" = { output = "🌡️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"timer★" = { output = "⏲️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"toilette★" = { output = "🧻", is_word = true, auto_expand = true, is_case_sensitive = true }
+"telephone★" = { output = "☎️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"téléphone★" = { output = "☎️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"train★" = { output = "🚂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"vélo★" = { output = "🚲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"voiture★" = { output = "🚗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"yeux★" = { output = "👀", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[food]]
-"ananas★" = { output = "🍍", is_word = true, auto_expand = true }
-"aubergine★" = { output = "🍆", is_word = true, auto_expand = true }
-"avocat★" = { output = "🥑", is_word = true, auto_expand = true }
-"banane★" = { output = "🍌", is_word = true, auto_expand = true }
-"bière★" = { output = "🍺", is_word = true, auto_expand = true }
-"brocoli★" = { output = "🥦", is_word = true, auto_expand = true }
-"burger★" = { output = "🍔", is_word = true, auto_expand = true }
-"café★" = { output = "☕", is_word = true, auto_expand = true }
-"carotte★" = { output = "🥕", is_word = true, auto_expand = true }
-"cerise★" = { output = "🍒", is_word = true, auto_expand = true }
-"champignon★" = { output = "🍄", is_word = true, auto_expand = true }
-"chocolat★" = { output = "🍫", is_word = true, auto_expand = true }
-"citron★" = { output = "🍋", is_word = true, auto_expand = true }
-"coco★" = { output = "🥥", is_word = true, auto_expand = true }
-"cookie★" = { output = "🍪", is_word = true, auto_expand = true }
-"croissant★" = { output = "🥐", is_word = true, auto_expand = true }
-"donut★" = { output = "🍩", is_word = true, auto_expand = true }
-"fraise★" = { output = "🍓", is_word = true, auto_expand = true }
-"frites★" = { output = "🍟", is_word = true, auto_expand = true }
-"fromage★" = { output = "🧀", is_word = true, auto_expand = true }
-"gâteau★" = { output = "🎂", is_word = true, auto_expand = true }
-"glace★" = { output = "🍦", is_word = true, auto_expand = true }
-"hamburger★" = { output = "🍔", is_word = true, auto_expand = true }
-"hotdog★" = { output = "🌭", is_word = true, auto_expand = true }
-"kebab★" = { output = "🥙", is_word = true, auto_expand = true }
-"kiwi★" = { output = "🥝", is_word = true, auto_expand = true }
-"lait★" = { output = "🥛", is_word = true, auto_expand = true }
-"maïs★" = { output = "🌽", is_word = true, auto_expand = true }
-"melon★" = { output = "🍈", is_word = true, auto_expand = true }
-"miel★" = { output = "🍯", is_word = true, auto_expand = true }
-"orange★" = { output = "🍊", is_word = true, auto_expand = true }
-"pain★" = { output = "🍞", is_word = true, auto_expand = true }
-"pastèque★" = { output = "🍉", is_word = true, auto_expand = true }
-"pates★" = { output = "🍝", is_word = true, auto_expand = true }
-"pêche★" = { output = "🍑", is_word = true, auto_expand = true }
-"pizza★" = { output = "🍕", is_word = true, auto_expand = true }
-"poire★" = { output = "🍐", is_word = true, auto_expand = true }
-"pomme★" = { output = "🍎", is_word = true, auto_expand = true }
-"popcorn★" = { output = "🍿", is_word = true, auto_expand = true }
-"raisin★" = { output = "🍇", is_word = true, auto_expand = true }
-"riz★" = { output = "🍚", is_word = true, auto_expand = true }
-"salade★" = { output = "🥗", is_word = true, auto_expand = true }
-"sandwich★" = { output = "🥪", is_word = true, auto_expand = true }
-"spaghetti★" = { output = "🍝", is_word = true, auto_expand = true }
-"taco★" = { output = "🌮", is_word = true, auto_expand = true }
-"tacos★" = { output = "🌮", is_word = true, auto_expand = true }
-"thé★" = { output = "🍵", is_word = true, auto_expand = true }
-"tomate★" = { output = "🍅", is_word = true, auto_expand = true }
-"vin★" = { output = "🍷", is_word = true, auto_expand = true }
+"ananas★" = { output = "🍍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"aubergine★" = { output = "🍆", is_word = true, auto_expand = true, is_case_sensitive = true }
+"avocat★" = { output = "🥑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"banane★" = { output = "🍌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"bière★" = { output = "🍺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"brocoli★" = { output = "🥦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"burger★" = { output = "🍔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"café★" = { output = "☕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"carotte★" = { output = "🥕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cerise★" = { output = "🍒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"champignon★" = { output = "🍄", is_word = true, auto_expand = true, is_case_sensitive = true }
+"chocolat★" = { output = "🍫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"citron★" = { output = "🍋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"coco★" = { output = "🥥", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cookie★" = { output = "🍪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"croissant★" = { output = "🥐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"donut★" = { output = "🍩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fraise★" = { output = "🍓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"frites★" = { output = "🍟", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fromage★" = { output = "🧀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"gâteau★" = { output = "🎂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"glace★" = { output = "🍦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"hamburger★" = { output = "🍔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"hotdog★" = { output = "🌭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"kebab★" = { output = "🥙", is_word = true, auto_expand = true, is_case_sensitive = true }
+"kiwi★" = { output = "🥝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"lait★" = { output = "🥛", is_word = true, auto_expand = true, is_case_sensitive = true }
+"maïs★" = { output = "🌽", is_word = true, auto_expand = true, is_case_sensitive = true }
+"melon★" = { output = "🍈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"miel★" = { output = "🍯", is_word = true, auto_expand = true, is_case_sensitive = true }
+"orange★" = { output = "🍊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pain★" = { output = "🍞", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pastèque★" = { output = "🍉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pates★" = { output = "🍝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pêche★" = { output = "🍑", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pizza★" = { output = "🍕", is_word = true, auto_expand = true, is_case_sensitive = true }
+"poire★" = { output = "🍐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pomme★" = { output = "🍎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"popcorn★" = { output = "🍿", is_word = true, auto_expand = true, is_case_sensitive = true }
+"raisin★" = { output = "🍇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"riz★" = { output = "🍚", is_word = true, auto_expand = true, is_case_sensitive = true }
+"salade★" = { output = "🥗", is_word = true, auto_expand = true, is_case_sensitive = true }
+"sandwich★" = { output = "🥪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"spaghetti★" = { output = "🍝", is_word = true, auto_expand = true, is_case_sensitive = true }
+"taco★" = { output = "🌮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"tacos★" = { output = "🌮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"thé★" = { output = "🍵", is_word = true, auto_expand = true, is_case_sensitive = true }
+"tomate★" = { output = "🍅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"vin★" = { output = "🍷", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[expressions_and_emotions]]
-"amour★" = { output = "🥰", is_word = true, auto_expand = true }
-"ange★" = { output = "👼", is_word = true, auto_expand = true }
-"bisou★" = { output = "😘", is_word = true, auto_expand = true }
-"bouche★" = { output = "🤭", is_word = true, auto_expand = true }
-"caca★" = { output = "💩", is_word = true, auto_expand = true }
-"clap★" = { output = "👏", is_word = true, auto_expand = true }
-"clin★" = { output = "😉", is_word = true, auto_expand = true }
-"cœur★" = { output = "❤️", is_word = true, auto_expand = true }
-"coeur★" = { output = "❤️", is_word = true, auto_expand = true }
-"colère★" = { output = "😠", is_word = true, auto_expand = true }
-"cowboy★" = { output = "🤠", is_word = true, auto_expand = true }
-"dégoût★" = { output = "🤮", is_word = true, auto_expand = true }
-"délice★" = { output = "😋", is_word = true, auto_expand = true }
-"délicieux★" = { output = "😋", is_word = true, auto_expand = true }
-"diable★" = { output = "😈", is_word = true, auto_expand = true }
-"dislike★" = { output = "👎", is_word = true, auto_expand = true }
-"dodo★" = { output = "😴", is_word = true, auto_expand = true }
-"effroi★" = { output = "😱", is_word = true, auto_expand = true }
-"facepalm★" = { output = "🤦", is_word = true, auto_expand = true }
-"fatigue★" = { output = "😩", is_word = true, auto_expand = true }
-"fier★" = { output = "😤", is_word = true, auto_expand = true }
-"fort★" = { output = "💪", is_word = true, auto_expand = true }
-"fou★" = { output = "🤪", is_word = true, auto_expand = true }
-"heureux★" = { output = "😊", is_word = true, auto_expand = true }
-"innocent★" = { output = "😇", is_word = true, auto_expand = true }
-"intello★" = { output = "🤓", is_word = true, auto_expand = true }
-"larme★" = { output = "😢", is_word = true, auto_expand = true }
-"larmes★" = { output = "😭", is_word = true, auto_expand = true }
-"like★" = { output = "👍", is_word = true, auto_expand = true }
-"lol★" = { output = "😂", is_word = true, auto_expand = true }
-"lunettes★" = { output = "🤓", is_word = true, auto_expand = true }
-"malade★" = { output = "🤒", is_word = true, auto_expand = true }
-"masque★" = { output = "😷", is_word = true, auto_expand = true }
-"mdr★" = { output = "😂", is_word = true, auto_expand = true }
-"mignon★" = { output = "🥺", is_word = true, auto_expand = true }
-"monocle★" = { output = "🧐", is_word = true, auto_expand = true }
-"mort★" = { output = "💀", is_word = true, auto_expand = true }
-"muscles★" = { output = "💪", is_word = true, auto_expand = true }
-"(n)★" = { output = "👎", is_word = true, auto_expand = true }
-"nice★" = { output = "👌", is_word = true, auto_expand = true }
-"ouf★" = { output = "😅", is_word = true, auto_expand = true }
-"oups★" = { output = "😅", is_word = true, auto_expand = true }
-"parfait★" = { output = "👌", is_word = true, auto_expand = true }
-"penser★" = { output = "🤔", is_word = true, auto_expand = true }
-"pensif★" = { output = "🤔", is_word = true, auto_expand = true }
-"peur★" = { output = "😨", is_word = true, auto_expand = true }
-"pleur★" = { output = "😭", is_word = true, auto_expand = true }
-"pleurer★" = { output = "😭", is_word = true, auto_expand = true }
-"pouce★" = { output = "👍", is_word = true, auto_expand = true }
-"rage★" = { output = "😡", is_word = true, auto_expand = true }
-"rire★" = { output = "😂", is_word = true, auto_expand = true }
-"silence★" = { output = "🤫", is_word = true, auto_expand = true }
-"snif★" = { output = "😢", is_word = true, auto_expand = true }
-"stress★" = { output = "😰", is_word = true, auto_expand = true }
-"strong★" = { output = "💪", is_word = true, auto_expand = true }
-"surprise★" = { output = "😲", is_word = true, auto_expand = true }
-"timide★" = { output = "😳", is_word = true, auto_expand = true }
-"triste★" = { output = "😢", is_word = true, auto_expand = true }
-"victoire★" = { output = "✌️", is_word = true, auto_expand = true }
-"(y)★" = { output = "👍", is_word = true, auto_expand = true }
-"zombie★" = { output = "🧟", is_word = true, auto_expand = true }
+"amour★" = { output = "🥰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ange★" = { output = "👼", is_word = true, auto_expand = true, is_case_sensitive = true }
+"bisou★" = { output = "😘", is_word = true, auto_expand = true, is_case_sensitive = true }
+"bouche★" = { output = "🤭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"caca★" = { output = "💩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"clap★" = { output = "👏", is_word = true, auto_expand = true, is_case_sensitive = true }
+"clin★" = { output = "😉", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cœur★" = { output = "❤️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"coeur★" = { output = "❤️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"colère★" = { output = "😠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cowboy★" = { output = "🤠", is_word = true, auto_expand = true, is_case_sensitive = true }
+"dégoût★" = { output = "🤮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"délice★" = { output = "😋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"délicieux★" = { output = "😋", is_word = true, auto_expand = true, is_case_sensitive = true }
+"diable★" = { output = "😈", is_word = true, auto_expand = true, is_case_sensitive = true }
+"dislike★" = { output = "👎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"dodo★" = { output = "😴", is_word = true, auto_expand = true, is_case_sensitive = true }
+"effroi★" = { output = "😱", is_word = true, auto_expand = true, is_case_sensitive = true }
+"facepalm★" = { output = "🤦", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fatigue★" = { output = "😩", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fier★" = { output = "😤", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fort★" = { output = "💪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"fou★" = { output = "🤪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"heureux★" = { output = "😊", is_word = true, auto_expand = true, is_case_sensitive = true }
+"innocent★" = { output = "😇", is_word = true, auto_expand = true, is_case_sensitive = true }
+"intello★" = { output = "🤓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"larme★" = { output = "😢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"larmes★" = { output = "😭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"like★" = { output = "👍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"lol★" = { output = "😂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"lunettes★" = { output = "🤓", is_word = true, auto_expand = true, is_case_sensitive = true }
+"malade★" = { output = "🤒", is_word = true, auto_expand = true, is_case_sensitive = true }
+"masque★" = { output = "😷", is_word = true, auto_expand = true, is_case_sensitive = true }
+"mdr★" = { output = "😂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"mignon★" = { output = "🥺", is_word = true, auto_expand = true, is_case_sensitive = true }
+"monocle★" = { output = "🧐", is_word = true, auto_expand = true, is_case_sensitive = true }
+"mort★" = { output = "💀", is_word = true, auto_expand = true, is_case_sensitive = true }
+"muscles★" = { output = "💪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"(n)★" = { output = "👎", is_word = true, auto_expand = true, is_case_sensitive = true }
+"nice★" = { output = "👌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ouf★" = { output = "😅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"oups★" = { output = "😅", is_word = true, auto_expand = true, is_case_sensitive = true }
+"parfait★" = { output = "👌", is_word = true, auto_expand = true, is_case_sensitive = true }
+"penser★" = { output = "🤔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pensif★" = { output = "🤔", is_word = true, auto_expand = true, is_case_sensitive = true }
+"peur★" = { output = "😨", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pleur★" = { output = "😭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pleurer★" = { output = "😭", is_word = true, auto_expand = true, is_case_sensitive = true }
+"pouce★" = { output = "👍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"rage★" = { output = "😡", is_word = true, auto_expand = true, is_case_sensitive = true }
+"rire★" = { output = "😂", is_word = true, auto_expand = true, is_case_sensitive = true }
+"silence★" = { output = "🤫", is_word = true, auto_expand = true, is_case_sensitive = true }
+"snif★" = { output = "😢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"stress★" = { output = "😰", is_word = true, auto_expand = true, is_case_sensitive = true }
+"strong★" = { output = "💪", is_word = true, auto_expand = true, is_case_sensitive = true }
+"surprise★" = { output = "😲", is_word = true, auto_expand = true, is_case_sensitive = true }
+"timide★" = { output = "😳", is_word = true, auto_expand = true, is_case_sensitive = true }
+"triste★" = { output = "😢", is_word = true, auto_expand = true, is_case_sensitive = true }
+"victoire★" = { output = "✌️", is_word = true, auto_expand = true, is_case_sensitive = true }
+"(y)★" = { output = "👍", is_word = true, auto_expand = true, is_case_sensitive = true }
+"zombie★" = { output = "🧟", is_word = true, auto_expand = true, is_case_sensitive = true }

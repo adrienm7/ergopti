@@ -8,27 +8,27 @@ block = "Names"
 description = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
 
 [[general]]
-"alexei" = { output = "Alexeï", is_word = true, auto_expand = false }
-"anais" = { output = "Anaïs", is_word = true, auto_expand = false }
-"azerbaidjan" = { output = "Azerbaïdjan", is_word = true, auto_expand = false }
-"benoit" = { output = "Benoît", is_word = true, auto_expand = false }
-"caraibes" = { output = "Caraïbes", is_word = true, auto_expand = false }
-"cleopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false }
-"cléopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false }
-"dubai" = { output = "Dubaï", is_word = true, auto_expand = false }
-"gaetan" = { output = "Gaëtan", is_word = true, auto_expand = false }
-"hanoi" = { output = "Hanoï", is_word = true, auto_expand = false }
-"israel" = { output = "Israël", is_word = true, auto_expand = false }
-"jerome" = { output = "Jérôme", is_word = true, auto_expand = false }
-"jérome" = { output = "Jérôme", is_word = true, auto_expand = false }
-"joel" = { output = "Joël", is_word = true, auto_expand = false }
-"mickael" = { output = "Mickaël", is_word = true, auto_expand = false }
-"noel" = { output = "Noël", is_word = true, auto_expand = false }
-"Quatar" = { output = "Qatar", is_word = true, auto_expand = true }
-"raphael" = { output = "Raphaël", is_word = true, auto_expand = false }
-"serguei" = { output = "Sergueï", is_word = true, auto_expand = false }
-"shanghai" = { output = "Shanghaï", is_word = true, auto_expand = false }
-"taiwan" = { output = "Taïwan", is_word = true, auto_expand = false }
-"thais" = { output = "Thaïs", is_word = true, auto_expand = false }
-"thailande" = { output = "Thaïlande", is_word = true, auto_expand = false }
-"tolstoi" = { output = "Tolstoï", is_word = true, auto_expand = false }
+"alexei" = { output = "Alexeï", is_word = true, auto_expand = false, is_case_sensitive = true }
+"anais" = { output = "Anaïs", is_word = true, auto_expand = false, is_case_sensitive = true }
+"azerbaidjan" = { output = "Azerbaïdjan", is_word = true, auto_expand = false, is_case_sensitive = true }
+"benoit" = { output = "Benoît", is_word = true, auto_expand = false, is_case_sensitive = true }
+"caraibes" = { output = "Caraïbes", is_word = true, auto_expand = false, is_case_sensitive = true }
+"cleopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false, is_case_sensitive = true }
+"cléopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false, is_case_sensitive = true }
+"dubai" = { output = "Dubaï", is_word = true, auto_expand = false, is_case_sensitive = true }
+"gaetan" = { output = "Gaëtan", is_word = true, auto_expand = false, is_case_sensitive = true }
+"hanoi" = { output = "Hanoï", is_word = true, auto_expand = false, is_case_sensitive = true }
+"israel" = { output = "Israël", is_word = true, auto_expand = false, is_case_sensitive = true }
+"jerome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true }
+"jérome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true }
+"joel" = { output = "Joël", is_word = true, auto_expand = false, is_case_sensitive = true }
+"mickael" = { output = "Mickaël", is_word = true, auto_expand = false, is_case_sensitive = true }
+"noel" = { output = "Noël", is_word = true, auto_expand = false, is_case_sensitive = true }
+"Quatar" = { output = "Qatar", is_word = true, auto_expand = true, is_case_sensitive = true }
+"raphael" = { output = "Raphaël", is_word = true, auto_expand = false, is_case_sensitive = true }
+"serguei" = { output = "Sergueï", is_word = true, auto_expand = false, is_case_sensitive = true }
+"shanghai" = { output = "Shanghaï", is_word = true, auto_expand = false, is_case_sensitive = true }
+"taiwan" = { output = "Taïwan", is_word = true, auto_expand = false, is_case_sensitive = true }
+"thais" = { output = "Thaïs", is_word = true, auto_expand = false, is_case_sensitive = true }
+"thailande" = { output = "Thaïlande", is_word = true, auto_expand = false, is_case_sensitive = true }
+"tolstoi" = { output = "Tolstoï", is_word = true, auto_expand = false, is_case_sensitive = true }

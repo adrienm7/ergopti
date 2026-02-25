@@ -8,540 +8,540 @@ block = "TextExpansion"
 description = "Expansion de texte : c★  = c’est, gt★  = j’étais, pex★  = par exemple, …"
 
 [[alphabetic_ligatures]]
-"ae★" = { output = "æ", is_word = false, auto_expand = true }
-"oe★" = { output = "œ", is_word = false, auto_expand = true }
+"ae★" = { output = "æ", is_word = false, auto_expand = true, is_case_sensitive = false }
+"oe★" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[numbers_and_symbols]]
-"1er★" = { output = "premier", is_word = true, auto_expand = true }
-"1ere★" = { output = "première", is_word = true, auto_expand = true }
-"2e★" = { output = "deuxième", is_word = true, auto_expand = true }
-"3e★" = { output = "troisième", is_word = true, auto_expand = true }
-"4e★" = { output = "quatrième", is_word = true, auto_expand = true }
-"5e★" = { output = "cinquième", is_word = true, auto_expand = true }
-"6e★" = { output = "sixième", is_word = true, auto_expand = true }
-"7e★" = { output = "septième", is_word = true, auto_expand = true }
-"8e★" = { output = "huitième", is_word = true, auto_expand = true }
-"9e★" = { output = "neuvième", is_word = true, auto_expand = true }
-"10e★" = { output = "dixième", is_word = true, auto_expand = true }
-"11e★" = { output = "onzième", is_word = true, auto_expand = true }
-"12e★" = { output = "douzième", is_word = true, auto_expand = true }
-"20e★" = { output = "vingtième", is_word = true, auto_expand = true }
-"100e★" = { output = "centième", is_word = true, auto_expand = true }
-"1000e★" = { output = "millième", is_word = true, auto_expand = true }
-"2s★" = { output = "2 secondes", is_word = true, auto_expand = true }
-"//★" = { output = "rapport", is_word = true, auto_expand = true }
-"+m★" = { output = "meilleur", is_word = true, auto_expand = true }
+"1er★" = { output = "premier", is_word = true, auto_expand = true, is_case_sensitive = false }
+"1ere★" = { output = "première", is_word = true, auto_expand = true, is_case_sensitive = false }
+"2e★" = { output = "deuxième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"3e★" = { output = "troisième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"4e★" = { output = "quatrième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"5e★" = { output = "cinquième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"6e★" = { output = "sixième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"7e★" = { output = "septième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"8e★" = { output = "huitième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"9e★" = { output = "neuvième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"10e★" = { output = "dixième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"11e★" = { output = "onzième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"12e★" = { output = "douzième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"20e★" = { output = "vingtième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"100e★" = { output = "centième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"1000e★" = { output = "millième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"2s★" = { output = "2 secondes", is_word = true, auto_expand = true, is_case_sensitive = false }
+"//★" = { output = "rapport", is_word = true, auto_expand = true, is_case_sensitive = false }
+"+m★" = { output = "meilleur", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[a]]
-"a★" = { output = "ainsi", is_word = true, auto_expand = true }
-"abr★" = { output = "abréviation", is_word = true, auto_expand = true }
-"actu★" = { output = "actualité", is_word = true, auto_expand = true }
-"add★" = { output = "addresse", is_word = true, auto_expand = true }
-"admin★" = { output = "administrateur", is_word = true, auto_expand = true }
-"afr★" = { output = "à faire", is_word = true, auto_expand = true }
-"ah★" = { output = "aujourd’hui", is_word = true, auto_expand = true }
-"ahk★" = { output = "AutoHotkey", is_word = true, auto_expand = true }
-"ajd★" = { output = "aujourd’hui", is_word = true, auto_expand = true }
-"algo★" = { output = "algorithme", is_word = true, auto_expand = true }
-"alpha★" = { output = "alphabétique", is_word = true, auto_expand = true }
-"amé★" = { output = "amélioration", is_word = true, auto_expand = true }
-"amélio★" = { output = "amélioration", is_word = true, auto_expand = true }
-"anc★" = { output = "ancien", is_word = true, auto_expand = true }
-"ano★" = { output = "anomalie", is_word = true, auto_expand = true }
-"anniv★" = { output = "anniversaire", is_word = true, auto_expand = true }
-"apm★" = { output = "après-midi", is_word = true, auto_expand = true }
-"apad★" = { output = "à partir de", is_word = true, auto_expand = true }
-"app★" = { output = "application", is_word = true, auto_expand = true }
-"appart★" = { output = "appartement", is_word = true, auto_expand = true }
-"appli★" = { output = "application", is_word = true, auto_expand = true }
-"approx★" = { output = "approximation", is_word = true, auto_expand = true }
-"archi★" = { output = "architecture", is_word = true, auto_expand = true }
-"asso★" = { output = "association", is_word = true, auto_expand = true }
-"asap★" = { output = "le plus rapidement possible", is_word = true, auto_expand = true }
-"atd★" = { output = "attend", is_word = true, auto_expand = true }
-"att★" = { output = "attention", is_word = true, auto_expand = true }
-"aud★" = { output = "aujourd’hui", is_word = true, auto_expand = true }
-"aug★" = { output = "augmentation", is_word = true, auto_expand = true }
-"auj★" = { output = "aujourd’hui", is_word = true, auto_expand = true }
-"auto★" = { output = "automatique", is_word = true, auto_expand = true }
-"av★" = { output = "avant", is_word = true, auto_expand = true }
-"avv★" = { output = "avez-vous", is_word = true, auto_expand = true }
-"avvd★" = { output = "avez-vous déjà", is_word = true, auto_expand = true }
+"a★" = { output = "ainsi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"abr★" = { output = "abréviation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"actu★" = { output = "actualité", is_word = true, auto_expand = true, is_case_sensitive = false }
+"add★" = { output = "addresse", is_word = true, auto_expand = true, is_case_sensitive = false }
+"admin★" = { output = "administrateur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"afr★" = { output = "à faire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ah★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ahk★" = { output = "AutoHotkey", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ajd★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false }
+"algo★" = { output = "algorithme", is_word = true, auto_expand = true, is_case_sensitive = false }
+"alpha★" = { output = "alphabétique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"amé★" = { output = "amélioration", is_word = true, auto_expand = true, is_case_sensitive = false }
+"amélio★" = { output = "amélioration", is_word = true, auto_expand = true, is_case_sensitive = false }
+"anc★" = { output = "ancien", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ano★" = { output = "anomalie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"anniv★" = { output = "anniversaire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"apm★" = { output = "après-midi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"apad★" = { output = "à partir de", is_word = true, auto_expand = true, is_case_sensitive = false }
+"app★" = { output = "application", is_word = true, auto_expand = true, is_case_sensitive = false }
+"appart★" = { output = "appartement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"appli★" = { output = "application", is_word = true, auto_expand = true, is_case_sensitive = false }
+"approx★" = { output = "approximation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"archi★" = { output = "architecture", is_word = true, auto_expand = true, is_case_sensitive = false }
+"asso★" = { output = "association", is_word = true, auto_expand = true, is_case_sensitive = false }
+"asap★" = { output = "le plus rapidement possible", is_word = true, auto_expand = true, is_case_sensitive = false }
+"atd★" = { output = "attend", is_word = true, auto_expand = true, is_case_sensitive = false }
+"att★" = { output = "attention", is_word = true, auto_expand = true, is_case_sensitive = false }
+"aud★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false }
+"aug★" = { output = "augmentation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"auj★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false }
+"auto★" = { output = "automatique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"av★" = { output = "avant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"avv★" = { output = "avez-vous", is_word = true, auto_expand = true, is_case_sensitive = false }
+"avvd★" = { output = "avez-vous déjà", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[b]]
-"b★" = { output = "bonjour", is_word = true, auto_expand = true }
-"bc★" = { output = "because", is_word = true, auto_expand = true }
-"bcp★" = { output = "beaucoup", is_word = true, auto_expand = true }
-"bdd★" = { output = "base de données", is_word = true, auto_expand = true }
-"bdds★" = { output = "bases de données", is_word = true, auto_expand = true }
-"bea★" = { output = "beaucoup", is_word = true, auto_expand = true }
-"bec★" = { output = "because", is_word = true, auto_expand = true }
-"bib★" = { output = "bibliographie", is_word = true, auto_expand = true }
-"biblio★" = { output = "bibliographie", is_word = true, auto_expand = true }
-"bjr★" = { output = "bonjour", is_word = true, auto_expand = true }
-"brain★" = { output = "brainstorming", is_word = true, auto_expand = true }
-"br★" = { output = "bonjour", is_word = true, auto_expand = true }
-"bsr★" = { output = "bonsoir", is_word = true, auto_expand = true }
-"bv★" = { output = "bravo", is_word = true, auto_expand = true }
-"bvn★" = { output = "bienvenue", is_word = true, auto_expand = true }
-"bwe★" = { output = "bon week-end", is_word = true, auto_expand = true }
-"bwk★" = { output = "bon week-end", is_word = true, auto_expand = true }
+"b★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bc★" = { output = "because", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bcp★" = { output = "beaucoup", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bdd★" = { output = "base de données", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bdds★" = { output = "bases de données", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bea★" = { output = "beaucoup", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bec★" = { output = "because", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bib★" = { output = "bibliographie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"biblio★" = { output = "bibliographie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bjr★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"brain★" = { output = "brainstorming", is_word = true, auto_expand = true, is_case_sensitive = false }
+"br★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bsr★" = { output = "bonsoir", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bv★" = { output = "bravo", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bvn★" = { output = "bienvenue", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bwe★" = { output = "bon week-end", is_word = true, auto_expand = true, is_case_sensitive = false }
+"bwk★" = { output = "bon week-end", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[c]]
-"c★" = { output = "c’est", is_word = true, auto_expand = true }
-"cad★" = { output = "c’est-à-dire", is_word = true, auto_expand = true }
-"camp★" = { output = "campagne", is_word = true, auto_expand = true }
-"carac★" = { output = "caractère", is_word = true, auto_expand = true }
-"caract★" = { output = "caractéristique", is_word = true, auto_expand = true }
-"cb★" = { output = "combien", is_word = true, auto_expand = true }
-"cc★" = { output = "copier-coller", is_word = true, auto_expand = true }
-"ccé★" = { output = "copié-collé", is_word = true, auto_expand = true }
-"ccl★" = { output = "conclusion", is_word = true, auto_expand = true }
-"cdg★" = { output = "Charles de Gaulle", is_word = true, auto_expand = true }
-"cdt★" = { output = "cordialement", is_word = true, auto_expand = true }
-"certif★" = { output = "certification", is_word = true, auto_expand = true }
-"chg★" = { output = "charge", is_word = true, auto_expand = true }
-"chap★" = { output = "chapitre", is_word = true, auto_expand = true }
-"chr★" = { output = "chercher", is_word = true, auto_expand = true }
-"ci★" = { output = "ci-joint", is_word = true, auto_expand = true }
-"cj★" = { output = "ci-joint", is_word = true, auto_expand = true }
-"coeff★" = { output = "coefficient", is_word = true, auto_expand = true }
-"cog★" = { output = "cognition", is_word = true, auto_expand = true }
-"cogv★" = { output = "cognitive", is_word = true, auto_expand = true }
-"comp★" = { output = "comprendre", is_word = true, auto_expand = true }
-"cond★" = { output = "condition", is_word = true, auto_expand = true }
-"conds★" = { output = "conditions", is_word = true, auto_expand = true }
-"config★" = { output = "configuration", is_word = true, auto_expand = true }
-"chgt★" = { output = "changement", is_word = true, auto_expand = true }
-"cnp★" = { output = "ce n’est pas", is_word = true, auto_expand = true }
-"contrib★" = { output = "contribution", is_word = true, auto_expand = true }
-"couv★" = { output = "couverture", is_word = true, auto_expand = true }
-"cpd★" = { output = "cependant", is_word = true, auto_expand = true }
-"cr★" = { output = "compte-rendu", is_word = true, auto_expand = true }
-"ct★" = { output = "c’était", is_word = true, auto_expand = true }
-"ctb★" = { output = "c’est très bien", is_word = true, auto_expand = true }
-"cv★" = { output = "ça va ?", is_word = true, auto_expand = true }
-"cvt★" = { output = "ça va toi ?", is_word = true, auto_expand = true }
-"ctc★" = { output = "Est-ce que cela te convient ?", is_word = true, auto_expand = true }
-"cvc★" = { output = "Est-ce que cela vous convient ?", is_word = true, auto_expand = true }
+"c★" = { output = "c’est", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cad★" = { output = "c’est-à-dire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"camp★" = { output = "campagne", is_word = true, auto_expand = true, is_case_sensitive = false }
+"carac★" = { output = "caractère", is_word = true, auto_expand = true, is_case_sensitive = false }
+"caract★" = { output = "caractéristique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cb★" = { output = "combien", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cc★" = { output = "copier-coller", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ccé★" = { output = "copié-collé", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ccl★" = { output = "conclusion", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cdg★" = { output = "Charles de Gaulle", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cdt★" = { output = "cordialement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"certif★" = { output = "certification", is_word = true, auto_expand = true, is_case_sensitive = false }
+"chg★" = { output = "charge", is_word = true, auto_expand = true, is_case_sensitive = false }
+"chap★" = { output = "chapitre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"chr★" = { output = "chercher", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ci★" = { output = "ci-joint", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cj★" = { output = "ci-joint", is_word = true, auto_expand = true, is_case_sensitive = false }
+"coeff★" = { output = "coefficient", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cog★" = { output = "cognition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cogv★" = { output = "cognitive", is_word = true, auto_expand = true, is_case_sensitive = false }
+"comp★" = { output = "comprendre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cond★" = { output = "condition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"conds★" = { output = "conditions", is_word = true, auto_expand = true, is_case_sensitive = false }
+"config★" = { output = "configuration", is_word = true, auto_expand = true, is_case_sensitive = false }
+"chgt★" = { output = "changement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cnp★" = { output = "ce n’est pas", is_word = true, auto_expand = true, is_case_sensitive = false }
+"contrib★" = { output = "contribution", is_word = true, auto_expand = true, is_case_sensitive = false }
+"couv★" = { output = "couverture", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cpd★" = { output = "cependant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cr★" = { output = "compte-rendu", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ct★" = { output = "c’était", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ctb★" = { output = "c’est très bien", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cv★" = { output = "ça va ?", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cvt★" = { output = "ça va toi ?", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ctc★" = { output = "Est-ce que cela te convient ?", is_word = true, auto_expand = true, is_case_sensitive = true }
+"cvc★" = { output = "Est-ce que cela vous convient ?", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[d]]
-"dac★" = { output = "d’accord", is_word = true, auto_expand = true }
-"ddl★" = { output = "download", is_word = true, auto_expand = true }
-"dé★" = { output = "déjà", is_word = true, auto_expand = true }
-"dê★" = { output = "d’être", is_word = true, auto_expand = true }
-"déc★" = { output = "décembre", is_word = true, auto_expand = true }
-"dec★" = { output = "décembre", is_word = true, auto_expand = true }
-"dedt★" = { output = "d’emploi du temps", is_word = true, auto_expand = true }
-"déf★" = { output = "définition", is_word = true, auto_expand = true }
-"def★" = { output = "définition", is_word = true, auto_expand = true }
-"défs★" = { output = "définitions", is_word = true, auto_expand = true }
-"démo★" = { output = "démonstration", is_word = true, auto_expand = true }
-"demo★" = { output = "démonstration", is_word = true, auto_expand = true }
-"dep★" = { output = "département", is_word = true, auto_expand = true }
-"deux★" = { output = "deuxième", is_word = true, auto_expand = true }
-"desc★" = { output = "description", is_word = true, auto_expand = true }
-"dev★" = { output = "développeur", is_word = true, auto_expand = true }
-"dév★" = { output = "développeur", is_word = true, auto_expand = true }
-"devt★" = { output = "développement", is_word = true, auto_expand = true }
-"dico★" = { output = "dictionnaire", is_word = true, auto_expand = true }
-"diff★" = { output = "différence", is_word = true, auto_expand = true }
-"difft★" = { output = "différent", is_word = true, auto_expand = true }
-"dim★" = { output = "dimension", is_word = true, auto_expand = true }
-"dimi★" = { output = "diminution", is_word = true, auto_expand = true }
-"la dispo★" = { output = "la disposition", is_word = true, auto_expand = true }
-"ta dispo★" = { output = "ta disposition", is_word = true, auto_expand = true }
-"une dispo★" = { output = "une disposition", is_word = true, auto_expand = true }
-"dispo★" = { output = "disponible", is_word = true, auto_expand = true }
-"distri★" = { output = "distributeur", is_word = true, auto_expand = true }
-"distrib★" = { output = "distributeur", is_word = true, auto_expand = true }
-"dj★" = { output = "déjà", is_word = true, auto_expand = true }
-"dm★" = { output = "donne-moi", is_word = true, auto_expand = true }
-"la doc★" = { output = "la documentation", is_word = true, auto_expand = true }
-"une doc★" = { output = "une documentation", is_word = true, auto_expand = true }
-"doc★" = { output = "document", is_word = true, auto_expand = true }
-"docs★" = { output = "documents", is_word = true, auto_expand = true }
-"dp★" = { output = "de plus", is_word = true, auto_expand = true }
-"dsl★" = { output = "désolé", is_word = true, auto_expand = true }
-"dtm★" = { output = "détermine", is_word = true, auto_expand = true }
-"dvlp★" = { output = "développe", is_word = true, auto_expand = true }
+"dac★" = { output = "d’accord", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ddl★" = { output = "download", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dé★" = { output = "déjà", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dê★" = { output = "d’être", is_word = true, auto_expand = true, is_case_sensitive = false }
+"déc★" = { output = "décembre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dec★" = { output = "décembre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dedt★" = { output = "d’emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false }
+"déf★" = { output = "définition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"def★" = { output = "définition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"défs★" = { output = "définitions", is_word = true, auto_expand = true, is_case_sensitive = false }
+"démo★" = { output = "démonstration", is_word = true, auto_expand = true, is_case_sensitive = false }
+"demo★" = { output = "démonstration", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dep★" = { output = "département", is_word = true, auto_expand = true, is_case_sensitive = false }
+"deux★" = { output = "deuxième", is_word = true, auto_expand = true, is_case_sensitive = false }
+"desc★" = { output = "description", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dev★" = { output = "développeur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dév★" = { output = "développeur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"devt★" = { output = "développement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dico★" = { output = "dictionnaire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"diff★" = { output = "différence", is_word = true, auto_expand = true, is_case_sensitive = false }
+"difft★" = { output = "différent", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dim★" = { output = "dimension", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dimi★" = { output = "diminution", is_word = true, auto_expand = true, is_case_sensitive = false }
+"la dispo★" = { output = "la disposition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ta dispo★" = { output = "ta disposition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"une dispo★" = { output = "une disposition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dispo★" = { output = "disponible", is_word = true, auto_expand = true, is_case_sensitive = false }
+"distri★" = { output = "distributeur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"distrib★" = { output = "distributeur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dj★" = { output = "déjà", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dm★" = { output = "donne-moi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"la doc★" = { output = "la documentation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"une doc★" = { output = "une documentation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"doc★" = { output = "document", is_word = true, auto_expand = true, is_case_sensitive = false }
+"docs★" = { output = "documents", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dp★" = { output = "de plus", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dsl★" = { output = "désolé", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dtm★" = { output = "détermine", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dvlp★" = { output = "développe", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[e]]
-"e★" = { output = "est", is_word = true, auto_expand = true }
-"echant★" = { output = "échantillon", is_word = true, auto_expand = true }
-"echants★" = { output = "échantillons", is_word = true, auto_expand = true }
-"eco★" = { output = "économie", is_word = true, auto_expand = true }
-"ecq★" = { output = "est-ce que", is_word = true, auto_expand = true }
-"edt★" = { output = "emploi du temps", is_word = true, auto_expand = true }
-"eef★" = { output = "en effet", is_word = true, auto_expand = true }
-"elt★" = { output = "élément", is_word = true, auto_expand = true }
-"elts★" = { output = "éléments", is_word = true, auto_expand = true }
-"eo★" = { output = "en outre", is_word = true, auto_expand = true }
-"enc★" = { output = "encore", is_word = true, auto_expand = true }
-"eng★" = { output = "english", is_word = true, auto_expand = true }
-"enft★" = { output = "en fait", is_word = true, auto_expand = true }
-"ens★" = { output = "ensemble", is_word = true, auto_expand = true }
-"ent★" = { output = "entreprise", is_word = true, auto_expand = true }
-"env★" = { output = "environ", is_word = true, auto_expand = true }
-"ep★" = { output = "épisode", is_word = true, auto_expand = true }
-"eps★" = { output = "épisodes", is_word = true, auto_expand = true }
-"eq★" = { output = "équation", is_word = true, auto_expand = true }
-"ety★" = { output = "étymologie", is_word = true, auto_expand = true }
-"eve★" = { output = "événement", is_word = true, auto_expand = true }
-"evtl★" = { output = "éventuel", is_word = true, auto_expand = true }
-"evtle★" = { output = "éventuelle", is_word = true, auto_expand = true }
-"evtlt★" = { output = "éventuellement", is_word = true, auto_expand = true }
-"ex★" = { output = "exemple", is_word = true, auto_expand = true }
-"exo★" = { output = "exercice", is_word = true, auto_expand = true }
-"exp★" = { output = "expérience", is_word = true, auto_expand = true }
-"expo★" = { output = "exposition", is_word = true, auto_expand = true }
-"é★" = { output = "écart", is_word = true, auto_expand = true }
-"éco★" = { output = "économie", is_word = true, auto_expand = true }
-"ém★" = { output = "écris-moi", is_word = true, auto_expand = true }
-"éq★" = { output = "équation", is_word = true, auto_expand = true }
-"ê★" = { output = "être", is_word = true, auto_expand = true }
-"êt★" = { output = "es-tu", is_word = true, auto_expand = true }
+"e★" = { output = "est", is_word = true, auto_expand = true, is_case_sensitive = false }
+"echant★" = { output = "échantillon", is_word = true, auto_expand = true, is_case_sensitive = false }
+"echants★" = { output = "échantillons", is_word = true, auto_expand = true, is_case_sensitive = false }
+"eco★" = { output = "économie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ecq★" = { output = "est-ce que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"edt★" = { output = "emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false }
+"eef★" = { output = "en effet", is_word = true, auto_expand = true, is_case_sensitive = false }
+"elt★" = { output = "élément", is_word = true, auto_expand = true, is_case_sensitive = false }
+"elts★" = { output = "éléments", is_word = true, auto_expand = true, is_case_sensitive = false }
+"eo★" = { output = "en outre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"enc★" = { output = "encore", is_word = true, auto_expand = true, is_case_sensitive = false }
+"eng★" = { output = "english", is_word = true, auto_expand = true, is_case_sensitive = false }
+"enft★" = { output = "en fait", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ens★" = { output = "ensemble", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ent★" = { output = "entreprise", is_word = true, auto_expand = true, is_case_sensitive = false }
+"env★" = { output = "environ", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ep★" = { output = "épisode", is_word = true, auto_expand = true, is_case_sensitive = false }
+"eps★" = { output = "épisodes", is_word = true, auto_expand = true, is_case_sensitive = false }
+"eq★" = { output = "équation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ety★" = { output = "étymologie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"eve★" = { output = "événement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"evtl★" = { output = "éventuel", is_word = true, auto_expand = true, is_case_sensitive = false }
+"evtle★" = { output = "éventuelle", is_word = true, auto_expand = true, is_case_sensitive = false }
+"evtlt★" = { output = "éventuellement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ex★" = { output = "exemple", is_word = true, auto_expand = true, is_case_sensitive = false }
+"exo★" = { output = "exercice", is_word = true, auto_expand = true, is_case_sensitive = false }
+"exp★" = { output = "expérience", is_word = true, auto_expand = true, is_case_sensitive = false }
+"expo★" = { output = "exposition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"é★" = { output = "écart", is_word = true, auto_expand = true, is_case_sensitive = false }
+"éco★" = { output = "économie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ém★" = { output = "écris-moi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"éq★" = { output = "équation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ê★" = { output = "être", is_word = true, auto_expand = true, is_case_sensitive = false }
+"êt★" = { output = "es-tu", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[f]]
-"f★" = { output = "faire", is_word = true, auto_expand = true }
-"fam★" = { output = "famille", is_word = true, auto_expand = true }
-"fb★" = { output = "Facebook", is_word = true, auto_expand = true }
-"fc★" = { output = "fonction", is_word = true, auto_expand = true }
-"fct★" = { output = "fonction", is_word = true, auto_expand = true }
-"fea★" = { output = "feature", is_word = true, auto_expand = true }
-"feat★" = { output = "feature", is_word = true, auto_expand = true }
-"fev★" = { output = "février", is_word = true, auto_expand = true }
-"fi★" = { output = "financier", is_word = true, auto_expand = true }
-"fiè★" = { output = "financière", is_word = true, auto_expand = true }
-"ff★" = { output = "Firefox", is_word = true, auto_expand = true }
-"fig★" = { output = "figure", is_word = true, auto_expand = true }
-"fl★" = { output = "falloir", is_word = true, auto_expand = true }
-"freq★" = { output = "fréquence", is_word = true, auto_expand = true }
-"fr★" = { output = "France", is_word = true, auto_expand = true }
-"frs★" = { output = "français", is_word = true, auto_expand = true }
+"f★" = { output = "faire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fam★" = { output = "famille", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fb★" = { output = "Facebook", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fc★" = { output = "fonction", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fct★" = { output = "fonction", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fea★" = { output = "feature", is_word = true, auto_expand = true, is_case_sensitive = false }
+"feat★" = { output = "feature", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fev★" = { output = "février", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fi★" = { output = "financier", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fiè★" = { output = "financière", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ff★" = { output = "Firefox", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fig★" = { output = "figure", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fl★" = { output = "falloir", is_word = true, auto_expand = true, is_case_sensitive = false }
+"freq★" = { output = "fréquence", is_word = true, auto_expand = true, is_case_sensitive = false }
+"fr★" = { output = "France", is_word = true, auto_expand = true, is_case_sensitive = true }
+"frs★" = { output = "français", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[g]]
-"g★" = { output = "j’ai", is_word = true, auto_expand = true }
-"g1r★" = { output = "j’ai une réunion", is_word = true, auto_expand = true }
-"gar★" = { output = "garantie", is_word = true, auto_expand = true }
-"gars★" = { output = "garanties", is_word = true, auto_expand = true }
-"gd★" = { output = "grand", is_word = true, auto_expand = true }
-"gg★" = { output = "Google", is_word = true, auto_expand = true }
-"ges★" = { output = "gestion", is_word = true, auto_expand = true }
-"gf★" = { output = "J’ai fait", is_word = true, auto_expand = true }
-"gmag★" = { output = "J’ai mis à jour", is_word = true, auto_expand = true }
-"gov★" = { output = "government", is_word = true, auto_expand = true }
-"gouv★" = { output = "gouvernement", is_word = true, auto_expand = true }
-"indiv★" = { output = "individuel", is_word = true, auto_expand = true }
-"gpa★" = { output = "je n’ai pas", is_word = true, auto_expand = true }
-"gt★" = { output = "j’étais", is_word = true, auto_expand = true }
-"gvt★" = { output = "gouvernement", is_word = true, auto_expand = true }
+"g★" = { output = "j’ai", is_word = true, auto_expand = true, is_case_sensitive = false }
+"g1r★" = { output = "j’ai une réunion", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gar★" = { output = "garantie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gars★" = { output = "garanties", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gd★" = { output = "grand", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gg★" = { output = "Google", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ges★" = { output = "gestion", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gf★" = { output = "J’ai fait", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gmag★" = { output = "J’ai mis à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gov★" = { output = "government", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gouv★" = { output = "gouvernement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"indiv★" = { output = "individuel", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gpa★" = { output = "je n’ai pas", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gt★" = { output = "j’étais", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gvt★" = { output = "gouvernement", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[h]]
-"h★" = { output = "heure", is_word = true, auto_expand = true }
-"his★" = { output = "historique", is_word = true, auto_expand = true }
-"histo★" = { output = "historique", is_word = true, auto_expand = true }
-"hyp★" = { output = "hypothèse", is_word = true, auto_expand = true }
+"h★" = { output = "heure", is_word = true, auto_expand = true, is_case_sensitive = false }
+"his★" = { output = "historique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"histo★" = { output = "historique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"hyp★" = { output = "hypothèse", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[i]]
-"ia★" = { output = "intelligence artificielle", is_word = true, auto_expand = true }
-"id★" = { output = "identifiant", is_word = true, auto_expand = true }
-"idf★" = { output = "Île-de-France", is_word = true, auto_expand = true }
-"idk★" = { output = "I don’t know", is_word = true, auto_expand = true }
-"ids★" = { output = "identifiants", is_word = true, auto_expand = true }
-"img★" = { output = "image", is_word = true, auto_expand = true }
-"imgs★" = { output = "images", is_word = true, auto_expand = true }
-"imm★" = { output = "immeuble", is_word = true, auto_expand = true }
-"imo★" = { output = "in my opinion", is_word = true, auto_expand = true }
-"imp★" = { output = "impossible", is_word = true, auto_expand = true }
-"inf★" = { output = "inférieur", is_word = true, auto_expand = true }
-"info★" = { output = "information", is_word = true, auto_expand = true }
-"infos★" = { output = "informations", is_word = true, auto_expand = true }
-"insta★" = { output = "Instagram", is_word = true, auto_expand = true }
-"intart★" = { output = "intelligence artificielle", is_word = true, auto_expand = true }
-"inter★" = { output = "international", is_word = true, auto_expand = true }
-"intro★" = { output = "introduction", is_word = true, auto_expand = true }
+"ia★" = { output = "intelligence artificielle", is_word = true, auto_expand = true, is_case_sensitive = false }
+"id★" = { output = "identifiant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"idf★" = { output = "Île-de-France", is_word = true, auto_expand = true, is_case_sensitive = false }
+"idk★" = { output = "I don’t know", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ids★" = { output = "identifiants", is_word = true, auto_expand = true, is_case_sensitive = false }
+"img★" = { output = "image", is_word = true, auto_expand = true, is_case_sensitive = false }
+"imgs★" = { output = "images", is_word = true, auto_expand = true, is_case_sensitive = false }
+"imm★" = { output = "immeuble", is_word = true, auto_expand = true, is_case_sensitive = false }
+"imo★" = { output = "in my opinion", is_word = true, auto_expand = true, is_case_sensitive = false }
+"imp★" = { output = "impossible", is_word = true, auto_expand = true, is_case_sensitive = false }
+"inf★" = { output = "inférieur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"info★" = { output = "information", is_word = true, auto_expand = true, is_case_sensitive = false }
+"infos★" = { output = "informations", is_word = true, auto_expand = true, is_case_sensitive = false }
+"insta★" = { output = "Instagram", is_word = true, auto_expand = true, is_case_sensitive = true }
+"intart★" = { output = "intelligence artificielle", is_word = true, auto_expand = true, is_case_sensitive = false }
+"inter★" = { output = "international", is_word = true, auto_expand = true, is_case_sensitive = false }
+"intro★" = { output = "introduction", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[j]]
-"j★" = { output = "bonjour", is_word = true, auto_expand = true }
-"ja★" = { output = "jamais", is_word = true, auto_expand = true }
-"janv★" = { output = "janvier", is_word = true, auto_expand = true }
-"jm★" = { output = "j’aime", is_word = true, auto_expand = true }
-"jms★" = { output = "jamais", is_word = true, auto_expand = true }
-"jnsp★" = { output = "je ne sais pas", is_word = true, auto_expand = true }
-"js★" = { output = "je suis", is_word = true, auto_expand = true }
-"jsp★" = { output = "je ne sais pas", is_word = true, auto_expand = true }
-"jtm★" = { output = "je t’aime", is_word = true, auto_expand = true }
-"ju★" = { output = "jusque", is_word = true, auto_expand = true }
-"ju'★" = { output = "jusqu’", is_word = true, auto_expand = true }
-"jus★" = { output = "jusque", is_word = true, auto_expand = true }
-"jusq★" = { output = "jusqu’", is_word = true, auto_expand = true }
-"jus'★" = { output = "jusqu’", is_word = true, auto_expand = true }
-"jui★" = { output = "juillet", is_word = true, auto_expand = true }
+"j★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ja★" = { output = "jamais", is_word = true, auto_expand = true, is_case_sensitive = false }
+"janv★" = { output = "janvier", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jm★" = { output = "j’aime", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jms★" = { output = "jamais", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jnsp★" = { output = "je ne sais pas", is_word = true, auto_expand = true, is_case_sensitive = false }
+"js★" = { output = "je suis", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jsp★" = { output = "je ne sais pas", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jtm★" = { output = "je t’aime", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ju★" = { output = "jusque", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ju'★" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jus★" = { output = "jusque", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jusq★" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jus'★" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false }
+"jui★" = { output = "juillet", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[k]]
-"k★" = { output = "contacter", is_word = true, auto_expand = true }
-"kb★" = { output = "keyboard", is_word = true, auto_expand = true }
-"kbd★" = { output = "keyboard", is_word = true, auto_expand = true }
-"kn★" = { output = "construction", is_word = true, auto_expand = true }
-"lê★" = { output = "l’être", is_word = true, auto_expand = true }
-"ledt★" = { output = "l’emploi du temps", is_word = true, auto_expand = true }
-"lex★" = { output = "l’exemple", is_word = true, auto_expand = true }
-"lim★" = { output = "limite", is_word = true, auto_expand = true }
+"k★" = { output = "contacter", is_word = true, auto_expand = true, is_case_sensitive = false }
+"kb★" = { output = "keyboard", is_word = true, auto_expand = true, is_case_sensitive = false }
+"kbd★" = { output = "keyboard", is_word = true, auto_expand = true, is_case_sensitive = false }
+"kn★" = { output = "construction", is_word = true, auto_expand = true, is_case_sensitive = false }
+"lê★" = { output = "l’être", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ledt★" = { output = "l’emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false }
+"lex★" = { output = "l’exemple", is_word = true, auto_expand = true, is_case_sensitive = false }
+"lim★" = { output = "limite", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[m]]
-"m★" = { output = "mais", is_word = true, auto_expand = true }
-"ma★" = { output = "madame", is_word = true, auto_expand = true }
-"maj★" = { output = "mise à jour", is_word = true, auto_expand = true }
-"màj★" = { output = "mise à jour", is_word = true, auto_expand = true }
-"math★" = { output = "mathématique", is_word = true, auto_expand = true }
-"manip★" = { output = "manipulation", is_word = true, auto_expand = true }
-"maths★" = { output = "mathématiques", is_word = true, auto_expand = true }
-"max★" = { output = "maximum", is_word = true, auto_expand = true }
-"md★" = { output = "milliard", is_word = true, auto_expand = true }
-"mds★" = { output = "milliards", is_word = true, auto_expand = true }
-"mdav★" = { output = "merci d’avance", is_word = true, auto_expand = true }
-"mdb★" = { output = "merci de bien vouloir", is_word = true, auto_expand = true }
-"mdl★" = { output = "modèle", is_word = true, auto_expand = true }
-"mdp★" = { output = "mot de passe", is_word = true, auto_expand = true }
-"mdps★" = { output = "mots de passe", is_word = true, auto_expand = true }
-"méthodo★" = { output = "méthodologie", is_word = true, auto_expand = true }
-"min★" = { output = "minimum", is_word = true, auto_expand = true }
-"mio★" = { output = "million", is_word = true, auto_expand = true }
-"mios★" = { output = "millions", is_word = true, auto_expand = true }
-"mjo★" = { output = "mettre à jour", is_word = true, auto_expand = true }
-"ml★" = { output = "machine learning", is_word = true, auto_expand = true }
-"mm★" = { output = "même", is_word = true, auto_expand = true }
-"mme★" = { output = "madame", is_word = true, auto_expand = true }
-"modif★" = { output = "modification", is_word = true, auto_expand = true }
-"mom★" = { output = "moi-même", is_word = true, auto_expand = true }
-"mq★" = { output = "montre que", is_word = true, auto_expand = true }
-"mr★" = { output = "monsieur", is_word = true, auto_expand = true }
-"mrc★" = { output = "merci", is_word = true, auto_expand = true }
-"msg★" = { output = "message", is_word = true, auto_expand = true }
-"mtn★" = { output = "maintenant", is_word = true, auto_expand = true }
-"moy★" = { output = "moyenne", is_word = true, auto_expand = true }
-"mutu★" = { output = "mutualiser", is_word = true, auto_expand = true }
-"mvt★" = { output = "mouvement", is_word = true, auto_expand = true }
+"m★" = { output = "mais", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ma★" = { output = "madame", is_word = true, auto_expand = true, is_case_sensitive = false }
+"maj★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"màj★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"math★" = { output = "mathématique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"manip★" = { output = "manipulation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"maths★" = { output = "mathématiques", is_word = true, auto_expand = true, is_case_sensitive = false }
+"max★" = { output = "maximum", is_word = true, auto_expand = true, is_case_sensitive = false }
+"md★" = { output = "milliard", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mds★" = { output = "milliards", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mdav★" = { output = "merci d’avance", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mdb★" = { output = "merci de bien vouloir", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mdl★" = { output = "modèle", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mdp★" = { output = "mot de passe", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mdps★" = { output = "mots de passe", is_word = true, auto_expand = true, is_case_sensitive = false }
+"méthodo★" = { output = "méthodologie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"min★" = { output = "minimum", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mio★" = { output = "million", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mios★" = { output = "millions", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mjo★" = { output = "mettre à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ml★" = { output = "machine learning", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mm★" = { output = "même", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mme★" = { output = "madame", is_word = true, auto_expand = true, is_case_sensitive = false }
+"modif★" = { output = "modification", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mom★" = { output = "moi-même", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mq★" = { output = "montre que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mr★" = { output = "monsieur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mrc★" = { output = "merci", is_word = true, auto_expand = true, is_case_sensitive = false }
+"msg★" = { output = "message", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mtn★" = { output = "maintenant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"moy★" = { output = "moyenne", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mutu★" = { output = "mutualiser", is_word = true, auto_expand = true, is_case_sensitive = false }
+"mvt★" = { output = "mouvement", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[n]]
-"n★" = { output = "nouveau", is_word = true, auto_expand = true }
-"nav★" = { output = "navigation", is_word = true, auto_expand = true }
-"nb★" = { output = "nombre", is_word = true, auto_expand = true }
-"nean★" = { output = "néanmoins", is_word = true, auto_expand = true }
-"new★" = { output = "nouveau", is_word = true, auto_expand = true }
-"newe★" = { output = "nouvelle", is_word = true, auto_expand = true }
-"nimp★" = { output = "n’importe", is_word = true, auto_expand = true }
-"niv★" = { output = "niveau", is_word = true, auto_expand = true }
-"norm★" = { output = "normalement", is_word = true, auto_expand = true }
-"nota★" = { output = "notamment", is_word = true, auto_expand = true }
-"notm★" = { output = "notamment", is_word = true, auto_expand = true }
-"nouv★" = { output = "nouvelle", is_word = true, auto_expand = true }
-"nov★" = { output = "novembre", is_word = true, auto_expand = true }
-"now★" = { output = "maintenant", is_word = true, auto_expand = true }
-"np★" = { output = "ne pas", is_word = true, auto_expand = true }
-"nrj★" = { output = "énergie", is_word = true, auto_expand = true }
-"ns★" = { output = "nous", is_word = true, auto_expand = true }
-"num★" = { output = "numéro", is_word = true, auto_expand = true }
+"n★" = { output = "nouveau", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nav★" = { output = "navigation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nb★" = { output = "nombre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nean★" = { output = "néanmoins", is_word = true, auto_expand = true, is_case_sensitive = false }
+"new★" = { output = "nouveau", is_word = true, auto_expand = true, is_case_sensitive = false }
+"newe★" = { output = "nouvelle", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nimp★" = { output = "n’importe", is_word = true, auto_expand = true, is_case_sensitive = false }
+"niv★" = { output = "niveau", is_word = true, auto_expand = true, is_case_sensitive = false }
+"norm★" = { output = "normalement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nota★" = { output = "notamment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"notm★" = { output = "notamment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nouv★" = { output = "nouvelle", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nov★" = { output = "novembre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"now★" = { output = "maintenant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"np★" = { output = "ne pas", is_word = true, auto_expand = true, is_case_sensitive = false }
+"nrj★" = { output = "énergie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ns★" = { output = "nous", is_word = true, auto_expand = true, is_case_sensitive = false }
+"num★" = { output = "numéro", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[o]]
-"o-★" = { output = "au moins", is_word = true, auto_expand = true }
-"o+★" = { output = "au plus", is_word = true, auto_expand = true }
-"obj★" = { output = "objectif", is_word = true, auto_expand = true }
-"obs★" = { output = "observation", is_word = true, auto_expand = true }
-"oct★" = { output = "octobre", is_word = true, auto_expand = true }
-"odj★" = { output = "ordre du jour", is_word = true, auto_expand = true }
-"opé★" = { output = "opération", is_word = true, auto_expand = true }
-"oqp★" = { output = "occupé", is_word = true, auto_expand = true }
-"ordi★" = { output = "ordinateur", is_word = true, auto_expand = true }
-"org★" = { output = "organisation", is_word = true, auto_expand = true }
-"orga★" = { output = "organisation", is_word = true, auto_expand = true }
-"ortho★" = { output = "orthographe", is_word = true, auto_expand = true }
-"out★" = { output = "Où es-tu ?", is_word = true, auto_expand = true }
-"outv★" = { output = "Où êtes-vous ?", is_word = true, auto_expand = true }
-"ouv★" = { output = "ouverture", is_word = true, auto_expand = true }
+"o-★" = { output = "au moins", is_word = true, auto_expand = true, is_case_sensitive = false }
+"o+★" = { output = "au plus", is_word = true, auto_expand = true, is_case_sensitive = false }
+"obj★" = { output = "objectif", is_word = true, auto_expand = true, is_case_sensitive = false }
+"obs★" = { output = "observation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"oct★" = { output = "octobre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"odj★" = { output = "ordre du jour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"opé★" = { output = "opération", is_word = true, auto_expand = true, is_case_sensitive = false }
+"oqp★" = { output = "occupé", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ordi★" = { output = "ordinateur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"org★" = { output = "organisation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"orga★" = { output = "organisation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ortho★" = { output = "orthographe", is_word = true, auto_expand = true, is_case_sensitive = false }
+"out★" = { output = "Où es-tu ?", is_word = true, auto_expand = true, is_case_sensitive = true }
+"outv★" = { output = "Où êtes-vous ?", is_word = true, auto_expand = true, is_case_sensitive = true }
+"ouv★" = { output = "ouverture", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[p]]
-"p★" = { output = "prendre", is_word = true, auto_expand = true }
-"p//★" = { output = "par rapport", is_word = true, auto_expand = true }
-"par★" = { output = "paragraphe", is_word = true, auto_expand = true }
-"param★" = { output = "paramètre", is_word = true, auto_expand = true }
-"pb★" = { output = "problème", is_word = true, auto_expand = true }
-"pcq★" = { output = "parce que", is_word = true, auto_expand = true }
-"pck★" = { output = "parce que", is_word = true, auto_expand = true }
-"pckil★" = { output = "parce qu’il", is_word = true, auto_expand = true }
-"pcquil★" = { output = "parce qu’il", is_word = true, auto_expand = true }
-"pcquon★" = { output = "parce qu’on", is_word = true, auto_expand = true }
-"pckon★" = { output = "parce qu’on", is_word = true, auto_expand = true }
-"pd★" = { output = "pendant", is_word = true, auto_expand = true }
-"pdt★" = { output = "pendant", is_word = true, auto_expand = true }
-"pdv★" = { output = "point de vue", is_word = true, auto_expand = true }
-"pdvs★" = { output = "points de vue", is_word = true, auto_expand = true }
-"perf★" = { output = "performance", is_word = true, auto_expand = true }
-"perso★" = { output = "personne", is_word = true, auto_expand = true }
-"pê★" = { output = "peut-être", is_word = true, auto_expand = true }
-"péri★" = { output = "périmètre", is_word = true, auto_expand = true }
-"périm★" = { output = "périmètre", is_word = true, auto_expand = true }
-"peut-ê★" = { output = "peut-être", is_word = true, auto_expand = true }
-"pex★" = { output = "par exemple", is_word = true, auto_expand = true }
-"pf★" = { output = "portefeuille", is_word = true, auto_expand = true }
-"pg★" = { output = "pas grave", is_word = true, auto_expand = true }
-"pgm★" = { output = "programme", is_word = true, auto_expand = true }
-"pi★" = { output = "pour information", is_word = true, auto_expand = true }
-"pic★" = { output = "picture", is_word = true, auto_expand = true }
-"pics★" = { output = "pictures", is_word = true, auto_expand = true }
-"piè★" = { output = "pièce jointe", is_word = true, auto_expand = true }
-"pj★" = { output = "pièce jointe", is_word = true, auto_expand = true }
-"pjs★" = { output = "pièces jointes", is_word = true, auto_expand = true }
-"pk★" = { output = "pourquoi", is_word = true, auto_expand = true }
-"pls★" = { output = "please", is_word = true, auto_expand = true }
-"poum★" = { output = "plus ou moins", is_word = true, auto_expand = true }
-"poss★" = { output = "possible", is_word = true, auto_expand = true }
-"pourcent★" = { output = "pourcentage", is_word = true, auto_expand = true }
-"ppt★" = { output = "PowerPoint", is_word = true, auto_expand = true }
-"pq★" = { output = "pourquoi", is_word = true, auto_expand = true }
-"prd★" = { output = "produit", is_word = true, auto_expand = true }
-"prem★" = { output = "premier", is_word = true, auto_expand = true }
-"prez★" = { output = "présentation", is_word = true, auto_expand = true }
-"prg★" = { output = "programme", is_word = true, auto_expand = true }
-"prio★" = { output = "priorité", is_word = true, auto_expand = true }
-"pro★" = { output = "professionnel", is_word = true, auto_expand = true }
-"prob★" = { output = "problème", is_word = true, auto_expand = true }
-"proba★" = { output = "probabilité", is_word = true, auto_expand = true }
-"prod★" = { output = "production", is_word = true, auto_expand = true }
-"prof★" = { output = "professeur", is_word = true, auto_expand = true }
-"prog★" = { output = "programme", is_word = true, auto_expand = true }
-"prop★" = { output = "propriété", is_word = true, auto_expand = true }
-"propo★" = { output = "proposition", is_word = true, auto_expand = true }
-"props★" = { output = "propriétés", is_word = true, auto_expand = true }
-"pros★" = { output = "professionnels", is_word = true, auto_expand = true }
-"prot★" = { output = "professionnellement", is_word = true, auto_expand = true }
-"prov★" = { output = "provision", is_word = true, auto_expand = true }
-"psycha★" = { output = "psychanalyse", is_word = true, auto_expand = true }
-"psycho★" = { output = "psychologie", is_word = true, auto_expand = true }
-"psb★" = { output = "possible", is_word = true, auto_expand = true }
-"psy★" = { output = "psychologie", is_word = true, auto_expand = true }
-"pt★" = { output = "point", is_word = true, auto_expand = true }
-"ptf★" = { output = "portefeuille", is_word = true, auto_expand = true }
-"pts★" = { output = "points", is_word = true, auto_expand = true }
-"pub★" = { output = "publicité", is_word = true, auto_expand = true }
-"pvv★" = { output = "pouvez-vous", is_word = true, auto_expand = true }
-"py★" = { output = "python", is_word = true, auto_expand = true }
+"p★" = { output = "prendre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"p//★" = { output = "par rapport", is_word = true, auto_expand = true, is_case_sensitive = false }
+"par★" = { output = "paragraphe", is_word = true, auto_expand = true, is_case_sensitive = false }
+"param★" = { output = "paramètre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pb★" = { output = "problème", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pcq★" = { output = "parce que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pck★" = { output = "parce que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pckil★" = { output = "parce qu’il", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pcquil★" = { output = "parce qu’il", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pcquon★" = { output = "parce qu’on", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pckon★" = { output = "parce qu’on", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pd★" = { output = "pendant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pdt★" = { output = "pendant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pdv★" = { output = "point de vue", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pdvs★" = { output = "points de vue", is_word = true, auto_expand = true, is_case_sensitive = false }
+"perf★" = { output = "performance", is_word = true, auto_expand = true, is_case_sensitive = false }
+"perso★" = { output = "personne", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pê★" = { output = "peut-être", is_word = true, auto_expand = true, is_case_sensitive = false }
+"péri★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"périm★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"peut-ê★" = { output = "peut-être", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pex★" = { output = "par exemple", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pf★" = { output = "portefeuille", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pg★" = { output = "pas grave", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pgm★" = { output = "programme", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pi★" = { output = "pour information", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pic★" = { output = "picture", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pics★" = { output = "pictures", is_word = true, auto_expand = true, is_case_sensitive = false }
+"piè★" = { output = "pièce jointe", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pj★" = { output = "pièce jointe", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pjs★" = { output = "pièces jointes", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pk★" = { output = "pourquoi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pls★" = { output = "please", is_word = true, auto_expand = true, is_case_sensitive = false }
+"poum★" = { output = "plus ou moins", is_word = true, auto_expand = true, is_case_sensitive = false }
+"poss★" = { output = "possible", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pourcent★" = { output = "pourcentage", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ppt★" = { output = "PowerPoint", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pq★" = { output = "pourquoi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prd★" = { output = "produit", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prem★" = { output = "premier", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prez★" = { output = "présentation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prg★" = { output = "programme", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prio★" = { output = "priorité", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pro★" = { output = "professionnel", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prob★" = { output = "problème", is_word = true, auto_expand = true, is_case_sensitive = false }
+"proba★" = { output = "probabilité", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prod★" = { output = "production", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prof★" = { output = "professeur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prog★" = { output = "programme", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prop★" = { output = "propriété", is_word = true, auto_expand = true, is_case_sensitive = false }
+"propo★" = { output = "proposition", is_word = true, auto_expand = true, is_case_sensitive = false }
+"props★" = { output = "propriétés", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pros★" = { output = "professionnels", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prot★" = { output = "professionnellement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"prov★" = { output = "provision", is_word = true, auto_expand = true, is_case_sensitive = false }
+"psycha★" = { output = "psychanalyse", is_word = true, auto_expand = true, is_case_sensitive = false }
+"psycho★" = { output = "psychologie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"psb★" = { output = "possible", is_word = true, auto_expand = true, is_case_sensitive = false }
+"psy★" = { output = "psychologie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pt★" = { output = "point", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ptf★" = { output = "portefeuille", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pts★" = { output = "points", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pub★" = { output = "publicité", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pvv★" = { output = "pouvez-vous", is_word = true, auto_expand = true, is_case_sensitive = false }
+"py★" = { output = "python", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[q]]
-"q★" = { output = "question", is_word = true, auto_expand = true }
-"qc★" = { output = "qu’est-ce", is_word = true, auto_expand = true }
-"qcq★" = { output = "qu’est-ce que", is_word = true, auto_expand = true }
-"qcq'★" = { output = "qu’est-ce qu’", is_word = true, auto_expand = true }
-"qq★" = { output = "quelque", is_word = true, auto_expand = true }
-"qqch★" = { output = "quelque chose", is_word = true, auto_expand = true }
-"qqs★" = { output = "quelques", is_word = true, auto_expand = true }
-"qqn★" = { output = "quelqu’un", is_word = true, auto_expand = true }
-"quasi★" = { output = "quasiment", is_word = true, auto_expand = true }
-"ques★" = { output = "question", is_word = true, auto_expand = true }
-"quid★" = { output = "qu’en est-il de", is_word = true, auto_expand = true }
+"q★" = { output = "question", is_word = true, auto_expand = true, is_case_sensitive = false }
+"qc★" = { output = "qu’est-ce", is_word = true, auto_expand = true, is_case_sensitive = false }
+"qcq★" = { output = "qu’est-ce que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"qcq'★" = { output = "qu’est-ce qu’", is_word = true, auto_expand = true, is_case_sensitive = false }
+"qq★" = { output = "quelque", is_word = true, auto_expand = true, is_case_sensitive = false }
+"qqch★" = { output = "quelque chose", is_word = true, auto_expand = true, is_case_sensitive = false }
+"qqs★" = { output = "quelques", is_word = true, auto_expand = true, is_case_sensitive = false }
+"qqn★" = { output = "quelqu’un", is_word = true, auto_expand = true, is_case_sensitive = false }
+"quasi★" = { output = "quasiment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ques★" = { output = "question", is_word = true, auto_expand = true, is_case_sensitive = false }
+"quid★" = { output = "qu’en est-il de", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[r]]
-"r★" = { output = "rien", is_word = true, auto_expand = true }
-"rapidt★" = { output = "rapidement", is_word = true, auto_expand = true }
-"rdv★" = { output = "rendez-vous", is_word = true, auto_expand = true }
-"ré★" = { output = "réunion", is_word = true, auto_expand = true }
-"rés★" = { output = "réunions", is_word = true, auto_expand = true }
-"rép★" = { output = "répertoire", is_word = true, auto_expand = true }
-"résil★" = { output = "résiliation", is_word = true, auto_expand = true }
-"reco★" = { output = "recommandation", is_word = true, auto_expand = true }
-"ref★" = { output = "référence", is_word = true, auto_expand = true }
-"rep★" = { output = "répertoire", is_word = true, auto_expand = true }
-"rex★" = { output = "retour d’expérience", is_word = true, auto_expand = true }
-"rmq★" = { output = "remarque", is_word = true, auto_expand = true }
-"rpz★" = { output = "représente", is_word = true, auto_expand = true }
-"rs★" = { output = "résultat", is_word = true, auto_expand = true }
+"r★" = { output = "rien", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rapidt★" = { output = "rapidement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rdv★" = { output = "rendez-vous", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ré★" = { output = "réunion", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rés★" = { output = "réunions", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rép★" = { output = "répertoire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"résil★" = { output = "résiliation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"reco★" = { output = "recommandation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ref★" = { output = "référence", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rep★" = { output = "répertoire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rex★" = { output = "retour d’expérience", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rmq★" = { output = "remarque", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rpz★" = { output = "représente", is_word = true, auto_expand = true, is_case_sensitive = false }
+"rs★" = { output = "résultat", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[s]]
-"seg★" = { output = "segment", is_word = true, auto_expand = true }
-"segm★" = { output = "segment", is_word = true, auto_expand = true }
-"sep★" = { output = "septembre", is_word = true, auto_expand = true }
-"sept★" = { output = "septembre", is_word = true, auto_expand = true }
-"simpl★" = { output = "simplement", is_word = true, auto_expand = true }
-"situ★" = { output = "situation", is_word = true, auto_expand = true }
-"smth★" = { output = "something", is_word = true, auto_expand = true }
-"srx★" = { output = "sérieux", is_word = true, auto_expand = true }
-"sécu★" = { output = "sécurité", is_word = true, auto_expand = true }
-"st★" = { output = "s’était", is_word = true, auto_expand = true }
-"stat★" = { output = "statistique", is_word = true, auto_expand = true }
-"sth★" = { output = "something", is_word = true, auto_expand = true }
-"stp★" = { output = "s’il te plaît", is_word = true, auto_expand = true }
-"strat★" = { output = "stratégique", is_word = true, auto_expand = true }
-"stream★" = { output = "streaming", is_word = true, auto_expand = true }
-"suff★" = { output = "suffisant", is_word = true, auto_expand = true }
-"sufft★" = { output = "suffisamment", is_word = true, auto_expand = true }
-"supé★" = { output = "supérieur", is_word = true, auto_expand = true }
-"surv★" = { output = "survenance", is_word = true, auto_expand = true }
-"svp★" = { output = "s’il vous plaît", is_word = true, auto_expand = true }
-"svt★" = { output = "souvent", is_word = true, auto_expand = true }
-"sya★" = { output = "s’il y a", is_word = true, auto_expand = true }
-"syn★" = { output = "synonyme", is_word = true, auto_expand = true }
-"sync★" = { output = "synchronisation", is_word = true, auto_expand = true }
-"syncro★" = { output = "synchronisation", is_word = true, auto_expand = true }
-"sys★" = { output = "système", is_word = true, auto_expand = true }
+"seg★" = { output = "segment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"segm★" = { output = "segment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sep★" = { output = "septembre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sept★" = { output = "septembre", is_word = true, auto_expand = true, is_case_sensitive = false }
+"simpl★" = { output = "simplement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"situ★" = { output = "situation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"smth★" = { output = "something", is_word = true, auto_expand = true, is_case_sensitive = false }
+"srx★" = { output = "sérieux", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sécu★" = { output = "sécurité", is_word = true, auto_expand = true, is_case_sensitive = false }
+"st★" = { output = "s’était", is_word = true, auto_expand = true, is_case_sensitive = false }
+"stat★" = { output = "statistique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sth★" = { output = "something", is_word = true, auto_expand = true, is_case_sensitive = false }
+"stp★" = { output = "s’il te plaît", is_word = true, auto_expand = true, is_case_sensitive = false }
+"strat★" = { output = "stratégique", is_word = true, auto_expand = true, is_case_sensitive = false }
+"stream★" = { output = "streaming", is_word = true, auto_expand = true, is_case_sensitive = false }
+"suff★" = { output = "suffisant", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sufft★" = { output = "suffisamment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"supé★" = { output = "supérieur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"surv★" = { output = "survenance", is_word = true, auto_expand = true, is_case_sensitive = false }
+"svp★" = { output = "s’il vous plaît", is_word = true, auto_expand = true, is_case_sensitive = false }
+"svt★" = { output = "souvent", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sya★" = { output = "s’il y a", is_word = true, auto_expand = true, is_case_sensitive = false }
+"syn★" = { output = "synonyme", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sync★" = { output = "synchronisation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"syncro★" = { output = "synchronisation", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sys★" = { output = "système", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[t]]
-"t★" = { output = "très", is_word = true, auto_expand = true }
-"tb★" = { output = "très bien", is_word = true, auto_expand = true }
-"temp★" = { output = "temporaire", is_word = true, auto_expand = true }
-"tes★" = { output = "tu es", is_word = true, auto_expand = true }
-"tél★" = { output = "téléphone", is_word = true, auto_expand = true }
-"teq★" = { output = "telle que", is_word = true, auto_expand = true }
-"teqs★" = { output = "telles que", is_word = true, auto_expand = true }
-"tfk★" = { output = "qu’est-ce que tu fais ?", is_word = true, auto_expand = true }
-"tgh★" = { output = "together", is_word = true, auto_expand = true }
-"théo★" = { output = "théorie", is_word = true, auto_expand = true }
-"thm★" = { output = "théorème", is_word = true, auto_expand = true }
-"tj★" = { output = "toujours", is_word = true, auto_expand = true }
-"tjr★" = { output = "toujours", is_word = true, auto_expand = true }
-"tlm★" = { output = "tout le monde", is_word = true, auto_expand = true }
-"tq★" = { output = "tel que", is_word = true, auto_expand = true }
-"tqs★" = { output = "tels que", is_word = true, auto_expand = true }
-"tout★" = { output = "toutefois", is_word = true, auto_expand = true }
-"tra★" = { output = "travail", is_word = true, auto_expand = true }
-"trad★" = { output = "traduction", is_word = true, auto_expand = true }
-"trav★" = { output = "travail", is_word = true, auto_expand = true }
-"trkl★" = { output = "tranquille", is_word = true, auto_expand = true }
-"tt★" = { output = "télétravail", is_word = true, auto_expand = true }
-"tv★" = { output = "télévision", is_word = true, auto_expand = true }
-"ty★" = { output = "thank you", is_word = true, auto_expand = true }
-"typo★" = { output = "typographie", is_word = true, auto_expand = true }
+"t★" = { output = "très", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tb★" = { output = "très bien", is_word = true, auto_expand = true, is_case_sensitive = false }
+"temp★" = { output = "temporaire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tes★" = { output = "tu es", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tél★" = { output = "téléphone", is_word = true, auto_expand = true, is_case_sensitive = false }
+"teq★" = { output = "telle que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"teqs★" = { output = "telles que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tfk★" = { output = "qu’est-ce que tu fais ?", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tgh★" = { output = "together", is_word = true, auto_expand = true, is_case_sensitive = false }
+"théo★" = { output = "théorie", is_word = true, auto_expand = true, is_case_sensitive = false }
+"thm★" = { output = "théorème", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tj★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tjr★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tlm★" = { output = "tout le monde", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tq★" = { output = "tel que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tqs★" = { output = "tels que", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tout★" = { output = "toutefois", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tra★" = { output = "travail", is_word = true, auto_expand = true, is_case_sensitive = false }
+"trad★" = { output = "traduction", is_word = true, auto_expand = true, is_case_sensitive = false }
+"trav★" = { output = "travail", is_word = true, auto_expand = true, is_case_sensitive = false }
+"trkl★" = { output = "tranquille", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tt★" = { output = "télétravail", is_word = true, auto_expand = true, is_case_sensitive = false }
+"tv★" = { output = "télévision", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ty★" = { output = "thank you", is_word = true, auto_expand = true, is_case_sensitive = false }
+"typo★" = { output = "typographie", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[u]]
-"une amé★" = { output = "une amélioration", is_word = true, auto_expand = true }
-"uniq★" = { output = "uniquement", is_word = true, auto_expand = true }
-"usa★" = { output = "États-Unis", is_word = true, auto_expand = true }
+"une amé★" = { output = "une amélioration", is_word = true, auto_expand = true, is_case_sensitive = false }
+"uniq★" = { output = "uniquement", is_word = true, auto_expand = true, is_case_sensitive = false }
+"usa★" = { output = "États-Unis", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[v]]
-"v★" = { output = "version", is_word = true, auto_expand = true }
-"var★" = { output = "variable", is_word = true, auto_expand = true }
-"vav★" = { output = "vis-à-vis", is_word = true, auto_expand = true }
-"verif★" = { output = "vérification", is_word = true, auto_expand = true }
-"vérif★" = { output = "vérification", is_word = true, auto_expand = true }
-"vocab★" = { output = "vocabulaire", is_word = true, auto_expand = true }
-"volat★" = { output = "volatilité", is_word = true, auto_expand = true }
-"vrm★" = { output = "vraiment", is_word = true, auto_expand = true }
-"vrmt★" = { output = "vraiment", is_word = true, auto_expand = true }
-"vs★" = { output = "vous êtes", is_word = true, auto_expand = true }
+"v★" = { output = "version", is_word = true, auto_expand = true, is_case_sensitive = false }
+"var★" = { output = "variable", is_word = true, auto_expand = true, is_case_sensitive = false }
+"vav★" = { output = "vis-à-vis", is_word = true, auto_expand = true, is_case_sensitive = false }
+"verif★" = { output = "vérification", is_word = true, auto_expand = true, is_case_sensitive = false }
+"vérif★" = { output = "vérification", is_word = true, auto_expand = true, is_case_sensitive = false }
+"vocab★" = { output = "vocabulaire", is_word = true, auto_expand = true, is_case_sensitive = false }
+"volat★" = { output = "volatilité", is_word = true, auto_expand = true, is_case_sensitive = false }
+"vrm★" = { output = "vraiment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"vrmt★" = { output = "vraiment", is_word = true, auto_expand = true, is_case_sensitive = false }
+"vs★" = { output = "vous êtes", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[w]]
-"w★" = { output = "with", is_word = true, auto_expand = true }
-"wd★" = { output = "Windows", is_word = true, auto_expand = true }
-"wk★" = { output = "week-end", is_word = true, auto_expand = true }
-"wknd★" = { output = "week-end", is_word = true, auto_expand = true }
-"wiki★" = { output = "Wikipédia", is_word = true, auto_expand = true }
+"w★" = { output = "with", is_word = true, auto_expand = true, is_case_sensitive = false }
+"wd★" = { output = "Windows", is_word = true, auto_expand = true, is_case_sensitive = false }
+"wk★" = { output = "week-end", is_word = true, auto_expand = true, is_case_sensitive = false }
+"wknd★" = { output = "week-end", is_word = true, auto_expand = true, is_case_sensitive = false }
+"wiki★" = { output = "Wikipédia", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[x]]
-"x★" = { output = "exemple", is_word = true, auto_expand = true }
+"x★" = { output = "exemple", is_word = true, auto_expand = true, is_case_sensitive = false }
 
 [[y]]
-"ya★" = { output = "il y a", is_word = true, auto_expand = true }
-"yapa★" = { output = "il n’y a pas", is_word = true, auto_expand = true }
-"yatil★" = { output = "y a-t-il", is_word = true, auto_expand = true }
-"yc★" = { output = "y compris", is_word = true, auto_expand = true }
-"yt★" = { output = "YouTube", is_word = true, auto_expand = true }
+"ya★" = { output = "il y a", is_word = true, auto_expand = true, is_case_sensitive = false }
+"yapa★" = { output = "il n’y a pas", is_word = true, auto_expand = true, is_case_sensitive = false }
+"yatil★" = { output = "y a-t-il", is_word = true, auto_expand = true, is_case_sensitive = false }
+"yc★" = { output = "y compris", is_word = true, auto_expand = true, is_case_sensitive = false }
+"yt★" = { output = "YouTube", is_word = true, auto_expand = true, is_case_sensitive = true }

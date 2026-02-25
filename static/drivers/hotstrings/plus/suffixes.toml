@@ -8,27 +8,27 @@ block = "SuffixesA"
 description = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …"
 
 [[general]]
-"àa" = { output = "aire", is_word = false, auto_expand = true }
-"àc" = { output = "ction", is_word = false, auto_expand = true }
-"càd" = { output = "could", is_word = false, auto_expand = true }
-"shàd" = { output = "should", is_word = false, auto_expand = true }
-"àd" = { output = "would", is_word = false, auto_expand = true }
-"àê" = { output = "able", is_word = false, auto_expand = true }
-"àf" = { output = "iste", is_word = false, auto_expand = true }
-"àg" = { output = "ought", is_word = false, auto_expand = true }
-"àh" = { output = "ight", is_word = false, auto_expand = true }
-"ài" = { output = "ying", is_word = false, auto_expand = true }
-"àk" = { output = "ique", is_word = false, auto_expand = true }
-"àl" = { output = "elle", is_word = false, auto_expand = true }
-"àp" = { output = "ence", is_word = false, auto_expand = true }
-"àm" = { output = "isme", is_word = false, auto_expand = true }
-"àn" = { output = "ation", is_word = false, auto_expand = true }
-"àq" = { output = "ique", is_word = false, auto_expand = true }
-"àr" = { output = "erre", is_word = false, auto_expand = true }
-"às" = { output = "ement", is_word = false, auto_expand = true }
-"àt" = { output = "ettre", is_word = false, auto_expand = true }
-"àv" = { output = "ment", is_word = false, auto_expand = true }
-"àx" = { output = "ieux", is_word = false, auto_expand = true }
-"àz" = { output = "ez-vous", is_word = false, auto_expand = true }
-"à'" = { output = "ance", is_word = false, auto_expand = true }
-"à’" = { output = "ance", is_word = false, auto_expand = true }
+"àa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àc" = { output = "ction", is_word = false, auto_expand = true, is_case_sensitive = false }
+"càd" = { output = "could", is_word = false, auto_expand = true, is_case_sensitive = false }
+"shàd" = { output = "should", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àd" = { output = "would", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àê" = { output = "able", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àf" = { output = "iste", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àg" = { output = "ought", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àh" = { output = "ight", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ài" = { output = "ying", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àk" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àl" = { output = "elle", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àp" = { output = "ence", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àm" = { output = "isme", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àn" = { output = "ation", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àr" = { output = "erre", is_word = false, auto_expand = true, is_case_sensitive = false }
+"às" = { output = "ement", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àt" = { output = "ettre", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àv" = { output = "ment", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àx" = { output = "ieux", is_word = false, auto_expand = true, is_case_sensitive = false }
+"àz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false }
+"à'" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false }
+"à’" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false }
