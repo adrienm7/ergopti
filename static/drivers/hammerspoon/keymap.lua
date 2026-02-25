@@ -150,17 +150,23 @@ end
 ---------------------------------------------------------------------------
 -- Ajout de raccourcis
 ---------------------------------------------------------------------------
-function M.add(trigger, replacement, mid_word, auto_expand, case_sensitive)
-    local is_mid = (mid_word == true)
-    local is_auto = (auto_expand == true)
-    local is_case_sensitive = (case_sensitive == true)
+function M.add(trigger, replacement, opts)
+    -- New calling convention: M.add(trigger, replacement, {
+    --   is_word = true/false,
+    --   auto_expand = true/false,
+    --   is_case_sensitive = true/false,
+    -- })
+    opts = opts or {}
+    local is_word = opts.is_word == true
+    local is_auto = opts.auto_expand == true
+    local is_case_sensitive = opts.is_case_sensitive == true
 
     local function add_mapping_raw(t, r, a)
         for _, m in ipairs(mappings) do
-            if m.trigger == t and m.repl == r and m.mid == is_mid and m.auto == a then return end
+            if m.trigger == t and m.repl == r and m.is_word == is_word and m.auto == a then return end
         end
         seq_counter = seq_counter + 1
-        local entry = { trigger = t, repl = r, mid = is_mid, auto = a, seq = seq_counter }
+        local entry = { trigger = t, repl = r, is_word = is_word, auto = a, seq = seq_counter }
         if current_group then entry.group = current_group end
         table.insert(mappings, entry)
     end
@@ -309,58 +315,70 @@ local function onKeyDown(e)
         for _, m in ipairs(mappings) do
             local trigger = m.trigger
 
-                    -- immediate expansion: trigger ends right at buffer end
-                    if utf8_ends_with(buffer, trigger) then
-                -- avoid immediate expansion for triggers that start with
-                -- a non-letter (punctuation/dead-key) because those
-                -- often represent composing sequences and can steal
-                -- matches from longer word triggers (e.g. ",e" vs "jeuner").
-                local trig_first = trigger:match("^[%z\1-\127\194-\244][\128-\191]*")
-                -- Only skip immediate expansion for non-letter-starting triggers
-                -- when the mapping is NOT allowed mid-word. If m.mid==true
-                -- (comma compose mappings), keep immediate expansion.
-                if trig_first and not is_letter_char(trig_first) and not m.mid then
-                    -- skip immediate expansion; let deferred expansion handle boundary
-                else
-                        local valid = true
-                if not m.mid and utf8_len(buffer) > utf8_len(trigger) then
-                    local trigger_starts_with_space = trigger:match("^[   ]")
-                    if not trigger_starts_with_space then
-                        local start = utf8.offset(buffer, -utf8_len(trigger))
-                        local prefix = (start and string.sub(buffer, 1, start - 1)) or ""
-                        local offset = utf8.offset(prefix, -1)
-                        local prev_char = offset and string.sub(prefix, offset) or ""
-                        if is_letter_char(prev_char) then
-                            valid = false
-                        end
-                    end
-                end
-                    if valid then
-                        is_replacing = true
+                -- immediate expansion: trigger ends right at buffer end
+                if utf8_ends_with(buffer, trigger) then
+                    -- Only perform immediate expansion for mappings explicitly marked
+                    -- as auto (m.auto == true). Non-auto mappings must wait for
+                    -- a boundary (space/tab/enter) and are handled by deferred expansion.
+                    if not m.auto then
+                        -- skip immediate expansion for non-auto mappings
+                    else
+                        -- avoid immediate expansion for triggers that start with
+                        -- a non-letter (punctuation/dead-key) because those
+                        -- often represent composing sequences and can steal
+                        -- matches from longer word triggers (e.g. ",e" vs "jeuner").
+                        local trig_first = trigger:match("^[%z\1-\127\194-\244][\128-\191]*")
+                        -- Only skip immediate expansion for non-letter-starting triggers
+                        -- when the mapping is NOT allowed is_word-word. If m.is_word==true
+                        -- (comma compose mappings), keep immediate expansion.
+                        -- If the trigger starts with a non-letter (punctuation/dead-key),
+                        -- we normally skip immediate expansion to avoid stealing matches
+                        -- from longer word triggers. However, if the mapping is marked
+                        -- `auto` (auto_expand==true) we should allow immediate expansion
+                        -- (useful for comma compose mappings like ",c").
+                        if trig_first and not is_letter_char(trig_first) and not m.is_word and not m.auto then
+                            -- skip immediate expansion; let deferred expansion handle boundary
+                        else
+                            local valid = true
+                            if m.is_word and utf8_len(buffer) > utf8_len(trigger) then
+                                local trigger_starts_with_space = trigger:match("^[   ]")
+                                if not trigger_starts_with_space then
+                                    local start = utf8.offset(buffer, -utf8_len(trigger))
+                                    local prefix = (start and string.sub(buffer, 1, start - 1)) or ""
+                                    local offset = utf8.offset(prefix, -1)
+                                    local prev_char = offset and string.sub(prefix, offset) or ""
+                                    if is_letter_char(prev_char) then
+                                        valid = false
+                                    end
+                                end
+                            end
+                            if valid then
+                                is_replacing = true
 
-                        local trigger_len = utf8_len(trigger)
-                        local chars_len = utf8_len(chars)
-                        local deletes = trigger_len - chars_len
+                                local trigger_len = utf8_len(trigger)
+                                local chars_len = utf8_len(chars)
+                                local deletes = trigger_len - chars_len
 
-                        if deletes > 0 then
-                            for _ = 1, deletes do
-                                keyStroke({}, 'delete', 0)
+                                if deletes > 0 then
+                                    for _ = 1, deletes do
+                                        keyStroke({}, 'delete', 0)
+                                    end
+                                end
+
+                                keyStrokes(m.repl)
+
+                                local start = utf8.offset(buffer, -(utf8_len(buffer) - trigger_len))
+                                buffer = (start and string.sub(buffer, 1, start - 1) or "") .. m.repl
+
+                                hs.timer.doAfter(0.01, function()
+                                    is_replacing = false
+                                    if DEBUG_EXPANSION then print("[keymap] finished immediate expand, buffer=", buffer) end
+                                end)
+
+                                return true
                             end
                         end
-
-                        keyStrokes(m.repl)
-
-                        local start = utf8.offset(buffer, -(utf8_len(buffer) - trigger_len))
-                        buffer = (start and string.sub(buffer, 1, start - 1) or "") .. m.repl
-
-                        hs.timer.doAfter(0.01, function()
-                            is_replacing = false
-                            if DEBUG_EXPANSION then print("[keymap] finished immediate expand, buffer=", buffer) end
-                        end)
-
-                        return true
                     end
-                end
                 end
 
             -- Deferred expansion: expand on boundary chars (apply to both auto and non-auto mappings)
@@ -373,7 +391,7 @@ local function onKeyDown(e)
                 end
                 if seg == trigger then
                     local valid = true
-                    if not m.mid then
+                    if m.is_word then
                         local trigger_starts_with_space = trigger:match("^[   ]")
                         if not trigger_starts_with_space then
                             local before_trigger = (start_pos and string.sub(buffer, 1, start_pos - 1)) or ""
@@ -394,12 +412,12 @@ local function onKeyDown(e)
                         hs.timer.doAfter(0, function()
                             if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
                             is_replacing = true
-                            -- move caret left one to be before the boundary char
-                            keyStroke({}, 'left', 0)
-                            -- delete the trigger characters
+                            -- delete the trigger characters (caret is after the trigger)
                             for _ = 1, trigger_len do keyStroke({}, 'delete', 0) end
-                            -- type replacement (it will be inserted before the boundary char)
+                            -- type replacement
                             keyStrokes(m.repl)
+                            -- explicitly send the boundary char so it's not lost
+                            keyStrokes(chars)
 
                             -- update buffer: remove trigger from prefix_before, append repl and the boundary char
                             buffer = before_trigger .. m.repl .. chars
@@ -410,8 +428,8 @@ local function onKeyDown(e)
                             end)
                         end)
 
-                        -- do not consume the event: let the boundary char be processed by the app
-                        return false
+                        -- consume the boundary event (we re-send it above), avoid double-insert
+                        return true
                     end
                 end
             end
