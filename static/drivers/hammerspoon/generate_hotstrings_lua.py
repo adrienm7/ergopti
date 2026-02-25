@@ -159,12 +159,13 @@ def main():
         lines.append('local keymap = require("keymap")')
         lines.append("")
         for inp, out, is_word, auto_expand, case_sensitive in entries:
-            # note: the third arg in keymap.add is `mid_word` (true means allow replacement mid-word)
-            mid_arg = "false" if is_word else "true"
-            auto_arg = "true" if auto_expand else "false"
-            case_arg = "true" if case_sensitive else "false"
+            # emit named-argument table for clarity: { is_word=..., auto_expand=..., is_case_sensitive=... }
+            is_word_lua = "true" if is_word else "false"
+            auto_lua = "true" if auto_expand else "false"
+            case_lua = "true" if case_sensitive else "false"
+            opts_table = f"{{is_word = {is_word_lua}, auto_expand = {auto_lua}, is_case_sensitive = {case_lua}}}"
             lines.append(
-                f"keymap.add({escape_lua(inp)}, {escape_lua(out)}, {mid_arg}, {auto_arg}, {case_arg})"
+                f"keymap.add({escape_lua(inp)}, {escape_lua(out)}, {opts_table})"
             )
 
         out_file.write_text("\n".join(lines), encoding="utf-8")
