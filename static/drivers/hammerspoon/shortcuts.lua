@@ -96,6 +96,30 @@ local function is_finder_like(appname)
     return false
 end
 
+-- Prioritized list of apps to try for `Ctrl+E` (Qspace first).
+local fm_candidates = {"Qspace", "QSpace", "qspace", "Path Finder", "Forklift", "Commander One", "TotalFinder", "XtraFinder"}
+
+local function launch_first_available(apps)
+    for _, name in ipairs(apps) do
+        local lname = name:lower()
+        -- try to focus a running app whose name contains the candidate
+            for _, a in ipairs(hs.application.runningApplications()) do
+                local an = a:name()
+                if an and an:lower():find(lname, 1, true) then
+                    a:activate()
+                    hs.alert.show("Opened: " .. an)
+                    return true
+                end
+            end
+            -- try to launch/focus by exact name
+            if hs.application.launchOrFocus(name) then
+                hs.alert.show("Opened: " .. name)
+                return true
+            end
+    end
+    return false
+end
+
 --------------------------------------------------------------------------------
 -- HOTKEYS (Classés par ordre alphabétique)
 --------------------------------------------------------------------------------
@@ -154,19 +178,38 @@ hotkey_defs.ctrl_a = function()
     end)
 end
 
-hotkey_labels.ctrl_e = "Ouvrir Finder (Ctrl+E)"
-hotkey_defs.ctrl_e = function()
-    return hs.hotkey.bind({"ctrl"}, "e", function()
-        hs.application.launchOrFocus("Finder")
-        center_frontmost_after(0.3)
-    end)
-end
-
 hotkey_labels.ctrl_d = "Ouvrir Téléchargements (Ctrl+D)"
 hotkey_defs.ctrl_d = function()
     return hs.hotkey.bind({"ctrl"}, "d", function()
         local home = os.getenv("HOME") or "~"
-        hs.execute('open "' .. home .. '/Downloads"')
+        -- try to bring a preferred file manager forward, then open Downloads
+        if not launch_first_available(fm_candidates) then
+            -- still open Downloads with system opener
+            hs.execute('open "' .. home .. '/Downloads"')
+        else
+            -- allow the file manager to appear then open Downloads
+            timer.doAfter(0.12, function()
+                hs.execute('open "' .. home .. '/Downloads"')
+            end)
+        end
+        center_frontmost_after(0.3)
+    end)
+end
+
+hotkey_labels.ctrl_e = "Ouvrir Finder (Ctrl+E)"
+hotkey_defs.ctrl_e = function()
+    return hs.hotkey.bind({"ctrl"}, "e", function()
+        local home = os.getenv("HOME") or "~"
+        -- try to bring a preferred file manager forward, then open Downloads
+        if not launch_first_available(fm_candidates) then
+            -- still open Downloads with system opener
+            hs.execute('open "' .. home .. '/Downloads"')   
+        else
+            -- allow the file manager to appear then open Downloads
+            timer.doAfter(0.12, function()
+                hs.execute('open "' .. home .. '"')
+            end)
+        end
         center_frontmost_after(0.3)
     end)
 end
@@ -193,26 +236,6 @@ hotkey_defs.ctrl_i = function()
             hs.application.launchOrFocus("System Preferences")
         end
         center_frontmost_after(0.3)
-    end)
-end
-
-hotkey_labels.ctrl_t = "Title Case toggle (Ctrl+T)"
-hotkey_defs.ctrl_t = function()
-    return hs.hotkey.bind({"ctrl"}, "t", function()
-        do_transform(function(sel)
-            local t = titlecase(sel)
-            return (sel == t) and sel:lower() or t
-        end)
-    end)
-end
-
-hotkey_labels.ctrl_u = "Upper/Lower toggle (Ctrl+U)"
-hotkey_defs.ctrl_u = function()
-    return hs.hotkey.bind({"ctrl"}, "u", function()
-        do_transform(function(sel)
-            local has_lower = sel:match("%l") ~= nil
-            return has_lower and sel:upper() or sel:lower()
-        end)
     end)
 end
 
@@ -278,6 +301,26 @@ hotkey_defs.ctrl_s = function()
                 local search = 'https://www.google.com/search?q=' .. q
                 urlevent.openURL(search)
             end
+        end)
+    end)
+end
+
+hotkey_labels.ctrl_t = "Title Case toggle (Ctrl+T)"
+hotkey_defs.ctrl_t = function()
+    return hs.hotkey.bind({"ctrl"}, "t", function()
+        do_transform(function(sel)
+            local t = titlecase(sel)
+            return (sel == t) and sel:lower() or t
+        end)
+    end)
+end
+
+hotkey_labels.ctrl_u = "Upper/Lower toggle (Ctrl+U)"
+hotkey_defs.ctrl_u = function()
+    return hs.hotkey.bind({"ctrl"}, "u", function()
+        do_transform(function(sel)
+            local has_lower = sel:match("%l") ~= nil
+            return has_lower and sel:upper() or sel:lower()
         end)
     end)
 end
