@@ -109,21 +109,48 @@ local hotkey_labels = {}
 local started = false
 
 -- Definitions des raccourcis (créent et retournent l'objet hotkey quand appelés)
+hotkey_labels.at_hash = "Capture fenêtre (touche ² / left of 1)"
+hotkey_defs.at_hash = function()
+    local tap
+    local obj = {}
+    tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+        if e:getKeyCode() == 10 then
+            local flags = e:getFlags()
+            if flags.cmd or flags.alt or flags.ctrl or flags.shift then
+                return false
+            end
+            local w = hs.window.frontmostWindow()
+            if not w then
+                hs.alert.show("Aucune fenêtre active")
+                return true
+            end
+            local id = w:id()
+            local home = os.getenv("HOME") or "~"
+            local dir = home .. "/Pictures/screenshots"
+            hs.execute('mkdir -p "' .. dir .. '"')
+            local filename = string.format('%s/screenshot_%s.png', dir, os.date('%Y_%m_%d_%H_%M_%S'))
+            local cmd = 'screencapture -l ' .. id .. ' "' .. filename .. '"'
+            hs.execute(cmd)
+            hs.alert.show("Saved: " .. filename)
+            return true
+        end
+        return false
+    end)
+    tap:start()
+    function obj:delete()
+        if tap then
+            tap:stop()
+            tap = nil
+        end
+    end
+    return obj
+end
+
 hotkey_labels.ctrl_a = "Sélectionner la ligne (Ctrl+A)"
 hotkey_defs.ctrl_a = function()
     return hs.hotkey.bind({"ctrl"}, "a", function()
         eventtap.keyStroke({"cmd"}, "left")
         eventtap.keyStroke({"cmd", "shift"}, "right")
-    end)
-end
-
-hotkey_labels.ctrl_h = "Capture interactive (Ctrl+H)"
-hotkey_defs.ctrl_h = function()
-    return hs.hotkey.bind({"ctrl"}, "h", function()
-        local home = os.getenv("HOME") or "~"
-        local filename = string.format('%s/Desktop/screenshot_%s.png', home, os.date('%Y%m%d%H%M%S'))
-        local cmd = 'screencapture -i "' .. filename .. '"'
-        hs.execute(cmd)
     end)
 end
 
@@ -143,6 +170,21 @@ hotkey_defs.ctrl_d = function()
         center_frontmost_after(0.3)
     end)
 end
+
+hotkey_labels.ctrl_h = "Capture interactive to clipboard (Ctrl+H)"
+hotkey_defs.ctrl_h = function()
+    return hs.hotkey.bind({"ctrl"}, "h", function()
+        -- interactive capture, saved to clipboard (-c)
+        local cmd = 'screencapture -i -c'
+        hs.execute(cmd)
+        hs.alert.show("Screenshot copied to clipboard")
+    end)
+end
+
+-- Listener for AZERTY physical key (keycode 10) is handled via eventtap in M.start()/M.stop().
+-- No named hotkey binding for the '²' character is created here.
+
+-- at_hash moved above to keep alphabetical ordering (before ctrl_a)
 
 hotkey_labels.ctrl_i = "Ouvrir Réglages (Ctrl+I)"
 hotkey_defs.ctrl_i = function()
@@ -267,7 +309,6 @@ function M.start()
             hotkeys[name] = def()
         end
     end
-    -- bindings created from hotkey_defs above
 end
 
 function M.stop()
