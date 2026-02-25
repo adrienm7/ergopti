@@ -8,40 +8,40 @@ block = "Comma"
 description = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"
 
 [[comma_top_row]]
-",f" = { output = "fl", is_word = false, auto_expand = true }
-",g" = { output = "gl", is_word = false, auto_expand = true }
-",h" = { output = "ph", is_word = false, auto_expand = true }
-",z" = { output = "bj", is_word = false, auto_expand = true }
+",f" = { output = "fl", is_word = false, auto_expand = true, is_case_sensitive = false }
+",g" = { output = "gl", is_word = false, auto_expand = true, is_case_sensitive = false }
+",h" = { output = "ph", is_word = false, auto_expand = true, is_case_sensitive = false }
+",z" = { output = "bj", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[comma_middle_row]]
-",v" = { output = "dv", is_word = false, auto_expand = true }
-",n" = { output = "nl", is_word = false, auto_expand = true }
-",t" = { output = "pt", is_word = false, auto_expand = true }
-",r" = { output = "rq", is_word = false, auto_expand = true }
-",q" = { output = "qu’", is_word = false, auto_expand = true }
+",v" = { output = "dv", is_word = false, auto_expand = true, is_case_sensitive = false }
+",n" = { output = "nl", is_word = false, auto_expand = true, is_case_sensitive = false }
+",t" = { output = "pt", is_word = false, auto_expand = true, is_case_sensitive = false }
+",r" = { output = "rq", is_word = false, auto_expand = true, is_case_sensitive = false }
+",q" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[comma_bottom_row]]
-",m" = { output = "ms", is_word = false, auto_expand = true }
-",d" = { output = "ds", is_word = false, auto_expand = true }
-",l" = { output = "cl", is_word = false, auto_expand = true }
-",p" = { output = "xp", is_word = false, auto_expand = true }
+",m" = { output = "ms", is_word = false, auto_expand = true, is_case_sensitive = false }
+",d" = { output = "ds", is_word = false, auto_expand = true, is_case_sensitive = false }
+",l" = { output = "cl", is_word = false, auto_expand = true, is_case_sensitive = false }
+",p" = { output = "xp", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[commaj_general]]
-",à" = { output = "j", is_word = false, auto_expand = true }
-",a" = { output = "ja", is_word = false, auto_expand = true }
-",e" = { output = "je", is_word = false, auto_expand = true }
-",é" = { output = "jé", is_word = false, auto_expand = true }
-",i" = { output = "ji", is_word = false, auto_expand = true }
-",o" = { output = "jo", is_word = false, auto_expand = true }
-",u" = { output = "ju", is_word = false, auto_expand = true }
-",ê" = { output = "ju", is_word = false, auto_expand = true }
-",'" = { output = "j’", is_word = false, auto_expand = true }
+",à" = { output = "j", is_word = false, auto_expand = true, is_case_sensitive = false }
+",a" = { output = "ja", is_word = false, auto_expand = true, is_case_sensitive = false }
+",e" = { output = "je", is_word = false, auto_expand = true, is_case_sensitive = false }
+",é" = { output = "jé", is_word = false, auto_expand = true, is_case_sensitive = false }
+",i" = { output = "ji", is_word = false, auto_expand = true, is_case_sensitive = false }
+",o" = { output = "jo", is_word = false, auto_expand = true, is_case_sensitive = false }
+",u" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false }
+",ê" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false }
+",'" = { output = "j’", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[commafarletters_top_row]]
-",è" = { output = "z", is_word = false, auto_expand = true }
-",y" = { output = "k", is_word = false, auto_expand = true }
-",c" = { output = "ç", is_word = false, auto_expand = true }
-",x" = { output = "où", is_word = false, auto_expand = true }
+",è" = { output = "z", is_word = false, auto_expand = true, is_case_sensitive = false }
+",y" = { output = "k", is_word = false, auto_expand = true, is_case_sensitive = false }
+",c" = { output = "ç", is_word = false, auto_expand = true, is_case_sensitive = false }
+",x" = { output = "où", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[commafarletters_middle_row]]
-",s" = { output = "q", is_word = false, auto_expand = true }
+",s" = { output = "q", is_word = false, auto_expand = true, is_case_sensitive = false }

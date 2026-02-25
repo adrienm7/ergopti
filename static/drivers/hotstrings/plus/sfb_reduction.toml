@@ -8,15 +8,15 @@ block = "ECirc"
 description = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u."
 
 [[ecirc_general]]
-"êé" = { output = "oe", is_word = false, auto_expand = true }
-"éê" = { output = "eo", is_word = false, auto_expand = true }
-"ê." = { output = "u.", is_word = false, auto_expand = true }
-"ê," = { output = "u,", is_word = false, auto_expand = true }
+"êé" = { output = "oe", is_word = false, auto_expand = true, is_case_sensitive = false }
+"éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ê." = { output = "u.", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ê," = { output = "u,", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[ie_general]]
-"àé" = { output = "éi", is_word = false, auto_expand = true }
-"éà" = { output = "ié", is_word = false, auto_expand = true }
+"àé" = { output = "éi", is_word = false, auto_expand = true, is_case_sensitive = false }
+"éà" = { output = "ié", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[egrave_general]]
-"yè" = { output = "â", is_word = false, auto_expand = true }
-"èy" = { output = "aî", is_word = false, auto_expand = true }
+"yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false }
+"èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false }

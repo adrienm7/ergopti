@@ -50,8 +50,8 @@ def normalize_section_name(name: str) -> str:
 
 
 def deduplicate_hotstrings(
-    hotstrings: dict[str, list[tuple[str, str, bool, bool]]],
-) -> dict[str, list[tuple[str, str, bool, bool]]]:
+    hotstrings: dict[str, list[tuple[str, str, bool, bool, bool]]],
+) -> dict[str, list[tuple[str, str, bool, bool, bool]]]:
     """
     Remove duplicate triggers within each section, keeping only the first occurrence.
 
@@ -61,16 +61,18 @@ def deduplicate_hotstrings(
     Returns:
         Dictionary with duplicates removed, maintaining the order of first occurrences
     """
-    deduplicated: dict[str, list[tuple[str, str, bool, bool]]] = {}
+    deduplicated: dict[str, list[tuple[str, str, bool, bool, bool]]] = {}
 
     for section_name, entries in hotstrings.items():
         seen_triggers: set[str] = set()
         unique_entries: list[tuple[str, str, bool, bool]] = []
 
-        for trigger, output, is_word, auto_expand in entries:
+        for trigger, output, is_word, auto_expand, case_sensitive in entries:
             if trigger not in seen_triggers:
                 seen_triggers.add(trigger)
-                unique_entries.append((trigger, output, is_word, auto_expand))
+                unique_entries.append(
+                    (trigger, output, is_word, auto_expand, case_sensitive)
+                )
             else:
                 logger.debug(
                     "Skipping duplicate trigger '%s' in section '%s'",
@@ -244,10 +246,10 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
             # Add hardcoded entries if this is the 'rolls' file
             if output_name == "rolls":
                 hardcoded_entries = [
-                    ("(#", '("', False, True),
-                    ("[#", '["', False, True),
-                    ("<%", "<=", False, True),
-                    (">%", ">=", False, True),
+                    ("(#", '("', False, True, False),
+                    ("[#", '["', False, True, False),
+                    ("<%", "<=", False, True, False),
+                    (">%", ">=", False, True, False),
                 ]
                 if "general" not in merged_hotstrings:
                     merged_hotstrings["general"] = []
@@ -258,11 +260,17 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
 
             # --- Patch: filter triggers already seen globally ---
             filtered_hotstrings: dict[
-                str, list[tuple[str, str, bool, bool]]
+                str, list[tuple[str, str, bool, bool, bool]]
             ] = {}
             for section_name, entries in deduplicated_hotstrings.items():
                 filtered_entries = []
-                for trigger, output, is_word, auto_expand in entries:
+                for (
+                    trigger,
+                    output,
+                    is_word,
+                    auto_expand,
+                    case_sensitive,
+                ) in entries:
                     # Always include emoji triggers (emojis file) to avoid them being
                     # filtered by earlier files. For other files, keep global dedupe.
                     if (
@@ -271,7 +279,13 @@ def main(ahk_file_path: Optional[Path] = None) -> None:
                     ):
                         global_seen_triggers.add(trigger)
                         filtered_entries.append(
-                            (trigger, output, is_word, auto_expand)
+                            (
+                                trigger,
+                                output,
+                                is_word,
+                                auto_expand,
+                                case_sensitive,
+                            )
                         )
                     else:
                         logger.info(
@@ -377,7 +391,7 @@ def extract_multiple_ahk_blocks_to_toml(
         raise OSError(f"Error reading file {ahk_file_path}: {e}")
 
     # Extract and merge hotstrings from all specified blocks
-    merged_hotstrings: dict[str, list[tuple[str, str, bool, bool]]] = {}
+    merged_hotstrings: dict[str, list[tuple[str, str, bool, bool, bool]]] = {}
     found_blocks = []
 
     for block_pattern in block_patterns:
@@ -796,7 +810,7 @@ def extract_hotstrings(
     Returns:
         Dictionary mapping section names to lists of (trigger, output, is_word, auto_expand) tuples
     """
-    hotstrings: dict[str, list[tuple[str, str, bool, bool]]] = {}
+    hotstrings: dict[str, list[tuple[str, str, bool, bool, bool]]] = {}
     current_section = "general"
 
     lines = block_content.split("\n")
@@ -846,15 +860,15 @@ def extract_hotstrings(
             is_multiline = True
 
         # Extract hotstrings using multiple patterns to cover all cases
-        trigger, output, is_word, auto_expand = extract_hotstring_from_line(
-            line
+        trigger, output, is_word, auto_expand, case_sensitive = (
+            extract_hotstring_from_line(line)
         )
         if trigger and output:
             # Initialize section if it doesn't exist
             if current_section not in hotstrings:
                 hotstrings[current_section] = []
             hotstrings[current_section].append(
-                (trigger, output, is_word, auto_expand)
+                (trigger, output, is_word, auto_expand, case_sensitive)
             )
             logger.debug(
                 "Extracted: section='%s', trigger='%s', output='%s'",
@@ -992,7 +1006,7 @@ def process_complex_output_expression(output_expr: str) -> Optional[str]:
 
 def extract_hotstring_from_line(
     line: str,
-) -> tuple[Optional[str], Optional[str], bool, bool]:
+) -> tuple[Optional[str], Optional[str], bool, bool, bool]:
     """
     Extract trigger and output from a single AutoHotkey line.
 
@@ -1002,6 +1016,9 @@ def extract_hotstring_from_line(
     Returns:
             Tuple of (trigger, output, is_word, auto_expand) or (None, None, False, False) if no match
     """
+    # Detect case-sensitivity: CreateCaseSensitiveHotstrings implies case sensitive
+    case_sensitive = "CreateCaseSensitiveHotstrings" in line
+
     # Pattern for CreateHotstring with complex escape sequences
     complex_escape_pattern = (
         r"CreateHotstring\s*\(\s*"
@@ -1037,7 +1054,7 @@ def extract_hotstring_from_line(
             is_word,
         )
 
-        return trigger, output, is_word, auto_expand
+        return trigger, output, is_word, auto_expand, case_sensitive
 
     # General pattern for CreateHotstring with escaped triggers
     general_escape_pattern = (
@@ -1074,7 +1091,7 @@ def extract_hotstring_from_line(
             is_word,
         )
 
-        return trigger, output, is_word, auto_expand
+        return trigger, output, is_word, auto_expand, case_sensitive
 
     # Handle complex CreateHotstring lines with variable concatenation
     # Pattern for CreateHotstring with string concatenation in output
@@ -1114,7 +1131,7 @@ def extract_hotstring_from_line(
                 auto_expand,
                 is_word,
             )
-            return trigger, output, is_word, auto_expand
+            return trigger, output, is_word, auto_expand, case_sensitive
 
     # First, try to match simple CreateHotstring format
     # Updated regex to handle escaped quotes in both trigger and output
@@ -1154,7 +1171,7 @@ def extract_hotstring_from_line(
             is_word,
         )
 
-        return trigger, output, is_word, auto_expand
+        return trigger, output, is_word, auto_expand, case_sensitive
 
     # Second, try to match CreateCaseSensitiveHotstrings format
     create_pattern = (
@@ -1191,7 +1208,7 @@ def extract_hotstring_from_line(
             is_word,
         )
 
-        return trigger, output, is_word, auto_expand
+        return trigger, output, is_word, auto_expand, case_sensitive
 
     # Fallback to original Hotstring format
     hotstring_pattern = (
@@ -1232,13 +1249,12 @@ def extract_hotstring_from_line(
             is_word,
         )
 
-        return trigger, output, is_word, auto_expand
-
-    return None, None, False, False
+        return trigger, output, is_word, auto_expand, case_sensitive
+    return None, None, False, False, False
 
 
 def convert_to_toml(
-    hotstrings: dict[str, list[tuple[str, str, bool, bool]]],
+    hotstrings: dict[str, list[tuple[str, str, bool, bool, bool]]],
     block_name: str,
     descriptions: dict[str, str] | None = None,
 ) -> str:
@@ -1285,14 +1301,14 @@ def convert_to_toml(
                 toml_lines.append(
                     f'description = "{escape_toml_string(sec_desc)}"'
                 )
-        for trigger, output, is_word, auto_expand in entries:
+        for trigger, output, is_word, auto_expand, case_sensitive in entries:
             # Always escape both trigger and output for valid TOML
             trigger_escaped = escape_toml_string(trigger)
             output_escaped = escape_toml_string(output)
 
             # Always use complex format for all entries
             toml_lines.append(
-                f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()} }}'
+                f'"{trigger_escaped}" = {{ output = "{output_escaped}", is_word = {str(is_word).lower()}, auto_expand = {str(auto_expand).lower()}, is_case_sensitive = {str((not case_sensitive)).lower()} }}'
             )
         toml_lines.append("")
 
@@ -1399,6 +1415,7 @@ def generate_e_deadkey_toml(
                         output,
                         is_word,
                         auto_expand,
+                        case_sensitive,
                     ) in section_entries:
                         # Skip uppercase triggers if we already have lowercase equivalent
                         lowercase_trigger = trigger.lower()
@@ -1408,7 +1425,13 @@ def generate_e_deadkey_toml(
                         ):
                             continue
                         ecirc_mappings.append(
-                            (trigger, output, is_word, auto_expand)
+                            (
+                                trigger,
+                                output,
+                                is_word,
+                                auto_expand,
+                                case_sensitive,
+                            )
                         )
 
                 logger.debug("Found %d ECirc mappings", len(ecirc_mappings))

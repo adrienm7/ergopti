@@ -150,9 +150,10 @@ end
 ---------------------------------------------------------------------------
 -- Ajout de raccourcis
 ---------------------------------------------------------------------------
-function M.add(trigger, replacement, mid_word, auto_expand)
+function M.add(trigger, replacement, mid_word, auto_expand, case_sensitive)
     local is_mid = (mid_word == true)
     local is_auto = (auto_expand == true)
+    local is_case_sensitive = (case_sensitive == true)
 
     local function add_mapping_raw(t, r, a)
         for _, m in ipairs(mappings) do
@@ -180,35 +181,40 @@ function M.add(trigger, replacement, mid_word, auto_expand)
         end
     end
 
-    local lower_trig = trig_lower(trigger)
-    local title_trigs = trig_title(lower_trig)
-    local upper_trigs = trig_upper(lower_trig)
-
     local base_repl = replacement
+    local lower_trig = trig_lower(trigger)
     local title_repl = repl_title(base_repl)
     local upper_repl = repl_upper(base_repl)
+    -- If case-sensitive, only add the trigger as provided (preserve case).
+    if is_case_sensitive then
+        add_mapping(trigger, base_repl)
+    else
+        local title_trigs = trig_title(lower_trig)
+        local upper_trigs = trig_upper(lower_trig)
 
-    -- Variantes standards
-    add_mapping(lower_trig, base_repl)
-    
-    for _, tt in ipairs(title_trigs) do
-        if tt ~= lower_trig then 
-            add_mapping(tt, title_repl) 
-        end
-    end
-    
-    for _, ut in ipairs(upper_trigs) do
-        local is_title = false
+        -- Variantes standards
+        add_mapping(lower_trig, base_repl)
+        
         for _, tt in ipairs(title_trigs) do
-            if ut == tt then is_title = true; break end
+            if tt ~= lower_trig then 
+                add_mapping(tt, title_repl) 
+            end
         end
-        if ut ~= lower_trig and not is_title then 
-            add_mapping(ut, upper_repl) 
+        
+        for _, ut in ipairs(upper_trigs) do
+            local is_title = false
+            for _, tt in ipairs(title_trigs) do
+                if ut == tt then is_title = true; break end
+            end
+            if ut ~= lower_trig and not is_title then 
+                add_mapping(ut, upper_repl) 
+            end
         end
     end
 
     -- Variante spéciale pour les triggers commençant par une virgule
-    local first_char = string.match(lower_trig, "^[%z\1-\127\194-\244][\128-\191]*")
+    local first_char_source = is_case_sensitive and trigger or trig_lower(trigger)
+    local first_char = string.match(first_char_source, "^[%z\1-\127\194-\244][\128-\191]*")
     if first_char == "," then
         local rest = string.sub(lower_trig, #first_char + 1)
         if rest ~= "" then

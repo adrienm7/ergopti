@@ -8,13 +8,13 @@ block = "QU"
 description = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …"
 
 [[general]]
-"qa" = { output = "qua", is_word = false, auto_expand = true }
-"qà" = { output = "quà", is_word = false, auto_expand = true }
-"qe" = { output = "que", is_word = false, auto_expand = true }
-"qé" = { output = "qué", is_word = false, auto_expand = true }
-"qè" = { output = "què", is_word = false, auto_expand = true }
-"qê" = { output = "quê", is_word = false, auto_expand = true }
-"qi" = { output = "qui", is_word = false, auto_expand = true }
-"qo" = { output = "quo", is_word = false, auto_expand = true }
-"q'" = { output = "qu’", is_word = false, auto_expand = true }
-"q’" = { output = "qu’", is_word = false, auto_expand = true }
+"qa" = { output = "qua", is_word = false, auto_expand = true, is_case_sensitive = false }
+"qà" = { output = "quà", is_word = false, auto_expand = true, is_case_sensitive = false }
+"qe" = { output = "que", is_word = false, auto_expand = true, is_case_sensitive = false }
+"qé" = { output = "qué", is_word = false, auto_expand = true, is_case_sensitive = false }
+"qè" = { output = "què", is_word = false, auto_expand = true, is_case_sensitive = false }
+"qê" = { output = "quê", is_word = false, auto_expand = true, is_case_sensitive = false }
+"qi" = { output = "qui", is_word = false, auto_expand = true, is_case_sensitive = false }
+"qo" = { output = "quo", is_word = false, auto_expand = true, is_case_sensitive = false }
+"q'" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false }
+"q’" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false }

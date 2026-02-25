@@ -8,21 +8,21 @@ block = "Brands"
 description = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 
 [[general]]
-"autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false }
-"citroen" = { output = "Citroën", is_word = true, auto_expand = false }
-"chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false }
-"insee" = { output = "INSEE", is_word = true, auto_expand = false }
-"latex" = { output = "LaTeX", is_word = true, auto_expand = false }
-"lualatex" = { output = "LuaLaTeX", is_word = true, auto_expand = false }
-"mbti" = { output = "MBTI", is_word = true, auto_expand = false }
-"nasa" = { output = "NASA", is_word = true, auto_expand = false }
-"nlp" = { output = "NLP", is_word = true, auto_expand = false }
-"optimot" = { output = "Optimot", is_word = true, auto_expand = false }
-"onedrive" = { output = "OneDrive", is_word = true, auto_expand = false }
-"onenote" = { output = "OneNote", is_word = true, auto_expand = false }
-"outlook" = { output = "Outlook", is_word = true, auto_expand = false }
-"powerbi" = { output = "PowerBI", is_word = true, auto_expand = false }
-"pnl" = { output = "PNL", is_word = true, auto_expand = false }
-"powerpoint" = { output = "PowerPoint", is_word = true, auto_expand = false }
-"sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false }
-"vscode" = { output = "VSCode", is_word = true, auto_expand = false }
+"autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true }
+"citroen" = { output = "Citroën", is_word = true, auto_expand = false, is_case_sensitive = true }
+"chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true }
+"insee" = { output = "INSEE", is_word = true, auto_expand = false, is_case_sensitive = true }
+"latex" = { output = "LaTeX", is_word = true, auto_expand = false, is_case_sensitive = true }
+"lualatex" = { output = "LuaLaTeX", is_word = true, auto_expand = false, is_case_sensitive = true }
+"mbti" = { output = "MBTI", is_word = true, auto_expand = false, is_case_sensitive = true }
+"nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true }
+"nlp" = { output = "NLP", is_word = true, auto_expand = false, is_case_sensitive = true }
+"optimot" = { output = "Optimot", is_word = true, auto_expand = false, is_case_sensitive = true }
+"onedrive" = { output = "OneDrive", is_word = true, auto_expand = false, is_case_sensitive = true }
+"onenote" = { output = "OneNote", is_word = true, auto_expand = false, is_case_sensitive = true }
+"outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true }
+"powerbi" = { output = "PowerBI", is_word = true, auto_expand = false, is_case_sensitive = true }
+"pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true }
+"powerpoint" = { output = "PowerPoint", is_word = true, auto_expand = false, is_case_sensitive = true }
+"sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true }
+"vscode" = { output = "VSCode", is_word = true, auto_expand = false, is_case_sensitive = true }

@@ -32,6 +32,7 @@ def extract_entries(data):
                         item["output"],
                         bool(item.get("is_word", False)),
                         bool(item.get("auto_expand", False)),
+                        bool(item.get("is_case_sensitive", False)),
                     )
                 )
             elif isinstance(item, dict):
@@ -44,6 +45,7 @@ def extract_entries(data):
                                 tv.get("output"),
                                 bool(tv.get("is_word", False)),
                                 bool(tv.get("auto_expand", False)),
+                                bool(tv.get("is_case_sensitive", False)),
                             )
                         )
         return entries
@@ -52,13 +54,13 @@ def extract_entries(data):
         # simple mapping: key -> string
         if all(isinstance(v, str) for v in data.values()):
             for k, v in data.items():
-                entries.append((k, v, False, False))
+                entries.append((k, v, False, False, False))
             return entries
 
         # mixed: keys may map to dicts or lists
         for k, v in data.items():
             if isinstance(v, str):
-                entries.append((k, v, False, False))
+                entries.append((k, v, False, False, False))
             elif isinstance(v, dict):
                 out = v.get("output") or v.get("value")
                 if out is not None:
@@ -68,6 +70,7 @@ def extract_entries(data):
                             out,
                             bool(v.get("is_word", False)),
                             bool(v.get("auto_expand", False)),
+                            bool(v.get("is_case_sensitive", False)),
                         )
                     )
                 elif "input" in v and "output" in v:
@@ -77,6 +80,7 @@ def extract_entries(data):
                             v["output"],
                             bool(v.get("is_word", False)),
                             bool(v.get("auto_expand", False)),
+                            bool(v.get("is_case_sensitive", False)),
                         )
                     )
                 else:
@@ -89,6 +93,7 @@ def extract_entries(data):
                                     tv.get("output"),
                                     bool(tv.get("is_word", False)),
                                     bool(tv.get("auto_expand", False)),
+                                    bool(tv.get("is_case_sensitive", False)),
                                 )
                             )
             elif isinstance(v, list):
@@ -104,6 +109,7 @@ def extract_entries(data):
                                 item["output"],
                                 bool(item.get("is_word", False)),
                                 bool(item.get("auto_expand", False)),
+                                bool(item.get("is_case_sensitive", False)),
                             )
                         )
                     elif isinstance(item, dict):
@@ -116,6 +122,9 @@ def extract_entries(data):
                                         tv.get("output"),
                                         bool(tv.get("is_word", False)),
                                         bool(tv.get("auto_expand", False)),
+                                        bool(
+                                            tv.get("is_case_sensitive", False)
+                                        ),
                                     )
                                 )
     return entries
@@ -149,12 +158,13 @@ def main():
         lines.append("-- Generated from " + str(toml_path))
         lines.append('local keymap = require("keymap")')
         lines.append("")
-        for inp, out, is_word, auto_expand in entries:
+        for inp, out, is_word, auto_expand, case_sensitive in entries:
             # note: the third arg in keymap.add is `mid_word` (true means allow replacement mid-word)
             mid_arg = "false" if is_word else "true"
             auto_arg = "true" if auto_expand else "false"
+            case_arg = "true" if case_sensitive else "false"
             lines.append(
-                f"keymap.add({escape_lua(inp)}, {escape_lua(out)}, {mid_arg}, {auto_arg})"
+                f"keymap.add({escape_lua(inp)}, {escape_lua(out)}, {mid_arg}, {auto_arg}, {case_arg})"
             )
 
         out_file.write_text("\n".join(lines), encoding="utf-8")

@@ -8,23 +8,23 @@ block = "Errors"
 description = "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …"
 
 [[general]]
-"(_" = { output = "( ", is_word = true, auto_expand = true }
-")_" = { output = ") ", is_word = true, auto_expand = true }
-"+_" = { output = "+ ", is_word = true, auto_expand = true }
-"#_" = { output = "# ", is_word = true, auto_expand = true }
-"$_" = { output = "$ ", is_word = true, auto_expand = true }
-"=_" = { output = "= ", is_word = true, auto_expand = true }
-"[_" = { output = "[ ", is_word = true, auto_expand = true }
-"]_" = { output = "] ", is_word = true, auto_expand = true }
-"~_" = { output = "~ ", is_word = true, auto_expand = true }
-"*_" = { output = "* ", is_word = true, auto_expand = true }
+"(_" = { output = "( ", is_word = true, auto_expand = true, is_case_sensitive = true }
+")_" = { output = ") ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"+_" = { output = "+ ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"#_" = { output = "# ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"$_" = { output = "$ ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"=_" = { output = "= ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"[_" = { output = "[ ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"]_" = { output = "] ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"~_" = { output = "~ ", is_word = true, auto_expand = true, is_case_sensitive = true }
+"*_" = { output = "* ", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[caps_correction]]
-"OUi" = { output = "Oui", is_word = true, auto_expand = true }
+"OUi" = { output = "Oui", is_word = true, auto_expand = true, is_case_sensitive = true }
 
 [[letters_chaining_correction]]
-"eua" = { output = "eau", is_word = false, auto_expand = true }
-"aeu" = { output = "eau", is_word = false, auto_expand = true }
-"oiu" = { output = "oui", is_word = false, auto_expand = true }
-"poru" = { output = "pour", is_word = true, auto_expand = true }
-"acceuil" = { output = "accueil", is_word = true, auto_expand = true }
+"eua" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
+"aeu" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
+"oiu" = { output = "oui", is_word = false, auto_expand = true, is_case_sensitive = false }
+"poru" = { output = "pour", is_word = true, auto_expand = true, is_case_sensitive = false }
+"acceuil" = { output = "accueil", is_word = true, auto_expand = true, is_case_sensitive = false }
