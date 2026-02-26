@@ -104,24 +104,65 @@ local function commitGesture(now)
         elseif mf == 4 and ff.tap_lookup    then triggerLookup() end
 
     elseif mf == 4 and ff.swipe_4 then
-        -- ── SWIPE 4 doigts → changement de Space ─────────────────────────────
-        -- ⚠ Nécessite de désactiver "Faire défiler entre les espaces" dans
-        --   Réglages Système > Bureau et Dock > Mission Control (ou Trackpad).
+        -- ── SWIPE 4 doigts → changement de Space via hs.spaces ───────────────
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
-            if dx < 0 then hs.eventtap.keyStroke({"ctrl"}, "left")
-            else           hs.eventtap.keyStroke({"ctrl"}, "right") end
-        elseif ady > adx and ady > SWIPE_MIN_V then
-            -- swipe vertical 4 doigts (Mission Control / App Exposé) — optionnel
-            -- if dy < 0 then hs.eventtap.keyStroke({}, "F3") end
+            -- Récupère la liste ordonnée des spaces sur l'écran principal.
+            local mainScreen = hs.screen.mainScreen()
+            local allSpaces = hs.spaces.spacesForScreen(mainScreen)
+            if allSpaces and #allSpaces > 1 then
+                -- Trouve le space actif parmi ceux de cet écran.
+                local activeSpace = hs.spaces.activeSpaceOnScreen(mainScreen)
+                local currentIdx = nil
+                for i, sid in ipairs(allSpaces) do
+                    if sid == activeSpace then currentIdx = i; break end
+                end
+                if currentIdx then
+                    local targetIdx
+                    if dx < 0 then
+                        targetIdx = currentIdx - 1  -- swipe gauche → Space précédent
+                    else
+                        targetIdx = currentIdx + 1  -- swipe droite → Space suivant
+                    end
+                    if targetIdx >= 1 and targetIdx <= #allSpaces then
+                        hs.spaces.gotoSpace(allSpaces[targetIdx])
+                    end
+                end
+            end
         end
 
     elseif mf >= 5 and ff.swipe_5 then
         -- ── SWIPE 5 doigts → fenêtre suivante/précédente même app ────────────
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
-            if dx < 0 then hs.eventtap.keyStroke({"cmd"}, "`")
-            else           hs.eventtap.keyStroke({"cmd", "shift"}, "`") end
+            local app = hs.application.frontmostApplication()
+            if app then
+                -- Ne prend que les fenêtres standard visibles (pas les tiroirs etc.)
+                local wins = app:allWindows()
+                local visible = {}
+                for _, w in ipairs(wins) do
+                    if w:isStandard() and not w:isMinimized() then
+                        table.insert(visible, w)
+                    end
+                end
+                if #visible > 1 then
+                    -- Trie par ID pour un ordre stable.
+                    table.sort(visible, function(a, b) return a:id() < b:id() end)
+                    local focused = hs.window.focusedWindow()
+                    local currentIdx = nil
+                    for i, w in ipairs(visible) do
+                        if focused and w:id() == focused:id() then currentIdx = i; break end
+                    end
+                    currentIdx = currentIdx or 1
+                    local targetIdx
+                    if dx < 0 then
+                        targetIdx = (currentIdx - 2) % #visible + 1  -- fenêtre précédente
+                    else
+                        targetIdx = currentIdx % #visible + 1         -- fenêtre suivante
+                    end
+                    visible[targetIdx]:focus()
+                end
+            end
         end
     end
     -- mf == 3 : swipe géré par le Swipe Spoon, on ne fait rien ici.
