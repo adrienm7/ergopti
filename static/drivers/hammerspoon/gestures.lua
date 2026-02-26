@@ -118,12 +118,9 @@ local function commitGesture(now)
         elseif mf == 4 and ff.tap_lookup    then triggerLookup() end
 
     elseif mf == 4 and ff.swipe_4 then
-        -- ── SWIPE 4 doigts → changement de Space ─────────────────────────────
-        -- En mode naturel : glisser gauche (dx<0) = Space suivant (→), comme le geste natif.
-        -- En mode non-naturel : glisser gauche = Space précédent (←).
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
-            local goNext = naturalScroll and (dx < 0) or (dx > 0)
+            local goNext = (naturalScroll and dx < 0) or (not naturalScroll and dx > 0)
             local keycode = goNext and 124 or 123  -- 124=→  123=←
             hs.osascript.applescript(string.format(
                 'tell application "System Events" to key code %d using {control down}',
@@ -131,11 +128,9 @@ local function commitGesture(now)
         end
 
     elseif mf >= 5 and ff.swipe_5 then
-        -- ── SWIPE 5 doigts → fenêtre suivante/précédente même app ────────────
-        -- Même logique de sens que swipe_4.
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
-            local goNext = naturalScroll and (dx < 0) or (dx > 0)
+            local goNext = (naturalScroll and dx < 0) or (not naturalScroll and dx > 0)
             local app = hs.application.frontmostApplication()
             if app then
                 local visible = {}
@@ -239,10 +234,15 @@ local function start_swipe3()
         local th = (dir == "left" or dir == "right") and sw3_th_h or sw3_th_v
         if dist > th then
             sw3_th_h, sw3_th_v = math.huge, math.huge
-            if dir == "left"  and ff.swipe_left  then hs.eventtap.keyStroke({"ctrl","shift"}, "tab") end
-            if dir == "right" and ff.swipe_right then hs.eventtap.keyStroke({"ctrl"}, "tab") end
-            if dir == "up"    and ff.swipe_up    then hs.eventtap.keyStroke({"cmd"}, "t") end
-            if dir == "down"  and ff.swipe_down  then hs.eventtap.keyStroke({"cmd"}, "w") end
+            -- En mode naturel le doigt va dans le même sens que le contenu :
+            -- glisser gauche = aller vers l'onglet suivant (à droite).
+            -- En mode non-naturel : glisser gauche = onglet précédent (sens classique).
+            local isLeft  = (naturalScroll and dir == "right") or (not naturalScroll and dir == "left")
+            local isRight = (naturalScroll and dir == "left")  or (not naturalScroll and dir == "right")
+            if isLeft  and ff.swipe_left  then hs.eventtap.keyStroke({"ctrl","shift"}, "tab") end
+            if isRight and ff.swipe_right then hs.eventtap.keyStroke({"ctrl"}, "tab") end
+            if dir == "up"   and ff.swipe_up   then hs.eventtap.keyStroke({"cmd"}, "t") end
+            if dir == "down" and ff.swipe_down then hs.eventtap.keyStroke({"cmd"}, "w") end
         end
     end)
     utils.debugLog("swipe3 démarré")
