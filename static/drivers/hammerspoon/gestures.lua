@@ -12,14 +12,17 @@ local M = {}
 -- ── Feature flags ─────────────────────────────────────────────────────────────
 -- Noms conservés identiques pour compatibilité avec le menu existant.
 local ff = {
-    tap_selection = true,  -- tap 3 doigts  → activer/désactiver sélection texte
-    tap_lookup    = true,  -- tap 4 doigts  → définition du mot (Ctrl+Cmd+D)
-    swipe_left    = true,  -- swipe 3 ←    → onglet précédent
-    swipe_right   = true,  -- swipe 3 →    → onglet suivant
-    swipe_up      = true,  -- swipe 3 ↑    → nouvel onglet
-    swipe_down    = true,  -- swipe 3 ↓    → fermer onglet
-    swipe_4       = true,  -- swipe 4 ←/→  → changer de Space (⚠ désactiver dans Réglages Système > Trackpad)
-    swipe_5       = true,  -- swipe 5 ←/→  → fenêtre suivante/précédente même app
+    tap_selection = true,  -- tap 3 doigts      → activer/désactiver sélection texte
+    tap_lookup    = true,  -- tap 4 doigts      → définition du mot (Ctrl+Cmd+D)
+    swipe_left    = true,  -- swipe 3 ←        → onglet précédent/suivant
+    swipe_right   = true,  -- swipe 3 →        → onglet suivant/précédent
+    swipe_up      = true,  -- swipe 3 ↑        → nouvel onglet
+    swipe_down    = true,  -- swipe 3 ↓        → fermer onglet
+    swipe_4       = true,  -- swipe 4 ←/→      → changer de Space
+    swipe_4_diag  = true,  -- swipe 4 / ou \   → onglet suivant/précédent
+    swipe_4_up    = true,  -- swipe 4 ↑        → Mission Control
+    swipe_4_down  = true,  -- swipe 4 ↓        → App Exposé
+    swipe_5       = true,  -- swipe 5 ←/→      → fenêtre suivante/précédente même app
 }
 
 -- ── Seuils ────────────────────────────────────────────────────────────────────
@@ -117,11 +120,42 @@ local function commitGesture(now)
         if     mf == 3 and ff.tap_selection then toggleSelection()
         elseif mf == 4 and ff.tap_lookup    then triggerLookup() end
 
-    elseif mf == 4 and ff.swipe_4 then
+    elseif mf == 4 then
         local adx, ady = math.abs(dx), math.abs(dy)
-        if adx > ady and adx > SWIPE_MIN_H then
+        -- Vertical pur : dy domine nettement (>2× dx)
+        local isVert  = ady > adx * 2 and ady > SWIPE_MIN_V
+        -- Horizontal pur : dx domine nettement (>2× dy)
+        local isHoriz = adx > ady * 2 and adx > SWIPE_MIN_H
+        -- Diagonale : les deux axes sont significatifs, ratio entre 1/2 et 2
+        -- (plus strict qu'avant pour éviter les faux positifs sur swipe horizontal)
+        local isDiag  = adx > SWIPE_MIN_H and ady > SWIPE_MIN_V
+                        and adx < ady * 2 and ady < adx * 2
+
+        if isVert then
+            -- ↑ Mission Control, ↓ App Exposé — via osascript pour déclencher l'animation native.
+            -- key code 160 = F10 (Mission Control), 101 = F10 (App Exposé) selon le clavier ;
+            -- on passe par les keycodes Mission Control / Exposé définis dans macOS.
+            -- La méthode la plus fiable est d'appeler directement le raccourci Mission Control (F3)
+            -- ou via CGSPrivate, mais osascript key code est suffisant si les raccourcis sont activés.
+            -- Ici on utilise hs.osascript pour rester cohérent avec swipe_4 ←/→.
+            if dy < 0 and ff.swipe_4_up then
+                -- Swipe vers le haut → Mission Control (key code 160 = touche Mission Control)
+                hs.osascript.applescript(
+                    'tell application "System Events" to key code 160')
+            elseif dy > 0 and ff.swipe_4_down then
+                -- Swipe vers le bas → App Exposé (Ctrl+↓, key code 125)
+                hs.osascript.applescript(
+                    'tell application "System Events" to key code 125 using {control down}')
+            end
+
+        elseif isDiag and ff.swipe_4_diag then
             local goNext = (naturalScroll and dx < 0) or (not naturalScroll and dx > 0)
-            local keycode = goNext and 124 or 123  -- 124=→  123=←
+            if goNext then hs.eventtap.keyStroke({"ctrl"}, "tab")
+            else            hs.eventtap.keyStroke({"ctrl", "shift"}, "tab") end
+
+        elseif isHoriz and ff.swipe_4 then
+            local goNext = (naturalScroll and dx < 0) or (not naturalScroll and dx > 0)
+            local keycode = goNext and 124 or 123  -- 124=→ Space suivant  123=← Space précédent
             hs.osascript.applescript(string.format(
                 'tell application "System Events" to key code %d using {control down}',
                 keycode))
@@ -277,7 +311,7 @@ end
 local ALL_FLAGS = {
     "tap_selection","tap_lookup",
     "swipe_left","swipe_right","swipe_up","swipe_down",
-    "swipe_4","swipe_5"
+    "swipe_4","swipe_4_diag","swipe_4_up","swipe_4_down","swipe_5"
 }
 
 function M.enable(name)
@@ -287,7 +321,7 @@ function M.enable(name)
         return
     end
     if name == "swipe" then
-        for _, k in ipairs({"swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_5"}) do ff[k] = true end
+        for _, k in ipairs({"swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_4_diag","swipe_4_up","swipe_4_down","swipe_5"}) do ff[k] = true end
         if not Swipe3 then start_swipe3() end
         return
     end
@@ -306,7 +340,7 @@ function M.disable(name)
         return
     end
     if name == "swipe" then
-        for _, k in ipairs({"swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_5"}) do ff[k] = false end
+        for _, k in ipairs({"swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_4_diag","swipe_4_up","swipe_4_down","swipe_5"}) do ff[k] = false end
         stop_swipe3()
         return
     end
