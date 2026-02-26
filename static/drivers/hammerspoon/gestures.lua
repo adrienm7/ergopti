@@ -105,18 +105,17 @@ local function commitGesture(now)
 
     elseif mf == 4 and ff.swipe_4 then
         -- ── SWIPE 4 doigts → changement de Space ─────────────────────────────
-        -- hs.eventtap.keyStroke poste au niveau kCGHIDEventTap : trop bas pour
-        -- atteindre le gestionnaire de Spaces de macOS. osascript/System Events
-        -- poste au niveau session et déclenche bien l'animation native de glissement.
-        -- Prérequis : activer Ctrl+←/→ dans Réglages Système > Clavier >
-        --   Raccourcis > Mission Control ("Déplacer vers l'espace à gauche/droite").
+        -- hs.osascript.applescript() tourne in-process (pas de sous-shell) et
+        -- hérite des droits Accessibility de Hammerspoon → déclenche l'animation native.
+        -- Prérequis : Ctrl+←/→ activé dans Réglages Système > Clavier >
+        --   Raccourcis > Mission Control.
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
             -- key code 123 = ←, 124 = →
             local keycode = dx < 0 and 123 or 124
-            hs.execute(string.format(
-                [[osascript -e 'tell application "System Events" to key code %d using {control down}']],
-                keycode), true)
+            hs.osascript.applescript(string.format(
+                'tell application "System Events" to key code %d using {control down}',
+                keycode))
         end
 
     elseif mf >= 5 and ff.swipe_5 then
