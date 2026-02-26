@@ -239,26 +239,26 @@ function M.get_all_actions()
 end
 
 -- ── Exécution ─────────────────────────────────────────────────────────────────
--- dist : distance du swipe (en unités touchdevice) pour les actions scalables.
-local function doAxis(slot, goNext, dist)
-    local a = AX[ga[slot]]
-    if not a then return end
-    local steps = 1
-    if a.scalable and dist then
-        steps = math.max(1, math.floor(dist / SCALE_DIV))
-    end
-    local fn = goNext and a.next or a.prev
-    for _ = 1, steps do fn() end
-end
-
 local function doSingle(slot)
     local s = SG[ga[slot]]
     if s then s.fn() end
 end
 
+-- Exécute une action axe UNE FOIS dans le sens goNext.
+-- Utilisée aussi bien en temps réel (scalable) qu'au commit (non-scalable).
+local function fireAxis(slot, goNext)
+    local a = AX[ga[slot]]
+    if not a then return end
+    local fn = goNext and a.next or a.prev
+    fn()
+end
+
+local function isScalableSlot(slot)
+    local a = AX[ga[slot]]
+    return a and a.scalable == true
+end
+
 -- ── Scroll blocker ────────────────────────────────────────────────────────────
--- Bloque les events scroll/swipe générés par macOS pendant un geste 3+ doigts,
--- ce qui empêche le scroll parasite pendant les swipes verticaux notamment.
 local scrollBlocker = nil
 
 local function startScrollBlock()
@@ -266,7 +266,7 @@ local function startScrollBlock()
     scrollBlocker = hs.eventtap.new(
         { hs.eventtap.event.types.scrollWheel,
           hs.eventtap.event.types.gesture },
-        function() return true end)  -- avaler l'événement
+        function() return true end)
     pcall(function() scrollBlocker:start() end)
 end
 
@@ -278,10 +278,23 @@ local function stopScrollBlock()
 end
 
 -- ── Machine à états ───────────────────────────────────────────────────────────
+-- Architecture :
+--   - Pour les actions NON-scalables : direction calculée au commit depuis endPos
+--     (pas de verrouillage en temps réel, évite tous les problèmes de jitter)
+--   - Pour les actions SCALABLES : verrouillage angulaire dès que le mouvement
+--     dépasse le seuil, avec gs.lifting pour geler au lever des doigts
+--
+-- Direction par angle (atan2) :
+--   vert  : angle > 55° depuis horizontal  (adx < ady × tan55° ≈ ady × 1.43)
+--   horiz : angle < 20° depuis horizontal  (adx > ady × tan70° ≈ ady × 2.75 — NOTE: angles inversés)
+--   diag  : entre 20° et 55°
 local gs = {}
 local function resetGS()
     stopScrollBlock()
-    gs = {active=false, startTime=nil, startPos=nil, endPos=nil, maxFingers=0}
+    gs = {
+        active=false, startTime=nil, startPos=nil, endPos=nil, maxFingers=0,
+        lockedDir=nil, stepsCommitted=0, lifting=false,
+    }
 end
 resetGS()
 
@@ -294,6 +307,52 @@ local function avgPos(touches)
     return {x=x/#touches, y=y/#touches}
 end
 
+local function slotForDir(mf, dir)
+    if     mf == 2 then
+        if dir == "diag"  then return "swipe_2_diag"  end
+    elseif mf == 3 then
+        if     dir == "horiz" then return "swipe_3_horiz"
+        elseif dir == "diag"  then return "swipe_3_diag" end
+    elseif mf == 4 then
+        if     dir == "horiz" then return "swipe_4_horiz"
+        elseif dir == "diag"  then return "swipe_4_diag" end
+    elseif mf >= 5 then
+        if     dir == "horiz" then return "swipe_5_horiz"
+        elseif dir == "diag"  then return "swipe_5_diag" end
+    end
+    return nil
+end
+
+-- Calcule la direction à partir de dx/dy par angle.
+-- Retourne "vert", "horiz", "diag" ou nil si distance insuffisante.
+-- Seuils :
+--   vert  : angle >= 35° depuis horiz  (adx < ady × tan55° ≈ ady × 1.43 → très permissif)
+--   horiz : angle <= 20° depuis horiz  (adx > ady × tan70° ≈ ady × 2.75)
+--   diag  : entre 20° et 35°, avec distance minimale dans les deux axes
+local function computeDir(dx, dy, mf)
+    local adx  = math.abs(dx)
+    local ady  = math.abs(dy)
+    local dist = adx + ady
+    local min  = (mf == 2) and SWIPE_MIN_2 or SWIPE_MIN
+    if dist < min then return nil end
+
+    local angle = math.deg(math.atan(ady, adx))   -- 0=horiz, 90=vert
+
+    if     angle >= 35 then return "vert"          -- large zone pour vert
+    elseif angle <= 20 then return "horiz"
+    else
+        local diagMin = (mf == 2) and DIAG_MIN_2 or min
+        if adx >= diagMin and ady >= diagMin then return "diag" end
+        -- Entre 20° et 35° mais distance diag insuffisante → on choisit le plus grand
+        if adx >= ady then return "horiz" else return "vert" end
+    end
+end
+
+local function signedDist(pos)
+    local dx = pos.x - gs.startPos.x
+    return (naturalScroll and -dx) or dx
+end
+
 local function commitGesture(now)
     if not gesturesEnabled then return end
     local dx      = gs.endPos.x - gs.startPos.x
@@ -302,8 +361,6 @@ local function commitGesture(now)
     local ady     = math.abs(dy)
     local elapsed = now - gs.startTime
     local mf      = gs.maxFingers
-    local min     = (mf == 2) and SWIPE_MIN_2 or SWIPE_MIN
-    local goNext  = (naturalScroll and dx < 0) or (not naturalScroll and dx > 0)
 
     -- Tap
     if elapsed <= TAP_MAX_SEC and (adx + ady) < TAP_MAX_DELTA then
@@ -313,41 +370,29 @@ local function commitGesture(now)
         return
     end
 
-    local isVert  = ady > adx * 2 and ady > min
-    local isHoriz = adx > ady * 2 and adx > min
-    -- Pour la diagonale 2 doigts : exige une distance totale minimale absolue
-    -- pour éviter que les micro-mouvements de scroll soient interprétés comme diagonale.
-    local diagMin = (mf == 2) and DIAG_MIN_2 or min
-    local isDiag  = adx > diagMin and ady > diagMin
-                    and adx < ady * DIAG_MAX_RATIO and ady < adx * DIAG_MAX_RATIO
-    -- Pour les actions scalables : distance principale du swipe
-    local distH = adx                        -- pour slots horiz
-    local distD = math.max(adx, ady)         -- pour slots diag
-    local distV = ady                        -- pour slots vert (non utilisé, simples)
+    -- Direction finale calculée ici pour toutes les actions non-scalables.
+    -- On ignore gs.lockedDir et on utilise la position finale réelle.
+    local dir = computeDir(dx, dy, mf)
+    if not dir then return end
 
-    if mf == 2 then
-        if isDiag then doAxis("swipe_2_diag", goNext, distD) end
+    -- Vert : actions simples
+    if dir == "vert" then
+        local goDown = dy > 0
+        if     mf == 3 then doSingle(goDown and "swipe_3_down" or "swipe_3_up")
+        elseif mf == 4 then doSingle(goDown and "swipe_4_down" or "swipe_4_up")
+        elseif mf >= 5 then doSingle(goDown and "swipe_5_down" or "swipe_5_up") end
+        return
+    end
 
-    elseif mf == 3 then
-        if     isHoriz then doAxis("swipe_3_horiz", goNext, distH)
-        elseif isDiag  then doAxis("swipe_3_diag",  goNext, distD)
-        elseif isVert  then
-            if dy < 0 then doSingle("swipe_3_up") else doSingle("swipe_3_down") end
-        end
-
-    elseif mf == 4 then
-        if     isVert  then
-            if dy < 0 then doSingle("swipe_4_up") else doSingle("swipe_4_down") end
-        elseif isDiag  then doAxis("swipe_4_diag",  goNext, distD)
-        elseif isHoriz then doAxis("swipe_4_horiz", goNext, distH)
-        end
-
-    elseif mf >= 5 then
-        if     isVert  then
-            if dy < 0 then doSingle("swipe_5_up") else doSingle("swipe_5_down") end
-        elseif isDiag  then doAxis("swipe_5_diag",  goNext, distD)
-        elseif isHoriz then doAxis("swipe_5_horiz", goNext, distH)
-        end
+    -- Horiz/diag : ne rien faire si l'action est désactivée
+    local slot = slotForDir(mf, dir)
+    if not slot then return end
+    if ga[slot] == "none" then return end
+    if isScalableSlot(slot) then
+        -- Scalable : déjà tiré en temps réel, rien à faire
+    else
+        local sd = signedDist(gs.endPos)
+        if math.abs(sd) >= SWIPE_MIN then fireAxis(slot, sd > 0) end
     end
 end
 
@@ -362,17 +407,55 @@ local function onFrame(touches)
         resetGS()
         return
     end
-    if n >= 3 then
-        -- Bloquer le scroll macOS dès qu'on pose 3+ doigts
-        startScrollBlock()
-    end
+    if n >= 3 then startScrollBlock() end
     if n >= 2 then
         local pos = avgPos(touches)
         if not gs.active then
-            gs = {active=true, startTime=now, startPos=pos, endPos=pos, maxFingers=n}
+            gs.active         = true
+            gs.startTime      = now
+            gs.startPos       = pos
+            gs.endPos         = pos
+            gs.maxFingers     = n
+            gs.stepsCommitted = 0
+            gs.lifting        = false
         else
-            if n > gs.maxFingers then gs.maxFingers = n end
+            if n < gs.maxFingers then
+                gs.lifting = true
+            else
+                gs.maxFingers = n
+            end
             gs.endPos = pos
+
+            -- Geler si encore dans la fenêtre de tap avec petit mouvement
+            local adx_now = math.abs(pos.x - gs.startPos.x)
+            local ady_now = math.abs(pos.y - gs.startPos.y)
+            if (now - gs.startTime) < TAP_MAX_SEC and (adx_now + ady_now) < TAP_MAX_DELTA then
+                return
+            end
+
+            -- Scalables en temps réel : verrouillage angulaire + steps
+            if not gs.lifting then
+                if gs.lockedDir == nil then
+                    local dx = pos.x - gs.startPos.x
+                    local dy = pos.y - gs.startPos.y
+                    gs.lockedDir = computeDir(dx, dy, gs.maxFingers)
+                end
+
+                if gs.lockedDir and gs.lockedDir ~= "vert" then
+                    local slot = slotForDir(gs.maxFingers, gs.lockedDir)
+                    if slot and isScalableSlot(slot) then
+                        local sd          = signedDist(pos)
+                        local targetSteps = math.floor(sd / SCALE_DIV)
+                        local diff        = targetSteps - gs.stepsCommitted
+                        if diff > 0 then
+                            for _ = 1, diff  do fireAxis(slot, true)  end
+                        elseif diff < 0 then
+                            for _ = 1, -diff do fireAxis(slot, false) end
+                        end
+                        gs.stepsCommitted = targetSteps
+                    end
+                end
+            end
         end
     end
 end
