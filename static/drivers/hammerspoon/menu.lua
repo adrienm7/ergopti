@@ -64,7 +64,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         local known_gestures = {
             "tap_selection","tap_lookup",
             "swipe_left","swipe_right","swipe_up","swipe_down",
-            "swipe_4","swipe_5"
+            "swipe_4","swipe_4_diag","swipe_4_up","swipe_4_down","swipe_5"
         }
         local prefs = {
             keymap=state.keymap, gestures=state.gestures,
@@ -108,7 +108,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
 
         local saved2 = load_prefs()
         if type(saved2)=="table" and type(saved2.gesture_map)=="table" then
-            for _, g in ipairs({"tap_selection","tap_lookup","swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_5"}) do
+            for _, g in ipairs({"tap_selection","tap_lookup","swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_4_diag","swipe_4_up","swipe_4_down","swipe_5"}) do
                 if saved2.gesture_map[g] then gestures.enable(g) else gestures.disable(g) end
             end
         else
@@ -194,21 +194,30 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             local s3_right = nat and "Onglet précédent"  or "Onglet suivant"
             local s4_left  = nat and "Space suivant"     or "Space précédent"
             local s4_right = nat and "Space précédent"   or "Space suivant"
+            -- Diagonale / : dx>0 dy<0 (non-nat) ou dx<0 dy>0 (nat) → même sens que swipe →
+            local sd_fwd   = nat and "Onglet précédent"  or "Onglet suivant"
+            -- Diagonale \ : dx<0 dy<0 (non-nat) ou dx>0 dy>0 (nat) → même sens que swipe ←
+            local sd_bwd   = nat and "Onglet suivant"    or "Onglet précédent"
             local s5_left  = nat and "Fenêtre suivante"  or "Fenêtre précédente"
             local s5_right = nat and "Fenêtre précédente"or "Fenêtre suivante"
             item.menu = {
-                { title="Tap 3 doigts : Toggle sélection",    checked=gestures.is_enabled("tap_selection") or nil, fn=function() gToggle("tap_selection") end },
-                { title="Tap 4 doigts : Recherche du mot",    checked=gestures.is_enabled("tap_lookup")    or nil, fn=function() gToggle("tap_lookup")    end },
+                { title="Tap 3 doigts : Toggle sélection",         checked=gestures.is_enabled("tap_selection") or nil, fn=function() gToggle("tap_selection") end },
+                { title="Tap 4 doigts : Recherche du mot",         checked=gestures.is_enabled("tap_lookup")    or nil, fn=function() gToggle("tap_lookup")    end },
                 { title="-" },
-                { title="Swipe 3 ← : "..s3_left,            checked=gestures.is_enabled("swipe_left")    or nil, fn=function() gToggle("swipe_left")    end },
-                { title="Swipe 3 → : "..s3_right,            checked=gestures.is_enabled("swipe_right")   or nil, fn=function() gToggle("swipe_right")   end },
-                { title="Swipe 3 ↑ : Nouvel onglet",         checked=gestures.is_enabled("swipe_up")      or nil, fn=function() gToggle("swipe_up")      end },
-                { title="Swipe 3 ↓ : Fermer onglet",         checked=gestures.is_enabled("swipe_down")    or nil, fn=function() gToggle("swipe_down")    end },
+                { title="Swipe 3 ← : "..s3_left,                  checked=gestures.is_enabled("swipe_left")    or nil, fn=function() gToggle("swipe_left")    end },
+                { title="Swipe 3 → : "..s3_right,                  checked=gestures.is_enabled("swipe_right")   or nil, fn=function() gToggle("swipe_right")   end },
+                { title="Swipe 3 ↑ : Nouvel onglet",               checked=gestures.is_enabled("swipe_up")      or nil, fn=function() gToggle("swipe_up")      end },
+                { title="Swipe 3 ↓ : Fermer onglet",               checked=gestures.is_enabled("swipe_down")    or nil, fn=function() gToggle("swipe_down")    end },
                 { title="-" },
-                { title="Swipe 4 ← : "..s4_left,            checked=gestures.is_enabled("swipe_4")       or nil, fn=function() gToggle("swipe_4")       end },
-                { title="Swipe 4 → : "..s4_right,           checked=gestures.is_enabled("swipe_4")       or nil, fn=function() gToggle("swipe_4")       end },
-                { title="Swipe 5 ← : "..s5_left,            checked=gestures.is_enabled("swipe_5")       or nil, fn=function() gToggle("swipe_5")       end },
-                { title="Swipe 5 → : "..s5_right,           checked=gestures.is_enabled("swipe_5")       or nil, fn=function() gToggle("swipe_5")       end },
+                { title="Swipe 4 ← : "..s4_left,                  checked=gestures.is_enabled("swipe_4")       or nil, fn=function() gToggle("swipe_4")       end },
+                { title="Swipe 4 → : "..s4_right,                  checked=gestures.is_enabled("swipe_4")       or nil, fn=function() gToggle("swipe_4")       end },
+                { title="Swipe 4 ↑ : Mission Control",             checked=gestures.is_enabled("swipe_4_up")    or nil, fn=function() gToggle("swipe_4_up")    end },
+                { title="Swipe 4 ↓ : App Exposé",                  checked=gestures.is_enabled("swipe_4_down")  or nil, fn=function() gToggle("swipe_4_down")  end },
+                { title="Swipe 4 ↗ : "..sd_fwd,                    checked=gestures.is_enabled("swipe_4_diag")  or nil, fn=function() gToggle("swipe_4_diag")  end },
+                { title="Swipe 4 ↙ : "..sd_bwd,                   checked=gestures.is_enabled("swipe_4_diag")  or nil, fn=function() gToggle("swipe_4_diag")  end },
+                { title="-" },
+                { title="Swipe 5 ← : "..s5_left,                  checked=gestures.is_enabled("swipe_5")       or nil, fn=function() gToggle("swipe_5")       end },
+                { title="Swipe 5 → : "..s5_right,                  checked=gestures.is_enabled("swipe_5")       or nil, fn=function() gToggle("swipe_5")       end },
             }
         end
         return item
