@@ -104,31 +104,19 @@ local function commitGesture(now)
         elseif mf == 4 and ff.tap_lookup    then triggerLookup() end
 
     elseif mf == 4 and ff.swipe_4 then
-        -- ── SWIPE 4 doigts → changement de Space via hs.spaces ───────────────
+        -- ── SWIPE 4 doigts → changement de Space ─────────────────────────────
+        -- hs.eventtap.keyStroke poste au niveau kCGHIDEventTap : trop bas pour
+        -- atteindre le gestionnaire de Spaces de macOS. osascript/System Events
+        -- poste au niveau session et déclenche bien l'animation native de glissement.
+        -- Prérequis : activer Ctrl+←/→ dans Réglages Système > Clavier >
+        --   Raccourcis > Mission Control ("Déplacer vers l'espace à gauche/droite").
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
-            -- Récupère la liste ordonnée des spaces sur l'écran principal.
-            local mainScreen = hs.screen.mainScreen()
-            local allSpaces = hs.spaces.spacesForScreen(mainScreen)
-            if allSpaces and #allSpaces > 1 then
-                -- Trouve le space actif parmi ceux de cet écran.
-                local activeSpace = hs.spaces.activeSpaceOnScreen(mainScreen)
-                local currentIdx = nil
-                for i, sid in ipairs(allSpaces) do
-                    if sid == activeSpace then currentIdx = i; break end
-                end
-                if currentIdx then
-                    local targetIdx
-                    if dx < 0 then
-                        targetIdx = currentIdx - 1  -- swipe gauche → Space précédent
-                    else
-                        targetIdx = currentIdx + 1  -- swipe droite → Space suivant
-                    end
-                    if targetIdx >= 1 and targetIdx <= #allSpaces then
-                        hs.spaces.gotoSpace(allSpaces[targetIdx])
-                    end
-                end
-            end
+            -- key code 123 = ←, 124 = →
+            local keycode = dx < 0 and 123 or 124
+            hs.execute(string.format(
+                [[osascript -e 'tell application "System Events" to key code %d using {control down}']],
+                keycode), true)
         end
 
     elseif mf >= 5 and ff.swipe_5 then
