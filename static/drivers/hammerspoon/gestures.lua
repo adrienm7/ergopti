@@ -23,10 +23,24 @@ local ff = {
 }
 
 -- ── Seuils ────────────────────────────────────────────────────────────────────
-local TAP_MAX_SEC   = 0.35   -- durée max pour un tap
-local TAP_MAX_DELTA = 2.0    -- déplacement max pour un tap (unités touchdevice)
-local SWIPE_MIN_H   = 1.5    -- déplacement min horizontal pour valider un swipe 4/5 doigts
-local SWIPE_MIN_V   = 3.0    -- déplacement min vertical
+local TAP_MAX_SEC   = 0.35
+local TAP_MAX_DELTA = 2.0
+local SWIPE_MIN_H   = 1.5
+local SWIPE_MIN_V   = 3.0
+
+-- ── Natural scroll ────────────────────────────────────────────────────────────
+-- "1" = naturel (sens trackpad = sens contenu, comme iOS) :
+--   glisser gauche → contenu part à droite → Space suivant
+-- "0" = non-naturel (sens classique) :
+--   glisser gauche → Space précédent
+-- On lit le réglage une fois au chargement ; un rechargement HS suffit si on change.
+local function isNaturalScroll()
+    local out = hs.execute("defaults read -g com.apple.swipescrolldirection 2>/dev/null")
+    return out and out:match("1") ~= nil
+end
+local naturalScroll = isNaturalScroll()
+
+function M.isNaturalScroll() return naturalScroll end
 
 -- ── Mode sélection ────────────────────────────────────────────────────────────
 local leftClickPressed = false
@@ -105,14 +119,12 @@ local function commitGesture(now)
 
     elseif mf == 4 and ff.swipe_4 then
         -- ── SWIPE 4 doigts → changement de Space ─────────────────────────────
-        -- hs.osascript.applescript() tourne in-process (pas de sous-shell) et
-        -- hérite des droits Accessibility de Hammerspoon → déclenche l'animation native.
-        -- Prérequis : Ctrl+←/→ activé dans Réglages Système > Clavier >
-        --   Raccourcis > Mission Control.
+        -- En mode naturel : glisser gauche (dx<0) = Space suivant (→), comme le geste natif.
+        -- En mode non-naturel : glisser gauche = Space précédent (←).
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
-            -- key code 123 = ←, 124 = →
-            local keycode = dx < 0 and 123 or 124
+            local goNext = naturalScroll and (dx < 0) or (dx > 0)
+            local keycode = goNext and 124 or 123  -- 124=→  123=←
             hs.osascript.applescript(string.format(
                 'tell application "System Events" to key code %d using {control down}',
                 keycode))
@@ -120,32 +132,30 @@ local function commitGesture(now)
 
     elseif mf >= 5 and ff.swipe_5 then
         -- ── SWIPE 5 doigts → fenêtre suivante/précédente même app ────────────
+        -- Même logique de sens que swipe_4.
         local adx, ady = math.abs(dx), math.abs(dy)
         if adx > ady and adx > SWIPE_MIN_H then
+            local goNext = naturalScroll and (dx < 0) or (dx > 0)
             local app = hs.application.frontmostApplication()
             if app then
-                -- Ne prend que les fenêtres standard visibles (pas les tiroirs etc.)
-                local wins = app:allWindows()
                 local visible = {}
-                for _, w in ipairs(wins) do
+                for _, w in ipairs(app:allWindows()) do
                     if w:isStandard() and not w:isMinimized() then
                         table.insert(visible, w)
                     end
                 end
                 if #visible > 1 then
-                    -- Trie par ID pour un ordre stable.
                     table.sort(visible, function(a, b) return a:id() < b:id() end)
                     local focused = hs.window.focusedWindow()
-                    local currentIdx = nil
+                    local currentIdx = 1
                     for i, w in ipairs(visible) do
                         if focused and w:id() == focused:id() then currentIdx = i; break end
                     end
-                    currentIdx = currentIdx or 1
                     local targetIdx
-                    if dx < 0 then
-                        targetIdx = (currentIdx - 2) % #visible + 1  -- fenêtre précédente
+                    if goNext then
+                        targetIdx = currentIdx % #visible + 1
                     else
-                        targetIdx = currentIdx % #visible + 1         -- fenêtre suivante
+                        targetIdx = (currentIdx - 2) % #visible + 1
                     end
                     visible[targetIdx]:focus()
                 end
