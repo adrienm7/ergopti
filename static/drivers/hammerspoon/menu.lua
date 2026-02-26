@@ -186,17 +186,27 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             end
         }
         if state.gestures then
+            -- Libellés adaptatifs selon le réglage "Défilement naturel" de macOS.
+            -- En mode naturel : glisser gauche = aller vers la droite (Space/fenêtre suivant).
+            -- En mode non-naturel : glisser gauche = aller vers la gauche (précédent).
+            local nat = gestures.isNaturalScroll and gestures.isNaturalScroll()
+            local s4_left  = nat and "Space suivant"   or "Space précédent"
+            local s4_right = nat and "Space précédent" or "Space suivant"
+            local s5_left  = nat and "Fenêtre suivante"   or "Fenêtre précédente"
+            local s5_right = nat and "Fenêtre précédente" or "Fenêtre suivante"
             item.menu = {
-                { title="Tap 3 doigts : Toggle sélection",         checked=gestures.is_enabled("tap_selection") or nil, fn=function() gToggle("tap_selection") end },
-                { title="Tap 4 doigts : Recherche du mot",          checked=gestures.is_enabled("tap_lookup")    or nil, fn=function() gToggle("tap_lookup")    end },
+                { title="Tap 3 doigts : Toggle sélection",    checked=gestures.is_enabled("tap_selection") or nil, fn=function() gToggle("tap_selection") end },
+                { title="Tap 4 doigts : Recherche du mot",    checked=gestures.is_enabled("tap_lookup")    or nil, fn=function() gToggle("tap_lookup")    end },
                 { title="-" },
-                { title="Swipe 3 ← : Onglet précédent",            checked=gestures.is_enabled("swipe_left")    or nil, fn=function() gToggle("swipe_left")    end },
-                { title="Swipe 3 → : Onglet suivant",               checked=gestures.is_enabled("swipe_right")   or nil, fn=function() gToggle("swipe_right")   end },
-                { title="Swipe 3 ↑ : Nouvel onglet",               checked=gestures.is_enabled("swipe_up")      or nil, fn=function() gToggle("swipe_up")      end },
-                { title="Swipe 3 ↓ : Fermer onglet",               checked=gestures.is_enabled("swipe_down")    or nil, fn=function() gToggle("swipe_down")    end },
+                { title="Swipe 3 ← : Onglet précédent",      checked=gestures.is_enabled("swipe_left")    or nil, fn=function() gToggle("swipe_left")    end },
+                { title="Swipe 3 → : Onglet suivant",         checked=gestures.is_enabled("swipe_right")   or nil, fn=function() gToggle("swipe_right")   end },
+                { title="Swipe 3 ↑ : Nouvel onglet",         checked=gestures.is_enabled("swipe_up")      or nil, fn=function() gToggle("swipe_up")      end },
+                { title="Swipe 3 ↓ : Fermer onglet",         checked=gestures.is_enabled("swipe_down")    or nil, fn=function() gToggle("swipe_down")    end },
                 { title="-" },
-                { title="Swipe 4 ←/→ : Changer de Space ⚠",       checked=gestures.is_enabled("swipe_4")       or nil, fn=function() gToggle("swipe_4")       end },
-                { title="Swipe 5 ←/→ : Fenêtre suivante/précédente", checked=gestures.is_enabled("swipe_5")    or nil, fn=function() gToggle("swipe_5")       end },
+                { title="Swipe 4 ← : "..s4_left,            checked=gestures.is_enabled("swipe_4")       or nil, fn=function() gToggle("swipe_4")       end },
+                { title="Swipe 4 → : "..s4_right,           checked=gestures.is_enabled("swipe_4")       or nil, fn=function() gToggle("swipe_4")       end },
+                { title="Swipe 5 ← : "..s5_left,            checked=gestures.is_enabled("swipe_5")       or nil, fn=function() gToggle("swipe_5")       end },
+                { title="Swipe 5 → : "..s5_right,           checked=gestures.is_enabled("swipe_5")       or nil, fn=function() gToggle("swipe_5")       end },
             }
         end
         return item
