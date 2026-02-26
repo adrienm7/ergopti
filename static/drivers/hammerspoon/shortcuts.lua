@@ -26,7 +26,8 @@ local function titlecase(s)
 end
 
 -- Fonction asynchrone pour les transformations de texte (T et U)
-local function do_transform(transform_func)
+ -- Asynchronous function for text transformations (T and U)
+ local function do_transform(transform_func)
     local prior = pasteboard.getContents()
     pasteboard.clearContents()
     
@@ -59,7 +60,7 @@ end
 
 -- get_selection_path removed: simplified approach uses Cmd+Option+C for Finder-like apps
 
--- Centre les fenêtres standard visibles d'une application
+-- Center an application's visible standard windows
 local function center_windows_of_app(app)
     if not app then return end
     local wins = app:allWindows()
@@ -121,19 +122,20 @@ local function launch_first_available(apps)
 end
 
 --------------------------------------------------------------------------------
--- HOTKEYS (Classés par ordre alphabétique)
---------------------------------------------------------------------------------
--- API: `M.start()` active les raccourcis, `M.stop()` les désactive.
--- Les handlers utilisent `hs.eventtap` pour copier/coller la sélection
--- et `hs.pasteboard` pour préserver/restaurer le presse-papiers.
+ --------------------------------------------------------------------------------
+ -- HOTKEYS (sorted alphabetically)
+ --------------------------------------------------------------------------------
+ -- API: `M.start()` enables hotkeys, `M.stop()` disables them.
+ -- Handlers use `hs.eventtap` to copy/paste the selection
+ -- and `hs.pasteboard` to preserve/restore the clipboard.
 local M = {}
 local hotkeys = {}
 local hotkey_defs = {}
 local hotkey_labels = {}
 local started = false
 
--- Definitions des raccourcis (créent et retournent l'objet hotkey quand appelés)
-hotkey_labels.at_hash = "Capture fenêtre (touche ² / left of 1)"
+-- Hotkey definitions (create and return the hotkey object when called)
+hotkey_labels.at_hash = "Capture fenêtre"
 hotkey_defs.at_hash = function()
     local tap
     local obj = {}
@@ -224,11 +226,6 @@ hotkey_defs.ctrl_h = function()
     end)
 end
 
--- Listener for AZERTY physical key (keycode 10) is handled via eventtap in M.start()/M.stop().
--- No named hotkey binding for the '²' character is created here.
-
--- at_hash moved above to keep alphabetical ordering (before ctrl_a)
-
 hotkey_labels.ctrl_i = "Ouvrir Réglages (Ctrl+I)"
 hotkey_defs.ctrl_i = function()
     return hs.hotkey.bind({"ctrl"}, "i", function()
@@ -254,7 +251,7 @@ hotkey_defs.ctrl_s = function()
                     hs.alert.show("Chemin [" .. p .. "] copié dans le presse-papiers")
                     return
                 end
-                -- fallback: copier la sélection et faire une recherche
+                -- fallback: copy the selection and perform a search
                 local prior = pasteboard.getContents()
                 pasteboard.clearContents()
                 eventtap.keyStroke({"cmd"}, "c")
@@ -280,7 +277,7 @@ hotkey_defs.ctrl_s = function()
             return
         end
 
-        -- Par défaut: copier la sélection et lancer la recherche/URL
+        -- Default: copy the selection and open search/URL
         local prior = pasteboard.getContents()
         pasteboard.clearContents()
         eventtap.keyStroke({"cmd"}, "c")

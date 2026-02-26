@@ -9,26 +9,26 @@ local keymap = require("keymap")
 local shortcuts = require("shortcuts")
 local repeat_keys = require("repeat_keys")
 
--- Démarrage initial des modules
+-- Initial startup of modules
 gestures.start()
 scroll.start()
--- Démarrer aussi les raccourcis (module `shortcuts`)
+-- Also start the shortcuts module (`shortcuts`)
 shortcuts.start()
 -- Register repeat keys
 repeat_keys.start(keymap)
--- (keymap démarre déjà tout seul grâce à ton keymap.lua)
+-- (keymap already starts itself via your `keymap.lua`)
 
 
 
 
 ---------------------------------------------------------------------------
--- Hotstrings dynamiques
+-- Dynamic hotstrings
 ---------------------------------------------------------------------------
--- Le chemin absolu vers ton vrai dossier source
+-- Absolute path to your real source directory
 local base_dir = "/Users/b519hs/Documents/perso/ergopti/static/drivers/hammerspoon/"
 local gen_dir = base_dir .. "generated_hotstrings/"
 
--- Liste des fichiers hotstrings générés
+-- List of generated hotstrings files
 local hotfiles = {
     "accents.lua",
     "brands.lua",
@@ -49,7 +49,7 @@ local hotfiles = {
     "symbols_typst.lua",
 }
 
--- Charger chaque fichier via keymap.load_file (permet toggle par groupe)
+-- Load each file via keymap.load_file (allows toggling per group)
 for _, f in ipairs(hotfiles) do
     local name = f:match("^(.*)%.lua$") or f
     keymap.load_file(name, gen_dir .. f)
@@ -57,7 +57,7 @@ end
 
 
 ---------------------------------------------------------------------------
--- Menu Barre des tâches (Hammerspoon Menubar)
+-- Menubar menu (Hammerspoon Menubar)
 ---------------------------------------------------------------------------
 -- External menu module
 local menu = require("menu")

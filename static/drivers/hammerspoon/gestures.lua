@@ -20,11 +20,17 @@ local touch_watchers = {}
 -- Swipe defaults
 local Swipe3 = nil
 local current_id_3f, threshold_horizontal, threshold_vertical
+local Swipe4 = nil
+local current_id_4f, threshold_horizontal_4
+local Swipe5 = nil
+local current_id_5f, threshold_horizontal_5
 local HORIZONTAL_DEFAULT = 0.04
 local VERTICAL_DEFAULT = 0.12
 
 threshold_horizontal = HORIZONTAL_DEFAULT
 threshold_vertical = VERTICAL_DEFAULT
+threshold_horizontal_4 = HORIZONTAL_DEFAULT
+threshold_horizontal_5 = HORIZONTAL_DEFAULT
 
 -- Feature flags for gestures (can be toggled at runtime)
 local feature_flags = {
@@ -35,7 +41,47 @@ local feature_flags = {
     swipe_right = true,
     swipe_up = true,
     swipe_down = true,
+    -- 4-finger swipes: switch windows within the same app (left/right)
+    swipe4_left = true,
+    swipe4_right = true,
+    -- 5-finger swipes: switch windows within the same app (left/right)
+    swipe5_left = true,
+    swipe5_right = true,
 }
+
+local function perform_swipe4(direction)
+    if direction == "left" then
+        if feature_flags.swipe4_left then
+            pcall(function() hs.alert.show("Geste 4 doigts : gauche (Bureau précédent)", 1.0) end)
+            utils.debugLog("gestures: perform_swipe4 left -> send Ctrl+Left")
+            -- try high-level keyStroke first
+            local ok = pcall(function() hs.eventtap.keyStroke({"ctrl"}, "left", 0) end)
+            if not ok then
+                -- fallback to low-level key events
+                pcall(function()
+                    local kc = hs.keycodes.map["left"]
+                    hs.eventtap.event.newKeyEvent({"ctrl"}, kc, true):post()
+                    hs.timer.usleep(10000)
+                    hs.eventtap.event.newKeyEvent({"ctrl"}, kc, false):post()
+                end)
+            end
+        end
+    elseif direction == "right" then
+        if feature_flags.swipe4_right then
+            pcall(function() hs.alert.show("Geste 4 doigts : droite (Bureau suivant)", 1.0) end)
+            utils.debugLog("gestures: perform_swipe4 right -> send Ctrl+Right")
+            local ok = pcall(function() hs.eventtap.keyStroke({"ctrl"}, "right", 0) end)
+            if not ok then
+                pcall(function()
+                    local kc = hs.keycodes.map["right"]
+                    hs.eventtap.event.newKeyEvent({"ctrl"}, kc, true):post()
+                    hs.timer.usleep(10000)
+                    hs.eventtap.event.newKeyEvent({"ctrl"}, kc, false):post()
+                end)
+            end
+        end
+    end
+end
 
 local function forceCleanup()
     utils.debugLog("forceCleanup: start mouseEventTap=", tostring(mouseEventTap), "leftClickPressed=", tostring(leftClickPressed))
@@ -170,6 +216,19 @@ local function create_watcher(deviceID)
                         utils.debugLog("watcher:", deviceID, "tap update at", xAvg, yAvg)
                     end
                 end
+                -- Fallback: detect horizontal 4-finger swipes via touch frames
+                if nFingers == 4 then
+                    local prev = touch_watchers[deviceID].swipe4_prev or {x = xAvg, t = 0}
+                    local dx = xAvg - prev.x
+                    local elapsed = now - (touch_watchers[deviceID].swipe4_last or 0)
+                    if math.abs(dx) > threshold_horizontal_4 and elapsed > 0.4 then
+                        local dir = dx < 0 and "left" or "right"
+                        utils.debugLog("watcher:", deviceID, "detected fallback 4-finger swipe", dir, "dx=", dx)
+                        perform_swipe4(dir)
+                        touch_watchers[deviceID].swipe4_last = now
+                    end
+                    touch_watchers[deviceID].swipe4_prev = { x = xAvg, t = now }
+                end
             elseif nFingers > 4 then
                 _maybeTap = false
                 _tapStartPoint = nil
@@ -233,6 +292,9 @@ local function start_swipe()
         return
     end
     Swipe3 = sp
+    Swipe4 = sp
+    Swipe5 = sp
+    -- 3-finger swipe handler (existing behaviour)
     Swipe3:start(3, function(direction, distance, id)
         if id == current_id_3f then
             local threshold = (direction == "left" or direction == "right") and threshold_horizontal or threshold_vertical
@@ -263,6 +325,80 @@ local function start_swipe()
             threshold_vertical = VERTICAL_DEFAULT
         end
     end)
+    -- 4-finger swipe handler: switch windows of the same frontmost application (left/right)
+    Swipe4:start(4, function(direction, distance, id)
+        if id == current_id_4f then
+            local threshold = (direction == "left" or direction == "right") and threshold_horizontal_4 or math.huge
+            if distance > threshold then
+                threshold_horizontal_4 = math.huge
+                if direction == "left" then
+                    perform_swipe4("left")
+                elseif direction == "right" then
+                    perform_swipe4("right")
+                end
+            end
+        else
+            current_id_4f = id
+            threshold_horizontal_4 = HORIZONTAL_DEFAULT
+        end
+    end)
+    -- 5-finger swipe handler: switch windows of the same frontmost application (left/right)
+    Swipe5:start(5, function(direction, distance, id)
+        if id == current_id_5f then
+            local threshold = (direction == "left" or direction == "right") and threshold_horizontal_5 or math.huge
+            if distance > threshold then
+                threshold_horizontal_5 = math.huge
+                if direction == "left" then
+                    if feature_flags.swipe5_left then
+                        pcall(function() hs.alert.show("Geste 5 doigts : gauche", 1.0) end)
+                        utils.debugLog("gestures: detected 5-finger swipe left - focus previous window in app")
+                        -- switch to previous window of the same app
+                        local app = hs.application.frontmostApplication()
+                        if app then
+                            local wins = {}
+                            for _, w in ipairs(app:allWindows()) do
+                                if w:isStandard() and w:isVisible() then table.insert(wins, w) end
+                            end
+                            if #wins > 1 then
+                                local front = hs.window.frontmostWindow()
+                                local idx = 1
+                                for i, w in ipairs(wins) do if front and w:id() == front:id() then idx = i; break end end
+                                local nextIdx = idx - 1
+                                if nextIdx < 1 then nextIdx = #wins end
+                                local target = wins[nextIdx]
+                                if target then target:focus() end
+                            end
+                        end
+                    end
+                elseif direction == "right" then
+                    if feature_flags.swipe5_right then
+                        pcall(function() hs.alert.show("Geste 5 doigts : droite", 1.0) end)
+                        utils.debugLog("gestures: detected 5-finger swipe right - focus next window in app")
+                        -- switch to next window of the same app
+                        local app = hs.application.frontmostApplication()
+                        if app then
+                            local wins = {}
+                            for _, w in ipairs(app:allWindows()) do
+                                if w:isStandard() and w:isVisible() then table.insert(wins, w) end
+                            end
+                            if #wins > 1 then
+                                local front = hs.window.frontmostWindow()
+                                local idx = 1
+                                for i, w in ipairs(wins) do if front and w:id() == front:id() then idx = i; break end end
+                                local nextIdx = idx + 1
+                                if nextIdx > #wins then nextIdx = 1 end
+                                local target = wins[nextIdx]
+                                if target then target:focus() end
+                            end
+                        end
+                    end
+                end
+            end
+        else
+            current_id_5f = id
+            threshold_horizontal_5 = HORIZONTAL_DEFAULT
+        end
+    end)
     utils.debugLog("gestures: swipe started")
 end
 
@@ -271,6 +407,14 @@ local function stop_swipe()
         pcall(function() Swipe3:stop() end)
     end
     Swipe3 = nil
+    if Swipe4 and Swipe4.stop then
+        pcall(function() Swipe4:stop() end)
+    end
+    Swipe4 = nil
+    if Swipe5 and Swipe5.stop then
+        pcall(function() Swipe5:stop() end)
+    end
+    Swipe5 = nil
     utils.debugLog("gestures: swipe stopped")
 end
 
@@ -278,7 +422,7 @@ function M.start()
     ensure_watchers()
     start_supervisor()
     start_status_logger()
-    if feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down then
+    if feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down or feature_flags.swipe4_left or feature_flags.swipe4_right or feature_flags.swipe5_left or feature_flags.swipe5_right then
         start_swipe()
     end
 end
@@ -292,6 +436,10 @@ function M.enable(name)
         feature_flags.swipe_right = true
         feature_flags.swipe_up = true
         feature_flags.swipe_down = true
+        feature_flags.swipe4_left = true
+        feature_flags.swipe4_right = true
+        feature_flags.swipe5_left = true
+        feature_flags.swipe5_right = true
         start_swipe()
         return
     end
@@ -305,7 +453,19 @@ function M.enable(name)
         return
     end
 
-    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" then
+    if name == "swipe5" then
+        feature_flags.swipe5_left = true
+        feature_flags.swipe5_right = true
+        start_swipe()
+        return
+    end
+    if name == "swipe4" then
+        feature_flags.swipe4_left = true
+        feature_flags.swipe4_right = true
+        start_swipe()
+        return
+    end
+    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" or name == "swipe4_left" or name == "swipe4_right" or name == "swipe5_left" or name == "swipe5_right" then
         feature_flags[name] = true
         -- ensure swipe subsystem is running
         if not Swipe3 then start_swipe() end
@@ -328,6 +488,10 @@ function M.disable(name)
         feature_flags.swipe_right = false
         feature_flags.swipe_up = false
         feature_flags.swipe_down = false
+        feature_flags.swipe4_left = false
+        feature_flags.swipe4_right = false
+        feature_flags.swipe5_left = false
+        feature_flags.swipe5_right = false
         stop_swipe()
         return
     end
@@ -341,10 +505,24 @@ function M.disable(name)
         return
     end
 
-    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" then
+    if name == "swipe5" then
+        feature_flags.swipe5_left = false
+        feature_flags.swipe5_right = false
+        stop_swipe()
+        return
+    end
+
+    if name == "swipe4" then
+        feature_flags.swipe4_left = false
+        feature_flags.swipe4_right = false
+        stop_swipe()
+        return
+    end
+
+    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" or name == "swipe4_left" or name == "swipe4_right" or name == "swipe5_left" or name == "swipe5_right" then
         feature_flags[name] = false
         -- if no swipe directions left enabled, stop the swipe subsystem
-        if not (feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down) then
+        if not (feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down or feature_flags.swipe4_left or feature_flags.swipe4_right or feature_flags.swipe5_left or feature_flags.swipe5_right) then
             stop_swipe()
         end
         return

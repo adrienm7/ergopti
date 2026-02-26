@@ -1,5 +1,4 @@
--- keymap.lua
--- Implémentation simplifiée de hotstrings pour Hammerspoon
+-- Simplified hotstrings implementation for Hammerspoon
 
 local eventtap = hs.eventtap
 local keyStrokes = hs.eventtap.keyStrokes
@@ -7,7 +6,7 @@ local keyStroke = hs.eventtap.keyStroke
 
 local M = {}
 
--- Gestion des groupes de mappings (pour permettre enable/disable par fichier)
+-- Manage mapping groups (allow enable/disable per file)
 local groups = {}
 local current_group = nil
 local mappings = {}
@@ -70,7 +69,9 @@ local seq_counter = 0
 local DEBUG_EXPANSION = false
 
 ---------------------------------------------------------------------------
--- Utilitaires UTF-8 (Casse & Ponctuation)
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+-- UTF-8 utilities (Case & Punctuation)
 ---------------------------------------------------------------------------
 local UPPER_LETTERS = {
     ['à']='À', ['â']='Â', ['ä']='Ä', ['é']='É', ['è']='È', ['ê']='Ê', ['ë']='Ë',
@@ -81,7 +82,7 @@ local UPPER_LETTERS = {
 local LOWER_LETTERS = {}
 for k, v in pairs(UPPER_LETTERS) do LOWER_LETTERS[v] = k end
 
--- Symboles spéciaux pour la MONTÉE en majuscule des triggers
+-- Special symbols for uppercase variants of triggers
 local UPPER_TRIGGERS = {}
 for k, v in pairs(UPPER_LETTERS) do UPPER_TRIGGERS[k] = v end
 UPPER_TRIGGERS["'"] = " ?" -- Espace fine insécable + ?
@@ -148,7 +149,9 @@ local function repl_title(s)
 end
 
 ---------------------------------------------------------------------------
--- Ajout de raccourcis
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+-- Adding shortcuts (hotstrings)
 ---------------------------------------------------------------------------
 function M.add(trigger, replacement, opts)
     -- New calling convention: M.add(trigger, replacement, {
@@ -237,7 +240,7 @@ function M.add(trigger, replacement, opts)
         end
     end
 
-    -- Tri par longueur, puis par priorité
+    -- Sort by length, then by priority
     table.sort(mappings, function(a, b)
         local len_a = utf8.len(a.trigger) or #a.trigger
         local len_b = utf8.len(b.trigger) or #b.trigger
@@ -247,7 +250,7 @@ function M.add(trigger, replacement, opts)
 end
 
 ---------------------------------------------------------------------------
--- Écoute du clavier
+-- Keyboard listener
 ---------------------------------------------------------------------------
 local function onKeyDown(e)
     if is_replacing then return false end
