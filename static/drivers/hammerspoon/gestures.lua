@@ -1,369 +1,290 @@
+-- gestures.lua
+-- Gestion des gestes multi-doigts via touchdevice + Swipe spoon (3 doigts)
+--
+-- Architecture : une seule machine à états (gs) par callback de frame.
+-- La décision tap/swipe est prise uniquement au lever complet des doigts (n==0),
+-- en utilisant gs.maxFingers pour éviter tout conflit 4↔5 doigts.
+
 local utils = require("utils")
 local touchdevice = require("hs._asm.undocumented.touchdevice")
-
 local M = {}
 
--- Internal state (from previous touchpad/swipe)
+-- ── Feature flags ─────────────────────────────────────────────────────────────
+-- Noms conservés identiques pour compatibilité avec le menu existant.
+local ff = {
+    tap_selection = true,  -- tap 3 doigts  → activer/désactiver sélection texte
+    tap_lookup    = true,  -- tap 4 doigts  → définition du mot (Ctrl+Cmd+D)
+    swipe_left    = true,  -- swipe 3 ←    → onglet précédent
+    swipe_right   = true,  -- swipe 3 →    → onglet suivant
+    swipe_up      = true,  -- swipe 3 ↑    → nouvel onglet
+    swipe_down    = true,  -- swipe 3 ↓    → fermer onglet
+    swipe_4       = true,  -- swipe 4 ←/→  → changer de Space (⚠ désactiver dans Réglages Système > Trackpad)
+    swipe_5       = true,  -- swipe 5 ←/→  → fenêtre suivante/précédente même app
+}
+
+-- ── Seuils ────────────────────────────────────────────────────────────────────
+local TAP_MAX_SEC   = 0.35   -- durée max pour un tap
+local TAP_MAX_DELTA = 2.0    -- déplacement max pour un tap (unités touchdevice)
+local SWIPE_MIN_H   = 1.5    -- déplacement min horizontal pour valider un swipe 4/5 doigts
+local SWIPE_MIN_V   = 3.0    -- déplacement min vertical
+
+-- ── Mode sélection ────────────────────────────────────────────────────────────
 local leftClickPressed = false
 local mouseEventTap = nil
 
-local _touchStartTime = nil
-local _tapStartPoint = nil
-local _tapEndPoint = nil
-local _maybeTap = false
-local _tapFingerCount = nil
-local _tapDelta = 2.0
-local _lastDebugTime = 0
-
-local touch_watchers = {}
-
--- Swipe defaults
-local Swipe3 = nil
-local current_id_3f, threshold_horizontal, threshold_vertical
-local HORIZONTAL_DEFAULT = 0.04
-local VERTICAL_DEFAULT = 0.12
-
-threshold_horizontal = HORIZONTAL_DEFAULT
-threshold_vertical = VERTICAL_DEFAULT
-
--- Feature flags for gestures (can be toggled at runtime)
-local feature_flags = {
-    tap_selection = true,
-    tap_lookup = true,
-    -- split swipe into four directions
-    swipe_left = true,
-    swipe_right = true,
-    swipe_up = true,
-    swipe_down = true,
-}
-
 local function forceCleanup()
-    utils.debugLog("forceCleanup: start mouseEventTap=", tostring(mouseEventTap), "leftClickPressed=", tostring(leftClickPressed))
     if mouseEventTap then
-        utils.debugLog("forceCleanup: stopping mouseEventTap")
         pcall(function() mouseEventTap:stop() end)
         mouseEventTap = nil
     end
-    pcall(function()
-        if leftClickPressed then
-            local pos = hs.mouse.absolutePosition()
-            hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post()
-        end
-        local pos = hs.mouse.absolutePosition()
-        hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.mouseMoved, pos):post()
-    end)
+    if leftClickPressed then
+        hs.eventtap.event.newMouseEvent(
+            hs.eventtap.event.types.leftMouseUp,
+            hs.mouse.absolutePosition()):post()
+    end
     leftClickPressed = false
-    _touchStartTime = nil
-    _tapStartPoint = nil
-    _tapEndPoint = nil
-    _tapFingerCount = nil
-    _maybeTap = false
 end
 
 local function toggleSelection()
-    utils.debugLog("toggleSelection: activating")
-    if leftClickPressed then
-        forceCleanup()
-        return
-    end
-    local pos = hs.mouse.absolutePosition()
-    hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post()
+    if leftClickPressed then forceCleanup(); return end
+    hs.eventtap.event.newMouseEvent(
+        hs.eventtap.event.types.leftMouseDown,
+        hs.mouse.absolutePosition()):post()
     leftClickPressed = true
-
-    mouseEventTap = hs.eventtap.new({hs.eventtap.event.types.mouseMoved,
-                                     hs.eventtap.event.types.leftMouseDragged,
-                                     hs.eventtap.event.types.leftMouseUp},
+    mouseEventTap = hs.eventtap.new(
+        { hs.eventtap.event.types.mouseMoved,
+          hs.eventtap.event.types.leftMouseDragged,
+          hs.eventtap.event.types.leftMouseUp },
         function(e)
             local t = e:getType()
             if t == hs.eventtap.event.types.leftMouseDragged then
-                local p = e:location()
-                hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDragged, p):post()
+                hs.eventtap.event.newMouseEvent(
+                    hs.eventtap.event.types.leftMouseDragged, e:location()):post()
                 return true
             elseif t == hs.eventtap.event.types.leftMouseUp then
-                hs.timer.doAfter(0, function() forceCleanup() end)
+                hs.timer.doAfter(0, forceCleanup)
                 return true
             end
-            return false
         end)
     pcall(function() mouseEventTap:start() end)
-    utils.debugLog("toggleSelection: mouseEventTap started")
 end
 
 local function triggerLookup()
-    utils.debugLog("triggerLookup: activating")
     pcall(function() hs.eventtap.keyStroke({"ctrl", "cmd"}, "d", 0) end)
 end
 
-local function create_watcher(deviceID)
-    if touch_watchers[deviceID] and touch_watchers[deviceID].watcher then
-        local ok, running = pcall(function() return touch_watchers[deviceID].watcher:isRunning() end)
-        if ok and running then return end
+-- ── Machine à états des gestes ────────────────────────────────────────────────
+local gs = {}
+
+local function resetGS()
+    gs = { active=false, startTime=nil, startPos=nil, endPos=nil, maxFingers=0 }
+end
+resetGS()
+
+local function avgPos(touches)
+    local x, y = 0, 0
+    for _, t in ipairs(touches) do
+        x = x + t.absoluteVector.position.x
+        y = y + t.absoluteVector.position.y
     end
-    if touch_watchers[deviceID] and touch_watchers[deviceID].watcher then
-        pcall(function() touch_watchers[deviceID].watcher:stop() end)
-        touch_watchers[deviceID] = nil
-    end
-    local lastSeen = hs.timer.secondsSinceEpoch()
-    local lastNFingers = nil
-    local stableFrames = 0
-    local watcher = touchdevice.forDeviceID(deviceID):frameCallback(function(_, touches, _, _)
-        local ok, err = pcall(function()
-            local nFingers = #touches
-            if lastNFingers ~= nFingers then
-                utils.debugLog("watcher:", deviceID, "nFingers=", nFingers)
-                lastNFingers = nFingers
-                stableFrames = 1
-            else
-                stableFrames = stableFrames + 1
-            end
-            local now = hs.timer.secondsSinceEpoch()
-            if touch_watchers[deviceID] then touch_watchers[deviceID].lastSeen = now end
+    return { x = x / #touches, y = y / #touches }
+end
 
-            if nFingers == 0 then
-                if _tapStartPoint and _tapEndPoint and _maybeTap and _tapFingerCount then
-                    local delta = math.abs(_tapStartPoint.x - _tapEndPoint.x) + math.abs(_tapStartPoint.y - _tapEndPoint.y)
-                    if delta < _tapDelta then
-                            if _tapFingerCount == 3 then
-                                utils.debugLog("watcher:", deviceID, "detected 3-finger tap (delta=", delta, ") -> toggleSelection")
-                                if feature_flags.tap_selection then toggleSelection() end
-                            elseif _tapFingerCount == 4 then
-                                utils.debugLog("watcher:", deviceID, "detected 4-finger tap (delta=", delta, ") -> triggerLookup")
-                                if feature_flags.tap_lookup then triggerLookup() end
-                            end
-                    end
-                end
-                _touchStartTime = nil
-                _tapStartPoint = nil
-                _tapEndPoint = nil
-                _tapFingerCount = nil
-                _maybeTap = false
-                return
-            end
+-- Appelée une seule fois, quand tous les doigts quittent le trackpad.
+local function commitGesture(now)
+    local elapsed = now - gs.startTime
+    local dx = gs.endPos.x - gs.startPos.x
+    local dy = gs.endPos.y - gs.startPos.y
+    local dist = math.abs(dx) + math.abs(dy)
+    local mf = gs.maxFingers
 
-            if nFingers > 0 and not _touchStartTime then
-                _touchStartTime = now
-                _maybeTap = true
-            elseif _touchStartTime and _maybeTap and (now - _touchStartTime > 0.5) then
-                _maybeTap = false
-                _tapStartPoint = nil
-                _tapEndPoint = nil
-            end
+    if elapsed <= TAP_MAX_SEC and dist < TAP_MAX_DELTA then
+        -- ── TAP ──────────────────────────────────────────────────────────────
+        if     mf == 3 and ff.tap_selection then toggleSelection()
+        elseif mf == 4 and ff.tap_lookup    then triggerLookup() end
 
-            if (nFingers == 3 or nFingers == 4) and stableFrames >= 2 then
-                local xSum, ySum = 0, 0
-                for i=1,#touches do
-                    xSum = xSum + touches[i].absoluteVector.position.x
-                    ySum = ySum + touches[i].absoluteVector.position.y
-                end
-                local xAvg = xSum / #touches
-                local yAvg = ySum / #touches
-
-                if _maybeTap and not _tapStartPoint then
-                    _tapStartPoint = { x = xAvg, y = yAvg }
-                    _tapFingerCount = nFingers
-                    utils.debugLog("watcher:", deviceID, "tap start at", xAvg, yAvg, "fingers=", _tapFingerCount, "stableFrames=", stableFrames)
-                end
-                if _maybeTap then
-                    _tapEndPoint = { x = xAvg, y = yAvg }
-                    if (now - (_lastDebugTime or 0)) > 2 then
-                        _lastDebugTime = now
-                        utils.debugLog("watcher:", deviceID, "tap update at", xAvg, yAvg)
-                    end
-                end
-            elseif nFingers > 4 then
-                _maybeTap = false
-                _tapStartPoint = nil
-                _tapEndPoint = nil
-                _tapFingerCount = nil
-            end
-        end)
-        if not ok then
-            hs.timer.doAfter(0, function()
-                hs.alert.show("touchdevice callback error: " .. tostring(err), 3)
-            end)
+    elseif mf == 4 and ff.swipe_4 then
+        -- ── SWIPE 4 doigts → changement de Space ─────────────────────────────
+        -- ⚠ Nécessite de désactiver "Faire défiler entre les espaces" dans
+        --   Réglages Système > Bureau et Dock > Mission Control (ou Trackpad).
+        local adx, ady = math.abs(dx), math.abs(dy)
+        if adx > ady and adx > SWIPE_MIN_H then
+            if dx < 0 then hs.eventtap.keyStroke({"ctrl"}, "left")
+            else           hs.eventtap.keyStroke({"ctrl"}, "right") end
+        elseif ady > adx and ady > SWIPE_MIN_V then
+            -- swipe vertical 4 doigts (Mission Control / App Exposé) — optionnel
+            -- if dy < 0 then hs.eventtap.keyStroke({}, "F3") end
         end
-    end)
 
-    touch_watchers[deviceID] = { watcher = watcher, lastSeen = lastSeen }
-    pcall(function() watcher:start() end)
-    utils.debugLog("created watcher for", deviceID)
+    elseif mf >= 5 and ff.swipe_5 then
+        -- ── SWIPE 5 doigts → fenêtre suivante/précédente même app ────────────
+        local adx, ady = math.abs(dx), math.abs(dy)
+        if adx > ady and adx > SWIPE_MIN_H then
+            if dx < 0 then hs.eventtap.keyStroke({"cmd"}, "`")
+            else           hs.eventtap.keyStroke({"cmd", "shift"}, "`") end
+        end
+    end
+    -- mf == 3 : swipe géré par le Swipe Spoon, on ne fait rien ici.
+end
+
+local function onFrame(touches)
+    local n = #touches
+    local now = hs.timer.secondsSinceEpoch()
+
+    if n == 0 then
+        -- Lever complet : c'est ici qu'on décide du geste.
+        if gs.active and gs.startPos and gs.endPos then
+            pcall(commitGesture, now)
+        end
+        resetGS()
+        return
+    end
+
+    if n >= 3 then
+        local pos = avgPos(touches)
+        if not gs.active then
+            -- Premier frame avec 3+ doigts : démarrage du geste.
+            gs.active    = true
+            gs.startTime = now
+            gs.startPos  = pos
+            gs.endPos    = pos
+            gs.maxFingers = n
+        else
+            -- Mise à jour : on mémorise le nombre max de doigts vus.
+            -- Cela permet de distinguer 4 et 5 doigts même si le 5e arrive tard.
+            if n > gs.maxFingers then gs.maxFingers = n end
+            gs.endPos = pos
+        end
+    end
+    -- n = 1 ou 2 : on laisse macOS gérer ; si un geste était en cours,
+    -- on attend simplement n==0 pour le valider (doigts qui se lèvent un à un).
+end
+
+-- ── Gestion des watchers ──────────────────────────────────────────────────────
+local touch_watchers = {}
+
+local function create_watcher(deviceID)
+    if touch_watchers[deviceID] then
+        local ok, running = pcall(function() return touch_watchers[deviceID]:isRunning() end)
+        if ok and running then return end
+        pcall(function() touch_watchers[deviceID]:stop() end)
+    end
+    local w = touchdevice.forDeviceID(deviceID):frameCallback(function(_, touches, _, _)
+        pcall(onFrame, touches)
+    end)
+    touch_watchers[deviceID] = w
+    pcall(function() w:start() end)
+    utils.debugLog("watcher créé pour device", deviceID)
 end
 
 local function ensure_watchers()
-    for _, deviceID in ipairs(touchdevice.devices()) do
-        pcall(function() create_watcher(deviceID) end)
+    for _, id in ipairs(touchdevice.devices()) do
+        pcall(create_watcher, id)
     end
 end
 
-local function start_supervisor()
-    hs.timer.doEvery(3, function()
-        for id, entry in pairs(touch_watchers) do
-            local ok, running = pcall(function() return entry.watcher and entry.watcher:isRunning() end)
-            local age = 9999
-            if entry.lastSeen then age = hs.timer.secondsSinceEpoch() - entry.lastSeen end
-            if not ok or not running or age > 2 then
-                utils.debugLog("supervisor: restarting watcher", id, "running=", tostring(running), "age=", age)
-                pcall(function()
-                    if entry.watcher then pcall(function() entry.watcher:stop() end) end
-                    touch_watchers[id] = nil
-                    create_watcher(id)
-                end)
+-- ── Swipe 3 doigts via Spoon ──────────────────────────────────────────────────
+local Swipe3 = nil
+local sw3_id, sw3_th_h, sw3_th_v = nil, 0.04, 0.12
+
+local function start_swipe3()
+    local ok, sp = pcall(function() return hs.loadSpoon("Swipe") end)
+    if not ok or not sp then
+        utils.debugLog("Swipe spoon indisponible, swipe 3 doigts désactivé")
+        return
+    end
+    Swipe3 = sp
+    Swipe3:start(3, function(dir, dist, id)
+        if id ~= sw3_id then
+            sw3_id = id; sw3_th_h = 0.04; sw3_th_v = 0.12
+        end
+        local th = (dir == "left" or dir == "right") and sw3_th_h or sw3_th_v
+        if dist > th then
+            sw3_th_h, sw3_th_v = math.huge, math.huge
+            if dir == "left"  and ff.swipe_left  then hs.eventtap.keyStroke({"ctrl","shift"}, "tab") end
+            if dir == "right" and ff.swipe_right then hs.eventtap.keyStroke({"ctrl"}, "tab") end
+            if dir == "up"    and ff.swipe_up    then hs.eventtap.keyStroke({"cmd"}, "t") end
+            if dir == "down"  and ff.swipe_down  then hs.eventtap.keyStroke({"cmd"}, "w") end
+        end
+    end)
+    utils.debugLog("swipe3 démarré")
+end
+
+local function stop_swipe3()
+    if Swipe3 then pcall(function() Swipe3:stop() end); Swipe3 = nil end
+end
+
+local function swipe3_needed()
+    return ff.swipe_left or ff.swipe_right or ff.swipe_up or ff.swipe_down
+end
+
+-- ── API publique ──────────────────────────────────────────────────────────────
+function M.start()
+    ensure_watchers()
+    if swipe3_needed() then start_swipe3() end
+    -- Superviseur : redémarre les watchers morts toutes les 5 s.
+    hs.timer.doEvery(5, function()
+        for id, w in pairs(touch_watchers) do
+            local ok, r = pcall(function() return w:isRunning() end)
+            if not ok or not r then
+                utils.debugLog("superviseur : redémarrage watcher", id)
+                touch_watchers[id] = nil
+                pcall(create_watcher, id)
             end
         end
         pcall(ensure_watchers)
     end)
 end
 
-local function start_status_logger()
-    hs.timer.doEvery(5, function()
-        local running = 0
-        for id, w in pairs(touch_watchers) do
-            local ok, r = pcall(function() return w and w.watcher and w.watcher:isRunning() end)
-            if ok and r then running = running + 1 end
-        end
-        utils.debugLog("status: watchers=", running, ", leftClickPressed=", tostring(leftClickPressed), ", mouseEventTap=", tostring(mouseEventTap ~= nil))
-    end)
-end
+local ALL_FLAGS = {
+    "tap_selection","tap_lookup",
+    "swipe_left","swipe_right","swipe_up","swipe_down",
+    "swipe_4","swipe_5"
+}
 
--- Swipe handling (Spoon). Try to load but don't hard-fail if problem.
-local function start_swipe()
-    local ok, sp = pcall(function() return hs.loadSpoon("Swipe") end)
-    if not ok or not sp then
-        utils.debugLog("gestures: Swipe spoon not available, swipe gestures disabled")
-        return
-    end
-    Swipe3 = sp
-    Swipe3:start(3, function(direction, distance, id)
-        if id == current_id_3f then
-            local threshold = (direction == "left" or direction == "right") and threshold_horizontal or threshold_vertical
-            if distance > threshold then
-                threshold_horizontal = math.huge
-                threshold_vertical = math.huge
-                if direction == "left" then
-                    if feature_flags.swipe_left then
-                        hs.eventtap.keyStroke({"ctrl", "shift"}, "tab")
-                    end
-                elseif direction == "right" then
-                    if feature_flags.swipe_right then
-                        hs.eventtap.keyStroke({"ctrl"}, "tab")
-                    end
-                elseif direction == "up" then
-                    if feature_flags.swipe_up then
-                        hs.eventtap.keyStroke({"cmd"}, "t")
-                    end
-                elseif direction == "down" then
-                    if feature_flags.swipe_down then
-                        hs.eventtap.keyStroke({"cmd"}, "w")
-                    end
-                end
-            end
-        else
-            current_id_3f = id
-            threshold_horizontal = HORIZONTAL_DEFAULT
-            threshold_vertical = VERTICAL_DEFAULT
-        end
-    end)
-    utils.debugLog("gestures: swipe started")
-end
-
-local function stop_swipe()
-    if Swipe3 and Swipe3.stop then
-        pcall(function() Swipe3:stop() end)
-    end
-    Swipe3 = nil
-    utils.debugLog("gestures: swipe stopped")
-end
-
-function M.start()
-    ensure_watchers()
-    start_supervisor()
-    start_status_logger()
-    if feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down then
-        start_swipe()
-    end
-end
-
--- Enable a specific gesture feature at runtime
 function M.enable(name)
     if name == "all" then
-        feature_flags.tap_selection = true
-        feature_flags.tap_lookup = true
-        feature_flags.swipe_left = true
-        feature_flags.swipe_right = true
-        feature_flags.swipe_up = true
-        feature_flags.swipe_down = true
-        start_swipe()
+        for _, k in ipairs(ALL_FLAGS) do ff[k] = true end
+        if not Swipe3 then start_swipe3() end
         return
     end
-
     if name == "swipe" then
-        feature_flags.swipe_left = true
-        feature_flags.swipe_right = true
-        feature_flags.swipe_up = true
-        feature_flags.swipe_down = true
-        start_swipe()
+        for _, k in ipairs({"swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_5"}) do ff[k] = true end
+        if not Swipe3 then start_swipe3() end
         return
     end
-
-    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" then
-        feature_flags[name] = true
-        -- ensure swipe subsystem is running
-        if not Swipe3 then start_swipe() end
-        return
-    end
-
-    if name == "tap_selection" then
-        feature_flags.tap_selection = true
-    elseif name == "tap_lookup" then
-        feature_flags.tap_lookup = true
+    if ff[name] ~= nil then
+        ff[name] = true
+        if (name=="swipe_left" or name=="swipe_right" or name=="swipe_up" or name=="swipe_down") and not Swipe3 then
+            start_swipe3()
+        end
     end
 end
 
--- Disable a specific gesture feature at runtime
 function M.disable(name)
     if name == "all" then
-        feature_flags.tap_selection = false
-        feature_flags.tap_lookup = false
-        feature_flags.swipe_left = false
-        feature_flags.swipe_right = false
-        feature_flags.swipe_up = false
-        feature_flags.swipe_down = false
-        stop_swipe()
+        for _, k in ipairs(ALL_FLAGS) do ff[k] = false end
+        stop_swipe3()
         return
     end
-
     if name == "swipe" then
-        feature_flags.swipe_left = false
-        feature_flags.swipe_right = false
-        feature_flags.swipe_up = false
-        feature_flags.swipe_down = false
-        stop_swipe()
+        for _, k in ipairs({"swipe_left","swipe_right","swipe_up","swipe_down","swipe_4","swipe_5"}) do ff[k] = false end
+        stop_swipe3()
         return
     end
-
-    if name == "swipe_left" or name == "swipe_right" or name == "swipe_up" or name == "swipe_down" then
-        feature_flags[name] = false
-        -- if no swipe directions left enabled, stop the swipe subsystem
-        if not (feature_flags.swipe_left or feature_flags.swipe_right or feature_flags.swipe_up or feature_flags.swipe_down) then
-            stop_swipe()
-        end
-        return
-    end
-
-    if name == "tap_selection" then
-        feature_flags.tap_selection = false
-    elseif name == "tap_lookup" then
-        feature_flags.tap_lookup = false
+    if ff[name] ~= nil then
+        ff[name] = false
+        if not swipe3_needed() then stop_swipe3() end
     end
 end
 
 function M.is_enabled(name)
-    return feature_flags[name] == true
+    return ff[name] == true
 end
 
-M.forceCleanup = forceCleanup
-M.toggleSelection = toggleSelection
-M.triggerLookup = triggerLookup
+M.forceCleanup       = forceCleanup
+M.toggleSelection    = toggleSelection
+M.triggerLookup      = triggerLookup
 M.isLeftClickPressed = function() return leftClickPressed end
 
 return M
