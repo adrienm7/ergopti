@@ -9,19 +9,19 @@ local SLOT_LABELS = {
     tap_3         = "Tap 3 doigts",
     tap_4         = "Tap 4 doigts",
     tap_5         = "Tap 5 doigts",
-    swipe_2_diag  = "Swipe 2 ↗/↙",
-    swipe_3_horiz = "Swipe 3 ←/→",
-    swipe_3_diag  = "Swipe 3 ↗/↙",
-    swipe_3_up    = "Swipe 3 ↑",
-    swipe_3_down  = "Swipe 3 ↓",
-    swipe_4_horiz = "Swipe 4 ←/→",
-    swipe_4_diag  = "Swipe 4 ↗/↙",
-    swipe_4_up    = "Swipe 4 ↑",
-    swipe_4_down  = "Swipe 4 ↓",
-    swipe_5_horiz = "Swipe 5 ←/→",
-    swipe_5_diag  = "Swipe 5 ↗/↙",
-    swipe_5_up    = "Swipe 5 ↑",
-    swipe_5_down  = "Swipe 5 ↓",
+    swipe_2_diag  = "Swipe 2 doigts ↗/↙",
+    swipe_3_horiz = "Swipe 3 doigts ←/→",
+    swipe_3_diag  = "Swipe 3 doigts ↗/↙",
+    swipe_3_up    = "Swipe 3 doigts ↑",
+    swipe_3_down  = "Swipe 3 doigts ↓",
+    swipe_4_horiz = "Swipe 4 doigts ←/→",
+    swipe_4_diag  = "Swipe 4 doigts ↗/↙",
+    swipe_4_up    = "Swipe 4 doigts ↑",
+    swipe_4_down  = "Swipe 4 doigts ↓",
+    swipe_5_horiz = "Swipe 5 doigts ←/→",
+    swipe_5_diag  = "Swipe 5 doigts ↗/↙",
+    swipe_5_up    = "Swipe 5 doigts ↑",
+    swipe_5_down  = "Swipe 5 doigts ↓",
 }
 
 function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
@@ -230,15 +230,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         end
 
         local menu = {}
-        -- Taps
-        for _, it in ipairs(section({"tap_3","tap_4","tap_5"}, false)) do
-            table.insert(menu, it)
-        end
-        table.insert(menu, {title="-"})
         -- 2 doigts
         table.insert(menu, slotItem("swipe_2_diag", true))
         table.insert(menu, {title="-"})
-        -- 3 doigts
+        -- 3 doigts : tap en premier, puis swipes
+        table.insert(menu, slotItem("tap_3", false))
         for _, it in ipairs(section({"swipe_3_horiz","swipe_3_diag"}, true)) do
             table.insert(menu, it)
         end
@@ -246,7 +242,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             table.insert(menu, it)
         end
         table.insert(menu, {title="-"})
-        -- 4 doigts
+        -- 4 doigts : tap en premier, puis swipes
+        table.insert(menu, slotItem("tap_4", false))
         for _, it in ipairs(section({"swipe_4_horiz","swipe_4_diag"}, true)) do
             table.insert(menu, it)
         end
@@ -254,7 +251,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             table.insert(menu, it)
         end
         table.insert(menu, {title="-"})
-        -- 5 doigts
+        -- 5 doigts : tap en premier, puis swipes
+        table.insert(menu, slotItem("tap_5", false))
         for _, it in ipairs(section({"swipe_5_horiz","swipe_5_diag"}, true)) do
             table.insert(menu, it)
         end
@@ -327,7 +325,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             {title="Console Hammerspoon",       fn=function() hs.openConsole() end},
             {title="Préférences Hammerspoon",   fn=function() hs.openPreferences() end},
             {title="Recharger la configuration",fn=function() do_reload() end},
-            {title="Quitter Hammerspoon",        fn=function() hs.quit() end},
+            {title="Quitter Hammerspoon",        fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end},
         }
     end
 
