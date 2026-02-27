@@ -94,6 +94,41 @@ local function winNav(goNext)
 end
 
 local function spaceNav(goNext)
+    -- Add ability to cycle through spaces when on the first or last one
+    local ok, spaces = pcall(function() return require("hs.spaces") end)
+    if ok and spaces then
+        local screen = hs.screen.mainScreen()
+        local uuid = screen and screen:getUUID()
+        if uuid then
+            local ok2, all = pcall(function() return spaces.allSpaces() end)
+            if ok2 and all and all[uuid] and #all[uuid] > 0 then
+                local sps = all[uuid]
+                local active = nil
+                if type(spaces.activeSpace) == "function" then
+                    pcall(function() active = spaces.activeSpace() end)
+                else
+                    local fw = hs.window.frontmostWindow()
+                    if fw and type(spaces.windowSpaces) == "function" then
+                        local okw, ws = pcall(function() return spaces.windowSpaces(fw) end)
+                        if okw and ws and #ws > 0 then active = ws[1] end
+                    end
+                end
+                if active then
+                    local idx = nil
+                    for i, id in ipairs(sps) do if tostring(id) == tostring(active) then idx = i; break end end
+                    if idx then
+                        local total = #sps
+                        local delta = goNext and 1 or -1
+                        local newIdx = ((idx - 1 + delta) % total) + 1
+                        pcall(function() hs.eventtap.keyStroke({"ctrl"}, tostring(newIdx), 0) end)
+                        return
+                    end
+                end
+            end
+        end
+    end
+    -- Fallback: send Ctrl+Left/Ctrl+Right via AppleScript when hs.spaces
+    -- lookup is not available or fails.
     hs.osascript.applescript(string.format(
         'tell application "System Events" to key code %d using {control down}',
         goNext and 124 or 123))
