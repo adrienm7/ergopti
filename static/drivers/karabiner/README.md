@@ -1,0 +1,1 @@
+TODO: modifier dans les paramètres macOs Clavier > Raccourcis clavier > Clavier > Déplacer la cible sur la fenêtre suivante pour y mettre le raccourci Cmd + $ (grave accent) au lieu de Cmd + \` (grave accent)

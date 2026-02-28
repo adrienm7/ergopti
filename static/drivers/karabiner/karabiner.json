@@ -1715,6 +1715,33 @@
                                     }
                                 ],
                                 "type": "basic"
+                            },
+                            {
+                                "description": "Layer: Tab -> Cycle windows in app (Command+`)",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "tab",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "non_us_backslash",
+                                        "modifiers": [
+                                            "command"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
                             }
                         ]
                     },
