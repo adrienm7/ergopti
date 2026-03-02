@@ -419,6 +419,25 @@ local function commitGesture(now)
         return
     end
 
+    -- Horiz/diag : if diagonal and disabled, fall back to dominant axis.
+    -- This gives more tolerance for horiz/vert detection when diag is unused.
+    if dir == "diag" then
+        local diag_slot = slotForDir(mf, dir)
+        if not diag_slot or ga[diag_slot] == "none" then
+            -- Re-classify as horizontal or vertical based on dominant axis
+            dir = (adx >= ady) and "horiz" or "vert"
+        end
+    end
+
+    -- Vert (re-evaluated after possible diagonal fallback)
+    if dir == "vert" then
+        local goDown = dy > 0
+        if     mf == 3 then doSingle(goDown and "swipe_3_down" or "swipe_3_up")
+        elseif mf == 4 then doSingle(goDown and "swipe_4_down" or "swipe_4_up")
+        elseif mf >= 5 then doSingle(goDown and "swipe_5_down" or "swipe_5_up") end
+        return
+    end
+
     -- Horiz/diag : ne rien faire si l'action est désactivée
     local slot = slotForDir(mf, dir)
     if not slot then return end
@@ -473,7 +492,16 @@ local function onFrame(touches)
                 if gs.lockedDir == nil then
                     local dx = pos.x - gs.startPos.x
                     local dy = pos.y - gs.startPos.y
-                    gs.lockedDir = computeDir(dx, dy, gs.maxFingers)
+                    local tentative = computeDir(dx, dy, gs.maxFingers)
+                    -- If diagonal slot is unused, reallocate to dominant axis so
+                    -- scalable actions get the right lock direction immediately.
+                    if tentative == "diag" then
+                        local diag_slot = slotForDir(gs.maxFingers, tentative)
+                        if not diag_slot or ga[diag_slot] == "none" then
+                            tentative = (math.abs(dx) >= math.abs(dy)) and "horiz" or "vert"
+                        end
+                    end
+                    gs.lockedDir = tentative
                 end
 
                 if gs.lockedDir and gs.lockedDir ~= "vert" then
