@@ -26,11 +26,6 @@ local SLOT_LABELS = {
 
 function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
     base_dir = base_dir or (hs.configdir .. "/")
-    local gen_dir = base_dir .. "generated_hotstrings/"
-
-    local descriptions = {}
-    local ok, res = pcall(function() return dofile(gen_dir .. "_descriptions.lua") end)
-    if ok and type(res) == "table" then descriptions = res end
 
     local myMenu = menubar.new()
 
@@ -144,46 +139,101 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
 
     -- ── Constructeurs d'items ─────────────────────────────────────────────────
 
-    local function buildHotstringsItem()
-        local item = {
-            title   = "Expansion de texte",
-            checked = state.keymap or nil,
-            fn = function()
-                state.keymap = not state.keymap
-                if state.keymap then keymap.start() else keymap.stop() end
-                save_prefs(); do_reload()
-            end
-        }
-        if state.keymap then
-            local normal_menu, plus_menu = {}, {}
-            for _, f in ipairs(hotfiles or {}) do
-                local name = f:match("^(.*)%.lua$") or f
-                local pretty = name:gsub("_"," ")
-                if descriptions[name] and descriptions[name] ~= "" then pretty = descriptions[name] end
-                local entry = {
-                    title   = pretty,
-                    checked = (keymap and type(keymap.is_group_enabled)=="function"
-                               and keymap.is_group_enabled(name))
-                              or state.hotstrings[name] or nil,
-                    fn = function()
-                        state.hotstrings[name] = not state.hotstrings[name]
-                        if state.hotstrings[name] then keymap.enable_group(name)
-                        else keymap.disable_group(name) end
-                        save_prefs(); do_reload()
-                    end
-                }
-                if name:match("^plus") then table.insert(plus_menu, entry)
-                else                        table.insert(normal_menu, entry) end
-            end
-            local out = {}
-            for _, it in ipairs(normal_menu) do table.insert(out, it) end
-            if #plus_menu > 0 then
-                table.insert(out, {title="-"})
-                for _, it in ipairs(plus_menu) do table.insert(out, it) end
-            end
-            item.menu = out
+    -- Helper: resolve enabled state for a top-level TOML/Lua group.
+    local function groupEnabled(name)
+        return (keymap and type(keymap.is_group_enabled) == "function"
+                and keymap.is_group_enabled(name))
+               or (state.hotstrings[name] ~= false)
+    end
+
+    -- Helper: label for a top-level group (uses [_meta] description if present).
+    local function groupLabel(name)
+        local meta = keymap and keymap.get_meta_description
+                     and keymap.get_meta_description(name) or nil
+        return (meta and meta ~= '') and meta or name:gsub('_', ' ')
+    end
+
+    -- Helper: toggle function for a top-level group.
+    local function toggleGroupFn(name)
+        return function()
+            state.hotstrings[name] = not groupEnabled(name)
+            if state.hotstrings[name] then keymap.enable_group(name)
+            else keymap.disable_group(name) end
+            save_prefs(); do_reload()
         end
-        return item
+    end
+
+    -- Helper: toggle function for a section within a TOML group.
+    local function toggleSectionFn(group_name, sec_name)
+        return function()
+            if keymap.is_section_enabled(group_name, sec_name) then
+                keymap.disable_section(group_name, sec_name)
+            else
+                keymap.enable_section(group_name, sec_name)
+            end
+            save_prefs(); do_reload()
+        end
+    end
+
+    -- Returns a flat list of items, one per TOML/Lua group, inserted directly
+    -- into the top-level menu (no extra "Hotstrings" parent wrapper).
+    --
+    -- Each group item title includes the total hotstring count: "Label (N)".
+    -- TOML groups that are enabled show a ">" sub-menu listing every section
+    -- as a checkable toggle; each section label includes its own count.
+    -- Disabled groups or Lua groups get a simple click-to-toggle.
+    local function buildHotstringsItems()
+        local top_names = {}
+        for _, f in ipairs(hotfiles or {}) do
+            top_names[#top_names + 1] = f:match("^(.*)%.lua$") or f
+        end
+
+        if #top_names == 0 then return {} end
+
+        local items = {}
+        for _, name in ipairs(top_names) do
+            local enabled  = groupEnabled(name)
+            local sections = keymap and keymap.get_sections
+                             and keymap.get_sections(name) or nil
+            local has_sections = sections and #sections > 0
+
+            -- Compute total count across all sections.
+            local total = 0
+            if has_sections then
+                for _, sec in ipairs(sections) do
+                    total = total + (sec.count or 0)
+                end
+            end
+
+            local base_label = groupLabel(name)
+            local item = {
+                title   = base_label .. " (" .. total .. ")",
+                checked = enabled or nil,
+            }
+
+            if has_sections and enabled then
+                -- Sub-menu: one entry per section with its own count.
+                local sec_menu = {}
+                for _, sec in ipairs(sections) do
+                    local sec_on = keymap.is_section_enabled(name, sec.name)
+                    local label  = (sec.description and sec.description ~= '')
+                                   and sec.description or sec.name:gsub('_', ' ')
+                    sec_menu[#sec_menu + 1] = {
+                        title   = label .. " (" .. (sec.count or 0) .. ")",
+                        checked = sec_on or nil,
+                        fn      = toggleSectionFn(name, sec.name),
+                    }
+                end
+                item.menu = sec_menu
+            else
+                -- Lua group or disabled TOML group: simple toggle.
+                item.fn = toggleGroupFn(name)
+            end
+
+            items[#items + 1] = item
+        end
+
+        return items
     end
 
     local function buildGestesItem()
@@ -331,7 +381,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
 
     local function updateMenu()
         local items = {}
-        table.insert(items, buildHotstringsItem())
+        for _, it in ipairs(buildHotstringsItems()) do
+            table.insert(items, it)
+        end
         table.insert(items, buildGestesItem())
         table.insert(items, buildRaccourcisItem())
         for _, it in ipairs(buildUtilityItems()) do table.insert(items, it) end

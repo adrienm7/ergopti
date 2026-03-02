@@ -22,37 +22,36 @@ repeat_keys.start(keymap)
 
 
 ---------------------------------------------------------------------------
--- Dynamic hotstrings
+-- TOML hotstrings (loaded directly from ../hotstrings/*.toml)
 ---------------------------------------------------------------------------
--- Absolute path to your real source directory
-local base_dir = "/Users/b519hs/Documents/perso/ergopti/static/drivers/hammerspoon/"
-local gen_dir = base_dir .. "generated_hotstrings/"
+-- Absolute path to this Hammerspoon config directory
+-- Derive absolute path to this Hammerspoon config directory from this file's
+-- location so the config remains portable across machines.
+local script_path = debug.getinfo(1, "S").source
+if script_path:sub(1, 1) == "@" then
+    script_path = script_path:sub(2)
+end
+local base_dir = script_path:match("^(.*[/\\])") or "./"
+if not base_dir:match("[/\\]$") then
+    base_dir = base_dir .. "/"
+end
+local hotstrings_dir = base_dir .. "../hotstrings/"
 
--- List of generated hotstrings files
-local hotfiles = {
-    "accents.lua",
-    "brands.lua",
-    "emojis.lua",
-    "errors.lua",
-    "magic.lua",
-    "minus.lua",
-    "names.lua",
-    "plus_apostrophe.lua",
-    "plus_comma.lua",
-    "plus_e_deadkey.lua",
-    "plus_qu.lua",
-    "plus_rolls.lua",
-    "sfb_reduction.lua",
-    "plus_suffixes.lua",
-    "punctuation.lua",
-    "symbols.lua",
-    "symbols_typst.lua",
-}
+-- Collect and sort all .toml filenames for a deterministic load order.
+local toml_fnames = {}
+for fname in hs.fs.dir(hotstrings_dir) do
+    if fname:match("%.toml$") then
+        toml_fnames[#toml_fnames + 1] = fname
+    end
+end
+table.sort(toml_fnames)
 
--- Load each file via keymap.load_file (allows toggling per group)
-for _, f in ipairs(hotfiles) do
-    local name = f:match("^(.*)%.lua$") or f
-    keymap.load_file(name, gen_dir .. f)
+-- Load each TOML file as an independent keymap group (group name = stem).
+local hotfiles = {}  -- group names passed to the menu
+for _, fname in ipairs(toml_fnames) do
+    local name = fname:match("^(.-)%.toml$")
+    keymap.load_toml(name, hotstrings_dir .. fname)
+    hotfiles[#hotfiles + 1] = name
 end
 
 

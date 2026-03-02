@@ -11,19 +11,110 @@ local groups = {}
 local current_group = nil
 local mappings = {}
 
-local function record_group(name, path)
+local function record_group(name, path, kind)
     local seqs = {}
     for _, m in ipairs(mappings) do
         if m.group == name then table.insert(seqs, m.seq) end
     end
-    groups[name] = { path = path, seqs = seqs, enabled = true }
+    groups[name] = { path = path, seqs = seqs, enabled = true, kind = kind or 'lua' }
 end
 
 function M.load_file(name, path)
     current_group = name
     dofile(path)
     current_group = nil
-    record_group(name, path)
+    record_group(name, path, 'lua')
+end
+
+-- Load hotstring entries from a TOML file produced by generate_hotstrings.py.
+-- Sections disabled via hs.settings are skipped (their entries are not loaded).
+-- Stores section info (name, description, count) in the group record so that
+-- the menu can display a sub-menu per section.
+function M.load_toml(name, path)
+	local toml_reader = require("toml_reader")
+	local data = toml_reader.parse(path)
+
+	-- Register all entries under the parent group name
+	current_group = name
+	local total = 0
+	local sections_info = {}
+
+	for _, sec_name in ipairs(data.sections_order) do
+		local sec = data.sections[sec_name]
+		local sec_enabled = M.is_section_enabled(name, sec_name)
+		if sec_enabled then
+			for _, entry in ipairs(sec.entries) do
+				M.add(entry.trigger, entry.output, {
+					is_word           = entry.is_word,
+					auto_expand       = entry.auto_expand,
+					is_case_sensitive = entry.is_case_sensitive,
+				})
+				total = total + 1
+			end
+		end
+		table.insert(sections_info, {
+			name        = sec_name,
+			description = sec.description,
+			count       = #sec.entries,
+		})
+	end
+
+	current_group = nil
+
+	-- Build the seqs list (entries added above are now in mappings)
+	local seqs = {}
+	for _, m in ipairs(mappings) do
+		if m.group == name then table.insert(seqs, m.seq) end
+	end
+
+	groups[name] = {
+		path             = path,
+		seqs             = seqs,
+		enabled          = true,
+		kind             = 'toml',
+		meta_description = data.meta.description,
+		sections         = sections_info,
+	}
+
+	print(string.format('[keymap] %s: loaded %d entries in %d sections',
+		name, total, #sections_info))
+end
+
+-- ── Section-level enable / disable ──────────────────────────────────────────
+-- State is persisted via hs.settings (survives reloads).
+-- Key pattern: "hotstrings_section_<group>_<section>"
+
+-- Return whether a specific section within a TOML group is enabled.
+-- Default is true (absent key ≡ enabled).
+function M.is_section_enabled(group_name, section_name)
+	local key = "hotstrings_section_" .. group_name .. "_" .. section_name
+	return hs.settings.get(key) ~= false
+end
+
+-- Persistently disable a section; takes effect on next config reload.
+function M.disable_section(group_name, section_name)
+	local key = "hotstrings_section_" .. group_name .. "_" .. section_name
+	hs.settings.set(key, false)
+end
+
+-- Re-enable a section (remove the persisted disabled flag).
+function M.enable_section(group_name, section_name)
+	local key = "hotstrings_section_" .. group_name .. "_" .. section_name
+	hs.settings.set(key, nil)
+end
+
+-- Return the ordered list of sections for a TOML group, or nil for Lua groups.
+-- Each element: { name, description, count }
+function M.get_sections(name)
+    local g = groups[name]
+    if not g or not g.sections then return nil end
+    return g.sections
+end
+
+-- Return the file-level description stored in [_meta] for a TOML group.
+function M.get_meta_description(name)
+    local g = groups[name]
+    return g and g.meta_description or nil
 end
 
 function M.disable_group(name)
@@ -52,8 +143,12 @@ function M.enable_group(name)
     local g = groups[name]
     if not g then return end
     if g.enabled then return end
-    -- re-load the file to re-add mappings under the same group name
-    M.load_file(name, g.path)
+    -- re-load the source (Lua or TOML) to re-add mappings under the same group name
+    if g.kind == 'toml' then
+        M.load_toml(name, g.path)
+    else
+        M.load_file(name, g.path)
+    end
 end
 
 ---------------------------------------------------------------------------
