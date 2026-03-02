@@ -457,6 +457,36 @@ def _extract_hotstring_from_line(
     return None, None, False, False, False
 
 
+def _strip_ahk_inline_comment(line: str) -> str:
+    """Strip an AHK inline comment (``; ...``) from *line*.
+
+    Respects double-quoted string literals so that semicolons inside quotes
+    are not treated as comment starters.  AHK backtick escapes (`` `x ``) are
+    handled inside strings.
+
+    Args:
+            line: A single AHK statement line.
+
+    Returns:
+            The line with the inline comment removed, stripped of trailing
+            whitespace.
+    """
+    in_string = False
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if ch == "`" and in_string:
+            # AHK backtick escape: skip the next character unconditionally
+            i += 2
+            continue
+        if ch == '"':
+            in_string = not in_string
+        elif ch == ";" and not in_string:
+            return line[:i].rstrip()
+        i += 1
+    return line
+
+
 def parse_body(
     body: str,
 ) -> list[tuple[str, str, bool, bool, bool]]:
@@ -491,11 +521,13 @@ def parse_body(
             or "CreateHotstring(" in line
             or bool(re.search(r"(?<![A-Za-z])Hotstring\s*\(", line))
         )
-        if _is_open_call and not line.rstrip().endswith(")"):
+        if _is_open_call and not _strip_ahk_inline_comment(line).endswith(")"):
             j = i + 1
-            while j < len(lines) and not line.rstrip().endswith(")"):
+            while j < len(lines) and not _strip_ahk_inline_comment(
+                line
+            ).endswith(")"):
                 next_fragment = lines[j].strip()
-                # Ignore inline comments; they corrupt the joined expression.
+                # Ignore standalone comment lines; they corrupt the joined expression.
                 if not next_fragment.startswith(";"):
                     line += " " + next_fragment
                 j += 1
@@ -648,6 +680,48 @@ def _e_deadkey_entries() -> list[tuple[str, str, bool, bool, bool]]:
     ]
 
 
+def _hashtag_quote_entries() -> list[tuple[str, str, bool, bool, bool]]:
+    """Return entries for the HashtagQuote roll: (# ➜ (" and [# ➜ [\'.
+
+    This roll is implemented via a ``#HotIf`` block in AHK (not a standard
+    ``CreateHotstring`` call) and therefore cannot be parsed automatically.
+    When the last character sent is ``(`` or ``[``, pressing the AltGr-mapped
+    ``#`` key outputs a double-quote instead.
+    """
+    return [
+        ("(#", '("', False, True, False),
+        ("[#", '["', False, True, False),
+    ]
+
+
+def _chevron_equal_entries() -> list[tuple[str, str, bool, bool, bool]]:
+    """Return entries for the ChevronEqual roll: <% ➜ <= and >% ➜ >=.
+
+    This roll is also implemented via a ``#HotIf`` block in AHK and is not
+    captured by the standard block parser.  When the last character sent is
+    ``<`` or ``>``, pressing the AltGr-mapped ``%`` key outputs ``=``.
+    """
+    return [
+        ("<%", "<=", False, True, False),
+        (">%", ">=", False, True, False),
+    ]
+
+
+def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool]]:
+    """Return corrected entries for the EqualString roll: [) ➜ = "".
+
+    The AHK source uses consecutive backtick-escaped double-quotes
+    (`` `"`" ``) followed by a cursor-movement command.  This pattern
+    confuses the string-concatenation collapsing regex, so the automatic
+    parser yields a truncated output (a bare backtick).  These hand-crafted
+    entries override the broken parsed ones with the correct expansion.
+    """
+    return [
+        (" [)", ' = ""', False, True, False),
+        ("[)", ' = ""', False, True, False),
+    ]
+
+
 # Sub-blocks to inject into specific category TOMLs.
 # Format: { AHK_category: { sub_name: (entries, section_description) } }
 _HANDCRAFTED_SECTIONS: dict[
@@ -658,6 +732,27 @@ _HANDCRAFTED_SECTIONS: dict[
             _apostrophe_entries(),
             "Remplace l'apostrophe droite par l'apostrophe typographique \u2019"
             " devant les voyelles et consonnes fréquentes",
+        ),
+    },
+    "Rolls": {
+        # HashtagQuote and ChevronEqual are #HotIf blocks in AHK — they use
+        # GetLastSentCharacterAt() context logic and are never emitted by a
+        # CreateHotstring() call, so the parser misses them entirely.
+        "HashtagQuote": (
+            _hashtag_quote_entries(),
+            '(# \u279c (" et [# \u279c ["',
+        ),
+        "ChevronEqual": (
+            _chevron_equal_entries(),
+            "<% \u279c <= et >% \u279c >=",
+        ),
+        # EqualString is parsed automatically but the output is wrong: the
+        # AHK source concatenates two backtick-escaped double-quotes followed
+        # by {Left}, which the concat-collapsing regex cannot handle. The
+        # correct expansion is = "" (cursor left is stripped).
+        "EqualString": (
+            _equal_string_entries(),
+            '[ ) \u279c = ""',
         ),
     },
     "SFBsReduction": {

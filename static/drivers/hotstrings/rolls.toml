@@ -16,7 +16,7 @@ assign = "#! ➜ :="
 notequal = "!# ➜ !="
 sx = "SX ➜ SK"
 cx = "CX ➜ CK"
-equalstring = "[ ) ➜ = \" \""
+equalstring = "[ ) ➜ = \"\""
 englishnegation = "NT' ➜ = N’T"
 leftarrow = "=+ = ➜"
 assignarrowequalright = "$= ➜ =>"
@@ -24,6 +24,8 @@ assignarrowequalleft = "=$ ➜ <="
 assignarrowminusright = "+? ➜ ->"
 assignarrowminusleft = "?+ ➜ <-"
 ct = "P' ➜ CT"
+hashtagquote = "(# ➜ (\" et [# ➜ [\""
+chevronequal = "<% ➜ <= et >% ➜ >="
 
 [[closechevrontag]]
 "<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true }
@@ -53,12 +55,15 @@ ct = "P' ➜ CT"
 "ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
 "!#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
 
+[[sx]]
+"sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false }
+
 [[cx]]
 "cx" = { output = "ck", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[equalstring]]
-" [)" = { output = " = `", is_word = false, auto_expand = true, is_case_sensitive = true }
-"[)" = { output = " = `", is_word = false, auto_expand = true, is_case_sensitive = true }
+" [)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true }
+"[)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[englishnegation]]
 "nt'" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = true }
@@ -85,3 +90,11 @@ ct = "P' ➜ CT"
 
 [[ct]]
 "p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[hashtagquote]]
+"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true }
+"[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true }
+
+[[chevronequal]]
+"<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true }
+">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true }

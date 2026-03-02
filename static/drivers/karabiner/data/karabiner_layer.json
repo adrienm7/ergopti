@@ -2,6 +2,20 @@
 	"description": "Left Command becomes a navigation layer",
 	"manipulators": [
 		{
+			"description": "AltGr + Left Command: send Option+Backspace (no right_option in output to avoid triggering Hammerspoon reload)",
+			"from": {
+				"key_code": "left_command",
+				"modifiers": { "mandatory": ["right_option"] }
+			},
+			"to": [
+				{
+					"key_code": "delete_or_backspace",
+					"modifiers": ["left_option"]
+				}
+			],
+			"type": "basic"
+		},
+		{
 			"description": "Hold: activate layer temporarily | Tap: send BackSpace",
 			"from": {
 				"key_code": "left_command",

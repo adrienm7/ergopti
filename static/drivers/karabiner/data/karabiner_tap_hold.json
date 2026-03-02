@@ -238,25 +238,54 @@
 								"type": "basic"
 							}
 						]
+					},
+					{
+						"description": "CapsLock: send Enter when no other rule matches",
+						"manipulators": [
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "caps_lock",
+									"modifiers": {
+										"optional": [
+											"caps_lock",
+											"left_command",
+											"right_command",
+											"left_control",
+											"right_control",
+											"left_option",
+											"left_shift",
+											"right_shift",
+											"fn"
+										]
+									}
+								},
+								"to": [{ "key_code": "return_or_enter" }]
+							}
+						]
+					},
+					{
+						"description": "Right Option: sticky Right Shift when no other rule matches",
+						"manipulators": [
+							{
+								"type": "basic",
+								"from": {
+									"key_code": "right_option",
+									"modifiers": { "optional": ["any"] }
+								},
+								"to": [
+									{ "sticky_modifier": { "right_shift": "toggle" } },
+									{ "key_code": "right_shift" }
+								]
+							}
+						]
 					}
 				]
 			},
 			"devices": [
 				{
 					"identifiers": { "is_keyboard": true },
-					"simple_modifications": [
-						{
-							"from": { "key_code": "caps_lock" },
-							"to": [{ "key_code": "return_or_enter" }]
-						},
-						{
-							"from": { "key_code": "right_option" },
-							"to": [
-								{ "sticky_modifier": { "right_shift": "toggle" } },
-								{ "key_code": "right_shift" }
-							]
-						}
-					]
+					"simple_modifications": []
 				}
 			],
 			"name": "Default profile",

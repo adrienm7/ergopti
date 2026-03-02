@@ -335,19 +335,33 @@ function M.add(trigger, replacement, opts)
         end
     end
 
-    -- Sort by length, then by priority
+    -- Sort by descending trigger length; for equal lengths, lower seq wins
+    -- (lower seq = registered earlier = higher conceptual priority, so TOML
+    -- hotstrings always beat repeat_key fallbacks of the same length).
     table.sort(mappings, function(a, b)
         local len_a = utf8.len(a.trigger) or #a.trigger
         local len_b = utf8.len(b.trigger) or #b.trigger
-        if len_a == len_b then return a.seq > b.seq end
+        if len_a == len_b then return a.seq < b.seq end
         return len_a > len_b
     end)
 end
 
 ---------------------------------------------------------------------------
+-- Pause flag: when true, the keydown handler passes all events through
+-- without expanding any hotstring. The tap itself keeps running so that
+-- script_control shortcuts (pause toggle / reload) remain reachable.
+---------------------------------------------------------------------------
+local processing_paused = false
+
+function M.pause_processing()  processing_paused = true  end
+function M.resume_processing() processing_paused = false end
+function M.is_processing_paused() return processing_paused end
+
+---------------------------------------------------------------------------
 -- Keyboard listener
 ---------------------------------------------------------------------------
 local function onKeyDown(e)
+    if processing_paused then return false end
     if is_replacing then return false end
 
     local keyCode = e:getKeyCode()
