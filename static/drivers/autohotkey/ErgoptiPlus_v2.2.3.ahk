@@ -4959,11 +4959,19 @@ if Features["Autocorrection"]["Errors"].Enabled {
 
     ; === Letters chaining correction ===
     CreateCaseSensitiveHotstrings(
-        "*?", "eua", "eau",
+        "*", "acceuil", "accueil",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
         "*?", "aeu", "eau",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eiu", "ieu",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "eua", "eau",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
@@ -4975,7 +4983,15 @@ if Features["Autocorrection"]["Errors"].Enabled {
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
-        "*", "acceuil", "accueil",
+        "*", "sru", "sur",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "uio", "uoi",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
+        "*?", "uei", "uie",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
 }
@@ -5166,9 +5182,16 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "autohotkey", "AutoHotkey")
     CreateHotstring("", "citroen", "Citroën")
     CreateHotstring("", "chatgpt", "ChatGPT")
+    CreateHotstring("", "facebook", "Facebook")
+    CreateHotstring("", "firefox", "Firefox")
+    CreateHotstring("", "github", "GitHub")
+    CreateHotstring("", "google", "Google")
+    CreateHotstring("", "ia", "IA")
     CreateHotstring("", "insee", "INSEE")
+    CreateHotstring("", "instagram", "Instagram")
     CreateHotstring("", "latex", "LaTeX")
     CreateHotstring("", "lualatex", "LuaLaTeX")
+    CreateHotstring("", "macos", "macOS")
     CreateHotstring("", "mbti", "MBTI")
     CreateHotstring("", "nasa", "NASA")
     CreateHotstring("", "nlp", "NLP")
@@ -5180,7 +5203,12 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "pnl", "PNL")
     CreateHotstring("", "powerpoint", "PowerPoint")
     CreateHotstring("", "sharepoint", "SharePoint")
+    CreateHotstring("", "url", "URL")
     CreateHotstring("", "vscode", "VSCode")
+    CreateHotstring("", "wikipedia", "Wikipedia")
+    CreateHotstring("", "wikipédia", "Wikipédia")
+    CreateHotstring("", "windows", "Windows")
+    CreateHotstring("", "youtube", "YouTube")
 
     ; For these apps, we only capitalize them when used in context of apps, and not as English words
     apps := ["excel", "teams", "word", "office"]
@@ -5325,6 +5353,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "chomé", "chômé")
     CreateCaseSensitiveHotstrings("*", "cloture", "clôture")
     CreateCaseSensitiveHotstrings("*", "cloturé", "clôturé")
+    CreateCaseSensitiveHotstrings("*", "cocaine", "cocaïne")
+    CreateCaseSensitiveHotstrings("*", "cocaino", "cocaïno")
     CreateCaseSensitiveHotstrings("*", "coeur", "cœur")
     CreateCaseSensitiveHotstrings("*", "coincide", "coïncide")
     CreateCaseSensitiveHotstrings("*?", "connait", "connaît")
@@ -5882,7 +5912,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "admin" . ScriptInformation["MagicKey"], "administrateur")
     CreateCaseSensitiveHotstrings("*", "afr" . ScriptInformation["MagicKey"], "à faire")
     CreateCaseSensitiveHotstrings("*", "ah" . ScriptInformation["MagicKey"], "aujourd’hui")
-    CreateHotstring("*", "ahk" . ScriptInformation["MagicKey"], "AutoHotkey", Map("FinalResult", True))
+    CreateCaseSensitiveHotstrings("*", "ahk" . ScriptInformation["MagicKey"], "autohotkey")
     CreateCaseSensitiveHotstrings("*", "ajd" . ScriptInformation["MagicKey"], "aujourd’hui")
     CreateCaseSensitiveHotstrings("*", "algo" . ScriptInformation["MagicKey"], "algorithme")
     CreateCaseSensitiveHotstrings("*", "alpha" . ScriptInformation["MagicKey"], "alphabétique")
@@ -5898,6 +5928,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "appli" . ScriptInformation["MagicKey"], "application")
     CreateCaseSensitiveHotstrings("*", "approx" . ScriptInformation["MagicKey"], "approximation")
     CreateCaseSensitiveHotstrings("*", "archi" . ScriptInformation["MagicKey"], "architecture")
+    CreateCaseSensitiveHotstrings("*", "arg" . ScriptInformation["MagicKey"], "argument")
     CreateCaseSensitiveHotstrings("*", "asso" . ScriptInformation["MagicKey"], "association")
     CreateCaseSensitiveHotstrings("*", "asap" . ScriptInformation["MagicKey"], "le plus rapidement possible")
     CreateCaseSensitiveHotstrings("*", "atd" . ScriptInformation["MagicKey"], "attend")
@@ -5939,7 +5970,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "cc" . ScriptInformation["MagicKey"], "copier-coller")
     CreateCaseSensitiveHotstrings("*", "ccé" . ScriptInformation["MagicKey"], "copié-collé")
     CreateCaseSensitiveHotstrings("*", "ccl" . ScriptInformation["MagicKey"], "conclusion")
-    CreateCaseSensitiveHotstrings("*", "cdg" . ScriptInformation["MagicKey"], "Charles de Gaulle")
+    CreateHotstring("*", "cdg" . ScriptInformation["MagicKey"], "Charles de Gaulle")
     CreateCaseSensitiveHotstrings("*", "cdt" . ScriptInformation["MagicKey"], "cordialement")
     CreateCaseSensitiveHotstrings("*", "certif" . ScriptInformation["MagicKey"], "certification")
     CreateCaseSensitiveHotstrings("*", "chg" . ScriptInformation["MagicKey"], "charge")
@@ -5954,6 +5985,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "cond" . ScriptInformation["MagicKey"], "condition")
     CreateCaseSensitiveHotstrings("*", "conds" . ScriptInformation["MagicKey"], "conditions")
     CreateCaseSensitiveHotstrings("*", "config" . ScriptInformation["MagicKey"], "configuration")
+    CreateCaseSensitiveHotstrings("*", "conso" . ScriptInformation["MagicKey"], "consommation")
     CreateCaseSensitiveHotstrings("*", "chgt" . ScriptInformation["MagicKey"], "changement")
     CreateCaseSensitiveHotstrings("*", "cnp" . ScriptInformation["MagicKey"], "ce n’est pas")
     CreateCaseSensitiveHotstrings("*", "contrib" . ScriptInformation["MagicKey"], "contribution")
@@ -6038,6 +6070,8 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "exp" . ScriptInformation["MagicKey"], "expérience")
     CreateCaseSensitiveHotstrings("*", "expo" . ScriptInformation["MagicKey"], "exposition")
     CreateCaseSensitiveHotstrings("*", "é" . ScriptInformation["MagicKey"], "écart")
+    CreateCaseSensitiveHotstrings("*", "échant" . ScriptInformation["MagicKey"], "échantillon")
+    CreateCaseSensitiveHotstrings("*", "échants" . ScriptInformation["MagicKey"], "échantillons")
     CreateCaseSensitiveHotstrings("*", "éco" . ScriptInformation["MagicKey"], "économie")
     CreateCaseSensitiveHotstrings("*", "ém" . ScriptInformation["MagicKey"], "écris-moi")
     CreateCaseSensitiveHotstrings("*", "éq" . ScriptInformation["MagicKey"], "équation")
@@ -6047,7 +6081,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     ; === F ===
     CreateCaseSensitiveHotstrings("*", "f" . ScriptInformation["MagicKey"], "faire")
     CreateCaseSensitiveHotstrings("*", "fam" . ScriptInformation["MagicKey"], "famille")
-    CreateCaseSensitiveHotstrings("*", "fb" . ScriptInformation["MagicKey"], "Facebook")
+    CreateCaseSensitiveHotstrings("*", "fb" . ScriptInformation["MagicKey"], "facebook")
     CreateCaseSensitiveHotstrings("*", "fc" . ScriptInformation["MagicKey"], "fonction")
     CreateCaseSensitiveHotstrings("*", "fct" . ScriptInformation["MagicKey"], "fonction")
     CreateCaseSensitiveHotstrings("*", "fea" . ScriptInformation["MagicKey"], "feature")
@@ -6055,7 +6089,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "fev" . ScriptInformation["MagicKey"], "février")
     CreateCaseSensitiveHotstrings("*", "fi" . ScriptInformation["MagicKey"], "financier")
     CreateCaseSensitiveHotstrings("*", "fiè" . ScriptInformation["MagicKey"], "financière")
-    CreateCaseSensitiveHotstrings("*", "ff" . ScriptInformation["MagicKey"], "Firefox")
+    CreateCaseSensitiveHotstrings("*", "ff" . ScriptInformation["MagicKey"], "firefox")
     CreateCaseSensitiveHotstrings("*", "fig" . ScriptInformation["MagicKey"], "figure")
     CreateCaseSensitiveHotstrings("*", "fl" . ScriptInformation["MagicKey"], "falloir")
     CreateCaseSensitiveHotstrings("*", "freq" . ScriptInformation["MagicKey"], "fréquence")
@@ -6068,10 +6102,12 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "gar" . ScriptInformation["MagicKey"], "garantie")
     CreateCaseSensitiveHotstrings("*", "gars" . ScriptInformation["MagicKey"], "garanties")
     CreateCaseSensitiveHotstrings("*", "gd" . ScriptInformation["MagicKey"], "grand")
-    CreateCaseSensitiveHotstrings("*", "gg" . ScriptInformation["MagicKey"], "Google")
+    CreateCaseSensitiveHotstrings("*", "gg" . ScriptInformation["MagicKey"], "google")
     CreateCaseSensitiveHotstrings("*", "ges" . ScriptInformation["MagicKey"], "gestion")
-    CreateCaseSensitiveHotstrings("*", "gf" . ScriptInformation["MagicKey"], "J’ai fait")
-    CreateCaseSensitiveHotstrings("*", "gmag" . ScriptInformation["MagicKey"], "J’ai mis à jour")
+    CreateCaseSensitiveHotstrings("*", "gf" . ScriptInformation["MagicKey"], "j’ai fait")
+    CreateCaseSensitiveHotstrings("*", "gh" . ScriptInformation["MagicKey"], "github")
+    CreateCaseSensitiveHotstrings("*", "ght" . ScriptInformation["MagicKey"], "j’ai acheté")
+    CreateCaseSensitiveHotstrings("*", "gmag" . ScriptInformation["MagicKey"], "j’ai mis à jour")
     CreateCaseSensitiveHotstrings("*", "gov" . ScriptInformation["MagicKey"], "government")
     CreateCaseSensitiveHotstrings("*", "gouv" . ScriptInformation["MagicKey"], "gouvernement")
     CreateCaseSensitiveHotstrings("*", "indiv" . ScriptInformation["MagicKey"], "individuel")
@@ -6088,8 +6124,8 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     ; === I ===
     CreateCaseSensitiveHotstrings("*", "ia" . ScriptInformation["MagicKey"], "intelligence artificielle")
     CreateCaseSensitiveHotstrings("*", "id" . ScriptInformation["MagicKey"], "identifiant")
-    CreateCaseSensitiveHotstrings("*", "idf" . ScriptInformation["MagicKey"], "Île-de-France")
-    CreateCaseSensitiveHotstrings("*", "idk" . ScriptInformation["MagicKey"], "I don’t know")
+    CreateHotstring("*", "idf" . ScriptInformation["MagicKey"], "Île-de-France")
+    CreateHotstring("*", "idk" . ScriptInformation["MagicKey"], "I don’t know")
     CreateCaseSensitiveHotstrings("*", "ids" . ScriptInformation["MagicKey"], "identifiants")
     CreateCaseSensitiveHotstrings("*", "img" . ScriptInformation["MagicKey"], "image")
     CreateCaseSensitiveHotstrings("*", "imgs" . ScriptInformation["MagicKey"], "images")
@@ -6099,7 +6135,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "inf" . ScriptInformation["MagicKey"], "inférieur")
     CreateCaseSensitiveHotstrings("*", "info" . ScriptInformation["MagicKey"], "information")
     CreateCaseSensitiveHotstrings("*", "infos" . ScriptInformation["MagicKey"], "informations")
-    CreateHotstring("*", "insta" . ScriptInformation["MagicKey"], "Instagram")
+    CreateCaseSensitiveHotstrings("*", "insta" . ScriptInformation["MagicKey"], "instagram")
     CreateCaseSensitiveHotstrings("*", "intart" . ScriptInformation["MagicKey"], "intelligence artificielle")
     CreateCaseSensitiveHotstrings("*", "inter" . ScriptInformation["MagicKey"], "international")
     CreateCaseSensitiveHotstrings("*", "intro" . ScriptInformation["MagicKey"], "introduction")
@@ -6126,6 +6162,9 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "kb" . ScriptInformation["MagicKey"], "keyboard")
     CreateCaseSensitiveHotstrings("*", "kbd" . ScriptInformation["MagicKey"], "keyboard")
     CreateCaseSensitiveHotstrings("*", "kn" . ScriptInformation["MagicKey"], "construction")
+
+    ; === L ===
+    CreateCaseSensitiveHotstrings("*", "l" . ScriptInformation["MagicKey"], "elle")
     CreateCaseSensitiveHotstrings("*", "lê" . ScriptInformation["MagicKey"], "l’être")
     CreateCaseSensitiveHotstrings("*", "ledt" . ScriptInformation["MagicKey"], "l’emploi du temps")
     CreateCaseSensitiveHotstrings("*", "lex" . ScriptInformation["MagicKey"], "l’exemple")
@@ -6375,10 +6414,10 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
 
     ; === W ===
     CreateCaseSensitiveHotstrings("*", "w" . ScriptInformation["MagicKey"], "with")
-    CreateCaseSensitiveHotstrings("*", "wd" . ScriptInformation["MagicKey"], "Windows")
+    CreateCaseSensitiveHotstrings("*", "wd" . ScriptInformation["MagicKey"], "windows")
     CreateCaseSensitiveHotstrings("*", "wk" . ScriptInformation["MagicKey"], "week-end")
     CreateCaseSensitiveHotstrings("*", "wknd" . ScriptInformation["MagicKey"], "week-end")
-    CreateHotstring("*", "wiki" . ScriptInformation["MagicKey"], "Wikipédia")
+    CreateCaseSensitiveHotstrings("*", "wiki" . ScriptInformation["MagicKey"], "wikipédia")
 
     ; === X ===
     CreateCaseSensitiveHotstrings("*", "x" . ScriptInformation["MagicKey"], "exemple")
@@ -6388,7 +6427,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "yapa" . ScriptInformation["MagicKey"], "il n’y a pas")
     CreateCaseSensitiveHotstrings("*", "yatil" . ScriptInformation["MagicKey"], "y a-t-il")
     CreateCaseSensitiveHotstrings("*", "yc" . ScriptInformation["MagicKey"], "y compris")
-    CreateHotstring("*", "yt" . ScriptInformation["MagicKey"], "YouTube")
+    CreateCaseSensitiveHotstrings("*", "yt" . ScriptInformation["MagicKey"], "youtube")
 
     ; === Z ===
 }
