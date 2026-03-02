@@ -27,33 +27,67 @@ local function titlecase(s)
 end
 
 -- Fonction asynchrone pour les transformations de texte (T et U)
- -- Asynchronous function for text transformations (T and U)
- local function do_transform(transform_func)
+-- Asynchronous function for text transformations (T and U)
+local function do_transform(transform_func)
     local prior = pasteboard.getContents()
     pasteboard.clearContents()
-    
+
     eventtap.keyStroke({"cmd"}, "c")
-    
+
     timer.doAfter(0.2, function()
         local sel = pasteboard.getContents()
-        
+
         if not sel or sel == "" then
             if prior then pasteboard.setContents(prior) end
             return
         end
-        
+
         local transformed = transform_func(sel)
+        if not transformed then
+            if prior then pasteboard.setContents(prior) end
+            return
+        end
+
         pasteboard.setContents(transformed)
-        
-        timer.doAfter(0.1, function()
-            eventtap.keyStroke({"cmd"}, "v")
-            
-            timer.doAfter(0.2, function()
-                if prior then 
-                    pasteboard.setContents(prior) 
-                else 
-                    pasteboard.clearContents() 
+
+        timer.doAfter(0.08, function()
+            -- paste the transformed text
+            eventtap.keyStroke({"cmd"}, "v", 0.02)
+
+            -- shortly after pasting, re-select the inserted text so
+            -- repeated transforms don't require re-selection
+            timer.doAfter(0.08, function()
+                local ok, ulen = pcall(function() return utf8.len(transformed) end)
+                local n
+                if ok and ulen and ulen > 0 then
+                    n = ulen
+                else
+                    n = #transformed
                 end
+
+                -- safety cap to avoid extremely long loops
+                local MAX = 5000
+                if n > MAX then n = MAX end
+
+                if n > 0 then
+                    -- move caret left `n` times to reach the start
+                    for i = 1, n do
+                        eventtap.keyStroke({}, "left", 0.001)
+                    end
+                    -- then select right `n` times to reselect the pasted text
+                    for i = 1, n do
+                        eventtap.keyStroke({"shift"}, "right", 0.001)
+                    end
+                end
+
+                -- restore prior clipboard shortly after
+                timer.doAfter(0.15, function()
+                    if prior and prior ~= "" then
+                        pasteboard.setContents(prior)
+                    else
+                        pasteboard.clearContents()
+                    end
+                end)
             end)
         end)
     end)
