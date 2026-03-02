@@ -7,6 +7,8 @@ description = "Réduction des SFBs (Same Finger Bigrams)"
 
 [_meta.sections]
 comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"
+ecirc = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u."
+egrave = "È + touche Y corrige 2 SFBs : èy = aî et yè = â"
 bu = "À + ★/B corrige 2 SFBs : à★"
 ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 e_deadkey = "Ê agit comme touche morte : êa→â, êe→œ, êi→î, êo→ô, êu→û, êy→ŷ"
@@ -31,6 +33,10 @@ e_deadkey = "Ê agit comme touche morte : êa→â, êe→œ, êi→î, êo→ô
 "éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false }
 "ê." = { output = "u.", is_word = false, auto_expand = true, is_case_sensitive = false }
 "ê," = { output = "u,", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[egrave]]
+"yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false }
+"èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[bu]]
 "il a mà★" = { output = "il a mis à jour", is_word = true, auto_expand = true, is_case_sensitive = false }

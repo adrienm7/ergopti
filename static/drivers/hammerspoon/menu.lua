@@ -384,6 +384,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         for _, it in ipairs(buildHotstringsItems()) do
             table.insert(items, it)
         end
+        table.insert(items, {title="-"})
         table.insert(items, buildGestesItem())
         table.insert(items, buildRaccourcisItem())
         for _, it in ipairs(buildUtilityItems()) do table.insert(items, it) end
