@@ -282,10 +282,13 @@ def parse_ahk_descriptions(content: str) -> dict[str, dict[str, str]]:
         dm = desc_re.search(line)
         if dm and current_cat and current_sub:
             desc_expr = dm.group(1).strip()
-            # Collect continuation lines when string is split across lines
-            while desc_expr.rstrip(",").rstrip().endswith(".") and i + 1 < len(
-                lines
-            ):
+            # Collect continuation lines when the expression is incomplete:
+            # either it ends with the concatenation operator '.' or it ends
+            # with an open bracket (e.g. ScriptInformation[ split across lines).
+            while (
+                desc_expr.rstrip(",").rstrip().endswith(".")
+                or desc_expr.rstrip().endswith("[")
+            ) and i + 1 < len(lines):
                 i += 1
                 desc_expr += " " + lines[i].strip()
             desc = _parse_ahk_desc_expr(desc_expr)

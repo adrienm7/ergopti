@@ -8,7 +8,7 @@ description = "Touche magique ★"
 [_meta.sections]
 replace = "Transformer la touche J en ★"
 textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom Prénom, etc."
-textexpansion = "Expansion de texte : c★ = c’est, gt★"
+textexpansion = "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …"
 textexpansionauto = "Expansion de texte sans touche ★ : ju' = jusqu’, ya = y’a, …"
 textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …"
 textexpansionsymbols = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
