@@ -25,7 +25,7 @@ local SLOT_LABELS = {
     swipe_5_down  = "Swipe 5 doigts ↓",
 }
 
-function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
+function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info)
     base_dir = base_dir or (hs.configdir .. "/")
 
     local myMenu = menubar.new()
@@ -62,7 +62,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         hs.timer.doAfter(0.25, function() hs.reload() end)
     end
 
-    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, hotstrings={}}
+    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}}
     for _, f in ipairs(hotfiles or {}) do
         local name = f:match("^(.*)%.lua$") or f
         state.hotstrings[name] = true
@@ -80,11 +80,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
 
     local function save_prefs()
         local prefs = {
-            keymap    = state.keymap,
-            gestures  = state.gestures,
-            scroll    = state.scroll,
-            shortcuts = state.shortcuts,
-            hotstrings     = state.hotstrings,
+            keymap        = state.keymap,
+            gestures      = state.gestures,
+            scroll        = state.scroll,
+            shortcuts     = state.shortcuts,
+            personal_info = state.personal_info,
+            hotstrings    = state.hotstrings,
             shortcut_keys  = {},
             gesture_actions = gestures.get_all_actions(),  -- nouveau format
         }
@@ -107,7 +108,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             if saved.keymap    ~= nil then state.keymap    = saved.keymap    end
             if saved.gestures  ~= nil then state.gestures  = saved.gestures  end
             if saved.scroll    ~= nil then state.scroll    = saved.scroll    end
-            if saved.shortcuts ~= nil then state.shortcuts = saved.shortcuts end
+            if saved.shortcuts     ~= nil then state.shortcuts     = saved.shortcuts     end
+            if saved.personal_info ~= nil then state.personal_info = saved.personal_info end
             if type(saved.hotstrings) == "table" then
                 for name in pairs(state.hotstrings) do
                     if saved.hotstrings[name] ~= nil then
@@ -123,10 +125,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
             end
         end
 
-        if state.keymap    then keymap.start()    else keymap.stop()    end
-        if state.gestures  then gestures.enable_all()  else gestures.disable_all() end
-        if state.scroll    then scroll.start()    else scroll.stop()    end
-        if state.shortcuts then shortcuts.start() else shortcuts.stop() end
+        if state.keymap        then keymap.start()        else keymap.stop()        end
+        if state.gestures      then gestures.enable_all()  else gestures.disable_all() end
+        if state.scroll        then scroll.start()        else scroll.stop()        end
+        if state.shortcuts     then shortcuts.start()     else shortcuts.stop()     end
+        if personal_info then
+            if state.personal_info then personal_info.start(base_dir, keymap) else personal_info.stop() end
+        end
 
         for name, enabled in pairs(state.hotstrings) do
             if enabled then keymap.enable_group(name) else keymap.disable_group(name) end
@@ -316,6 +321,23 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         return item
     end
 
+    local function buildPersonalInfoItem()
+        if not personal_info then return nil end
+        return {
+            title   = "Infos personnelles (@np★)",
+            checked = state.personal_info or nil,
+            fn = function()
+                state.personal_info = not state.personal_info
+                if state.personal_info then
+                    personal_info.start(base_dir, keymap)
+                else
+                    personal_info.stop()
+                end
+                save_prefs(); do_reload()
+            end
+        }
+    end
+
     local function buildRaccourcisItem()
         local item = {
             title   = "Raccourcis",
@@ -388,6 +410,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
         end
         table.insert(items, {title="-"})
         table.insert(items, buildGestesItem())
+        local pi_item = buildPersonalInfoItem()
+        if pi_item then table.insert(items, pi_item) end
         table.insert(items, buildRaccourcisItem())
         for _, it in ipairs(buildUtilityItems()) do table.insert(items, it) end
         myMenu:setMenu({})

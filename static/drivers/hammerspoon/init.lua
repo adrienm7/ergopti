@@ -7,6 +7,7 @@ local gestures = require("gestures")
 local scroll = require("scroll")
 local keymap = require("keymap")
 local shortcuts = require("shortcuts")
+local personal_info = require("personal_info")
 local repeat_keys = require("repeat_keys")
 local script_control = require("script_control")
 
@@ -62,11 +63,18 @@ end
 repeat_keys.start(keymap)
 
 ---------------------------------------------------------------------------
+-- Personal information shortcuts (loaded after base_dir is resolved)
+-- keymap is passed so personal_info can register a suppress hook that
+-- prevents hotstrings like n★→"nouveau" from firing during @-combos.
+---------------------------------------------------------------------------
+personal_info.start(base_dir, keymap)
+
+---------------------------------------------------------------------------
 -- Menubar menu (Hammerspoon Menubar)
 ---------------------------------------------------------------------------
 -- External menu module
 local menu = require("menu")
-menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
+menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info)
 
 ---------------------------------------------------------------------------
 -- Script control shortcuts (AltGr+Return = pause/resume, AltGr+Backspace = reload)
