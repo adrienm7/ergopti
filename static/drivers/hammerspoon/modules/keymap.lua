@@ -474,6 +474,9 @@ local function onKeyDown(e)
         local function is_letter_char(c)
             if not c or c == "" then return false end
             if c:match("[%w]") then return true end
+            -- Lua/LuaJIT string.upper does not handle UTF-8 accented characters,
+            -- so we fall back to the known accent tables defined at module level.
+            if UPPER_LETTERS[c] or LOWER_LETTERS[c] then return true end
             return string.upper(c) ~= string.lower(c)
         end
         for _, m in ipairs(mappings) do
