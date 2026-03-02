@@ -3,6 +3,7 @@
 --   AltGr (Right Option) + Backspace : reload the Hammerspoon configuration
 
 local M = {}
+local utils = require("utils")
 
 local is_paused = false
 local tap = nil
@@ -25,16 +26,6 @@ local function is_right_alt_only(e)
 	-- If masks are unavailable we cannot distinguish sides; accept any alt.
 	if right_mask == 0 then return true end
 	return (raw & right_mask) ~= 0 and (raw & left_mask) == 0
-end
-
--- ── Notification helper ───────────────────────────────────────────────────────
-
-local function notify(title, body)
-	hs.notify.new({
-		title          = title,
-		informativeText = body,
-		withdrawAfter  = 3,
-	}):send()
 end
 
 -- ── Module lifecycle ──────────────────────────────────────────────────────────
@@ -76,18 +67,18 @@ local function handle_key(e)
 		if is_paused then
 			resume_all()
 			is_paused = false
-			notify("Ergopti", "Script réactivé ▶")
+			utils.notify("Script réactivé ▶")
 		else
 			pause_all()
 			is_paused = true
-			notify("Ergopti", "Script mis en pause ⏸")
+			utils.notify("Script mis en pause ⏸")
 		end
 		return true  -- consume the event
 	end
 
 	-- AltGr + Backspace : reload the entire configuration
 	if code == KEYCODE_BACKSPACE then
-		notify("Ergopti", "Rechargement du script… 🔄")
+		utils.notify("Rechargement du script… 🔄")
 		-- Small delay so the notification has time to appear before reload
 		hs.timer.doAfter(0.3, function() hs.reload() end)
 		return true  -- consume the event
