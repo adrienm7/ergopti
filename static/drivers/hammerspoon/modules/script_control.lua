@@ -3,7 +3,7 @@
 --   AltGr (Right Option) + Backspace : reload the Hammerspoon configuration
 
 local M = {}
-local utils = require("utils")
+local utils = require("lib.utils")
 
 local is_paused = false
 local tap = nil
