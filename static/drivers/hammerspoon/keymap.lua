@@ -11,6 +11,19 @@ local groups = {}
 local current_group = nil
 local mappings = {}
 
+-- External interceptor: a function(event, km_buffer) called on every keyDown
+-- (after cmd/ctrl guard, before backspace/escape/getCharacters processing).
+-- Possible return values:
+--   "consume"  → keymap returns true  (event fully consumed, no hotstring check)
+--   "suppress" → keymap returns false (event reaches apps, but hotstrings skipped)
+--   nil / false → normal keymap processing
+-- Used by personal_info for priority @-combo expansion.
+local _interceptor = nil
+
+function M.register_interceptor(fn)
+	_interceptor = fn
+end
+
 local function record_group(name, path, kind)
     local seqs = {}
     for _, m in ipairs(mappings) do
@@ -398,6 +411,16 @@ local function onKeyDown(e)
         return false
     end
 
+    -- Give registered interceptors first look at every event (before backspace,
+    -- escape, and getCharacters processing so that Unicode trigger chars like ★
+    -- that produce getCharacters("") are still catchable).
+    local _interceptor_suppress = false
+    if _interceptor then
+        local result = _interceptor(e, buffer)
+        if result == "consume" then return true end
+        if result == "suppress" then _interceptor_suppress = true end
+    end
+
     if keyCode == 51 then
         if #buffer > 0 then
             local offset = utf8.offset(buffer, -1)
@@ -418,6 +441,8 @@ local function onKeyDown(e)
     if #buffer > 100 then
         buffer = string.sub(buffer, utf8.offset(buffer, -50) or 1)
     end
+
+    if _interceptor_suppress then return false end
 
     if time_since_last_key <= allowed_delay then
         local char_count = utf8.len(chars) or #chars
