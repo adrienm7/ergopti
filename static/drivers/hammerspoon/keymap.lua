@@ -158,6 +158,11 @@ local BASE_DELAY_SEC = 0.5
 
 local buffer = ""
 local is_replacing = false
+-- Number of synthetic keydown events still pending (deletes + replacement chars).
+-- is_replacing is cleared once this counter reaches zero instead of a fixed timer,
+-- which eliminates the race condition that corrupted the buffer when auto-expanded
+-- text was typed faster than the 10 ms timer (e.g. ,ê → ju followed by ' → jusqu').
+local synthetic_remaining = 0
 local last_key_time = 0
 local last_key_was_complex = false
 local seq_counter = 0 
@@ -362,7 +367,17 @@ function M.is_processing_paused() return processing_paused end
 ---------------------------------------------------------------------------
 local function onKeyDown(e)
     if processing_paused then return false end
-    if is_replacing then return false end
+    if is_replacing then
+        -- Consume one expected synthetic event; clear the guard once all are done.
+        if synthetic_remaining > 0 then
+            synthetic_remaining = synthetic_remaining - 1
+            if synthetic_remaining <= 0 then
+                is_replacing = false
+                synthetic_remaining = 0
+            end
+        end
+        return false
+    end
 
     local keyCode = e:getKeyCode()
     local flags = e:getFlags()
@@ -465,11 +480,14 @@ local function onKeyDown(e)
                                 end
                             end
                             if valid then
-                                is_replacing = true
-
                                 local trigger_len = utf8_len(trigger)
                                 local chars_len = utf8_len(chars)
                                 local deletes = trigger_len - chars_len
+                                -- Pre-compute synthetic event count BEFORE emitting anything.
+                                -- Each keyStroke(delete) + each char in repl = one keyDown event.
+                                synthetic_remaining = (deletes > 0 and deletes or 0)
+                                    + (utf8_len(m.repl))
+                                is_replacing = true
 
                                 if deletes > 0 then
                                     for _ = 1, deletes do
@@ -479,12 +497,21 @@ local function onKeyDown(e)
 
                                 keyStrokes(m.repl)
 
-                                local start = utf8.offset(buffer, -(utf8_len(buffer) - trigger_len))
-                                buffer = (start and string.sub(buffer, 1, start - 1) or "") .. m.repl
+                                -- Keep everything before the trigger, then append the replacement.
+                                -- utf8.offset(buffer, -trigger_len) gives the byte position of the
+                                -- first character of the trigger inside buffer, so sub(1, pos-1)
+                                -- is exactly the prefix that precedes it.
+                                local trig_start = utf8.offset(buffer, -trigger_len)
+                                buffer = (trig_start and string.sub(buffer, 1, trig_start - 1) or "") .. m.repl
 
-                                hs.timer.doAfter(0.01, function()
-                                    is_replacing = false
-                                    if DEBUG_EXPANSION then print("[keymap] finished immediate expand, buffer=", buffer) end
+                                -- Safety fallback: if the counter somehow gets off, release the
+                                -- guard after 100 ms so the system doesn't stay frozen.
+                                hs.timer.doAfter(0.1, function()
+                                    if is_replacing then
+                                        is_replacing = false
+                                        synthetic_remaining = 0
+                                        if DEBUG_EXPANSION then print("[keymap] fallback reset after immediate expand, buffer=", buffer) end
+                                    end
                                 end)
 
                                 return true
@@ -523,6 +550,10 @@ local function onKeyDown(e)
 
                         hs.timer.doAfter(0, function()
                             if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
+                            -- Pre-compute synthetic event count: trigger deletes + repl chars + boundary char.
+                            synthetic_remaining = trigger_len
+                                + (utf8_len(m.repl))
+                                + (utf8_len(chars))
                             is_replacing = true
                             -- delete the trigger characters (caret is after the trigger)
                             for _ = 1, trigger_len do keyStroke({}, 'delete', 0) end
@@ -534,9 +565,13 @@ local function onKeyDown(e)
                             -- update buffer: remove trigger from prefix_before, append repl and the boundary char
                             buffer = before_trigger .. m.repl .. chars
 
-                            hs.timer.doAfter(0.01, function()
-                                is_replacing = false
-                                if DEBUG_EXPANSION then print("[keymap] finished deferred expand, buffer=", buffer) end
+                            -- Safety fallback in case the counter gets off.
+                            hs.timer.doAfter(0.1, function()
+                                if is_replacing then
+                                    is_replacing = false
+                                    synthetic_remaining = 0
+                                    if DEBUG_EXPANSION then print("[keymap] fallback reset after deferred expand, buffer=", buffer) end
+                                end
                             end)
                         end)
 
