@@ -3,6 +3,7 @@ local hs = hs
 local image = hs.image
 local menubar = hs.menubar
 local pathwatcher = hs.pathwatcher
+local utils = require("utils")
 
 -- Labels des slots affichés dans le menu
 local SLOT_LABELS = {
@@ -51,11 +52,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
     local function do_reload(source)
         if source == "watcher" then
             pcall(function()
-                hs.notify.new({title="Hammerspoon",
-                    informativeText="Fichiers modifiés — rechargement"}):send()
+                utils.notify("Fichiers modifiés — Rechargement du script… 🔄")
             end)
         else
-            pcall(function() hs.alert.show("Rechargement Hammerspoon…", 1.0) end)
+            pcall(function()
+                utils.notify("Rechargement du script… 🔄")
+            end)
         end
         hs.timer.doAfter(0.25, function() hs.reload() end)
     end
@@ -405,7 +407,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
     M._watcher = configWatcher
     M._icon    = icon
 
-    hs.alert.show("Hammerspoon prêt ! 🚀")
+    utils.notify("Script prêt ! 🚀")
     return myMenu, configWatcher
 end
 

@@ -4,6 +4,7 @@ local eventtap = hs.eventtap
 local pasteboard = hs.pasteboard
 local http = hs.http
 local urlevent = hs.urlevent
+local utils = require("utils")
 
 -- Helpers
 local function trim(s)
@@ -108,13 +109,13 @@ local function launch_first_available(apps)
                 local an = a:name()
                 if an and an:lower():find(lname, 1, true) then
                     a:activate()
-                    hs.alert.show("Opened: " .. an)
+                    utils.notify("Opened: " .. an)
                     return true
                 end
             end
             -- try to launch/focus by exact name
             if hs.application.launchOrFocus(name) then
-                hs.alert.show("Opened: " .. name)
+                utils.notify("Opened: " .. name)
                 return true
             end
     end
@@ -147,7 +148,7 @@ hotkey_defs.at_hash = function()
             end
             local w = hs.window.frontmostWindow()
             if not w then
-                hs.alert.show("Aucune fenêtre active")
+                utils.notify("Aucune fenêtre active")
                 return true
             end
             local id = w:id()
@@ -157,7 +158,7 @@ hotkey_defs.at_hash = function()
             local filename = string.format('%s/screenshot_%s.png', dir, os.date('%Y_%m_%d_%H_%M_%S'))
             local cmd = 'screencapture -l ' .. id .. ' "' .. filename .. '"'
             hs.execute(cmd)
-            hs.alert.show("Saved: " .. filename)
+            utils.notify("Saved: " .. filename)
             return true
         end
         return false
@@ -222,7 +223,7 @@ hotkey_defs.ctrl_h = function()
         -- interactive capture, saved to clipboard (-c)
         local cmd = 'screencapture -i -c'
         hs.execute(cmd)
-        hs.alert.show("Screenshot copied to clipboard")
+        utils.notify("Capture d’écran copiée dans le presse-papiers")
     end)
 end
 
@@ -248,7 +249,7 @@ hotkey_defs.ctrl_s = function()
             timer.doAfter(0.15, function()
                 local p = pasteboard.getContents()
                 if p and p ~= "" then
-                    hs.alert.show("Chemin [" .. p .. "] copié dans le presse-papiers")
+                    utils.notify("Chemin copié : " .. p)
                     return
                 end
                 -- fallback: copy the selection and perform a search
