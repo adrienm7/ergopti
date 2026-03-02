@@ -4,7 +4,7 @@ local eventtap = hs.eventtap
 local pasteboard = hs.pasteboard
 local http = hs.http
 local urlevent = hs.urlevent
-local utils = require("utils")
+local utils = require("lib.utils")
 
 -- Helpers
 local function trim(s)

@@ -44,7 +44,7 @@ end
 -- Stores section info (name, description, count) in the group record so that
 -- the menu can display a sub-menu per section.
 function M.load_toml(name, path)
-	local toml_reader = require("toml_reader")
+	local toml_reader = require("lib.toml_reader")
 	local data = toml_reader.parse(path)
 
 	-- Register all entries under the parent group name

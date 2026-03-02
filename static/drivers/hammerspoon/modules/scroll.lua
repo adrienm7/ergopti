@@ -1,5 +1,5 @@
-local utils = require("utils")
-local gestures = require("gestures")
+local utils = require("lib.utils")
+local gestures = require("modules.gestures")
 
 local M = {}
 

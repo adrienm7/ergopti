@@ -3,7 +3,7 @@ local hs = hs
 local image = hs.image
 local menubar = hs.menubar
 local pathwatcher = hs.pathwatcher
-local utils = require("utils")
+local utils = require("lib.utils")
 
 -- Labels des slots affichés dans le menu
 local SLOT_LABELS = {
@@ -68,7 +68,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         state.hotstrings[name] = true
     end
 
-    local prefs_file = base_dir .. "ergopti_prefs.json"
+    local prefs_file = base_dir .. "config.json"
 
     local function load_prefs()
         local fh = io.open(prefs_file, "r")

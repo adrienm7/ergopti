@@ -3,13 +3,13 @@
 -- 2) Three-finger gestures for tab navigation
 -- 3) Change volume with left Option + scroll
 
-local gestures = require("gestures")
-local scroll = require("scroll")
-local keymap = require("keymap")
-local shortcuts = require("shortcuts")
-local personal_info = require("personal_info")
-local repeat_keys = require("repeat_keys")
-local script_control = require("script_control")
+local gestures = require("modules.gestures")
+local scroll = require("modules.scroll")
+local keymap = require("modules.keymap")
+local shortcuts = require("modules.shortcuts")
+local personal_info = require("modules.personal_info")
+local repeat_keys = require("modules.repeat_keys")
+local script_control = require("modules.script_control")
 
 -- Initial startup of modules
 gestures.start()
@@ -73,7 +73,7 @@ personal_info.start(base_dir, keymap)
 -- Menubar menu (Hammerspoon Menubar)
 ---------------------------------------------------------------------------
 -- External menu module
-local menu = require("menu")
+local menu = require("modules.menu")
 menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info)
 
 ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 -- Slots "axe" (←/→ ou /\) → actions avec sens prev/next.
 -- Slots "simple" (tap, ↑↓)  → actions sans direction.
 
-local utils = require("utils")
+local utils = require("lib.utils")
 local touchdevice = require("hs._asm.undocumented.touchdevice")
 local M = {}
 
