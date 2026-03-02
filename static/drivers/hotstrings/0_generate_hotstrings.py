@@ -209,8 +209,10 @@ def _parse_ahk_desc_expr(expr: str) -> str:
     Returns:
             Resolved plain string, e.g. ``"text ★ suite"``.
     """
-    # Split on the AHK concatenation operator '.'
-    tokens = re.split(r"\s*\.\s*", expr.strip().rstrip(","))
+    # Split on the AHK concatenation operator ' . ' (always surrounded by spaces).
+    # Using \s+ (not \s*) avoids splitting on literal dots inside quoted strings
+    # (e.g. "ê. = u." or "$eq.not$").
+    tokens = re.split(r"\s+\.\s+", expr.strip().rstrip(","))
     parts: list[str] = []
     for tok in tokens:
         tok = tok.strip()

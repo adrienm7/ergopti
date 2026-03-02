@@ -7,10 +7,12 @@ description = "Touche magique ★"
 
 [_meta.sections]
 replace = "Transformer la touche J en ★"
-textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★"
+textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom Prénom, etc."
 textexpansion = "Expansion de texte : c★ = c’est, gt★"
+textexpansionauto = "Expansion de texte sans touche ★ : ju' = jusqu’, ya = y’a, …"
 textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …"
 textexpansionsymbols = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
+textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …"
 repeat = "La touche ★ permet la répétition"
 
 [[textexpansion]]
@@ -508,6 +510,10 @@ repeat = "La touche ★ permet la répétition"
 "yatil★" = { output = "y a-t-il", is_word = true, auto_expand = true, is_case_sensitive = false }
 "yc★" = { output = "y compris", is_word = true, auto_expand = true, is_case_sensitive = false }
 "yt★" = { output = "youtube", is_word = true, auto_expand = true, is_case_sensitive = false }
+
+[[textexpansionauto]]
+"ju'" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ya" = { output = "y’a", is_word = true, auto_expand = false, is_case_sensitive = false }
 
 [[textexpansionemojis]]
 ":)★" = { output = "😀", is_word = true, auto_expand = true, is_case_sensitive = true }

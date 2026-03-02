@@ -641,6 +641,7 @@ global Features := Map(
             "Repeat",
             "-",
             "TextExpansion",
+            "TextExpansionAuto",
             "TextExpansionEmojis",
             "TextExpansionSymbols",
             "TextExpansionSymbolsTypst",
@@ -659,6 +660,11 @@ global Features := Map(
             Enabled: True,
             Description: "Expansion de texte : c" . ScriptInformation["MagicKey"] . " = c’est, gt" . ScriptInformation[
                 "MagicKey"] . " = j’étais, pex" . ScriptInformation["MagicKey"] . " = par exemple, …",
+        },
+        "TextExpansionAuto", {
+            Enabled: True,
+            Description: "Expansion de texte sans touche " . ScriptInformation["MagicKey"] .
+                " : ju' = jusqu’, ya = y’a, …",
         },
         "TextExpansionEmojis", {
             Enabled: True,
@@ -4583,7 +4589,7 @@ if Features["SFBsReduction"]["ECirc"].Enabled {
 ; ======= 6.7) SFBs reduction with È =======
 ; ==========================================
 
-if Features["SFBsReduction"]["EGrave"] {
+if Features["SFBsReduction"]["EGrave"].Enabled {
     CreateCaseSensitiveHotstrings(
         "*?", "yè", "â",
         Map("TimeActivationSeconds", Features["SFBsReduction"]["EGrave"].TimeActivationSeconds)
@@ -5179,11 +5185,18 @@ if Features["Autocorrection"]["MinusApostrophe"].Enabled {
 ; ========================================
 
 if Features["Autocorrection"]["Brands"].Enabled {
+    CreateHotstring("", "api", "API")
     CreateHotstring("", "autohotkey", "AutoHotkey")
+    CreateHotstring("", "aws", "AWS")
+    CreateHotstring("", "axa", "AXA")
+    CreateHotstring("", "azure devops", "Azure DevOps")
     CreateHotstring("", "citroen", "Citroën")
     CreateHotstring("", "chatgpt", "ChatGPT")
+    CreateHotstring("", "docker", "Docker")
+    CreateHotstring("", "dynatrace", "Dynatrace")
     CreateHotstring("", "facebook", "Facebook")
     CreateHotstring("", "firefox", "Firefox")
+    CreateHotstring("", "gcp", "GCP")
     CreateHotstring("", "github", "GitHub")
     CreateHotstring("", "google", "Google")
     CreateHotstring("", "ia", "IA")
@@ -5198,6 +5211,8 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "optimot", "Optimot")
     CreateHotstring("", "onedrive", "OneDrive")
     CreateHotstring("", "onenote", "OneNote")
+    CreateHotstring("", "openshift", "OpenShift")
+    CreateHotstring("", "opentelemetry", "OpenTelemetry")
     CreateHotstring("", "outlook", "Outlook")
     CreateHotstring("", "powerbi", "PowerBI")
     CreateHotstring("", "pnl", "PNL")
@@ -6430,6 +6445,11 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "yt" . ScriptInformation["MagicKey"], "youtube")
 
     ; === Z ===
+}
+
+if Features["MagicKey"]["TextExpansionAuto"].Enabled {
+    CreateCaseSensitiveHotstrings("*", "ju'", "jusqu’")
+    CreateCaseSensitiveHotstrings("", "ya", "y’a")
 }
 
 ; ===========================

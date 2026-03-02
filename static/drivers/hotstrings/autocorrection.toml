@@ -136,11 +136,18 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "z'v" = { output = "z-v", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[brands]]
+"api" = { output = "API", is_word = true, auto_expand = false, is_case_sensitive = true }
 "autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true }
+"aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true }
+"axa" = { output = "AXA", is_word = true, auto_expand = false, is_case_sensitive = true }
+"azure devops" = { output = "Azure DevOps", is_word = true, auto_expand = false, is_case_sensitive = true }
 "citroen" = { output = "Citroën", is_word = true, auto_expand = false, is_case_sensitive = true }
 "chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true }
+"docker" = { output = "Docker", is_word = true, auto_expand = false, is_case_sensitive = true }
+"dynatrace" = { output = "Dynatrace", is_word = true, auto_expand = false, is_case_sensitive = true }
 "facebook" = { output = "Facebook", is_word = true, auto_expand = false, is_case_sensitive = true }
 "firefox" = { output = "Firefox", is_word = true, auto_expand = false, is_case_sensitive = true }
+"gcp" = { output = "GCP", is_word = true, auto_expand = false, is_case_sensitive = true }
 "github" = { output = "GitHub", is_word = true, auto_expand = false, is_case_sensitive = true }
 "google" = { output = "Google", is_word = true, auto_expand = false, is_case_sensitive = true }
 "ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -155,6 +162,8 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "optimot" = { output = "Optimot", is_word = true, auto_expand = false, is_case_sensitive = true }
 "onedrive" = { output = "OneDrive", is_word = true, auto_expand = false, is_case_sensitive = true }
 "onenote" = { output = "OneNote", is_word = true, auto_expand = false, is_case_sensitive = true }
+"openshift" = { output = "OpenShift", is_word = true, auto_expand = false, is_case_sensitive = true }
+"opentelemetry" = { output = "OpenTelemetry", is_word = true, auto_expand = false, is_case_sensitive = true }
 "outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true }
 "powerbi" = { output = "PowerBI", is_word = true, auto_expand = false, is_case_sensitive = true }
 "pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true }
