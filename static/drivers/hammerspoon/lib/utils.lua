@@ -8,7 +8,7 @@ local DEBUG = false
 -- location so the logo path stays portable across machines.
 local _src = debug.getinfo(1, "S").source
 local _base = (_src:sub(1,1) == "@" and _src:sub(2) or _src):match("^(.*[/\\])") or "./"
-local _logo_path = _base .. "../../favicon.png"
+local _logo_path = _base .. "../../../favicon.png"
 local _logo_image = nil
 
 local function _get_logo()
