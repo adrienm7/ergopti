@@ -101,6 +101,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         fh:write(encoded); fh:close()
     end
 
+    -- Forward declaration so toggle closures can reference it before its body is defined.
+    local updateMenu
+
     -- Appliquer les préférences sauvegardées
     do
         local saved = load_prefs()
@@ -166,7 +169,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             state.hotstrings[name] = not groupEnabled(name)
             if state.hotstrings[name] then keymap.enable_group(name)
             else keymap.disable_group(name) end
-            save_prefs(); do_reload()
+            save_prefs(); updateMenu()
         end
     end
 
@@ -178,7 +181,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             else
                 keymap.enable_section(group_name, sec_name)
             end
-            save_prefs(); do_reload()
+            save_prefs(); updateMenu()
         end
     end
 
@@ -250,7 +253,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             fn = function()
                 state.gestures = not state.gestures
                 if state.gestures then gestures.enable_all() else gestures.disable_all() end
-                save_prefs(); do_reload()
+                save_prefs(); updateMenu()
             end
         }
 
@@ -270,7 +273,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     checked = (current == aname) or nil,
                     fn = (function(a) return function()
                         gestures.set_action(slot, a)
-                        save_prefs(); do_reload()
+                        save_prefs(); updateMenu()
                     end end)(aname)
                 })
             end
@@ -333,7 +336,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 else
                     personal_info.stop()
                 end
-                save_prefs(); do_reload()
+                save_prefs(); updateMenu()
             end
         }
     end
@@ -345,7 +348,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             fn = function()
                 state.shortcuts = not state.shortcuts
                 if state.shortcuts then shortcuts.start() else shortcuts.stop() end
-                save_prefs(); do_reload()
+                save_prefs(); updateMenu()
             end
         }
         if state.shortcuts then
@@ -378,7 +381,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     fn = (function(id) return function()
                         if shortcuts.is_enabled(id) then shortcuts.disable(id)
                         else shortcuts.enable(id) end
-                        save_prefs(); do_reload()
+                        save_prefs(); updateMenu()
                     end end)(s.id)
                 })
             end
@@ -392,7 +395,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             {title="Option + Scroll : Volume", checked=state.scroll or nil, fn=function()
                 state.scroll = not state.scroll
                 if state.scroll then scroll.start() else scroll.stop() end
-                save_prefs(); do_reload()
+                save_prefs(); updateMenu()
             end},
             {title="-"},
             {title="Ouvrir init.lua",           fn=function() hs.execute('open "'..base_dir..'init.lua"') end},
@@ -403,7 +406,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         }
     end
 
-    local function updateMenu()
+    updateMenu = function()
         local items = {}
         for _, it in ipairs(buildHotstringsItems()) do
             table.insert(items, it)

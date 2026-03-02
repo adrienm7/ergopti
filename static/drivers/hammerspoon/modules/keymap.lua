@@ -104,16 +104,28 @@ function M.is_section_enabled(group_name, section_name)
 	return hs.settings.get(key) ~= false
 end
 
--- Persistently disable a section; takes effect on next config reload.
+-- Rebuild the in-memory mappings for a group immediately, taking the current
+-- hs.settings section flags into account (used after a section toggle).
+local function reload_group_inplace(group_name)
+	if not M.is_group_enabled(group_name) then return end
+	-- disable_group removes all mappings for this group and marks it disabled.
+	M.disable_group(group_name)
+	-- enable_group calls load_toml which re-adds only the enabled sections.
+	M.enable_group(group_name)
+end
+
+-- Persistently disable a section and rebuild the group immediately.
 function M.disable_section(group_name, section_name)
 	local key = "hotstrings_section_" .. group_name .. "_" .. section_name
 	hs.settings.set(key, false)
+	reload_group_inplace(group_name)
 end
 
--- Re-enable a section (remove the persisted disabled flag).
+-- Re-enable a section (remove the persisted disabled flag) and rebuild immediately.
 function M.enable_section(group_name, section_name)
 	local key = "hotstrings_section_" .. group_name .. "_" .. section_name
 	hs.settings.set(key, nil)
+	reload_group_inplace(group_name)
 end
 
 -- Return the ordered list of sections for a TOML group, or nil for Lua groups.
