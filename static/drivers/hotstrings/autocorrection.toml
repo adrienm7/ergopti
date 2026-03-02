@@ -41,11 +41,15 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "~_" = { output = "~ ", is_word = true, auto_expand = true, is_case_sensitive = true }
 "*_" = { output = "* ", is_word = true, auto_expand = true, is_case_sensitive = true }
 "OUi" = { output = "Oui", is_word = true, auto_expand = true, is_case_sensitive = true }
-"eua" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
+"acceuil" = { output = "accueil", is_word = true, auto_expand = true, is_case_sensitive = false }
 "aeu" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eiu" = { output = "ieu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eua" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
 "oiu" = { output = "oui", is_word = false, auto_expand = true, is_case_sensitive = false }
 "poru" = { output = "pour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"acceuil" = { output = "accueil", is_word = true, auto_expand = true, is_case_sensitive = false }
+"sru" = { output = "sur", is_word = true, auto_expand = true, is_case_sensitive = false }
+"uio" = { output = "uoi", is_word = false, auto_expand = true, is_case_sensitive = false }
+"uei" = { output = "uie", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[ou]]
 "où ." = { output = "où.", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -69,11 +73,6 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "eàn" = { output = "ation", is_word = false, auto_expand = true, is_case_sensitive = false }
 "eàp" = { output = "ence", is_word = false, auto_expand = true, is_case_sensitive = false }
 "ieàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàr" = { output = "erre", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàs" = { output = "ement", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàt" = { output = "ettre", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[minus]]
 "aije" = { output = "ai-je", is_word = true, auto_expand = false, is_case_sensitive = false }
@@ -120,8 +119,11 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "as't" = { output = "as-t", is_word = false, auto_expand = true, is_case_sensitive = false }
 "a't" = { output = "a-t", is_word = false, auto_expand = true, is_case_sensitive = false }
 "a-t’e" = { output = "a-t-e", is_word = false, auto_expand = true, is_case_sensitive = false }
+"a't'e" = { output = "a-t-e", is_word = false, auto_expand = true, is_case_sensitive = false }
 "a-t’i" = { output = "a-t-i", is_word = false, auto_expand = true, is_case_sensitive = false }
+"a't'i" = { output = "a-t-i", is_word = false, auto_expand = true, is_case_sensitive = false }
 "a-t’o" = { output = "a-t-o", is_word = false, auto_expand = true, is_case_sensitive = false }
+"a't'o" = { output = "a-t-o", is_word = false, auto_expand = true, is_case_sensitive = false }
 "s'," = { output = "s-j", is_word = false, auto_expand = true, is_case_sensitive = false }
 "s'j" = { output = "s-j", is_word = false, auto_expand = true, is_case_sensitive = false }
 "s'm" = { output = "s-m", is_word = false, auto_expand = true, is_case_sensitive = false }
@@ -137,9 +139,16 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true }
 "citroen" = { output = "Citroën", is_word = true, auto_expand = false, is_case_sensitive = true }
 "chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true }
+"facebook" = { output = "Facebook", is_word = true, auto_expand = false, is_case_sensitive = true }
+"firefox" = { output = "Firefox", is_word = true, auto_expand = false, is_case_sensitive = true }
+"github" = { output = "GitHub", is_word = true, auto_expand = false, is_case_sensitive = true }
+"google" = { output = "Google", is_word = true, auto_expand = false, is_case_sensitive = true }
+"ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true }
 "insee" = { output = "INSEE", is_word = true, auto_expand = false, is_case_sensitive = true }
+"instagram" = { output = "Instagram", is_word = true, auto_expand = false, is_case_sensitive = true }
 "latex" = { output = "LaTeX", is_word = true, auto_expand = false, is_case_sensitive = true }
 "lualatex" = { output = "LuaLaTeX", is_word = true, auto_expand = false, is_case_sensitive = true }
+"macos" = { output = "macOS", is_word = true, auto_expand = false, is_case_sensitive = true }
 "mbti" = { output = "MBTI", is_word = true, auto_expand = false, is_case_sensitive = true }
 "nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true }
 "nlp" = { output = "NLP", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -151,7 +160,12 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true }
 "powerpoint" = { output = "PowerPoint", is_word = true, auto_expand = false, is_case_sensitive = true }
 "sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true }
+"url" = { output = "URL", is_word = true, auto_expand = false, is_case_sensitive = true }
 "vscode" = { output = "VSCode", is_word = true, auto_expand = false, is_case_sensitive = true }
+"wikipedia" = { output = "Wikipedia", is_word = true, auto_expand = false, is_case_sensitive = true }
+"wikipédia" = { output = "Wikipédia", is_word = true, auto_expand = false, is_case_sensitive = true }
+"windows" = { output = "Windows", is_word = true, auto_expand = false, is_case_sensitive = true }
+"youtube" = { output = "YouTube", is_word = true, auto_expand = false, is_case_sensitive = true }
 
 [[names]]
 "alexei" = { output = "Alexeï", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -171,6 +185,7 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "mickael" = { output = "Mickaël", is_word = true, auto_expand = false, is_case_sensitive = true }
 "noel" = { output = "Noël", is_word = true, auto_expand = false, is_case_sensitive = true }
 "Quatar" = { output = "Qatar", is_word = true, auto_expand = true, is_case_sensitive = true }
+"raphael" = { output = "Raphaël", is_word = true, auto_expand = false, is_case_sensitive = true }
 "serguei" = { output = "Sergueï", is_word = true, auto_expand = false, is_case_sensitive = true }
 "shanghai" = { output = "Shanghaï", is_word = true, auto_expand = false, is_case_sensitive = true }
 "taiwan" = { output = "Taïwan", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -256,6 +271,8 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "chomé" = { output = "chômé", is_word = true, auto_expand = true, is_case_sensitive = false }
 "cloture" = { output = "clôture", is_word = true, auto_expand = true, is_case_sensitive = false }
 "cloturé" = { output = "clôturé", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cocaine" = { output = "cocaïne", is_word = true, auto_expand = true, is_case_sensitive = false }
+"cocaino" = { output = "cocaïno", is_word = true, auto_expand = true, is_case_sensitive = false }
 "coeur" = { output = "cœur", is_word = true, auto_expand = true, is_case_sensitive = false }
 "coincide" = { output = "coïncide", is_word = true, auto_expand = true, is_case_sensitive = false }
 "connait" = { output = "connaît", is_word = false, auto_expand = true, is_case_sensitive = false }
@@ -408,6 +425,8 @@ apostrophe = "Remplace l'apostrophe droite par l'apostrophe typographique ’ de
 "oeuf" = { output = "œuf", is_word = true, auto_expand = true, is_case_sensitive = false }
 "oeuvre" = { output = "œuvre", is_word = true, auto_expand = true, is_case_sensitive = false }
 "oiaque" = { output = "oïaque", is_word = false, auto_expand = true, is_case_sensitive = false }
+"oide" = { output = "oïde", is_word = false, auto_expand = true, is_case_sensitive = false }
+"opiniatre" = { output = "opiniâtre", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ouie" = { output = "ouïe", is_word = true, auto_expand = true, is_case_sensitive = false }
 "oter" = { output = "ôter", is_word = true, auto_expand = false, is_case_sensitive = false }
 "paella" = { output = "paëlla", is_word = true, auto_expand = true, is_case_sensitive = false }

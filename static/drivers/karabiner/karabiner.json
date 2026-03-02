@@ -7,6 +7,26 @@
                         "description": "Left Command becomes a navigation layer",
                         "manipulators": [
                             {
+                                "description": "AltGr + Left Command: send Option+Backspace (no right_option in output to avoid triggering Hammerspoon reload)",
+                                "from": {
+                                    "key_code": "left_command",
+                                    "modifiers": {
+                                        "mandatory": [
+                                            "right_option"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "delete_or_backspace",
+                                        "modifiers": [
+                                            "left_option"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
                                 "description": "Hold: activate layer temporarily | Tap: send BackSpace",
                                 "from": {
                                     "key_code": "left_command",
@@ -1750,8 +1770,15 @@
                         "manipulators": [
                             {
                                 "description": "Right Command + Caps Lock: Toggle Caps Word",
+                                "conditions": [
+                                    {
+                                        "name": "layer_active",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    }
+                                ],
                                 "from": {
-                                    "key_code": "return_or_enter",
+                                    "key_code": "caps_lock",
                                     "modifiers": {
                                         "mandatory": [
                                             "right_option"
@@ -1786,7 +1813,7 @@
                                     }
                                 ],
                                 "from": {
-                                    "key_code": "return_or_enter",
+                                    "key_code": "caps_lock",
                                     "modifiers": {
                                         "optional": [
                                             "any"
@@ -1821,7 +1848,7 @@
                                     }
                                 ],
                                 "from": {
-                                    "key_code": "return_or_enter",
+                                    "key_code": "caps_lock",
                                     "modifiers": {
                                         "optional": [
                                             "any"
@@ -2370,6 +2397,61 @@
                                 "type": "basic"
                             }
                         ]
+                    },
+                    {
+                        "description": "CapsLock: send Enter when no other rule matches",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "caps_lock",
+                                    "modifiers": {
+                                        "optional": [
+                                            "caps_lock",
+                                            "left_command",
+                                            "right_command",
+                                            "left_control",
+                                            "right_control",
+                                            "left_option",
+                                            "left_shift",
+                                            "right_shift",
+                                            "fn"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "return_or_enter"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Right Option: sticky Right Shift when no other rule matches",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "right_option",
+                                    "modifiers": {
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "sticky_modifier": {
+                                            "right_shift": "toggle"
+                                        }
+                                    },
+                                    {
+                                        "key_code": "right_shift"
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             },
@@ -2378,33 +2460,7 @@
                     "identifiers": {
                         "is_keyboard": true
                     },
-                    "simple_modifications": [
-                        {
-                            "from": {
-                                "key_code": "caps_lock"
-                            },
-                            "to": [
-                                {
-                                    "key_code": "return_or_enter"
-                                }
-                            ]
-                        },
-                        {
-                            "from": {
-                                "key_code": "right_option"
-                            },
-                            "to": [
-                                {
-                                    "sticky_modifier": {
-                                        "right_shift": "toggle"
-                                    }
-                                },
-                                {
-                                    "key_code": "right_shift"
-                                }
-                            ]
-                        }
-                    ]
+                    "simple_modifications": []
                 }
             ],
             "name": "Default profile",

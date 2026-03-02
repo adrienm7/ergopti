@@ -57,4 +57,11 @@ function M.start()
     utils.debugLog("scroll: event taps started")
 end
 
+function M.stop()
+    pcall(function() physicalOptionTap:stop() end)
+    pcall(function() scrollZoom:stop() end)
+    leftCommandPhysical = false
+    utils.debugLog("scroll: event taps stopped")
+end
+
 return M

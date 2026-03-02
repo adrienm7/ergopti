@@ -3,8 +3,15 @@
 	"manipulators": [
 		{
 			"description": "Right Command + Caps Lock: Toggle Caps Word",
+			"conditions": [
+				{
+					"name": "layer_active",
+					"type": "variable_if",
+					"value": 1
+				}
+			],
 			"from": {
-				"key_code": "return_or_enter",
+				"key_code": "caps_lock",
 				"modifiers": { "mandatory": ["right_option"] }
 			},
 			"to": [
@@ -33,7 +40,7 @@
 				}
 			],
 			"from": {
-				"key_code": "return_or_enter",
+				"key_code": "caps_lock",
 				"modifiers": {
 					"optional": ["any"]
 				}
@@ -66,7 +73,7 @@
 				}
 			],
 			"from": {
-				"key_code": "return_or_enter",
+				"key_code": "caps_lock",
 				"modifiers": {
 					"optional": ["any"]
 				}

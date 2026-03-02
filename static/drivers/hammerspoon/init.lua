@@ -8,15 +8,16 @@ local scroll = require("scroll")
 local keymap = require("keymap")
 local shortcuts = require("shortcuts")
 local repeat_keys = require("repeat_keys")
+local script_control = require("script_control")
 
 -- Initial startup of modules
 gestures.start()
 scroll.start()
 -- Also start the shortcuts module (`shortcuts`)
 shortcuts.start()
--- Register repeat keys
-repeat_keys.start(keymap)
 -- (keymap already starts itself via your `keymap.lua`)
+-- repeat_keys is registered after TOML hotstrings to ensure lowest priority
+-- (it acts as a fallback when no other hotstring matches)
 
 
 
@@ -56,8 +57,18 @@ end
 
 
 ---------------------------------------------------------------------------
+-- Repeat keys (registered last = lowest priority, fallback if nothing else matches)
+---------------------------------------------------------------------------
+repeat_keys.start(keymap)
+
+---------------------------------------------------------------------------
 -- Menubar menu (Hammerspoon Menubar)
 ---------------------------------------------------------------------------
 -- External menu module
 local menu = require("menu")
 menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts)
+
+---------------------------------------------------------------------------
+-- Script control shortcuts (AltGr+Return = pause/resume, AltGr+Backspace = reload)
+---------------------------------------------------------------------------
+script_control.start(keymap, shortcuts, gestures, scroll)
