@@ -341,7 +341,12 @@ function M.add(trigger, replacement, opts)
 
     local function add_mapping(t, r)
         add_mapping_raw(t, r, is_auto)
-        if t:match(" ") or t:match(" ") or t:match(" ") then
+        -- Do not add space variants for triggers that start with a space character.
+        -- Those come from comma-uppercase expansions (e.g. " :D" from ",d") and
+        -- the leading non-breaking space is intentional; adding a regular-space
+        -- variant would match unintended sequences like " :D" (colon+D smiley).
+        local first_is_space = t:match("^[ \194\160\226\128\175]") ~= nil
+        if not first_is_space and (t:match(" ") or t:match(" ") or t:match(" ")) then
             add_mapping_raw(set_spaces(t, " "), r, is_auto)  
             add_mapping_raw(set_spaces(t, " "), r, is_auto) 
             add_mapping_raw(set_spaces(t, " "), r, is_auto) 
