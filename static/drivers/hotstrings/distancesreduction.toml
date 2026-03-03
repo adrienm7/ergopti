@@ -91,8 +91,8 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "ê9" = { output = "➈", is_word = true, auto_expand = true, is_case_sensitive = true }
 "ê:" = { output = "▶", is_word = true, auto_expand = true, is_case_sensitive = true }
 "ê;" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êa" = { output = "â", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êA" = { output = "Â", is_word = true, auto_expand = true, is_case_sensitive = true }
+"êa" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êA" = { output = "Â", is_word = false, auto_expand = true, is_case_sensitive = true }
 "êb" = { output = "ó", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êB" = { output = "Ó", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êc" = { output = "ç", is_word = true, auto_expand = true, is_case_sensitive = true }
@@ -105,8 +105,8 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "êG" = { output = "Ĝ", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êh" = { output = "ĥ", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êH" = { output = "Ĥ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êi" = { output = "î", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êI" = { output = "Î", is_word = true, auto_expand = true, is_case_sensitive = true }
+"êi" = { output = "î", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êI" = { output = "Î", is_word = false, auto_expand = true, is_case_sensitive = true }
 "êj" = { output = "j", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êJ" = { output = "J", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êk" = { output = "☺", is_word = true, auto_expand = true, is_case_sensitive = true }
@@ -117,8 +117,8 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "êM" = { output = "☑", is_word = true, auto_expand = true, is_case_sensitive = true }
 "ên" = { output = "ñ", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êN" = { output = "Ñ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êo" = { output = "ô", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êO" = { output = "Ô", is_word = true, auto_expand = true, is_case_sensitive = true }
+"êo" = { output = "ô", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êO" = { output = "Ô", is_word = false, auto_expand = true, is_case_sensitive = true }
 "êp" = { output = "¶", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êP" = { output = "⁂", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êq" = { output = "☒", is_word = true, auto_expand = true, is_case_sensitive = true }
@@ -127,8 +127,8 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "êR" = { output = "°", is_word = true, auto_expand = true, is_case_sensitive = true }
 "ês" = { output = "ß", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êS" = { output = "ẞ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êu" = { output = "û", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êU" = { output = "Û", is_word = true, auto_expand = true, is_case_sensitive = true }
+"êu" = { output = "û", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êU" = { output = "Û", is_word = false, auto_expand = true, is_case_sensitive = true }
 "êv" = { output = "✓", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êV" = { output = "✔", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êw" = { output = "ù ", is_word = true, auto_expand = true, is_case_sensitive = true }
@@ -139,14 +139,14 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "êY" = { output = "Ŷ", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êz" = { output = "ẑ", is_word = true, auto_expand = true, is_case_sensitive = true }
 "êZ" = { output = "Ẑ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êà" = { output = "æ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êÀ" = { output = "Æ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êè" = { output = "í", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êÈ" = { output = "Í", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êé" = { output = "œ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êÉ" = { output = "Œ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êê" = { output = "á", is_word = true, auto_expand = true, is_case_sensitive = true }
-"êÊ" = { output = "Á", is_word = true, auto_expand = true, is_case_sensitive = true }
+"êà" = { output = "æ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êÀ" = { output = "Æ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êè" = { output = "í", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êÈ" = { output = "Í", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êé" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êÉ" = { output = "Œ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êê" = { output = "á", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êÊ" = { output = "Á", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[ecircumflexe]]
 "êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false }
