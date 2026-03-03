@@ -62,6 +62,18 @@ function M.load_toml(name, path)
 		do
 			local sec = data.sections[sec_name]
 			if not sec then goto continue_sec end
+			if sec.is_placeholder then
+				-- Section listed in __Order with a description but no TOML entries:
+				-- handled by a separate Lua module (e.g. personal_info).  Insert
+				-- a placeholder so that the menu renders it at the right position.
+				table.insert(sections_info, {
+					name                  = sec_name,
+					description           = sec.description,
+					count                 = 0,
+					is_module_placeholder = true,
+				})
+				goto continue_sec
+			end
 			local sec_enabled = M.is_section_enabled(name, sec_name)
 			if sec_enabled then
 				for _, entry in ipairs(sec.entries) do

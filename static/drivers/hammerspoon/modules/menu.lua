@@ -25,7 +25,7 @@ local SLOT_LABELS = {
     swipe_5_down  = "Swipe 5 doigts ↓",
 }
 
-function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info)
+function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info, module_sections)
     base_dir = base_dir or (hs.configdir .. "/")
 
     local myMenu = menubar.new()
@@ -191,6 +191,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         end
     end
 
+    -- Forward declaration: buildPersonalInfoItem is defined below but called
+    -- from inside buildHotstringsItems (to inject it at the right sub-menu slot).
+    local buildPersonalInfoItem
+
     -- Returns a flat list of items, one per TOML/Lua group, inserted directly
     -- into the top-level menu (no extra "Hotstrings" parent wrapper).
     --
@@ -267,6 +271,17 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 for _, sec in ipairs(ordered_secs) do
                     if sec.name == '-' then
                         sec_menu[#sec_menu + 1] = { title = "-" }
+                    elseif sec.is_module_placeholder then
+                        -- This section has no TOML entries: it is handled by a
+                        -- dedicated Lua module whose toggle item is injected here
+                        -- so that its position in the sub-menu follows the AHK
+                        -- __Order definition automatically.
+                        local ms = module_sections and module_sections[name]
+                        local mod_id = ms and ms[sec.name]
+                        if mod_id == "personal_info" then
+                            local pi = buildPersonalInfoItem()
+                            if pi then sec_menu[#sec_menu + 1] = pi end
+                        end
                     else
                         local sec_on = keymap.is_section_enabled(name, sec.name)
                         local label  = (sec.description and sec.description ~= '')
@@ -368,7 +383,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         return item
     end
 
-    local function buildPersonalInfoItem()
+    buildPersonalInfoItem = function()
         if not personal_info then return nil end
         return {
             title   = "Remplissage de formulaires : @npd★ → Nom Prénom DateNaissance, etc.",
@@ -477,8 +492,6 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         end
         table.insert(items, {title="-"})
         table.insert(items, buildGestesItem())
-        local pi_item = buildPersonalInfoItem()
-        if pi_item then table.insert(items, pi_item) end
         table.insert(items, buildRaccourcisItem())
         for _, it in ipairs(buildUtilityItems()) do table.insert(items, it) end
         myMenu:setMenu({})
