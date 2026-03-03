@@ -671,6 +671,8 @@ def _strip_ahk_inline_comment(line: str) -> str:
 
 def parse_body(
     body: str,
+    *,
+    skip_identity: bool = True,
 ) -> list[tuple[str, str, bool, bool, bool]]:
     """Extract all hotstring entries from a block body.
 
@@ -680,6 +682,12 @@ def parse_body(
 
     Args:
             body: Raw body text of a ``Features[...][...]`` block.
+            skip_identity: When ``True`` (default), hotstrings where trigger
+                    equals output are dropped.  Pass ``False`` for sections
+                    such as ``Repeat`` where identity entries are semantically
+                    required (they guard against shorter triggers firing inside
+                    longer words, e.g. ``honn\u00ea`` blocks ``nn\u00ea → nnu``
+                    inside ``honn\u00eate``).
 
     Returns:
             Deduplicated list of
@@ -722,9 +730,13 @@ def parse_body(
         )
 
         if trigger and output:
-            # Skip identity hotstrings (trigger == output): they are no-ops in
-            # Hammerspoon and only exist in AHK to block longer hotstrings.
-            if trigger == output:
+            # Skip identity hotstrings (trigger == output) by default: they
+            # are no-ops in Hammerspoon.  Callers pass skip_identity=False for
+            # sections such as ``Repeat`` where identity entries are guards
+            # that prevent shorter SFB-correction triggers from firing inside
+            # longer words (e.g. ``honnê`` blocks ``nnê → nnu`` in
+            # ``honnête``).
+            if skip_identity and trigger == output:
                 pass
             elif trigger not in seen:
                 seen.add(trigger)
@@ -916,6 +928,11 @@ def _deadkey_ecircumflex_entries(
     flag, each (key, value) pair from the map is emitted as a distinct
     case-sensitive entry.
 
+    ``is_word=True`` mirrors the AHK ``ShouldActivateDeadkey`` logic: the
+    combination is only fired when the character before ``ê`` is not a letter
+    (word boundary).  This prevents mid-word sequences like ``mêm`` in
+    ``même`` from triggering ``ê``+key shortcut substitution.
+
     Args:
             circumflex_map: Parsed ``{key: value}`` dict from the AHK source.
 
@@ -924,7 +941,7 @@ def _deadkey_ecircumflex_entries(
     """
     excluded = {"e", "E", "t", "T"}
     return [
-        (f"ê{key}", value, False, True, False)
+        (f"ê{key}", value, True, True, False)
         for key, value in circumflex_map.items()
         if key not in excluded
     ]
@@ -1038,11 +1055,6 @@ def build_handcrafted_sections(
     }
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-
 def main() -> None:
     """Extract all AHK hotstring blocks and write one TOML file per category."""
     reset_error_count()
@@ -1088,10 +1100,19 @@ def main() -> None:
 
     handcrafted = build_handcrafted_sections(content)
 
+    # Sub-sections that must preserve identity hotstrings (trigger == output)
+    # because they act as guards preventing shorter triggers from firing inside
+    # longer words (e.g. ``honnê`` blocks ``nnê → nnu`` inside ``honnête``).
+    _IDENTITY_SECTIONS: frozenset[str] = frozenset({"Repeat"})
+
     total_entries = 0
     for category, subs in all_blocks.items():
         sub_entries: dict[str, list[tuple[str, str, bool, bool, bool]]] = {
-            sub_name: parse_body(body) for sub_name, body in subs.items()
+            sub_name: parse_body(
+                body,
+                skip_identity=sub_name not in _IDENTITY_SECTIONS,
+            )
+            for sub_name, body in subs.items()
         }
         # Inject hand-crafted sections that belong to this category.
         for sub_name, (entries, section_desc) in handcrafted.get(
@@ -1124,10 +1145,12 @@ def main() -> None:
     # Build module_sections: tell Lua which placeholder sub-sections (those
     # absent from TOML because handled by a separate Lua module) map to which
     # Lua module identifier.  Keyed by normalised category / section name.
+    # Each value is a dict with at least ``mod_id``; ``description`` is added
+    # when an AHK description is available for the sub-section.
     _module_secs_norm: dict[str, str] = {
         normalize_name(k): v for k, v in _MODULE_SECTIONS.items()
     }
-    module_sections: dict[str, dict[str, str]] = {}
+    module_sections: dict[str, dict[str, dict[str, str]]] = {}
     for category, subs_order in all_orders.items():
         normalized_cat = normalize_name(category)
         for item in subs_order:
@@ -1135,7 +1158,30 @@ def main() -> None:
                 continue
             module = _module_secs_norm.get(item)
             if module:
-                module_sections.setdefault(normalized_cat, {})[item] = module
+                entry: dict[str, str] = {"mod_id": module}
+                # Look up the AHK-parsed description for this sub-section.
+                original_name = next(
+                    (k for k in _MODULE_SECTIONS if normalize_name(k) == item),
+                    None,
+                )
+                if original_name:
+                    desc = (
+                        all_descriptions.get(category, {})
+                        or all_descriptions.get(
+                            next(
+                                (
+                                    c
+                                    for c in all_descriptions
+                                    if normalize_name(c) == normalized_cat
+                                ),
+                                "",
+                            ),
+                            {},
+                        )
+                    ).get(original_name)
+                    if desc:
+                        entry["description"] = desc
+                module_sections.setdefault(normalized_cat, {})[item] = entry
 
     index_path = OUTPUT_DIR / "_index.json"
     index_path.write_text(

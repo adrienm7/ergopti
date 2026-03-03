@@ -277,9 +277,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         -- so that its position in the sub-menu follows the AHK
                         -- __Order definition automatically.
                         local ms = module_sections and module_sections[name]
-                        local mod_id = ms and ms[sec.name]
+                        local ms_entry = ms and ms[sec.name]
+                        local mod_id = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
+                        local mod_desc = type(ms_entry) == "table" and ms_entry.description or nil
                         if mod_id == "personal_info" then
-                            local pi = buildPersonalInfoItem()
+                            local pi = buildPersonalInfoItem(mod_desc)
                             if pi then sec_menu[#sec_menu + 1] = pi end
                         end
                     else
@@ -383,10 +385,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         return item
     end
 
-    buildPersonalInfoItem = function()
+    buildPersonalInfoItem = function(description)
         if not personal_info then return nil end
         return {
-            title   = "Remplissage de formulaires : @npd★ → Nom Prénom DateNaissance, etc.",
+            title   = description,
             checked = state.personal_info or nil,
             fn = function()
                 state.personal_info = not state.personal_info
