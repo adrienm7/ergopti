@@ -2,15 +2,15 @@
 -- Parses the hotstrings TOML format produced by generate_hotstrings.py.
 --
 -- Supports the following constructs:
---   [_meta]              file-level description
+--   [_meta]              file-level description + optional sections_order array
 --   [_meta.sections]     per-section descriptions (key = "description")
 --   [[section_name]]     start of a hotstring section
 --   "trigger" = { output = "...", is_word = bool, auto_expand = bool, is_case_sensitive = bool }
 --
 -- Public API:
 --   M.parse(path)
---       → { meta = {description, sections = {[name]=desc}},
---            sections_order = {"name1","name2",...},
+--       → { meta = {description, sections = {[name]=desc}, sections_order = {...}},
+--            sections_order = {"name1","-","name2",...},
 --            sections = {name1 = {description, entries = [{...}]}, ...} }
 --
 --   M.load(path, keymap_module)   [backward-compatible helper]
@@ -54,6 +54,32 @@ end
 local function skip_ws(s, i)
     while i <= #s and s:sub(i, i):match('%s') do i = i + 1 end
     return i
+end
+
+-- Parse a TOML inline array of double-quoted strings: ["a", "-", "b", ...].
+-- Returns a list (may be empty) even on partial parse.
+local function parse_string_array(s)
+    local result = {}
+    local i = skip_ws(s, 1)
+    if s:sub(i, i) ~= '[' then return result end
+    i = skip_ws(s, i + 1)
+    while i <= #s do
+        if s:sub(i, i) == ']' then break end
+        if s:sub(i, i) == ',' then
+            i = skip_ws(s, i + 1)
+        elseif s:sub(i, i) == '"' then
+            local val, ni = parse_dq_string(s, i)
+            if val then
+                result[#result + 1] = val
+                i = skip_ws(s, ni)
+            else
+                break
+            end
+        else
+            break
+        end
+    end
+    return result
 end
 
 ---------------------------------------------------------------------------
@@ -152,14 +178,16 @@ function M.parse(path)
     local f = io.open(path, 'r')
     if not f then
         print('[toml_reader] cannot open: ' .. tostring(path))
-        return { meta = { description = '', sections = {} }, sections_order = {}, sections = {} }
+        return { meta = { description = '', sections = {}, sections_order = {} }, sections_order = {}, sections = {} }
     end
 
     local result = {
-        meta           = { description = '', sections = {} },
-        sections_order = {},
+        meta           = { description = '', sections = {}, sections_order = {} },
+        sections_order = {},   -- final order (rebuilt after parsing)
         sections       = {},
     }
+    -- Raw file order (order [[sec]] headers appear) – used as fallback.
+    local file_order = {}
 
     -- Parser state
     local mode          = 'top'   -- 'top' | 'meta' | 'meta_sections' | 'section'
@@ -191,7 +219,7 @@ function M.parse(path)
             mode         = 'section'
             current_sec  = sec_name
             if not result.sections[current_sec] then
-                table.insert(result.sections_order, current_sec)
+                table.insert(file_order, current_sec)
                 result.sections[current_sec] = {
                     description = result.meta.sections[current_sec] or '',
                     entries     = {},
@@ -209,9 +237,15 @@ function M.parse(path)
         -- Content lines ---------------------------------------------------
 
         if mode == 'meta' then
-            local key, val = parse_kv_string(line)
-            if key == 'description' and val then
-                result.meta.description = val
+            -- sections_order = [...] inline array
+            local arr_val = line:match('^sections_order%s*=%s*(%[.*)$')
+            if arr_val then
+                result.meta.sections_order = parse_string_array(arr_val)
+            else
+                local key, val = parse_kv_string(line)
+                if key == 'description' and val then
+                    result.meta.description = val
+                end
             end
 
         elseif mode == 'meta_sections' then
@@ -235,6 +269,32 @@ function M.parse(path)
     end
 
     f:close()
+
+    -- Rebuild sections_order from TOML metadata order when available;
+    -- otherwise fall back to the order sections appeared in the file.
+    -- Sections not mentioned in meta.sections_order are appended at the end.
+    local meta_order = result.meta.sections_order
+    if meta_order and #meta_order > 0 then
+        local seen = {}
+        for _, item in ipairs(meta_order) do
+            if item == '-' then
+                table.insert(result.sections_order, '-')
+            elseif result.sections[item] then
+                table.insert(result.sections_order, item)
+                seen[item] = true
+            end
+        end
+        -- Append sections present in the file but absent from the meta order.
+        for _, name in ipairs(file_order) do
+            if not seen[name] then
+                table.insert(result.sections_order, name)
+            end
+        end
+    else
+        -- Fallback: use file order (no separators).
+        result.sections_order = file_order
+    end
+
     return result
 end
 

@@ -3,7 +3,8 @@
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
 [_meta]
-description = "Réduction des SFBs (Same Finger Bigrams)"
+description = "Réduction des SFBs"
+sections_order = ["comma", "ecirc", "egrave", "bu", "ie"]
 
 [_meta.sections]
 comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"

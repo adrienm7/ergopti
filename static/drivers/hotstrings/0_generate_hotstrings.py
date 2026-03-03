@@ -9,9 +9,9 @@ this script.  Each sub-block becomes a [[sub_name]] section inside that file.
 A [_meta] / [_meta.sections] TOML table is prepended to each file so that
 Hammerspoon can display human-readable descriptions in its menu.
 
-Hand-crafted sub-blocks (apostrophe, e_deadkey) have no AHK source block;
-they are injected as sections into their parent category TOML files
-(Autocorrection and SFBsReduction respectively).
+Hand-crafted sub-blocks (e_deadkey, HashtagQuote, ChevronEqual, EqualString)
+have no AHK source block; they are injected as sections into their parent
+category TOML files (SFBsReduction and Rolls respectively).
 """
 
 import re
@@ -34,11 +34,11 @@ TOML_HEADER: list[str] = [
 
 # Human-readable file-level labels used in the Hammerspoon menu.
 FILE_DESCRIPTIONS: dict[str, str] = {
-    "DistancesReduction": "Réduction des distances de frappe",
-    "SFBsReduction": "Réduction des SFBs (Same Finger Bigrams)",
-    "Rolls": "Roulements — substitutions par combinaisons de touches",
-    "Autocorrection": "Corrections automatiques",
-    "MagicKey": "Touche magique ★",
+    "DistancesReduction": "Réduction des distances",
+    "SFBsReduction": "Réduction des SFBs",
+    "Rolls": "Roulements",
+    "Autocorrection": "Autocorrection",
+    "MagicKey": "Touche ★ et expansion de texte",
 }
 
 # All generated TOML files land in this directory (next to this script).
@@ -300,9 +300,72 @@ def parse_ahk_descriptions(content: str) -> dict[str, dict[str, str]]:
     return result
 
 
-# ---------------------------------------------------------------------------
-# AHK file discovery
-# ---------------------------------------------------------------------------
+def parse_ahk_orders(content: str) -> dict[str, list[str]]:
+    """Extract the ``__Order`` list for every category in the AHK Features map.
+
+    Separators (``"-"``) are preserved as ``"-"``; all other entries are
+    normalized with :func:`normalize_name` to match the TOML section keys.
+    Sections not mentioned in ``__Order`` but present in the data will be
+    appended (in their original position) by the caller.
+
+    Args:
+        content: Full AHK file content.
+
+    Returns:
+        ``{category_name: [normalized_sub, "-", ...]}``
+    """
+    features_start = content.find("global Features := Map(")
+    if features_start < 0:
+        return {}
+
+    first_if = re.search(
+        r"^\s*if\s+Features\[", content[features_start:], re.MULTILINE
+    )
+    features_text = (
+        content[features_start : features_start + first_if.start()]
+        if first_if
+        else content[features_start : features_start + 20_000]
+    )
+
+    result: dict[str, list[str]] = {}
+    cat_re = re.compile(r'"([A-Za-z]+)",\s*Map\(')
+    order_start_re = re.compile(r'"__Order"\s*,\s*\[')
+
+    lines = features_text.splitlines()
+    current_cat: Optional[str] = None
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+
+        cm = cat_re.search(line)
+        if cm and cm.group(1) != "__Order":
+            current_cat = cm.group(1)
+
+        if current_cat and order_start_re.search(line):
+            # Collect the full array text — may span multiple lines
+            array_text = ""
+            # Take the portion after "["
+            bracket_pos = line.find("[")
+            array_text += line[bracket_pos + 1 :]
+            # Consume continuation lines until the closing "]"
+            while "]" not in array_text and i + 1 < len(lines):
+                i += 1
+                array_text += " " + lines[i]
+            # Strip everything after the closing "]"
+            close = array_text.find("]")
+            if close >= 0:
+                array_text = array_text[:close]
+            # Extract all quoted items
+            items: list[str] = re.findall(r'"([^"]+)"', array_text)
+            normalized: list[str] = [
+                "-" if item == "-" else normalize_name(item) for item in items
+            ]
+            result[current_cat] = normalized
+
+        i += 1
+
+    return result
 
 
 def get_latest_ahk_file() -> Path:
@@ -606,19 +669,26 @@ def write_category_toml(
     category: str,
     sub_blocks: dict[str, list[tuple[str, str, bool, bool, bool]]],
     section_descriptions: Optional[dict[str, str]] = None,
+    section_order: Optional[list[str]] = None,
 ) -> int:
     """Write one TOML file for *category* and return the total entry count.
 
     The filename is :func:`normalize_name` applied to *category*.
     Each sub-block becomes a ``[[sub_name]]`` array-of-tables section.
     A leading ``[_meta]`` table carries the human-readable descriptions used
-    by the Hammerspoon menu.
+    by the Hammerspoon menu, including an optional ``sections_order`` array
+    that records the original AHK ``__Order`` list for faithful menu ordering.
 
     Args:
             category: Original AHK category name (e.g. ``"MagicKey"``).
             sub_blocks: Mapping of sub-block names to their hotstring entries.
             section_descriptions: Optional ``{AHK_sub_name: description}`` mapping
                     extracted from the AHK Features map.
+            section_order: Optional ordered list of *normalised* section names
+                    (with ``"-"`` as separator sentinel) extracted from the AHK
+                    ``__Order`` array.  Sections not listed are appended at the
+                    end.  When ``None``, the insertion order of *sub_blocks* is
+                    kept.
 
     Returns:
             Total number of entries written.
@@ -628,10 +698,35 @@ def write_category_toml(
 
     lines = TOML_HEADER.copy()
 
+    # ── Build final section order ─────────────────────────────────────────────
+    known_subs = list(sub_blocks.keys())
+    norm_known = [normalize_name(s) for s in known_subs]
+
+    if section_order:
+        ordered: list[str] = []
+        seen_norm: set[str] = set()
+        for item in section_order:
+            if item == "-":
+                ordered.append("-")
+            elif item in norm_known and item not in seen_norm:
+                ordered.append(item)
+                seen_norm.add(item)
+        # Append any sub that was not referenced in __Order
+        for norm in norm_known:
+            if norm not in seen_norm:
+                ordered.append(norm)
+                seen_norm.add(norm)
+    else:
+        ordered = norm_known
+
     # ── [_meta] block ────────────────────────────────────────────────────────
     file_desc = FILE_DESCRIPTIONS.get(category, "")
     lines.append("[_meta]")
     lines.append(f'description = "{escape_toml_string(file_desc)}"')
+
+    # Write sections_order as a TOML inline array (preserves order + separators)
+    toml_items = ", ".join(f'"{item}"' for item in ordered)
+    lines.append(f"sections_order = [{toml_items}]")
     lines.append("")
 
     if section_descriptions:
@@ -643,12 +738,20 @@ def write_category_toml(
                 lines.append(f'{norm} = "{escape_toml_string(desc)}"')
         lines.append("")
 
-    # ── section data ─────────────────────────────────────────────────────────
+    # ── section data — written in the resolved order ──────────────────────────
+    # Map norm → original sub_name for lookup
+    norm_to_orig = {normalize_name(s): s for s in known_subs}
     total = 0
-    for sub_name, entries in sub_blocks.items():
+    for item in ordered:
+        if item == "-":
+            continue  # separators have no data block
+        orig = norm_to_orig.get(item)
+        if orig is None:
+            continue
+        entries = sub_blocks.get(orig, [])
         if not entries:
             continue
-        lines.append(f"[[{normalize_name(sub_name)}]]")
+        lines.append(f"[[{item}]]")
         lines.extend(entries_to_toml_lines(entries))
         lines.append("")
         total += len(entries)
@@ -665,12 +768,6 @@ def write_category_toml(
 # ---------------------------------------------------------------------------
 # Handcrafted section data (no AHK source – injected into parent TOMLs)
 # ---------------------------------------------------------------------------
-
-
-def _apostrophe_entries() -> list[tuple[str, str, bool, bool, bool]]:
-    """Return hotstring entries for the typographic-apostrophe section."""
-    chars = ["a", "e", "i", "o", "u", "y", "é", "ê", "è", "r", "t"]
-    return [(f"'{c}", f"\u2019{c}", False, True, False) for c in chars]
 
 
 def _e_deadkey_entries() -> list[tuple[str, str, bool, bool, bool]]:
@@ -732,13 +829,6 @@ def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool]]:
 _HANDCRAFTED_SECTIONS: dict[
     str, dict[str, tuple[list[tuple[str, str, bool, bool, bool]], str]]
 ] = {
-    "Autocorrection": {
-        "apostrophe": (
-            _apostrophe_entries(),
-            "Remplace l'apostrophe droite par l'apostrophe typographique \u2019"
-            " devant les voyelles et consonnes fréquentes",
-        ),
-    },
     "Rolls": {
         # HashtagQuote and ChevronEqual are #HotIf blocks in AHK — they use
         # GetLastSentCharacterAt() context logic and are never emitted by a
@@ -803,6 +893,13 @@ def main() -> None:
         len(all_descriptions),
     )
 
+    all_orders = parse_ahk_orders(content)
+    logger.info(
+        "Extracted __Order for %d categories: %s",
+        len(all_orders),
+        sorted(all_orders.keys()),
+    )
+
     total_entries = 0
     for category, subs in all_blocks.items():
         sub_entries: dict[str, list[tuple[str, str, bool, bool, bool]]] = {
@@ -818,10 +915,11 @@ def main() -> None:
             category,
             sub_entries,
             section_descriptions=all_descriptions.get(category),
+            section_order=all_orders.get(category),
         )
 
     # Remove obsolete standalone TOML files now embedded in their parent.
-    for orphan_name in ("apostrophe.toml", "e_deadkey.toml"):
+    for orphan_name in ("e_deadkey.toml",):
         orphan_path = OUTPUT_DIR / orphan_name
         if orphan_path.exists():
             orphan_path.unlink()

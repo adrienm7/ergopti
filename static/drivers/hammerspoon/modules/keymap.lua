@@ -53,23 +53,34 @@ function M.load_toml(name, path)
 	local sections_info = {}
 
 	for _, sec_name in ipairs(data.sections_order) do
-		local sec = data.sections[sec_name]
-		local sec_enabled = M.is_section_enabled(name, sec_name)
-		if sec_enabled then
-			for _, entry in ipairs(sec.entries) do
-				M.add(entry.trigger, entry.output, {
-					is_word           = entry.is_word,
-					auto_expand       = entry.auto_expand,
-					is_case_sensitive = entry.is_case_sensitive,
-				})
-				total = total + 1
-			end
+		-- Separator entries: carry ordering info but have no hotstrings.
+		if sec_name == '-' then
+			table.insert(sections_info, { name = '-', description = '-', count = 0 })
+			goto continue_sec
 		end
-		table.insert(sections_info, {
-			name        = sec_name,
-			description = sec.description,
-			count       = #sec.entries,
-		})
+
+		do
+			local sec = data.sections[sec_name]
+			if not sec then goto continue_sec end
+			local sec_enabled = M.is_section_enabled(name, sec_name)
+			if sec_enabled then
+				for _, entry in ipairs(sec.entries) do
+					M.add(entry.trigger, entry.output, {
+						is_word           = entry.is_word,
+						auto_expand       = entry.auto_expand,
+						is_case_sensitive = entry.is_case_sensitive,
+					})
+					total = total + 1
+				end
+			end
+			table.insert(sections_info, {
+				name        = sec_name,
+				description = sec.description,
+				count       = #sec.entries,
+			})
+		end
+
+		::continue_sec::
 	end
 
 	current_group = nil

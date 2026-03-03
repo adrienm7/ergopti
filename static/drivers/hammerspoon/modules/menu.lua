@@ -62,7 +62,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         hs.timer.doAfter(0.25, function() hs.reload() end)
     end
 
-    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}, chatgpt_url="https://chat.openai.com"}
+    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}, chatgpt_url="https://chat.openai.com", sections_order_overrides={}}
     for _, f in ipairs(hotfiles or {}) do
         local name = f:match("^(.*)%.lua$") or f
         state.hotstrings[name] = true
@@ -80,15 +80,16 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
     local function save_prefs()
         local prefs = {
-            keymap        = state.keymap,
-            gestures      = state.gestures,
-            scroll        = state.scroll,
-            shortcuts     = state.shortcuts,
-            personal_info = state.personal_info,
-            hotstrings    = state.hotstrings,
-            chatgpt_url   = state.chatgpt_url,
-            shortcut_keys  = {},
-            gesture_actions = gestures.get_all_actions(),  -- nouveau format
+            keymap                   = state.keymap,
+            gestures                 = state.gestures,
+            scroll                   = state.scroll,
+            shortcuts                = state.shortcuts,
+            personal_info            = state.personal_info,
+            hotstrings               = state.hotstrings,
+            chatgpt_url              = state.chatgpt_url,
+            sections_order_overrides = state.sections_order_overrides,
+            shortcut_keys            = {},
+            gesture_actions          = gestures.get_all_actions(),  -- nouveau format
         }
         if shortcuts and type(shortcuts.list_shortcuts) == "function" then
             for _, s in ipairs(shortcuts.list_shortcuts()) do
@@ -114,7 +115,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             if saved.scroll    ~= nil then state.scroll    = saved.scroll    end
             if saved.shortcuts     ~= nil then state.shortcuts     = saved.shortcuts     end
             if saved.personal_info ~= nil then state.personal_info = saved.personal_info end
-            if saved.chatgpt_url   ~= nil then state.chatgpt_url   = saved.chatgpt_url   end
+            if saved.chatgpt_url              ~= nil then state.chatgpt_url              = saved.chatgpt_url              end
+            if type(saved.sections_order_overrides) == 'table' then
+                state.sections_order_overrides = saved.sections_order_overrides
+            end
             if type(saved.hotstrings) == "table" then
                 for name in pairs(state.hotstrings) do
                     if saved.hotstrings[name] ~= nil then
@@ -224,42 +228,56 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             }
 
             if has_sections and enabled then
-                -- Sub-menu: letter-based rolls first (A-Z label, sorted α),
-                -- separator, then symbol-based rolls (original order).
-                local letter_secs = {}
-                local symbol_secs = {}
-                for _, sec in ipairs(sections) do
-                    local lbl = (sec.description and sec.description ~= '')
-                                and sec.description or sec.name:gsub('_', ' ')
-                    -- Sections whose description starts with an uppercase letter
-                    -- are letter rolls; everything else is symbol rolls.
-                    if lbl:sub(1, 1):match('[A-Z]') then
-                        table.insert(letter_secs, sec)
+                -- Build sub-menu in TOML sections_order.
+                -- Entries with name == "-" become native menu separators.
+                -- An optional override can be supplied via config.json as:
+                --   "sections_order_overrides": { "rolls": ["hc","sx","-",...] }
+                -- When present, the override list is used instead of the TOML order;
+                -- sections not mentioned in the override are appended at the end.
+                local override_map = state.sections_order_overrides or {}
+                local override = override_map[name]  -- nil or list of strings
+
+                local ordered_secs  -- list of section objects in display order
+                if override then
+                    -- Build a lookup of sections by name for fast access.
+                    local by_name = {}
+                    for _, sec in ipairs(sections) do by_name[sec.name] = sec end
+                    local seen = {}
+                    ordered_secs = {}
+                    for _, entry in ipairs(override) do
+                        if entry == '-' then
+                            table.insert(ordered_secs, { name = '-' })
+                        elseif by_name[entry] then
+                            table.insert(ordered_secs, by_name[entry])
+                            seen[entry] = true
+                        end
+                    end
+                    -- Append sections absent from the override.
+                    for _, sec in ipairs(sections) do
+                        if not seen[sec.name] and sec.name ~= '-' then
+                            table.insert(ordered_secs, sec)
+                        end
+                    end
+                else
+                    -- Use the order already provided by keymap (from TOML sections_order).
+                    ordered_secs = sections
+                end
+
+                local sec_menu = {}
+                for _, sec in ipairs(ordered_secs) do
+                    if sec.name == '-' then
+                        sec_menu[#sec_menu + 1] = { title = "-" }
                     else
-                        table.insert(symbol_secs, sec)
+                        local sec_on = keymap.is_section_enabled(name, sec.name)
+                        local label  = (sec.description and sec.description ~= '')
+                                       and sec.description or sec.name:gsub('_', ' ')
+                        sec_menu[#sec_menu + 1] = {
+                            title   = label .. " (" .. (sec.count or 0) .. ")",
+                            checked = sec_on or nil,
+                            fn      = toggleSectionFn(name, sec.name),
+                        }
                     end
                 end
-                table.sort(letter_secs, function(a, b)
-                    local la = (a.description and a.description ~= '') and a.description or a.name:gsub('_', ' ')
-                    local lb = (b.description and b.description ~= '') and b.description or b.name:gsub('_', ' ')
-                    return la:lower() < lb:lower()
-                end)
-                local sec_menu = {}
-                local function add_sec_item(sec)
-                    local sec_on = keymap.is_section_enabled(name, sec.name)
-                    local label  = (sec.description and sec.description ~= '')
-                                   and sec.description or sec.name:gsub('_', ' ')
-                    sec_menu[#sec_menu + 1] = {
-                        title   = label .. " (" .. (sec.count or 0) .. ")",
-                        checked = sec_on or nil,
-                        fn      = toggleSectionFn(name, sec.name),
-                    }
-                end
-                for _, sec in ipairs(letter_secs) do add_sec_item(sec) end
-                if #letter_secs > 0 and #symbol_secs > 0 then
-                    sec_menu[#sec_menu + 1] = {title = "-"}
-                end
-                for _, sec in ipairs(symbol_secs) do add_sec_item(sec) end
                 item.menu = sec_menu
             else
                 -- Lua group or disabled TOML group: simple toggle.
