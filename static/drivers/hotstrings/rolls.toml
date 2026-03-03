@@ -4,12 +4,12 @@
 
 [_meta]
 description = "Roulements"
-sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronequal", "assign", "notequal", "hashtagquote", "hashtagparenthesis", "hashtagbracket", "equalstring", "comment", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft", "leftarrow"]
+sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronequal", "comment", "-", "assign", "notequal", "-", "hashtagquote", "hashtagparenthesis", "hashtagbracket", "equalstring", "-", "leftarrow", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft"]
 
 [_meta.sections]
 closechevrontag = "<@ ➜ </"
 ez = "EÉ ➜ EZ"
-comment = "\\\" = /*"
+comment = "\\\" ➜ /* et \"\\\" ➜ */"
 hashtagparenthesis = "#( ➜ \")"
 hashtagbracket = "#[ ➜ \"] et #] ➜ \"]"
 hc = "HC ➜ WH"
@@ -80,6 +80,10 @@ chevronequal = "<% ➜ <= et >% ➜ >="
 " [)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true }
 "[)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true }
 
+[[leftarrow]]
+" =+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"=+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
+
 [[assignarrowequalright]]
 " $=" = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true }
 "$=" = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true }
@@ -95,7 +99,3 @@ chevronequal = "<% ➜ <= et >% ➜ >="
 [[assignarrowminusleft]]
 " ?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true }
 "?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true }
-
-[[leftarrow]]
-" =+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
-"=+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }

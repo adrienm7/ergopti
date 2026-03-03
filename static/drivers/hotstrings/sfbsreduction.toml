@@ -4,7 +4,7 @@
 
 [_meta]
 description = "Réduction des SFBs"
-sections_order = ["comma", "ecirc", "egrave", "bu", "ie"]
+sections_order = ["comma", "-", "ecirc", "egrave", "-", "bu", "ie"]
 
 [_meta.sections]
 comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"

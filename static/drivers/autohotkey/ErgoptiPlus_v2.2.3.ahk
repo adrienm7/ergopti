@@ -437,8 +437,12 @@ global Features := Map(
     "SFBsReduction", Map(
         "__Order", [
             "Comma",
+            "-",
             "ECirc",
-            "EGrave"
+            "EGrave",
+            "-",
+            "BU",
+            "IÉ"
         ],
         "Comma", {
             Enabled: True,
@@ -468,10 +472,16 @@ global Features := Map(
         },
     ),
     "Rolls", Map(
-        "__Order", ["HC", "SX", "CX", "EnglishNegation", "EZ", "CT", "-", "CloseChevronTag", "ChevronEqual",
-            "Assign",
-            "NotEqual", "HashtagQuote", "HashtagParenthesis", "HashtagBracket", "EqualString", "Comment",
-            "AssignArrowEqualRight", "AssignArrowEqualLeft", "AssignArrowMinusRight", "AssignArrowMinusLeft"],
+        "__Order", ["HC", "SX", "CX", "EnglishNegation", "EZ", "CT",
+            "-",
+            "CloseChevronTag", "ChevronEqual", "Comment",
+            "-",
+            "Assign", "NotEqual",
+            "-",
+            "HashtagQuote", "HashtagParenthesis", "HashtagBracket", "EqualString",
+            "-",
+            "LeftArrow", "AssignArrowEqualRight", "AssignArrowEqualLeft", "AssignArrowMinusRight",
+            "AssignArrowMinusLeft"],
         "HC", {
             Enabled: True,
             Description: "HC ➜ WH",
@@ -512,6 +522,11 @@ global Features := Map(
             Description: "<% ➜ <= et >% ➜ >=",
             TimeActivationSeconds: 0.5,
         },
+        "Comment", {
+            Enabled: True,
+            Description: "\`" ➜ /* et `"\`" ➜ */",
+            TimeActivationSeconds: 0.5,
+        },
         "Assign", {
             Enabled: True,
             Description: "#! ➜ :=",
@@ -540,11 +555,6 @@ global Features := Map(
         "EqualString", {
             Enabled: True,
             Description: "[ ) ➜ = `" `"",
-            TimeActivationSeconds: 0.5,
-        },
-        "Comment", {
-            Enabled: True,
-            Description: "\`" = /*",
             TimeActivationSeconds: 0.5,
         },
         "LeftArrow", {
