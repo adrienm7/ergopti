@@ -314,7 +314,17 @@ function M.add(trigger, replacement, opts)
 
     local function add_mapping_raw(t, r, a)
         for _, m in ipairs(mappings) do
-            if m.trigger == t and m.repl == r and m.is_word == is_word and m.auto == a then return end
+            if m.trigger == t and m.is_word == is_word and m.auto == a then
+                if m.repl == r then return end  -- exact duplicate, skip
+                -- Same trigger with different output: last write wins.
+                -- This matches AHK's behaviour where a later hotstring
+                -- definition overrides an earlier one for the same trigger.
+                -- Typical case: a generic "c★"→"cc" repeat fallback being
+                -- overridden by a specific "c★"→"c'est" expansion.
+                m.repl = r
+                if current_group then m.group = current_group end
+                return
+            end
         end
         seq_counter = seq_counter + 1
         local entry = { trigger = t, repl = r, is_word = is_word, auto = a, seq = seq_counter }
@@ -388,14 +398,16 @@ function M.add(trigger, replacement, opts)
         end
     end
 
-    -- Sort by descending trigger length; for equal lengths, lower seq wins
-    -- (lower seq = registered earlier = higher conceptual priority, so TOML
-    -- hotstrings always beat repeat_key fallbacks of the same length).
+    -- Sort by descending trigger length.  For equal lengths:
+    --   1. is_word=true entries come first (more specific: fires only at word
+    --      boundary, e.g. textexpansion "c★"→"c'est" vs repeat "c★"→"cc").
+    --   2. Tie-break by seq (lower = registered earlier).
     table.sort(mappings, function(a, b)
         local len_a = utf8.len(a.trigger) or #a.trigger
         local len_b = utf8.len(b.trigger) or #b.trigger
-        if len_a == len_b then return a.seq < b.seq end
-        return len_a > len_b
+        if len_a ~= len_b then return len_a > len_b end
+        if a.is_word ~= b.is_word then return a.is_word end
+        return a.seq < b.seq
     end)
 end
 

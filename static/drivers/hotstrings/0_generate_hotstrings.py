@@ -451,8 +451,67 @@ def get_latest_ahk_file() -> Path:
     return latest
 
 
-# ---------------------------------------------------------------------------
-# Block discovery
+def parse_ahk_circumflex_map(content: str) -> dict[str, str]:
+    """Parse the ``DeadkeyMappingCircumflex`` global map from the AHK source.
+
+    The map contains alternating key / value string pairs; each pair
+    ``key, value`` produces one entry ``{key: value}`` in the returned dict.
+    Line comments (``; …``) are stripped before extraction so they cannot
+    interfere with the quoted-string scan.
+
+    Args:
+            content: Full AHK file content.
+
+    Returns:
+            Mapping of dead-key character to replacement character.  Excludes
+            nothing — callers decide which entries to use.
+    """
+    marker = "global DeadkeyMappingCircumflex := Map("
+    start = content.find(marker)
+    if start < 0:
+        logger.warning("DeadkeyMappingCircumflex not found in AHK source.")
+        return {}
+
+    # Walk forward to find the matching closing paren.
+    idx = start + len(marker)
+    depth = 1
+    while idx < len(content) and depth > 0:
+        c = content[idx]
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        idx += 1
+    map_body = content[start + len(marker) : idx - 1]
+
+    # Strip inline comments so semicolons inside them can't interfere.
+    # A naive line.find(";") would incorrectly truncate at the ";" key entry,
+    # so we track whether we are inside a double-quoted string first.
+    def _strip_comment(line: str) -> str:
+        in_str = False
+        for i, ch in enumerate(line):
+            if ch == '"':
+                in_str = not in_str
+            elif ch == ";" and not in_str:
+                return line[:i]
+        return line
+
+    clean_lines: list[str] = [
+        _strip_comment(line) for line in map_body.splitlines()
+    ]
+    clean_body = "\n".join(clean_lines)
+
+    # Extract all double-quoted literal strings.  AHK2 uses backtick for
+    # in-string escaping, so [^"] is safe as the non-capturing inner pattern.
+    strings = re.findall(r'"([^"]*)"', clean_body)
+
+    # Pair up: even index = key, odd index = value.
+    result: dict[str, str] = {}
+    for i in range(0, len(strings) - 1, 2):
+        result[strings[i]] = strings[i + 1]
+    return result
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -825,15 +884,49 @@ def write_category_toml(
 # ---------------------------------------------------------------------------
 
 
-def _e_deadkey_entries() -> list[tuple[str, str, bool, bool, bool]]:
-    """Return hotstring entries for the ê dead-key circumflex section."""
+def _comment_entries() -> list[tuple[str, str, bool, bool, bool]]:
+    r"""Return entries for the Comment roll: ``\"`` ➜ ``/*`` and ``"\`` ➜ ``*/``.
+
+    The AHK source uses backtick-escaped double-quotes inside the string
+    literals (``\`"`` and `` `"\``).  These sequences match
+    ``_UNRESOLVABLE_PATTERNS`` and are silently skipped by the parser,
+    so they must be hand-crafted.
+    """
     return [
-        ("êa", "â", False, True, False),
-        ("êe", "œ", False, True, False),
-        ("êi", "î", False, True, False),
-        ("êo", "ô", False, True, False),
-        ("êu", "û", False, True, False),
-        ("êy", "ŷ", False, True, False),
+        ('\\"', "/*", False, True, False),
+        ('"\\', "*/", False, True, False),
+    ]
+
+
+def _deadkey_ecircumflex_entries(
+    circumflex_map: dict[str, str],
+) -> list[tuple[str, str, bool, bool, bool]]:
+    """Generate hotstring entries for all ``ê``+key combinations.
+
+    Iterates the full ``DeadkeyMappingCircumflex`` and produces one
+    ``(trigger, output, is_word, auto_expand, case_sensitive)`` tuple per
+    entry.  Excluded keys:
+
+    - ``"e"`` / ``"E"``: handled by the dedicated ``ECircumflexE`` section
+      (``êe`` ➜ ``œ``).
+    - ``"t"`` / ``"T"``: reserved so that ``être`` can be typed normally.
+
+    Since both the vowel shortcuts (``CreateCaseSensitiveHotstrings``) and the
+    remaining dead-key shortcuts (``CreateDeadkeyHotstring``) use the AHK ``C``
+    flag, each (key, value) pair from the map is emitted as a distinct
+    case-sensitive entry.
+
+    Args:
+            circumflex_map: Parsed ``{key: value}`` dict from the AHK source.
+
+    Returns:
+            Ordered list of hotstring entry tuples.
+    """
+    excluded = {"e", "E", "t", "T"}
+    return [
+        (f"ê{key}", value, False, True, False)
+        for key, value in circumflex_map.items()
+        if key not in excluded
     ]
 
 
@@ -890,39 +983,59 @@ _MODULE_SECTIONS: dict[str, str] = {
 }
 
 
-# Sub-blocks to inject into specific category TOMLs.
-# Format: { AHK_category: { sub_name: (entries, section_description) } }
-_HANDCRAFTED_SECTIONS: dict[
-    str, dict[str, tuple[list[tuple[str, str, bool, bool, bool]], str]]
-] = {
-    "Rolls": {
-        # HashtagQuote and ChevronEqual are #HotIf blocks in AHK — they use
-        # GetLastSentCharacterAt() context logic and are never emitted by a
-        # CreateHotstring() call, so the parser misses them entirely.
-        "HashtagQuote": (
-            _hashtag_quote_entries(),
-            '(# \u279c (" et [# \u279c ["',
-        ),
-        "ChevronEqual": (
-            _chevron_equal_entries(),
-            "<% \u279c <= et >% \u279c >=",
-        ),
-        # EqualString is parsed automatically but the output is wrong: the
-        # AHK source concatenates two backtick-escaped double-quotes followed
-        # by {Left}, which the concat-collapsing regex cannot handle. The
-        # correct expansion is = "" (cursor left is stripped).
-        "EqualString": (
-            _equal_string_entries(),
-            '[ ) \u279c = ""',
-        ),
-    },
-    "DistancesReduction": {
-        "e_deadkey": (
-            _e_deadkey_entries(),
-            "Ê agit comme touche morte : êa→â, êe→œ, êi→î, êo→ô, êu→û, êy→ŷ",
-        ),
-    },
-}
+def build_handcrafted_sections(
+    content: str,
+) -> dict[str, dict[str, tuple[list[tuple[str, str, bool, bool, bool]], str]]]:
+    """Build the hand-crafted sections dict from the parsed AHK source.
+
+    Some AHK sub-sections cannot be parsed automatically (``#HotIf`` context
+    blocks, backtick-escaped literals, etc.).  This function constructs them
+    from well-known helpers and from data parsed directly out of *content*.
+
+    Args:
+            content: Full text of the AHK source file.
+
+    Returns:
+            Nested dict  ``{AHK_category: {sub_name: (entries, description)}}``.
+    """
+    circumflex_map = parse_ahk_circumflex_map(content)
+    return {
+        "Rolls": {
+            # Comment uses backtick-escaped double-quotes in AHK — the
+            # unresolvable-pattern filter drops them during normal parsing.
+            "Comment": (
+                _comment_entries(),
+                '\\" \u279c /* et "\\ \u279c */',
+            ),
+            # HashtagQuote and ChevronEqual are #HotIf blocks in AHK — they
+            # use GetLastSentCharacterAt() context logic and are never emitted
+            # by a CreateHotstring() call, so the parser misses them entirely.
+            "HashtagQuote": (
+                _hashtag_quote_entries(),
+                '(# \u279c (" et [# \u279c ["',
+            ),
+            "ChevronEqual": (
+                _chevron_equal_entries(),
+                "<% \u279c <= et >% \u279c >=",
+            ),
+            # EqualString: AHK source concatenates two backtick-escaped
+            # double-quotes + {Left}; the concat-collapsing regex yields a
+            # truncated output.  Correct expansion is = "".
+            "EqualString": (
+                _equal_string_entries(),
+                '[ ) \u279c = ""',
+            ),
+        },
+        "DistancesReduction": {
+            # Key must match the AHK __Order entry exactly so the normalised
+            # name ("deadkeyecircumflex") lands in the right TOML position.
+            # Description is None so parse_ahk_descriptions() value is kept.
+            "DeadKeyECircumflex": (
+                _deadkey_ecircumflex_entries(circumflex_map),
+                None,
+            ),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -973,17 +1086,24 @@ def main() -> None:
         top_level_order,
     )
 
+    handcrafted = build_handcrafted_sections(content)
+
     total_entries = 0
     for category, subs in all_blocks.items():
         sub_entries: dict[str, list[tuple[str, str, bool, bool, bool]]] = {
             sub_name: parse_body(body) for sub_name, body in subs.items()
         }
         # Inject hand-crafted sections that belong to this category.
-        for sub_name, (entries, section_desc) in _HANDCRAFTED_SECTIONS.get(
+        for sub_name, (entries, section_desc) in handcrafted.get(
             category, {}
         ).items():
             sub_entries[sub_name] = entries
-            all_descriptions.setdefault(category, {})[sub_name] = section_desc
+            # Only override the AHK-parsed description when the hand-crafted
+            # section explicitly provides one (i.e. description is not None).
+            if section_desc is not None:
+                all_descriptions.setdefault(category, {})[sub_name] = (
+                    section_desc
+                )
         total_entries += write_category_toml(
             category,
             sub_entries,
