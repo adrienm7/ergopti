@@ -14,6 +14,7 @@ have no AHK source block; they are injected as sections into their parent
 category TOML files (SFBsReduction and Rolls respectively).
 """
 
+import json
 import re
 import sys
 import unicodedata
@@ -366,6 +367,60 @@ def parse_ahk_orders(content: str) -> dict[str, list[str]]:
         i += 1
 
     return result
+
+
+def parse_ahk_top_level_order(content: str) -> list[str]:
+    """Extract the top-level ``__Order`` list from the AHK Features map.
+
+    Returns the normalized category names in the order defined at the root of
+    ``global Features := Map(...)`` (i.e. the order of the main categories,
+    not the sub-sections within each category).
+
+    Args:
+            content: Full AHK file content.
+
+    Returns:
+            List of normalized category names in the defined order.  Separators
+            (``"-"``) are excluded.
+    """
+    features_start = content.find("global Features := Map(")
+    if features_start < 0:
+        return []
+
+    first_if = re.search(
+        r"^\s*if\s+Features\[", content[features_start:], re.MULTILINE
+    )
+    features_text = (
+        content[features_start : features_start + first_if.start()]
+        if first_if
+        else content[features_start : features_start + 20_000]
+    )
+
+    cat_re = re.compile(r'"([A-Za-z]+)",\s*Map\(')
+    order_start_re = re.compile(r'"__Order"\s*,\s*\[')
+
+    lines = features_text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Stop as soon as we reach the first category Map – the top-level
+        # __Order must come before any sub-Map definition.
+        if cat_re.search(line):
+            break
+        order_m = order_start_re.search(line)
+        if order_m:
+            bracket_pos = line.find("[")
+            array_text = line[bracket_pos + 1 :]
+            while "]" not in array_text and i + 1 < len(lines):
+                i += 1
+                array_text += " " + lines[i]
+            close = array_text.find("]")
+            if close >= 0:
+                array_text = array_text[:close]
+            items: list[str] = re.findall(r'"([^"]+)"', array_text)
+            return [normalize_name(it) for it in items if it != "-"]
+        i += 1
+    return []
 
 
 def get_latest_ahk_file() -> Path:
@@ -824,6 +879,17 @@ def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool]]:
     ]
 
 
+# Mapping from AHK sub-section names (any casing; normalised internally) to the
+# Lua module identifier that handles them at runtime.  Each entry here is a
+# section that appears in the AHK ``__Order`` list but produces no TOML entries
+# because its logic lives entirely outside the keymap TOML pipeline.
+# Hammerspoon reads this via ``module_sections`` in ``_index.json`` and renders
+# the corresponding toggle item inline within the parent group's sub-menu.
+_MODULE_SECTIONS: dict[str, str] = {
+    "TextExpansionPersonalInformation": "personal_info",
+}
+
+
 # Sub-blocks to inject into specific category TOMLs.
 # Format: { AHK_category: { sub_name: (entries, section_description) } }
 _HANDCRAFTED_SECTIONS: dict[
@@ -900,6 +966,13 @@ def main() -> None:
         sorted(all_orders.keys()),
     )
 
+    # --- Determine global category order from AHK top-level __Order --------
+    top_level_order = parse_ahk_top_level_order(content)
+    logger.info(
+        "Top-level __Order: %s",
+        top_level_order,
+    )
+
     total_entries = 0
     for category, subs in all_blocks.items():
         sub_entries: dict[str, list[tuple[str, str, bool, bool, bool]]] = {
@@ -917,6 +990,49 @@ def main() -> None:
             section_descriptions=all_descriptions.get(category),
             section_order=all_orders.get(category),
         )
+
+    # --- Write _index.json so Hammerspoon can restore the AHK menu order ----
+    # Keep only names whose TOML file was actually written (non-empty categories).
+    written_names = {p.stem for p in OUTPUT_DIR.glob("*.toml")}
+    ordered: list[str] = [
+        name for name in top_level_order if name in written_names
+    ]
+    # Append any written TOML not listed in top_level_order, alphabetically.
+    for name in sorted(written_names - set(ordered)):
+        ordered.append(name)
+
+    # Build module_sections: tell Lua which placeholder sub-sections (those
+    # absent from TOML because handled by a separate Lua module) map to which
+    # Lua module identifier.  Keyed by normalised category / section name.
+    _module_secs_norm: dict[str, str] = {
+        normalize_name(k): v for k, v in _MODULE_SECTIONS.items()
+    }
+    module_sections: dict[str, dict[str, str]] = {}
+    for category, subs_order in all_orders.items():
+        normalized_cat = normalize_name(category)
+        for item in subs_order:
+            if item == "-":
+                continue
+            module = _module_secs_norm.get(item)
+            if module:
+                module_sections.setdefault(normalized_cat, {})[item] = module
+
+    index_path = OUTPUT_DIR / "_index.json"
+    index_path.write_text(
+        json.dumps(
+            {"categories_order": ordered, "module_sections": module_sections},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    logger.info(
+        "Written %s → categories_order: %s, module_sections: %s",
+        index_path.name,
+        ordered,
+        module_sections,
+    )
 
     # Remove obsolete standalone TOML files now embedded in their parent.
     for orphan_name in ("e_deadkey.toml",):

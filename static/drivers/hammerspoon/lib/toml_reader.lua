@@ -282,6 +282,17 @@ function M.parse(path)
             elseif result.sections[item] then
                 table.insert(result.sections_order, item)
                 seen[item] = true
+            elseif result.meta.sections[item] then
+                -- Section listed in __Order with a description but no [[]] block
+                -- (no TOML entries): create an empty placeholder so keymap.lua
+                -- can detect it and inject the matching Lua-module toggle.
+                result.sections[item] = {
+                    description = result.meta.sections[item],
+                    entries     = {},
+                    is_placeholder = true,
+                }
+                table.insert(result.sections_order, item)
+                seen[item] = true
             end
         end
         -- Append sections present in the file but absent from the meta order.

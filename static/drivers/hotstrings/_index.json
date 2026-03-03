@@ -1,0 +1,14 @@
+{
+  "categories_order": [
+    "distancesreduction",
+    "sfbsreduction",
+    "rolls",
+    "autocorrection",
+    "magickey"
+  ],
+  "module_sections": {
+    "magickey": {
+      "textexpansionpersonalinformation": "personal_info"
+    }
+  }
+}
