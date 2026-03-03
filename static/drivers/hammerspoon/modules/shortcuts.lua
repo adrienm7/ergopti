@@ -384,7 +384,7 @@ hotkey_defs.ctrl_s = function()
     end)
 end
 
-hotkey_labels.ctrl_t = "Capitale initiale / minuscule (Ctrl+T)"
+hotkey_labels.ctrl_t = "Casse de titre / minuscules (Ctrl+T)"
 hotkey_defs.ctrl_t = function()
     return hs.hotkey.bind({"ctrl"}, "t", function()
         do_transform(function(sel)

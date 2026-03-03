@@ -428,7 +428,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             table.insert(s_menu, {title = "-"})
             local function pretty_key(id)
                 -- Special cases to avoid ugly tokenised display
-                if id == "at_hash" then return "@/#" end
+                if id == "at_hash" then return "Touche @/#" end
                 local parts = {}
                 for p in id:gmatch("[^_]+") do table.insert(parts, p) end
                 if #parts == 0 then return id end
