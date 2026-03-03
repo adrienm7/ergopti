@@ -62,7 +62,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         hs.timer.doAfter(0.25, function() hs.reload() end)
     end
 
-    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}}
+    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}, chatgpt_url="https://chat.openai.com"}
     for _, f in ipairs(hotfiles or {}) do
         local name = f:match("^(.*)%.lua$") or f
         state.hotstrings[name] = true
@@ -86,6 +86,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             shortcuts     = state.shortcuts,
             personal_info = state.personal_info,
             hotstrings    = state.hotstrings,
+            chatgpt_url   = state.chatgpt_url,
             shortcut_keys  = {},
             gesture_actions = gestures.get_all_actions(),  -- nouveau format
         }
@@ -113,6 +114,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             if saved.scroll    ~= nil then state.scroll    = saved.scroll    end
             if saved.shortcuts     ~= nil then state.shortcuts     = saved.shortcuts     end
             if saved.personal_info ~= nil then state.personal_info = saved.personal_info end
+            if saved.chatgpt_url   ~= nil then state.chatgpt_url   = saved.chatgpt_url   end
             if type(saved.hotstrings) == "table" then
                 for name in pairs(state.hotstrings) do
                     if saved.hotstrings[name] ~= nil then
@@ -222,9 +224,28 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             }
 
             if has_sections and enabled then
-                -- Sub-menu: one entry per section with its own count.
-                local sec_menu = {}
+                -- Sub-menu: letter-based rolls first (A-Z label, sorted α),
+                -- separator, then symbol-based rolls (original order).
+                local letter_secs = {}
+                local symbol_secs = {}
                 for _, sec in ipairs(sections) do
+                    local lbl = (sec.description and sec.description ~= '')
+                                and sec.description or sec.name:gsub('_', ' ')
+                    -- Sections whose description starts with an uppercase letter
+                    -- are letter rolls; everything else is symbol rolls.
+                    if lbl:sub(1, 1):match('[A-Z]') then
+                        table.insert(letter_secs, sec)
+                    else
+                        table.insert(symbol_secs, sec)
+                    end
+                end
+                table.sort(letter_secs, function(a, b)
+                    local la = (a.description and a.description ~= '') and a.description or a.name:gsub('_', ' ')
+                    local lb = (b.description and b.description ~= '') and b.description or b.name:gsub('_', ' ')
+                    return la:lower() < lb:lower()
+                end)
+                local sec_menu = {}
+                local function add_sec_item(sec)
                     local sec_on = keymap.is_section_enabled(name, sec.name)
                     local label  = (sec.description and sec.description ~= '')
                                    and sec.description or sec.name:gsub('_', ' ')
@@ -234,6 +255,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         fn      = toggleSectionFn(name, sec.name),
                     }
                 end
+                for _, sec in ipairs(letter_secs) do add_sec_item(sec) end
+                if #letter_secs > 0 and #symbol_secs > 0 then
+                    sec_menu[#sec_menu + 1] = {title = "-"}
+                end
+                for _, sec in ipairs(symbol_secs) do add_sec_item(sec) end
                 item.menu = sec_menu
             else
                 -- Lua group or disabled TOML group: simple toggle.
@@ -277,7 +303,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     end end)(aname)
                 })
             end
-            return {title = slotLbl .. " : " .. actionLbl, menu = submenu}
+            return {title = slotLbl .. " : " .. actionLbl, menu = submenu}
         end
 
         -- Construit un groupe de slots avec séparateur
@@ -327,7 +353,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     local function buildPersonalInfoItem()
         if not personal_info then return nil end
         return {
-            title   = "Infos personnelles (@np★)",
+            title   = "Remplissage de formulaires : @npd★ → Nom Prénom DateNaissance, etc.",
             checked = state.personal_info or nil,
             fn = function()
                 state.personal_info = not state.personal_info
@@ -353,7 +379,21 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         }
         if state.shortcuts then
             local s_menu = {}
+            -- Option+Scroll to change volume: grouped here since it is a
+            -- system-wide shortcut managed alongside the other shortcuts.
+            table.insert(s_menu, {
+                title   = "Option + Scroll : Volume",
+                checked = state.scroll or nil,
+                fn = function()
+                    state.scroll = not state.scroll
+                    if state.scroll then scroll.start() else scroll.stop() end
+                    save_prefs(); updateMenu()
+                end
+            })
+            table.insert(s_menu, {title = "-"})
             local function pretty_key(id)
+                -- Special cases to avoid ugly tokenised display
+                if id == "at_hash" then return "@/#" end
                 local parts = {}
                 for p in id:gmatch("[^_]+") do table.insert(parts, p) end
                 if #parts == 0 then return id end
@@ -370,10 +410,20 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 return (#mods>0 and table.concat(mods," + ").." + " or "")..key:upper()
             end
             local function trim(s) return (s:gsub("^%s*(.-)%s*$","%1")) end
+            local last_was_non_ctrl = false
+            local separator_inserted = false
             for _, s in ipairs(shortcuts.list_shortcuts()) do
+                -- Insert a separator between non-Ctrl shortcuts (e.g. @/#, Cmd+…)
+                -- and the Ctrl shortcuts.
+                local is_ctrl = s.id:sub(1, 5) == "ctrl_"
+                if not separator_inserted and last_was_non_ctrl and is_ctrl then
+                    table.insert(s_menu, {title = "-"})
+                    separator_inserted = true
+                end
+                if not is_ctrl then last_was_non_ctrl = true end
                 local key   = pretty_key(s.id)
                 local desc  = trim((s.label or ""):gsub("%s*%b()",""))
-                local title = key.." : "..(desc~="" and desc or s.id)
+                local title = key.." : "..(desc~="" and desc or s.id)
                 local is_on = shortcuts.is_enabled and shortcuts.is_enabled(s.id) or s.enabled
                 table.insert(s_menu, {
                     title   = title,
@@ -392,15 +442,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
     local function buildUtilityItems()
         return {
-            {title="Option + Scroll : Volume", checked=state.scroll or nil, fn=function()
-                state.scroll = not state.scroll
-                if state.scroll then scroll.start() else scroll.stop() end
-                save_prefs(); updateMenu()
-            end},
             {title="-"},
             {title="Ouvrir init.lua",           fn=function() hs.execute('open "'..base_dir..'init.lua"') end},
             {title="Console Hammerspoon",       fn=function() hs.openConsole() end},
             {title="Préférences Hammerspoon",   fn=function() hs.openPreferences() end},
+            {title="-"},
             {title="Recharger la configuration",fn=function() do_reload() end},
             {title="Quitter Hammerspoon",        fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end},
         }

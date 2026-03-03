@@ -12,6 +12,7 @@ ecircumflexe = "Ê suivi de E donne Œ"
 commaj = "Virgule + Voyelle donne J : ,a = ja, ,o = jo, ,' = j’, …"
 commafarletters = "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q"
 suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …"
+e_deadkey = "Ê agit comme touche morte : êa→â, êe→œ, êi→î, êo→ô, êu→û, êy→ŷ"
 
 [[qu]]
 "qa" = { output = "qua", is_word = false, auto_expand = true, is_case_sensitive = false }
@@ -71,3 +72,11 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "àz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false }
 "à'" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false }
 "à’" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[e_deadkey]]
+"êa" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êi" = { output = "î", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êo" = { output = "ô", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êu" = { output = "û", is_word = false, auto_expand = true, is_case_sensitive = true }
+"êy" = { output = "ŷ", is_word = false, auto_expand = true, is_case_sensitive = true }
