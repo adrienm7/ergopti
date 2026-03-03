@@ -299,6 +299,7 @@ repeat = "La touche ★ permet la répétition"
 "freq★" = { output = "fréquence", is_word = true, auto_expand = true, is_case_sensitive = false }
 "fr★" = { output = "France", is_word = true, auto_expand = true, is_case_sensitive = true }
 "frs★" = { output = "français", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ft★" = { output = "fine-tuning", is_word = true, auto_expand = true, is_case_sensitive = false }
 "g★" = { output = "j’ai", is_word = true, auto_expand = true, is_case_sensitive = false }
 "g1r★" = { output = "j’ai une réunion", is_word = true, auto_expand = true, is_case_sensitive = false }
 "gar★" = { output = "garantie", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -333,6 +334,7 @@ repeat = "La touche ★ permet la répétition"
 "inf★" = { output = "inférieur", is_word = true, auto_expand = true, is_case_sensitive = false }
 "info★" = { output = "information", is_word = true, auto_expand = true, is_case_sensitive = false }
 "infos★" = { output = "informations", is_word = true, auto_expand = true, is_case_sensitive = false }
+"infra★" = { output = "infrastructure", is_word = true, auto_expand = true, is_case_sensitive = false }
 "insta★" = { output = "instagram", is_word = true, auto_expand = true, is_case_sensitive = false }
 "intart★" = { output = "intelligence artificielle", is_word = true, auto_expand = true, is_case_sensitive = false }
 "inter★" = { output = "international", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -361,6 +363,7 @@ repeat = "La touche ★ permet la répétition"
 "ledt★" = { output = "l’emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false }
 "lex★" = { output = "l’exemple", is_word = true, auto_expand = true, is_case_sensitive = false }
 "lim★" = { output = "limite", is_word = true, auto_expand = true, is_case_sensitive = false }
+"llm★" = { output = "large language model", is_word = true, auto_expand = true, is_case_sensitive = false }
 "m★" = { output = "mais", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ma★" = { output = "madame", is_word = true, auto_expand = true, is_case_sensitive = false }
 "maj★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -465,6 +468,7 @@ repeat = "La touche ★ permet la répétition"
 "pourcent★" = { output = "pourcentage", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ppt★" = { output = "PowerPoint", is_word = true, auto_expand = true, is_case_sensitive = false }
 "pq★" = { output = "pourquoi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pr★" = { output = "pull request", is_word = true, auto_expand = true, is_case_sensitive = false }
 "prd★" = { output = "produit", is_word = true, auto_expand = true, is_case_sensitive = false }
 "prem★" = { output = "premier", is_word = true, auto_expand = true, is_case_sensitive = false }
 "prez★" = { output = "présentation", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -696,7 +700,6 @@ repeat = "La touche ★ permet la répétition"
 "couronne★" = { output = "👑", is_word = true, auto_expand = true, is_case_sensitive = true }
 "croix★" = { output = "❌", is_word = true, auto_expand = true, is_case_sensitive = true }
 "danse★" = { output = "💃", is_word = true, auto_expand = true, is_case_sensitive = true }
-"dé★" = { output = "🎲", is_word = true, auto_expand = true, is_case_sensitive = true }
 "diamant★" = { output = "💎", is_word = true, auto_expand = true, is_case_sensitive = true }
 "drapeau★" = { output = "🏁", is_word = true, auto_expand = true, is_case_sensitive = true }
 "douche★" = { output = "🛁", is_word = true, auto_expand = true, is_case_sensitive = true }
