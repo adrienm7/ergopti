@@ -3,7 +3,8 @@
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
 [_meta]
-description = "Touche magique ★"
+description = "Touche ★ et expansion de texte"
+sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst", "-", "textexpansionpersonalinformation"]
 
 [_meta.sections]
 replace = "Transformer la touche J en ★"
@@ -14,6 +15,85 @@ textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ =
 textexpansionsymbols = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
 textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …"
 repeat = "La touche ★ permet la répétition"
+
+[[repeat]]
+"ccê" = { output = "ccu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ddê" = { output = "ddu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ffê" = { output = "ffu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ggê" = { output = "ggu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"llê" = { output = "llu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"mmê" = { output = "mmu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"nnê" = { output = "nnu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ppê" = { output = "ppu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"rrê" = { output = "rru", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ssê" = { output = "ssu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ttê" = { output = "ttu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"a★" = { output = "aa", is_word = false, auto_expand = true, is_case_sensitive = false }
+"b★" = { output = "bb", is_word = false, auto_expand = true, is_case_sensitive = false }
+"c★" = { output = "cc", is_word = false, auto_expand = true, is_case_sensitive = false }
+"d★" = { output = "dd", is_word = false, auto_expand = true, is_case_sensitive = false }
+"e★" = { output = "ee", is_word = false, auto_expand = true, is_case_sensitive = false }
+"é★" = { output = "éé", is_word = false, auto_expand = true, is_case_sensitive = false }
+"è★" = { output = "èè", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ê★" = { output = "êê", is_word = false, auto_expand = true, is_case_sensitive = false }
+"f★" = { output = "ff", is_word = false, auto_expand = true, is_case_sensitive = false }
+"g★" = { output = "gg", is_word = false, auto_expand = true, is_case_sensitive = false }
+"h★" = { output = "hh", is_word = false, auto_expand = true, is_case_sensitive = false }
+"i★" = { output = "ii", is_word = false, auto_expand = true, is_case_sensitive = false }
+"j★" = { output = "jj", is_word = false, auto_expand = true, is_case_sensitive = false }
+"k★" = { output = "kk", is_word = false, auto_expand = true, is_case_sensitive = false }
+"l★" = { output = "ll", is_word = false, auto_expand = true, is_case_sensitive = false }
+"m★" = { output = "mm", is_word = false, auto_expand = true, is_case_sensitive = false }
+"n★" = { output = "nn", is_word = false, auto_expand = true, is_case_sensitive = false }
+"o★" = { output = "oo", is_word = false, auto_expand = true, is_case_sensitive = false }
+"p★" = { output = "pp", is_word = false, auto_expand = true, is_case_sensitive = false }
+"q★" = { output = "qq", is_word = false, auto_expand = true, is_case_sensitive = false }
+"r★" = { output = "rr", is_word = false, auto_expand = true, is_case_sensitive = false }
+"s★" = { output = "ss", is_word = false, auto_expand = true, is_case_sensitive = false }
+"t★" = { output = "tt", is_word = false, auto_expand = true, is_case_sensitive = false }
+"u★" = { output = "uu", is_word = false, auto_expand = true, is_case_sensitive = false }
+"v★" = { output = "vv", is_word = false, auto_expand = true, is_case_sensitive = false }
+"w★" = { output = "ww", is_word = false, auto_expand = true, is_case_sensitive = false }
+"x★" = { output = "xx", is_word = false, auto_expand = true, is_case_sensitive = false }
+"y★" = { output = "yy", is_word = false, auto_expand = true, is_case_sensitive = false }
+"z★" = { output = "zz", is_word = false, auto_expand = true, is_case_sensitive = false }
+"0★" = { output = "00", is_word = false, auto_expand = true, is_case_sensitive = true }
+"1★" = { output = "11", is_word = false, auto_expand = true, is_case_sensitive = true }
+"2★" = { output = "22", is_word = false, auto_expand = true, is_case_sensitive = true }
+"3★" = { output = "33", is_word = false, auto_expand = true, is_case_sensitive = true }
+"4★" = { output = "44", is_word = false, auto_expand = true, is_case_sensitive = true }
+"5★" = { output = "55", is_word = false, auto_expand = true, is_case_sensitive = true }
+"6★" = { output = "66", is_word = false, auto_expand = true, is_case_sensitive = true }
+"7★" = { output = "77", is_word = false, auto_expand = true, is_case_sensitive = true }
+"8★" = { output = "88", is_word = false, auto_expand = true, is_case_sensitive = true }
+"9★" = { output = "99", is_word = false, auto_expand = true, is_case_sensitive = true }
+"<★" = { output = "<<", is_word = false, auto_expand = true, is_case_sensitive = true }
+">★" = { output = ">>", is_word = false, auto_expand = true, is_case_sensitive = true }
+"{★" = { output = "{{", is_word = false, auto_expand = true, is_case_sensitive = true }
+"}★" = { output = "}}", is_word = false, auto_expand = true, is_case_sensitive = true }
+"(★" = { output = "((", is_word = false, auto_expand = true, is_case_sensitive = true }
+")★" = { output = "))", is_word = false, auto_expand = true, is_case_sensitive = true }
+"[★" = { output = "[[", is_word = false, auto_expand = true, is_case_sensitive = true }
+"]★" = { output = "]]", is_word = false, auto_expand = true, is_case_sensitive = true }
+"-★" = { output = "--", is_word = false, auto_expand = true, is_case_sensitive = true }
+"_★" = { output = "__", is_word = false, auto_expand = true, is_case_sensitive = true }
+":★" = { output = "::", is_word = false, auto_expand = true, is_case_sensitive = true }
+";★" = { output = ";;", is_word = false, auto_expand = true, is_case_sensitive = true }
+"?★" = { output = "??", is_word = false, auto_expand = true, is_case_sensitive = true }
+"!★" = { output = "!!", is_word = false, auto_expand = true, is_case_sensitive = true }
+"+★" = { output = "++", is_word = false, auto_expand = true, is_case_sensitive = true }
+"^★" = { output = "^^", is_word = false, auto_expand = true, is_case_sensitive = true }
+"#★" = { output = "##", is_word = false, auto_expand = true, is_case_sensitive = true }
+"`★" = { output = "``", is_word = false, auto_expand = true, is_case_sensitive = true }
+"=★" = { output = "==", is_word = false, auto_expand = true, is_case_sensitive = true }
+"/★" = { output = "//", is_word = false, auto_expand = true, is_case_sensitive = true }
+"\\★" = { output = "\\\\", is_word = false, auto_expand = true, is_case_sensitive = true }
+"|★" = { output = "||", is_word = false, auto_expand = true, is_case_sensitive = true }
+"&★" = { output = "&&", is_word = false, auto_expand = true, is_case_sensitive = true }
+"$★" = { output = "$$", is_word = false, auto_expand = true, is_case_sensitive = true }
+"@★" = { output = "@@", is_word = false, auto_expand = true, is_case_sensitive = true }
+"~★" = { output = "~~", is_word = false, auto_expand = true, is_case_sensitive = true }
+"*★" = { output = "**", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[textexpansion]]
 "ae★" = { output = "æ", is_word = false, auto_expand = true, is_case_sensitive = false }
@@ -2097,82 +2177,3 @@ repeat = "La touche ★ permet la répétition"
 "$gender.male.stroke.r$" = { output = "⚩", is_word = true, auto_expand = true, is_case_sensitive = true }
 "$gender.neuter$" = { output = "⚲", is_word = true, auto_expand = true, is_case_sensitive = true }
 "$gender.trans$" = { output = "⚧", is_word = true, auto_expand = true, is_case_sensitive = true }
-
-[[repeat]]
-"ccê" = { output = "ccu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ddê" = { output = "ddu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ffê" = { output = "ffu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ggê" = { output = "ggu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"llê" = { output = "llu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"mmê" = { output = "mmu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"nnê" = { output = "nnu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ppê" = { output = "ppu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"rrê" = { output = "rru", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ssê" = { output = "ssu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ttê" = { output = "ttu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a★" = { output = "aa", is_word = false, auto_expand = true, is_case_sensitive = false }
-"b★" = { output = "bb", is_word = false, auto_expand = true, is_case_sensitive = false }
-"c★" = { output = "cc", is_word = false, auto_expand = true, is_case_sensitive = false }
-"d★" = { output = "dd", is_word = false, auto_expand = true, is_case_sensitive = false }
-"e★" = { output = "ee", is_word = false, auto_expand = true, is_case_sensitive = false }
-"é★" = { output = "éé", is_word = false, auto_expand = true, is_case_sensitive = false }
-"è★" = { output = "èè", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ê★" = { output = "êê", is_word = false, auto_expand = true, is_case_sensitive = false }
-"f★" = { output = "ff", is_word = false, auto_expand = true, is_case_sensitive = false }
-"g★" = { output = "gg", is_word = false, auto_expand = true, is_case_sensitive = false }
-"h★" = { output = "hh", is_word = false, auto_expand = true, is_case_sensitive = false }
-"i★" = { output = "ii", is_word = false, auto_expand = true, is_case_sensitive = false }
-"j★" = { output = "jj", is_word = false, auto_expand = true, is_case_sensitive = false }
-"k★" = { output = "kk", is_word = false, auto_expand = true, is_case_sensitive = false }
-"l★" = { output = "ll", is_word = false, auto_expand = true, is_case_sensitive = false }
-"m★" = { output = "mm", is_word = false, auto_expand = true, is_case_sensitive = false }
-"n★" = { output = "nn", is_word = false, auto_expand = true, is_case_sensitive = false }
-"o★" = { output = "oo", is_word = false, auto_expand = true, is_case_sensitive = false }
-"p★" = { output = "pp", is_word = false, auto_expand = true, is_case_sensitive = false }
-"q★" = { output = "qq", is_word = false, auto_expand = true, is_case_sensitive = false }
-"r★" = { output = "rr", is_word = false, auto_expand = true, is_case_sensitive = false }
-"s★" = { output = "ss", is_word = false, auto_expand = true, is_case_sensitive = false }
-"t★" = { output = "tt", is_word = false, auto_expand = true, is_case_sensitive = false }
-"u★" = { output = "uu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"v★" = { output = "vv", is_word = false, auto_expand = true, is_case_sensitive = false }
-"w★" = { output = "ww", is_word = false, auto_expand = true, is_case_sensitive = false }
-"x★" = { output = "xx", is_word = false, auto_expand = true, is_case_sensitive = false }
-"y★" = { output = "yy", is_word = false, auto_expand = true, is_case_sensitive = false }
-"z★" = { output = "zz", is_word = false, auto_expand = true, is_case_sensitive = false }
-"0★" = { output = "00", is_word = false, auto_expand = true, is_case_sensitive = true }
-"1★" = { output = "11", is_word = false, auto_expand = true, is_case_sensitive = true }
-"2★" = { output = "22", is_word = false, auto_expand = true, is_case_sensitive = true }
-"3★" = { output = "33", is_word = false, auto_expand = true, is_case_sensitive = true }
-"4★" = { output = "44", is_word = false, auto_expand = true, is_case_sensitive = true }
-"5★" = { output = "55", is_word = false, auto_expand = true, is_case_sensitive = true }
-"6★" = { output = "66", is_word = false, auto_expand = true, is_case_sensitive = true }
-"7★" = { output = "77", is_word = false, auto_expand = true, is_case_sensitive = true }
-"8★" = { output = "88", is_word = false, auto_expand = true, is_case_sensitive = true }
-"9★" = { output = "99", is_word = false, auto_expand = true, is_case_sensitive = true }
-"<★" = { output = "<<", is_word = false, auto_expand = true, is_case_sensitive = true }
-">★" = { output = ">>", is_word = false, auto_expand = true, is_case_sensitive = true }
-"{★" = { output = "{{", is_word = false, auto_expand = true, is_case_sensitive = true }
-"}★" = { output = "}}", is_word = false, auto_expand = true, is_case_sensitive = true }
-"(★" = { output = "((", is_word = false, auto_expand = true, is_case_sensitive = true }
-")★" = { output = "))", is_word = false, auto_expand = true, is_case_sensitive = true }
-"[★" = { output = "[[", is_word = false, auto_expand = true, is_case_sensitive = true }
-"]★" = { output = "]]", is_word = false, auto_expand = true, is_case_sensitive = true }
-"-★" = { output = "--", is_word = false, auto_expand = true, is_case_sensitive = true }
-"_★" = { output = "__", is_word = false, auto_expand = true, is_case_sensitive = true }
-":★" = { output = "::", is_word = false, auto_expand = true, is_case_sensitive = true }
-";★" = { output = ";;", is_word = false, auto_expand = true, is_case_sensitive = true }
-"?★" = { output = "??", is_word = false, auto_expand = true, is_case_sensitive = true }
-"!★" = { output = "!!", is_word = false, auto_expand = true, is_case_sensitive = true }
-"+★" = { output = "++", is_word = false, auto_expand = true, is_case_sensitive = true }
-"^★" = { output = "^^", is_word = false, auto_expand = true, is_case_sensitive = true }
-"#★" = { output = "##", is_word = false, auto_expand = true, is_case_sensitive = true }
-"`★" = { output = "``", is_word = false, auto_expand = true, is_case_sensitive = true }
-"=★" = { output = "==", is_word = false, auto_expand = true, is_case_sensitive = true }
-"/★" = { output = "//", is_word = false, auto_expand = true, is_case_sensitive = true }
-"\\★" = { output = "\\\\", is_word = false, auto_expand = true, is_case_sensitive = true }
-"|★" = { output = "||", is_word = false, auto_expand = true, is_case_sensitive = true }
-"&★" = { output = "&&", is_word = false, auto_expand = true, is_case_sensitive = true }
-"$★" = { output = "$$", is_word = false, auto_expand = true, is_case_sensitive = true }
-"@★" = { output = "@@", is_word = false, auto_expand = true, is_case_sensitive = true }
-"~★" = { output = "~~", is_word = false, auto_expand = true, is_case_sensitive = true }
-"*★" = { output = "**", is_word = false, auto_expand = true, is_case_sensitive = true }

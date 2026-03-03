@@ -3,7 +3,8 @@
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
 [_meta]
-description = "Réduction des distances de frappe"
+description = "Réduction des distances"
+sections_order = ["qu", "deadkeyecircumflex", "suffixesa", "-", "commaj", "commafarletters", "-", "ecircumflexe", "e_deadkey"]
 
 [_meta.sections]
 qu = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …"
@@ -25,27 +26,6 @@ e_deadkey = "Ê agit comme touche morte : êa→â, êe→œ, êi→î, êo→ô
 "qo" = { output = "quo", is_word = false, auto_expand = true, is_case_sensitive = false }
 "q'" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false }
 "q’" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false }
-
-[[ecircumflexe]]
-"êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false }
-
-[[commaj]]
-",à" = { output = "j", is_word = false, auto_expand = true, is_case_sensitive = false }
-",a" = { output = "ja", is_word = false, auto_expand = true, is_case_sensitive = false }
-",e" = { output = "je", is_word = false, auto_expand = true, is_case_sensitive = false }
-",é" = { output = "jé", is_word = false, auto_expand = true, is_case_sensitive = false }
-",i" = { output = "ji", is_word = false, auto_expand = true, is_case_sensitive = false }
-",o" = { output = "jo", is_word = false, auto_expand = true, is_case_sensitive = false }
-",u" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false }
-",ê" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false }
-",'" = { output = "j’", is_word = false, auto_expand = true, is_case_sensitive = false }
-
-[[commafarletters]]
-",è" = { output = "z", is_word = false, auto_expand = true, is_case_sensitive = false }
-",y" = { output = "k", is_word = false, auto_expand = true, is_case_sensitive = false }
-",c" = { output = "ç", is_word = false, auto_expand = true, is_case_sensitive = false }
-",x" = { output = "où ", is_word = false, auto_expand = true, is_case_sensitive = false }
-",s" = { output = "q", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[suffixesa]]
 "àa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false }
@@ -72,6 +52,27 @@ e_deadkey = "Ê agit comme touche morte : êa→â, êe→œ, êi→î, êo→ô
 "àz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false }
 "à'" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false }
 "à’" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[commaj]]
+",à" = { output = "j", is_word = false, auto_expand = true, is_case_sensitive = false }
+",a" = { output = "ja", is_word = false, auto_expand = true, is_case_sensitive = false }
+",e" = { output = "je", is_word = false, auto_expand = true, is_case_sensitive = false }
+",é" = { output = "jé", is_word = false, auto_expand = true, is_case_sensitive = false }
+",i" = { output = "ji", is_word = false, auto_expand = true, is_case_sensitive = false }
+",o" = { output = "jo", is_word = false, auto_expand = true, is_case_sensitive = false }
+",u" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false }
+",ê" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false }
+",'" = { output = "j’", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[commafarletters]]
+",è" = { output = "z", is_word = false, auto_expand = true, is_case_sensitive = false }
+",y" = { output = "k", is_word = false, auto_expand = true, is_case_sensitive = false }
+",c" = { output = "ç", is_word = false, auto_expand = true, is_case_sensitive = false }
+",x" = { output = "où ", is_word = false, auto_expand = true, is_case_sensitive = false }
+",s" = { output = "q", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[ecircumflexe]]
+"êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[e_deadkey]]
 "êa" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = true }

@@ -3,7 +3,8 @@
 # All entries use: trigger = { output = "replacement", is_word = true/false, auto_expand = true/false }
 
 [_meta]
-description = "Roulements — substitutions par combinaisons de touches"
+description = "Roulements"
+sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronequal", "assign", "notequal", "hashtagquote", "hashtagparenthesis", "hashtagbracket", "equalstring", "comment", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft", "leftarrow"]
 
 [_meta.sections]
 closechevrontag = "<@ ➜ </"
@@ -27,21 +28,30 @@ ct = "P' ➜ CT"
 hashtagquote = "(# ➜ (\" et [# ➜ [\""
 chevronequal = "<% ➜ <= et >% ➜ >="
 
-[[closechevrontag]]
-"<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true }
+[[hc]]
+"hc" = { output = "wh", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[sx]]
+"sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[cx]]
+"cx" = { output = "ck", is_word = false, auto_expand = true, is_case_sensitive = false }
+
+[[englishnegation]]
+"nt'" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[ez]]
 "eé" = { output = "ez", is_word = false, auto_expand = true, is_case_sensitive = false }
 
-[[hashtagparenthesis]]
-"#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true }
+[[ct]]
+"p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false }
 
-[[hashtagbracket]]
-"#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true }
-"#]" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true }
+[[closechevrontag]]
+"<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true }
 
-[[hc]]
-"hc" = { output = "wh", is_word = false, auto_expand = true, is_case_sensitive = false }
+[[chevronequal]]
+"<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true }
+">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[assign]]
 " #ç" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true }
@@ -55,22 +65,20 @@ chevronequal = "<% ➜ <= et >% ➜ >="
 "ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
 "!#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true }
 
-[[sx]]
-"sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false }
+[[hashtagquote]]
+"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true }
+"[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true }
 
-[[cx]]
-"cx" = { output = "ck", is_word = false, auto_expand = true, is_case_sensitive = false }
+[[hashtagparenthesis]]
+"#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true }
+
+[[hashtagbracket]]
+"#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true }
+"#]" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[equalstring]]
 " [)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true }
 "[)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true }
-
-[[englishnegation]]
-"nt'" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = true }
-
-[[leftarrow]]
-" =+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
-"=+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[assignarrowequalright]]
 " $=" = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true }
@@ -88,13 +96,6 @@ chevronequal = "<% ➜ <= et >% ➜ >="
 " ?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true }
 "?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true }
 
-[[ct]]
-"p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false }
-
-[[hashtagquote]]
-"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true }
-"[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true }
-
-[[chevronequal]]
-"<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true }
-">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true }
+[[leftarrow]]
+" =+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
+"=+" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true }
