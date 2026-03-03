@@ -390,27 +390,19 @@ global Features := Map(
     "DistancesReduction", Map(
         "__Order", [
             "QU",
-            "DeadKeyECircumflex",
             "SuffixesA",
             "-",
             "CommaJ",
             "CommaFarLetters",
+            "-",
+            "DeadKeyECircumflex",
+            "ECircumflexE",
             "-",
             "SpaceAroundSymbols"
         ],
         "QU", {
             Enabled: True,
             Description: "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …",
-            TimeActivationSeconds: 1,
-        },
-        "DeadKeyECircumflex", {
-            Enabled: True,
-            Description: "Ê suivi d’une lettre agit comme une touche morte : êo = ô, êu = û, ês = ß…",
-            TimeActivationSeconds: 1,
-        },
-        "ECircumflexE", {
-            Enabled: True,
-            Description: "Ê suivi de E donne Œ",
             TimeActivationSeconds: 1,
         },
         "SuffixesA", {
@@ -426,6 +418,16 @@ global Features := Map(
         "CommaFarLetters", {
             Enabled: True,
             Description: "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q",
+            TimeActivationSeconds: 1,
+        },
+        "DeadKeyECircumflex", {
+            Enabled: True,
+            Description: "Ê suivi d’une lettre agit comme une touche morte : êo = ô, êu = û, ês = ß…",
+            TimeActivationSeconds: 1,
+        },
+        "ECircumflexE", {
+            Enabled: True,
+            Description: "Ê suivi de E donne Œ",
             TimeActivationSeconds: 1,
         },
         "SpaceAroundSymbols", {
