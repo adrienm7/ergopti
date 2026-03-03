@@ -8,7 +8,10 @@
   ],
   "module_sections": {
     "magickey": {
-      "textexpansionpersonalinformation": "personal_info"
+      "textexpansionpersonalinformation": {
+        "mod_id": "personal_info",
+        "description": "Remplissage de formulaires avec le suffixe @ : @np★ = Nom Prénom, etc."
+      }
     }
   }
 }

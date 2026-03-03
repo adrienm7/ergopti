@@ -17,6 +17,8 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 repeat = "La touche ★ permet la répétition"
 
 [[repeat]]
+"honnê" = { output = "honnê", is_word = false, auto_expand = true, is_case_sensitive = false }
+"arrê" = { output = "arrê", is_word = false, auto_expand = true, is_case_sensitive = false }
 "ccê" = { output = "ccu", is_word = false, auto_expand = true, is_case_sensitive = false }
 "ddê" = { output = "ddu", is_word = false, auto_expand = true, is_case_sensitive = false }
 "ffê" = { output = "ffu", is_word = false, auto_expand = true, is_case_sensitive = false }
