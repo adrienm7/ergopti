@@ -760,7 +760,7 @@ _HANDCRAFTED_SECTIONS: dict[
             '[ ) \u279c = ""',
         ),
     },
-    "SFBsReduction": {
+    "DistancesReduction": {
         "e_deadkey": (
             _e_deadkey_entries(),
             "Ê agit comme touche morte : êa→â, êe→œ, êi→î, êo→ô, êu→û, êy→ŷ",
