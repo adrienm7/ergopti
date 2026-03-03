@@ -604,7 +604,7 @@ local function onKeyDown(e)
             -- auto=true mappings are expanded immediately (above) based on the timing
             -- between the last two chars of the trigger; the boundary char has no role
             -- and must not re-trigger them.
-            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == ".") then
+            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == "." or chars == ",") then
                 local end_pos = utf8.offset(buffer, -char_count) or (#buffer + 1)
                 local start_pos = utf8.offset(buffer, -(char_count + utf8_len(trigger)))
                 local seg = nil
@@ -671,8 +671,27 @@ end
 
 local tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
-function M.start() tap:start() end
-function M.stop() if tap then tap:stop() end end
+-- Clear the buffer whenever the user repositions the cursor with the mouse,
+-- otherwise stale typed characters cause false "inside a word" rejections.
+local mouse_tap = eventtap.new(
+	{ eventtap.event.types.leftMouseDown,
+	  eventtap.event.types.rightMouseDown,
+	  eventtap.event.types.middleMouseDown },
+	function()
+		buffer = ""
+		return false
+	end
+)
+
+function M.start()
+	tap:start()
+	mouse_tap:start()
+end
+
+function M.stop()
+	if tap then tap:stop() end
+	if mouse_tap then mouse_tap:stop() end
+end
 
 M.start()
 
