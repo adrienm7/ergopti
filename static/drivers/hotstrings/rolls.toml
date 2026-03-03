@@ -9,7 +9,7 @@ sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closech
 [_meta.sections]
 closechevrontag = "<@ ➜ </"
 ez = "EÉ ➜ EZ"
-comment = "\\\" ➜ /* et \"\\\" ➜ */"
+comment = "\\\" ➜ /* et \"\\ ➜ */"
 hashtagparenthesis = "#( ➜ \")"
 hashtagbracket = "#[ ➜ \"] et #] ➜ \"]"
 hc = "HC ➜ WH"
@@ -52,6 +52,10 @@ chevronequal = "<% ➜ <= et >% ➜ >="
 [[chevronequal]]
 "<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true }
 ">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true }
+
+[[comment]]
+"\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true }
+"\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[assign]]
 " #ç" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true }
