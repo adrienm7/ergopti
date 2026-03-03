@@ -571,8 +571,11 @@ local function onKeyDown(e)
                     end
                 end
 
-            -- Deferred expansion: expand on boundary chars (apply to both auto and non-auto mappings)
-            if chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == "." then
+            -- Deferred expansion: expand on boundary chars (non-auto mappings only).
+            -- auto=true mappings are expanded immediately (above) based on the timing
+            -- between the last two chars of the trigger; the boundary char has no role
+            -- and must not re-trigger them.
+            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == ".") then
                 local end_pos = utf8.offset(buffer, -char_count) or (#buffer + 1)
                 local start_pos = utf8.offset(buffer, -(char_count + utf8_len(trigger)))
                 local seg = nil
