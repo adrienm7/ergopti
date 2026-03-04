@@ -193,7 +193,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 if enabled then shortcuts.enable(id) else shortcuts.disable(id) end
             end
         end
-        save_prefs()
+        -- Only rewrite config.json when it was absent (first run / migration).
+        -- When the file already exists it is already canonical: rewriting it
+        -- from live-module states would corrupt a config just written by
+        -- set_all_enabled() before the reload.
+        if config_absent then
+            save_prefs()
+        end
     end
 
     -- ── Constructeurs d'items ─────────────────────────────────────────────────
@@ -281,11 +287,14 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                              and keymap.get_sections(name) or nil
             local has_sections = sections and #sections > 0
 
-            -- Compute total count across all sections.
+            -- Compute total count: only active sections, 0 when group is disabled.
             local total = 0
-            if has_sections then
+            if enabled and has_sections then
                 for _, sec in ipairs(sections) do
-                    total = total + (sec.count or 0)
+                    if sec.name ~= '-' and not sec.is_module_placeholder
+                       and keymap.is_section_enabled(name, sec.name) then
+                        total = total + (sec.count or 0)
+                    end
                 end
             end
 
@@ -565,17 +574,24 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             state.hotstrings[name] = enabled
         end
 
-        -- Write section states directly into hs.settings so that the keymap
-        -- module picks them up on reload without any per-section module call.
-        -- Key pattern mirrors keymap.lua: "hotstrings_section_<group>_<section>".
+        -- Write section states into hs.settings so the keymap module picks
+        -- them up correctly on reload.  No live per-section calls here: since
+        -- do_reload() triggers hs.reload() we let the fresh session apply
+        -- everything in one clean pass, which is both faster and correct.
         for name in pairs(state.hotstrings) do
             local sections = keymap and keymap.get_sections and keymap.get_sections(name) or nil
             if sections then
                 for _, sec in ipairs(sections) do
                     if sec.name ~= '-' and not sec.is_module_placeholder then
                         local key = "hotstrings_section_" .. name .. "_" .. sec.name
-                        -- nil = enabled (default), false = disabled
-                        hs.settings.set(key, enabled and nil or false)
+                        -- nil = enabled (default), false = disabled.
+                        -- Explicit if/else avoids the Lua nil-ternary anti-pattern
+                        -- where `true and nil or false` always evaluates to false.
+                        if enabled then
+                            hs.settings.set(key, nil)
+                        else
+                            hs.settings.set(key, false)
+                        end
                     end
                 end
             end
