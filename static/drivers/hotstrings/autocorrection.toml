@@ -7,6 +7,7 @@ description = "Autocorrection"
 sections_order = ["accents", "names", "brands", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe"]
 
 [_meta.sections]
+brands = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 typographicapostrophe = "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
 errors = "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …"
 ou = "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant"
@@ -14,7 +15,6 @@ multiplepunctuationmarks = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n�
 suffixesachaining = "Enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement"
 minus = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
 minusapostrophe = "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … "
-brands = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 names = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
 accents = "Autocorrection des accents de très nombreux mots"
 
@@ -357,11 +357,16 @@ accents = "Autocorrection des accents de très nombreux mots"
 "aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true }
 "axa" = { output = "AXA", is_word = true, auto_expand = false, is_case_sensitive = true }
 "azure devops" = { output = "Azure DevOps", is_word = true, auto_expand = false, is_case_sensitive = true }
+"bdd" = { output = "BDD", is_word = true, auto_expand = false, is_case_sensitive = true }
+"bdds" = { output = "BDDs", is_word = true, auto_expand = false, is_case_sensitive = true }
+"catboost" = { output = "CatBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
 "chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true }
 "citroen" = { output = "Citroën", is_word = true, auto_expand = false, is_case_sensitive = true }
 "cli" = { output = "CLI", is_word = true, auto_expand = false, is_case_sensitive = true }
 "comex" = { output = "COMEX", is_word = true, auto_expand = false, is_case_sensitive = true }
 "cpu" = { output = "CPU", is_word = true, auto_expand = false, is_case_sensitive = true }
+"data science" = { output = "Data Science", is_word = true, auto_expand = false, is_case_sensitive = true }
+"data scientist" = { output = "Data Scientist", is_word = true, auto_expand = false, is_case_sensitive = true }
 "databricks" = { output = "Databricks", is_word = true, auto_expand = false, is_case_sensitive = true }
 "docker" = { output = "Docker", is_word = true, auto_expand = false, is_case_sensitive = true }
 "dynatrace" = { output = "Dynatrace", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -372,6 +377,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "github" = { output = "GitHub", is_word = true, auto_expand = false, is_case_sensitive = true }
 "google" = { output = "Google", is_word = true, auto_expand = false, is_case_sensitive = true }
 "gpu" = { output = "GPU", is_word = true, auto_expand = false, is_case_sensitive = true }
+"hammerspoon" = { output = "Hammerspoon", is_word = true, auto_expand = false, is_case_sensitive = true }
 "ht" = { output = "HT", is_word = true, auto_expand = false, is_case_sensitive = true }
 "ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true }
 "insee" = { output = "INSEE", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -382,6 +388,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "kpi" = { output = "KPI", is_word = true, auto_expand = false, is_case_sensitive = true }
 "kpis" = { output = "KPIs", is_word = true, auto_expand = false, is_case_sensitive = true }
 "latex" = { output = "LaTeX", is_word = true, auto_expand = false, is_case_sensitive = true }
+"lightgbm" = { output = "LightGBM", is_word = true, auto_expand = false, is_case_sensitive = true }
 "linux" = { output = "Linux", is_word = true, auto_expand = false, is_case_sensitive = true }
 "llm" = { output = "LLM", is_word = true, auto_expand = false, is_case_sensitive = true }
 "llms" = { output = "LLMs", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -392,6 +399,8 @@ accents = "Autocorrection des accents de très nombreux mots"
 "majs" = { output = "MAJs", is_word = true, auto_expand = false, is_case_sensitive = true }
 "mbti" = { output = "MBTI", is_word = true, auto_expand = false, is_case_sensitive = true }
 "mcp" = { output = "MCP", is_word = true, auto_expand = false, is_case_sensitive = true }
+"ml" = { output = "ML", is_word = true, auto_expand = false, is_case_sensitive = true }
+"mle" = { output = "MLE", is_word = true, auto_expand = false, is_case_sensitive = true }
 "mlflow" = { output = "MLflow", is_word = true, auto_expand = false, is_case_sensitive = true }
 "mlops" = { output = "MLOps", is_word = true, auto_expand = false, is_case_sensitive = true }
 "nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -404,6 +413,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "opentelemetry" = { output = "OpenTelemetry", is_word = true, auto_expand = false, is_case_sensitive = true }
 "outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true }
 "powerbi" = { output = "PowerBI", is_word = true, auto_expand = false, is_case_sensitive = true }
+"poc" = { output = "POC", is_word = true, auto_expand = false, is_case_sensitive = true }
 "pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true }
 "powerpoint" = { output = "PowerPoint", is_word = true, auto_expand = false, is_case_sensitive = true }
 "pr" = { output = "PR", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -424,6 +434,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "wikipedia" = { output = "Wikipedia", is_word = true, auto_expand = false, is_case_sensitive = true }
 "wikipédia" = { output = "Wikipédia", is_word = true, auto_expand = false, is_case_sensitive = true }
 "windows" = { output = "Windows", is_word = true, auto_expand = false, is_case_sensitive = true }
+"xgboost" = { output = "XGBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
 "youtube" = { output = "YouTube", is_word = true, auto_expand = false, is_case_sensitive = true }
 
 [[typographicapostrophe]]

@@ -1797,6 +1797,905 @@ SC138 & SC153::
 
 #InputLevel 2 ; Mandatory for this section to work, it needs to be below the InputLevel of the key remappings
 
+Features["Others"] := Map(
+    "ProfessionalEnvironment", {
+        Enabled: False,
+        Description: "Specific behavior in professional environment"
+    },
+    "LaptopBrokenKey", {
+        Enabled: False,
+        Description: "Specific behavior for my laptop where the dot key is broken"
+    },
+)
+if FileExist(ConfigurationFile) {
+    ReadPersonalConfiguration()
+}
+ReadPersonalConfiguration() {
+    for Feature in Features["Others"] {
+        RawValue := IniRead(ConfigurationFile, "Others", Feature . ".Enabled", "_")
+        if RawValue != "_" {
+            Features["Others"][Feature].Enabled := (RawValue != "0")
+        }
+    }
+}
+
+; ==============================================
+; ==============================================
+; ================ 4/ SHORTCUTS ================
+; ==============================================
+; ==============================================
+
+; For programmable keyboards
+F19:: OneShotShift()
+F20:: ToggleCapsWord()
+F21::j
+F22::LAlt
+F23:: SendFinalResult("{LAlt Down}{Tab}{LAlt Up}") ; Alt + Tab
+F24:: SendFinalResult("{LControl Up}-{LControl Up}") ; Minus
+
+; if IsBaseCondition() and Features["Layout"]["ErgoptiBase"].Enabled {
+;     Hotkey("SC02C", (*) => SendInput("a"), "I2")
+;     LControl & SC02D:: Send("i")
+; }
+
+; For my laptop, where a key is missing
+#HotIf Features["Others"]["LaptopBrokenKey"].Enabled and not LayerEnabled
+SC022:: SendNewResult(",")
+SC138 & SC022:: {
+    if GetKeyState("Shift", "P") {
+        WrapTextIfSelected(";", ";", ";")
+    } else {
+        WrapTextIfSelected(":", ":", ":")
+    }
+}
++SC02E:: SendNewResult(".") ; . on Shift + J/★
+#HotIf
+
+#HotIf Features["Others"]["ProfessionalEnvironment"].Enabled
+; === Number row ===
+; SC138 & SC029:: Return
+; SC138 & SC002:: Return ; AltGr + 1
+; SC138 & SC003:: Return ; AltGr + 2
+; SC138 & SC004:: Return ; AltGr + 3
+; SC138 & SC005:: Return ; AltGr + 4
+; SC138 & SC006:: Return ; AltGr + 5
+; SC138 & SC007:: Return ; AltGr + 6
+; SC138 & SC008:: Return ; AltGr + 7
+; SC138 & SC009:: SendNewResult("windows_nom") ; AltGr + 8
+; SC138 & SC00A:: SendNewResult("windows_mdp") ; AltGr + 9
+SC138 & SC00B:: {
+    if GetKeyState("Shift", "P") {
+        SendNewResult("0")
+    } else {
+        OpenApps()
+    }
+}
+; SC138 & SC00C::Return
+; SC138 & SC00D::Return
+
+OpenApps() {
+    EnsureAppOnMonitor("ms-teams.exe", A_AppData . "\Microsoft\Teams\Update.exe --processStart Teams.exe", 1)
+    EnsureAppOnMonitor("code.exe", "C:\Users\B519HS\AppData\Local\Programs\Microsoft VS Code\Code.exe", 2)
+    EnsureAppOnMonitor("msedge.exe", "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", 3)
+}
+
+EnsureAppOnMonitor(WindowExe, LaunchPath, MonitorNumber) {
+    ; Check if the window exists
+    if !WinExist("ahk_exe " WindowExe) {
+        ; Try to launch the app
+        try {
+            Run(LaunchPath)
+        } catch {
+            MsgBox "Failed to launch: " LaunchPath
+            return
+        }
+
+        ; Wait for the window to appear
+        WinWait("ahk_exe " WindowExe, , 10) ; Timeout after 10 seconds
+        if !WinExist("ahk_exe " WindowExe) {
+            MsgBox "Window not found after launch: " WindowExe
+            return
+        }
+    }
+
+    ; Get monitor bounds
+    MonitorGet(MonitorNumber, &left, &top, &right, &bottom)
+    width := right - left
+    height := bottom - top
+
+    ; Move the window to fill the monitor
+    WinMove(left, top, width, height, "ahk_exe " WindowExe)
+    WinActivate()
+}
+#HotIf
+
+; Ctrl + Shift + V = Paste without formatting
+AddShortcut("^+", "v", (*) => PasteWithoutFormatting)
+
+PasteWithoutFormatting(*) {
+    ; In Excel this method doesn’t work, hence the if
+    if not WinActive("ahk_exe EXCEL.EXE") {
+        A_Clipboard := A_Clipboard
+        SendFinalResult("^v")
+    } else {
+        SendFinalResult("^+v")
+    }
+}
+
+; =================================
+; ======= Touchpad gestures =======
+; =================================
+
+global drag_enabled := 0
+
+; Ctrl + Win + $ : Unused combination to assign to triple clic in Settings > Bluetooth & devices > Touchpad > Advanced gesture configuration
+^#SC029::
+{
+    global drag_enabled
+    if (drag_enabled) {
+        Click("Left", "Up")
+        drag_enabled := 0
+    } else {
+        drag_enabled := 1
+        Click("Left", "Down")
+    }
+}
+
+; Deactivate variable on click
+~LButton::
+{
+    global drag_enabled := 0
+}
+
+; Shortcuts triggered with 3 fingers in Windows
+^#SC002:: SendEvent("^t")
+^#SC003:: SendEvent("^w")
+; Key at the position of "Tab" key on an AZERTY keyboard
+^SC00F:: {
+    SendEvent("{RCtrl Down}{Tab}{RCtrl Up}")
+}
+^+SC00F:: {
+    SendEvent("{RCtrl Down}{Shift Down}{Tab}{Shift Up}{RCtrl Up}")
+}
+
+; ===================================================
+; ===================================================
+; ================ 8/ AUTOCORRECTION ================
+; ===================================================
+; ===================================================
+
+#InputLevel 1
+
+; ========================================
+; ======= Automatic autocorrection =======
+; ========================================
+
+CreateHotstring("*", "+33" SubStr(PersonalInformation["PhoneNumber"], 1, 2), PersonalInformation["PhoneNumber"]) ; +3306X
+CreateHotstring("*", "+33" SubStr(PersonalInformation["PhoneNumber"], 2, 3), PersonalInformation["PhoneNumber"]) ; +336X
+CreateHotstring("*", SubStr(PersonalInformation["PhoneNumber"], 1, 4), PersonalInformation["PhoneNumber"]) ; 06XX
+CreateHotstring("*", SubStr(PersonalInformation["PhoneNumber"], 2, 5), PersonalInformation["PhoneNumber"]) ; 6XXX
+
+CreateHotstring("*", SubStr(PersonalInformation["PhoneNumberClean"], 1, 5), PersonalInformation["PhoneNumberClean"]) ; 06 XX
+CreateHotstring("*", SubStr(PersonalInformation["PhoneNumberClean"], 2, 5), SubStr(PersonalInformation[
+    "PhoneNumberClean"], 2)) ; 6 XX
+
+CreateHotstring("*", SubStr(PersonalInformation["SocialSecurityNumber"], 1, 5), PersonalInformation[
+    "SocialSecurityNumber"])
+
+::coté::côté
+:*:subz::subj
+
+CreateHotstring("*?", "ww", "www.")
+
+; ========================================
+; ======= 8.4) Caps autocorrection =======
+; ========================================
+
+if Features["Autocorrection"]["Brands"].Enabled {
+    ::acpr::ACPR
+    ::axa,::AXA, ; Not triggering @axa.fr
+    ::axapac::AXAPAC
+    ::copht::COPHT
+    ::csp::CSP
+    ::dax::DAX
+    ::dt2::DT2
+    ::ecr::ECR
+    ::glm::GLM
+    ::iard::IARD
+    ::ifrs::IFRS
+    ::ifrs9::IFRS9
+    ::ifrs17::IFRS17
+    ::ko::KO
+    ::mrh::MRH
+    ::ok::OK
+    ::pleiades::Pléiades
+    ::pléiades::Pléiades
+    ::rc::RC
+    ::rsls::RSLS
+    ::sas::SAS
+    ::tt::TT
+    ::wps::WPS
+}
+
+; ===================================================
+; ===================================================
+; ================ 9/ TEXT EXPANSION ================
+; ===================================================
+; ===================================================
+
+; ==========================================================
+; ======= 9.2) PERSONAL INFORMATION SHORTCUTS WITH @ =======
+; ==========================================================
+
+if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
+    CreateHotstring("*", "@am" . ScriptInformation["MagicKey"], "adrien.moyaux@gmail.com", Map("FinalResult", True))
+    CreateHotstring("*", "@b7" . ScriptInformation["MagicKey"], "be7ven@gmail.com", Map("FinalResult", True))
+    CreateHotstring("*", "@h" . ScriptInformation["MagicKey"], "hahnonymme@gmail.com", Map("FinalResult", True))
+    CreateHotstring("*", "@j" . ScriptInformation["MagicKey"], "julien.zeidler@gmail.com", Map("FinalResult", True))
+    CreateHotstring("*", "@x" . ScriptInformation["MagicKey"], "adrien.moyaux@axa.fr", Map("FinalResult", True))
+}
+
+; ===========================================
+; ======= 9.3) TEXT EXPANSION WITH ★ =======
+; ===========================================
+
+if Features["MagicKey"]["TextExpansion"].Enabled {
+
+    ; ====================
+    ; ======= Code =======
+    ; ====================
+
+    ; === CSS ===
+    CreateHotstring("*", "!i" . ScriptInformation["MagicKey"], "!important", Map("FinalResult", True))
+    CreateHotstring("*", "bgc" . ScriptInformation["MagicKey"], "background-color:", Map("FinalResult", True))
+    CreateHotstring("*", "br" . ScriptInformation["MagicKey"], "border-radius:", Map("FinalResult", True))
+    CreateHotstring("*", "ff" . ScriptInformation["MagicKey"], "font-family:", Map("FinalResult", True))
+    CreateHotstring("*", "fs" . ScriptInformation["MagicKey"], "font-size:", Map("FinalResult", True))
+    CreateHotstring("*", "fw" . ScriptInformation["MagicKey"], "font-weight:", Map("FinalResult", True))
+    CreateHotstring("*", "ta" . ScriptInformation["MagicKey"], "text-align:", Map("FinalResult", True))
+
+    ; === Git ===
+    CreateHotstring("*", "gc" . ScriptInformation["MagicKey"], "git checkout", Map("FinalResult", True))
+    CreateHotstring("*", "gca" . ScriptInformation["MagicKey"], "git commit --amend", Map("FinalResult", True))
+    CreateHotstring("*", "gcm" . ScriptInformation["MagicKey"], "git commit -m `"`"{Left}", Map("OnlyText", False).Set(
+        "FinalResult", True))
+    CreateHotstring("*", "gp" . ScriptInformation["MagicKey"], "git pull", Map("FinalResult", True))
+    CreateHotstring("*", "gpd" . ScriptInformation["MagicKey"], "git pull origin dev", Map("FinalResult", True))
+    CreateHotstring("*", "gf" . ScriptInformation["MagicKey"], "git fetch", Map("FinalResult", True))
+    CreateHotstring("*", "gfd" . ScriptInformation["MagicKey"], "git fetch origin dev", Map("FinalResult", True))
+    CreateHotstring("*", "gm" . ScriptInformation["MagicKey"], "git merge", Map("FinalResult", True))
+    CreateHotstring("*", "gs" . ScriptInformation["MagicKey"], "git status", Map("FinalResult", True))
+
+    ; === Python ===
+    CreateHotstring("*?", ".à" . ScriptInformation["MagicKey"], ".join(df2, on = 'variable', how = 'left')", Map(
+        "FinalResult", True))
+    CreateHotstring("*?", ".j" . ScriptInformation["MagicKey"], ".join(df2, on = 'variable', how = 'left')", Map(
+        "FinalResult", True))
+    CreateHotstring("*?", ".c" . ScriptInformation["MagicKey"], ".count()", Map("FinalResult", True))
+    CreateHotstring("*?", ".cr" . ScriptInformation["MagicKey"], ".createDataFrame()", Map("FinalResult", True))
+    CreateHotstring("*?", ".h" . ScriptInformation["MagicKey"], ".head()", Map("FinalResult", True))
+    CreateHotstring("*?", ".d" . ScriptInformation["MagicKey"], ".display()", Map("FinalResult", True))
+    CreateHotstring("*?", ".f" . ScriptInformation["MagicKey"], ".filter(){Left}", Map("OnlyText", False).Set(
+        "FinalResult", True))
+    CreateHotstring("*?", ".hd" . ScriptInformation["MagicKey"], ".head()", Map("FinalResult", True))
+    CreateHotstring("*?", ".o" . ScriptInformation["MagicKey"], ".orderBy(desc(`"variable`")){Left 3}^{Left}", Map(
+        "OnlyText", False).Set(
+            "FinalResult", True))
+    CreateHotstring("*?", ".s" . ScriptInformation["MagicKey"], ".select(`"`"){Left 2}", Map("OnlyText", False).Set(
+        "FinalResult", True))
+
+    ; === SAS ===
+    :*:chemin★:: {
+        SendInstant("%let chemin=~/NAS/F/06 Orga/Perso/Adrien/;")
+    }
+
+    :*:%do★:: {
+        SendInstant("
+        (
+            %DO i=1 %TO 10;
+
+            %END;
+        )")
+        SendFinalResult("{Home}{Left}")
+    }
+
+    :*:proc e★:: {
+        SendInstant("
+        (
+            proc export data = base_a_exporter
+                outfile = "&chemin./nom_export.xlsx"
+                dbms = xlsx
+                replace;
+                sheet = "resultat";
+            run;
+        )"
+        )
+    }
+
+    :*:proc f★:: {
+        SendInstant("
+        (
+            /* Pour les variables catégorielles */
+            proc freq data = nom_base;
+                tables variable / out = resultat_proc_freq;
+            run;
+        )"
+        )
+    }
+
+    :*:proc i★:: {
+        SendInstant("
+        (
+            proc import datafile = ""&chemin.fichier.xlsx""
+                out = fichier
+                dbms = xlsx replace;
+            run;
+        )"
+        )
+    }
+
+    :*:proc m★:: {
+        SendInstant("
+        (
+            /* Pour les variables numériques */
+            proc means data = nom_base;
+                *class variables_groupe / ; /* Comme un group by */
+                var variables;
+                output out = resultat_proc_means;
+            run;
+        )"
+        )
+    }
+    :*:proc s★:: {
+        SendInstant("
+        (
+            proc sql;
+                create table nom_table as 
+                    select *
+                    from nom_base;
+            quit;
+        )"
+        )
+    }
+    :*:proc sort★:: {
+        SendInstant("
+        (
+            proc sort data = nom_table
+                out = nom_table;
+                by variables; 
+            run;
+        )"
+        )
+    }
+
+    ; ========================
+    ; ======= Non code =======
+    ; ========================
+
+    ; === Symbols ===
+    CreateHotstring("*", "07" . ScriptInformation["MagicKey"], "0750399576", Map("FinalResult", True))
+    :*:dt★:: ; This hotstring replaces dt★ with the current date via the commands below.
+    {
+        CurrentDateTime := FormatTime(, "dd/MM/yyyy") ; It will look like 19/01/2005
+        SendFinalResult(CurrentDateTime)
+    }
+
+    ; === A ===
+    CreateHotstring("*", "acm" . ScriptInformation["MagicKey"], "Assurances du Crédit Mutuel")
+    CreateCaseSensitiveHotstrings("*", "act" . ScriptInformation["MagicKey"], "actuaire")
+    CreateHotstring("*", "ada" . ScriptInformation["MagicKey"], "AdaBoost")
+    CreateHotstring("*", "adaboost" . ScriptInformation["MagicKey"], "AdaBoost")
+    CreateHotstring("*", "ade" . ScriptInformation["MagicKey"], "Assurance des Emprunteurs")
+    CreateCaseSensitiveHotstrings("*", "adt" . ScriptInformation["MagicKey"], "arrêt de travail")
+    CreateHotstring("*", "adv" . ScriptInformation["MagicKey"], "Azure DevOps")
+    CreateCaseSensitiveHotstrings("*", "aé" . ScriptInformation["MagicKey"], "assuré")
+    CreateCaseSensitiveHotstrings("*", "afn" . ScriptInformation["MagicKey"], "affaire nouvelle")
+    CreateCaseSensitiveHotstrings("*", "afns" . ScriptInformation["MagicKey"], "affaires nouvelles")
+    CreateCaseSensitiveHotstrings("*", "aif" . ScriptInformation["MagicKey"], "AI Factory")
+    CreateHotstring("*", "alt" . ScriptInformation["MagicKey"], "AltGr")
+    CreateHotstring("*", "altgr" . ScriptInformation["MagicKey"], "AltGr")
+    CreateHotstring("*", "am" . ScriptInformation["MagicKey"], "Adrien Moyaux")
+    CreateCaseSensitiveHotstrings("*", "ans" . ScriptInformation["MagicKey"], "affaires nouvelles")
+    CreateCaseSensitiveHotstrings("*", "aoa" . ScriptInformation["MagicKey"], "absence d’opportunité d’arbitrage")
+    CreateCaseSensitiveHotstrings("*", "ass" . ScriptInformation["MagicKey"], "assurance")
+    CreateHotstring("*", "assb" . ScriptInformation["MagicKey"], "Assurances du Groupe BPCE")
+    CreateCaseSensitiveHotstrings("*", "assé" . ScriptInformation["MagicKey"], "assuré")
+    CreateCaseSensitiveHotstrings("*", "assr" . ScriptInformation["MagicKey"], "assureur")
+    CreateCaseSensitiveHotstrings("*", "assrs" . ScriptInformation["MagicKey"], "assureurs")
+    CreateCaseSensitiveHotstrings("*", "asss" . ScriptInformation["MagicKey"], "assurances")
+    CreateHotstring("*", "axa" . ScriptInformation["MagicKey"], "AXA")
+
+    ; === B ===
+    CreateCaseSensitiveHotstrings("*", "bs" . ScriptInformation["MagicKey"], "beseven")
+    CreateCaseSensitiveHotstrings("*", "b7" . ScriptInformation["MagicKey"], "BeSeven")
+    CreateCaseSensitiveHotstrings("*", "bg" . ScriptInformation["MagicKey"], "background")
+
+    ; === C ===
+    CreateHotstring("*", "ca" . ScriptInformation["MagicKey"], "Crédit Agricole")
+    CreateCaseSensitiveHotstrings("*", "caf" . ScriptInformation["MagicKey"], "chiffre d’affaires")
+    CreateCaseSensitiveHotstrings("*", "caff" . ScriptInformation["MagicKey"], "chiffre d’affaires")
+    CreateCaseSensitiveHotstrings("*", "carto" . ScriptInformation["MagicKey"], "cartographie")
+    CreateHotstring("*", "cat" . ScriptInformation["MagicKey"], "CatBoost")
+    CreateHotstring("*", "catboost" . ScriptInformation["MagicKey"], "CatBoost")
+    CreateHotstring("*", "cda" . ScriptInformation["MagicKey"], "Code des Assurances")
+    CreateCaseSensitiveHotstrings("*", "cdas" . ScriptInformation["MagicKey"], "contrat d’assurance")
+    CreateCaseSensitiveHotstrings("*", "cdass" . ScriptInformation["MagicKey"], "contrat d’assurance")
+    CreateCaseSensitiveHotstrings("*", "cdr" . ScriptInformation["MagicKey"], "compte de résultat")
+    CreateCaseSensitiveHotstrings("*", "cg" . ScriptInformation["MagicKey"], "conditions générales")
+    CreateHotstring("*", "cha" . ScriptInformation["MagicKey"], "Charenton-le-Pont")
+    CreateHotstring("*", "cl" . ScriptInformation["MagicKey"], "Chain-Ladder")
+    CreateCaseSensitiveHotstrings("*", "cm" . ScriptInformation["MagicKey"], "commit")
+    CreateCaseSensitiveHotstrings("*", "cnt" . ScriptInformation["MagicKey"], "contrat")
+    CreateCaseSensitiveHotstrings("*", "cnts" . ScriptInformation["MagicKey"], "contrats")
+    CreateCaseSensitiveHotstrings("*", "cols" . ScriptInformation["MagicKey"], "columns")
+    CreateCaseSensitiveHotstrings("*", "cov" . ScriptInformation["MagicKey"], "covariance")
+    CreateCaseSensitiveHotstrings("*", "cp" . ScriptInformation["MagicKey"], "code postal")
+    CreateCaseSensitiveHotstrings("*", "csp" . ScriptInformation["MagicKey"], "catégorie socioprofessionnelle")
+    CreateCaseSensitiveHotstrings("*", "csps" . ScriptInformation["MagicKey"], "catégories socioprofessionnelles")
+    CreateCaseSensitiveHotstrings("*", "cts" . ScriptInformation["MagicKey"], "correctifs tarifaires")
+    CreateCaseSensitiveHotstrings("*", "ctt" . ScriptInformation["MagicKey"], "correctif tarifaire")
+
+    ; === D ===
+    CreateHotstring("*", "da" . ScriptInformation["MagicKey"], "Direct Assurance")
+    CreateCaseSensitiveHotstrings("*", "dacty" . ScriptInformation["MagicKey"], "dactylographie")
+    CreateCaseSensitiveHotstrings("*", "dactyq" . ScriptInformation["MagicKey"], "dactylographique")
+    CreateCaseSensitiveHotstrings("*", "dass" . ScriptInformation["MagicKey"], "d’assurance")
+    CreateCaseSensitiveHotstrings("*", "dasss" . ScriptInformation["MagicKey"], "d’assurances")
+    CreateCaseSensitiveHotstrings("*", "db" . ScriptInformation["MagicKey"], "database")
+    CreateCaseSensitiveHotstrings("*", "dc" . ScriptInformation["MagicKey"], "décès")
+    CreateCaseSensitiveHotstrings("*", "dctc" . ScriptInformation["MagicKey"], "décès toutes causes")
+    CreateCaseSensitiveHotstrings("*", "dd" . ScriptInformation["MagicKey"], "dossier-dossier")
+    CreateCaseSensitiveHotstrings("*", "dde" . ScriptInformation["MagicKey"], "dégât des eaux")
+    CreateCaseSensitiveHotstrings("*", "df" . ScriptInformation["MagicKey"], "dataframe")
+    CreateCaseSensitiveHotstrings("*", "di" . ScriptInformation["MagicKey"], "Databricks")
+    CreateCaseSensitiveHotstrings("*", "dl" . ScriptInformation["MagicKey"], "datalake")
+    CreateHotstring("*C", ":D" . ScriptInformation["MagicKey"], "😁")
+    CreateCaseSensitiveHotstrings("*", "d" . ScriptInformation["MagicKey"], "donc") ; Necessary to define the emoji before
+    CreateHotstring("*", "ds" . ScriptInformation["MagicKey"], "Data Science")
+    CreateHotstring("*", "dst" . ScriptInformation["MagicKey"], "Data Scientist")
+    CreateHotstring("*", "dwh" . ScriptInformation["MagicKey"], "Data Warehouse")
+
+    ; === E ===
+    CreateHotstring("*", "ecr" . ScriptInformation["MagicKey"], "Economic Combined Ratio")
+    CreateHotstring("*", "ed" . ScriptInformation["MagicKey"], "E-Declare")
+    CreateHotstring("*", "erg" . ScriptInformation["MagicKey"], "Ergo‑L")
+    CreateHotstring("*", "ergo" . ScriptInformation["MagicKey"], "Ergo‑L")
+
+    ; === F ===
+    CreateCaseSensitiveHotstrings("*", "fa" . ScriptInformation["MagicKey"], "Fonction Actuarielle")
+    CreateCaseSensitiveHotstrings("*", "fdr" . ScriptInformation["MagicKey"], "fonction de répartition")
+    CreateCaseSensitiveHotstrings("*", "fp" . ScriptInformation["MagicKey"], "fonds propres")
+    CreateCaseSensitiveHotstrings("*", "fpdf" . ScriptInformation["MagicKey"], "filetype:pdf")
+    CreateCaseSensitiveHotstrings("*", "fps" . ScriptInformation["MagicKey"], "fonds propres")
+
+    ; === G ===
+    CreateCaseSensitiveHotstrings("*", "gb" . ScriptInformation["MagicKey"], "gradient boosting")
+    CreateCaseSensitiveHotstrings("*", "gdel" . ScriptInformation["MagicKey"], "gestion déléguée")
+    CreateHotstring("*", "gp" . ScriptInformation["MagicKey"], "Graduate Program")
+
+    ; === H ===
+    CreateHotstring("*", "hcn" . ScriptInformation["MagicKey"], "HCNPJASSCL")
+    CreateHotstring("*", "hm" . ScriptInformation["MagicKey"], "Herman Miller")
+    CreateCaseSensitiveHotstrings("*", "httw", "https://www.")
+    CreateCaseSensitiveHotstrings("*", "hyper" . ScriptInformation["MagicKey"], "hyperparamètre")
+    CreateCaseSensitiveHotstrings("*", "hyperparam" . ScriptInformation["MagicKey"], "hyperparamètre")
+
+    ; === I ===
+    CreateHotstring("*", "iact" . ScriptInformation["MagicKey"], "Institut des Actuaires")
+    CreateCaseSensitiveHotstrings("*", "ic" . ScriptInformation["MagicKey"], "intervalle de confiance")
+    CreateCaseSensitiveHotstrings("*", "ics" . ScriptInformation["MagicKey"], "intervalles de confiance")
+
+    ; === J ===
+    CreateHotstring("*", "jyp" . ScriptInformation["MagicKey"], "Jean-Yves Ponce")
+
+    ; === K ===
+    CreateHotstring("*", "kla" . ScriptInformation["MagicKey"], "KLAnext")
+    CreateHotstring("*", "km" . ScriptInformation["MagicKey"], "Kaplan-Meier")
+    CreateHotstring("*", "ks" . ScriptInformation["MagicKey"], "KOMA-Script")
+
+    ; === L ===
+    CreateHotstring("*", "lds" . ScriptInformation["MagicKey"], "Livre de Savoir")
+    CreateHotstring("*", "le" . ScriptInformation["MagicKey"], "Label Encoder")
+    CreateHotstring("*", "light" . ScriptInformation["MagicKey"], "LightGBM")
+    CreateHotstring("*", "lightgbm" . ScriptInformation["MagicKey"], "LightGBM")
+    CreateHotstring("*", "llm" . ScriptInformation["MagicKey"], "Large Language Model")
+    CreateHotstring("*", "llms" . ScriptInformation["MagicKey"], "Large Language Models")
+    CreateHotstring("*", "lr" . ScriptInformation["MagicKey"], "Loss Ratio")
+    CreateCaseSensitiveHotstrings("*", "lrs" . ScriptInformation["MagicKey"], "les résultats")
+    CreateCaseSensitiveHotstrings("*", "lsex" . ScriptInformation["MagicKey"], "les exemples")
+
+    ; === M ===
+    CreateCaseSensitiveHotstrings("*", "morta" . ScriptInformation["MagicKey"], "mortalité")
+    CreateCaseSensitiveHotstrings("*", "mé" . ScriptInformation["MagicKey"], "multiéquipé")
+    CreateHotstring("*", "mlp" . ScriptInformation["MagicKey"], "Marie Le Pennec")
+    CreateCaseSensitiveHotstrings("*", "mo" . ScriptInformation["MagicKey"], "moyaux")
+    CreateHotstring("*", "mypy" . ScriptInformation["MagicKey"], "MyPy")
+
+    ; === N ===
+    CreateCaseSensitiveHotstrings("*", "na" . ScriptInformation["MagicKey"], "valeur manquante")
+    CreateCaseSensitiveHotstrings("*", "nas" . ScriptInformation["MagicKey"], "valeurs manquantes")
+    CreateCaseSensitiveHotstrings("*", "nass" . ScriptInformation["MagicKey"], "Natixis Assurances")
+    CreateHotstring("*", "nat" . ScriptInformation["MagicKey"], "Natixis")
+    CreateCaseSensitiveHotstrings("*", "next" . ScriptInformation["MagicKey"], "next_best_offer")
+    CreateCaseSensitiveHotstrings("*", "not" . ScriptInformation["MagicKey"], "notebook")
+
+    ; === O ===
+    CreateCaseSensitiveHotstrings("*", "oa" . ScriptInformation["MagicKey"], "observés sur attendus")
+    CreateHotstring("*", "opt" . ScriptInformation["MagicKey"], "Optimot")
+    CreateCaseSensitiveHotstrings("*", "or" . ScriptInformation["MagicKey"], "offre recommandée")
+    CreateCaseSensitiveHotstrings("*", "ors" . ScriptInformation["MagicKey"], "offres recommandées")
+
+    ; === P ===
+    CreateCaseSensitiveHotstrings("*", "pa" . ScriptInformation["MagicKey"], "prime acquise")
+    CreateHotstring("*", "pbi" . ScriptInformation["MagicKey"], "Power BI")
+    CreateCaseSensitiveHotstrings("*", "pc" . ScriptInformation["MagicKey"], "prime commerciale")
+    CreateCaseSensitiveHotstrings("*", "pcs" . ScriptInformation["MagicKey"], "primes commerciales")
+    CreateCaseSensitiveHotstrings("*", "pé" . ScriptInformation["MagicKey"], "prime émise")
+    CreateCaseSensitiveHotstrings("*", "pés" . ScriptInformation["MagicKey"], "primes émises")
+    CreateCaseSensitiveHotstrings("*", "pgs" . ScriptInformation["MagicKey"], "processus gaussiens")
+    CreateHotstring("*", "phi" . ScriptInformation["MagicKey"], "Philippe")
+    CreateCaseSensitiveHotstrings("*", "pl" . ScriptInformation["MagicKey"], "pipeline")
+    CreateCaseSensitiveHotstrings("*", "pm" . ScriptInformation["MagicKey"], "provision mathématique")
+    CreateCaseSensitiveHotstrings("*", "pms" . ScriptInformation["MagicKey"], "provisions mathématiques")
+    CreateCaseSensitiveHotstrings("*", "pp" . ScriptInformation["MagicKey"], "prime pure")
+    CreateCaseSensitiveHotstrings("*", "pps" . ScriptInformation["MagicKey"], "primes pures")
+    CreateCaseSensitiveHotstrings("*", "pr" . ScriptInformation["MagicKey"], "pull request")
+    CreateCaseSensitiveHotstrings("*", "pra" . ScriptInformation["MagicKey"], "prime acquise")
+    CreateCaseSensitiveHotstrings("*", "pras" . ScriptInformation["MagicKey"], "primes acquises")
+    CreateCaseSensitiveHotstrings("*", "prév" . ScriptInformation["MagicKey"], "prévoyance")
+    CreateCaseSensitiveHotstrings("*", "prev" . ScriptInformation["MagicKey"], "prévoyance")
+    CreateHotstring("*", "ps" . ScriptInformation["MagicKey"], "PySpark")
+
+    ; === Q ===
+    CreateCaseSensitiveHotstrings("*", "qdd" . ScriptInformation["MagicKey"], "qualité des données")
+    CreateCaseSensitiveHotstrings("*", "qss" . ScriptInformation["MagicKey"], "questionnaire de santé simplifié")
+
+    ; === R ===
+    CreateCaseSensitiveHotstrings("*", "r7" . ScriptInformation["MagicKey"], "recette")
+    CreateCaseSensitiveHotstrings("*", "reass" . ScriptInformation["MagicKey"], "réassurance")
+    CreateCaseSensitiveHotstrings("*", "rc" . ScriptInformation["MagicKey"], "responsabilité civile")
+    CreateCaseSensitiveHotstrings("*", "renta" . ScriptInformation["MagicKey"], "rentabilité")
+    CreateCaseSensitiveHotstrings("*", "resp" . ScriptInformation["MagicKey"], "responsabilité")
+    CreateCaseSensitiveHotstrings("*", "réass" . ScriptInformation["MagicKey"], "réassurance")
+    CreateHotstring("*", "rmd" . ScriptInformation["MagicKey"], "R Markdown")
+    CreateCaseSensitiveHotstrings("*", "rn" . ScriptInformation["MagicKey"], "risque-neutre")
+    CreateHotstring("*", "roq" . ScriptInformation["MagicKey"], "45 Rue Roque de Fillol")
+    CreateCaseSensitiveHotstrings("*", "rsls" . ScriptInformation["MagicKey"],
+        "risques spéciaux lignes spécialisées")
+    CreateCaseSensitiveHotstrings("*", "rt" . ScriptInformation["MagicKey"], "risque technique")
+
+    ; === S ===
+    CreateCaseSensitiveHotstrings("*", "s" . ScriptInformation["MagicKey"], "SFB")
+    CreateHotstring("*", "s2" . ScriptInformation["MagicKey"], "Solvabilité II")
+    CreateCaseSensitiveHotstrings("*", "selmed" . ScriptInformation["MagicKey"], "sélection médicale")
+    CreateHotstring("*", "sg" . ScriptInformation["MagicKey"], "Société Générale")
+    CreateCaseSensitiveHotstrings("*", "sin" . ScriptInformation["MagicKey"], "sinistre")
+    CreateCaseSensitiveHotstrings("*", "sk" . ScriptInformation["MagicKey"], "scikit-learn")
+    CreateCaseSensitiveHotstrings("*", "solva" . ScriptInformation["MagicKey"], "solvabilité")
+    CreateCaseSensitiveHotstrings("*", "sous" . ScriptInformation["MagicKey"], "souscripteur")
+    CreateCaseSensitiveHotstrings("*", "sousn" . ScriptInformation["MagicKey"], "souscription")
+    CreateCaseSensitiveHotstrings("*", "sousr" . ScriptInformation["MagicKey"], "souscrire")
+    CreateHotstring("*", "sp" . ScriptInformation["MagicKey"], "SharePoint")
+    CreateCaseSensitiveHotstrings("*", "ssi" . ScriptInformation["MagicKey"], "si et seulement si")
+    CreateCaseSensitiveHotstrings("*", "sto" . ScriptInformation["MagicKey"], "stochastique")
+    CreateHotstring("*", "stra" . ScriptInformation["MagicKey"], "Strasbourg")
+    CreateHotstring("*", "stras" . ScriptInformation["MagicKey"], "Strasbourg")
+
+    ; === T ===
+    CreateCaseSensitiveHotstrings("*", "taf" . ScriptInformation["MagicKey"], "tout à fait")
+    CreateCaseSensitiveHotstrings("*", "tarif" . ScriptInformation["MagicKey"], "tarification")
+    CreateCaseSensitiveHotstrings("*", "tdb" . ScriptInformation["MagicKey"], "tableau de bord")
+    CreateCaseSensitiveHotstrings("*", "tdbs" . ScriptInformation["MagicKey"], "tableaux de bord")
+    CreateCaseSensitiveHotstrings("*", "tdm" . ScriptInformation["MagicKey"], "table de mortalité")
+    CreateCaseSensitiveHotstrings("*", "tdms" . ScriptInformation["MagicKey"], "tables de mortalité")
+    CreateHotstring("*", "tnr" . ScriptInformation["MagicKey"], "Times New Roman")
+    CreateCaseSensitiveHotstrings("*", "tu" . ScriptInformation["MagicKey"], "test unitaire")
+    CreateCaseSensitiveHotstrings("*", "tus" . ScriptInformation["MagicKey"], "tests unitaires")
+    CreateCaseSensitiveHotstrings("*", "tff" . ScriptInformation["MagicKey"], "tenfastfingers")
+
+    ; === U ===
+
+    ; === V ===
+    CreateCaseSensitiveHotstrings("*", "va" . ScriptInformation["MagicKey"], "variable aléatoire")
+    CreateCaseSensitiveHotstrings("*", "vas" . ScriptInformation["MagicKey"], "variables aléatoires")
+    CreateCaseSensitiveHotstrings("*", "vect" . ScriptInformation["MagicKey"], "vecteur")
+    CreateHotstring("*", "vsc" . ScriptInformation["MagicKey"], "VSCode")
+
+    ; === W ===
+    CreateHotstring("*", "wh" . ScriptInformation["MagicKey"], "Whittaker-Henderson")
+    CreateHotstring("*", "what" . ScriptInformation["MagicKey"], "WhatsApp")
+
+    ; === X ===
+    CreateHotstring("*", "xg" . ScriptInformation["MagicKey"], "XGBoost")
+    CreateHotstring("*", "xgb" . ScriptInformation["MagicKey"], "XGBoost")
+    CreateHotstring("*", "xgboost" . ScriptInformation["MagicKey"], "XGBoost")
+    CreateCaseSensitiveHotstrings("*", "xs" . ScriptInformation["MagicKey"], "cross sell")
+
+    ; === Y ===
+
+    ; === Z ===
+    CreateHotstring("*", "za" . ScriptInformation["MagicKey"], "Zacharie")
+    CreateCaseSensitiveHotstrings("*", "zc" . ScriptInformation["MagicKey"], "zéro coupon")
+}
+
+; =======================================
+; =======================================
+; ================ TESTS ================
+; =======================================
+; =======================================
+
+; Holding right or left button + press back/forward to switch tab
+~RButton & XButton1:: Send("^{Tab}")
+~RButton & XButton2:: Send("+^{Tab}")
+~LButton & XButton1:: Send("^{Tab}")
+~LButton & XButton2:: Send("+^{Tab}")
+
+; move window - press and hold left button -> press both mouse buttons -> move.
+; does not work on PhpStorm as the combo is rebounded there
+~LButton & RButton::
+EWD_MoveWindow(*) {
+    CoordMode "Mouse"  ; Switch to screen/absolute coordinates.
+    MouseGetPos &EWD_MouseStartX, &EWD_MouseStartY, &EWD_MouseWin
+    WinGetPos &EWD_OriginalPosX, &EWD_OriginalPosY, , , EWD_MouseWin
+    ; if !WinGetMinMax(EWD_MouseWin)  ; Only if the window isn't maximized
+    SetTimer EWD_WatchMouse, 10 ; Track the mouse as the user drags it.
+
+    EWD_WatchMouse() {
+        if not GetKeyState("LButton", "P")  ; Button has been released, so drag is complete.
+        {
+            SetTimer , 0
+            return
+        }
+        if GetKeyState("Escape", "P")  ; Escape has been pressed, so drag is cancelled.
+        {
+            SetTimer , 0
+            WinMove EWD_OriginalPosX, EWD_OriginalPosY, , , EWD_MouseWin
+            return
+        }
+        ; Otherwise, reposition the window to match the change in mouse coordinates
+        ; caused by the user having dragged the mouse:
+        CoordMode "Mouse"
+        MouseGetPos &EWD_MouseX, &EWD_MouseY
+        WinGetPos &EWD_WinX, &EWD_WinY, , , EWD_MouseWin
+        SetWinDelay -1   ; Makes the below move faster/smoother.
+        WinMove EWD_WinX + EWD_MouseX - EWD_MouseStartX, EWD_WinY + EWD_MouseY - EWD_MouseStartY, , , EWD_MouseWin
+        EWD_MouseStartX := EWD_MouseX  ; Update for the next timer-call to this subroutine.
+        EWD_MouseStartY := EWD_MouseY
+    }
+}
+
+; ================================================================
+; ======= 4.7) Raccourcis des IDE qui fonctionnent partout =======
+; ================================================================
+
+CodeEditors() {
+    return WinActive("ahk_exe Code.exe")
+    or WinActive("ahk_exe rstudio.exe")
+    or WinActive("RStudio- \\Distant")
+}
+
+#HotIf not CodeEditors()
+; Code ne fonctionnant qu’en dehors des IDE (car ces raccourcis ne sont pas aussi fiables que ceux des IDE)
+
+^SC032:: ; Ctrl + D fonctionne partout, même en dehors des IDE
+{
+    SelectLine()
+    SendFinalResult("{BackSpace}{Delete}{End}")
+}
+
+!Up:: ; Alt + Haut fonctionne partout, même en dehors des IDE
+{
+
+    OldClipboard := ClipboardAll()
+    A_Clipboard := ""
+    ligne := 0 ; Est-ce une ligne ou un bloc de texte ?
+
+    SendEvent("^c")
+    Errorlevel := !ClipWait(1) ; Attente que le presse-papier contienne des données
+    if (ErrorLevel) { ; Pas de données trouvées = pas de sélection de bloc de texte ici
+        ligne := 1 ; C’est une ligne
+        SelectLine()
+        SendFinalResult("^c")
+        Sleep(300)
+    }
+    SendFinalResult("{BackSpace 2}{Home}")
+    SendFinalResult("^v")
+    Sleep(100)
+    if (ligne == 1) {
+        SendFinalResult("{Enter}")
+    }
+    SendFinalResult("{Home}{Left}{End}")
+
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
+!Down:: ; Alt + Bas fonctionne partout, même en dehors des IDE
+{
+    OldClipboard := ClipboardAll()
+    A_Clipboard := ""
+    ligne := 0 ; Est-ce une ligne ou un bloc de texte ?
+    SendEvent("^c")
+    Errorlevel := !ClipWait(0.3) ; Attente que le presse-papier contienne des données
+    if (ErrorLevel) { ; Pas de données trouvées = pas de sélection de bloc de texte ici
+        ligne := 1 ; C’est une ligne
+        SelectLine()
+        SendFinalResult("^c")
+        Sleep(300)
+    }
+    SendFinalResult("{BackSpace}")
+    if (ligne == 1) {
+        SendFinalResult("{Delete}")
+    }
+    SendFinalResult("{End}{Enter}")
+    SendFinalResult("^v")
+    Sleep(100)
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
++!Up:: ; Alt + Shift + Haut fonctionne partout, même en dehors des IDE
+{
+    OldClipboard := ClipboardAll()
+    A_Clipboard := ""
+    SendEvent("^c")
+    Errorlevel := !ClipWait(0.1) ; Attente que le presse-papier contienne des données
+    if (ErrorLevel) ; Pas de données trouvées = pas de sélection de bloc de texte ici
+    {
+        SelectLine()
+        SendFinalResult("^c")
+        Sleep(100)
+    }
+    SendFinalResult("{BackSpace 2}{Enter}^v{Enter}^v") ; Suppression de la ligne pour la coller deux fois pour avoir le curseur au bon endroit
+    Sleep(100)
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
++!Down:: ; Alt + Shift + Bas fonctionne partout, même en dehors des IDE
+{
+    OldClipboard := ClipboardAll()
+    A_Clipboard := ""
+    SendEvent("^c")
+    Errorlevel := !ClipWait(0.1) ; Attente que le presse-papier contienne des données
+    if (ErrorLevel) ; Pas de données trouvées = pas de sélection de bloc de texte ici
+    {
+        SelectLine()
+        SendFinalResult("^c")
+        Sleep(100)
+    }
+    SendFinalResult("{BackSpace}^v{Enter}^v") ; Suppression de la ligne pour la coller deux fois pour avoir le curseur au bon endroit
+    Sleep(100)
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+#HotIf
+
+; ====================================================
+; ======= 4.8) Déplacement de texte horizontal =======
+; ====================================================
+
+!Right:: ; Alt + Droite déplace le texte sélectionné sur la droite
+{
+    OldClipboard := ClipboardAll()
+    SendFinalResult("^x")
+    Sleep(100)
+    SendFinalResult("{Right}")
+    longueur_texte := StrLen(A_Clipboard)
+    SendFinalResult("^v")
+    Sleep(100)
+    SendFinalResult("{Left " longueur_texte "}")
+    Sleep(100)
+    SendFinalResult("{Shift Down}{Right " longueur_texte "}{Shift Up}")
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
+!Left:: ; Alt + Gauche déplace le texte sélectionné sur la gauche
+{
+    OldClipboard := ClipboardAll()
+    SendFinalResult("^x")
+    Sleep(100)
+    SendFinalResult("{Left}")
+    longueur_texte := StrLen(A_Clipboard)
+    SendFinalResult("^v")
+    Sleep(100)
+    SendFinalResult("{Left " longueur_texte "}")
+    SendFinalResult("{Shift Down}{Right " longueur_texte "}{Shift Up}")
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
+!+Left:: ; Alt + Shift + Gauche duplique le texte sélectionné sur la gauche
+{
+    OldClipboard := ClipboardAll()
+    SendFinalResult("^c")
+    Sleep(100)
+    SendFinalResult("{Left}")
+    longueur_texte := StrLen(A_Clipboard)
+    SendFinalResult("^v")
+    Sleep(100)
+    ; Send, {Left %longueur_texte%}
+    ; Send, {Shift Down}{Right %longueur_texte%}{Shift Up}
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
+!+Right:: ; Alt + Shift + Droite duplique le texte sélectionné sur la droite
+{
+    OldClipboard := ClipboardAll()
+    SendFinalResult("^c")
+    Sleep(100)
+    SendFinalResult("{Right}")
+    longueur_texte := StrLen(A_Clipboard)
+    SendFinalResult("^v")
+    Sleep(100)
+    ; Send, {Left %longueur_texte%}
+    ; Send, {Shift Down}{Right %longueur_texte%}{Shift Up}
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
+^!Left:: ; Ctrl + Alt + Gauche déplace le mot/sélection sur la gauche
+{
+    OldClipboard := ClipboardAll()
+    A_Clipboard := ""
+    SendEvent("^c")
+    Errorlevel := !ClipWait(0.1) ; Attente que le presse-papier contienne des données
+    if (ErrorLevel) ; Pas de données trouvées = pas de sélection de bloc de texte ici
+    {
+        SelectWord()
+        SendFinalResult("^c")
+        Sleep(100)
+    }
+    longueur_texte := StrLen(A_Clipboard)
+    SendFinalResult("{BackSpace 2}^{Left}")
+    SendFinalResult("^v")
+    Sleep(100)
+    SendFinalResult("{Space}{Left}")
+    SendFinalResult("{Left " longueur_texte "}")
+    SendFinalResult("{Shift Down}{Right " longueur_texte "}{Shift Up}")
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
+^!Right:: ; Ctrl + Alt + Droite déplace le mot/sélection sur la droite
+{
+    OldClipboard := ClipboardAll()
+    A_Clipboard := ""
+    SendEvent("^c")
+    Errorlevel := !ClipWait(0.1) ; Attente que le presse-papier contienne des données
+    if (ErrorLevel) ; Pas de données trouvées = pas de sélection de bloc de texte ici
+    {
+        SelectWord()
+        SendFinalResult("^c")
+        Sleep(100)
+    }
+    longueur_texte := StrLen(A_Clipboard)
+    SendFinalResult("{BackSpace 2}{Right}^{Right}{Space}")
+    longueur_texte := StrLen(A_Clipboard)
+    SendFinalResult("^v")
+    Sleep(100)
+    SendFinalResult("{Left " longueur_texte "}")
+    SendFinalResult("{Shift Down}{Right " longueur_texte "}{Shift Up}")
+    A_Clipboard := OldClipboard ; Restore the original clipboard. Note the use of Clipboard (not ClipboardAll).
+    OldClipboard := "" ; Free the memory in case the clipboard was very large.
+}
+
+; ========================
+; ======= 4.3) Alt =======
+; ========================
+
+; Attention au raccourci Windows de changement de clavier (Alt + LShift)
+
+#HotIf (WinActive("ahk_exe rstudio.exe") or WinActive("RStudio- \\Distant"))
+!SC027::^!i ; Ajout d’un chunk de code R sur RStudio avec Alt + R
+
+; Pour avoir les raccourcis <- sur RStudio
+; !SC007::!-
+; !SC009::!_
+#HotIf
+
 ; ========================================================
 ; ========================================================
 ; ========================================================
@@ -5203,11 +6102,16 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "aws", "AWS")
     CreateHotstring("", "axa", "AXA")
     CreateHotstring("", "azure devops", "Azure DevOps")
+    CreateHotstring("", "bdd", "BDD")
+    CreateHotstring("", "bdds", "BDDs")
+    CreateHotstring("", "catboost", "CatBoost")
     CreateHotstring("", "chatgpt", "ChatGPT")
     CreateHotstring("", "citroen", "Citroën")
     CreateHotstring("", "cli", "CLI")
     CreateHotstring("", "comex", "COMEX")
     CreateHotstring("", "cpu", "CPU")
+    CreateHotstring("", "data science", "Data Science")
+    CreateHotstring("", "data scientist", "Data Scientist")
     CreateHotstring("", "databricks", "Databricks")
     CreateHotstring("", "docker", "Docker")
     CreateHotstring("", "dynatrace", "Dynatrace")
@@ -5218,6 +6122,7 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "github", "GitHub")
     CreateHotstring("", "google", "Google")
     CreateHotstring("", "gpu", "GPU")
+    CreateHotstring("", "hammerspoon", "Hammerspoon")
     CreateHotstring("", "ht", "HT")
     CreateHotstring("", "ia", "IA")
     CreateHotstring("", "insee", "INSEE")
@@ -5228,6 +6133,7 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "kpi", "KPI")
     CreateHotstring("", "kpis", "KPIs")
     CreateHotstring("", "latex", "LaTeX")
+    CreateHotstring("", "lightgbm", "LightGBM")
     CreateHotstring("", "linux", "Linux")
     CreateHotstring("", "llm", "LLM")
     CreateHotstring("", "llms", "LLMs")
@@ -5238,6 +6144,8 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "majs", "MAJs")
     CreateHotstring("", "mbti", "MBTI")
     CreateHotstring("", "mcp", "MCP")
+    CreateHotstring("", "ml", "ML")
+    CreateHotstring("", "mle", "MLE")
     CreateHotstring("", "mlflow", "MLflow")
     CreateHotstring("", "mlops", "MLOps")
     CreateHotstring("", "nasa", "NASA")
@@ -5250,6 +6158,7 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "opentelemetry", "OpenTelemetry")
     CreateHotstring("", "outlook", "Outlook")
     CreateHotstring("", "powerbi", "PowerBI")
+    CreateHotstring("", "poc", "POC")
     CreateHotstring("", "pnl", "PNL")
     CreateHotstring("", "powerpoint", "PowerPoint")
     CreateHotstring("", "pr", "PR")
@@ -5270,6 +6179,7 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "wikipedia", "Wikipedia")
     CreateHotstring("", "wikipédia", "Wikipédia")
     CreateHotstring("", "windows", "Windows")
+    CreateHotstring("", "xgboost", "XGBoost")
     CreateHotstring("", "youtube", "YouTube")
 
     ; For these apps, we only capitalize them when used in context of apps, and not as English words
@@ -6098,7 +7008,9 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "doc" . ScriptInformation["MagicKey"], "document")
     CreateCaseSensitiveHotstrings("*", "docs" . ScriptInformation["MagicKey"], "documents")
     CreateCaseSensitiveHotstrings("*", "dp" . ScriptInformation["MagicKey"], "de plus")
+    CreateCaseSensitiveHotstrings("*", "ds" . ScriptInformation["MagicKey"], "data science")
     CreateCaseSensitiveHotstrings("*", "dsl" . ScriptInformation["MagicKey"], "désolé")
+    CreateCaseSensitiveHotstrings("*", "dst" . ScriptInformation["MagicKey"], "data scientist")
     CreateCaseSensitiveHotstrings("*", "dtm" . ScriptInformation["MagicKey"], "détermine")
     CreateCaseSensitiveHotstrings("*", "dvlp" . ScriptInformation["MagicKey"], "développe")
 
@@ -6184,6 +7096,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateHotstring("*", "hf" . ScriptInformation["MagicKey"], "Hugging Face")
     CreateCaseSensitiveHotstrings("*", "his" . ScriptInformation["MagicKey"], "historique")
     CreateCaseSensitiveHotstrings("*", "histo" . ScriptInformation["MagicKey"], "historique")
+    CreateCaseSensitiveHotstrings("*", "hs" . ScriptInformation["MagicKey"], "hammerspoon")
     CreateCaseSensitiveHotstrings("*", "hyp" . ScriptInformation["MagicKey"], "hypothèse")
 
     ; === I ===
@@ -6235,6 +7148,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "lê" . ScriptInformation["MagicKey"], "l’être")
     CreateCaseSensitiveHotstrings("*", "ledt" . ScriptInformation["MagicKey"], "l’emploi du temps")
     CreateCaseSensitiveHotstrings("*", "lex" . ScriptInformation["MagicKey"], "l’exemple")
+    CreateCaseSensitiveHotstrings("*", "lgb" . ScriptInformation["MagicKey"], "lightgbm")
     CreateCaseSensitiveHotstrings("*", "lim" . ScriptInformation["MagicKey"], "limite")
     CreateCaseSensitiveHotstrings("*", "llm" . ScriptInformation["MagicKey"], "large language model")
 
@@ -6261,6 +7175,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "mios" . ScriptInformation["MagicKey"], "millions")
     CreateCaseSensitiveHotstrings("*", "mjo" . ScriptInformation["MagicKey"], "mettre à jour")
     CreateCaseSensitiveHotstrings("*", "ml" . ScriptInformation["MagicKey"], "machine learning")
+    CreateCaseSensitiveHotstrings("*", "mle" . ScriptInformation["MagicKey"], "machine learning engineer")
     CreateCaseSensitiveHotstrings("*", "mm" . ScriptInformation["MagicKey"], "même")
     CreateCaseSensitiveHotstrings("*", "mme" . ScriptInformation["MagicKey"], "madame")
     CreateCaseSensitiveHotstrings("*", "modif" . ScriptInformation["MagicKey"], "modification")
@@ -6345,6 +7260,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "pjs" . ScriptInformation["MagicKey"], "pièces jointes")
     CreateCaseSensitiveHotstrings("*", "pk" . ScriptInformation["MagicKey"], "pourquoi")
     CreateCaseSensitiveHotstrings("*", "pls" . ScriptInformation["MagicKey"], "please")
+    CreateCaseSensitiveHotstrings("*", "poc" . ScriptInformation["MagicKey"], "proof of concept")
     CreateCaseSensitiveHotstrings("*", "poum" . ScriptInformation["MagicKey"], "plus ou moins")
     CreateCaseSensitiveHotstrings("*", "poss" . ScriptInformation["MagicKey"], "possible")
     CreateCaseSensitiveHotstrings("*", "pourcent" . ScriptInformation["MagicKey"], "pourcentage")
@@ -6493,6 +7409,8 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
 
     ; === X ===
     CreateCaseSensitiveHotstrings("*", "x" . ScriptInformation["MagicKey"], "exemple")
+    CreateCaseSensitiveHotstrings("*", "xg" . ScriptInformation["MagicKey"], "xgboost")
+    CreateCaseSensitiveHotstrings("*", "xgb" . ScriptInformation["MagicKey"], "xgboost")
 
     ; === Y ===
     CreateCaseSensitiveHotstrings("*", "ya" . ScriptInformation["MagicKey"], "il y a")
