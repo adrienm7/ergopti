@@ -79,6 +79,22 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     local function save_prefs()
+        -- Snapshot section states from hs.settings so they are fully portable.
+        local section_states = {}
+        for _, f in ipairs(hotfiles or {}) do
+            local name = f:match("^(.*)%.lua$") or f
+            local secs = keymap and keymap.get_sections and keymap.get_sections(name) or nil
+            if secs then
+                section_states[name] = {}
+                for _, sec in ipairs(secs) do
+                    if sec.name ~= '-' and not sec.is_module_placeholder then
+                        section_states[name][sec.name] =
+                            keymap.is_section_enabled(name, sec.name)
+                    end
+                end
+            end
+        end
+
         local prefs = {
             keymap                   = state.keymap,
             gestures                 = state.gestures,
@@ -88,8 +104,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             hotstrings               = state.hotstrings,
             chatgpt_url              = state.chatgpt_url,
             sections_order_overrides = state.sections_order_overrides,
+            section_states           = section_states,
             shortcut_keys            = {},
-            gesture_actions          = gestures.get_all_actions(),  -- nouveau format
+            gesture_actions          = gestures.get_all_actions(),
         }
         if shortcuts and type(shortcuts.list_shortcuts) == "function" then
             for _, s in ipairs(shortcuts.list_shortcuts()) do
@@ -109,6 +126,28 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- Appliquer les préférences sauvegardées
     do
         local saved = load_prefs()
+        local config_absent = (next(saved) == nil)  -- empty table = file missing
+
+        if config_absent then
+            -- No config.json: reset hs.settings section keys to nil (= enabled)
+            -- so that stale NSUserDefaults values from a previous session do not
+            -- pollute the new file that save_prefs() will write below.
+            for _, f in ipairs(hotfiles or {}) do
+                local name = f:match("^(.*)%.lua$") or f
+                local secs = keymap and keymap.get_sections and keymap.get_sections(name) or nil
+                if secs then
+                    for _, sec in ipairs(secs) do
+                        if sec.name ~= '-' and not sec.is_module_placeholder then
+                            hs.settings.set("hotstrings_section_" .. name .. "_" .. sec.name, nil)
+                        end
+                    end
+                end
+                -- Reload each group so load_toml re-reads the now-cleared hs.settings.
+                keymap.disable_group(name)
+                keymap.enable_group(name)
+            end
+        end
+
         if type(saved) == "table" then
             if saved.keymap    ~= nil then state.keymap    = saved.keymap    end
             if saved.gestures  ~= nil then state.gestures  = saved.gestures  end
@@ -126,12 +165,14 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     end
                 end
             end
-            -- Restaurer les actions de geste (nouveau format)
+            -- Restaurer les actions de geste
             if type(saved.gesture_actions) == "table" then
                 for slot, action in pairs(saved.gesture_actions) do
                     gestures.set_action(slot, action)
                 end
             end
+            -- Note: section_states are applied to hs.settings by init.lua BEFORE
+            -- load_toml is called, so no hs.settings manipulation is needed here.
         end
 
         if state.keymap        then keymap.start()        else keymap.stop()        end
@@ -142,6 +183,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             if state.personal_info then personal_info.start(base_dir, keymap) else personal_info.stop() end
         end
 
+        -- Groups are already loaded correctly by init.lua (hs.settings was primed
+        -- from config.json before load_toml ran).  Just enable/disable the tap.
         for name, enabled in pairs(state.hotstrings) do
             if enabled then keymap.enable_group(name) else keymap.disable_group(name) end
         end
@@ -170,22 +213,39 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     -- Helper: toggle function for a top-level group.
+    -- Enabling any group also restarts the eventtap if it was stopped
+    -- (e.g. after a "Tout désactiver" which sets state.keymap=false).
     local function toggleGroupFn(name)
         return function()
             state.hotstrings[name] = not groupEnabled(name)
-            if state.hotstrings[name] then keymap.enable_group(name)
-            else keymap.disable_group(name) end
+            if state.hotstrings[name] then
+                keymap.enable_group(name)
+                -- Ensure the eventtap is running; calling start() when already
+                -- running is a no-op in Hammerspoon.
+                if not state.keymap then
+                    state.keymap = true
+                    keymap.start()
+                end
+            else
+                keymap.disable_group(name)
+            end
             save_prefs(); updateMenu()
         end
     end
 
     -- Helper: toggle function for a section within a TOML group.
+    -- Also restarts the eventtap if it was stopped (state.keymap=false).
     local function toggleSectionFn(group_name, sec_name)
         return function()
             if keymap.is_section_enabled(group_name, sec_name) then
                 keymap.disable_section(group_name, sec_name)
             else
                 keymap.enable_section(group_name, sec_name)
+                -- Ensure the eventtap is running.
+                if not state.keymap then
+                    state.keymap = true
+                    keymap.start()
+                end
             end
             save_prefs(); updateMenu()
         end
@@ -199,9 +259,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- into the top-level menu (no extra "Hotstrings" parent wrapper).
     --
     -- Each group item title includes the total hotstring count: "Label (N)".
-    -- TOML groups that are enabled show a ">" sub-menu listing every section
-    -- as a checkable toggle; each section label includes its own count.
-    -- Disabled groups or Lua groups get a simple click-to-toggle.
+    -- TOML groups always show a ">" sub-menu listing every section as a
+    -- checkable toggle (even when the group is disabled).  The parent item is
+    -- itself clickable (toggles the group) while the sub-menu lets the user
+    -- control individual sections.  When the group is disabled, sub-items are
+    -- rendered without an fn so macOS greys them out; the group must be
+    -- re-enabled first before sections can be toggled.
+    -- Lua groups (no sections) keep the simple click-to-toggle behaviour.
     local function buildHotstringsItems()
         local top_names = {}
         for _, f in ipairs(hotfiles or {}) do
@@ -229,10 +293,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             local item = {
                 title   = base_label .. " (" .. total .. ")",
                 checked = enabled or nil,
+                -- The parent item is clickable even alongside a sub-menu.
+                fn      = toggleGroupFn(name),
             }
 
-            if has_sections and enabled then
-                -- Build sub-menu in TOML sections_order.
+            if has_sections then
+                -- Always build sub-menu regardless of enabled state.
                 -- Entries with name == "-" become native menu separators.
                 -- An optional override can be supplied via config.json as:
                 --   "sections_order_overrides": { "rolls": ["hc","sx","-",...] }
@@ -268,6 +334,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 end
 
                 local sec_menu = {}
+
                 for _, sec in ipairs(ordered_secs) do
                     if sec.name == '-' then
                         sec_menu[#sec_menu + 1] = { title = "-" }
@@ -276,28 +343,35 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         -- dedicated Lua module whose toggle item is injected here
                         -- so that its position in the sub-menu follows the AHK
                         -- __Order definition automatically.
+                        -- When the group is disabled, omit fn so the item is greyed.
                         local ms = module_sections and module_sections[name]
                         local ms_entry = ms and ms[sec.name]
                         local mod_id = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
                         local mod_desc = type(ms_entry) == "table" and ms_entry.description or nil
                         if mod_id == "personal_info" then
                             local pi = buildPersonalInfoItem(mod_desc)
-                            if pi then sec_menu[#sec_menu + 1] = pi end
+                            if pi then
+                                if not enabled then pi.fn = nil; pi.disabled = true end
+                                sec_menu[#sec_menu + 1] = pi
+                            end
                         end
                     else
                         local sec_on = keymap.is_section_enabled(name, sec.name)
                         local label  = (sec.description and sec.description ~= '')
                                        and sec.description or sec.name:gsub('_', ' ')
+                        -- Omit fn when the parent group is disabled so macOS greys
+                        -- out the item; the user must re-enable the group first.
                         sec_menu[#sec_menu + 1] = {
-                            title   = label .. " (" .. (sec.count or 0) .. ")",
-                            checked = sec_on or nil,
-                            fn      = toggleSectionFn(name, sec.name),
+                            title    = label .. " (" .. (sec.count or 0) .. ")",
+                            checked  = sec_on or nil,
+                            fn       = enabled and toggleSectionFn(name, sec.name) or nil,
+                            disabled = not enabled or nil,
                         }
                     end
                 end
                 item.menu = sec_menu
             else
-                -- Lua group or disabled TOML group: simple toggle.
+                -- Lua group (no sections): simple click-to-toggle.
                 item.fn = toggleGroupFn(name)
             end
 
@@ -475,8 +549,84 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         return item
     end
 
+    -- Enable or disable every feature at once, including sub-items
+    -- (sections within TOML groups and individual shortcuts).
+    -- State is written directly (config.json + hs.settings) then the script
+    -- is reloaded for a clean single-pass restart — no per-item module calls.
+    local function set_all_enabled(enabled)
+        -- Update top-level state flags.
+        state.keymap    = enabled
+        state.gestures  = enabled
+        state.scroll    = enabled
+        state.shortcuts = enabled
+        if personal_info then state.personal_info = enabled end
+
+        for name in pairs(state.hotstrings) do
+            state.hotstrings[name] = enabled
+        end
+
+        -- Write section states directly into hs.settings so that the keymap
+        -- module picks them up on reload without any per-section module call.
+        -- Key pattern mirrors keymap.lua: "hotstrings_section_<group>_<section>".
+        for name in pairs(state.hotstrings) do
+            local sections = keymap and keymap.get_sections and keymap.get_sections(name) or nil
+            if sections then
+                for _, sec in ipairs(sections) do
+                    if sec.name ~= '-' and not sec.is_module_placeholder then
+                        local key = "hotstrings_section_" .. name .. "_" .. sec.name
+                        -- nil = enabled (default), false = disabled
+                        hs.settings.set(key, enabled and nil or false)
+                    end
+                end
+            end
+        end
+
+        -- Write config.json with all shortcut_keys and section_states forced.
+        local section_states = {}
+        for name in pairs(state.hotstrings) do
+            local secs = keymap and keymap.get_sections and keymap.get_sections(name) or nil
+            if secs then
+                section_states[name] = {}
+                for _, sec in ipairs(secs) do
+                    if sec.name ~= '-' and not sec.is_module_placeholder then
+                        section_states[name][sec.name] = enabled
+                    end
+                end
+            end
+        end
+        local prefs = {
+            keymap                   = state.keymap,
+            gestures                 = state.gestures,
+            scroll                   = state.scroll,
+            shortcuts                = state.shortcuts,
+            personal_info            = state.personal_info,
+            hotstrings               = state.hotstrings,
+            chatgpt_url              = state.chatgpt_url,
+            sections_order_overrides = state.sections_order_overrides,
+            section_states           = section_states,
+            shortcut_keys            = {},
+            gesture_actions          = gestures.get_all_actions(),
+        }
+        if shortcuts and type(shortcuts.list_shortcuts) == "function" then
+            for _, s in ipairs(shortcuts.list_shortcuts()) do
+                prefs.shortcut_keys[s.id] = enabled
+            end
+        end
+        local ok2, encoded = pcall(function() return hs.json.encode(prefs) end)
+        if ok2 and encoded then
+            local fh = io.open(prefs_file, "w")
+            if fh then fh:write(encoded); fh:close() end
+        end
+
+        -- Reload the whole script so everything is applied in one clean pass.
+        do_reload()
+    end
+
     local function buildUtilityItems()
         return {
+            {title="-"},
+            {title="Tout activer",    fn=function() set_all_enabled(true)  end},
+            {title="Tout désactiver", fn=function() set_all_enabled(false) end},
             {title="-"},
             {title="Ouvrir init.lua",           fn=function() hs.execute('open "'..base_dir..'init.lua"') end},
             {title="Console Hammerspoon",       fn=function() hs.openConsole() end},
