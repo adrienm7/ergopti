@@ -719,7 +719,12 @@ def parse_body(
                 next_fragment = lines[j].strip()
                 # Ignore standalone comment lines; they corrupt the joined expression.
                 if not next_fragment.startswith(";"):
-                    line += " " + next_fragment
+                    # Strip inline comments before joining so that embedded
+                    # "; comment" text does not mask the closing ")" in the
+                    # loop condition check.
+                    stripped_fragment = _strip_ahk_inline_comment(next_fragment)
+                    if stripped_fragment:
+                        line += " " + stripped_fragment
                 j += 1
             i = j
         else:
