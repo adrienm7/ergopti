@@ -54,8 +54,16 @@ do
                 if type(secs) == "table" then
                     for sec_name, enabled in pairs(secs) do
                         local key = "hotstrings_section_" .. grp .. "_" .. sec_name
-                        -- nil = enabled (default), false = disabled
-                        hs.settings.set(key, enabled ~= false and nil or false)
+                        -- nil = enabled (default), false = disabled.
+                        -- NOTE: `enabled and nil or false` is a Lua anti-pattern:
+                        -- `true and nil` = nil, then `nil or false` = false, so it
+                        -- always evaluates to false regardless of `enabled`.  Use
+                        -- an explicit if/else instead.
+                        if enabled ~= false then
+                            hs.settings.set(key, nil)
+                        else
+                            hs.settings.set(key, false)
+                        end
                     end
                 end
             end
@@ -119,8 +127,19 @@ end
 
 ---------------------------------------------------------------------------
 -- Repeat keys (registered last = lowest priority, fallback if nothing else matches)
+-- Registered under the "magickey" group so they are removed/re-added together
+-- with that group when the repeat section is toggled.  Without a group context
+-- these entries would have group=nil and could never be disabled.
+-- A post-load hook ensures they are also re-added after any enable_group /
+-- reload_group_inplace call (e.g. when toggling a magickey section).
 ---------------------------------------------------------------------------
-repeat_keys.start(keymap)
+local function register_repeat_keys()
+    keymap.set_group_context("magickey")
+    repeat_keys.start(keymap)
+    keymap.set_group_context(nil)
+end
+register_repeat_keys()
+keymap.set_post_load_hook("magickey", register_repeat_keys)
 
 ---------------------------------------------------------------------------
 -- Personal information shortcuts (loaded after base_dir is resolved)

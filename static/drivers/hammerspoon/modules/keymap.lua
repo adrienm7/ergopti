@@ -165,6 +165,24 @@ function M.get_meta_description(name)
     return g and g.meta_description or nil
 end
 
+-- Set the current group context for subsequent M.add() calls.
+-- Pass nil to clear the context.
+-- Used to register Lua-defined entries (e.g. repeat_keys) under a named group
+-- so that disable_group / reload_group_inplace manage them correctly.
+function M.set_group_context(name)
+    current_group = name
+end
+
+-- Per-group callbacks invoked at the end of enable_group(), after load_toml /
+-- load_file has run.  Used to re-register Lua-defined entries (e.g. repeat_keys)
+-- that are not part of the TOML file but must live in the same group so that
+-- disable_group / reload_group_inplace can remove and re-add them correctly.
+local group_post_load_hooks = {}
+
+function M.set_post_load_hook(name, fn)
+    group_post_load_hooks[name] = fn
+end
+
 function M.disable_group(name)
     if not groups[name] or not groups[name].enabled then return end
     groups[name].enabled = false
@@ -196,6 +214,11 @@ function M.enable_group(name)
         M.load_toml(name, g.path)
     else
         M.load_file(name, g.path)
+    end
+    -- Re-run any Lua-defined entries that are not in the source file but belong
+    -- to this group (e.g. repeat_keys entries registered under "magickey").
+    if group_post_load_hooks[name] then
+        group_post_load_hooks[name]()
     end
 end
 
