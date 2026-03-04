@@ -139,6 +139,9 @@ local function register_repeat_keys()
     keymap.set_group_context(nil)
 end
 register_repeat_keys()
+-- Re-sort once after appending the repeat entries (load_toml already sorted
+-- magickey entries; repeat_keys adds more entries that need to be merged in).
+keymap.sort_mappings()
 keymap.set_post_load_hook("magickey", register_repeat_keys)
 
 ---------------------------------------------------------------------------

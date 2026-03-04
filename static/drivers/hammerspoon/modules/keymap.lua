@@ -10,6 +10,32 @@ local M = {}
 local groups = {}
 local current_group = nil
 local mappings = {}
+-- Hash index for O(1) duplicate detection in add_mapping_raw.
+-- Key: trigger .. "\0" .. tostring(is_word) .. "\0" .. tostring(auto)
+-- Value: the mapping entry table (same reference as in `mappings`).
+local mappings_lookup = {}
+
+-- Rebuild mappings_lookup from the current mappings table.
+-- Called after disable_group replaces the mappings array.
+local function rebuild_lookup()
+    mappings_lookup = {}
+    for _, m in ipairs(mappings) do
+        local k = m.trigger .. "\0" .. tostring(m.is_word) .. "\0" .. tostring(m.auto)
+        mappings_lookup[k] = m
+    end
+end
+
+-- Sort mappings by descending trigger length, is_word priority, then seq.
+-- Uses pre-cached .tlen to avoid repeated utf8.len calls.
+-- Exposed as M.sort_mappings for callers that add entries outside load_toml.
+local function sort_mappings()
+    table.sort(mappings, function(a, b)
+        if a.tlen ~= b.tlen then return a.tlen > b.tlen end
+        if a.is_word ~= b.is_word then return a.is_word end
+        return a.seq < b.seq
+    end)
+end
+M.sort_mappings = sort_mappings
 
 -- External interceptor: a function(event, km_buffer) called on every keyDown
 -- (after cmd/ctrl guard, before backspace/escape/getCharacters processing).
@@ -37,6 +63,7 @@ function M.load_file(name, path)
     dofile(path)
     current_group = nil
     record_group(name, path, 'lua')
+    sort_mappings()
 end
 
 -- Load hotstring entries from a TOML file produced by generate_hotstrings.py.
@@ -96,6 +123,10 @@ function M.load_toml(name, path)
 	end
 
 	current_group = nil
+
+	-- Single sort pass after all entries have been inserted (O(N log N) once
+	-- instead of O(N² log N) from sorting after every M.add call).
+	sort_mappings()
 
 	-- Build the seqs list (entries added above are now in mappings)
 	local seqs = {}
@@ -191,6 +222,7 @@ function M.disable_group(name)
         if m.group ~= name then table.insert(new_mappings, m) end
     end
     mappings = new_mappings
+    rebuild_lookup()
 end
 
 -- Return whether a group is currently enabled
@@ -219,6 +251,8 @@ function M.enable_group(name)
     -- to this group (e.g. repeat_keys entries registered under "magickey").
     if group_post_load_hooks[name] then
         group_post_load_hooks[name]()
+        -- Re-sort because the hook appended entries after load_toml's sort.
+        sort_mappings()
     end
 end
 
@@ -336,23 +370,27 @@ function M.add(trigger, replacement, opts)
     local is_case_sensitive = opts.is_case_sensitive == true
 
     local function add_mapping_raw(t, r, a)
-        for _, m in ipairs(mappings) do
-            if m.trigger == t and m.is_word == is_word and m.auto == a then
-                if m.repl == r then return end  -- exact duplicate, skip
-                -- Same trigger with different output: last write wins.
-                -- This matches AHK's behaviour where a later hotstring
-                -- definition overrides an earlier one for the same trigger.
-                -- Typical case: a generic "c★"→"cc" repeat fallback being
-                -- overridden by a specific "c★"→"c'est" expansion.
-                m.repl = r
-                if current_group then m.group = current_group end
-                return
-            end
+        local k = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a)
+        local existing = mappings_lookup[k]
+        if existing then
+            if existing.repl == r then return end  -- exact duplicate, skip
+            -- Same trigger with different output: last write wins.
+            existing.repl = r
+            if current_group then existing.group = current_group end
+            return
         end
         seq_counter = seq_counter + 1
-        local entry = { trigger = t, repl = r, is_word = is_word, auto = a, seq = seq_counter }
+        local entry = {
+            trigger  = t,
+            repl     = r,
+            is_word  = is_word,
+            auto     = a,
+            seq      = seq_counter,
+            tlen     = utf8.len(t) or #t,  -- pre-cache for sort
+        }
         if current_group then entry.group = current_group end
         table.insert(mappings, entry)
+        mappings_lookup[k] = entry
     end
 
     local function set_spaces(str, space_char)
@@ -426,17 +464,8 @@ function M.add(trigger, replacement, opts)
         end
     end
 
-    -- Sort by descending trigger length.  For equal lengths:
-    --   1. is_word=true entries come first (more specific: fires only at word
-    --      boundary, e.g. textexpansion "c★"→"c'est" vs repeat "c★"→"cc").
-    --   2. Tie-break by seq (lower = registered earlier).
-    table.sort(mappings, function(a, b)
-        local len_a = utf8.len(a.trigger) or #a.trigger
-        local len_b = utf8.len(b.trigger) or #b.trigger
-        if len_a ~= len_b then return len_a > len_b end
-        if a.is_word ~= b.is_word then return a.is_word end
-        return a.seq < b.seq
-    end)
+    -- Sort by descending trigger length is now deferred to the end of
+    -- load_toml / load_file (called once per bulk load, not per entry).
 end
 
 ---------------------------------------------------------------------------
