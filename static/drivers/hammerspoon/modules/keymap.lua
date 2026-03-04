@@ -656,7 +656,8 @@ local function onKeyDown(e)
             -- auto=true mappings are expanded immediately (above) based on the timing
             -- between the last two chars of the trigger; the boundary char has no role
             -- and must not re-trigger them.
-            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == "." or chars == ",") then
+            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == "." or chars == ","
+                or chars:sub(1, 2) == "\194\160" or chars:sub(1, 3) == "\226\128\175") then
                 local end_pos = utf8.offset(buffer, -char_count) or (#buffer + 1)
                 local start_pos = utf8.offset(buffer, -(char_count + utf8_len(trigger)))
                 local seg = nil
