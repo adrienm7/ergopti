@@ -10,6 +10,32 @@ local M = {}
 local groups = {}
 local current_group = nil
 local mappings = {}
+-- Hash index for O(1) duplicate detection in add_mapping_raw.
+-- Key: trigger .. "\0" .. tostring(is_word) .. "\0" .. tostring(auto)
+-- Value: the mapping entry table (same reference as in `mappings`).
+local mappings_lookup = {}
+
+-- Rebuild mappings_lookup from the current mappings table.
+-- Called after disable_group replaces the mappings array.
+local function rebuild_lookup()
+    mappings_lookup = {}
+    for _, m in ipairs(mappings) do
+        local k = m.trigger .. "\0" .. tostring(m.is_word) .. "\0" .. tostring(m.auto)
+        mappings_lookup[k] = m
+    end
+end
+
+-- Sort mappings by descending trigger length, is_word priority, then seq.
+-- Uses pre-cached .tlen to avoid repeated utf8.len calls.
+-- Exposed as M.sort_mappings for callers that add entries outside load_toml.
+local function sort_mappings()
+    table.sort(mappings, function(a, b)
+        if a.tlen ~= b.tlen then return a.tlen > b.tlen end
+        if a.is_word ~= b.is_word then return a.is_word end
+        return a.seq < b.seq
+    end)
+end
+M.sort_mappings = sort_mappings
 
 -- External interceptor: a function(event, km_buffer) called on every keyDown
 -- (after cmd/ctrl guard, before backspace/escape/getCharacters processing).
@@ -37,6 +63,7 @@ function M.load_file(name, path)
     dofile(path)
     current_group = nil
     record_group(name, path, 'lua')
+    sort_mappings()
 end
 
 -- Load hotstring entries from a TOML file produced by generate_hotstrings.py.
@@ -96,6 +123,10 @@ function M.load_toml(name, path)
 	end
 
 	current_group = nil
+
+	-- Single sort pass after all entries have been inserted (O(N log N) once
+	-- instead of O(N² log N) from sorting after every M.add call).
+	sort_mappings()
 
 	-- Build the seqs list (entries added above are now in mappings)
 	local seqs = {}
@@ -165,6 +196,24 @@ function M.get_meta_description(name)
     return g and g.meta_description or nil
 end
 
+-- Set the current group context for subsequent M.add() calls.
+-- Pass nil to clear the context.
+-- Used to register Lua-defined entries (e.g. repeat_keys) under a named group
+-- so that disable_group / reload_group_inplace manage them correctly.
+function M.set_group_context(name)
+    current_group = name
+end
+
+-- Per-group callbacks invoked at the end of enable_group(), after load_toml /
+-- load_file has run.  Used to re-register Lua-defined entries (e.g. repeat_keys)
+-- that are not part of the TOML file but must live in the same group so that
+-- disable_group / reload_group_inplace can remove and re-add them correctly.
+local group_post_load_hooks = {}
+
+function M.set_post_load_hook(name, fn)
+    group_post_load_hooks[name] = fn
+end
+
 function M.disable_group(name)
     if not groups[name] or not groups[name].enabled then return end
     groups[name].enabled = false
@@ -173,6 +222,7 @@ function M.disable_group(name)
         if m.group ~= name then table.insert(new_mappings, m) end
     end
     mappings = new_mappings
+    rebuild_lookup()
 end
 
 -- Return whether a group is currently enabled
@@ -196,6 +246,13 @@ function M.enable_group(name)
         M.load_toml(name, g.path)
     else
         M.load_file(name, g.path)
+    end
+    -- Re-run any Lua-defined entries that are not in the source file but belong
+    -- to this group (e.g. repeat_keys entries registered under "magickey").
+    if group_post_load_hooks[name] then
+        group_post_load_hooks[name]()
+        -- Re-sort because the hook appended entries after load_toml's sort.
+        sort_mappings()
     end
 end
 
@@ -313,23 +370,27 @@ function M.add(trigger, replacement, opts)
     local is_case_sensitive = opts.is_case_sensitive == true
 
     local function add_mapping_raw(t, r, a)
-        for _, m in ipairs(mappings) do
-            if m.trigger == t and m.is_word == is_word and m.auto == a then
-                if m.repl == r then return end  -- exact duplicate, skip
-                -- Same trigger with different output: last write wins.
-                -- This matches AHK's behaviour where a later hotstring
-                -- definition overrides an earlier one for the same trigger.
-                -- Typical case: a generic "c★"→"cc" repeat fallback being
-                -- overridden by a specific "c★"→"c'est" expansion.
-                m.repl = r
-                if current_group then m.group = current_group end
-                return
-            end
+        local k = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a)
+        local existing = mappings_lookup[k]
+        if existing then
+            if existing.repl == r then return end  -- exact duplicate, skip
+            -- Same trigger with different output: last write wins.
+            existing.repl = r
+            if current_group then existing.group = current_group end
+            return
         end
         seq_counter = seq_counter + 1
-        local entry = { trigger = t, repl = r, is_word = is_word, auto = a, seq = seq_counter }
+        local entry = {
+            trigger  = t,
+            repl     = r,
+            is_word  = is_word,
+            auto     = a,
+            seq      = seq_counter,
+            tlen     = utf8.len(t) or #t,  -- pre-cache for sort
+        }
         if current_group then entry.group = current_group end
         table.insert(mappings, entry)
+        mappings_lookup[k] = entry
     end
 
     local function set_spaces(str, space_char)
@@ -341,7 +402,12 @@ function M.add(trigger, replacement, opts)
 
     local function add_mapping(t, r)
         add_mapping_raw(t, r, is_auto)
-        if t:match(" ") or t:match(" ") or t:match(" ") then
+        -- Do not add space variants for triggers that start with a space character.
+        -- Those come from comma-uppercase expansions (e.g. " :D" from ",d") and
+        -- the leading non-breaking space is intentional; adding a regular-space
+        -- variant would match unintended sequences like " :D" (colon+D smiley).
+        local first_is_space = t:match("^[ \194\160\226\128\175]") ~= nil
+        if not first_is_space and (t:match(" ") or t:match(" ") or t:match(" ")) then
             add_mapping_raw(set_spaces(t, " "), r, is_auto)  
             add_mapping_raw(set_spaces(t, " "), r, is_auto) 
             add_mapping_raw(set_spaces(t, " "), r, is_auto) 
@@ -398,17 +464,8 @@ function M.add(trigger, replacement, opts)
         end
     end
 
-    -- Sort by descending trigger length.  For equal lengths:
-    --   1. is_word=true entries come first (more specific: fires only at word
-    --      boundary, e.g. textexpansion "c★"→"c'est" vs repeat "c★"→"cc").
-    --   2. Tie-break by seq (lower = registered earlier).
-    table.sort(mappings, function(a, b)
-        local len_a = utf8.len(a.trigger) or #a.trigger
-        local len_b = utf8.len(b.trigger) or #b.trigger
-        if len_a ~= len_b then return len_a > len_b end
-        if a.is_word ~= b.is_word then return a.is_word end
-        return a.seq < b.seq
-    end)
+    -- Sort by descending trigger length is now deferred to the end of
+    -- load_toml / load_file (called once per bulk load, not per entry).
 end
 
 ---------------------------------------------------------------------------
@@ -599,7 +656,8 @@ local function onKeyDown(e)
             -- auto=true mappings are expanded immediately (above) based on the timing
             -- between the last two chars of the trigger; the boundary char has no role
             -- and must not re-trigger them.
-            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == ".") then
+            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == "." or chars == ","
+                or chars:sub(1, 2) == "\194\160" or chars:sub(1, 3) == "\226\128\175") then
                 local end_pos = utf8.offset(buffer, -char_count) or (#buffer + 1)
                 local start_pos = utf8.offset(buffer, -(char_count + utf8_len(trigger)))
                 local seg = nil
@@ -666,8 +724,27 @@ end
 
 local tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
-function M.start() tap:start() end
-function M.stop() if tap then tap:stop() end end
+-- Clear the buffer whenever the user repositions the cursor with the mouse,
+-- otherwise stale typed characters cause false "inside a word" rejections.
+local mouse_tap = eventtap.new(
+	{ eventtap.event.types.leftMouseDown,
+	  eventtap.event.types.rightMouseDown,
+	  eventtap.event.types.middleMouseDown },
+	function()
+		buffer = ""
+		return false
+	end
+)
+
+function M.start()
+	tap:start()
+	mouse_tap:start()
+end
+
+function M.stop()
+	if tap then tap:stop() end
+	if mouse_tap then mouse_tap:stop() end
+end
 
 M.start()
 

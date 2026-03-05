@@ -497,6 +497,11 @@ accents = "Autocorrection des accents de très nombreux mots"
 "eàn" = { output = "ation", is_word = false, auto_expand = true, is_case_sensitive = false }
 "eàp" = { output = "ence", is_word = false, auto_expand = true, is_case_sensitive = false }
 "ieàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eàr" = { output = "erre", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eàs" = { output = "ement", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eàt" = { output = "ettre", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eàz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false }
 
 [[minus]]
 "aije" = { output = "ai-je", is_word = true, auto_expand = false, is_case_sensitive = false }
