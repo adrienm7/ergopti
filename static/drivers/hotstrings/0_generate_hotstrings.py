@@ -719,7 +719,12 @@ def parse_body(
                 next_fragment = lines[j].strip()
                 # Ignore standalone comment lines; they corrupt the joined expression.
                 if not next_fragment.startswith(";"):
-                    line += " " + next_fragment
+                    # Strip inline comments before joining so that embedded
+                    # "; comment" text does not mask the closing ")" in the
+                    # loop condition check.
+                    stripped_fragment = _strip_ahk_inline_comment(next_fragment)
+                    if stripped_fragment:
+                        line += " " + stripped_fragment
                 j += 1
             i = j
         else:
@@ -910,6 +915,11 @@ def _comment_entries() -> list[tuple[str, str, bool, bool, bool]]:
     ]
 
 
+# Vowel keys following ê that use is_word=False so the hotstring fires
+# mid-word (e.g. "coêut" → "coût").  Non-vowel keys keep is_word=True.
+_ECIRCUMFLEX_VOWEL_KEYS: frozenset[str] = frozenset("aAiIoOuUàÀèÈéÉêÊ")
+
+
 def _deadkey_ecircumflex_entries(
     circumflex_map: dict[str, str],
 ) -> list[tuple[str, str, bool, bool, bool]]:
@@ -928,10 +938,13 @@ def _deadkey_ecircumflex_entries(
     flag, each (key, value) pair from the map is emitted as a distinct
     case-sensitive entry.
 
-    ``is_word=True`` mirrors the AHK ``ShouldActivateDeadkey`` logic: the
-    combination is only fired when the character before ``ê`` is not a letter
-    (word boundary).  This prevents mid-word sequences like ``mêm`` in
-    ``même`` from triggering ``ê``+key shortcut substitution.
+    ``is_word`` behaviour depends on the following key:
+
+    - **Vowel keys** (``_ECIRCUMFLEX_VOWEL_KEYS``): ``is_word=False`` so the
+      hotstring fires even mid-word, e.g. ``coêut`` ➜ ``coût``.
+    - **Non-vowel keys**: ``is_word=True`` mirrors the AHK
+      ``ShouldActivateDeadkey`` logic – the combination only fires at a word
+      boundary, preventing mid-word false positives like ``mêm`` in ``même``.
 
     Args:
             circumflex_map: Parsed ``{key: value}`` dict from the AHK source.
@@ -941,7 +954,7 @@ def _deadkey_ecircumflex_entries(
     """
     excluded = {"e", "E", "t", "T"}
     return [
-        (f"ê{key}", value, True, True, False)
+        (f"ê{key}", value, key not in _ECIRCUMFLEX_VOWEL_KEYS, True, False)
         for key, value in circumflex_map.items()
         if key not in excluded
     ]
