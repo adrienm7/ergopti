@@ -5,7 +5,7 @@ local menubar = hs.menubar
 local pathwatcher = hs.pathwatcher
 local utils = require("lib.utils")
 
--- Labels des slots affichés dans le menu
+-- Display labels for slots shown in the menu
 local SLOT_LABELS = {
     tap_3         = "Tap 3 doigts",
     tap_4         = "Tap 4 doigts",
@@ -123,7 +123,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- Forward declaration so toggle closures can reference it before its body is defined.
     local updateMenu
 
-    -- Appliquer les préférences sauvegardées
+    -- Apply saved preferences
     do
         local saved = load_prefs()
         local config_absent = (next(saved) == nil)  -- empty table = file missing
@@ -165,12 +165,15 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     end
                 end
             end
-            -- Restaurer les actions de geste
+            -- Restore gesture actions
             if type(saved.gesture_actions) == "table" then
                 for slot, action in pairs(saved.gesture_actions) do
                     gestures.set_action(slot, action)
                 end
             end
+            -- Silently re-enforce any overrides the user may have re-activated
+            -- in System Settings between two script sessions.
+            gestures.apply_all_overrides()
             -- Note: section_states are applied to hs.settings by init.lua BEFORE
             -- load_toml is called, so no hs.settings manipulation is needed here.
         end
@@ -202,7 +205,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         end
     end
 
-    -- ── Constructeurs d'items ─────────────────────────────────────────────────
+    -- ── Menu item builders ─────────────────────────────────────────────────────
 
     -- Helper: resolve enabled state for a top-level TOML/Lua group.
     local function groupEnabled(name)
@@ -220,7 +223,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
     -- Helper: toggle function for a top-level group.
     -- Enabling any group also restarts the eventtap if it was stopped
-    -- (e.g. after a "Tout désactiver" which sets state.keymap=false).
+    -- (e.g. after a "Disable all" which sets state.keymap=false).
     local function toggleGroupFn(name)
         return function()
             state.hotstrings[name] = not groupEnabled(name)
@@ -403,8 +406,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
         if not state.gestures then return item end
 
-        -- Construit un item avec sous-menu radio pour un slot donné.
-        -- isAxis=true → liste AX_NAMES, false → liste SG_NAMES
+        -- Builds an item with a radio sub-menu for a given slot.
+        -- isAxis=true → AX_NAMES list, false → SG_NAMES list
         local function slotItem(slot, isAxis)
             local current  = gestures.get_action(slot)
             local slotLbl  = SLOT_LABELS[slot] or slot
@@ -417,14 +420,28 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     checked = (current == aname) or nil,
                     fn = (function(a) return function()
                         gestures.set_action(slot, a)
+                        -- Warn user if the chosen action conflicts with a macOS gesture.
+                        local conflict = gestures.on_action_changed(slot, a)
                         save_prefs(); updateMenu()
+                        if conflict then
+                            hs.timer.doAfter(0.3, function()
+                                hs.focus()
+                                local clicked = hs.dialog.blockAlert(
+                                    "⚠️  Conflit potentiel avec un geste macOS", conflict.msg,
+                                    "Ouvrir Réglages", "OK", "warning")
+                                if clicked == "Ouvrir Réglages" then
+                                    hs.execute(string.format(
+                                        "open '%s'", conflict.url))
+                                end
+                            end)
+                        end
                     end end)(aname)
                 })
             end
             return {title = slotLbl .. " : " .. actionLbl, menu = submenu}
         end
 
-        -- Construit un groupe de slots avec séparateur
+        -- Builds a group of slots (flat list, no separator)
         local function section(slots, isAxis)
             local items = {}
             for _, slot in ipairs(slots) do
@@ -434,10 +451,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         end
 
         local menu = {}
-        -- 2 doigts
+        -- 2 fingers
         table.insert(menu, slotItem("swipe_2_diag", true))
         table.insert(menu, {title="-"})
-        -- 3 doigts : tap en premier, puis swipes
+        -- 3 fingers: tap first, then swipes
         table.insert(menu, slotItem("tap_3", false))
         for _, it in ipairs(section({"swipe_3_horiz","swipe_3_diag"}, true)) do
             table.insert(menu, it)
@@ -446,7 +463,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             table.insert(menu, it)
         end
         table.insert(menu, {title="-"})
-        -- 4 doigts : tap en premier, puis swipes
+        -- 4 fingers: tap first, then swipes
         table.insert(menu, slotItem("tap_4", false))
         for _, it in ipairs(section({"swipe_4_horiz","swipe_4_diag"}, true)) do
             table.insert(menu, it)
@@ -455,7 +472,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             table.insert(menu, it)
         end
         table.insert(menu, {title="-"})
-        -- 5 doigts : tap en premier, puis swipes
+        -- 5 fingers: tap first, then swipes
         table.insert(menu, slotItem("tap_5", false))
         for _, it in ipairs(section({"swipe_5_horiz","swipe_5_diag"}, true)) do
             table.insert(menu, it)

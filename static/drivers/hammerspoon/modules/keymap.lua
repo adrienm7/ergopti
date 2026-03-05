@@ -294,7 +294,7 @@ UPPER_TRIGGERS["'"] = " ?" -- Espace fine insécable + ?
 UPPER_TRIGGERS[","] = {" :", " ;"} -- Tableau : Espace insécable + : ET Espace fine + ;
 UPPER_TRIGGERS["."] = " :" -- Espace insécable + :
 
--- Retourne un tableau de toutes les combinaisons possibles de majuscules
+-- Returns all possible uppercase trigger combinations
 local function trig_upper(s)
     local results = {""}
     for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
@@ -326,7 +326,7 @@ local function trig_lower(s)
     end))
 end
 
--- Retourne un tableau de chaînes en Titlecase
+-- Returns all possible Titlecase trigger strings
 local function trig_title(s)
     local first = s:match("^[%z\1-\127\194-\244][\128-\191]*")
     if not first then return {s} end
@@ -425,7 +425,7 @@ function M.add(trigger, replacement, opts)
         local title_trigs = trig_title(lower_trig)
         local upper_trigs = trig_upper(lower_trig)
 
-        -- Variantes standards
+    -- Standard variants
         add_mapping(lower_trig, base_repl)
         
         for _, tt in ipairs(title_trigs) do
@@ -445,7 +445,7 @@ function M.add(trigger, replacement, opts)
         end
     end
 
-    -- Variante spéciale pour les triggers commençant par une virgule
+    -- Special variant for triggers starting with a comma
     local first_char_source = is_case_sensitive and trigger or trig_lower(trigger)
     local first_char = string.match(first_char_source, "^[%z\1-\127\194-\244][\128-\191]*")
     if first_char == "," then

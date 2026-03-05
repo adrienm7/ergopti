@@ -162,3 +162,11 @@ menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_inf
 -- Script control shortcuts (AltGr+Return = pause/resume, AltGr+Backspace = reload)
 ---------------------------------------------------------------------------
 script_control.start(keymap, shortcuts, gestures, scroll)
+
+---------------------------------------------------------------------------
+-- Shutdown callback: restore macOS gesture prefs before Hammerspoon exits
+-- so the user gets their system gestures back on quit or reload.
+---------------------------------------------------------------------------
+hs.shutdownCallback = function()
+    gestures.restore_all_overrides()
+end
