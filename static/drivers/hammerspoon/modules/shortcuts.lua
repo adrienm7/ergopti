@@ -26,8 +26,7 @@ local function titlecase(s)
     return s
 end
 
--- Fonction asynchrone pour les transformations de texte (T et U)
--- Asynchronous function for text transformations (T and U)
+-- Asynchronous function for text transformations
 local function do_transform(transform_func)
     local prior = pasteboard.getContents()
     pasteboard.clearContents()
