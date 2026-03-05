@@ -6990,7 +6990,6 @@ if Features["MagicKey"]["TextExpansionSymbols"].Enabled {
     CreateHotstring("*C", "(sqrt)" . ScriptInformation["MagicKey"], "√")
     CreateHotstring("*C", "(racine)" . ScriptInformation["MagicKey"], "√")
     CreateHotstring("*C", "(^)" . ScriptInformation["MagicKey"], "∧")
-    CreateHotstring("*C", "(v)" . ScriptInformation["MagicKey"], "∨")
     CreateHotstring("*C", "(delta)" . ScriptInformation["MagicKey"], "∆")
     CreateHotstring("*C", "(nabla)" . ScriptInformation["MagicKey"], "∇")
     CreateHotstring("*C", "(<<)" . ScriptInformation["MagicKey"], "≪")
