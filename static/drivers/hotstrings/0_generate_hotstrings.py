@@ -1208,5 +1208,15 @@ def main(
 
 
 if __name__ == "__main__":
-    ahk_path = Path(__file__).parent.parent / "autohotkey" / "ErgoptiPlus.ahk"
+    # Allow a local machine override via a gitignored file.
+    # Create ".local_ahk_path" next to this script and put the absolute path
+    # to your private AHK file on the first line, e.g.:
+    #   /Users/you/private-config/ErgoptiPlus.ahk
+    local_override = Path(__file__).parent / ".local_ahk_path"
+    if local_override.exists():
+        ahk_path = Path(local_override.read_text(encoding="utf-8").strip())
+    else:
+        ahk_path = (
+            Path(__file__).parent.parent / "autohotkey" / "ErgoptiPlus.ahk"
+        )
     main(ahk_path)
