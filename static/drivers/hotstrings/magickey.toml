@@ -1175,7 +1175,6 @@ repeat = "La touche ★ permet la répétition"
 "(sqrt)★" = { output = "√", is_word = true, auto_expand = true, is_case_sensitive = true }
 "(racine)★" = { output = "√", is_word = true, auto_expand = true, is_case_sensitive = true }
 "(^)★" = { output = "∧", is_word = true, auto_expand = true, is_case_sensitive = true }
-"(v)★" = { output = "∨", is_word = true, auto_expand = true, is_case_sensitive = true }
 "(delta)★" = { output = "∆", is_word = true, auto_expand = true, is_case_sensitive = true }
 "(nabla)★" = { output = "∇", is_word = true, auto_expand = true, is_case_sensitive = true }
 "(<<)★" = { output = "≪", is_word = true, auto_expand = true, is_case_sensitive = true }
@@ -1216,6 +1215,7 @@ repeat = "La touche ★ permet la répétition"
 "|->★" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true }
 "<-|★" = { output = "↩", is_word = true, auto_expand = true, is_case_sensitive = true }
 "^|-★" = { output = "⭮", is_word = true, auto_expand = true, is_case_sensitive = true }
+"(v)★" = { output = "✓", is_word = true, auto_expand = true, is_case_sensitive = true }
 "(x)★" = { output = "✗", is_word = true, auto_expand = true, is_case_sensitive = true }
 "[v]★" = { output = "☑", is_word = true, auto_expand = true, is_case_sensitive = true }
 "[x]★" = { output = "☒", is_word = true, auto_expand = true, is_case_sensitive = true }

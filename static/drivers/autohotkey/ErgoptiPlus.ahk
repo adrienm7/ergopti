@@ -1,4 +1,4 @@
-; Last modified on 2026-03-06 at 12:07 (UTC+1)
+; Last modified on 2026-03-06 at 12:12 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -4998,6 +4998,10 @@ if Features["Autocorrection"]["Errors"].Enabled {
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
+        "*?", "oyu", "you",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    CreateCaseSensitiveHotstrings(
         "*", "poru", "pour",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
@@ -5198,7 +5202,7 @@ if Features["Autocorrection"]["MinusApostrophe"].Enabled {
 ; ========================================
 
 if Features["Autocorrection"]["Brands"].Enabled {
-    CreateHotstring("", "ai", "AI")
+    ; CreateHotstring("", "ai", "AI") ; conflict with j’"ai"
     CreateHotstring("", "api", "API")
     CreateHotstring("", "autohotkey", "AutoHotkey")
     CreateHotstring("", "aws", "AWS")
@@ -5267,6 +5271,7 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "qlora", "QLoRA")
     CreateHotstring("", "r", "R")
     CreateHotstring("", "rdc", "RDC")
+    CreateHotstring("", "red hat", "Rad Hat")
     CreateHotstring("", "rh", "RH")
     CreateHotstring("", "sas", "SAS")
     CreateHotstring("", "sharepoint", "SharePoint")
@@ -5283,6 +5288,14 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "windows", "Windows")
     CreateHotstring("", "xgboost", "XGBoost")
     CreateHotstring("", "youtube", "YouTube")
+
+    ; Cloud / as-a-Service acronyms
+    CreateHotstring("", "iaas", "IaaS")
+    CreateHotstring("", "paas", "PaaS")
+    CreateHotstring("", "saas", "SaaS")
+    CreateHotstring("", "caas", "CaaS")
+    CreateHotstring("", "faas", "FaaS")
+    CreateHotstring("", "dbaas", "DBaaS")
 
     ; For these apps, we only capitalize them when used in context of apps, and not as English words
     apps := ["excel", "teams", "word", "office"]
@@ -6915,7 +6928,6 @@ if Features["MagicKey"]["TextExpansionSymbols"].Enabled {
     CreateHotstring("*C", "(sqrt)" . ScriptInformation["MagicKey"], "√")
     CreateHotstring("*C", "(racine)" . ScriptInformation["MagicKey"], "√")
     CreateHotstring("*C", "(^)" . ScriptInformation["MagicKey"], "∧")
-    CreateHotstring("*C", "(v)" . ScriptInformation["MagicKey"], "∨")
     CreateHotstring("*C", "(delta)" . ScriptInformation["MagicKey"], "∆")
     CreateHotstring("*C", "(nabla)" . ScriptInformation["MagicKey"], "∇")
     CreateHotstring("*C", "(<<)" . ScriptInformation["MagicKey"], "≪")

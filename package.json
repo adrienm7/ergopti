@@ -12,6 +12,7 @@
 		"format": "prettier --plugin-search-dir . --write .",
 		"sync-ahk": "node scripts/sync-private-ahk.js",
 		"clean-ahk": "node remove_ahk_personal_configuration.js",
+		"update": "npm run sync-ahk && npm run clean-ahk && node scripts/update-ahk-date.js && uv run python static/drivers/hotstrings/0_generate_hotstrings.py",
 		"prepare": "husky install"
 	},
 	"type": "module",
