@@ -19,7 +19,11 @@ jobs:
 
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              run: |
+                  git clone --depth 1 --branch "$env:GITHUB_REF_NAME" `
+                    "https://x-access-token:${{ secrets.PAT_ERGOPTI }}@github.com/${{ github.repository }}.git" `
+                    "${{ github.workspace }}"
+              shell: pwsh
 
             - name: Download AutoHotkey v2 runtime and Ahk2Exe
               run: |
