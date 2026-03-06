@@ -29,7 +29,7 @@
 		"@sveltejs/adapter-auto": "^6.1.0",
 		"@sveltejs/adapter-static": "^3.0.9",
 		"@sveltejs/enhanced-img": "^0.8.1",
-		"@sveltejs/kit": "^2.50.1",
+		"@sveltejs/kit": "^2.53.4",
 		"@types/aos": "^3.0.7",
 		"husky": "^8.0.0",
 		"lint-staged": "^16.1.5",
@@ -37,7 +37,7 @@
 		"prettier": "^3.6.2",
 		"prettier-plugin-css-order": "^2.1.2",
 		"prettier-plugin-svelte": "^3.4.0",
-		"svelte": "^5.38.3",
+		"svelte": "^5.53.7",
 		"vite": "^7.2.2"
 	}
 }
