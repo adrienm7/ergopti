@@ -46,11 +46,25 @@ jobs:
                   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
               shell: pwsh
 
-            - name: Commit and push compiled EXE
+            - name: Commit compiled EXE and auto-merge PR
               run: |
                   git config user.name  "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
                   git add static/drivers/autohotkey/ErgoptiPlus.exe
-                  git diff --cached --quiet && echo "No changes to commit" || git commit -m "ci: recompile ErgoptiPlus.exe"
-                  git push
+                  if git diff --cached --quiet; then
+                    echo "No changes to commit"
+                    exit 0
+                  fi
+                  git commit -m "ci: recompile ErgoptiPlus.exe"
+                  git checkout -b ci/recompile-exe
+                  git push origin ci/recompile-exe --force
+                  PR_URL=$(gh pr create \
+                    --base "$GITHUB_REF_NAME" \
+                    --head ci/recompile-exe \
+                    --title "ci: recompile ErgoptiPlus.exe" \
+                    --body "Automated recompilation triggered by a change to \`ErgoptiPlus.ahk\`.")
+                  echo "PR created: $PR_URL"
+                  gh pr merge "$PR_URL" --squash --admin --delete-branch
               shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
