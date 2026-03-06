@@ -20,17 +20,18 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Install AutoHotkey v2
+            - name: Download AutoHotkey v2 portable zip
               run: |
-                  $url = "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19_setup.exe"
-                  $installer = "$env:TEMP\AutoHotkey_setup.exe"
-                  Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
-                  Start-Process $installer -ArgumentList "/S" -Wait
+                  $zip = "$env:TEMP\AutoHotkey.zip"
+                  $dest = "$env:TEMP\AutoHotkey"
+                  Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile $zip -UseBasicParsing
+                  Expand-Archive -Path $zip -DestinationPath $dest -Force
+                  Write-Host "Contents:" && Get-ChildItem $dest -Recurse | Select-Object FullName
               shell: pwsh
 
             - name: Compile ErgoptiPlus.ahk
               run: |
-                  $ahk2exe = "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe"
+                  $ahk2exe = "$env:TEMP\AutoHotkey\Compiler\Ahk2Exe.exe"
                   $input   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
                   $output  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
                   $icon    = "${{ github.workspace }}\static\favicon.ico"
