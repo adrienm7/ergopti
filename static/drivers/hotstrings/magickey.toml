@@ -7,9 +7,9 @@ description = "Touche ★ et expansion de texte"
 sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst", "-", "textexpansionpersonalinformation"]
 
 [_meta.sections]
+replace = "Transformer la touche J en ★"
 textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom Prénom, etc."
 textexpansion = "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …"
-replace = "Transformer la touche J en ★"
 textexpansionauto = "Expansion de texte sans touche ★ : ju' = jusqu’, ya = y’a, …"
 textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …"
 textexpansionsymbols = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
@@ -98,216 +98,6 @@ repeat = "La touche ★ permet la répétition"
 "*★" = { output = "**", is_word = false, auto_expand = true, is_case_sensitive = true }
 
 [[textexpansion]]
-"!i★" = { output = "!important", is_word = true, auto_expand = true, is_case_sensitive = true }
-"bgc★" = { output = "background-color:", is_word = true, auto_expand = true, is_case_sensitive = true }
-"br★" = { output = "border-radius:", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ff★" = { output = "font-family:", is_word = true, auto_expand = true, is_case_sensitive = true }
-"fs★" = { output = "font-size:", is_word = true, auto_expand = true, is_case_sensitive = true }
-"fw★" = { output = "font-weight:", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ta★" = { output = "text-align:", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gc★" = { output = "git checkout", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gca★" = { output = "git commit --amend", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gcm★" = { output = "git commit -m `", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gp★" = { output = "git pull", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gpd★" = { output = "git pull origin dev", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gf★" = { output = "git fetch", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gfd★" = { output = "git fetch origin dev", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gm★" = { output = "git merge", is_word = true, auto_expand = true, is_case_sensitive = true }
-"gs★" = { output = "git status", is_word = true, auto_expand = true, is_case_sensitive = true }
-".à★" = { output = ".join(df2, on = 'variable', how = 'left')", is_word = false, auto_expand = true, is_case_sensitive = true }
-".j★" = { output = ".join(df2, on = 'variable', how = 'left')", is_word = false, auto_expand = true, is_case_sensitive = true }
-".c★" = { output = ".count()", is_word = false, auto_expand = true, is_case_sensitive = true }
-".cr★" = { output = ".createDataFrame()", is_word = false, auto_expand = true, is_case_sensitive = true }
-".h★" = { output = ".head()", is_word = false, auto_expand = true, is_case_sensitive = true }
-".d★" = { output = ".display()", is_word = false, auto_expand = true, is_case_sensitive = true }
-".f★" = { output = ".filter()", is_word = false, auto_expand = true, is_case_sensitive = true }
-".hd★" = { output = ".head()", is_word = false, auto_expand = true, is_case_sensitive = true }
-".o★" = { output = ".orderBy(desc(`", is_word = false, auto_expand = true, is_case_sensitive = true }
-".s★" = { output = ".select(`", is_word = false, auto_expand = true, is_case_sensitive = true }
-"07★" = { output = "0750399576", is_word = true, auto_expand = true, is_case_sensitive = true }
-"acm★" = { output = "Assurances du Crédit Mutuel", is_word = true, auto_expand = true, is_case_sensitive = true }
-"act★" = { output = "actuaire", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ada★" = { output = "AdaBoost", is_word = true, auto_expand = true, is_case_sensitive = true }
-"adaboost★" = { output = "AdaBoost", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ade★" = { output = "Assurance des Emprunteurs", is_word = true, auto_expand = true, is_case_sensitive = true }
-"adt★" = { output = "arrêt de travail", is_word = true, auto_expand = true, is_case_sensitive = false }
-"adv★" = { output = "Azure DevOps", is_word = true, auto_expand = true, is_case_sensitive = true }
-"aé★" = { output = "assuré", is_word = true, auto_expand = true, is_case_sensitive = false }
-"afn★" = { output = "affaire nouvelle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"afns★" = { output = "affaires nouvelles", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aif★" = { output = "AI Factory", is_word = true, auto_expand = true, is_case_sensitive = false }
-"alt★" = { output = "AltGr", is_word = true, auto_expand = true, is_case_sensitive = true }
-"altgr★" = { output = "AltGr", is_word = true, auto_expand = true, is_case_sensitive = true }
-"am★" = { output = "Adrien Moyaux", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ans★" = { output = "affaires nouvelles", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aoa★" = { output = "absence d’opportunité d’arbitrage", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ass★" = { output = "assurance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"assb★" = { output = "Assurances du Groupe BPCE", is_word = true, auto_expand = true, is_case_sensitive = true }
-"assé★" = { output = "assuré", is_word = true, auto_expand = true, is_case_sensitive = false }
-"assr★" = { output = "assureur", is_word = true, auto_expand = true, is_case_sensitive = false }
-"assrs★" = { output = "assureurs", is_word = true, auto_expand = true, is_case_sensitive = false }
-"asss★" = { output = "assurances", is_word = true, auto_expand = true, is_case_sensitive = false }
-"axa★" = { output = "AXA", is_word = true, auto_expand = true, is_case_sensitive = true }
-"bs★" = { output = "beseven", is_word = true, auto_expand = true, is_case_sensitive = false }
-"b7★" = { output = "BeSeven", is_word = true, auto_expand = true, is_case_sensitive = false }
-"bg★" = { output = "background", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ca★" = { output = "Crédit Agricole", is_word = true, auto_expand = true, is_case_sensitive = true }
-"caf★" = { output = "chiffre d’affaires", is_word = true, auto_expand = true, is_case_sensitive = false }
-"caff★" = { output = "chiffre d’affaires", is_word = true, auto_expand = true, is_case_sensitive = false }
-"carto★" = { output = "cartographie", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cat★" = { output = "CatBoost", is_word = true, auto_expand = true, is_case_sensitive = true }
-"catboost★" = { output = "CatBoost", is_word = true, auto_expand = true, is_case_sensitive = true }
-"cda★" = { output = "Code des Assurances", is_word = true, auto_expand = true, is_case_sensitive = true }
-"cdas★" = { output = "contrat d’assurance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cdass★" = { output = "contrat d’assurance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cdr★" = { output = "compte de résultat", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cg★" = { output = "conditions générales", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cha★" = { output = "Charenton-le-Pont", is_word = true, auto_expand = true, is_case_sensitive = true }
-"cl★" = { output = "Chain-Ladder", is_word = true, auto_expand = true, is_case_sensitive = true }
-"cm★" = { output = "commit", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cnt★" = { output = "contrat", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cnts★" = { output = "contrats", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cols★" = { output = "columns", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cov★" = { output = "covariance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cp★" = { output = "code postal", is_word = true, auto_expand = true, is_case_sensitive = false }
-"csp★" = { output = "catégorie socioprofessionnelle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"csps★" = { output = "catégories socioprofessionnelles", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cts★" = { output = "correctifs tarifaires", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ctt★" = { output = "correctif tarifaire", is_word = true, auto_expand = true, is_case_sensitive = false }
-"da★" = { output = "Direct Assurance", is_word = true, auto_expand = true, is_case_sensitive = true }
-"dacty★" = { output = "dactylographie", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dactyq★" = { output = "dactylographique", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dass★" = { output = "d’assurance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dasss★" = { output = "d’assurances", is_word = true, auto_expand = true, is_case_sensitive = false }
-"db★" = { output = "database", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dc★" = { output = "décès", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dctc★" = { output = "décès toutes causes", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dd★" = { output = "dossier-dossier", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dde★" = { output = "dégât des eaux", is_word = true, auto_expand = true, is_case_sensitive = false }
-"df★" = { output = "dataframe", is_word = true, auto_expand = true, is_case_sensitive = false }
-"di★" = { output = "Databricks", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dl★" = { output = "datalake", is_word = true, auto_expand = true, is_case_sensitive = false }
-":D★" = { output = "😁", is_word = true, auto_expand = true, is_case_sensitive = true }
-"d★" = { output = "donc", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ds★" = { output = "Data Science", is_word = true, auto_expand = true, is_case_sensitive = true }
-"dst★" = { output = "Data Scientist", is_word = true, auto_expand = true, is_case_sensitive = true }
-"dwh★" = { output = "Data Warehouse", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ecr★" = { output = "Economic Combined Ratio", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ed★" = { output = "E-Declare", is_word = true, auto_expand = true, is_case_sensitive = true }
-"erg★" = { output = "Ergo‑L", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ergo★" = { output = "Ergo‑L", is_word = true, auto_expand = true, is_case_sensitive = true }
-"fa★" = { output = "Fonction Actuarielle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fdr★" = { output = "fonction de répartition", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fp★" = { output = "fonds propres", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fpdf★" = { output = "filetype:pdf", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fps★" = { output = "fonds propres", is_word = true, auto_expand = true, is_case_sensitive = false }
-"gb★" = { output = "gradient boosting", is_word = true, auto_expand = true, is_case_sensitive = false }
-"gdel★" = { output = "gestion déléguée", is_word = true, auto_expand = true, is_case_sensitive = false }
-"hcn★" = { output = "HCNPJASSCL", is_word = true, auto_expand = true, is_case_sensitive = true }
-"hm★" = { output = "Herman Miller", is_word = true, auto_expand = true, is_case_sensitive = true }
-"httw" = { output = "https://www.", is_word = true, auto_expand = true, is_case_sensitive = false }
-"hyper★" = { output = "hyperparamètre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"hyperparam★" = { output = "hyperparamètre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"iact★" = { output = "Institut des Actuaires", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ic★" = { output = "intervalle de confiance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ics★" = { output = "intervalles de confiance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"jyp★" = { output = "Jean-Yves Ponce", is_word = true, auto_expand = true, is_case_sensitive = true }
-"kla★" = { output = "KLAnext", is_word = true, auto_expand = true, is_case_sensitive = true }
-"km★" = { output = "Kaplan-Meier", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ks★" = { output = "KOMA-Script", is_word = true, auto_expand = true, is_case_sensitive = true }
-"lds★" = { output = "Livre de Savoir", is_word = true, auto_expand = true, is_case_sensitive = true }
-"le★" = { output = "Label Encoder", is_word = true, auto_expand = true, is_case_sensitive = true }
-"light★" = { output = "LightGBM", is_word = true, auto_expand = true, is_case_sensitive = true }
-"lightgbm★" = { output = "LightGBM", is_word = true, auto_expand = true, is_case_sensitive = true }
-"llm★" = { output = "Large Language Model", is_word = true, auto_expand = true, is_case_sensitive = true }
-"llms★" = { output = "Large Language Models", is_word = true, auto_expand = true, is_case_sensitive = true }
-"lr★" = { output = "Loss Ratio", is_word = true, auto_expand = true, is_case_sensitive = true }
-"lrs★" = { output = "les résultats", is_word = true, auto_expand = true, is_case_sensitive = false }
-"lsex★" = { output = "les exemples", is_word = true, auto_expand = true, is_case_sensitive = false }
-"morta★" = { output = "mortalité", is_word = true, auto_expand = true, is_case_sensitive = false }
-"mé★" = { output = "multiéquipé", is_word = true, auto_expand = true, is_case_sensitive = false }
-"mlp★" = { output = "Marie Le Pennec", is_word = true, auto_expand = true, is_case_sensitive = true }
-"mo★" = { output = "moyaux", is_word = true, auto_expand = true, is_case_sensitive = false }
-"mypy★" = { output = "MyPy", is_word = true, auto_expand = true, is_case_sensitive = true }
-"na★" = { output = "valeur manquante", is_word = true, auto_expand = true, is_case_sensitive = false }
-"nas★" = { output = "valeurs manquantes", is_word = true, auto_expand = true, is_case_sensitive = false }
-"nass★" = { output = "Natixis Assurances", is_word = true, auto_expand = true, is_case_sensitive = false }
-"nat★" = { output = "Natixis", is_word = true, auto_expand = true, is_case_sensitive = true }
-"next★" = { output = "next_best_offer", is_word = true, auto_expand = true, is_case_sensitive = false }
-"not★" = { output = "notebook", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oa★" = { output = "observés sur attendus", is_word = true, auto_expand = true, is_case_sensitive = false }
-"opt★" = { output = "Optimot", is_word = true, auto_expand = true, is_case_sensitive = true }
-"or★" = { output = "offre recommandée", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ors★" = { output = "offres recommandées", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pa★" = { output = "prime acquise", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pbi★" = { output = "Power BI", is_word = true, auto_expand = true, is_case_sensitive = true }
-"pc★" = { output = "prime commerciale", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pcs★" = { output = "primes commerciales", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pé★" = { output = "prime émise", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pés★" = { output = "primes émises", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pgs★" = { output = "processus gaussiens", is_word = true, auto_expand = true, is_case_sensitive = false }
-"phi★" = { output = "Philippe", is_word = true, auto_expand = true, is_case_sensitive = true }
-"pl★" = { output = "pipeline", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pm★" = { output = "provision mathématique", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pms★" = { output = "provisions mathématiques", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pp★" = { output = "prime pure", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pps★" = { output = "primes pures", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pr★" = { output = "pull request", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pra★" = { output = "prime acquise", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pras★" = { output = "primes acquises", is_word = true, auto_expand = true, is_case_sensitive = false }
-"prév★" = { output = "prévoyance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"prev★" = { output = "prévoyance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ps★" = { output = "PySpark", is_word = true, auto_expand = true, is_case_sensitive = true }
-"qdd★" = { output = "qualité des données", is_word = true, auto_expand = true, is_case_sensitive = false }
-"qss★" = { output = "questionnaire de santé simplifié", is_word = true, auto_expand = true, is_case_sensitive = false }
-"r7★" = { output = "recette", is_word = true, auto_expand = true, is_case_sensitive = false }
-"reass★" = { output = "réassurance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"rc★" = { output = "responsabilité civile", is_word = true, auto_expand = true, is_case_sensitive = false }
-"renta★" = { output = "rentabilité", is_word = true, auto_expand = true, is_case_sensitive = false }
-"resp★" = { output = "responsabilité", is_word = true, auto_expand = true, is_case_sensitive = false }
-"réass★" = { output = "réassurance", is_word = true, auto_expand = true, is_case_sensitive = false }
-"rmd★" = { output = "R Markdown", is_word = true, auto_expand = true, is_case_sensitive = true }
-"rn★" = { output = "risque-neutre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"roq★" = { output = "45 Rue Roque de Fillol", is_word = true, auto_expand = true, is_case_sensitive = true }
-"rsls★" = { output = "risques spéciaux lignes spécialisées", is_word = true, auto_expand = true, is_case_sensitive = false }
-"rt★" = { output = "risque technique", is_word = true, auto_expand = true, is_case_sensitive = false }
-"s★" = { output = "SFB", is_word = true, auto_expand = true, is_case_sensitive = false }
-"s2★" = { output = "Solvabilité II", is_word = true, auto_expand = true, is_case_sensitive = true }
-"selmed★" = { output = "sélection médicale", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sg★" = { output = "Société Générale", is_word = true, auto_expand = true, is_case_sensitive = true }
-"sin★" = { output = "sinistre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sk★" = { output = "scikit-learn", is_word = true, auto_expand = true, is_case_sensitive = false }
-"solva★" = { output = "solvabilité", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sous★" = { output = "souscripteur", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sousn★" = { output = "souscription", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sousr★" = { output = "souscrire", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sp★" = { output = "SharePoint", is_word = true, auto_expand = true, is_case_sensitive = true }
-"ssi★" = { output = "si et seulement si", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sto★" = { output = "stochastique", is_word = true, auto_expand = true, is_case_sensitive = false }
-"stra★" = { output = "Strasbourg", is_word = true, auto_expand = true, is_case_sensitive = true }
-"stras★" = { output = "Strasbourg", is_word = true, auto_expand = true, is_case_sensitive = true }
-"taf★" = { output = "tout à fait", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tarif★" = { output = "tarification", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tdb★" = { output = "tableau de bord", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tdbs★" = { output = "tableaux de bord", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tdm★" = { output = "table de mortalité", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tdms★" = { output = "tables de mortalité", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tnr★" = { output = "Times New Roman", is_word = true, auto_expand = true, is_case_sensitive = true }
-"tu★" = { output = "test unitaire", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tus★" = { output = "tests unitaires", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tff★" = { output = "tenfastfingers", is_word = true, auto_expand = true, is_case_sensitive = false }
-"va★" = { output = "variable aléatoire", is_word = true, auto_expand = true, is_case_sensitive = false }
-"vas★" = { output = "variables aléatoires", is_word = true, auto_expand = true, is_case_sensitive = false }
-"vect★" = { output = "vecteur", is_word = true, auto_expand = true, is_case_sensitive = false }
-"vsc★" = { output = "VSCode", is_word = true, auto_expand = true, is_case_sensitive = true }
-"wh★" = { output = "Whittaker-Henderson", is_word = true, auto_expand = true, is_case_sensitive = true }
-"what★" = { output = "WhatsApp", is_word = true, auto_expand = true, is_case_sensitive = true }
-"xg★" = { output = "XGBoost", is_word = true, auto_expand = true, is_case_sensitive = true }
-"xgb★" = { output = "XGBoost", is_word = true, auto_expand = true, is_case_sensitive = true }
-"xgboost★" = { output = "XGBoost", is_word = true, auto_expand = true, is_case_sensitive = true }
-"xs★" = { output = "cross sell", is_word = true, auto_expand = true, is_case_sensitive = false }
-"za★" = { output = "Zacharie", is_word = true, auto_expand = true, is_case_sensitive = true }
-"zc★" = { output = "zéro coupon", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ae★" = { output = "æ", is_word = false, auto_expand = true, is_case_sensitive = false }
 "oe★" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false }
 "1er★" = { output = "premier", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -375,6 +165,7 @@ repeat = "La touche ★ permet la répétition"
 "biblio★" = { output = "bibliographie", is_word = true, auto_expand = true, is_case_sensitive = false }
 "bjr★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false }
 "brain★" = { output = "brainstorming", is_word = true, auto_expand = true, is_case_sensitive = false }
+"br★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false }
 "bsr★" = { output = "bonsoir", is_word = true, auto_expand = true, is_case_sensitive = false }
 "bv★" = { output = "bravo", is_word = true, auto_expand = true, is_case_sensitive = false }
 "bvn★" = { output = "bienvenue", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -453,7 +244,9 @@ repeat = "La touche ★ permet la répétition"
 "doc★" = { output = "document", is_word = true, auto_expand = true, is_case_sensitive = false }
 "docs★" = { output = "documents", is_word = true, auto_expand = true, is_case_sensitive = false }
 "dp★" = { output = "de plus", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ds★" = { output = "data science", is_word = true, auto_expand = true, is_case_sensitive = false }
 "dsl★" = { output = "désolé", is_word = true, auto_expand = true, is_case_sensitive = false }
+"dst★" = { output = "data scientist", is_word = true, auto_expand = true, is_case_sensitive = false }
 "dtm★" = { output = "détermine", is_word = true, auto_expand = true, is_case_sensitive = false }
 "dvlp★" = { output = "développe", is_word = true, auto_expand = true, is_case_sensitive = false }
 "e★" = { output = "est", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -502,6 +295,7 @@ repeat = "La touche ★ permet la répétition"
 "fev★" = { output = "février", is_word = true, auto_expand = true, is_case_sensitive = false }
 "fi★" = { output = "financier", is_word = true, auto_expand = true, is_case_sensitive = false }
 "fiè★" = { output = "financière", is_word = true, auto_expand = true, is_case_sensitive = false }
+"ff★" = { output = "firefox", is_word = true, auto_expand = true, is_case_sensitive = false }
 "fig★" = { output = "figure", is_word = true, auto_expand = true, is_case_sensitive = false }
 "fl★" = { output = "falloir", is_word = true, auto_expand = true, is_case_sensitive = false }
 "freq★" = { output = "fréquence", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -515,6 +309,7 @@ repeat = "La touche ★ permet la répétition"
 "gd★" = { output = "grand", is_word = true, auto_expand = true, is_case_sensitive = false }
 "gg★" = { output = "google", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ges★" = { output = "gestion", is_word = true, auto_expand = true, is_case_sensitive = false }
+"gf★" = { output = "j’ai fait", is_word = true, auto_expand = true, is_case_sensitive = false }
 "gh★" = { output = "github", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ghc★" = { output = "GitHub Copilot", is_word = true, auto_expand = true, is_case_sensitive = true }
 "ght★" = { output = "j’ai acheté", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -575,6 +370,7 @@ repeat = "La touche ★ permet la répétition"
 "lex★" = { output = "l’exemple", is_word = true, auto_expand = true, is_case_sensitive = false }
 "lgb★" = { output = "lightgbm", is_word = true, auto_expand = true, is_case_sensitive = false }
 "lim★" = { output = "limite", is_word = true, auto_expand = true, is_case_sensitive = false }
+"llm★" = { output = "large language model", is_word = true, auto_expand = true, is_case_sensitive = false }
 "m★" = { output = "mais", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ma★" = { output = "madame", is_word = true, auto_expand = true, is_case_sensitive = false }
 "maj★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -682,6 +478,7 @@ repeat = "La touche ★ permet la répétition"
 "pourcent★" = { output = "pourcentage", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ppt★" = { output = "PowerPoint", is_word = true, auto_expand = true, is_case_sensitive = false }
 "pq★" = { output = "pourquoi", is_word = true, auto_expand = true, is_case_sensitive = false }
+"pr★" = { output = "pull request", is_word = true, auto_expand = true, is_case_sensitive = false }
 "prd★" = { output = "produit", is_word = true, auto_expand = true, is_case_sensitive = false }
 "prem★" = { output = "premier", is_word = true, auto_expand = true, is_case_sensitive = false }
 "prez★" = { output = "présentation", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -806,6 +603,8 @@ repeat = "La touche ★ permet la répétition"
 "wknd★" = { output = "week-end", is_word = true, auto_expand = true, is_case_sensitive = false }
 "wiki★" = { output = "wikipédia", is_word = true, auto_expand = true, is_case_sensitive = false }
 "x★" = { output = "exemple", is_word = true, auto_expand = true, is_case_sensitive = false }
+"xg★" = { output = "xgboost", is_word = true, auto_expand = true, is_case_sensitive = false }
+"xgb★" = { output = "xgboost", is_word = true, auto_expand = true, is_case_sensitive = false }
 "ya★" = { output = "il y a", is_word = true, auto_expand = true, is_case_sensitive = false }
 "yapa★" = { output = "il n’y a pas", is_word = true, auto_expand = true, is_case_sensitive = false }
 "yatil★" = { output = "y a-t-il", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -2397,10 +2196,3 @@ repeat = "La touche ★ permet la répétition"
 "$gender.male.stroke.r$" = { output = "⚩", is_word = true, auto_expand = true, is_case_sensitive = true }
 "$gender.neuter$" = { output = "⚲", is_word = true, auto_expand = true, is_case_sensitive = true }
 "$gender.trans$" = { output = "⚧", is_word = true, auto_expand = true, is_case_sensitive = true }
-
-[[textexpansionpersonalinformation]]
-"@am★" = { output = "adrien.moyaux@gmail.com", is_word = true, auto_expand = true, is_case_sensitive = true }
-"@b7★" = { output = "be7ven@gmail.com", is_word = true, auto_expand = true, is_case_sensitive = true }
-"@h★" = { output = "hahnonymme@gmail.com", is_word = true, auto_expand = true, is_case_sensitive = true }
-"@j★" = { output = "julien.zeidler@gmail.com", is_word = true, auto_expand = true, is_case_sensitive = true }
-"@x★" = { output = "adrien.moyaux@axa.fr", is_word = true, auto_expand = true, is_case_sensitive = true }
