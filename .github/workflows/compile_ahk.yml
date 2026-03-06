@@ -65,7 +65,9 @@ jobs:
                     --title "ci: recompile ErgoptiPlus.exe" \
                     --body "Automated recompilation triggered by a change to \`ErgoptiPlus.ahk\`.")
                   echo "PR created: $PR_URL"
-                  gh pr merge "$PR_URL" --squash --admin --delete-branch
+                  PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+                  gh pr review "$PR_NUMBER" --approve --body "Auto-approved by CI"
+                  gh pr merge "$PR_NUMBER" --squash --admin --delete-branch
               shell: bash
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
