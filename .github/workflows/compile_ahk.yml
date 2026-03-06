@@ -26,7 +26,18 @@ jobs:
 
             - name: Compile ErgoptiPlus.ahk
               run: |
-                  $ahk2exe = "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe"
+                  # Try to find Ahk2Exe in PATH or common Program Files locations
+                  $ahk2exe = (Get-Command -Name Ahk2Exe.exe -ErrorAction SilentlyContinue)?.Source
+                  if (-not $ahk2exe) {
+                    $candidates = Get-ChildItem -Path 'C:\Program Files','C:\Program Files (x86)' -Recurse -ErrorAction SilentlyContinue -Filter 'Ahk2Exe.exe' | Select-Object -First 1
+                    if ($candidates) { $ahk2exe = $candidates.FullName }
+                  }
+                  if (-not $ahk2exe) {
+                    Write-Error "Ahk2Exe.exe not found after installing AutoHotkey. Listing Program Files for debugging:"
+                    Get-ChildItem -Path 'C:\Program Files','C:\Program Files (x86)' -Recurse -ErrorAction SilentlyContinue -Include '*AutoHotkey*' | Select-Object -First 50
+                    exit 1
+                  }
+                  Write-Host "Using Ahk2Exe at: $ahk2exe"
                   $input   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
                   $output  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
                   $icon    = "${{ github.workspace }}\static\favicon.ico"
