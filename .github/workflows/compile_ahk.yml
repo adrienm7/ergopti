@@ -20,22 +20,29 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Download AutoHotkey v2 portable zip
+            - name: Download AutoHotkey v2 runtime and Ahk2Exe
               run: |
-                  $zip = "$env:TEMP\AutoHotkey.zip"
-                  $dest = "$env:TEMP\AutoHotkey"
-                  Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile $zip -UseBasicParsing
-                  Expand-Archive -Path $zip -DestinationPath $dest -Force
-                  Write-Host "Contents:" && Get-ChildItem $dest -Recurse | Select-Object FullName
+                  # AHK v2 runtime (contains AutoHotkey64.exe needed by Ahk2Exe)
+                  Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+                  Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "$env:TEMP\AutoHotkey" -Force
+                  # Ahk2Exe compiler (separate repo/release)
+                  gh release download --repo AutoHotkey/Ahk2Exe --pattern "*.zip" --dir "$env:TEMP\Ahk2ExeZip"
+                  $z = Get-ChildItem "$env:TEMP\Ahk2ExeZip" -Filter "*.zip" | Select-Object -First 1
+                  Expand-Archive -Path $z.FullName -DestinationPath "$env:TEMP\Ahk2Exe" -Force
               shell: pwsh
+              env:
+                  GH_TOKEN: ${{ github.token }}
 
             - name: Compile ErgoptiPlus.ahk
               run: |
-                  $ahk2exe = "$env:TEMP\AutoHotkey\Compiler\Ahk2Exe.exe"
-                  $input   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
-                  $output  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
-                  $icon    = "${{ github.workspace }}\static\favicon.ico"
-                  & $ahk2exe /in $input /out $output /icon $icon
+                  $ahk2exe  = Get-ChildItem "$env:TEMP\Ahk2Exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  $runtime  = Get-ChildItem "$env:TEMP\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  Write-Host "Ahk2Exe  : $ahk2exe"
+                  Write-Host "Runtime  : $runtime"
+                  $in   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
+                  $out  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
+                  $icon = "${{ github.workspace }}\static\favicon.ico"
+                  & $ahk2exe /in $in /out $out /base $runtime /icon $icon
                   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
               shell: pwsh
 
