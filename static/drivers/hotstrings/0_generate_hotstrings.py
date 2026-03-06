@@ -88,11 +88,16 @@ def escape_toml_string(text: str) -> str:
 def process_autohotkey_escapes(text: str) -> str:
     """Replace AHK escape sequences with their actual characters.
 
+    Backtick-escape sequences (AHK2 style) are resolved.  Cursor-movement
+    tokens such as ``{Left}``, ``{Right}``, etc. are **kept** as literal
+    strings so that the Hammerspoon keymap module can emit the corresponding
+    key press at expansion time.
+
     Args:
             text: Text containing AHK escape sequences.
 
     Returns:
-            Text with escape sequences expanded.
+            Text with escape sequences expanded, cursor tokens preserved.
     """
     replacements: dict[str, str] = {
         '`"': '"',
@@ -103,15 +108,12 @@ def process_autohotkey_escapes(text: str) -> str:
         "`r": "\r",
         "`{": "{",
         "`}": "}",
-        # Cursor-positioning sequences that must simply be removed
-        '""{Left}': '"',
-        '"{Left}': "",
-        "{Left}": "",
-        "{Right}": "",
-        "{Up}": "",
-        "{Down}": "",
-        "{Home}": "",
-        "{End}": "",
+        # Note: "" (two consecutive quotes) in an AHK2 string literal is the
+        # in-string escape for a single literal ".  However, the regex now
+        # consumes "" as an atomic unit before the closing-quote terminator,
+        # and in the SendInput context of CreateHotstring, "" means TWO
+        # literal quote characters the user wants typed.  We therefore keep
+        # "" as-is here so that both quotes reach the TOML output.
     }
     for seq, replacement in replacements.items():
         text = text.replace(seq, replacement)
@@ -145,8 +147,7 @@ _UNRESOLVABLE_PATTERNS = re.compile(
     r"|\bPersonalInformationHotstrings\b"  # runtime private-data collection
     r"|\bGeneratePersonalInformation"  # custom generator function
     r"|\bCreateHotstringCombo"  # custom combo-hotstring functions
-    r"|\bCreateDeadkeyHotstring\b"  # custom dead-key hotstring function
-    r"|[`]\"",  # AHK2 backtick-escaped double-quote inside a string literal
+    r"|\bCreateDeadkeyHotstring\b",  # custom dead-key hotstring function
     re.IGNORECASE,
 )
 
@@ -625,19 +626,19 @@ def _extract_hotstring_from_line(
 
     # Try from most-specific to most-generic.
     patterns: list[str] = [
-        # Complex escape: backtick-quoted output
+        # Standard CreateHotstring / CreateCaseSensitiveHotstrings.
+        # The output / trigger groups handle:
+        #   - ordinary chars           [^"`\\]
+        #   - backslash escapes        \\.
+        #   - AHK2 backtick escapes    `.    (`` `" `` → `"`, ```` `` ```` → `` ` ``)
+        #   - AHK2 in-string "" escape  ""   captured as two chars; the
+        #     process_autohotkey_escapes step keeps them as-is so that two
+        #     literal quote chars reach the SendInput / TOML output.
         (
             r"(?:CreateCaseSensitiveHotstrings|CreateHotstring)\s*\(\s*"
             r'"(?P<opts>[^"]*)",\s*'
-            r'"(?P<trig>(?:[^"\\]|\\.)*)",\s*'
-            r'"(?P<out>`"[^"]*)"'
-        ),
-        # Standard CreateHotstring / CreateCaseSensitiveHotstrings
-        (
-            r"(?:CreateCaseSensitiveHotstrings|CreateHotstring)\s*\(\s*"
-            r'"(?P<opts>[^"]*)",\s*'
-            r'"(?P<trig>(?:[^"\\]|\\.)*)",\s*'
-            r'"(?P<out>(?:[^"\\]|\\.)*)"'
+            r'"(?P<trig>(?:[^"`\\]|\\.|`.|"")*)",\s*'
+            r'"(?P<out>(?:[^"`\\]|\\.|`.|"")*)",?\s*'
         ),
         # Hotstring() legacy format
         (
