@@ -40,15 +40,15 @@ FILE_DESCRIPTIONS: dict[str, str] = {
     "Rolls": "Roulements",
     "Autocorrection": "Autocorrection",
     "MagicKey": "Touche ★ et expansion de texte",
+    "Personal": "Personnel",
 }
 
 # All generated TOML files land in this directory (next to this script).
 OUTPUT_DIR = Path(__file__).parent
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# Categories whose TOML files are gitignored and must never appear in the
+# committed _index.json (Hammerspoon will load them outside of that index).
+_PRIVATE_CATEGORIES: frozenset[str] = frozenset({"personal"})
 
 
 def normalize_name(name: str) -> str:
@@ -298,6 +298,29 @@ def parse_ahk_descriptions(content: str) -> dict[str, dict[str, str]]:
 
         i += 1
 
+    # Also scan standalone  Features["Cat"] := Map(...)  declarations that
+    # appear outside the main global map (e.g. section 2 of the private file).
+    standalone_cat_re = re.compile(r'Features\["([A-Za-z]+)"\]\s*:=\s*Map\(')
+    for standalone_m in standalone_cat_re.finditer(content):
+        cat_name = standalone_m.group(1)
+        block_text = content[standalone_m.end() :]
+        close_m = re.search(r"^\)", block_text, re.MULTILINE)
+        if close_m:
+            block_text = block_text[: close_m.start()]
+        current_sub = None
+        for bline in block_text.splitlines():
+            bline_s = bline.strip()
+            sm2 = sub_re.search(bline_s)
+            if sm2:
+                cand = sm2.group(1)
+                if cand not in ("__Order",) and not cand.startswith("-"):
+                    current_sub = cand
+            dm = desc_re.search(bline_s)
+            if dm and current_sub:
+                desc = _parse_ahk_desc_expr(dm.group(1).strip())
+                if desc:
+                    result.setdefault(cat_name, {})[current_sub] = desc
+
     return result
 
 
@@ -365,6 +388,35 @@ def parse_ahk_orders(content: str) -> dict[str, list[str]]:
             result[current_cat] = normalized
 
         i += 1
+
+    # Also scan standalone  Features["Cat"] := Map(...)  declarations.
+    standalone_cat_re = re.compile(r'Features\["([A-Za-z]+)"\]\s*:=\s*Map\(')
+    order_start_re_local = re.compile(r'"__Order"\s*,\s*\[')
+    for standalone_m in standalone_cat_re.finditer(content):
+        cat_name = standalone_m.group(1)
+        block_text = content[standalone_m.end() :]
+        close_m = re.search(r"^\)", block_text, re.MULTILINE)
+        if close_m:
+            block_text = block_text[: close_m.start()]
+        for j, bline in enumerate(block_text.splitlines()):
+            if order_start_re_local.search(bline):
+                bracket_pos = bline.find("[")
+                array_text = bline[bracket_pos + 1 :]
+                remaining = block_text.splitlines()[j + 1 :]
+                k = 0
+                while "]" not in array_text and k < len(remaining):
+                    array_text += " " + remaining[k]
+                    k += 1
+                close_bracket = array_text.find("]")
+                if close_bracket >= 0:
+                    array_text = array_text[:close_bracket]
+                items: list[str] = re.findall(r'"([^"]+)"', array_text)
+                normalized: list[str] = [
+                    "-" if item == "-" else normalize_name(item)
+                    for item in items
+                ]
+                result[cat_name] = normalized
+                break
 
     return result
 
@@ -1115,12 +1167,16 @@ def main(
 
     # --- Write _index.json so Hammerspoon can restore the AHK menu order ----
     # Keep only names whose TOML file was actually written (non-empty categories).
+    # Exclude private categories: their TOML files are gitignored and must not
+    # appear in the committed _index.json.
     written_names = {p.stem for p in OUTPUT_DIR.glob("*.toml")}
     ordered: list[str] = [
-        name for name in top_level_order if name in written_names
+        name
+        for name in top_level_order
+        if name in written_names and name not in _PRIVATE_CATEGORIES
     ]
     # Append any written TOML not listed in top_level_order, alphabetically.
-    for name in sorted(written_names - set(ordered)):
+    for name in sorted(written_names - set(ordered) - _PRIVATE_CATEGORIES):
         ordered.append(name)
 
     # Build module_sections: tell Lua which placeholder sub-sections (those

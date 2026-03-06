@@ -16,5 +16,6 @@ git add static/drivers/autohotkey/*.ahk
 # Regenerate TOML hotstrings from the (now cleaned) AHK file
 uv run python static/drivers/hotstrings/0_generate_hotstrings.py
 
-# Stage the regenerated TOML files
-git add static/drivers/hotstrings/*.toml
+# Stage the regenerated TOML files (personal.toml is .gitignore'd — skip it)
+find static/drivers/hotstrings/ -maxdepth 1 -name '*.toml' ! -name 'personal.toml' -print0 \
+  | xargs -0 git add --

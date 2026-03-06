@@ -188,6 +188,17 @@ end
 -- Public API
 -- ---------------------------------------------------------------------------
 
+-- Return the loaded info table (used by init.lua to pass data to
+-- dynamic_hotstrings without coupling the two modules directly).
+function M.get_info()
+	return _info
+end
+
+-- Return the trigger character loaded from config.
+function M.get_trigger_char()
+	return _trigger
+end
+
 -- Start the module.
 -- base_dir      : path to the Hammerspoon config directory (trailing slash).
 -- keymap_module : the loaded keymap module; used to register the interceptor.

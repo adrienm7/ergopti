@@ -8,6 +8,7 @@ local scroll = require("modules.scroll")
 local keymap = require("modules.keymap")
 local shortcuts = require("modules.shortcuts")
 local personal_info = require("modules.personal_info")
+local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 local repeat_keys = require("modules.repeat_keys")
 local script_control = require("modules.script_control")
 
@@ -101,7 +102,28 @@ for fname in hs.fs.dir(hotstrings_dir) do
     end
 end
 
+-- Private/personal TOML files (absent from _index.json) are loaded first so
+-- their hotstrings have the highest priority.  When the same trigger exists in
+-- both a common file and personal.toml, the personal mapping wins.
+local PRIVATE_STEMS = { personal = true }
+
 local toml_fnames = {}
+
+-- 1) Personal files first (highest priority).
+local personal_fnames = {}
+for stem, fname in pairs(toml_set) do
+    if PRIVATE_STEMS[stem] then
+        personal_fnames[#personal_fnames + 1] = fname
+    end
+end
+table.sort(personal_fnames)
+for _, fname in ipairs(personal_fnames) do
+    local stem = fname:match("^(.-)%.toml$")
+    toml_fnames[#toml_fnames + 1] = fname
+    toml_set[stem] = nil  -- mark as consumed
+end
+
+-- 2) _index.json order (public categories).
 if ordered_names then
     for _, name in ipairs(ordered_names) do
         if toml_set[name] then
@@ -110,7 +132,8 @@ if ordered_names then
         end
     end
 end
--- Append remaining files not covered by _index.json, sorted alphabetically.
+
+-- 3) Append any remaining files not covered above, sorted alphabetically.
 local remaining = {}
 for _, fname in pairs(toml_set) do remaining[#remaining + 1] = fname end
 table.sort(remaining)
@@ -146,10 +169,25 @@ keymap.set_post_load_hook("magickey", register_repeat_keys)
 
 ---------------------------------------------------------------------------
 -- Personal information shortcuts (loaded after base_dir is resolved)
--- keymap is passed so personal_info can register a suppress hook that
--- prevents hotstrings like n★→"nouveau" from firing during @-combos.
+-- keymap is passed so personal_info can register an interceptor that
+-- handles @<letters>★ expansions with highest priority in the chain.
 ---------------------------------------------------------------------------
 personal_info.start(base_dir, keymap)
+
+---------------------------------------------------------------------------
+-- Dynamic hotstrings (dt★ → date, phone/SSN prefix expansion, …)
+-- Started AFTER personal_info so the @-combo interceptor has higher priority
+-- (personal_info registers first = interceptor chain position [1]).
+-- register_personal_data supplies the private phone/SSN data loaded by
+-- personal_info without coupling the two modules directly.
+-- "dynamichotstrings" is appended to hotfiles so it appears in the menu.
+---------------------------------------------------------------------------
+dynamic_hotstrings.start(keymap)
+dynamic_hotstrings.register_personal_data(
+    personal_info.get_info(),
+    personal_info.get_trigger_char()
+)
+hotfiles[#hotfiles + 1] = "dynamichotstrings"
 
 ---------------------------------------------------------------------------
 -- Menubar menu (Hammerspoon Menubar)

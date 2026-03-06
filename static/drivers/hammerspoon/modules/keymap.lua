@@ -37,17 +37,17 @@ local function sort_mappings()
 end
 M.sort_mappings = sort_mappings
 
--- External interceptor: a function(event, km_buffer) called on every keyDown
--- (after cmd/ctrl guard, before backspace/escape/getCharacters processing).
--- Possible return values:
+-- Interceptor chain: functions called on every keyDown event in registration
+-- order.  Each function(event, km_buffer) may return:
 --   "consume"  → keymap returns true  (event fully consumed, no hotstring check)
 --   "suppress" → keymap returns false (event reaches apps, but hotstrings skipped)
---   nil / false → normal keymap processing
--- Used by personal_info for priority @-combo expansion.
-local _interceptor = nil
+--   nil / false → pass to next interceptor, then normal keymap processing
+-- The chain stops at the first non-nil result.
+local _interceptors = {}
 
+-- Append fn to the interceptor chain.
 function M.register_interceptor(fn)
-	_interceptor = fn
+	table.insert(_interceptors, fn)
 end
 
 local function record_group(name, path, kind)
@@ -237,10 +237,34 @@ function M.list_groups()
     return out
 end
 
+-- Register a pure-Lua group that has no source file.
+-- Sections is an array of { name, description, count } tables.
+-- Actual hotstring entries must be added by a post_load_hook so that
+-- enable_group() can re-register them after a disable_group() call.
+function M.register_lua_group(name, meta_description, sections)
+    groups[name] = {
+        path             = nil,
+        seqs             = {},
+        enabled          = true,
+        kind             = 'lua',
+        meta_description = meta_description,
+        sections         = sections or {},
+    }
+end
+
 function M.enable_group(name)
     local g = groups[name]
     if not g then return end
     if g.enabled then return end
+    -- Pure-Lua groups have no source file: re-add entries via post_load_hook.
+    if g.path == nil then
+        g.enabled = true
+        if group_post_load_hooks[name] then
+            group_post_load_hooks[name]()
+            sort_mappings()
+        end
+        return
+    end
     -- re-load the source (Lua or TOML) to re-add mappings under the same group name
     if g.kind == 'toml' then
         M.load_toml(name, g.path)
@@ -518,11 +542,13 @@ local function onKeyDown(e)
     -- Give registered interceptors first look at every event (before backspace,
     -- escape, and getCharacters processing so that Unicode trigger chars like ★
     -- that produce getCharacters("") are still catchable).
+    -- Interceptors are called in registration order; the chain stops at the
+    -- first non-nil result.
     local _interceptor_suppress = false
-    if _interceptor then
-        local result = _interceptor(e, buffer)
+    for _, iceptor in ipairs(_interceptors) do
+        local result = iceptor(e, buffer)
         if result == "consume" then return true end
-        if result == "suppress" then _interceptor_suppress = true end
+        if result == "suppress" then _interceptor_suppress = true; break end
     end
 
     if keyCode == 51 then
