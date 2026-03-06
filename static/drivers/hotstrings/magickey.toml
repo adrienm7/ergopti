@@ -4,11 +4,12 @@
 
 [_meta]
 description = "Touche ★ et expansion de texte"
-sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst", "-", "textexpansionpersonalinformation"]
+sections_order = ["replace", "repeat", "-", "textexpansiondate", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst", "-", "textexpansionpersonalinformation"]
 
 [_meta.sections]
 replace = "Transformer la touche J en ★"
 textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom Prénom, etc."
+textexpansiondate = "Date du jour avec dt★ → 19/01/2005"
 textexpansion = "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …"
 textexpansionauto = "Expansion de texte sans touche ★ : ju' = jusqu’, ya = y’a, …"
 textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …"
@@ -597,6 +598,7 @@ repeat = "La touche ★ permet la répétition"
 "vrm★" = { output = "vraiment", is_word = true, auto_expand = true, is_case_sensitive = false }
 "vrmt★" = { output = "vraiment", is_word = true, auto_expand = true, is_case_sensitive = false }
 "vs★" = { output = "vous êtes", is_word = true, auto_expand = true, is_case_sensitive = false }
+"vsc★" = { output = "VSCode", is_word = true, auto_expand = true, is_case_sensitive = true }
 "w★" = { output = "with", is_word = true, auto_expand = true, is_case_sensitive = false }
 "wd★" = { output = "windows", is_word = true, auto_expand = true, is_case_sensitive = false }
 "wk★" = { output = "week-end", is_word = true, auto_expand = true, is_case_sensitive = false }

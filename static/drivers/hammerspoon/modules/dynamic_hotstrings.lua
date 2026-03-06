@@ -164,7 +164,9 @@ function M.start(keymap_module)
 	-- Register the group in keymap so the menu can display and toggle it.
 	local sections = {}
 	for _, s in ipairs(SECTIONS) do
-		table.insert(sections, { name = s.name, description = s.description, count = 0 })
+		-- count is intentionally omitted: these sections are generated at runtime
+		-- so no static count is available; menu.lua will hide the "(N)" badge.
+		table.insert(sections, { name = s.name, description = s.description })
 	end
 	keymap_module.register_lua_group(
 		GROUP_NAME,

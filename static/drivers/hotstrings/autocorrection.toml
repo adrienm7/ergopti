@@ -4,7 +4,7 @@
 
 [_meta]
 description = "Autocorrection"
-sections_order = ["accents", "names", "brands", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe"]
+sections_order = ["accents", "names", "brands", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe", "-", "phonenumberautocomplete"]
 
 [_meta.sections]
 typographicapostrophe = "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
@@ -14,6 +14,7 @@ multiplepunctuationmarks = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n�
 suffixesachaining = "Enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement"
 minus = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
 minusapostrophe = "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … "
+phonenumberautocomplete = "Complétion automatique du n° de téléphone et numéro de sécu en tapant les premiers chiffres"
 brands = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 names = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
 accents = "Autocorrection des accents de très nombreux mots"
@@ -351,6 +352,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "tolstoi" = { output = "Tolstoï", is_word = true, auto_expand = false, is_case_sensitive = true }
 
 [[brands]]
+"adaboost" = { output = "AdaBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
 "api" = { output = "API", is_word = true, auto_expand = false, is_case_sensitive = true }
 "autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true }
 "aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true }

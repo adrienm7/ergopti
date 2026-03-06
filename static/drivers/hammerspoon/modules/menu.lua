@@ -95,6 +95,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             end
         end
 
+        -- Read existing config.json first so keys managed by other modules
+        -- (e.g. personal_info_config) are preserved across saves.
+        local existing = load_prefs()
+
         local prefs = {
             keymap                   = state.keymap,
             gestures                 = state.gestures,
@@ -113,7 +117,14 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 prefs.shortcut_keys[s.id] = s.enabled
             end
         end
-        local ok2, encoded = pcall(function() return hs.json.encode(prefs) end)
+
+        -- Merge: start from existing file, then overwrite only our own keys.
+        -- This preserves foreign keys (e.g. personal_info_config) untouched.
+        for k, v in pairs(prefs) do
+            existing[k] = v
+        end
+
+        local ok2, encoded = pcall(function() return hs.json.encode(existing) end)
         if not ok2 or not encoded then return end
         local fh = io.open(prefs_file, "w")
         if not fh then return end
@@ -291,19 +302,25 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             local has_sections = sections and #sections > 0
 
             -- Compute total count: only active sections, 0 when group is disabled.
-            local total = 0
+            -- has_count stays false when no section provides a real count (e.g. Lua
+            -- groups like dynamichotstrings): in that case the badge is omitted.
+            local total     = 0
+            local has_count = false
             if enabled and has_sections then
                 for _, sec in ipairs(sections) do
                     if sec.name ~= '-' and not sec.is_module_placeholder
                        and keymap.is_section_enabled(name, sec.name) then
-                        total = total + (sec.count or 0)
+                        if sec.count ~= nil then
+                            has_count = true
+                            total = total + sec.count
+                        end
                     end
                 end
             end
 
             local base_label = groupLabel(name)
             local item = {
-                title   = base_label .. " (" .. total .. ")",
+                title   = has_count and (base_label .. " (" .. total .. ")") or base_label,
                 checked = enabled or nil,
                 -- The parent item is clickable even alongside a sub-menu.
                 fn      = toggleGroupFn(name),
@@ -374,7 +391,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         -- Omit fn when the parent group is disabled so macOS greys
                         -- out the item; the user must re-enable the group first.
                         sec_menu[#sec_menu + 1] = {
-                            title    = label .. " (" .. (sec.count or 0) .. ")",
+                            -- Show count badge only when a real count is provided.
+                            -- Lua-generated sections (e.g. dynamichotstrings) omit
+                            -- sec.count so no misleading "(0)" is shown.
+                            title    = sec.count ~= nil
+                                       and (label .. " (" .. sec.count .. ")")
+                                       or  label,
                             checked  = sec_on or nil,
                             fn       = enabled and toggleSectionFn(name, sec.name) or nil,
                             disabled = not enabled or nil,
@@ -645,7 +667,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 prefs.shortcut_keys[s.id] = enabled
             end
         end
-        local ok2, encoded = pcall(function() return hs.json.encode(prefs) end)
+        -- Merge into existing config.json to preserve third-party keys.
+        local existing2 = load_prefs()
+        for k, v in pairs(prefs) do existing2[k] = v end
+        local ok2, encoded = pcall(function() return hs.json.encode(existing2) end)
         if ok2 and encoded then
             local fh = io.open(prefs_file, "w")
             if fh then fh:write(encoded); fh:close() end
