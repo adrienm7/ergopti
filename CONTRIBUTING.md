@@ -71,20 +71,28 @@ This plain-text file contains a single line: the absolute path to your private
      > static/drivers/hotstrings/.local_ahk_path
    ```
 
-2. Install the launchd watcher (macOS only) — triggers the full pipeline
+2. Install the pm2 watcher (macOS, Windows, Linux) — triggers the full pipeline
    automatically on every save of your private file, no terminal needed:
 
    ```bash
+   npm install        # installs pm2 along with other dev dependencies
    npm run install-watcher
    ```
 
-   To stop it:
+   Then, **once only**, make it survive reboots:
+
+   ```bash
+   npx pm2 startup
+   # execute the command it prints (requires sudo on Linux)
+   ```
+
+   To stop the watcher permanently:
 
    ```bash
    npm run uninstall-watcher
    ```
 
-   Logs are available at `~/Library/Logs/ergopti-ahk-watcher.log`.
+   Logs are available at `logs/ahk-watcher.log` inside the project.
 
 3. Alternatively, run the pipeline manually at any time:
 

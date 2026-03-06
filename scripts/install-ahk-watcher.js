@@ -1,15 +1,23 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { execSync } from 'child_process';
-import os from 'os';
+import { existsSync, readFileSync } from 'fs';
+import { execFileSync } from 'child_process';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Install a launchd agent that watches the private AHK file and runs the
-// update pipeline automatically on every save — no terminal needed.
+// Install the AHK file watcher as a persistent background process via pm2.
+// Works on macOS, Windows, and Linux — runs under the current user account,
+// so no permission/TCC issues.
+//
+// After running this script, also run once in a terminal:
+//   npx pm2 startup
+// and execute the command it prints — this makes the watcher survive reboots.
 
-const AGENT_LABEL = 'fr.ergopti.ahk-watcher';
-const PLIST_PATH = path.join(os.homedir(), 'Library', 'LaunchAgents', `${AGENT_LABEL}.plist`);
+const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const overrideFile = path.join('static', 'drivers', 'hotstrings', '.local_ahk_path');
+const PM2 = path.join(PROJECT_DIR, 'node_modules', '.bin', 'pm2');
+const WATCHER = path.join(PROJECT_DIR, 'scripts', 'watch-ahk.js');
+const APP_NAME = 'ergopti-ahk-watcher';
+
+const overrideFile = path.join(PROJECT_DIR, 'static', 'drivers', 'hotstrings', '.local_ahk_path');
 
 if (!existsSync(overrideFile)) {
 	console.error('❌ No .local_ahk_path found.');
@@ -23,54 +31,40 @@ if (!privatePath || !existsSync(privatePath)) {
 	process.exit(1);
 }
 
-const projectDir = path.resolve('.');
-const scriptPath = path.join(projectDir, 'scripts', 'run-ahk-update.sh');
-
-// Make the shell script executable
-execSync(`chmod +x "${scriptPath}"`);
-
-const plist = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>${AGENT_LABEL}</string>
-
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/bash</string>
-		<string>${scriptPath}</string>
-	</array>
-
-	<key>WatchPaths</key>
-	<array>
-		<string>${privatePath}</string>
-	</array>
-
-	<key>WorkingDirectory</key>
-	<string>${projectDir}</string>
-
-	<key>RunAtLoad</key>
-	<false/>
-
-	<key>StandardOutPath</key>
-	<string>${os.homedir()}/Library/Logs/ergopti-ahk-watcher.log</string>
-
-	<key>StandardErrorPath</key>
-	<string>${os.homedir()}/Library/Logs/ergopti-ahk-watcher.log</string>
-</dict>
-</plist>
-`;
-
-writeFileSync(PLIST_PATH, plist, 'utf8');
-console.log(`📝 Plist written: ${PLIST_PATH}`);
-
-// Unload first in case it was already loaded, then reload
+// Stop existing instance if running, then start fresh.
 try {
-	execSync(`launchctl unload "${PLIST_PATH}" 2>/dev/null || true`);
+	execFileSync(PM2, ['delete', APP_NAME], { stdio: 'ignore' });
 } catch {}
-execSync(`launchctl load "${PLIST_PATH}"`);
 
-console.log(`✅ Launchd agent loaded — watching: ${privatePath}`);
-console.log(`   Logs: ~/Library/Logs/ergopti-ahk-watcher.log`);
+execFileSync(
+	PM2,
+	[
+		'start',
+		WATCHER,
+		'--name',
+		APP_NAME,
+		'--interpreter',
+		process.execPath,
+		'--cwd',
+		PROJECT_DIR,
+		'--output',
+		path.join(PROJECT_DIR, 'logs', 'ahk-watcher.log'),
+		'--error',
+		path.join(PROJECT_DIR, 'logs', 'ahk-watcher.log'),
+		'--time'
+	],
+	{ cwd: PROJECT_DIR, stdio: 'inherit' }
+);
+
+// Save the pm2 process list so it survives reboots (requires pm2 startup to
+// have been configured once).
+execFileSync(PM2, ['save'], { cwd: PROJECT_DIR, stdio: 'inherit' });
+
+console.log(`
+✅ Watcher started as pm2 process "${APP_NAME}"`);
+console.log(`   Watching: ${privatePath}`);
+console.log(`   Logs: logs/ahk-watcher.log`);
+console.log(`
+   To survive reboots, run once in your terminal:`);
+console.log(`     npx pm2 startup`);
+console.log(`   Then execute the command it prints.`);

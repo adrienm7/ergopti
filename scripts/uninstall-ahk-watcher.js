@@ -1,19 +1,16 @@
-import { existsSync, rmSync } from 'fs';
-import { execSync } from 'child_process';
-import os from 'os';
+import { execFileSync } from 'child_process';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const AGENT_LABEL = 'fr.ergopti.ahk-watcher';
-const PLIST_PATH = path.join(os.homedir(), 'Library', 'LaunchAgents', `${AGENT_LABEL}.plist`);
+const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-if (!existsSync(PLIST_PATH)) {
-	console.log('ℹ️  No launchd agent found — nothing to uninstall.');
-	process.exit(0);
-}
+const PM2 = path.join(PROJECT_DIR, 'node_modules', '.bin', 'pm2');
+const APP_NAME = 'ergopti-ahk-watcher';
 
 try {
-	execSync(`launchctl unload "${PLIST_PATH}"`);
-} catch {}
-
-rmSync(PLIST_PATH);
-console.log(`✅ Launchd agent unloaded and removed.`);
+	execFileSync(PM2, ['delete', APP_NAME], { stdio: 'inherit' });
+	execFileSync(PM2, ['save'], { stdio: 'inherit' });
+	console.log(`✅ Watcher "${APP_NAME}" stopped and removed.`);
+} catch {
+	console.log(`ℹ️  No watcher "${APP_NAME}" was running.`);
+}
