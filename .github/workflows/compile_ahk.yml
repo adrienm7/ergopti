@@ -78,6 +78,9 @@ jobs:
                   fi
                   gh pr review "$PR_NUMBER" --approve --body "Auto-approved by CI"
                   gh pr merge "$PR_NUMBER" --squash --admin --delete-branch
+                  # Explicit fallback: delete remote branch even if --delete-branch
+                  # did not fire (e.g. PAT vs GITHUB_TOKEN discrepancy).
+                  git push origin --delete ci/recompile-exe || true
               shell: bash
               env:
                   GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
