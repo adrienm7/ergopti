@@ -1,81 +1,81 @@
 name: Build and Deploy to GitHub Pages
 
 on:
-  # Déclenchement sur un push vers la branche principale
-  push:
-    branches: ['main', 'dev']
+    # Déclenchement sur un push vers la branche principale
+    push:
+        branches: ["main", "dev"]
 
-  # Permet de lancer manuellement depuis l'onglet Actions
-  workflow_dispatch:
+    # Permet de lancer manuellement depuis l'onglet Actions
+    workflow_dispatch:
 
 # Permissions nécessaires pour pousser sur la branche gh-pages
 permissions:
-  contents: write
+    contents: write
 
 # Un seul déploiement peut être en cours à la fois
 concurrency:
-  group: 'pages'
-  cancel-in-progress: false
+    group: "pages"
+    cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      # Installation de Node.js 20 via nodesource (sans action externe)
-      - name: Setup Node.js 20
-        run: |
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-          node --version
-          npm --version
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        steps:
+            # Installation de Node.js 20 via nodesource (sans action externe)
+            - name: Setup Node.js 20
+              run: |
+                  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                  sudo apt-get install -y nodejs
+                  node --version
+                  npm --version
 
-      # Si push sur main : build seulement main
-      - name: Build main branch only
-        if: github.ref_name == 'main'
-        run: |
-          git clone --depth 1 --branch main https://github.com/${{ github.repository }}.git main-repo
-          cd main-repo
-          npm install
-          npm run build
-          cd ..
-          mkdir -p staging
-          mv main-repo/build/* staging/
+            # Si push sur main : build seulement main
+            - name: Build main branch only
+              if: github.ref_name == 'main'
+              run: |
+                  git clone --depth 1 --branch main https://github.com/${{ github.repository }}.git main-repo
+                  cd main-repo
+                  npm install
+                  npm run build
+                  cd ..
+                  mkdir -p staging
+                  mv main-repo/build/* staging/
 
-      # Si push sur dev : build main ET dev
-      - name: Build both main and dev branches
-        if: github.ref_name == 'dev'
-        run: |
-          # Build main
-          echo "Building main branch..."
-          git clone --depth 1 --branch main https://github.com/${{ github.repository }}.git main-repo
-          cd main-repo
-          npm install
-          npm run build
-          cd ..
+            # Si push sur dev : build main ET dev
+            - name: Build both main and dev branches
+              if: github.ref_name == 'dev'
+              run: |
+                  # Build main
+                  echo "Building main branch..."
+                  git clone --depth 1 --branch main https://github.com/${{ github.repository }}.git main-repo
+                  cd main-repo
+                  npm install
+                  npm run build
+                  cd ..
 
-          # Build dev
-          echo "Building dev branch..."
-          git clone --depth 1 --branch dev https://github.com/${{ github.repository }}.git dev-repo
-          cd dev-repo
-          npm install
-          npm run build
-          cd ..
+                  # Build dev
+                  echo "Building dev branch..."
+                  git clone --depth 1 --branch dev https://github.com/${{ github.repository }}.git dev-repo
+                  cd dev-repo
+                  npm install
+                  npm run build
+                  cd ..
 
-          # Organize: main at root, dev in /dev
-          mkdir -p staging
-          mv main-repo/build/* staging/
-          mkdir -p staging/dev
-          mv dev-repo/build/* staging/dev/
+                  # Organize: main at root, dev in /dev
+                  mkdir -p staging
+                  mv main-repo/build/* staging/
+                  mkdir -p staging/dev
+                  mv dev-repo/build/* staging/dev/
 
-      # Déploiement via push sur la branche gh-pages (sans action externe)
-      - name: Deploy to gh-pages branch
-        run: |
-          cd staging
-          git init
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "ci: deploy ${{ github.ref_name }} @ ${{ github.sha }}"
-          git push --force \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-            HEAD:gh-pages
+            # Déploiement via push sur la branche gh-pages (sans action externe)
+            - name: Deploy to gh-pages branch
+              run: |
+                  cd staging
+                  git init
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add .
+                  git commit -m "ci: deploy ${{ github.ref_name }} @ ${{ github.sha }}"
+                  git push --force \
+                    "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+                    HEAD:gh-pages

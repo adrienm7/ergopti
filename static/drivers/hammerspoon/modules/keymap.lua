@@ -504,6 +504,105 @@ function M.resume_processing() processing_paused = false end
 function M.is_processing_paused() return processing_paused end
 
 ---------------------------------------------------------------------------
+-- Replacement-emission helpers
+---------------------------------------------------------------------------
+
+-- UTF-8 aware length helper used both here and inside onKeyDown.
+local function utf8_len(s) return utf8.len(s) or #s end
+
+-- Maps AHK-style {Key} token names to Hammerspoon key names.
+-- Token matching is tried with the exact case first, then Title-case.
+local KEY_COMMANDS = {
+	Left      = "left",
+	Right     = "right",
+	Up        = "up",
+	Down      = "down",
+	Home      = "home",
+	End       = "end",
+	Delete    = "forwarddelete",
+	Del       = "forwarddelete",
+	Backspace = "delete",
+	BS        = "delete",
+	Tab       = "tab",
+	Enter     = "return",
+	Return    = "return",
+	Escape    = "escape",
+	Esc       = "escape",
+}
+
+-- Split a replacement string into a flat list of tokens.
+-- Each token: { kind = "text", value = "..." }
+--          or { kind = "key",  value = "<hs-key-name>" }
+-- Unrecognised {Foo} sequences are treated as literal text.
+local function tokens_from_repl(repl)
+	local tokens = {}
+	local i = 1
+	while i <= #repl do
+		local s, e, name = repl:find("{(%w+)}", i)
+		if s then
+			if s > i then
+				table.insert(tokens, { kind = "text", value = repl:sub(i, s - 1) })
+			end
+			-- Try exact case, then Title-case (e.g. "left" → "Left").
+			local title = name:sub(1, 1):upper() .. name:sub(2):lower()
+			local hs_key = KEY_COMMANDS[name] or KEY_COMMANDS[title]
+			if hs_key then
+				table.insert(tokens, { kind = "key", value = hs_key })
+			else
+				-- Unknown token – preserve as literal text.
+				table.insert(tokens, { kind = "text", value = "{" .. name .. "}" })
+			end
+			i = e + 1
+		else
+			table.insert(tokens, { kind = "text", value = repl:sub(i) })
+			break
+		end
+	end
+	return tokens
+end
+
+-- Emit all tokens as actual key events.
+-- Returns the number of synthetic keyDown events generated so callers can
+-- prime synthetic_remaining correctly.
+local function emit_tokens(tokens)
+	local count = 0
+	for _, tok in ipairs(tokens) do
+		if tok.kind == "key" then
+			keyStroke({}, tok.value, 0)
+			count = count + 1
+		else
+			keyStrokes(tok.value)
+			count = count + utf8_len(tok.value)
+		end
+	end
+	return count
+end
+
+-- Return only the plain-text portion of a replacement (key-command tokens
+-- do not contribute printable characters to the tracked buffer).
+local function text_from_tokens(tokens)
+	local parts = {}
+	for _, tok in ipairs(tokens) do
+		if tok.kind == "text" then table.insert(parts, tok.value) end
+	end
+	return table.concat(parts)
+end
+
+-- Count how many synthetic keyDown events a list of tokens will generate
+-- without emitting anything.  Mirrors the logic in emit_tokens.
+local function count_token_events(tokens)
+	local count = 0
+	for _, tok in ipairs(tokens) do
+		if tok.kind == "key" then
+			count = count + 1
+		else
+			count = count + utf8_len(tok.value)
+		end
+	end
+	return count
+end
+
+---------------------------------------------------------------------------
 -- Keyboard listener
 ---------------------------------------------------------------------------
 local function onKeyDown(e)
@@ -577,7 +676,6 @@ local function onKeyDown(e)
     if time_since_last_key <= allowed_delay then
         local char_count = utf8.len(chars) or #chars
         local prefix_before = string.sub(buffer, 1, (utf8.offset(buffer, -char_count) or (#buffer+1)) - 1)
-        local function utf8_len(s) return utf8.len(s) or #s end
         local function utf8_ends_with(s, suffix)
             local n = utf8_len(suffix)
             local start = utf8.offset(s, -n)
@@ -641,10 +739,15 @@ local function onKeyDown(e)
                                 local trigger_len = utf8_len(trigger)
                                 local chars_len = utf8_len(chars)
                                 local deletes = trigger_len - chars_len
+                                -- Tokenise the replacement so that {Left}/{Right}/etc. become
+                                -- real key strokes rather than literal characters.
+                                local repl_tokens = tokens_from_repl(m.repl)
+                                local repl_text   = text_from_tokens(repl_tokens)
                                 -- Pre-compute synthetic event count BEFORE emitting anything.
-                                -- Each keyStroke(delete) + each char in repl = one keyDown event.
+                                -- Each keyStroke(delete) = 1; text chars = 1 each; key
+                                -- commands ({Left} etc.) = 1 each.
                                 synthetic_remaining = (deletes > 0 and deletes or 0)
-                                    + (utf8_len(m.repl))
+                                    + count_token_events(repl_tokens)
                                 is_replacing = true
 
                                 if deletes > 0 then
@@ -653,14 +756,14 @@ local function onKeyDown(e)
                                     end
                                 end
 
-                                keyStrokes(m.repl)
+                                emit_tokens(repl_tokens)
 
                                 -- Keep everything before the trigger, then append the replacement.
                                 -- utf8.offset(buffer, -trigger_len) gives the byte position of the
                                 -- first character of the trigger inside buffer, so sub(1, pos-1)
                                 -- is exactly the prefix that precedes it.
                                 local trig_start = utf8.offset(buffer, -trigger_len)
-                                buffer = (trig_start and string.sub(buffer, 1, trig_start - 1) or "") .. m.repl
+                                buffer = (trig_start and string.sub(buffer, 1, trig_start - 1) or "") .. repl_text
 
                                 -- Safety fallback: if the counter somehow gets off, release the
                                 -- guard after 100 ms so the system doesn't stay frozen.
@@ -712,20 +815,22 @@ local function onKeyDown(e)
 
                         hs.timer.doAfter(0, function()
                             if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
-                            -- Pre-compute synthetic event count: trigger deletes + repl chars + boundary char.
+                            local repl_tokens = tokens_from_repl(m.repl)
+                            local repl_text   = text_from_tokens(repl_tokens)
+                            -- Pre-compute synthetic event count: trigger deletes + repl events + boundary char.
                             synthetic_remaining = trigger_len
-                                + (utf8_len(m.repl))
+                                + count_token_events(repl_tokens)
                                 + (utf8_len(chars))
                             is_replacing = true
                             -- delete the trigger characters (caret is after the trigger)
                             for _ = 1, trigger_len do keyStroke({}, 'delete', 0) end
-                            -- type replacement
-                            keyStrokes(m.repl)
+                            -- type replacement (handles {Left} / {Right} / etc.)
+                            emit_tokens(repl_tokens)
                             -- explicitly send the boundary char so it's not lost
                             keyStrokes(chars)
 
-                            -- update buffer: remove trigger from prefix_before, append repl and the boundary char
-                            buffer = before_trigger .. m.repl .. chars
+                            -- update buffer: remove trigger from prefix_before, append repl text and the boundary char
+                            buffer = before_trigger .. repl_text .. chars
 
                             -- Safety fallback in case the counter gets off.
                             hs.timer.doAfter(0.1, function()

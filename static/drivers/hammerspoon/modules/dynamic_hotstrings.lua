@@ -21,9 +21,9 @@ local GROUP_NAME = "dynamichotstrings"
 
 -- Section descriptors (defines menu order and labels).
 local SECTIONS = {
-	{ name = "date",          description = "dt\u{2605} inserts the current date (dd/mm/yyyy)" },
-	{ name = "phoneprefixes", description = "Typing the first digits of your phone number expands it" },
-	{ name = "ssnprefixes",   description = "Typing the first chars of your SSN expands it" },
+	{ name = "date",          description = "dt★ insère la date courante (jj/mm/aaaa)" },
+	{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement" },
+	{ name = "ssnprefixes",   description = "Saisir les premiers caractères du numéro de sécurité sociale le complète automatiquement" },
 }
 
 -- ---------------------------------------------------------------------------
