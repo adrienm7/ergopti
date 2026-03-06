@@ -59,13 +59,19 @@ jobs:
                   git commit -m "ci: recompile ErgoptiPlus.exe"
                   git checkout -b ci/recompile-exe
                   git push origin ci/recompile-exe --force
-                  PR_URL=$(gh pr create \
-                    --base "$GITHUB_REF_NAME" \
-                    --head ci/recompile-exe \
-                    --title "ci: recompile ErgoptiPlus.exe" \
-                    --body "Automated recompilation triggered by a change to \`ErgoptiPlus.ahk\`.")
-                  echo "PR created: $PR_URL"
-                  PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+                  EXISTING_PR=$(gh pr list --head ci/recompile-exe --base "$GITHUB_REF_NAME" --json number --jq '.[0].number')
+                  if [ -n "$EXISTING_PR" ]; then
+                    echo "Reusing existing PR #$EXISTING_PR"
+                    PR_NUMBER="$EXISTING_PR"
+                  else
+                    PR_URL=$(gh pr create \
+                      --base "$GITHUB_REF_NAME" \
+                      --head ci/recompile-exe \
+                      --title "ci: recompile ErgoptiPlus.exe" \
+                      --body "Automated recompilation triggered by a change to \`ErgoptiPlus.ahk\`.")
+                    echo "PR created: $PR_URL"
+                    PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+                  fi
                   gh pr review "$PR_NUMBER" --approve --body "Auto-approved by CI"
                   gh pr merge "$PR_NUMBER" --squash --admin --delete-branch
               shell: bash
