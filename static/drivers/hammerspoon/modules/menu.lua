@@ -183,7 +183,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         if state.scroll        then scroll.start()        else scroll.stop()        end
         if state.shortcuts     then shortcuts.start()     else shortcuts.stop()     end
         if personal_info then
-            if state.personal_info then personal_info.start(base_dir, keymap) else personal_info.stop() end
+            if state.personal_info then personal_info.enable() else personal_info.disable() end
         end
 
         -- Groups are already loaded correctly by init.lua (hs.settings was primed
@@ -493,9 +493,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             fn = function()
                 state.personal_info = not state.personal_info
                 if state.personal_info then
-                    personal_info.start(base_dir, keymap)
+                    personal_info.enable()
                 else
-                    personal_info.stop()
+                    personal_info.disable()
                 end
                 save_prefs(); updateMenu()
             end
@@ -656,10 +656,34 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     local function buildUtilityItems()
-        return {
+        local items = {
             {title="-"},
             {title="Tout activer",    fn=function() set_all_enabled(true)  end},
             {title="Tout désactiver", fn=function() set_all_enabled(false) end},
+            {title="-"},
+            {title="URL ChatGPT...", fn=function()
+                local clicked, url = hs.dialog.textPrompt(
+                    "URL ChatGPT",
+                    "URL ouverte par Ctrl+G :",
+                    state.chatgpt_url or "", "OK", "Annuler")
+                if clicked == "OK" and url ~= nil and url ~= "" then
+                    state.chatgpt_url = url
+                    save_prefs()
+                    updateMenu()
+                end
+            end},
+        }
+        if personal_info and type(personal_info.open_editor) == "function" then
+            table.insert(items, {
+                title = "Modifier les informations personnelles...",
+                fn = function()
+                    hs.timer.doAfter(0.1, function()
+                        personal_info.open_editor()
+                    end)
+                end,
+            })
+        end
+        local tail = {
             {title="-"},
             {title="Ouvrir init.lua",           fn=function() hs.execute('open "'..base_dir..'init.lua"') end},
             {title="Console Hammerspoon",       fn=function() hs.openConsole() end},
@@ -668,6 +692,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             {title="Recharger la configuration",fn=function() do_reload() end},
             {title="Quitter Hammerspoon",        fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end},
         }
+        for _, it in ipairs(tail) do table.insert(items, it) end
+        return items
     end
 
     updateMenu = function()

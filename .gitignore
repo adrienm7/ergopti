@@ -20,4 +20,3 @@ static/drivers/hammerspoon/config.json
 static/drivers/hotstrings/.local_ahk_path
 static/drivers/hotstrings/personal.toml
 logs/
-static/drivers/hammerspoon/personal_info_config.lua
