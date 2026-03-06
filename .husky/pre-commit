@@ -4,5 +4,17 @@
 # Run AHk cleanup
 npm run clean-ahk
 
+# Update "Last modified on" date in ErgoptiPlus.ahk if the line exists
+AHK_FILE="static/drivers/autohotkey/ErgoptiPlus.ahk"
+if [ -f "$AHK_FILE" ] && head -1 "$AHK_FILE" | grep -qE "; (Created|Last modified) on "; then
+    UTC_OFFSET=$(date "+%z" | sed 's/\([+-]\)0*\([0-9][0-9]*\)00/\1\2/')
+    NEW_DATE="$(date "+%Y-%m-%d at %H:%M") (UTC${UTC_OFFSET})"
+    if [ "$(uname)" = "Darwin" ]; then
+        sed -i '' "1s/.*/; Last modified on ${NEW_DATE}/" "$AHK_FILE"
+    else
+        sed -i "1s/.*/; Last modified on ${NEW_DATE}/" "$AHK_FILE"
+    fi
+fi
+
 # Stage any changes made by the cleanup
 git add static/drivers/autohotkey/*.ahk
