@@ -1,0 +1,17 @@
+{
+  "categories_order": [
+    "distancesreduction",
+    "sfbsreduction",
+    "rolls",
+    "autocorrection",
+    "magickey"
+  ],
+  "module_sections": {
+    "magickey": {
+      "textexpansionpersonalinformation": {
+        "mod_id": "personal_info",
+        "description": "Remplissage de formulaires avec le suffixe @ : @np★ = Nom Prénom, etc."
+      }
+    }
+  }
+}
