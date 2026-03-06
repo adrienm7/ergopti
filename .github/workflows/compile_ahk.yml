@@ -21,23 +21,16 @@ jobs:
               uses: actions/checkout@v4
 
             - name: Install AutoHotkey v2
-              run: choco install autohotkey --version=2.0.19 -y
+              run: |
+                  $url = "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19_setup.exe"
+                  $installer = "$env:TEMP\AutoHotkey_setup.exe"
+                  Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
+                  Start-Process $installer -ArgumentList "/S" -Wait
               shell: pwsh
 
             - name: Compile ErgoptiPlus.ahk
               run: |
-                  # Try to find Ahk2Exe in PATH or common Program Files locations
-                  $ahk2exe = (Get-Command -Name Ahk2Exe.exe -ErrorAction SilentlyContinue)?.Source
-                  if (-not $ahk2exe) {
-                    $candidates = Get-ChildItem -Path 'C:\Program Files','C:\Program Files (x86)' -Recurse -ErrorAction SilentlyContinue -Filter 'Ahk2Exe.exe' | Select-Object -First 1
-                    if ($candidates) { $ahk2exe = $candidates.FullName }
-                  }
-                  if (-not $ahk2exe) {
-                    Write-Error "Ahk2Exe.exe not found after installing AutoHotkey. Listing Program Files for debugging:"
-                    Get-ChildItem -Path 'C:\Program Files','C:\Program Files (x86)' -Recurse -ErrorAction SilentlyContinue -Include '*AutoHotkey*' | Select-Object -First 50
-                    exit 1
-                  }
-                  Write-Host "Using Ahk2Exe at: $ahk2exe"
+                  $ahk2exe = "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe"
                   $input   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
                   $output  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
                   $icon    = "${{ github.workspace }}\static\favicon.ico"
