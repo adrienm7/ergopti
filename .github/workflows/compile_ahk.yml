@@ -76,7 +76,6 @@ jobs:
                     echo "PR created: $PR_URL"
                     PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
                   fi
-                  gh pr review "$PR_NUMBER" --approve --body "Auto-approved by CI"
                   gh pr merge "$PR_NUMBER" --squash --admin --delete-branch
                   # Explicit fallback: delete remote branch even if --delete-branch
                   # did not fire (e.g. PAT vs GITHUB_TOKEN discrepancy).

@@ -1,3 +1,4 @@
+; Last modified on 2026-03-06 at 16:24 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -600,6 +601,8 @@ global Features := Map(
             "-",
             "Minus",
             "MinusApostrophe",
+            "-",
+            "PhoneNumberAutoComplete",
         ],
         "TypographicApostrophe", {
             Enabled: True,
@@ -636,6 +639,10 @@ global Features := Map(
             Enabled: True,
             Description: "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … ",
         },
+        "PhoneNumberAutoComplete", {
+            Enabled: True,
+            Description: "Complétion automatique du n° de téléphone et numéro de sécu en tapant les premiers chiffres",
+        },
         "OU", {
             Enabled: True,
             Description: "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant",
@@ -652,6 +659,7 @@ global Features := Map(
             "Replace",
             "Repeat",
             "-",
+            "TextExpansionDate",
             "TextExpansion",
             "TextExpansionAuto",
             "TextExpansionEmojis",
@@ -691,6 +699,10 @@ global Features := Map(
         "TextExpansionSymbolsTypst", {
             Enabled: True,
             Description: "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …",
+        },
+        "TextExpansionDate", {
+            Enabled: True,
+            Description: "Date du jour avec dt" . ScriptInformation["MagicKey"] . " → 19/01/2005",
         },
         "TextExpansionPersonalInformation", {
             Enabled: True,
@@ -5196,12 +5208,32 @@ if Features["Autocorrection"]["MinusApostrophe"].Enabled {
     CreateCaseSensitiveHotstrings("*?", "z'v", "z-v")
 }
 
+; ====================================================================
+; ======= 8.3.1) Phone number & social security auto-complete =========
+; ====================================================================
+
+if Features["Autocorrection"]["PhoneNumberAutoComplete"].Enabled {
+    CreateHotstring("*", "+33" . SubStr(PersonalInformation["PhoneNumber"], 1, 2), "+33" . PersonalInformation[
+        "PhoneNumber"]) ; +3306X
+    CreateHotstring("*", "+33" . SubStr(PersonalInformation["PhoneNumber"], 2, 3), "+33" . PersonalInformation[
+        "PhoneNumber"]) ; +336X
+    CreateHotstring("*", SubStr(PersonalInformation["PhoneNumber"], 1, 4), PersonalInformation["PhoneNumber"]) ; 06XX
+    CreateHotstring("*", SubStr(PersonalInformation["PhoneNumber"], 2, 5), PersonalInformation["PhoneNumber"]) ; 6XXX
+
+    CreateHotstring("*", SubStr(PersonalInformation["PhoneNumberClean"], 1, 5), PersonalInformation["PhoneNumberClean"]) ; 06 XX
+    CreateHotstring("*", SubStr(PersonalInformation["PhoneNumberClean"], 2, 5), SubStr(PersonalInformation[
+        "PhoneNumberClean"], 2)) ; 6 XX
+    CreateHotstring("*", SubStr(PersonalInformation["SocialSecurityNumber"], 1, 5), PersonalInformation[
+        "SocialSecurityNumber"])
+}
+
 ; ========================================
 ; ======= 8.4) Caps autocorrection =======
 ; ========================================
 
 if Features["Autocorrection"]["Brands"].Enabled {
     ; CreateHotstring("", "ai", "AI") ; conflict with j’"ai"
+    CreateHotstring("", "adaboost", "AdaBoost")
     CreateHotstring("", "api", "API")
     CreateHotstring("", "autohotkey", "AutoHotkey")
     CreateHotstring("", "aws", "AWS")
@@ -5960,6 +5992,20 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
     CreateHotstringComboAuto("pntmmd")
 }
 
+; ===============================================
+; ======= 9.2.1) DATE EXPANSION WITH dt★ =======
+; ===============================================
+
+if Features["MagicKey"]["TextExpansionDate"].Enabled {
+    MK := ScriptInformation["MagicKey"]
+    Abbreviation := "dt" . MK
+    Hotstring(":*B0:" . Abbreviation, DateHotstringCallback.Bind(Abbreviation))
+    DateHotstringCallback(Abbr, *) {
+        SendFinalResult("{BackSpace " . StrLen(Abbr) . "}", Map("OnlyText", False))
+        SendFinalResult(FormatTime(, "dd/MM/yyyy"))
+    }
+}
+
 ; ===========================================
 ; ======= 9.3) TEXT EXPANSION WITH ★ =======
 ; ===========================================
@@ -6513,6 +6559,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "vrm" . ScriptInformation["MagicKey"], "vraiment")
     CreateCaseSensitiveHotstrings("*", "vrmt" . ScriptInformation["MagicKey"], "vraiment")
     CreateCaseSensitiveHotstrings("*", "vs" . ScriptInformation["MagicKey"], "vous êtes")
+    CreateHotstring("*", "vsc" . ScriptInformation["MagicKey"], "VSCode")
 
     ; === W ===
     CreateCaseSensitiveHotstrings("*", "w" . ScriptInformation["MagicKey"], "with")
