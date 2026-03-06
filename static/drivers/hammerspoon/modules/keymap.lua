@@ -510,6 +510,11 @@ function M.is_processing_paused() return processing_paused end
 -- UTF-8 aware length helper used both here and inside onKeyDown.
 local function utf8_len(s) return utf8.len(s) or #s end
 
+-- Text tokens longer than this (in UTF-8 codepoints) are inserted via
+-- clipboard paste (Cmd+V) instead of keyStrokes to avoid per-character
+-- timing issues that corrupt long replacements.
+local PASTE_THRESHOLD = 30
+
 -- Maps AHK-style {Key} token names to Hammerspoon key names.
 -- Token matching is tried with the exact case first, then Title-case.
 local KEY_COMMANDS = {
@@ -562,6 +567,9 @@ local function tokens_from_repl(repl)
 end
 
 -- Emit all tokens as actual key events.
+-- Text tokens longer than PASTE_THRESHOLD codepoints are sent via
+-- clipboard paste (Cmd+V = 1 synthetic keyDown) instead of keyStrokes
+-- (N synthetic keyDowns) to avoid per-character errors on long strings.
 -- Returns the number of synthetic keyDown events generated so callers can
 -- prime synthetic_remaining correctly.
 local function emit_tokens(tokens)
@@ -570,6 +578,15 @@ local function emit_tokens(tokens)
 		if tok.kind == "key" then
 			keyStroke({}, tok.value, 0)
 			count = count + 1
+		elseif utf8_len(tok.value) > PASTE_THRESHOLD then
+			-- Save and restore the clipboard so the user's content is preserved.
+			local prev_clip = hs.pasteboard.getContents()
+			hs.pasteboard.setContents(tok.value)
+			keyStroke({"cmd"}, "v", 0)
+			count = count + 1  -- only the Cmd+V keyDown reaches our eventtap
+			hs.timer.doAfter(1, function()
+				hs.pasteboard.setContents(prev_clip or "")
+			end)
 		else
 			keyStrokes(tok.value)
 			count = count + utf8_len(tok.value)
@@ -589,12 +606,15 @@ local function text_from_tokens(tokens)
 end
 
 -- Count how many synthetic keyDown events a list of tokens will generate
--- without emitting anything.  Mirrors the logic in emit_tokens.
+-- without emitting anything.  Mirrors the logic in emit_tokens exactly:
+-- long text tokens count as 1 (the Cmd+V), short ones count per codepoint.
 local function count_token_events(tokens)
 	local count = 0
 	for _, tok in ipairs(tokens) do
 		if tok.kind == "key" then
 			count = count + 1
+		elseif utf8_len(tok.value) > PASTE_THRESHOLD then
+			count = count + 1  -- Cmd+V = 1 keyDown
 		else
 			count = count + utf8_len(tok.value)
 		end

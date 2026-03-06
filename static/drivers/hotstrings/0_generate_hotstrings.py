@@ -72,7 +72,11 @@ def normalize_name(name: str) -> str:
 
 
 def escape_toml_string(text: str) -> str:
-    """Escape backslashes and double-quotes for a TOML double-quoted string.
+    """Escape special characters for a TOML double-quoted basic string.
+
+    Handles backslashes, double-quotes, and control characters that would
+    break TOML parsing if emitted literally (newlines inside inline tables
+    are forbidden by TOML 1.0 and break the line-by-line toml_reader).
 
     Args:
             text: Raw string value.
@@ -82,6 +86,9 @@ def escape_toml_string(text: str) -> str:
     """
     text = text.replace("\\", "\\\\")
     text = text.replace('"', '\\"')
+    text = text.replace("\n", "\\n")
+    text = text.replace("\t", "\\t")
+    text = text.replace("\r", "\\r")
     return text
 
 
@@ -694,6 +701,136 @@ def _strip_ahk_inline_comment(line: str) -> str:
     return line
 
 
+_AHK1_HOTSTRING_HEADER_RE = re.compile(r":([^:\n]*):([^:\n]+)::\s*\{")
+
+
+def _extract_send_instant_output(block: str) -> str:
+    """Extract and normalise the output string from a ``SendInstant(...)`` call.
+
+    Handles both single-line strings and multi-line AHK2 continuation-section
+    strings (``"\\n(\\n...\\n)"``) .  Double-quote escape (``""`` → ``"``) and
+    backtick escapes are applied to the extracted content.
+
+    Args:
+        block: Body text of a ``:*:trigger:: { ... }`` block (between the
+               braces), with no surrounding braces.
+
+    Returns:
+        Normalised output text, or empty string if no ``SendInstant`` found.
+    """
+    # Single-line: SendInstant("text here")
+    single_m = re.search(r'SendInstant\("([^"\n]*)"\)', block)
+    if single_m:
+        return process_autohotkey_escapes(single_m.group(1))
+
+    # Multi-line continuation section: SendInstant("\n(\n...\n)"\n)
+    # The string literal ends with )" where ) closes the continuation section
+    # and " closes the string.
+    multi_m = re.search(r'SendInstant\("\s*\n(.*?)\)"', block, re.DOTALL)
+    if not multi_m:
+        return ""
+
+    raw = multi_m.group(1)
+
+    # Strip the AHK2 continuation-section ( / ) marker lines if present.
+    # The opening ( is the first non-empty line; the closing ) was consumed by
+    # the )" in the regex, so only the ( line needs to be stripped here.
+    lines = raw.split("\n")
+    while lines and re.match(r"^\s*\(\s*$", lines[0]):
+        lines.pop(0)
+
+    # Dedent: remove common leading whitespace from non-empty lines.
+    non_empty = [li for li in lines if li.strip()]
+    if non_empty:
+        min_indent = min(len(li) - len(li.lstrip()) for li in non_empty)
+        lines = [
+            li[min_indent:] if len(li) >= min_indent else li for li in lines
+        ]
+
+    content = "\n".join(lines).strip()
+
+    # AHK2 in-string double-quote escape inside continuation sections: "" → "
+    content = content.replace('""', '"')
+
+    # Apply remaining backtick escapes.
+    return process_autohotkey_escapes(content)
+
+
+def _extract_legacy_hotstrings(
+    body: str,
+) -> list[tuple[str, str, bool, bool, bool]]:
+    """Parse AHK1-style ``:*:trigger:: { SendInstant(...) }`` hotstrings.
+
+    These use the legacy AHK label syntax rather than ``CreateHotstring()``.
+    The trigger options (e.g. ``*`` for auto-expand) are parsed from the
+    colon-prefix.  The output text is extracted from ``SendInstant()`` and
+    optional trailing key tokens are appended from ``SendFinalResult()``.
+
+    Args:
+        body: Raw body text of a ``Features[...][...]`` block.
+
+    Returns:
+        List of ``(trigger, output, is_word, auto_expand, case_sensitive)``
+        tuples, one per discovered legacy hotstring.
+    """
+    results: list[tuple[str, str, bool, bool, bool]] = []
+    pos = 0
+    while pos < len(body):
+        header_m = _AHK1_HOTSTRING_HEADER_RE.search(body, pos)
+        if not header_m:
+            break
+
+        opts_str = header_m.group(1)  # e.g. "*" or "*C"
+        trigger = header_m.group(2).strip()
+
+        # Walk forward from the opening brace, counting balanced braces.
+        # Braces inside string literals (between pairs of ") are ignored so
+        # that AHK key tokens like {Left} do not confuse the depth counter.
+        brace_start = header_m.end()
+        depth = 1
+        idx = brace_start
+        in_str = False
+        while idx < len(body) and depth > 0:
+            ch = body[idx]
+            if ch == "`" and in_str:
+                idx += 2  # AHK backtick escape – skip next char
+                continue
+            if ch == '"':
+                in_str = not in_str
+            elif not in_str:
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+            idx += 1
+        block = body[brace_start : idx - 1]
+        pos = idx
+
+        auto_expand = "*" in opts_str
+        is_word = True
+        # Mirror the convention used by CreateHotstring vs
+        # CreateCaseSensitiveHotstrings: the tuple element means "was this
+        # extracted from the CaseSensitive variant?" which entries_to_toml_lines
+        # then inverts (str(not case_sensitive)) when writing is_case_sensitive.
+        # AHK1 `:C:` option = case-sensitive; absence = case-insensitive (False).
+        is_case_sensitive = "C" in opts_str
+
+        output = _extract_send_instant_output(block)
+        if not output:
+            continue
+
+        # Append key tokens from an optional SendFinalResult("{...}") call.
+        final_m = re.search(r'SendFinalResult\("([^"]+)"\)', block)
+        if final_m:
+            output += final_m.group(1)
+
+        results.append(
+            (trigger, output, is_word, auto_expand, is_case_sensitive)
+        )
+
+    return results
+
+
 def parse_body(
     body: str,
     *,
@@ -720,6 +857,18 @@ def parse_body(
     """
     entries: list[tuple[str, str, bool, bool, bool]] = []
     seen: set[str] = set()
+
+    # First pass: extract AHK1-style :*:trigger:: { SendInstant(...) } blocks
+    # before the line-by-line scan so those triggers are registered in `seen`
+    # and their multi-line bodies do not confuse the CreateHotstring parser.
+    for legacy in _extract_legacy_hotstrings(body):
+        trig, out, iw, ae, cs = legacy
+        if skip_identity and trig == out:
+            continue
+        if trig not in seen:
+            seen.add(trig)
+            entries.append(legacy)
+
     lines = body.split("\n")
     i = 0
 
