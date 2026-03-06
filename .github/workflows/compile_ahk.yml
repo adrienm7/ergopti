@@ -76,4 +76,4 @@ jobs:
                   gh pr merge "$PR_NUMBER" --squash --admin --delete-branch
               shell: bash
               env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
