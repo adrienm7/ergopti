@@ -351,7 +351,6 @@ accents = "Autocorrection des accents de très nombreux mots"
 "tolstoi" = { output = "Tolstoï", is_word = true, auto_expand = false, is_case_sensitive = true }
 
 [[brands]]
-"ai" = { output = "AI", is_word = true, auto_expand = false, is_case_sensitive = true }
 "api" = { output = "API", is_word = true, auto_expand = false, is_case_sensitive = true }
 "autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true }
 "aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -420,6 +419,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "qlora" = { output = "QLoRA", is_word = true, auto_expand = false, is_case_sensitive = true }
 "r" = { output = "R", is_word = true, auto_expand = false, is_case_sensitive = true }
 "rdc" = { output = "RDC", is_word = true, auto_expand = false, is_case_sensitive = true }
+"red hat" = { output = "Rad Hat", is_word = true, auto_expand = false, is_case_sensitive = true }
 "rh" = { output = "RH", is_word = true, auto_expand = false, is_case_sensitive = true }
 "sas" = { output = "SAS", is_word = true, auto_expand = false, is_case_sensitive = true }
 "sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -436,6 +436,12 @@ accents = "Autocorrection des accents de très nombreux mots"
 "windows" = { output = "Windows", is_word = true, auto_expand = false, is_case_sensitive = true }
 "xgboost" = { output = "XGBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
 "youtube" = { output = "YouTube", is_word = true, auto_expand = false, is_case_sensitive = true }
+"iaas" = { output = "IaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
+"paas" = { output = "PaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
+"saas" = { output = "SaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
+"caas" = { output = "CaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
+"faas" = { output = "FaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
+"dbaas" = { output = "DBaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
 
 [[typographicapostrophe]]
 "c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false }
@@ -465,6 +471,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "eiu" = { output = "ieu", is_word = false, auto_expand = true, is_case_sensitive = false }
 "eua" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
 "oiu" = { output = "oui", is_word = false, auto_expand = true, is_case_sensitive = false }
+"oyu" = { output = "you", is_word = false, auto_expand = true, is_case_sensitive = false }
 "poru" = { output = "pour", is_word = true, auto_expand = true, is_case_sensitive = false }
 "sru" = { output = "sur", is_word = true, auto_expand = true, is_case_sensitive = false }
 "uio" = { output = "uoi", is_word = false, auto_expand = true, is_case_sensitive = false }
