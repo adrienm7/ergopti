@@ -10,6 +10,7 @@
 		"preview": "vite preview",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write .",
+		"sync-ahk": "node scripts/sync-private-ahk.js",
 		"clean-ahk": "node remove_ahk_personal_configuration.js",
 		"prepare": "husky install"
 	},

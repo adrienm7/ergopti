@@ -20,7 +20,7 @@ dependencies = [
     { name = "lxml" },
     { name = "pyyaml" },
     { name = "toml" },
-    { name = "windows-curses" },
+    { name = "windows-curses", marker = "sys_platform == 'win32'" },
 ]
 
 [package.metadata]
@@ -29,7 +29,7 @@ requires-dist = [
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "toml", specifier = ">=0.10.2" },
-    { name = "windows-curses", specifier = ">=2.4.1" },
+    { name = "windows-curses", marker = "sys_platform == 'win32'", specifier = ">=2.4.1" },
 ]
 
 [[package]]

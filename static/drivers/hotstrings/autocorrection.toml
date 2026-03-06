@@ -7,6 +7,7 @@ description = "Autocorrection"
 sections_order = ["accents", "names", "brands", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe"]
 
 [_meta.sections]
+brands = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 typographicapostrophe = "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
 errors = "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …"
 ou = "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant"
@@ -14,7 +15,6 @@ multiplepunctuationmarks = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n�
 suffixesachaining = "Enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement"
 minus = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
 minusapostrophe = "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … "
-brands = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 names = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
 accents = "Autocorrection des accents de très nombreux mots"
 
@@ -351,6 +351,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "tolstoi" = { output = "Tolstoï", is_word = true, auto_expand = false, is_case_sensitive = true }
 
 [[brands]]
+"ai" = { output = "AI", is_word = true, auto_expand = false, is_case_sensitive = true }
 "api" = { output = "API", is_word = true, auto_expand = false, is_case_sensitive = true }
 "autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true }
 "aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true }
@@ -435,12 +436,6 @@ accents = "Autocorrection des accents de très nombreux mots"
 "windows" = { output = "Windows", is_word = true, auto_expand = false, is_case_sensitive = true }
 "xgboost" = { output = "XGBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
 "youtube" = { output = "YouTube", is_word = true, auto_expand = false, is_case_sensitive = true }
-"iaas" = { output = "IaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"paas" = { output = "PaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"saas" = { output = "SaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"caas" = { output = "CaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"faas" = { output = "FaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"dbaas" = { output = "DBaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
 
 [[typographicapostrophe]]
 "c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false }

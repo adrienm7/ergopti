@@ -17,3 +17,4 @@ static/corpus/modifie/
 static/version.json
 version.json
 static/drivers/hammerspoon/config.json
+static/drivers/hotstrings/.local_ahk_path
