@@ -4,17 +4,11 @@
 	import SFB from '$lib/components/SFB.svelte';
 	import { version, discordLink } from '$lib/stores_infos.js';
 	import { getLatestVersion } from '$lib/js/getVersions.js';
-	let versionValue,
-		version_mineure_kbdedit_exe,
-		version_mineure_kbdedit_kbe,
-		version_mineure_ahk_exe,
-		version_mineure_ahk;
+	let versionValue, version_mineure_kbdedit_exe, version_mineure_kbdedit_kbe;
 	version.subscribe((value) => {
 		versionValue = value;
 		version_mineure_kbdedit_exe = getLatestVersion('kbdedit_exe', versionValue);
 		version_mineure_kbdedit_kbe = getLatestVersion('kbdedit_kbe', versionValue);
-		version_mineure_ahk_exe = getLatestVersion('autohotkey_exe', versionValue);
-		version_mineure_ahk = getLatestVersion('autohotkey', versionValue);
 	});
 </script>
 
@@ -125,22 +119,18 @@
 <small-space></small-space>
 
 <div class="download-buttons">
-	{#if version_mineure_ahk !== undefined}
-		<a href="drivers/autohotkey/ErgoptiPlus_v{version_mineure_ahk}.ahk" download>
-			<button
-				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
-				ErgoptiPlus v{version_mineure_ahk}.ahk</button
-			>
-		</a>
-	{/if}
-	{#if version_mineure_ahk_exe !== undefined}
-		<a href="drivers/autohotkey/compiled/ErgoptiPlus_v{version_mineure_ahk_exe}.exe" download>
-			<button class="alt-button"
-				><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
-				ErgoptiPlus v{version_mineure_ahk_exe} compilé</button
-			>
-		</a>
-	{/if}
+	<a href="drivers/autohotkey/ErgoptiPlus.ahk" download>
+		<button
+			><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
+			ErgoptiPlus.ahk</button
+		>
+	</a>
+	<a href="drivers/autohotkey/ErgoptiPlus.exe" download>
+		<button class="alt-button"
+			><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
+			ErgoptiPlus compilé</button
+		>
+	</a>
 </div>
 <p>
 	Il est également conseillé (mais c’est optionnel) de télécharger les 2 fichiers suivants : <a

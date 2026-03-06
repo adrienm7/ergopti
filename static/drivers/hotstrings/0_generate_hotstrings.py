@@ -423,34 +423,6 @@ def parse_ahk_top_level_order(content: str) -> list[str]:
     return []
 
 
-def get_latest_ahk_file() -> Path:
-    """Return the path to the most recent ErgoptiPlus AHK file.
-
-    Returns:
-            Path to the latest versioned AHK file.
-
-    Raises:
-            FileNotFoundError: When no matching file exists in the autohotkey dir.
-    """
-    ahk_dir = Path(__file__).parent.parent / "autohotkey"
-    candidates = list(ahk_dir.glob("ErgoptiPlus_v*.*.*.ahk"))
-    if not candidates:
-        raise FileNotFoundError(f"No AutoHotkey files found in {ahk_dir}")
-
-    def _version_key(p: Path) -> tuple[int, int, int]:
-        m = re.search(r"v(\d+)\.(\d+)\.(\d+)", p.name)
-        return (
-            (int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            if m
-            else (0, 0, 0)
-        )
-
-    candidates.sort(key=_version_key, reverse=True)
-    latest = candidates[0]
-    logger.info("Detected AHK file: %s", latest.name)
-    return latest
-
-
 def parse_ahk_circumflex_map(content: str) -> dict[str, str]:
     """Parse the ``DeadkeyMappingCircumflex`` global map from the AHK source.
 
@@ -1068,19 +1040,15 @@ def build_handcrafted_sections(
     }
 
 
-def main() -> None:
+def main(
+    ahk_file: Path,
+) -> None:
     """Extract all AHK hotstring blocks and write one TOML file per category."""
     reset_error_count()
 
     logger.info("=" * 80)
     logger.info("AutoHotkey → TOML hotstring generator")
     logger.info("=" * 80)
-
-    try:
-        ahk_file = get_latest_ahk_file()
-    except FileNotFoundError as exc:
-        logger.error("%s", exc)
-        return
 
     content = ahk_file.read_text(encoding="utf-8")
     all_blocks = find_all_blocks(content)
@@ -1240,4 +1208,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    ahk_path = Path(__file__).parent.parent / "autohotkey" / "ErgoptiPlus.ahk"
+    main(ahk_path)

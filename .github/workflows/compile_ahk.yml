@@ -1,0 +1,44 @@
+name: Compile ErgoptiPlus AHK
+
+on:
+    push:
+        branches: ["main", "dev"]
+        paths:
+            - "static/drivers/autohotkey/ErgoptiPlus.ahk"
+
+    # Permet de lancer manuellement depuis l'onglet Actions
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    compile:
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Install AutoHotkey v2
+              run: choco install autohotkey --version=2.0.19 -y
+              shell: pwsh
+
+            - name: Compile ErgoptiPlus.ahk
+              run: |
+                  $ahk2exe = "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe"
+                  $input   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
+                  $output  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
+                  $icon    = "${{ github.workspace }}\static\favicon.ico"
+                  & $ahk2exe /in $input /out $output /icon $icon
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              shell: pwsh
+
+            - name: Commit and push compiled EXE
+              run: |
+                  git config user.name  "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add static/drivers/autohotkey/ErgoptiPlus.exe
+                  git diff --cached --quiet && echo "No changes to commit" || git commit -m "ci: recompile ErgoptiPlus.exe"
+                  git push
+              shell: bash
