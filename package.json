@@ -13,6 +13,9 @@
 		"sync-ahk": "node scripts/sync-private-ahk.js",
 		"clean-ahk": "node remove_ahk_personal_configuration.js",
 		"update": "npm run sync-ahk && npm run clean-ahk && node scripts/update-ahk-date.js && uv run python static/drivers/hotstrings/0_generate_hotstrings.py",
+		"watch-ahk": "node scripts/watch-ahk.js",
+		"install-watcher": "node scripts/install-ahk-watcher.js",
+		"uninstall-watcher": "node scripts/uninstall-ahk-watcher.js",
 		"prepare": "husky install"
 	},
 	"type": "module",

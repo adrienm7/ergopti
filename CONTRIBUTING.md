@@ -71,7 +71,26 @@ This plain-text file contains a single line: the absolute path to your private
      > static/drivers/hotstrings/.local_ahk_path
    ```
 
-2. That's it. The file is listed in `.gitignore` and will never be committed.
+2. Install the launchd watcher (macOS only) — triggers the full pipeline
+   automatically on every save of your private file, no terminal needed:
+
+   ```bash
+   npm run install-watcher
+   ```
+
+   To stop it:
+
+   ```bash
+   npm run uninstall-watcher
+   ```
+
+   Logs are available at `~/Library/Logs/ergopti-ahk-watcher.log`.
+
+3. Alternatively, run the pipeline manually at any time:
+
+   ```bash
+   npm run update
+   ```
 
 ### What happens automatically at commit time
 
