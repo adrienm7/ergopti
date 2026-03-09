@@ -10,7 +10,7 @@ sections_order = ["comma", "-", "ecirc", "egrave", "-", "bu", "ie"]
 comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"
 ecirc = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u."
 egrave = "È + touche Y corrige 2 SFBs : èy = aî et yè = â"
-bu = "À + ★/B corrige 2 SFBs : à★ = bu et àu = ub"
+bu = "À + ★/U corrige 2 SFBs : à★ = bu et àu = ub"
 ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 [[comma]]
