@@ -564,11 +564,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         -- Display value in ms, rounded to avoid floating-point noise.
         local current_ms = math.floor(current * 1000 + 0.5)
         return {
-            title = string.format("Délai d'expansion : %d ms", current_ms),
+            title = string.format("Délai maximal d'expansion : %d ms…", current_ms),
             fn = function()
                 local btn, raw = hs.dialog.textPrompt(
-                    "Délai d'expansion",
-                    "Entrez le délai en millisecondes (nombre entier ≥ 0) :",
+                    "Délai maximal d'expansion",
+                    "Entrez le délai en millisecondes\n (nombre entier ≥ 0) :",
                     tostring(current_ms),
                     "OK", "Annuler"
                 )
@@ -745,26 +745,18 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         do_reload()
     end
 
-    local function buildUtilityItems()
-        local items = {
-            {title="-"},
-            {title="Tout activer",    fn=function() set_all_enabled(true)  end},
-            {title="Tout désactiver", fn=function() set_all_enabled(false) end},
-            {title="-"},
-            buildExpandersItem(),
-            buildDelayItem(),
-            {title="URL ChatGPT...", fn=function()
-                local clicked, url = hs.dialog.textPrompt(
-                    "URL ChatGPT",
-                    "URL ouverte par Ctrl+G :",
-                    state.chatgpt_url or "", "OK", "Annuler")
-                if clicked == "OK" and url ~= nil and url ~= "" then
-                    state.chatgpt_url = url
-                    save_prefs()
-                    updateMenu()
-                end
-            end},
-        }
+    updateMenu = function()
+        local items = {}
+        for _, it in ipairs(buildHotstringsItems()) do table.insert(items, it) end
+        table.insert(items, {title="-"})
+        table.insert(items, buildGestesItem())
+        table.insert(items, buildRaccourcisItem())
+        table.insert(items, {title="-"})
+        table.insert(items, {title="Tout activer",    fn=function() set_all_enabled(true)  end})
+        table.insert(items, {title="Tout désactiver", fn=function() set_all_enabled(false) end})
+        table.insert(items, {title="-"})
+        table.insert(items, buildExpandersItem())
+        table.insert(items, buildDelayItem())
         if personal_info and type(personal_info.open_editor) == "function" then
             table.insert(items, {
                 title = "Modifier les informations personnelles...",
@@ -775,28 +767,24 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 end,
             })
         end
-        local tail = {
-            {title="-"},
-            {title="Ouvrir init.lua",           fn=function() hs.execute('open "'..base_dir..'init.lua"') end},
-            {title="Console Hammerspoon",       fn=function() hs.openConsole() end},
-            {title="Préférences Hammerspoon",   fn=function() hs.openPreferences() end},
-            {title="-"},
-            {title="Recharger la configuration",fn=function() do_reload() end},
-            {title="Quitter Hammerspoon",        fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end},
-        }
-        for _, it in ipairs(tail) do table.insert(items, it) end
-        return items
-    end
-
-    updateMenu = function()
-        local items = {}
-        for _, it in ipairs(buildHotstringsItems()) do
-            table.insert(items, it)
-        end
+        table.insert(items, {title="URL ChatGPT...", fn=function()
+            local clicked, url = hs.dialog.textPrompt(
+                "URL ChatGPT",
+                "URL ouverte par Ctrl+G :",
+                state.chatgpt_url or "", "OK", "Annuler")
+            if clicked == "OK" and url ~= nil and url ~= "" then
+                state.chatgpt_url = url
+                save_prefs()
+                updateMenu()
+            end
+        end})
         table.insert(items, {title="-"})
-        table.insert(items, buildGestesItem())
-        table.insert(items, buildRaccourcisItem())
-        for _, it in ipairs(buildUtilityItems()) do table.insert(items, it) end
+        table.insert(items, {title="Ouvrir init.lua",           fn=function() hs.execute('open "'..base_dir..'init.lua"') end})
+        table.insert(items, {title="Console Hammerspoon",       fn=function() hs.openConsole() end})
+        table.insert(items, {title="Préférences Hammerspoon",   fn=function() hs.openPreferences() end})
+        table.insert(items, {title="-"})
+        table.insert(items, {title="Recharger la configuration",fn=function() do_reload() end})
+        table.insert(items, {title="Quitter Hammerspoon",       fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end})
         myMenu:setMenu({})
         hs.timer.doAfter(0.02, function() myMenu:setMenu(items) end)
     end
