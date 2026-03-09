@@ -108,6 +108,7 @@ function M.load_toml(name, path)
 						is_word           = entry.is_word,
 						auto_expand       = entry.auto_expand,
 						is_case_sensitive = entry.is_case_sensitive,
+						final_result      = entry.final_result,
 					})
 					total = total + 1
 				end
@@ -387,11 +388,13 @@ function M.add(trigger, replacement, opts)
     --   is_word = true/false,
     --   auto_expand = true/false,
     --   is_case_sensitive = true/false,
+    --   final_result = true/false,  -- when true, expanded text is never re-scanned
     -- })
     opts = opts or {}
     local is_word = opts.is_word == true
     local is_auto = opts.auto_expand == true
     local is_case_sensitive = opts.is_case_sensitive == true
+    local is_final = opts.final_result == true
 
     local function add_mapping_raw(t, r, a)
         local k = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a)
@@ -405,12 +408,13 @@ function M.add(trigger, replacement, opts)
         end
         seq_counter = seq_counter + 1
         local entry = {
-            trigger  = t,
-            repl     = r,
-            is_word  = is_word,
-            auto     = a,
-            seq      = seq_counter,
-            tlen     = utf8.len(t) or #t,  -- pre-cache for sort
+            trigger      = t,
+            repl         = r,
+            is_word      = is_word,
+            auto         = a,
+            seq          = seq_counter,
+            tlen         = utf8.len(t) or #t,  -- pre-cache for sort
+            final_result = is_final,
         }
         if current_group then entry.group = current_group end
         table.insert(mappings, entry)
@@ -502,6 +506,37 @@ local processing_paused = false
 function M.pause_processing()  processing_paused = true  end
 function M.resume_processing() processing_paused = false end
 function M.is_processing_paused() return processing_paused end
+
+-- Timestamp (seconds) until which hotstring matching is suppressed after a
+-- final_result expansion.  Prevents the expanded text from being re-scanned
+-- by other hotstrings (e.g. "axa" inside an e-mail address).
+local _no_rescan_until = 0
+
+-- Mark the buffer as off-limits for hotstring matching for `duration` seconds.
+-- Also clears the buffer so that residual characters cannot participate in a
+-- future match that spans the expansion boundary.
+-- Exposed as M.suppress_rescan so external modules (e.g. personal_info) that
+-- emit replacement text directly via eventtap can trigger the same protection.
+local function suppress_rescan(duration)
+	_no_rescan_until = hs.timer.secondsSinceEpoch() + (duration or 0.5)
+	buffer = ""
+end
+function M.suppress_rescan(duration) suppress_rescan(duration) end
+
+-- Return true when re-scan suppression is currently active.
+local function rescan_suppressed()
+	return hs.timer.secondsSinceEpoch() < _no_rescan_until
+end
+
+-- Return whether a case-sensitive TOML trigger is registered in the mappings.
+-- Used by personal_info.lua to yield priority to explicit TOML shortcuts like
+-- "@am★" so they are never swallowed by the @<letters>★ interceptor.
+function M.has_exact_trigger(trigger)
+	for _, m in ipairs(mappings) do
+		if m.trigger == trigger then return true end
+	end
+	return false
+end
 
 ---------------------------------------------------------------------------
 -- Replacement-emission helpers
@@ -625,6 +660,7 @@ end
 ---------------------------------------------------------------------------
 -- Keyboard listener
 ---------------------------------------------------------------------------
+
 local function onKeyDown(e)
     if processing_paused then return false end
     if is_replacing then
@@ -692,6 +728,10 @@ local function onKeyDown(e)
     end
 
     if _interceptor_suppress then return false end
+
+    -- If a final_result expansion just finished, skip all hotstring matching
+    -- for this event.  The buffer was already cleared by suppress_rescan().
+    if rescan_suppressed() then return false end
 
     if time_since_last_key <= allowed_delay then
         local char_count = utf8.len(chars) or #chars
@@ -785,6 +825,10 @@ local function onKeyDown(e)
                                 local trig_start = utf8.offset(buffer, -trigger_len)
                                 buffer = (trig_start and string.sub(buffer, 1, trig_start - 1) or "") .. repl_text
 
+                                -- When final_result is set, prevent any further hotstring from
+                                -- re-scanning the expanded text (e.g. "axa" inside an e-mail).
+                                if m.final_result then suppress_rescan() end
+
                                 -- Safety fallback: if the counter somehow gets off, release the
                                 -- guard after 100 ms so the system doesn't stay frozen.
                                 hs.timer.doAfter(0.1, function()
@@ -832,6 +876,7 @@ local function onKeyDown(e)
                         local trigger_len = utf8_len(trigger)
                         local start_trigger = utf8.offset(prefix_before, -utf8_len(trigger))
                         local before_trigger = (start_trigger and string.sub(prefix_before, 1, start_trigger - 1)) or ""
+                        local is_final_mapping = m.final_result
 
                         hs.timer.doAfter(0, function()
                             if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
@@ -851,6 +896,10 @@ local function onKeyDown(e)
 
                             -- update buffer: remove trigger from prefix_before, append repl text and the boundary char
                             buffer = before_trigger .. repl_text .. chars
+
+                            -- When final_result is set, prevent any further hotstring from
+                            -- re-scanning the expanded text (e.g. "axa" inside an e-mail).
+                            if is_final_mapping then suppress_rescan() end
 
                             -- Safety fallback in case the counter gets off.
                             hs.timer.doAfter(0.1, function()

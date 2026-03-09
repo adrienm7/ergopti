@@ -46,6 +46,40 @@ FILE_DESCRIPTIONS: dict[str, str] = {
 # All generated TOML files land in this directory (next to this script).
 OUTPUT_DIR = Path(__file__).parent
 
+# Minimum output length above which final_result is set to True.
+# Must match PASTE_THRESHOLD in keymap.lua: outputs longer than this are
+# inserted via clipboard paste, so any sub-sequence could re-trigger a
+# hotstring if re-scanning is not suppressed.
+_FINAL_RESULT_THRESHOLD: int = 30
+
+
+def _needs_final_result(output: str) -> bool:
+    """Return True when expanded text should not be re-scanned for hotstrings.
+
+    Criteria (any one is sufficient):
+    - Output contains ``@``: likely an e-mail address.
+    - Output length exceeds ``_FINAL_RESULT_THRESHOLD``: pasted via clipboard.
+    - Output has **no letters** (a–z, A–Z, accented U+00C0–U+024F) **and** at
+      least **2 distinct non-space characters**: this catches operator
+      sequences like ``/*``, ``<=``, ``:=``, ``!=``, ``("`` which could
+      re-trigger symbol-based hotstrings, while leaving simple repeated-char
+      outputs like ``--``, ``==``, ``;;`` untouched (only 1 distinct char).
+
+    Args:
+        output: Expanded replacement text.
+
+    Returns:
+        ``True`` when the output should be marked ``final_result = true``.
+    """
+    if "@" in output or len(output) > _FINAL_RESULT_THRESHOLD:
+        return True
+    if re.search(r"[a-zA-Z\u00C0-\u024F]", output):
+        return False
+    # No letters: check for 2+ distinct non-space chars (operator sequence).
+    distinct_non_space = {c for c in output if not c.isspace()}
+    return len(distinct_non_space) >= 2
+
+
 # Categories whose TOML files are gitignored and must never appear in the
 # committed _index.json (Hammerspoon will load them outside of that index).
 _PRIVATE_CATEGORIES: frozenset[str] = frozenset({"personal"})
@@ -612,7 +646,7 @@ def find_all_blocks(content: str) -> dict[str, dict[str, str]]:
 
 def _extract_hotstring_from_line(
     line: str,
-) -> tuple[Optional[str], Optional[str], bool, bool, bool]:
+) -> tuple[Optional[str], Optional[str], bool, bool, bool, bool]:
     """Parse one (possibly multi-line-joined) AHK call and return its fields.
 
     Applies :func:`preprocess_ahk_line` first so that known AHK global
@@ -623,8 +657,10 @@ def _extract_hotstring_from_line(
             line: A single logical AHK statement, with whitespace normalised.
 
     Returns:
-            ``(trigger, output, is_word, auto_expand, case_sensitive)`` where
-            *trigger* and *output* are ``None`` when no hotstring was found.
+            ``(trigger, output, is_word, auto_expand, case_sensitive,
+            final_result)`` where *trigger* and *output* are ``None`` when no
+            hotstring was found.  ``final_result`` is derived automatically
+            from the output via :func:`_needs_final_result`.
     """
     # Resolve variables and collapse string concatenations upfront.
     line = preprocess_ahk_line(line)
@@ -666,9 +702,16 @@ def _extract_hotstring_from_line(
         output = process_autohotkey_escapes(m.group("out"))
         auto_expand = "*" in opts
         is_word = "?" not in opts
-        return trigger, output, is_word, auto_expand, case_sensitive
+        return (
+            trigger,
+            output,
+            is_word,
+            auto_expand,
+            case_sensitive,
+            _needs_final_result(output),
+        )
 
-    return None, None, False, False, False
+    return None, None, False, False, False, False
 
 
 def _strip_ahk_inline_comment(line: str) -> str:
@@ -758,7 +801,7 @@ def _extract_send_instant_output(block: str) -> str:
 
 def _extract_legacy_hotstrings(
     body: str,
-) -> list[tuple[str, str, bool, bool, bool]]:
+) -> list[tuple[str, str, bool, bool, bool, bool]]:
     """Parse AHK1-style ``:*:trigger:: { SendInstant(...) }`` hotstrings.
 
     These use the legacy AHK label syntax rather than ``CreateHotstring()``.
@@ -770,10 +813,10 @@ def _extract_legacy_hotstrings(
         body: Raw body text of a ``Features[...][...]`` block.
 
     Returns:
-        List of ``(trigger, output, is_word, auto_expand, case_sensitive)``
-        tuples, one per discovered legacy hotstring.
+        List of ``(trigger, output, is_word, auto_expand, case_sensitive,
+        final_result)`` 6-tuples, one per discovered legacy hotstring.
     """
-    results: list[tuple[str, str, bool, bool, bool]] = []
+    results: list[tuple[str, str, bool, bool, bool, bool]] = []
     pos = 0
     while pos < len(body):
         header_m = _AHK1_HOTSTRING_HEADER_RE.search(body, pos)
@@ -825,7 +868,14 @@ def _extract_legacy_hotstrings(
             output += final_m.group(1)
 
         results.append(
-            (trigger, output, is_word, auto_expand, is_case_sensitive)
+            (
+                trigger,
+                output,
+                is_word,
+                auto_expand,
+                is_case_sensitive,
+                _needs_final_result(output),
+            )
         )
 
     return results
@@ -835,7 +885,7 @@ def parse_body(
     body: str,
     *,
     skip_identity: bool = True,
-) -> list[tuple[str, str, bool, bool, bool]]:
+) -> list[tuple[str, str, bool, bool, bool, bool]]:
     """Extract all hotstring entries from a block body.
 
     Section-header comments (``; === Name ===``) are ignored – every entry
@@ -853,16 +903,17 @@ def parse_body(
 
     Returns:
             Deduplicated list of
-            ``(trigger, output, is_word, auto_expand, case_sensitive)`` tuples.
+            ``(trigger, output, is_word, auto_expand, case_sensitive,
+            final_result)`` 6-tuples.
     """
-    entries: list[tuple[str, str, bool, bool, bool]] = []
+    entries: list[tuple[str, str, bool, bool, bool, bool]] = []
     seen: set[str] = set()
 
     # First pass: extract AHK1-style :*:trigger:: { SendInstant(...) } blocks
     # before the line-by-line scan so those triggers are registered in `seen`
     # and their multi-line bodies do not confuse the CreateHotstring parser.
     for legacy in _extract_legacy_hotstrings(body):
-        trig, out, iw, ae, cs = legacy
+        trig, out, iw, ae, cs, fr = legacy
         if skip_identity and trig == out:
             continue
         if trig not in seen:
@@ -904,7 +955,7 @@ def parse_body(
         else:
             i += 1
 
-        trigger, output, is_word, auto_expand, case_sensitive = (
+        trigger, output, is_word, auto_expand, case_sensitive, final_result = (
             _extract_hotstring_from_line(line)
         )
 
@@ -920,7 +971,14 @@ def parse_body(
             elif trigger not in seen:
                 seen.add(trigger)
                 entries.append(
-                    (trigger, output, is_word, auto_expand, case_sensitive)
+                    (
+                        trigger,
+                        output,
+                        is_word,
+                        auto_expand,
+                        case_sensitive,
+                        final_result,
+                    )
                 )
         elif any(
             kw in line
@@ -947,9 +1005,14 @@ def parse_body(
 
 
 def entries_to_toml_lines(
-    entries: list[tuple[str, str, bool, bool, bool]],
+    entries: list[tuple[str, str, bool, bool, bool, bool]],
 ) -> list[str]:
     """Render a list of hotstring entries as TOML assignment lines.
+
+    Each entry is a 6-tuple ``(trigger, output, is_word, auto_expand,
+    case_sensitive, final_result)``.  The ``final_result`` field is always
+    written (``true`` or ``false``) so that Hammerspoon can rely on its
+    presence without a default-value fallback.
 
     Args:
             entries: Hotstring tuples produced by :func:`parse_body`.
@@ -958,21 +1021,26 @@ def entries_to_toml_lines(
             One TOML line per entry.
     """
     lines = []
-    for trigger, output, is_word, auto_expand, case_sensitive in entries:
+    for row in entries:
+        trigger, output, is_word, auto_expand, case_sensitive = row[:5]
+        final_result: bool = row[5] if len(row) > 5 else False  # type: ignore[index]
         t = escape_toml_string(trigger)
         o = escape_toml_string(output)
-        lines.append(
+        line = (
             f'"{t}" = {{ output = "{o}"'
             f", is_word = {str(is_word).lower()}"
             f", auto_expand = {str(auto_expand).lower()}"
-            f", is_case_sensitive = {str(not case_sensitive).lower()} }}"
+            f", is_case_sensitive = {str(not case_sensitive).lower()}"
+            f", final_result = {str(final_result).lower()}"
+            " }"
         )
+        lines.append(line)
     return lines
 
 
 def write_category_toml(
     category: str,
-    sub_blocks: dict[str, list[tuple[str, str, bool, bool, bool]]],
+    sub_blocks: dict[str, list[tuple[str, str, bool, bool, bool, bool]]],
     section_descriptions: Optional[dict[str, str]] = None,
     section_order: Optional[list[str]] = None,
 ) -> int:
@@ -1075,7 +1143,7 @@ def write_category_toml(
 # ---------------------------------------------------------------------------
 
 
-def _comment_entries() -> list[tuple[str, str, bool, bool, bool]]:
+def _comment_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     r"""Return entries for the Comment roll: ``\"`` ➜ ``/*`` and ``"\`` ➜ ``*/``.
 
     The AHK source uses backtick-escaped double-quotes inside the string
@@ -1084,8 +1152,8 @@ def _comment_entries() -> list[tuple[str, str, bool, bool, bool]]:
     so they must be hand-crafted.
     """
     return [
-        ('\\"', "/*", False, True, False),
-        ('"\\', "*/", False, True, False),
+        ('\\"', "/*", False, True, False, _needs_final_result("/*")),
+        ('"\\', "*/", False, True, False, _needs_final_result("*/")),
     ]
 
 
@@ -1096,7 +1164,7 @@ _ECIRCUMFLEX_VOWEL_KEYS: frozenset[str] = frozenset("aAiIoOuUàÀèÈéÉêÊ")
 
 def _deadkey_ecircumflex_entries(
     circumflex_map: dict[str, str],
-) -> list[tuple[str, str, bool, bool, bool]]:
+) -> list[tuple[str, str, bool, bool, bool, bool]]:
     """Generate hotstring entries for all ``ê``+key combinations.
 
     Iterates the full ``DeadkeyMappingCircumflex`` and produces one
@@ -1128,13 +1196,20 @@ def _deadkey_ecircumflex_entries(
     """
     excluded = {"e", "E", "t", "T"}
     return [
-        (f"ê{key}", value, key not in _ECIRCUMFLEX_VOWEL_KEYS, True, False)
+        (
+            f"ê{key}",
+            value,
+            key not in _ECIRCUMFLEX_VOWEL_KEYS,
+            True,
+            False,
+            _needs_final_result(value),
+        )
         for key, value in circumflex_map.items()
         if key not in excluded
     ]
 
 
-def _hashtag_quote_entries() -> list[tuple[str, str, bool, bool, bool]]:
+def _hashtag_quote_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     """Return entries for the HashtagQuote roll: (# ➜ (" and [# ➜ [\'.
 
     This roll is implemented via a ``#HotIf`` block in AHK (not a standard
@@ -1143,12 +1218,12 @@ def _hashtag_quote_entries() -> list[tuple[str, str, bool, bool, bool]]:
     ``#`` key outputs a double-quote instead.
     """
     return [
-        ("(#", '("', False, True, False),
-        ("[#", '["', False, True, False),
+        ("(#", '("', False, True, False, _needs_final_result('("')),
+        ("[#", '["', False, True, False, _needs_final_result('["')),
     ]
 
 
-def _chevron_equal_entries() -> list[tuple[str, str, bool, bool, bool]]:
+def _chevron_equal_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     """Return entries for the ChevronEqual roll: <% ➜ <= and >% ➜ >=.
 
     This roll is also implemented via a ``#HotIf`` block in AHK and is not
@@ -1156,12 +1231,12 @@ def _chevron_equal_entries() -> list[tuple[str, str, bool, bool, bool]]:
     ``<`` or ``>``, pressing the AltGr-mapped ``%`` key outputs ``=``.
     """
     return [
-        ("<%", "<=", False, True, False),
-        (">%", ">=", False, True, False),
+        ("<%", "<=", False, True, False, _needs_final_result("<=")),
+        (">%", ">=", False, True, False, _needs_final_result(">=")),
     ]
 
 
-def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool]]:
+def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     """Return corrected entries for the EqualString roll: [) ➜ = "".
 
     The AHK source uses consecutive backtick-escaped double-quotes
@@ -1171,8 +1246,8 @@ def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool]]:
     entries override the broken parsed ones with the correct expansion.
     """
     return [
-        (" [)", ' = ""', False, True, False),
-        ("[)", ' = ""', False, True, False),
+        (" [)", ' = ""', False, True, False, _needs_final_result(' = ""')),
+        ("[)", ' = ""', False, True, False, _needs_final_result(' = ""')),
     ]
 
 
@@ -1189,7 +1264,9 @@ _MODULE_SECTIONS: dict[str, str] = {
 
 def build_handcrafted_sections(
     content: str,
-) -> dict[str, dict[str, tuple[list[tuple[str, str, bool, bool, bool]], str]]]:
+) -> dict[
+    str, dict[str, tuple[list[tuple[str, str, bool, bool, bool, bool]], str]]
+]:
     """Build the hand-crafted sections dict from the parsed AHK source.
 
     Some AHK sub-sections cannot be parsed automatically (``#HotIf`` context

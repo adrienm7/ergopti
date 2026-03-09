@@ -4,7 +4,7 @@
 
 [_meta]
 description = "Autocorrection"
-sections_order = ["accents", "names", "brands", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe", "-", "phonenumberautocomplete"]
+sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe", "-", "phonenumberautocomplete"]
 
 [_meta.sections]
 typographicapostrophe = "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
@@ -15,555 +15,555 @@ suffixesachaining = "Enchaîner plusieurs fois des suffixes, comme aim|able|emen
 minus = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
 minusapostrophe = "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … "
 phonenumberautocomplete = "Complétion automatique du n° de téléphone et numéro de sécu en tapant les premiers chiffres"
-brands = "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
+caps = "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 names = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
 accents = "Autocorrection des accents de très nombreux mots"
 
 [[accents]]
-"abim" = { output = "abîm", is_word = true, auto_expand = true, is_case_sensitive = false }
-"accroit" = { output = "accroît", is_word = true, auto_expand = true, is_case_sensitive = false }
-"affut" = { output = "affût", is_word = true, auto_expand = true, is_case_sensitive = false }
-"agé" = { output = "âgé", is_word = true, auto_expand = false, is_case_sensitive = false }
-"agée" = { output = "âgée", is_word = true, auto_expand = false, is_case_sensitive = false }
-"agés" = { output = "âgés", is_word = true, auto_expand = false, is_case_sensitive = false }
-"agées" = { output = "âgées", is_word = true, auto_expand = false, is_case_sensitive = false }
-"aieul" = { output = "aïeul", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aieux" = { output = "aïeux", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aigue" = { output = "aiguë", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aikido" = { output = "aïkido", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ainé" = { output = "aîné", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ambigue" = { output = "ambiguë", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ambigui" = { output = "ambiguï", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ame" = { output = "âme", is_word = true, auto_expand = false, is_case_sensitive = false }
-"ames" = { output = "âmes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"ane" = { output = "âne", is_word = true, auto_expand = false, is_case_sensitive = false }
-"anerie" = { output = "ânerie", is_word = true, auto_expand = true, is_case_sensitive = false }
-"anes" = { output = "ânes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"angstrom" = { output = "ångström", is_word = true, auto_expand = false, is_case_sensitive = false }
-"apotre" = { output = "apôtre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"appat" = { output = "appât", is_word = true, auto_expand = true, is_case_sensitive = false }
-"apprete" = { output = "apprête", is_word = true, auto_expand = false, is_case_sensitive = false }
-"appreter" = { output = "apprêter", is_word = true, auto_expand = false, is_case_sensitive = false }
-"apre" = { output = "âpre", is_word = true, auto_expand = false, is_case_sensitive = false }
-"archaique" = { output = "archaïque", is_word = true, auto_expand = true, is_case_sensitive = false }
-"archaisme" = { output = "archaïsme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"archeveque" = { output = "archevêque", is_word = true, auto_expand = false, is_case_sensitive = false }
-"archeveques" = { output = "archevêques", is_word = true, auto_expand = false, is_case_sensitive = false }
-"arete" = { output = "arête", is_word = true, auto_expand = false, is_case_sensitive = false }
-"aretes" = { output = "arêtes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"arome" = { output = "arôme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"arret" = { output = "arrêt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aout" = { output = "août", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aumone" = { output = "aumône", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aumonier" = { output = "aumônier", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aussitot" = { output = "aussitôt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"avant-gout" = { output = "avant-goût", is_word = true, auto_expand = true, is_case_sensitive = false }
-"babord" = { output = "bâbord", is_word = true, auto_expand = true, is_case_sensitive = false }
-"baille" = { output = "bâille", is_word = true, auto_expand = true, is_case_sensitive = false }
-"baillon" = { output = "bâillon", is_word = true, auto_expand = true, is_case_sensitive = false }
-"baionnette" = { output = "baïonnette", is_word = true, auto_expand = true, is_case_sensitive = false }
-"batard" = { output = "bâtard", is_word = true, auto_expand = true, is_case_sensitive = false }
-"bati" = { output = "bâti", is_word = true, auto_expand = true, is_case_sensitive = false }
-"baton" = { output = "bâton", is_word = true, auto_expand = true, is_case_sensitive = false }
-"beche" = { output = "bêche", is_word = true, auto_expand = false, is_case_sensitive = false }
-"beches" = { output = "bêches", is_word = true, auto_expand = false, is_case_sensitive = false }
-"benet" = { output = "benêt", is_word = true, auto_expand = false, is_case_sensitive = false }
-"benets" = { output = "benêts", is_word = true, auto_expand = false, is_case_sensitive = false }
-"bete" = { output = "bête", is_word = true, auto_expand = true, is_case_sensitive = false }
-"betis" = { output = "bêtis", is_word = true, auto_expand = true, is_case_sensitive = false }
-"bientot" = { output = "bientôt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"binome" = { output = "binôme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"blamer" = { output = "blâmer", is_word = true, auto_expand = true, is_case_sensitive = false }
-"bleme" = { output = "blême", is_word = true, auto_expand = false, is_case_sensitive = false }
-"blemes" = { output = "blêmes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"blemir" = { output = "blêmir", is_word = true, auto_expand = false, is_case_sensitive = false }
-"blémir" = { output = "blêmir", is_word = true, auto_expand = false, is_case_sensitive = false }
-"boeuf" = { output = "bœuf", is_word = true, auto_expand = true, is_case_sensitive = false }
-"boite" = { output = "boîte", is_word = false, auto_expand = true, is_case_sensitive = false }
-"brul" = { output = "brûl", is_word = true, auto_expand = true, is_case_sensitive = false }
-"buche" = { output = "bûche", is_word = true, auto_expand = true, is_case_sensitive = false }
-"calin" = { output = "câlin", is_word = true, auto_expand = true, is_case_sensitive = false }
-"canoe" = { output = "canoë", is_word = true, auto_expand = true, is_case_sensitive = false }
-"chaine" = { output = "chaîne", is_word = false, auto_expand = true, is_case_sensitive = false }
-"chaîned" = { output = "chained", is_word = false, auto_expand = true, is_case_sensitive = false }
-"chainé" = { output = "chaîné", is_word = false, auto_expand = true, is_case_sensitive = false }
-"chassis" = { output = "châssis", is_word = true, auto_expand = false, is_case_sensitive = false }
-"chateau" = { output = "château", is_word = true, auto_expand = true, is_case_sensitive = false }
-"chatier" = { output = "châtier", is_word = true, auto_expand = true, is_case_sensitive = false }
-"chatiment" = { output = "châtiment", is_word = true, auto_expand = true, is_case_sensitive = false }
-"chomage" = { output = "chômage", is_word = true, auto_expand = true, is_case_sensitive = false }
-"chomer" = { output = "chômer", is_word = true, auto_expand = false, is_case_sensitive = false }
-"chomeu" = { output = "chômeu", is_word = true, auto_expand = true, is_case_sensitive = false }
-"chomé" = { output = "chômé", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cloture" = { output = "clôture", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cloturé" = { output = "clôturé", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cocaine" = { output = "cocaïne", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cocaino" = { output = "cocaïno", is_word = true, auto_expand = true, is_case_sensitive = false }
-"coeur" = { output = "cœur", is_word = true, auto_expand = true, is_case_sensitive = false }
-"coincide" = { output = "coïncide", is_word = true, auto_expand = true, is_case_sensitive = false }
-"connait" = { output = "connaît", is_word = false, auto_expand = true, is_case_sensitive = false }
-"controle" = { output = "contrôle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"controlé" = { output = "contrôlé", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cout" = { output = "coût", is_word = true, auto_expand = false, is_case_sensitive = false }
-"coute" = { output = "coûte", is_word = true, auto_expand = false, is_case_sensitive = false }
-"couter" = { output = "coûter", is_word = true, auto_expand = false, is_case_sensitive = false }
-"couteu" = { output = "coûteu", is_word = true, auto_expand = true, is_case_sensitive = false }
-"couts" = { output = "coûts", is_word = true, auto_expand = false, is_case_sensitive = false }
-"cote" = { output = "côte", is_word = true, auto_expand = false, is_case_sensitive = false }
-"cotes" = { output = "côtes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"cotoie" = { output = "côtoie", is_word = true, auto_expand = true, is_case_sensitive = false }
-"cotoy" = { output = "côtoy", is_word = true, auto_expand = true, is_case_sensitive = false }
-"croitre" = { output = "croître", is_word = false, auto_expand = true, is_case_sensitive = false }
-"crouton" = { output = "croûton", is_word = true, auto_expand = true, is_case_sensitive = false }
-"débacle" = { output = "débâcle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dégat" = { output = "dégât", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dégout" = { output = "dégoût", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dépech" = { output = "dépêch", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dépot" = { output = "dépôt", is_word = true, auto_expand = false, is_case_sensitive = false }
-"dépots" = { output = "dépôts", is_word = true, auto_expand = false, is_case_sensitive = false }
-"diplome" = { output = "diplôme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"diplomé" = { output = "diplômé", is_word = true, auto_expand = true, is_case_sensitive = false }
-"drole" = { output = "drôle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"dument" = { output = "dûment", is_word = true, auto_expand = false, is_case_sensitive = false }
-"egoisme" = { output = "egoïsme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"égoisme" = { output = "égoïsme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"egoiste" = { output = "egoïste", is_word = true, auto_expand = true, is_case_sensitive = false }
-"égoiste" = { output = "égoïste", is_word = true, auto_expand = true, is_case_sensitive = false }
-"elle-meme" = { output = "elle-même", is_word = true, auto_expand = true, is_case_sensitive = false }
-"elles-meme" = { output = "elles-mêmes", is_word = true, auto_expand = true, is_case_sensitive = false }
-"elles-memes" = { output = "elles-mêmes", is_word = true, auto_expand = true, is_case_sensitive = false }
-"embet" = { output = "embêt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"embuch" = { output = "embûch", is_word = true, auto_expand = true, is_case_sensitive = false }
-"empeche" = { output = "empêche", is_word = true, auto_expand = true, is_case_sensitive = false }
-"enchaine" = { output = "enchaîne", is_word = true, auto_expand = true, is_case_sensitive = false }
-"enjoleu" = { output = "enjôleu", is_word = true, auto_expand = true, is_case_sensitive = false }
-"enrole" = { output = "enrôle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"entete" = { output = "entête", is_word = true, auto_expand = true, is_case_sensitive = false }
-"enteté" = { output = "entêté", is_word = true, auto_expand = true, is_case_sensitive = false }
-"entraina" = { output = "entraîna", is_word = true, auto_expand = true, is_case_sensitive = false }
-"entraine" = { output = "entraîne", is_word = true, auto_expand = true, is_case_sensitive = false }
-"entrainé" = { output = "entraîné", is_word = true, auto_expand = true, is_case_sensitive = false }
-"entrepot" = { output = "entrepôt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"envout" = { output = "envoût", is_word = true, auto_expand = true, is_case_sensitive = false }
-"eux-meme" = { output = "eux-mêmes", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fache" = { output = "fâche", is_word = true, auto_expand = true, is_case_sensitive = false }
-"faché" = { output = "fâché", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fantom" = { output = "fantôm", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fenetre" = { output = "fenêtre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"felure" = { output = "fêlure", is_word = true, auto_expand = true, is_case_sensitive = false }
-"félure" = { output = "fêlure", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fete" = { output = "fête", is_word = true, auto_expand = false, is_case_sensitive = false }
-"feter" = { output = "fêter", is_word = true, auto_expand = false, is_case_sensitive = false }
-"fetes" = { output = "fêtes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"flane" = { output = "flâne", is_word = true, auto_expand = false, is_case_sensitive = false }
-"flaner" = { output = "flâner", is_word = true, auto_expand = false, is_case_sensitive = false }
-"flanes" = { output = "flânes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"flaneu" = { output = "flâneu", is_word = true, auto_expand = true, is_case_sensitive = false }
-"flanez" = { output = "flânez", is_word = true, auto_expand = false, is_case_sensitive = false }
-"flanons" = { output = "flânons", is_word = true, auto_expand = false, is_case_sensitive = false }
-"flute" = { output = "flûte", is_word = true, auto_expand = false, is_case_sensitive = false }
-"flutes" = { output = "flûtes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"foetus" = { output = "fœtus", is_word = true, auto_expand = true, is_case_sensitive = false }
-"foret" = { output = "forêt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"fraich" = { output = "fraîch", is_word = false, auto_expand = true, is_case_sensitive = false }
-"frole" = { output = "frôle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"gach" = { output = "gâch", is_word = true, auto_expand = true, is_case_sensitive = false }
-"gateau" = { output = "gâteau", is_word = true, auto_expand = true, is_case_sensitive = false }
-"gater" = { output = "gâter", is_word = true, auto_expand = false, is_case_sensitive = false }
-"gaté" = { output = "gâté", is_word = true, auto_expand = false, is_case_sensitive = false }
-"gatés" = { output = "gâtés", is_word = true, auto_expand = false, is_case_sensitive = false }
-"genant" = { output = "gênant", is_word = true, auto_expand = true, is_case_sensitive = false }
-"gener" = { output = "gêner", is_word = true, auto_expand = false, is_case_sensitive = false }
-"génant" = { output = "gênant", is_word = true, auto_expand = true, is_case_sensitive = false }
-"génants" = { output = "gênants", is_word = true, auto_expand = false, is_case_sensitive = false }
-"geole" = { output = "geôle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"geolier" = { output = "geôlier", is_word = false, auto_expand = true, is_case_sensitive = false }
-"geoliè" = { output = "geôliè", is_word = false, auto_expand = true, is_case_sensitive = false }
-"gout" = { output = "goût", is_word = true, auto_expand = false, is_case_sensitive = false }
-"gouta" = { output = "goûta", is_word = true, auto_expand = false, is_case_sensitive = false }
-"goute" = { output = "goûte", is_word = true, auto_expand = false, is_case_sensitive = false }
-"gouter" = { output = "goûter", is_word = true, auto_expand = false, is_case_sensitive = false }
-"goutes" = { output = "goûtes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"goutez" = { output = "goûtez", is_word = true, auto_expand = false, is_case_sensitive = false }
-"goutons" = { output = "goûtons", is_word = true, auto_expand = false, is_case_sensitive = false }
-"grele" = { output = "grêle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"grèle" = { output = "grêle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"greler" = { output = "grêler", is_word = true, auto_expand = true, is_case_sensitive = false }
-"guepe" = { output = "guêpe", is_word = true, auto_expand = true, is_case_sensitive = false }
-"heroique" = { output = "héroïque", is_word = true, auto_expand = true, is_case_sensitive = false }
-"heroisme" = { output = "héroïsme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"héroique" = { output = "héroïque", is_word = true, auto_expand = true, is_case_sensitive = false }
-"héroisme" = { output = "héroïsme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"honnete" = { output = "honnête", is_word = false, auto_expand = true, is_case_sensitive = false }
-"hopita" = { output = "hôpita", is_word = true, auto_expand = true, is_case_sensitive = false }
-"huitre" = { output = "huître", is_word = true, auto_expand = true, is_case_sensitive = false }
-"icone" = { output = "icône", is_word = true, auto_expand = true, is_case_sensitive = false }
-"idolatr" = { output = "idolâtr", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ile" = { output = "île", is_word = true, auto_expand = false, is_case_sensitive = false }
-"iles" = { output = "îles", is_word = true, auto_expand = false, is_case_sensitive = false }
-"ilot" = { output = "îlot", is_word = true, auto_expand = false, is_case_sensitive = false }
-"ilots" = { output = "îlots", is_word = true, auto_expand = false, is_case_sensitive = false }
-"impot" = { output = "impôt", is_word = true, auto_expand = false, is_case_sensitive = false }
-"impots" = { output = "impôts", is_word = true, auto_expand = false, is_case_sensitive = false }
-"indu" = { output = "indû", is_word = true, auto_expand = false, is_case_sensitive = false }
-"indument" = { output = "indûment", is_word = true, auto_expand = true, is_case_sensitive = false }
-"indus" = { output = "indûs", is_word = true, auto_expand = false, is_case_sensitive = false }
-"infame" = { output = "infâme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"infamie" = { output = "infâmie", is_word = true, auto_expand = true, is_case_sensitive = false }
-"inoui" = { output = "inouï", is_word = true, auto_expand = true, is_case_sensitive = false }
-"interet" = { output = "intérêt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"intéret" = { output = "intérêt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"jeuner" = { output = "jeûner", is_word = true, auto_expand = true, is_case_sensitive = false }
-"lache" = { output = "lâche", is_word = true, auto_expand = true, is_case_sensitive = false }
-"laique" = { output = "laïque", is_word = true, auto_expand = true, is_case_sensitive = false }
-"laius" = { output = "laïus", is_word = true, auto_expand = true, is_case_sensitive = false }
-"les notres" = { output = "les nôtres", is_word = true, auto_expand = true, is_case_sensitive = false }
-"les votres" = { output = "les vôtres", is_word = true, auto_expand = true, is_case_sensitive = false }
-"lui-meme" = { output = "lui-même", is_word = true, auto_expand = true, is_case_sensitive = false }
-"m'apprete" = { output = "m'apprête", is_word = true, auto_expand = true, is_case_sensitive = false }
-"m’apprete" = { output = "m’apprête", is_word = true, auto_expand = true, is_case_sensitive = false }
-"mache" = { output = "mâche", is_word = true, auto_expand = false, is_case_sensitive = false }
-"macher" = { output = "mâcher", is_word = true, auto_expand = false, is_case_sensitive = false }
-"machoire" = { output = "mâchoire", is_word = true, auto_expand = true, is_case_sensitive = false }
-"machouill" = { output = "mâchouill", is_word = true, auto_expand = true, is_case_sensitive = false }
-"maelstrom" = { output = "maelström", is_word = true, auto_expand = true, is_case_sensitive = false }
-"malstrom" = { output = "malström", is_word = true, auto_expand = true, is_case_sensitive = false }
-"maitr" = { output = "maîtr", is_word = true, auto_expand = true, is_case_sensitive = false }
-"male" = { output = "mâle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"males" = { output = "mâles", is_word = true, auto_expand = false, is_case_sensitive = false }
-"manoeuvr" = { output = "manœuvr", is_word = true, auto_expand = true, is_case_sensitive = false }
-"maratre" = { output = "marâtre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"meler" = { output = "mêler", is_word = false, auto_expand = true, is_case_sensitive = false }
-"mome" = { output = "môme", is_word = true, auto_expand = false, is_case_sensitive = false }
-"momes" = { output = "mômes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"mosaique" = { output = "mosaïque", is_word = true, auto_expand = true, is_case_sensitive = false }
-"multitache" = { output = "multitâche", is_word = true, auto_expand = true, is_case_sensitive = false }
-"murement" = { output = "mûrement", is_word = true, auto_expand = true, is_case_sensitive = false }
-"murir" = { output = "mûrir", is_word = true, auto_expand = true, is_case_sensitive = false }
-"naif" = { output = "naïf", is_word = true, auto_expand = false, is_case_sensitive = false }
-"naifs" = { output = "naïfs", is_word = true, auto_expand = true, is_case_sensitive = false }
-"naivement" = { output = "naïvement", is_word = true, auto_expand = true, is_case_sensitive = false }
-"naives" = { output = "naïves", is_word = true, auto_expand = true, is_case_sensitive = false }
-"naitre" = { output = "naître", is_word = true, auto_expand = true, is_case_sensitive = false }
-"noeud" = { output = "nœud", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oecuméni" = { output = "œcuméni", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oeil" = { output = "œil", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oesophage" = { output = "œsophage", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oeuf" = { output = "œuf", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oeuvre" = { output = "œuvre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oiaque" = { output = "oïaque", is_word = false, auto_expand = true, is_case_sensitive = false }
-"oide" = { output = "oïde", is_word = false, auto_expand = true, is_case_sensitive = false }
-"opiniatre" = { output = "opiniâtre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ouie" = { output = "ouïe", is_word = true, auto_expand = true, is_case_sensitive = false }
-"oter" = { output = "ôter", is_word = true, auto_expand = false, is_case_sensitive = false }
-"paella" = { output = "paëlla", is_word = true, auto_expand = true, is_case_sensitive = false }
-"palir" = { output = "pâlir", is_word = true, auto_expand = true, is_case_sensitive = false }
-"parait" = { output = "paraît", is_word = false, auto_expand = true, is_case_sensitive = false }
-"paranoia" = { output = "paranoïa", is_word = false, auto_expand = true, is_case_sensitive = false }
-"paté" = { output = "pâté", is_word = true, auto_expand = false, is_case_sensitive = false }
-"patés" = { output = "pâtés", is_word = true, auto_expand = false, is_case_sensitive = false }
-"pate" = { output = "pâte", is_word = true, auto_expand = false, is_case_sensitive = false }
-"pates" = { output = "pâtes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"patir" = { output = "pâtir", is_word = true, auto_expand = true, is_case_sensitive = false }
-"patiss" = { output = "pâtiss", is_word = true, auto_expand = true, is_case_sensitive = false }
-"patur" = { output = "pâtur", is_word = true, auto_expand = true, is_case_sensitive = false }
-"peche" = { output = "pêche", is_word = true, auto_expand = false, is_case_sensitive = false }
-"pecher" = { output = "pêcher", is_word = true, auto_expand = false, is_case_sensitive = false }
-"peches" = { output = "pêches", is_word = true, auto_expand = false, is_case_sensitive = false }
-"pecheu" = { output = "pêcheu", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pentecote" = { output = "Pentecôte", is_word = true, auto_expand = true, is_case_sensitive = false }
-"phoenix" = { output = "phœnix", is_word = true, auto_expand = true, is_case_sensitive = false }
-"photovoltai" = { output = "photovoltaï", is_word = true, auto_expand = true, is_case_sensitive = false }
-"piqure" = { output = "piqûre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"plait" = { output = "plaît", is_word = true, auto_expand = false, is_case_sensitive = false }
-"platre" = { output = "plâtre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"plutot" = { output = "plutôt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"poele" = { output = "poêle", is_word = true, auto_expand = true, is_case_sensitive = false }
-"polynom" = { output = "polynôm", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pret" = { output = "prêt", is_word = true, auto_expand = false, is_case_sensitive = false }
-"prets" = { output = "prêts", is_word = true, auto_expand = false, is_case_sensitive = false }
-"prosaique" = { output = "prosaïque", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pylone" = { output = "pylône", is_word = true, auto_expand = true, is_case_sensitive = false }
-"quete" = { output = "quête", is_word = true, auto_expand = true, is_case_sensitive = false }
-"raler" = { output = "râler", is_word = true, auto_expand = true, is_case_sensitive = false }
-"relache" = { output = "relâche", is_word = true, auto_expand = true, is_case_sensitive = false }
-"revasse" = { output = "rêvasse", is_word = true, auto_expand = true, is_case_sensitive = false }
-"reve" = { output = "rêve", is_word = true, auto_expand = false, is_case_sensitive = false }
-"rever" = { output = "rêver", is_word = true, auto_expand = false, is_case_sensitive = false }
-"reverie" = { output = "rêverie", is_word = true, auto_expand = false, is_case_sensitive = false }
-"reves" = { output = "rêves", is_word = true, auto_expand = false, is_case_sensitive = false }
-"requete" = { output = "requête", is_word = true, auto_expand = true, is_case_sensitive = false }
-"roti" = { output = "rôti", is_word = true, auto_expand = true, is_case_sensitive = false }
-"salpetre" = { output = "salpêtre", is_word = true, auto_expand = true, is_case_sensitive = false }
-"samourai" = { output = "samouraï", is_word = true, auto_expand = true, is_case_sensitive = false }
-"soeur" = { output = "sœur", is_word = true, auto_expand = true, is_case_sensitive = false }
-"soule" = { output = "soûle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"souler" = { output = "soûler", is_word = true, auto_expand = true, is_case_sensitive = false }
-"soules" = { output = "soûles", is_word = true, auto_expand = false, is_case_sensitive = false }
-"soulé" = { output = "soûlé", is_word = true, auto_expand = true, is_case_sensitive = false }
-"stoique" = { output = "stoïque", is_word = true, auto_expand = true, is_case_sensitive = false }
-"stoicisme" = { output = "stoïcisme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"surement" = { output = "sûrement", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sureté" = { output = "sûreté", is_word = true, auto_expand = true, is_case_sensitive = false }
-"surcout" = { output = "surcoût", is_word = true, auto_expand = true, is_case_sensitive = false }
-"surcroit" = { output = "surcroît", is_word = true, auto_expand = true, is_case_sensitive = false }
-"surs" = { output = "sûrs", is_word = true, auto_expand = false, is_case_sensitive = false }
-"symptom" = { output = "symptôm", is_word = false, auto_expand = true, is_case_sensitive = false }
-"tantot" = { output = "tantôt", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tete" = { output = "tête", is_word = true, auto_expand = false, is_case_sensitive = false }
-"tetes" = { output = "têtes", is_word = true, auto_expand = false, is_case_sensitive = false }
-"theatr" = { output = "théâtr", is_word = true, auto_expand = true, is_case_sensitive = false }
-"théatr" = { output = "théâtr", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tole" = { output = "tôle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"toles" = { output = "tôles", is_word = true, auto_expand = false, is_case_sensitive = false }
-"traitr" = { output = "traîtr", is_word = true, auto_expand = true, is_case_sensitive = false }
-"treve" = { output = "trêve", is_word = true, auto_expand = false, is_case_sensitive = false }
-"treves" = { output = "trêves", is_word = true, auto_expand = false, is_case_sensitive = false }
-"trinome" = { output = "trinôme", is_word = true, auto_expand = true, is_case_sensitive = false }
-"trone" = { output = "trône", is_word = false, auto_expand = true, is_case_sensitive = false }
-"tempete" = { output = "tempête", is_word = true, auto_expand = true, is_case_sensitive = false }
-"vetement" = { output = "vêtement", is_word = false, auto_expand = true, is_case_sensitive = false }
-"voeu" = { output = "vœu", is_word = true, auto_expand = true, is_case_sensitive = false }
+"abim" = { output = "abîm", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"accroit" = { output = "accroît", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"affut" = { output = "affût", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"agé" = { output = "âgé", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"agée" = { output = "âgée", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"agés" = { output = "âgés", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"agées" = { output = "âgées", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"aieul" = { output = "aïeul", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aieux" = { output = "aïeux", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aigue" = { output = "aiguë", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aikido" = { output = "aïkido", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ainé" = { output = "aîné", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ambigue" = { output = "ambiguë", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ambigui" = { output = "ambiguï", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ame" = { output = "âme", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"ames" = { output = "âmes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"ane" = { output = "âne", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"anerie" = { output = "ânerie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"anes" = { output = "ânes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"angstrom" = { output = "ångström", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"apotre" = { output = "apôtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"appat" = { output = "appât", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"apprete" = { output = "apprête", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"appreter" = { output = "apprêter", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"apre" = { output = "âpre", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"archaique" = { output = "archaïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"archaisme" = { output = "archaïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"archeveque" = { output = "archevêque", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"archeveques" = { output = "archevêques", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"arete" = { output = "arête", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"aretes" = { output = "arêtes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"arome" = { output = "arôme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"arret" = { output = "arrêt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aout" = { output = "août", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aumone" = { output = "aumône", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aumonier" = { output = "aumônier", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aussitot" = { output = "aussitôt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"avant-gout" = { output = "avant-goût", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"babord" = { output = "bâbord", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"baille" = { output = "bâille", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"baillon" = { output = "bâillon", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"baionnette" = { output = "baïonnette", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"batard" = { output = "bâtard", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"bati" = { output = "bâti", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"baton" = { output = "bâton", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"beche" = { output = "bêche", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"beches" = { output = "bêches", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"benet" = { output = "benêt", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"benets" = { output = "benêts", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"bete" = { output = "bête", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"betis" = { output = "bêtis", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"bientot" = { output = "bientôt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"binome" = { output = "binôme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"blamer" = { output = "blâmer", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"bleme" = { output = "blême", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"blemes" = { output = "blêmes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"blemir" = { output = "blêmir", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"blémir" = { output = "blêmir", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"boeuf" = { output = "bœuf", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"boite" = { output = "boîte", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"brul" = { output = "brûl", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"buche" = { output = "bûche", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"calin" = { output = "câlin", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"canoe" = { output = "canoë", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chaine" = { output = "chaîne", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chaîned" = { output = "chained", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chainé" = { output = "chaîné", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chassis" = { output = "châssis", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"chateau" = { output = "château", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chatier" = { output = "châtier", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chatiment" = { output = "châtiment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chomage" = { output = "chômage", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chomer" = { output = "chômer", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"chomeu" = { output = "chômeu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"chomé" = { output = "chômé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"cloture" = { output = "clôture", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"cloturé" = { output = "clôturé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"cocaine" = { output = "cocaïne", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"cocaino" = { output = "cocaïno", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"coeur" = { output = "cœur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"coincide" = { output = "coïncide", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"connait" = { output = "connaît", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"controle" = { output = "contrôle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"controlé" = { output = "contrôlé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"cout" = { output = "coût", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"coute" = { output = "coûte", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"couter" = { output = "coûter", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"couteu" = { output = "coûteu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"couts" = { output = "coûts", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"cote" = { output = "côte", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"cotes" = { output = "côtes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"cotoie" = { output = "côtoie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"cotoy" = { output = "côtoy", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"croitre" = { output = "croître", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"crouton" = { output = "croûton", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"débacle" = { output = "débâcle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dégat" = { output = "dégât", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dégout" = { output = "dégoût", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dépech" = { output = "dépêch", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dépot" = { output = "dépôt", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"dépots" = { output = "dépôts", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"diplome" = { output = "diplôme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"diplomé" = { output = "diplômé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"drole" = { output = "drôle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dument" = { output = "dûment", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"egoisme" = { output = "egoïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"égoisme" = { output = "égoïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"egoiste" = { output = "egoïste", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"égoiste" = { output = "égoïste", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"elle-meme" = { output = "elle-même", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"elles-meme" = { output = "elles-mêmes", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"elles-memes" = { output = "elles-mêmes", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"embet" = { output = "embêt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"embuch" = { output = "embûch", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"empeche" = { output = "empêche", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"enchaine" = { output = "enchaîne", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"enjoleu" = { output = "enjôleu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"enrole" = { output = "enrôle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"entete" = { output = "entête", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"enteté" = { output = "entêté", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"entraina" = { output = "entraîna", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"entraine" = { output = "entraîne", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"entrainé" = { output = "entraîné", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"entrepot" = { output = "entrepôt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"envout" = { output = "envoût", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eux-meme" = { output = "eux-mêmes", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"fache" = { output = "fâche", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"faché" = { output = "fâché", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"fantom" = { output = "fantôm", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"fenetre" = { output = "fenêtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"felure" = { output = "fêlure", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"félure" = { output = "fêlure", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"fete" = { output = "fête", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"feter" = { output = "fêter", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"fetes" = { output = "fêtes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"flane" = { output = "flâne", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"flaner" = { output = "flâner", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"flanes" = { output = "flânes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"flaneu" = { output = "flâneu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"flanez" = { output = "flânez", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"flanons" = { output = "flânons", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"flute" = { output = "flûte", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"flutes" = { output = "flûtes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"foetus" = { output = "fœtus", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"foret" = { output = "forêt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"fraich" = { output = "fraîch", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"frole" = { output = "frôle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"gach" = { output = "gâch", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"gateau" = { output = "gâteau", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"gater" = { output = "gâter", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"gaté" = { output = "gâté", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"gatés" = { output = "gâtés", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"genant" = { output = "gênant", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"gener" = { output = "gêner", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"génant" = { output = "gênant", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"génants" = { output = "gênants", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"geole" = { output = "geôle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"geolier" = { output = "geôlier", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"geoliè" = { output = "geôliè", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"gout" = { output = "goût", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"gouta" = { output = "goûta", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"goute" = { output = "goûte", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"gouter" = { output = "goûter", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"goutes" = { output = "goûtes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"goutez" = { output = "goûtez", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"goutons" = { output = "goûtons", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"grele" = { output = "grêle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"grèle" = { output = "grêle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"greler" = { output = "grêler", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"guepe" = { output = "guêpe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"heroique" = { output = "héroïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"heroisme" = { output = "héroïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"héroique" = { output = "héroïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"héroisme" = { output = "héroïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"honnete" = { output = "honnête", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"hopita" = { output = "hôpita", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"huitre" = { output = "huître", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"icone" = { output = "icône", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"idolatr" = { output = "idolâtr", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ile" = { output = "île", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"iles" = { output = "îles", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"ilot" = { output = "îlot", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"ilots" = { output = "îlots", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"impot" = { output = "impôt", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"impots" = { output = "impôts", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"indu" = { output = "indû", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"indument" = { output = "indûment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"indus" = { output = "indûs", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"infame" = { output = "infâme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"infamie" = { output = "infâmie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"inoui" = { output = "inouï", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"interet" = { output = "intérêt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"intéret" = { output = "intérêt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"jeuner" = { output = "jeûner", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"lache" = { output = "lâche", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"laique" = { output = "laïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"laius" = { output = "laïus", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"les notres" = { output = "les nôtres", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"les votres" = { output = "les vôtres", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"lui-meme" = { output = "lui-même", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"m'apprete" = { output = "m'apprête", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"m’apprete" = { output = "m’apprête", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mache" = { output = "mâche", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"macher" = { output = "mâcher", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"machoire" = { output = "mâchoire", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"machouill" = { output = "mâchouill", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"maelstrom" = { output = "maelström", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"malstrom" = { output = "malström", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"maitr" = { output = "maîtr", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"male" = { output = "mâle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"males" = { output = "mâles", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"manoeuvr" = { output = "manœuvr", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"maratre" = { output = "marâtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"meler" = { output = "mêler", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mome" = { output = "môme", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"momes" = { output = "mômes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"mosaique" = { output = "mosaïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"multitache" = { output = "multitâche", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"murement" = { output = "mûrement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"murir" = { output = "mûrir", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"naif" = { output = "naïf", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"naifs" = { output = "naïfs", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"naivement" = { output = "naïvement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"naives" = { output = "naïves", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"naitre" = { output = "naître", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"noeud" = { output = "nœud", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oecuméni" = { output = "œcuméni", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oeil" = { output = "œil", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oesophage" = { output = "œsophage", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oeuf" = { output = "œuf", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oeuvre" = { output = "œuvre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oiaque" = { output = "oïaque", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oide" = { output = "oïde", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"opiniatre" = { output = "opiniâtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ouie" = { output = "ouïe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oter" = { output = "ôter", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"paella" = { output = "paëlla", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"palir" = { output = "pâlir", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"parait" = { output = "paraît", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"paranoia" = { output = "paranoïa", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"paté" = { output = "pâté", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"patés" = { output = "pâtés", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"pate" = { output = "pâte", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"pates" = { output = "pâtes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"patir" = { output = "pâtir", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"patiss" = { output = "pâtiss", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"patur" = { output = "pâtur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"peche" = { output = "pêche", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"pecher" = { output = "pêcher", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"peches" = { output = "pêches", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"pecheu" = { output = "pêcheu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"pentecote" = { output = "Pentecôte", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"phoenix" = { output = "phœnix", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"photovoltai" = { output = "photovoltaï", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"piqure" = { output = "piqûre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"plait" = { output = "plaît", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"platre" = { output = "plâtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"plutot" = { output = "plutôt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"poele" = { output = "poêle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"polynom" = { output = "polynôm", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"pret" = { output = "prêt", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"prets" = { output = "prêts", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"prosaique" = { output = "prosaïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"pylone" = { output = "pylône", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"quete" = { output = "quête", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"raler" = { output = "râler", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"relache" = { output = "relâche", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"revasse" = { output = "rêvasse", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"reve" = { output = "rêve", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"rever" = { output = "rêver", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"reverie" = { output = "rêverie", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"reves" = { output = "rêves", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"requete" = { output = "requête", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"roti" = { output = "rôti", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"salpetre" = { output = "salpêtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"samourai" = { output = "samouraï", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"soeur" = { output = "sœur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"soule" = { output = "soûle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"souler" = { output = "soûler", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"soules" = { output = "soûles", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"soulé" = { output = "soûlé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"stoique" = { output = "stoïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"stoicisme" = { output = "stoïcisme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"surement" = { output = "sûrement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"sureté" = { output = "sûreté", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"surcout" = { output = "surcoût", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"surcroit" = { output = "surcroît", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"surs" = { output = "sûrs", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"symptom" = { output = "symptôm", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"tantot" = { output = "tantôt", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"tete" = { output = "tête", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"tetes" = { output = "têtes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"theatr" = { output = "théâtr", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"théatr" = { output = "théâtr", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"tole" = { output = "tôle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"toles" = { output = "tôles", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"traitr" = { output = "traîtr", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"treve" = { output = "trêve", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"treves" = { output = "trêves", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"trinome" = { output = "trinôme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"trone" = { output = "trône", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"tempete" = { output = "tempête", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"vetement" = { output = "vêtement", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"voeu" = { output = "vœu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[names]]
-"alexei" = { output = "Alexeï", is_word = true, auto_expand = false, is_case_sensitive = true }
-"anais" = { output = "Anaïs", is_word = true, auto_expand = false, is_case_sensitive = true }
-"azerbaidjan" = { output = "Azerbaïdjan", is_word = true, auto_expand = false, is_case_sensitive = true }
-"benoit" = { output = "Benoît", is_word = true, auto_expand = false, is_case_sensitive = true }
-"caraibes" = { output = "Caraïbes", is_word = true, auto_expand = false, is_case_sensitive = true }
-"cleopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false, is_case_sensitive = true }
-"cléopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false, is_case_sensitive = true }
-"dubai" = { output = "Dubaï", is_word = true, auto_expand = false, is_case_sensitive = true }
-"gaetan" = { output = "Gaëtan", is_word = true, auto_expand = false, is_case_sensitive = true }
-"hanoi" = { output = "Hanoï", is_word = true, auto_expand = false, is_case_sensitive = true }
-"israel" = { output = "Israël", is_word = true, auto_expand = false, is_case_sensitive = true }
-"jerome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true }
-"jérome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true }
-"joel" = { output = "Joël", is_word = true, auto_expand = false, is_case_sensitive = true }
-"mickael" = { output = "Mickaël", is_word = true, auto_expand = false, is_case_sensitive = true }
-"noel" = { output = "Noël", is_word = true, auto_expand = false, is_case_sensitive = true }
-"Quatar" = { output = "Qatar", is_word = true, auto_expand = true, is_case_sensitive = true }
-"raphael" = { output = "Raphaël", is_word = true, auto_expand = false, is_case_sensitive = true }
-"serguei" = { output = "Sergueï", is_word = true, auto_expand = false, is_case_sensitive = true }
-"shanghai" = { output = "Shanghaï", is_word = true, auto_expand = false, is_case_sensitive = true }
-"taiwan" = { output = "Taïwan", is_word = true, auto_expand = false, is_case_sensitive = true }
-"thais" = { output = "Thaïs", is_word = true, auto_expand = false, is_case_sensitive = true }
-"thailande" = { output = "Thaïlande", is_word = true, auto_expand = false, is_case_sensitive = true }
-"tolstoi" = { output = "Tolstoï", is_word = true, auto_expand = false, is_case_sensitive = true }
+"alexei" = { output = "Alexeï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"anais" = { output = "Anaïs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"azerbaidjan" = { output = "Azerbaïdjan", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"benoit" = { output = "Benoît", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"caraibes" = { output = "Caraïbes", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cleopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cléopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"dubai" = { output = "Dubaï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"gaetan" = { output = "Gaëtan", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"hanoi" = { output = "Hanoï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"israel" = { output = "Israël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"jerome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"jérome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"joel" = { output = "Joël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mickael" = { output = "Mickaël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"noel" = { output = "Noël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"Quatar" = { output = "Qatar", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"raphael" = { output = "Raphaël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"serguei" = { output = "Sergueï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"shanghai" = { output = "Shanghaï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"taiwan" = { output = "Taïwan", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"thais" = { output = "Thaïs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"thailande" = { output = "Thaïlande", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"tolstoi" = { output = "Tolstoï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 
-[[brands]]
-"adaboost" = { output = "AdaBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
-"api" = { output = "API", is_word = true, auto_expand = false, is_case_sensitive = true }
-"autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true }
-"aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"axa" = { output = "AXA", is_word = true, auto_expand = false, is_case_sensitive = true }
-"azure devops" = { output = "Azure DevOps", is_word = true, auto_expand = false, is_case_sensitive = true }
-"bdd" = { output = "BDD", is_word = true, auto_expand = false, is_case_sensitive = true }
-"bdds" = { output = "BDDs", is_word = true, auto_expand = false, is_case_sensitive = true }
-"catboost" = { output = "CatBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
-"chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true }
-"citroen" = { output = "Citroën", is_word = true, auto_expand = false, is_case_sensitive = true }
-"cli" = { output = "CLI", is_word = true, auto_expand = false, is_case_sensitive = true }
-"comex" = { output = "COMEX", is_word = true, auto_expand = false, is_case_sensitive = true }
-"cpu" = { output = "CPU", is_word = true, auto_expand = false, is_case_sensitive = true }
-"data science" = { output = "Data Science", is_word = true, auto_expand = false, is_case_sensitive = true }
-"data scientist" = { output = "Data Scientist", is_word = true, auto_expand = false, is_case_sensitive = true }
-"databricks" = { output = "Databricks", is_word = true, auto_expand = false, is_case_sensitive = true }
-"docker" = { output = "Docker", is_word = true, auto_expand = false, is_case_sensitive = true }
-"dynatrace" = { output = "Dynatrace", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ergopti" = { output = "Ergopti", is_word = true, auto_expand = false, is_case_sensitive = true }
-"facebook" = { output = "Facebook", is_word = true, auto_expand = false, is_case_sensitive = true }
-"firefox" = { output = "Firefox", is_word = true, auto_expand = false, is_case_sensitive = true }
-"gcp" = { output = "GCP", is_word = true, auto_expand = false, is_case_sensitive = true }
-"github" = { output = "GitHub", is_word = true, auto_expand = false, is_case_sensitive = true }
-"google" = { output = "Google", is_word = true, auto_expand = false, is_case_sensitive = true }
-"gpu" = { output = "GPU", is_word = true, auto_expand = false, is_case_sensitive = true }
-"hammerspoon" = { output = "Hammerspoon", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ht" = { output = "HT", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true }
-"insee" = { output = "INSEE", is_word = true, auto_expand = false, is_case_sensitive = true }
-"instagram" = { output = "Instagram", is_word = true, auto_expand = false, is_case_sensitive = true }
-"intellij" = { output = "IntelliJ", is_word = true, auto_expand = false, is_case_sensitive = true }
-"json" = { output = "JSON", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ko" = { output = "KO", is_word = true, auto_expand = false, is_case_sensitive = true }
-"kpi" = { output = "KPI", is_word = true, auto_expand = false, is_case_sensitive = true }
-"kpis" = { output = "KPIs", is_word = true, auto_expand = false, is_case_sensitive = true }
-"latex" = { output = "LaTeX", is_word = true, auto_expand = false, is_case_sensitive = true }
-"lightgbm" = { output = "LightGBM", is_word = true, auto_expand = false, is_case_sensitive = true }
-"linux" = { output = "Linux", is_word = true, auto_expand = false, is_case_sensitive = true }
-"llm" = { output = "LLM", is_word = true, auto_expand = false, is_case_sensitive = true }
-"llms" = { output = "LLMs", is_word = true, auto_expand = false, is_case_sensitive = true }
-"lora" = { output = "LoRA", is_word = true, auto_expand = false, is_case_sensitive = true }
-"lualatex" = { output = "LuaLaTeX", is_word = true, auto_expand = false, is_case_sensitive = true }
-"macos" = { output = "macOS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"maj" = { output = "MAJ", is_word = true, auto_expand = false, is_case_sensitive = true }
-"majs" = { output = "MAJs", is_word = true, auto_expand = false, is_case_sensitive = true }
-"mbti" = { output = "MBTI", is_word = true, auto_expand = false, is_case_sensitive = true }
-"mcp" = { output = "MCP", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ml" = { output = "ML", is_word = true, auto_expand = false, is_case_sensitive = true }
-"mle" = { output = "MLE", is_word = true, auto_expand = false, is_case_sensitive = true }
-"mlflow" = { output = "MLflow", is_word = true, auto_expand = false, is_case_sensitive = true }
-"mlops" = { output = "MLOps", is_word = true, auto_expand = false, is_case_sensitive = true }
-"nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true }
-"nlp" = { output = "NLP", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ok" = { output = "OK", is_word = true, auto_expand = false, is_case_sensitive = true }
-"optimot" = { output = "Optimot", is_word = true, auto_expand = false, is_case_sensitive = true }
-"onedrive" = { output = "OneDrive", is_word = true, auto_expand = false, is_case_sensitive = true }
-"onenote" = { output = "OneNote", is_word = true, auto_expand = false, is_case_sensitive = true }
-"openshift" = { output = "OpenShift", is_word = true, auto_expand = false, is_case_sensitive = true }
-"opentelemetry" = { output = "OpenTelemetry", is_word = true, auto_expand = false, is_case_sensitive = true }
-"outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true }
-"powerbi" = { output = "PowerBI", is_word = true, auto_expand = false, is_case_sensitive = true }
-"poc" = { output = "POC", is_word = true, auto_expand = false, is_case_sensitive = true }
-"pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true }
-"powerpoint" = { output = "PowerPoint", is_word = true, auto_expand = false, is_case_sensitive = true }
-"pr" = { output = "PR", is_word = true, auto_expand = false, is_case_sensitive = true }
-"qlora" = { output = "QLoRA", is_word = true, auto_expand = false, is_case_sensitive = true }
-"r" = { output = "R", is_word = true, auto_expand = false, is_case_sensitive = true }
-"rdc" = { output = "RDC", is_word = true, auto_expand = false, is_case_sensitive = true }
-"red hat" = { output = "Rad Hat", is_word = true, auto_expand = false, is_case_sensitive = true }
-"rh" = { output = "RH", is_word = true, auto_expand = false, is_case_sensitive = true }
-"sas" = { output = "SAS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true }
-"slm" = { output = "SLM", is_word = true, auto_expand = false, is_case_sensitive = true }
-"sql" = { output = "SQL", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ssh" = { output = "SSH", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ssl" = { output = "SSL", is_word = true, auto_expand = false, is_case_sensitive = true }
-"tls" = { output = "TLS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"ttc" = { output = "TTC", is_word = true, auto_expand = false, is_case_sensitive = true }
-"url" = { output = "URL", is_word = true, auto_expand = false, is_case_sensitive = true }
-"vscode" = { output = "VSCode", is_word = true, auto_expand = false, is_case_sensitive = true }
-"wikipedia" = { output = "Wikipedia", is_word = true, auto_expand = false, is_case_sensitive = true }
-"wikipédia" = { output = "Wikipédia", is_word = true, auto_expand = false, is_case_sensitive = true }
-"windows" = { output = "Windows", is_word = true, auto_expand = false, is_case_sensitive = true }
-"xgboost" = { output = "XGBoost", is_word = true, auto_expand = false, is_case_sensitive = true }
-"youtube" = { output = "YouTube", is_word = true, auto_expand = false, is_case_sensitive = true }
-"iaas" = { output = "IaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"paas" = { output = "PaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"saas" = { output = "SaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"caas" = { output = "CaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"faas" = { output = "FaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
-"dbaas" = { output = "DBaaS", is_word = true, auto_expand = false, is_case_sensitive = true }
+[[caps]]
+"adaboost" = { output = "AdaBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"api" = { output = "API", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"axa" = { output = "AXA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"azure devops" = { output = "Azure DevOps", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bdd" = { output = "BDD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bdds" = { output = "BDDs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"catboost" = { output = "CatBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"citroen" = { output = "Citroën", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cli" = { output = "CLI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"comex" = { output = "COMEX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cpu" = { output = "CPU", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"csp" = { output = "CSP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"data science" = { output = "Data Science", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"data scientist" = { output = "Data Scientist", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"databricks" = { output = "Databricks", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"docker" = { output = "Docker", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"dynatrace" = { output = "Dynatrace", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ergopti" = { output = "Ergopti", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"facebook" = { output = "Facebook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"firefox" = { output = "Firefox", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"gcp" = { output = "GCP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"github" = { output = "GitHub", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"google" = { output = "Google", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"gpu" = { output = "GPU", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"hammerspoon" = { output = "Hammerspoon", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ht" = { output = "HT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"insee" = { output = "INSEE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"instagram" = { output = "Instagram", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"intellij" = { output = "IntelliJ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"json" = { output = "JSON", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ko" = { output = "KO", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"kpi" = { output = "KPI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"kpis" = { output = "KPIs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"latex" = { output = "LaTeX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"lightgbm" = { output = "LightGBM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"linux" = { output = "Linux", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"llm" = { output = "LLM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"llms" = { output = "LLMs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"lora" = { output = "LoRA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"lualatex" = { output = "LuaLaTeX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"macos" = { output = "macOS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"maj" = { output = "MAJ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"majs" = { output = "MAJs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mbti" = { output = "MBTI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mcp" = { output = "MCP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ml" = { output = "ML", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mle" = { output = "MLE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mlflow" = { output = "MLflow", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mlops" = { output = "MLOps", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"nlp" = { output = "NLP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ok" = { output = "OK", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"optimot" = { output = "Optimot", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"onedrive" = { output = "OneDrive", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"onenote" = { output = "OneNote", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"openshift" = { output = "OpenShift", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"opentelemetry" = { output = "OpenTelemetry", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"powerbi" = { output = "PowerBI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"poc" = { output = "POC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"powerpoint" = { output = "PowerPoint", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"pr" = { output = "PR", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"qlora" = { output = "QLoRA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"r" = { output = "R", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rdc" = { output = "RDC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rh" = { output = "RH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"sas" = { output = "SAS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"slm" = { output = "SLM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"sql" = { output = "SQL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ssh" = { output = "SSH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ssl" = { output = "SSL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"tls" = { output = "TLS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ttc" = { output = "TTC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"url" = { output = "URL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"vscode" = { output = "VSCode", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"wikipedia" = { output = "Wikipedia", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"wikipédia" = { output = "Wikipédia", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"windows" = { output = "Windows", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"xgboost" = { output = "XGBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"youtube" = { output = "YouTube", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"iaas" = { output = "IaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"paas" = { output = "PaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"saas" = { output = "SaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"caas" = { output = "CaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"faas" = { output = "FaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"dbaas" = { output = "DBaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 
 [[typographicapostrophe]]
-"c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"d'" = { output = "d’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"j'" = { output = "j’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"l'" = { output = "l’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"m'" = { output = "m’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"n'" = { output = "n’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"s'" = { output = "s’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"t'" = { output = "t’", is_word = true, auto_expand = true, is_case_sensitive = false }
-"n't" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = false }
+"c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"d'" = { output = "d’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"j'" = { output = "j’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"l'" = { output = "l’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"m'" = { output = "m’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"n'" = { output = "n’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"s'" = { output = "s’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"t'" = { output = "t’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"n't" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[errors]]
-"(_" = { output = "( ", is_word = true, auto_expand = true, is_case_sensitive = true }
-")_" = { output = ") ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"+_" = { output = "+ ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"#_" = { output = "# ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"$_" = { output = "$ ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"=_" = { output = "= ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"[_" = { output = "[ ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"]_" = { output = "] ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"~_" = { output = "~ ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"*_" = { output = "* ", is_word = true, auto_expand = true, is_case_sensitive = true }
-"OUi" = { output = "Oui", is_word = true, auto_expand = true, is_case_sensitive = true }
-"acceuil" = { output = "accueil", is_word = true, auto_expand = true, is_case_sensitive = false }
-"aeu" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eiu" = { output = "ieu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eua" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false }
-"oiu" = { output = "oui", is_word = false, auto_expand = true, is_case_sensitive = false }
-"oyu" = { output = "you", is_word = false, auto_expand = true, is_case_sensitive = false }
-"poru" = { output = "pour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"sru" = { output = "sur", is_word = true, auto_expand = true, is_case_sensitive = false }
-"uio" = { output = "uoi", is_word = false, auto_expand = true, is_case_sensitive = false }
-"uei" = { output = "uie", is_word = false, auto_expand = true, is_case_sensitive = false }
+"(_" = { output = "( ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+")_" = { output = ") ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"+_" = { output = "+ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"#_" = { output = "# ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"$_" = { output = "$ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"=_" = { output = "= ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"[_" = { output = "[ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"]_" = { output = "] ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"~_" = { output = "~ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"*_" = { output = "* ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"OUi" = { output = "Oui", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"acceuil" = { output = "accueil", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"aeu" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eiu" = { output = "ieu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eua" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oiu" = { output = "oui", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"oyu" = { output = "you", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"poru" = { output = "pour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"sru" = { output = "sur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"uio" = { output = "uoi", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"uei" = { output = "uie", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[ou]]
-"où ." = { output = "où.", is_word = true, auto_expand = true, is_case_sensitive = false }
-"où ," = { output = "où, ", is_word = true, auto_expand = true, is_case_sensitive = false }
+"où ." = { output = "où.", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"où ," = { output = "où, ", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[multiplepunctuationmarks]]
-" ! !" = { output = " !!", is_word = true, auto_expand = true, is_case_sensitive = true }
-"! !" = { output = "!!", is_word = true, auto_expand = true, is_case_sensitive = true }
-" ? ?" = { output = " ??", is_word = true, auto_expand = true, is_case_sensitive = true }
-"? ?" = { output = "??", is_word = true, auto_expand = true, is_case_sensitive = true }
-" ! ?" = { output = " !?", is_word = true, auto_expand = true, is_case_sensitive = true }
-"! ?" = { output = "!?", is_word = true, auto_expand = true, is_case_sensitive = true }
-" ? !" = { output = " ?!", is_word = true, auto_expand = true, is_case_sensitive = true }
-"? !" = { output = "?!", is_word = true, auto_expand = true, is_case_sensitive = true }
+" ! !" = { output = " !!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"! !" = { output = "!!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+" ? ?" = { output = " ??", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"? ?" = { output = "??", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+" ! ?" = { output = " !?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
+"! ?" = { output = "!?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
+" ? !" = { output = " ?!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
+"? !" = { output = "?!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 [[suffixesachaining]]
-"eàa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàf" = { output = "iste", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàl" = { output = "elle", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàm" = { output = "isme", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàn" = { output = "ation", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàp" = { output = "ence", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ieàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàr" = { output = "erre", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàs" = { output = "ement", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàt" = { output = "ettre", is_word = false, auto_expand = true, is_case_sensitive = false }
-"eàz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false }
+"eàa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàf" = { output = "iste", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàl" = { output = "elle", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàm" = { output = "isme", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàn" = { output = "ation", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàp" = { output = "ence", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ieàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàr" = { output = "erre", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàs" = { output = "ement", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàt" = { output = "ettre", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"eàz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[minus]]
-"aije" = { output = "ai-je", is_word = true, auto_expand = false, is_case_sensitive = false }
-"astu" = { output = "as-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
-"atil" = { output = "a-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"aton" = { output = "a-t-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"auratelle" = { output = "aura-t-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"auratil" = { output = "aura-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"auraton" = { output = "aura-t-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"dismoi" = { output = "dis-moi", is_word = true, auto_expand = false, is_case_sensitive = false }
-"ditelle" = { output = "dit-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"ditil" = { output = "dit-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"distu" = { output = "dis-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
-"diton" = { output = "dit-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"doisje" = { output = "dois-je", is_word = true, auto_expand = false, is_case_sensitive = false }
-"doitelle" = { output = "doit-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"doitil" = { output = "doit-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"doiton" = { output = "doit-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"estu" = { output = "es-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
-"estil" = { output = "est-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"eston" = { output = "est-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"fautelle" = { output = "faut-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"fautil" = { output = "faut-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"fauton" = { output = "faut-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"peutil" = { output = "peut-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"peutelle" = { output = "peut-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"peuton" = { output = "peut-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"peuxtu" = { output = "peux-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
-"puisje" = { output = "puis-je", is_word = true, auto_expand = false, is_case_sensitive = false }
-"vatelle" = { output = "va-t-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"vatil" = { output = "va-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"vaton" = { output = "va-t-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"veutelle" = { output = "veut-elle", is_word = true, auto_expand = false, is_case_sensitive = false }
-"veutil" = { output = "veut-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"veuton" = { output = "veut-on", is_word = true, auto_expand = false, is_case_sensitive = false }
-"veuxtu" = { output = "veux-tu", is_word = true, auto_expand = false, is_case_sensitive = false }
-"yatil" = { output = "y a-t-il", is_word = true, auto_expand = false, is_case_sensitive = false }
-"vonsn" = { output = "vons-n", is_word = false, auto_expand = true, is_case_sensitive = false }
-"vezv" = { output = "vez-v", is_word = false, auto_expand = true, is_case_sensitive = false }
+"aije" = { output = "ai-je", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"astu" = { output = "as-tu", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"atil" = { output = "a-t-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"aton" = { output = "a-t-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"auratelle" = { output = "aura-t-elle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"auratil" = { output = "aura-t-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"auraton" = { output = "aura-t-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"dismoi" = { output = "dis-moi", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"ditelle" = { output = "dit-elle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"ditil" = { output = "dit-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"distu" = { output = "dis-tu", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"diton" = { output = "dit-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"doisje" = { output = "dois-je", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"doitelle" = { output = "doit-elle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"doitil" = { output = "doit-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"doiton" = { output = "doit-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"estu" = { output = "es-tu", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"estil" = { output = "est-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"eston" = { output = "est-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"fautelle" = { output = "faut-elle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"fautil" = { output = "faut-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"fauton" = { output = "faut-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"peutil" = { output = "peut-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"peutelle" = { output = "peut-elle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"peuton" = { output = "peut-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"peuxtu" = { output = "peux-tu", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"puisje" = { output = "puis-je", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"vatelle" = { output = "va-t-elle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"vatil" = { output = "va-t-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"vaton" = { output = "va-t-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"veutelle" = { output = "veut-elle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"veutil" = { output = "veut-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"veuton" = { output = "veut-on", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"veuxtu" = { output = "veux-tu", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"yatil" = { output = "y a-t-il", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"vonsn" = { output = "vons-n", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"vezv" = { output = "vez-v", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[minusapostrophe]]
-"ai'j" = { output = "ai-j", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ai'," = { output = "ai-j", is_word = false, auto_expand = true, is_case_sensitive = false }
-"as't" = { output = "as-t", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a't" = { output = "a-t", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a-t’e" = { output = "a-t-e", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a't'e" = { output = "a-t-e", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a-t’i" = { output = "a-t-i", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a't'i" = { output = "a-t-i", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a-t’o" = { output = "a-t-o", is_word = false, auto_expand = true, is_case_sensitive = false }
-"a't'o" = { output = "a-t-o", is_word = false, auto_expand = true, is_case_sensitive = false }
-"s'," = { output = "s-j", is_word = false, auto_expand = true, is_case_sensitive = false }
-"s'j" = { output = "s-j", is_word = false, auto_expand = true, is_case_sensitive = false }
-"s'm" = { output = "s-m", is_word = false, auto_expand = true, is_case_sensitive = false }
-"s'n" = { output = "s-n", is_word = false, auto_expand = true, is_case_sensitive = false }
-"s't" = { output = "s-t", is_word = false, auto_expand = true, is_case_sensitive = false }
-"t'e" = { output = "t-e", is_word = false, auto_expand = true, is_case_sensitive = false }
-"t'i" = { output = "t-i", is_word = false, auto_expand = true, is_case_sensitive = false }
-"t'o" = { output = "t-o", is_word = false, auto_expand = true, is_case_sensitive = false }
-"x't" = { output = "x-t", is_word = false, auto_expand = true, is_case_sensitive = false }
-"z'v" = { output = "z-v", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ai'j" = { output = "ai-j", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ai'," = { output = "ai-j", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"as't" = { output = "as-t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"a't" = { output = "a-t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"a-t’e" = { output = "a-t-e", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"a't'e" = { output = "a-t-e", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"a-t’i" = { output = "a-t-i", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"a't'i" = { output = "a-t-i", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"a-t’o" = { output = "a-t-o", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"a't'o" = { output = "a-t-o", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"s'," = { output = "s-j", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"s'j" = { output = "s-j", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"s'm" = { output = "s-m", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"s'n" = { output = "s-n", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"s't" = { output = "s-t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"t'e" = { output = "t-e", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"t'i" = { output = "t-i", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"t'o" = { output = "t-o", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"x't" = { output = "x-t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"z'v" = { output = "z-v", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

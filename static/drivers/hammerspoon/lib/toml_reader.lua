@@ -139,6 +139,11 @@ local function parse_entry(line)
         is_word           = result.is_word           or false,
         auto_expand       = result.auto_expand       or false,
         is_case_sensitive = result.is_case_sensitive or false,
+        -- When true, the expanded text is never re-scanned for further hotstring
+        -- matches.  Use this for entries whose output contains sequences that
+        -- would otherwise be caught by another hotstring (e.g. e-mail addresses
+        -- that contain a known abbreviation like "axa").
+        final_result      = result.final_result      or false,
     }
 end
 

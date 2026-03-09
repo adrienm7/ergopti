@@ -44,6 +44,10 @@ local _trigger   = "★"
 local _info      = {}
 local _letters   = {}
 local _base_dir  = ""
+-- Reference to the keymap module, stored at start() time so that the
+-- interceptor can query M.has_exact_trigger() and yield priority to
+-- explicitly registered TOML shortcuts (e.g. "@am★").
+local _keymap    = nil
 
 -- ---------------------------------------------------------------------------
 -- Built-in defaults — used when config.json has no "personal_info_config" key.
@@ -128,6 +132,13 @@ local function do_expand(combo)
 
 	_replacing = true
 
+	-- Suppress keymap hotstring re-scanning before emitting synthetic events,
+	-- so the expanded text (e.g. an e-mail containing "axa") is never
+	-- re-matched by another hotstring during or after the emission.
+	if _keymap and _keymap.suppress_rescan then
+		_keymap.suppress_rescan()
+	end
+
 	for _ = 1, n_back do
 		eventtap.keyStroke({}, "delete", 0)
 	end
@@ -208,6 +219,21 @@ local function interceptor(event, _km_buffer)
                 if char == _trigger then
                         if #_combo > 0 and #resolve_combo(_combo) > 0 then
                                 local combo = _combo
+                                -- Check whether an explicit TOML shortcut covers this exact
+                                -- trigger (e.g. "@am★").  Only yield when the TOML trigger
+                                -- starts with "@" so that bare hotstrings like "am★" can never
+                                -- steal priority from an @-combo expansion.
+                                -- NOTE: the chars @<combo> were already added to keymap's buffer
+                                -- by the earlier "suppress" returns, so NO injection is needed.
+                                -- Returning nil lets keymap append ★ and match "@am★" directly.
+                                local full_trigger = "@" .. combo .. _trigger
+                                if _keymap and _keymap.has_exact_trigger
+                                        and _keymap.has_exact_trigger(full_trigger)
+                                        and full_trigger:sub(1, 1) == "@" then
+                                        _state = STATE_IDLE
+                                        _combo = ""
+                                        return nil  -- let TOML @-mapping win
+                                end
                                 _state = STATE_IDLE
                                 _combo = ""
                                 -- Defer so keymap's tap finishes returning "consume" first.
@@ -400,6 +426,7 @@ function M.start(base_dir, keymap_module)
 	_combo     = ""
 	_replacing = false
 	_enabled   = true
+	_keymap    = keymap_module  -- store for TOML-priority lookup
 
 	-- Register interceptor once; subsequent enable/disable only flip _enabled.
 	if keymap_module and type(keymap_module.register_interceptor) == "function" then
