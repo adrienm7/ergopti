@@ -282,9 +282,90 @@ function M.enable_group(name)
 end
 
 ---------------------------------------------------------------------------
+-- Expansion terminators
+---------------------------------------------------------------------------
+-- Characters that trigger deferred expansion for non-auto hotstrings.
+-- Each entry has a unique `key`, a list `chars` of exact byte strings or a
+-- `prefix` for variable-length sequences, and a `label` for the menu.
+local TERMINATOR_DEFS = {
+	{ key = "space",  chars  = { " " },                   label = "Espace" },
+	{ key = "tab",    chars  = { "\t" },                  label = "Tabulation" },
+	{ key = "enter",  chars  = { "\r", "\n" },            label = "Entrée" },
+	{ key = "period", chars  = { "." },                   label = "Point (.)" },
+	{ key = "comma",  chars  = { "," },                   label = "Virgule (,)" },
+	{ key = "nbsp",   prefix = "\194\160",               label = "Espace insécable" },
+	{ key = "nnbsp",  prefix = "\226\128\175",           label = "Espace fine insécable" },
+	-- ★ is listed last so that any hotstring whose trigger already ends with ★
+	-- (auto_expand=true, handled in the immediate path) takes precedence.
+	-- consume=true: the ★ char is deleted along with the trigger and NOT re-sent
+	-- (unlike space/tab/period which are preserved after the replacement).
+	{ key = "star",   chars  = { "★" },                  label = "Touche ★", consume = true },
+}
+
+local _terminator_enabled = {}
+for _, def in ipairs(TERMINATOR_DEFS) do
+	_terminator_enabled[def.key] = true
+end
+
+local function is_terminator(chars)
+	for _, def in ipairs(TERMINATOR_DEFS) do
+		if _terminator_enabled[def.key] then
+			if def.chars then
+				for _, c in ipairs(def.chars) do
+					if chars == c then return true end
+				end
+			elseif def.prefix then
+				if chars:sub(1, #def.prefix) == def.prefix then return true end
+			end
+		end
+	end
+	return false
+end
+
+-- Return true when the terminator that matches `chars` has consume=true,
+-- meaning it must be deleted along with the trigger and NOT re-emitted.
+local function terminator_is_consumed(chars)
+	for _, def in ipairs(TERMINATOR_DEFS) do
+		if _terminator_enabled[def.key] and def.consume then
+			if def.chars then
+				for _, c in ipairs(def.chars) do
+					if chars == c then return true end
+				end
+			elseif def.prefix then
+				if chars:sub(1, #def.prefix) == def.prefix then return true end
+			end
+		end
+	end
+	return false
+end
+
+--- Enable or disable a single terminator character.
+function M.set_terminator_enabled(key, enabled)
+	_terminator_enabled[key] = (enabled ~= false)
+end
+
+--- Return whether a terminator is currently enabled.
+function M.is_terminator_enabled(key)
+	return _terminator_enabled[key] ~= false
+end
+
+--- Return the full ordered list of terminator definitions (read-only).
+function M.get_terminator_defs()
+	return TERMINATOR_DEFS
+end
+
+---------------------------------------------------------------------------
 -- Configuration
 ---------------------------------------------------------------------------
-local BASE_DELAY_SEC = 0.5 
+local BASE_DELAY_SEC = 0.75
+
+--- Return the current expansion timing threshold (seconds).
+function M.get_base_delay() return BASE_DELAY_SEC end
+
+--- Set the expansion timing threshold (seconds).  Must be >= 0.
+function M.set_base_delay(secs)
+	BASE_DELAY_SEC = math.max(0, secs)
+end
 
 local buffer = ""
 local is_replacing = false
@@ -849,8 +930,7 @@ local function onKeyDown(e)
             -- auto=true mappings are expanded immediately (above) based on the timing
             -- between the last two chars of the trigger; the boundary char has no role
             -- and must not re-trigger them.
-            if not m.auto and (chars == " " or chars == "\t" or chars == "\r" or chars == "\n" or chars == "." or chars == ","
-                or chars:sub(1, 2) == "\194\160" or chars:sub(1, 3) == "\226\128\175") then
+            if not m.auto and is_terminator(chars) then
                 local end_pos = utf8.offset(buffer, -char_count) or (#buffer + 1)
                 local start_pos = utf8.offset(buffer, -(char_count + utf8_len(trigger)))
                 local seg = nil
@@ -878,24 +958,28 @@ local function onKeyDown(e)
                         local before_trigger = (start_trigger and string.sub(prefix_before, 1, start_trigger - 1)) or ""
                         local is_final_mapping = m.final_result
 
+                        local consume_term = terminator_is_consumed(chars)
+
                         hs.timer.doAfter(0, function()
                             if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
                             local repl_tokens = tokens_from_repl(m.repl)
                             local repl_text   = text_from_tokens(repl_tokens)
-                            -- Pre-compute synthetic event count: trigger deletes + repl events + boundary char.
+                            -- Pre-compute synthetic event count: trigger deletes + repl events.
+                            -- consume_term: terminator already consumed (e.g. ★), no re-send.
+                            -- Otherwise add 1 per boundary codepoint (re-sent below).
                             synthetic_remaining = trigger_len
                                 + count_token_events(repl_tokens)
-                                + (utf8_len(chars))
+                                + (consume_term and 0 or utf8_len(chars))
                             is_replacing = true
                             -- delete the trigger characters (caret is after the trigger)
                             for _ = 1, trigger_len do keyStroke({}, 'delete', 0) end
                             -- type replacement (handles {Left} / {Right} / etc.)
                             emit_tokens(repl_tokens)
-                            -- explicitly send the boundary char so it's not lost
-                            keyStrokes(chars)
+                            -- re-send the boundary char only if it must be preserved
+                            if not consume_term then keyStrokes(chars) end
 
-                            -- update buffer: remove trigger from prefix_before, append repl text and the boundary char
-                            buffer = before_trigger .. repl_text .. chars
+                            -- update buffer: remove trigger, append repl text (and boundary if kept)
+                            buffer = before_trigger .. repl_text .. (consume_term and "" or chars)
 
                             -- When final_result is set, prevent any further hotstring from
                             -- re-scanning the expanded text (e.g. "axa" inside an e-mail).
