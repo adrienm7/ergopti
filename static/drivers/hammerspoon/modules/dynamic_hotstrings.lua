@@ -23,7 +23,7 @@ local GROUP_NAME = "dynamichotstrings"
 local SECTIONS = {
 	{ name = "date",          description = "dt★ insère la date courante (jj/mm/aaaa)" },
 	{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement" },
-	{ name = "ssnprefixes",   description = "Saisir les premiers caractères du numéro de sécurité sociale le complète automatiquement" },
+	{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement" },
 }
 
 -- ---------------------------------------------------------------------------

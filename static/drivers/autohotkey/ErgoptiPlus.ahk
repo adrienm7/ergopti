@@ -1,3 +1,4 @@
+; Last modified on 2026-03-09 at 17:04 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -463,7 +464,7 @@ global Features := Map(
         },
         "BU", {
             Enabled: True,
-            Description: "À + " . ScriptInformation["MagicKey"] . "/B corrige 2 SFBs : à" . ScriptInformation[
+            Description: "À + " . ScriptInformation["MagicKey"] . "/U corrige 2 SFBs : à" . ScriptInformation[
                 "MagicKey"] . " = bu et àu = ub",
             TimeActivationSeconds: 1,
         },
