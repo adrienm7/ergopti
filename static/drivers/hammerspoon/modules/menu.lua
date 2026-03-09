@@ -880,7 +880,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         local cur_back   = state.script_control_shortcuts.backspace   or "none"
         local sub = {}
         table.insert(sub, {
-            title    = "AltGr + Entrée : " .. (act_labels[cur_return] or cur_return),
+            title    = "AltGr + ↩ : " .. (act_labels[cur_return] or cur_return),
             disabled = not enabled or paused or nil,
             menu     = key_submenu("return_key"),
         })
@@ -963,7 +963,6 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         table.insert(items, {title="Ouvrir init.lua",           fn=function() hs.execute('open "'..base_dir..'init.lua"') end})
         table.insert(items, {title="Console Hammerspoon",       fn=function() hs.openConsole() end})
         table.insert(items, {title="Préférences Hammerspoon",   fn=function() hs.openPreferences() end})
-        table.insert(items, {title="-"})
         table.insert(items, {title="Recharger la configuration",fn=function() do_reload() end})
         table.insert(items, {title="Quitter Hammerspoon",       fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end})
         myMenu:setMenu({})
