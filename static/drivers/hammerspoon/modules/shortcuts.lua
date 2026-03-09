@@ -300,10 +300,20 @@ end
 hotkey_labels.ctrl_h = "Capture interactive vers presse-papiers (Ctrl+H)"
 hotkey_defs.ctrl_h = function()
     return hs.hotkey.bind({"ctrl"}, "h", function()
-        -- interactive capture, saved to clipboard (-c)
-        local cmd = 'screencapture -i -c'
-        hs.execute(cmd)
-        utils.notify("Capture d’écran copiée dans le presse-papiers")
+        -- Launch screencapture asynchronously so Hammerspoon is NOT blocked.
+        -- This allows gestures (e.g. 3-finger tap → toggleSelection) to fire
+        -- during the capture: first tap presses the mouse button, second tap
+        -- releases it, completing the rectangle selection.
+        local task = hs.task.new(
+            "/usr/sbin/screencapture",
+            function(exit_code, _, _)
+                if exit_code == 0 then
+                    utils.notify("Capture d'écran copiée dans le presse-papiers")
+                end
+            end,
+            { "-i", "-c" }
+        )
+        task:start()
     end)
 end
 
