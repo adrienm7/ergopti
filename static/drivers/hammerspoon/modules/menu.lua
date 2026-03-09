@@ -25,11 +25,14 @@ local SLOT_LABELS = {
     swipe_5_down  = "Swipe 5 doigts ↓",
 }
 
-function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info, module_sections)
+function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info, module_sections, script_control)
     base_dir = base_dir or (hs.configdir .. "/")
 
     local myMenu = menubar.new()
 
+    -- Icon logic: dark mode XOR paused → logo_white, else logo_black.
+    -- In dark mode the bar is dark, so white = visible (normal) / black = faded (paused).
+    -- In light mode it is the inverse.
     local function isDarkMode()
         local ok2, out = pcall(function()
             return hs.execute('defaults read -g AppleInterfaceStyle 2>/dev/null')
@@ -37,17 +40,22 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         return ok2 and out and out:match("Dark") ~= nil
     end
 
-    local function make_icon()
-        local logo_file = isDarkMode() and "logo_black.png" or "logo_white.png"
+    local function update_icon()
+        local is_dark   = isDarkMode()
+        local is_paused = script_control and script_control.is_paused() or false
+        -- XOR: normal state = readable icon; paused = faded icon
+        local logo_file = (is_dark ~= is_paused) and "logo_black.png" or "logo_white.png"
         local icon_path = base_dir .. "images/" .. logo_file
-        local icon = image.imageFromPath(icon_path)
-        if icon then pcall(function() if icon.setSize then icon:setSize({w=18,h=18}) end end) end
-        return icon, icon_path
+        local ico = image.imageFromPath(icon_path)
+        if ico then
+            pcall(function() if ico.setSize then ico:setSize({w=18,h=18}) end end)
+            myMenu:setIcon(ico, false)
+        else
+            myMenu:setTitle("🔨")
+        end
     end
 
-    local icon, icon_path = make_icon()
-    if icon then myMenu:setIcon(icon, false); print("menu icon loaded:", icon_path)
-    else         myMenu:setTitle("🔨");         print("menu icon NOT loaded:", icon_path) end
+    update_icon()
 
     local function do_reload(source)
         if source == "watcher" then
@@ -62,13 +70,17 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         hs.timer.doAfter(0.25, function() hs.reload() end)
     end
 
-    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}, chatgpt_url="https://chat.openai.com", sections_order_overrides={}, terminator_states={}, expansion_delay=0.75}
+    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}, chatgpt_url="https://chat.openai.com", sections_order_overrides={}, terminator_states={}, expansion_delay=0.75, script_control_shortcuts={return_key="pause", backspace="reload"}, script_control_enabled=true, ahk_source_path=""}
     for _, f in ipairs(hotfiles or {}) do
         local name = f:match("^(.*)%.lua$") or f
         state.hotstrings[name] = true
     end
 
     local prefs_file = base_dir .. "config.json"
+    -- Timestamp until which the path-watcher ignores .lua change events.
+    -- Set after open_init to avoid a spurious reload when the editor opens
+    -- the file and writes metadata/swap files back to the directory.
+    local _suppress_watcher_until = 0
 
     local function load_prefs()
         local fh = io.open(prefs_file, "r")
@@ -113,6 +125,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             expansion_delay          = state.expansion_delay,
             shortcut_keys            = {},
             gesture_actions          = gestures.get_all_actions(),
+            script_control_shortcuts = state.script_control_shortcuts,
+            script_control_enabled   = state.script_control_enabled,
+            ahk_source_path          = state.ahk_source_path,
         }
         if shortcuts and type(shortcuts.list_shortcuts) == "function" then
             for _, s in ipairs(shortcuts.list_shortcuts()) do
@@ -185,6 +200,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     keymap.set_base_delay(saved.expansion_delay)
                 end
             end
+            if type(saved.script_control_shortcuts) == "table" then
+                for k, v in pairs(saved.script_control_shortcuts) do
+                    state.script_control_shortcuts[k] = v
+                end
+            end
+            if saved.script_control_enabled ~= nil then state.script_control_enabled = saved.script_control_enabled end
+            if saved.ahk_source_path ~= nil then state.ahk_source_path = saved.ahk_source_path end
             if type(saved.hotstrings) == "table" then
                 for name in pairs(state.hotstrings) do
                     if saved.hotstrings[name] ~= nil then
@@ -231,7 +253,71 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             save_prefs()
         end
     end
-
+    -- Configure script_control with persisted shortcuts and callbacks.
+    if script_control then
+        script_control.set_on_pause_change(function(_) update_icon(); updateMenu() end)
+        -- Apply enabled state: if disabled, push "none" for all slots.
+        local function apply_sc_enabled()
+            if state.script_control_enabled then
+                script_control.set_shortcut_action("return_key", state.script_control_shortcuts.return_key)
+                script_control.set_shortcut_action("backspace",  state.script_control_shortcuts.backspace)
+            else
+                script_control.set_shortcut_action("return_key", "none")
+                script_control.set_shortcut_action("backspace",  "none")
+            end
+        end
+        apply_sc_enabled()
+        script_control.set_extras({
+            open_init = function()
+                hs.timer.doAfter(0, function()
+                    -- Suppress the path-watcher for a few seconds so that the
+                    -- editor opening init.lua does not trigger a spurious reload
+                    -- (e.g. VS Code writing metadata / swap files on open).
+                    _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+                    hs.execute('open "'..base_dir..'init.lua"')
+                end)
+            end,
+            open_ahk  = function()
+                -- Run entirely async to avoid blocking the eventtap handler.
+                hs.timer.doAfter(0, function()
+                    -- Resolution order for the file path:
+                    -- 1. User override saved in config.json
+                    -- 2. LOCAL_AHK_PATH environment variable
+                    -- 3. .local_ahk_path file next to hotstrings
+                    -- 4. Default project path: ../autohotkey/ErgoptiPlus.ahk
+                    local path = (state.ahk_source_path ~= "") and state.ahk_source_path or nil
+                    if not path then
+                        path = os.getenv("LOCAL_AHK_PATH")
+                    end
+                    if not path then
+                        local lf = io.open(base_dir .. "../hotstrings/.local_ahk_path", "r")
+                        if lf then
+                            local raw = lf:read("*a"); lf:close()
+                            raw = raw:match("^%s*(.-)%s*$")
+                            if raw ~= "" then path = raw end
+                        end
+                    end
+                    if not path then
+                        path = base_dir .. "../autohotkey/ErgoptiPlus.ahk"
+                    end
+                    -- Open with the same app that handles init.lua (e.g. VS Code),
+                    -- falling back to the system text editor (open -t).
+                    local init_path = base_dir .. "init.lua"
+                    local app_name = hs.execute(string.format(
+                        "osascript -e 'tell application \"Finder\" to return name of" ..
+                        " (default application of (info for POSIX file \"%s\"))' 2>/dev/null",
+                        init_path
+                    ))
+                    app_name = app_name and app_name:match("^%s*(.-)%s*$") or ""
+                    if app_name ~= "" then
+                        hs.execute(string.format('open -a "%s" "%s"', app_name, path))
+                    else
+                        hs.execute('open -t "'..path..'"')
+                    end
+                end)
+            end,
+        })
+    end
     -- ── Menu item builders ─────────────────────────────────────────────────────
 
     -- Helper: resolve enabled state for a top-level TOML/Lua group.
@@ -303,6 +389,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- re-enabled first before sections can be toggled.
     -- Lua groups (no sections) keep the simple click-to-toggle behaviour.
     local function buildHotstringsItems()
+        local paused = script_control and script_control.is_paused() or false
         local top_names = {}
         for _, f in ipairs(hotfiles or {}) do
             top_names[#top_names + 1] = f:match("^(.*)%.lua$") or f
@@ -337,7 +424,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             local base_label = groupLabel(name)
             local item = {
                 title   = has_count and (base_label .. " (" .. total .. ")") or base_label,
-                checked = enabled or nil,
+                checked = (enabled and not paused) or nil,
                 -- The parent item is clickable even alongside a sub-menu.
                 fn      = toggleGroupFn(name),
             }
@@ -396,7 +483,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         if mod_id == "personal_info" then
                             local pi = buildPersonalInfoItem(mod_desc)
                             if pi then
-                                if not enabled then pi.fn = nil; pi.disabled = true end
+                                if paused then pi.checked = nil end
+                            if not enabled or paused then pi.fn = nil; pi.disabled = true end
                                 sec_menu[#sec_menu + 1] = pi
                             end
                         end
@@ -413,9 +501,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                             title    = sec.count ~= nil
                                        and (label .. " (" .. sec.count .. ")")
                                        or  label,
-                            checked  = sec_on or nil,
-                            fn       = enabled and toggleSectionFn(name, sec.name) or nil,
-                            disabled = not enabled or nil,
+                            checked  = (sec_on and not paused) or nil,
+                            fn       = (enabled and not paused) and toggleSectionFn(name, sec.name) or nil,
+                            disabled = not enabled or paused or nil,
                         }
                     end
                 end
@@ -432,9 +520,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     local function buildGestesItem()
+        local paused = script_control and script_control.is_paused() or false
         local item = {
             title   = "Gestes",
-            checked = state.gestures or nil,
+            checked = (state.gestures and not paused) or nil,
             fn = function()
                 state.gestures = not state.gestures
                 if state.gestures then gestures.enable_all() else gestures.disable_all() end
@@ -442,9 +531,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             end
         }
 
-        if not state.gestures then return item end
-
         -- Builds an item with a radio sub-menu for a given slot.
+        -- Sub-items are greyed out when gestures are disabled; the parent
+        -- item's fn still lets the user toggle gestures back on.
         -- isAxis=true → AX_NAMES list, false → SG_NAMES list
         local function slotItem(slot, isAxis)
             local current  = gestures.get_action(slot)
@@ -454,9 +543,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             local submenu  = {}
             for _, aname in ipairs(names) do
                 table.insert(submenu, {
-                    title   = gestures.get_action_label(aname),
-                    checked = (current == aname) or nil,
-                    fn = (function(a) return function()
+                    title    = gestures.get_action_label(aname),
+                    checked  = ((current == aname) and not paused) or nil,
+                    disabled = not state.gestures or paused or nil,
+                    fn = (state.gestures and not paused) and (function(a) return function()
                         gestures.set_action(slot, a)
                         -- Warn user if the chosen action conflicts with a macOS gesture.
                         local conflict = gestures.on_action_changed(slot, a)
@@ -473,10 +563,15 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                                 end
                             end)
                         end
-                    end end)(aname)
+                    end end)(aname) or nil,
                 })
             end
-            return {title = slotLbl .. " : " .. actionLbl, menu = submenu}
+            -- Grey the slot header itself when gestures or pause are active.
+            return {
+                title    = slotLbl .. " : " .. actionLbl,
+                disabled = not state.gestures or paused or nil,
+                menu     = submenu,
+            }
         end
 
         -- Builds a group of slots (flat list, no separator)
@@ -541,19 +636,21 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     local function buildExpandersItem()
+        local paused = script_control and script_control.is_paused() or false
         local defs = keymap and keymap.get_terminator_defs and keymap.get_terminator_defs() or {}
         local sub = {}
         for _, def in ipairs(defs) do
             local enabled = keymap.is_terminator_enabled(def.key)
             sub[#sub + 1] = {
-                title   = def.label,
-                checked = enabled or nil,
-                fn = (function(k) return function()
+                title    = def.label,
+                checked  = (enabled and not paused) or nil,
+                disabled = paused or nil,
+                fn = not paused and (function(k) return function()
                     local new_val = not keymap.is_terminator_enabled(k)
                     keymap.set_terminator_enabled(k, new_val)
                     state.terminator_states[k] = new_val
                     save_prefs(); updateMenu()
-                end end)(def.key),
+                end end)(def.key) or nil,
             }
         end
         return { title = "Expanseurs", menu = sub }
@@ -588,75 +685,78 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     local function buildRaccourcisItem()
+        local paused = script_control and script_control.is_paused() or false
         local item = {
             title   = "Raccourcis",
-            checked = state.shortcuts or nil,
+            checked = (state.shortcuts and not paused) or nil,
             fn = function()
                 state.shortcuts = not state.shortcuts
                 if state.shortcuts then shortcuts.start() else shortcuts.stop() end
                 save_prefs(); updateMenu()
             end
         }
-        if state.shortcuts then
-            local s_menu = {}
-            -- Option+Scroll to change volume: grouped here since it is a
-            -- system-wide shortcut managed alongside the other shortcuts.
-            table.insert(s_menu, {
-                title   = "Option + Scroll : Volume",
-                checked = state.scroll or nil,
-                fn = function()
-                    state.scroll = not state.scroll
-                    if state.scroll then scroll.start() else scroll.stop() end
-                    save_prefs(); updateMenu()
-                end
-            })
-            table.insert(s_menu, {title = "-"})
-            local function pretty_key(id)
-                -- Special cases to avoid ugly tokenised display
-                if id == "at_hash" then return "Touche @/#" end
-                local parts = {}
-                for p in id:gmatch("[^_]+") do table.insert(parts, p) end
-                if #parts == 0 then return id end
-                local key  = parts[#parts]
-                local mods = {}
-                for i = 1, #parts-1 do
-                    local p = parts[i]
-                    if     p=="ctrl"  then table.insert(mods,"Ctrl")
-                    elseif p=="cmd"   then table.insert(mods,"Cmd")
-                    elseif p=="alt" or p=="option" then table.insert(mods,"Alt")
-                    elseif p=="shift" then table.insert(mods,"Shift")
-                    else table.insert(mods, p:sub(1,1):upper()..p:sub(2)) end
-                end
-                return (#mods>0 and table.concat(mods," + ").." + " or "")..key:upper()
+        -- Always build the sub-menu so the user can see items even when
+        -- shortcuts are disabled.  Items without fn are greyed out by macOS.
+        local s_menu = {}
+        -- Option+Scroll to change volume: grouped here since it is a
+        -- system-wide shortcut managed alongside the other shortcuts.
+        table.insert(s_menu, {
+            title    = "Option + Scroll : Volume",
+            checked  = (state.scroll and not paused) or nil,
+            disabled = not state.shortcuts or paused or nil,
+            fn = (state.shortcuts and not paused) and function()
+                state.scroll = not state.scroll
+                if state.scroll then scroll.start() else scroll.stop() end
+                save_prefs(); updateMenu()
+            end or nil,
+        })
+        table.insert(s_menu, {title = "-"})
+        local function pretty_key(id)
+            -- Special cases to avoid ugly tokenised display
+            if id == "at_hash" then return "Touche @/#" end
+            local parts = {}
+            for p in id:gmatch("[^_]+") do table.insert(parts, p) end
+            if #parts == 0 then return id end
+            local key  = parts[#parts]
+            local mods = {}
+            for i = 1, #parts-1 do
+                local p = parts[i]
+                if     p=="ctrl"  then table.insert(mods,"Ctrl")
+                elseif p=="cmd"   then table.insert(mods,"Cmd")
+                elseif p=="alt" or p=="option" then table.insert(mods,"Alt")
+                elseif p=="shift" then table.insert(mods,"Shift")
+                else table.insert(mods, p:sub(1,1):upper()..p:sub(2)) end
             end
-            local function trim(s) return (s:gsub("^%s*(.-)%s*$","%1")) end
-            local last_was_non_ctrl = false
-            local separator_inserted = false
-            for _, s in ipairs(shortcuts.list_shortcuts()) do
-                -- Insert a separator between non-Ctrl shortcuts (e.g. @/#, Cmd+…)
-                -- and the Ctrl shortcuts.
-                local is_ctrl = s.id:sub(1, 5) == "ctrl_"
-                if not separator_inserted and last_was_non_ctrl and is_ctrl then
-                    table.insert(s_menu, {title = "-"})
-                    separator_inserted = true
-                end
-                if not is_ctrl then last_was_non_ctrl = true end
-                local key   = pretty_key(s.id)
-                local desc  = trim((s.label or ""):gsub("%s*%b()",""))
-                local title = key.." : "..(desc~="" and desc or s.id)
-                local is_on = shortcuts.is_enabled and shortcuts.is_enabled(s.id) or s.enabled
-                table.insert(s_menu, {
-                    title   = title,
-                    checked = is_on or nil,
-                    fn = (function(id) return function()
-                        if shortcuts.is_enabled(id) then shortcuts.disable(id)
-                        else shortcuts.enable(id) end
-                        save_prefs(); updateMenu()
-                    end end)(s.id)
-                })
-            end
-            item.menu = s_menu
+            return (#mods>0 and table.concat(mods," + ").." + " or "")..key:upper()
         end
+        local function trim(s) return (s:gsub("^%s*(.-)%s*$","%1")) end
+        local last_was_non_ctrl = false
+        local separator_inserted = false
+        for _, s in ipairs(shortcuts.list_shortcuts()) do
+            -- Insert a separator between non-Ctrl shortcuts (e.g. @/#, Cmd+…)
+            -- and the Ctrl shortcuts.
+            local is_ctrl = s.id:sub(1, 5) == "ctrl_"
+            if not separator_inserted and last_was_non_ctrl and is_ctrl then
+                table.insert(s_menu, {title = "-"})
+                separator_inserted = true
+            end
+            if not is_ctrl then last_was_non_ctrl = true end
+            local key   = pretty_key(s.id)
+            local desc  = trim((s.label or ""):gsub("%s*%b()",""))
+            local title = key.." : "..(desc~="" and desc or s.id)
+            local is_on = shortcuts.is_enabled and shortcuts.is_enabled(s.id) or s.enabled
+            table.insert(s_menu, {
+                title    = title,
+                checked  = (is_on and not paused) or nil,
+                disabled = not state.shortcuts or paused or nil,
+                fn = (state.shortcuts and not paused) and (function(id) return function()
+                    if shortcuts.is_enabled(id) then shortcuts.disable(id)
+                    else shortcuts.enable(id) end
+                    save_prefs(); updateMenu()
+                end end)(s.id) or nil,
+            })
+        end
+        item.menu = s_menu
         return item
     end
 
@@ -726,6 +826,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             expansion_delay          = state.expansion_delay,
             shortcut_keys            = {},
             gesture_actions          = gestures.get_all_actions(),
+            script_control_shortcuts = state.script_control_shortcuts,
+            script_control_enabled   = state.script_control_enabled,
+            ahk_source_path          = state.ahk_source_path,
         }
         if shortcuts and type(shortcuts.list_shortcuts) == "function" then
             for _, s in ipairs(shortcuts.list_shortcuts()) do
@@ -745,12 +848,89 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         do_reload()
     end
 
+    local function buildScriptControlItem()
+        if not script_control then return nil end
+        local paused  = script_control.is_paused()
+        local actions    = script_control.ACTIONS
+        local act_labels = script_control.ACTION_LABELS
+        local enabled    = state.script_control_enabled
+
+        -- Build a radio sub-menu for one key slot.
+        -- Items are greyed out (no fn) when the module is disabled.
+        local function key_submenu(keyname)
+            local current = state.script_control_shortcuts[keyname] or "none"
+            local sub = {}
+            for _, act in ipairs(actions) do
+                table.insert(sub, {
+                    title    = act_labels[act],
+                    checked  = ((current == act) and not paused) or nil,
+                    disabled = not enabled or paused or nil,
+                    fn = (enabled and not paused) and (function(a) return function()
+                        state.script_control_shortcuts[keyname] = a
+                        script_control.set_shortcut_action(keyname, a)
+                        save_prefs(); updateMenu()
+                    end end)(act) or nil,
+                })
+            end
+            return sub
+        end
+
+        local cur_return = state.script_control_shortcuts.return_key or "none"
+        local cur_back   = state.script_control_shortcuts.backspace   or "none"
+        local sub = {}
+        table.insert(sub, {
+            title    = "AltGr + Entrée : " .. (act_labels[cur_return] or cur_return),
+            disabled = not enabled or paused or nil,
+            menu     = key_submenu("return_key"),
+        })
+        table.insert(sub, {
+            title    = "AltGr + ⌫ : " .. (act_labels[cur_back] or cur_back),
+            disabled = not enabled or paused or nil,
+            menu     = key_submenu("backspace"),
+        })
+        table.insert(sub, {title = "-"})
+        table.insert(sub, {
+            title    = "Chemin du script AHK...",
+            disabled = paused or nil,
+            fn = not paused and function()
+                local btn, path = hs.dialog.textPrompt(
+                    "Script AHK",
+                    "Chemin du fichier AHK source :",
+                    state.ahk_source_path or "", "OK", "Annuler")
+                if btn == "OK" and path ~= nil then
+                    state.ahk_source_path = path
+                    save_prefs(); updateMenu()
+                end
+            end or nil,
+        })
+        return {
+            title   = "Contrôle du script",
+            checked = (enabled and not paused) or nil,
+            fn = function()
+                state.script_control_enabled = not state.script_control_enabled
+                if state.script_control_enabled then
+                    -- Restore the configured actions.
+                    script_control.set_shortcut_action("return_key", state.script_control_shortcuts.return_key)
+                    script_control.set_shortcut_action("backspace",  state.script_control_shortcuts.backspace)
+                else
+                    -- Disable all slots without erasing the user config.
+                    script_control.set_shortcut_action("return_key", "none")
+                    script_control.set_shortcut_action("backspace",  "none")
+                end
+                save_prefs(); updateMenu()
+            end,
+            menu = sub,
+        }
+    end
+
     updateMenu = function()
         local items = {}
         for _, it in ipairs(buildHotstringsItems()) do table.insert(items, it) end
         table.insert(items, {title="-"})
         table.insert(items, buildGestesItem())
         table.insert(items, buildRaccourcisItem())
+        local sc_item = buildScriptControlItem()
+        if sc_item then table.insert(items, sc_item) end
         table.insert(items, {title="-"})
         table.insert(items, {title="Tout activer",    fn=function() set_all_enabled(true)  end})
         table.insert(items, {title="Tout désactiver", fn=function() set_all_enabled(false) end})
@@ -786,12 +966,15 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         table.insert(items, {title="Recharger la configuration",fn=function() do_reload() end})
         table.insert(items, {title="Quitter Hammerspoon",       fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end})
         myMenu:setMenu({})
-        hs.timer.doAfter(0.02, function() myMenu:setMenu(items) end)
+        hs.timer.doAfter(0.02, function() update_icon(); myMenu:setMenu(items) end)
     end
 
     updateMenu()
 
     local function reloadConfig(files)
+        -- Ignore events fired shortly after open_init ran: the editor may
+        -- write swap/metadata files that look like .lua modifications.
+        if hs.timer.secondsSinceEpoch() < _suppress_watcher_until then return end
         for _, file in pairs(files) do
             if file:sub(-4) == ".lua" then do_reload("watcher"); return end
         end
