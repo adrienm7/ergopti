@@ -1,3 +1,4 @@
+; Last modified on 2026-03-09 at 13:59 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -589,7 +590,7 @@ global Features := Map(
         "__Order", [
             "Accents",
             "Names",
-            "Brands",
+            "Caps",
             "-",
             "TypographicApostrophe",
             "-",
@@ -622,9 +623,9 @@ global Features := Map(
             Enabled: True,
             Description: "Autocorrection des accents de très nombreux mots",
         },
-        "Brands", {
+        "Caps", {
             Enabled: True,
-            Description: "Majuscules automatiques aux noms des marques : chatgpt = ChatGPT, powerpoint = PowerPoint, …",
+            Description: "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …",
         },
         "Names", {
             Enabled: True,
@@ -5230,7 +5231,7 @@ if Features["Autocorrection"]["PhoneNumberAutoComplete"].Enabled {
 ; ======= 8.4) Caps autocorrection =======
 ; ========================================
 
-if Features["Autocorrection"]["Brands"].Enabled {
+if Features["Autocorrection"]["Caps"].Enabled {
     ; CreateHotstring("", "ai", "AI") ; conflict with j’"ai"
     CreateHotstring("", "adaboost", "AdaBoost")
     CreateHotstring("", "api", "API")
@@ -5246,6 +5247,7 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "cli", "CLI")
     CreateHotstring("", "comex", "COMEX")
     CreateHotstring("", "cpu", "CPU")
+    CreateHotstring("", "csp", "CSP")
     CreateHotstring("", "data science", "Data Science")
     CreateHotstring("", "data scientist", "Data Scientist")
     CreateHotstring("", "databricks", "Databricks")
@@ -5301,7 +5303,6 @@ if Features["Autocorrection"]["Brands"].Enabled {
     CreateHotstring("", "qlora", "QLoRA")
     CreateHotstring("", "r", "R")
     CreateHotstring("", "rdc", "RDC")
-    CreateHotstring("", "red hat", "Rad Hat")
     CreateHotstring("", "rh", "RH")
     CreateHotstring("", "sas", "SAS")
     CreateHotstring("", "sharepoint", "SharePoint")

@@ -14,45 +14,45 @@ bu = "À + ★/B corrige 2 SFBs : à★ = bu et àu = ub"
 ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 [[comma]]
-",f" = { output = "fl", is_word = false, auto_expand = true, is_case_sensitive = false }
-",g" = { output = "gl", is_word = false, auto_expand = true, is_case_sensitive = false }
-",h" = { output = "ph", is_word = false, auto_expand = true, is_case_sensitive = false }
-",z" = { output = "bj", is_word = false, auto_expand = true, is_case_sensitive = false }
-",v" = { output = "dv", is_word = false, auto_expand = true, is_case_sensitive = false }
-",n" = { output = "nl", is_word = false, auto_expand = true, is_case_sensitive = false }
-",t" = { output = "pt", is_word = false, auto_expand = true, is_case_sensitive = false }
-",r" = { output = "rq", is_word = false, auto_expand = true, is_case_sensitive = false }
-",q" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false }
-",m" = { output = "ms", is_word = false, auto_expand = true, is_case_sensitive = false }
-",d" = { output = "ds", is_word = false, auto_expand = true, is_case_sensitive = false }
-",l" = { output = "cl", is_word = false, auto_expand = true, is_case_sensitive = false }
-",p" = { output = "xp", is_word = false, auto_expand = true, is_case_sensitive = false }
+",f" = { output = "fl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",g" = { output = "gl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",h" = { output = "ph", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",z" = { output = "bj", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",v" = { output = "dv", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",n" = { output = "nl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",t" = { output = "pt", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",r" = { output = "rq", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",q" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",m" = { output = "ms", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",d" = { output = "ds", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",l" = { output = "cl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",p" = { output = "xp", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[ecirc]]
-"êé" = { output = "oe", is_word = false, auto_expand = true, is_case_sensitive = false }
-"éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ê." = { output = "u.", is_word = false, auto_expand = true, is_case_sensitive = false }
-"ê," = { output = "u,", is_word = false, auto_expand = true, is_case_sensitive = false }
+"êé" = { output = "oe", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ê." = { output = "u.", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ê," = { output = "u,", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[egrave]]
-"yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false }
-"èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false }
+"yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[bu]]
-"il a mà★" = { output = "il a mis à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"la mà★" = { output = "la mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ta mà★" = { output = "ta mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"ma mà★" = { output = "ma mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"e mà★" = { output = "e mise à jour", is_word = false, auto_expand = true, is_case_sensitive = false }
-"es mà★" = { output = "es mises à jour", is_word = false, auto_expand = true, is_case_sensitive = false }
-"mà★" = { output = "mettre à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"mià★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false }
-"pià★" = { output = "pièce jointe", is_word = true, auto_expand = true, is_case_sensitive = false }
-"tà★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false }
-"à★" = { output = "bu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"àu" = { output = "ub", is_word = false, auto_expand = true, is_case_sensitive = false }
+"il a mà★" = { output = "il a mis à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"la mà★" = { output = "la mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ta mà★" = { output = "ta mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ma mà★" = { output = "ma mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"e mà★" = { output = "e mise à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"es mà★" = { output = "es mises à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mà★" = { output = "mettre à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mià★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"pià★" = { output = "pièce jointe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"tà★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"à★" = { output = "bu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àu" = { output = "ub", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[ie]]
-"ié★" = { output = "ébu", is_word = false, auto_expand = true, is_case_sensitive = false }
-"àé" = { output = "éi", is_word = false, auto_expand = true, is_case_sensitive = false }
-"éà" = { output = "ié", is_word = false, auto_expand = true, is_case_sensitive = false }
+"ié★" = { output = "ébu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àé" = { output = "éi", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"éà" = { output = "ié", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
