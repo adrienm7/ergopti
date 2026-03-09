@@ -62,7 +62,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         hs.timer.doAfter(0.25, function() hs.reload() end)
     end
 
-    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}, chatgpt_url="https://chat.openai.com", sections_order_overrides={}}
+    local state = {keymap=true, gestures=true, scroll=true, shortcuts=true, personal_info=true, hotstrings={}, chatgpt_url="https://chat.openai.com", sections_order_overrides={}, terminator_states={}, expansion_delay=0.75}
     for _, f in ipairs(hotfiles or {}) do
         local name = f:match("^(.*)%.lua$") or f
         state.hotstrings[name] = true
@@ -109,6 +109,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             chatgpt_url              = state.chatgpt_url,
             sections_order_overrides = state.sections_order_overrides,
             section_states           = section_states,
+            terminator_states        = state.terminator_states,
+            expansion_delay          = state.expansion_delay,
             shortcut_keys            = {},
             gesture_actions          = gestures.get_all_actions(),
         }
@@ -168,6 +170,20 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             if saved.chatgpt_url              ~= nil then state.chatgpt_url              = saved.chatgpt_url              end
             if type(saved.sections_order_overrides) == 'table' then
                 state.sections_order_overrides = saved.sections_order_overrides
+            end
+            if type(saved.terminator_states) == 'table' then
+                state.terminator_states = saved.terminator_states
+                for key, enabled in pairs(saved.terminator_states) do
+                    if keymap and keymap.set_terminator_enabled then
+                        keymap.set_terminator_enabled(key, enabled)
+                    end
+                end
+            end
+            if type(saved.expansion_delay) == 'number' then
+                state.expansion_delay = saved.expansion_delay
+                if keymap and keymap.set_base_delay then
+                    keymap.set_base_delay(saved.expansion_delay)
+                end
             end
             if type(saved.hotstrings) == "table" then
                 for name in pairs(state.hotstrings) do
@@ -524,6 +540,53 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         }
     end
 
+    local function buildExpandersItem()
+        local defs = keymap and keymap.get_terminator_defs and keymap.get_terminator_defs() or {}
+        local sub = {}
+        for _, def in ipairs(defs) do
+            local enabled = keymap.is_terminator_enabled(def.key)
+            sub[#sub + 1] = {
+                title   = def.label,
+                checked = enabled or nil,
+                fn = (function(k) return function()
+                    local new_val = not keymap.is_terminator_enabled(k)
+                    keymap.set_terminator_enabled(k, new_val)
+                    state.terminator_states[k] = new_val
+                    save_prefs(); updateMenu()
+                end end)(def.key),
+            }
+        end
+        return { title = "Expanseurs", menu = sub }
+    end
+
+    local function buildDelayItem()
+        local current = keymap and keymap.get_base_delay and keymap.get_base_delay() or state.expansion_delay
+        -- Display value in ms, rounded to avoid floating-point noise.
+        local current_ms = math.floor(current * 1000 + 0.5)
+        return {
+            title = string.format("Délai d'expansion : %d ms", current_ms),
+            fn = function()
+                local btn, raw = hs.dialog.textPrompt(
+                    "Délai d'expansion",
+                    "Entrez le délai en millisecondes (nombre entier ≥ 0) :",
+                    tostring(current_ms),
+                    "OK", "Annuler"
+                )
+                if btn ~= "OK" then return end
+                local val = tonumber(raw)
+                if not val or val < 0 or val ~= math.floor(val) then
+                    hs.notify.new({ title = "Délai invalide",
+                        informativeText = "Veuillez saisir un entier ≥ 0." }):send()
+                    return
+                end
+                local secs = val / 1000
+                keymap.set_base_delay(secs)
+                state.expansion_delay = secs
+                save_prefs(); updateMenu()
+            end,
+        }
+    end
+
     local function buildRaccourcisItem()
         local item = {
             title   = "Raccourcis",
@@ -659,6 +722,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             chatgpt_url              = state.chatgpt_url,
             sections_order_overrides = state.sections_order_overrides,
             section_states           = section_states,
+            terminator_states        = state.terminator_states,
+            expansion_delay          = state.expansion_delay,
             shortcut_keys            = {},
             gesture_actions          = gestures.get_all_actions(),
         }
@@ -686,6 +751,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             {title="Tout activer",    fn=function() set_all_enabled(true)  end},
             {title="Tout désactiver", fn=function() set_all_enabled(false) end},
             {title="-"},
+            buildExpandersItem(),
+            buildDelayItem(),
             {title="URL ChatGPT...", fn=function()
                 local clicked, url = hs.dialog.textPrompt(
                     "URL ChatGPT",

@@ -93,27 +93,22 @@ local function register_prefix_entries()
 
 	-- ── Phone prefix expansions ──────────────────────────────────────────────
 	if _km.is_section_enabled(GROUP_NAME, "phoneprefixes") then
-		-- XX★ → full number  (e.g. "07★")
 		if #phone >= 2 then
+			-- XX★ → full number  (e.g. "07★" → "0706060606")
 			_km.add(phone:sub(1, 2) .. _trigger, phone, opts)
-		end
-		-- International-prefix variants (no ★, auto-expand on next char)
-		if #phone >= 2 then
-			_km.add("+33" .. phone:sub(1, 2), phone, opts)   -- "+3307"
+			-- International-prefix variant  (e.g. "+3307" → "+330706060606")
+			_km.add("+33" .. phone:sub(1, 2), "+33" .. phone, opts)
 		end
 		if #phone >= 4 then
-			_km.add("+33" .. phone:sub(2, 4), phone, opts)  -- "+33706"
-			_km.add(phone:sub(1, 4), phone, opts)            -- "0706"
+			_km.add(phone:sub(1, 4), phone, opts)                          -- "0706"
+			_km.add("+33" .. phone:sub(2, 4), "+33" .. phone, opts)       -- "+33706"
 		end
 		if #phone >= 6 then
-			_km.add(phone:sub(2, 6), phone, opts)            -- "70606"
+			_km.add(phone:sub(2, 5), phone, opts)                          -- "70606"
 		end
 		-- Formatted variants (e.g. "07 06" → "07 06 06 06 06")
 		if #fphone >= 5 then
 			_km.add(fphone:sub(1, 5), fphone, opts)
-		end
-		if #fphone >= 6 then
-			_km.add(fphone:sub(2, 6), fphone:sub(2), opts)
 		end
 	end
 
