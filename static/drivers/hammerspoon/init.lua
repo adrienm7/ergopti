@@ -194,7 +194,7 @@ hotfiles[#hotfiles + 1] = "dynamichotstrings"
 ---------------------------------------------------------------------------
 -- External menu module
 local menu = require("modules.menu")
-menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info, module_sections)
+menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info, module_sections, script_control)
 
 ---------------------------------------------------------------------------
 -- Script control shortcuts (AltGr+Return = pause/resume, AltGr+Backspace = reload)
