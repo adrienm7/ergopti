@@ -34,10 +34,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- In dark mode the bar is dark, so white = visible (normal) / black = faded (paused).
     -- In light mode it is the inverse.
     local function isDarkMode()
-        local ok2, out = pcall(function()
-            return hs.execute('defaults read -g AppleInterfaceStyle 2>/dev/null')
-        end)
-        return ok2 and out and out:match("Dark") ~= nil
+        return false -- Disable dark mode detection for now since the dark mode menu is the same as the light mode one and the icons are designed for that. To re-enable if separate dark mode icons are added.
+        -- local ok2, out = pcall(function()
+        --     return hs.execute('defaults read -g AppleInterfaceStyle 2>/dev/null')
+        -- end)
+        -- return ok2 and out and out:match("Dark") ~= nil
     end
 
     local function update_icon()
