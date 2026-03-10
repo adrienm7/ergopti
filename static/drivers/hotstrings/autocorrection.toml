@@ -84,6 +84,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "buche" = { output = "bûche", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "calin" = { output = "câlin", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "canoe" = { output = "canoë", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"prochaine" = { output = "prochaine", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chaine" = { output = "chaîne", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chaîned" = { output = "chained", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chainé" = { output = "chaîné", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -252,6 +253,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "oeuf" = { output = "œuf", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "oeuvre" = { output = "œuvre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "oiaque" = { output = "oïaque", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"froide" = { output = "froide", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "oide" = { output = "oïde", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "opiniatre" = { output = "opiniâtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ouie" = { output = "ouïe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }

@@ -32,6 +32,7 @@ chevronequal = "<% ➜ <= et >% ➜ >="
 "hc" = { output = "wh", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[sx]]
+"xlsx" = { output = "xlsx", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[cx]]
@@ -44,6 +45,7 @@ chevronequal = "<% ➜ <= et >% ➜ >="
 "eé" = { output = "ez", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[ct]]
+"p ?" = { output = "p ?", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
 "p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[closechevrontag]]
