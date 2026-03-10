@@ -884,6 +884,13 @@ local function onKeyDown(e)
                                 -- real key strokes rather than literal characters.
                                 local repl_tokens = tokens_from_repl(m.repl)
                                 local repl_text   = text_from_tokens(repl_tokens)
+                                -- Identity guard: trigger and output are the same string.
+                                -- No keystroke manipulation needed; the triggering char already
+                                -- reached the app naturally and the buffer is already up to date.
+                                if repl_text == trigger then
+                                    if m.final_result then suppress_rescan() end
+                                    return false
+                                end
                                 -- Pre-compute synthetic event count BEFORE emitting anything.
                                 -- Each keyStroke(delete) = 1; text chars = 1 each; key
                                 -- commands ({Left} etc.) = 1 each.
@@ -959,6 +966,14 @@ local function onKeyDown(e)
                         local is_final_mapping = m.final_result
 
                         local consume_term = terminator_is_consumed(chars)
+
+                        -- Identity guard: trigger and output are the same string.
+                        -- No keystroke manipulation needed; let the boundary char pass
+                        -- through naturally (buffer already has trigger + boundary).
+                        if m.repl == trigger then
+                            if is_final_mapping then suppress_rescan() end
+                            return false
+                        end
 
                         hs.timer.doAfter(0, function()
                             if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
