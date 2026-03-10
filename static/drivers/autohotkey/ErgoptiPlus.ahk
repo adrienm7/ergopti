@@ -1,4 +1,4 @@
-; Last modified on 2026-03-09 at 17:04 (UTC+1)
+; Last modified on 2026-03-10 at 10:10 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -6391,6 +6391,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "p//" . ScriptInformation["MagicKey"], "par rapport")
     CreateCaseSensitiveHotstrings("*", "par" . ScriptInformation["MagicKey"], "paragraphe")
     CreateCaseSensitiveHotstrings("*", "param" . ScriptInformation["MagicKey"], "paramètre")
+    CreateCaseSensitiveHotstrings("*", "params" . ScriptInformation["MagicKey"], "paramètres")
     CreateCaseSensitiveHotstrings("*", "pb" . ScriptInformation["MagicKey"], "problème")
     CreateCaseSensitiveHotstrings("*", "pcq" . ScriptInformation["MagicKey"], "parce que")
     CreateCaseSensitiveHotstrings("*", "pck" . ScriptInformation["MagicKey"], "parce que")

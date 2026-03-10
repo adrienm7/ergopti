@@ -444,6 +444,7 @@ repeat = "La touche ★ permet la répétition"
 "p//★" = { output = "par rapport", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "par★" = { output = "paragraphe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "param★" = { output = "paramètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"params★" = { output = "paramètres", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pb★" = { output = "problème", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pcq★" = { output = "parce que", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pck★" = { output = "parce que", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }

@@ -894,12 +894,16 @@ def parse_body(
 
     Args:
             body: Raw body text of a ``Features[...][...]`` block.
-            skip_identity: When ``True`` (default), hotstrings where trigger
-                    equals output are dropped.  Pass ``False`` for sections
-                    such as ``Repeat`` where identity entries are semantically
-                    required (they guard against shorter triggers firing inside
-                    longer words, e.g. ``honn\u00ea`` blocks ``nn\u00ea → nnu``
-                    inside ``honn\u00eate``).
+            skip_identity: When ``True`` (default), non-auto-expand hotstrings
+                    where trigger equals output are dropped (they are genuine
+                    no-ops: they need an end-key to fire and would just retype
+                    the trigger).  Auto-expand (``*``) identity hotstrings are
+                    **always** kept regardless of this flag: they are guard
+                    entries that prevent shorter triggers from firing inside a
+                    longer word (e.g. ``prochaine`` blocks shorter SFB
+                    corrections that would otherwise match inside it).  Pass
+                    ``False`` to also keep non-auto-expand identity entries
+                    (used for the ``Repeat`` section).
 
     Returns:
             Deduplicated list of
@@ -960,13 +964,16 @@ def parse_body(
         )
 
         if trigger and output:
-            # Skip identity hotstrings (trigger == output) by default: they
-            # are no-ops in Hammerspoon.  Callers pass skip_identity=False for
-            # sections such as ``Repeat`` where identity entries are guards
-            # that prevent shorter SFB-correction triggers from firing inside
-            # longer words (e.g. ``honnê`` blocks ``nnê → nnu`` in
-            # ``honnête``).
-            if skip_identity and trigger == output:
+            # Skip non-auto-expand identity hotstrings (trigger == output)
+            # by default: without the ``*`` flag they would need an end-key
+            # to fire and, upon firing, would simply retype the trigger —
+            # a genuine no-op in Hammerspoon.
+            # Auto-expand (``*``) identity hotstrings are guard entries that
+            # prevent shorter triggers from firing inside a longer word
+            # (e.g. ``prochaine`` blocks shorter SFB-correction triggers that
+            # would otherwise match inside it).  They must always be kept,
+            # regardless of the section.
+            if skip_identity and trigger == output and not auto_expand:
                 pass
             elif trigger not in seen:
                 seen.add(trigger)
