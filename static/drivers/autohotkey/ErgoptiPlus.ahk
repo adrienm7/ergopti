@@ -1,4 +1,3 @@
-; Last modified on 2026-03-10 at 10:54 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
