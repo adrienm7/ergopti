@@ -297,7 +297,7 @@ hotkey_defs.ctrl_e = function()
     end)
 end
 
-hotkey_labels.ctrl_h = "Capture interactive vers presse-papiers (Ctrl+H)"
+hotkey_labels.ctrl_h = "Capture interactive vers le presse-papiers (Ctrl+H)"
 hotkey_defs.ctrl_h = function()
     return hs.hotkey.bind({"ctrl"}, "h", function()
         -- Launch screencapture asynchronously so Hammerspoon is NOT blocked.

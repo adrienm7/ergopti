@@ -880,12 +880,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         local cur_back   = state.script_control_shortcuts.backspace   or "none"
         local sub = {}
         table.insert(sub, {
-            title    = "AltGr + ↩ : " .. (act_labels[cur_return] or cur_return),
+            title    = "Option droite + ↩ : " .. (act_labels[cur_return] or cur_return),
             disabled = not enabled or paused or nil,
             menu     = key_submenu("return_key"),
         })
         table.insert(sub, {
-            title    = "AltGr + ⌫ : " .. (act_labels[cur_back] or cur_back),
+            title    = "Option droite + ⌫ : " .. (act_labels[cur_back] or cur_back),
             disabled = not enabled or paused or nil,
             menu     = key_submenu("backspace"),
         })
