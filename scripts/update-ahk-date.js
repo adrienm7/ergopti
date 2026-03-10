@@ -32,13 +32,22 @@ try {
 	headContent = '';
 }
 
-if (headContent !== '' && stripDateLine(currentContent) === stripDateLine(headContent)) {
+// Normalize possible BOM and detect whether a date line is already present on first line.
+const lines = currentContent.split('\n');
+const firstLine = lines[0] ? lines[0].replace(/^\uFEFF/, '') : '';
+const hasDateLine = !!firstLine.match(/^; (Created|Last modified) on /);
+
+// Only skip updating when the file exists in HEAD, contents are identical after
+// stripping a date line, AND a date line is already present. If there's no date
+// line, we must add one even when the rest of the file matches HEAD.
+if (
+	headContent !== '' &&
+	stripDateLine(currentContent) === stripDateLine(headContent) &&
+	hasDateLine
+) {
 	console.log('⏭️  AHK date not updated: no real content change beyond the date line.');
 	process.exit(0);
 }
-
-const lines = currentContent.split('\n');
-const hasDateLine = lines[0].match(/^; (Created|Last modified) on /);
 
 const now = new Date();
 const pad = (n) => String(n).padStart(2, '0');
