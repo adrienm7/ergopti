@@ -1,4 +1,4 @@
-; Last modified on 2026-03-10 at 10:10 (UTC+1)
+; Last modified on 2026-03-10 at 10:54 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -5575,9 +5575,9 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "guepe", "guêpe")
 
     ; === H ===
-    CreateCaseSensitiveHotstrings("*", "heroique", "héroïque")
+    CreateCaseSensitiveHotstrings("*", "heroiq", "héroïq")
     CreateCaseSensitiveHotstrings("*", "heroisme", "héroïsme")
-    CreateCaseSensitiveHotstrings("*", "héroique", "héroïque")
+    CreateCaseSensitiveHotstrings("*", "héroiq", "héroïq")
     CreateCaseSensitiveHotstrings("*", "héroisme", "héroïsme")
     CreateCaseSensitiveHotstrings("*?", "honnete", "honnête")
     CreateCaseSensitiveHotstrings("*", "hopita", "hôpita")
