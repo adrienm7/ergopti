@@ -191,9 +191,9 @@ accents = "Autocorrection des accents de très nombreux mots"
 "grèle" = { output = "grêle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "greler" = { output = "grêler", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "guepe" = { output = "guêpe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"heroique" = { output = "héroïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"heroiq" = { output = "héroïq", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "heroisme" = { output = "héroïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"héroique" = { output = "héroïque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"héroiq" = { output = "héroïq", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "héroisme" = { output = "héroïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "honnete" = { output = "honnête", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "hopita" = { output = "hôpita", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
