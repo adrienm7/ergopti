@@ -1,3 +1,4 @@
+; Last modified on 2026-03-11 at 14:26 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -239,30 +240,31 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
         }
 
         ; Inverted titlecase: beginning lowercase, last letter uppercase
-        if OptionPreferTitleCase {
-            if !(StrLower(lastChar) == StrUpper(lastChar)) {
-                Hotstring(
-                    FlagsPortion AbbreviationInvertedTitleCase,
-                    (*) => HotstringHandler(AbbreviationInvertedTitleCase, ReplacementTitleCase, A_EndChar,
-                        HotstringOptions)
-                )
-            } else if UppercasedSymbols.Has(LastChar) {
-                for UppercasedSymbol in UppercasedSymbols[LastChar] {
-                    AbbreviationInvertedTitleCaseVariant := SubStr(AbbreviationLowerCase, 1, -1) . UppercasedSymbol
-                    Hotstring(
-                        FlagsPortion AbbreviationInvertedTitleCaseVariant,
-                        (*) => HotstringHandler(AbbreviationInvertedTitleCaseVariant, ReplacementTitleCase, A_EndChar,
-                            HotstringOptions)
-                    )
-                }
-            }
-        } else {
-            Hotstring(
-                FlagsPortion AbbreviationInvertedTitleCase,
-                (*) => HotstringHandler(AbbreviationInvertedTitleCase, ReplacementUpperCase, A_EndChar,
-                    HotstringOptions)
-            )
-        }
+        ; Currently deactivated because of some issues like typing [don]c ? that would give [don]pt
+        ; if OptionPreferTitleCase {
+        ;     if !(StrLower(lastChar) == StrUpper(lastChar)) {
+        ;         Hotstring(
+        ;             FlagsPortion AbbreviationInvertedTitleCase,
+        ;             (*) => HotstringHandler(AbbreviationInvertedTitleCase, ReplacementTitleCase, A_EndChar,
+        ;                 HotstringOptions)
+        ;         )
+        ;     } else if UppercasedSymbols.Has(LastChar) {
+        ;         for UppercasedSymbol in UppercasedSymbols[LastChar] {
+        ;             AbbreviationInvertedTitleCaseVariant := SubStr(AbbreviationLowerCase, 1, -1) . UppercasedSymbol
+        ;             Hotstring(
+        ;                 FlagsPortion AbbreviationInvertedTitleCaseVariant,
+        ;                 (*) => HotstringHandler(AbbreviationInvertedTitleCaseVariant, ReplacementTitleCase, A_EndChar,
+        ;                     HotstringOptions)
+        ;             )
+        ;         }
+        ;     }
+        ; } else {
+        ;     Hotstring(
+        ;         FlagsPortion AbbreviationInvertedTitleCase,
+        ;         (*) => HotstringHandler(AbbreviationInvertedTitleCase, ReplacementUpperCase, A_EndChar,
+        ;             HotstringOptions)
+        ;     )
+        ; }
     }
 }
 
