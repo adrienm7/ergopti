@@ -1,4 +1,4 @@
-; Last modified on 2026-03-11 at 14:26 (UTC+1)
+; Last modified on 2026-03-11 at 14:29 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -240,7 +240,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
         }
 
         ; Inverted titlecase: beginning lowercase, last letter uppercase
-        ; Currently deactivated because of some issues like typing [don]c ? that would give [don]pt
+        ; Currently deactivated because of some issues like typing [don]c ? that would give [don]ct
         ; if OptionPreferTitleCase {
         ;     if !(StrLower(lastChar) == StrUpper(lastChar)) {
         ;         Hotstring(
