@@ -3,9 +3,13 @@ local gestures = require("modules.gestures")
 
 local M = {}
 
+-- `leftCommandPhysical` is true while the Karabiner layer key is held.
+-- This script expects Karabiner to emit the `F19` keycode for the layer.
+-- We detect that low-level keycode and do not rely on modifier flags.
 local leftCommandPhysical = false
-local f19_keycode = hs.keycodes.map["f19"] or hs.keycodes.map["leftcmd"] or hs.keycodes.map["cmd"]
+local f19_keycode = hs.keycodes.map["f19"]
 
+-- Listen for F19 keyDown/keyUp and set `leftCommandPhysical` while held.
 local physicalOptionTap = hs.eventtap.new({hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp}, function(event)
     local kc = event:getKeyCode()
     if kc == f19_keycode then
@@ -19,19 +23,13 @@ local physicalOptionTap = hs.eventtap.new({hs.eventtap.event.types.keyDown, hs.e
     return false
 end)
 
+-- Handle scrollWheel events only when the Karabiner layer (F19) is active.
+-- `leftCommandPhysical` is the canonical indicator of the layer.
 local scrollZoom = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
     local flags = event:getFlags()
     local scrollY = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
 
-    if flags.cmd then
-        if scrollY > 0 then
-            hs.eventtap.keyStroke({"cmd"}, "pad+", 0)
-        elseif scrollY < 0 then
-            hs.eventtap.keyStroke({"cmd"}, "pad-", 0)
-        end
-        return true
-    end
-
+    -- React only when the physical layer key (F19) is active.
     if leftCommandPhysical then
         if gestures.isLeftClickPressed() then gestures.forceCleanup() end
         if scrollY > 0 then

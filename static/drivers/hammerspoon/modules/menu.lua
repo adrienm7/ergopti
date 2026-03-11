@@ -702,7 +702,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         -- Option+Scroll to change volume: grouped here since it is a
         -- system-wide shortcut managed alongside the other shortcuts.
         table.insert(s_menu, {
-            title    = "Option + Scroll : Volume",
+            title    = "Layer (Left Command) + Scroll : Volume",
             checked  = (state.scroll and not paused) or nil,
             disabled = not state.shortcuts or paused or nil,
             fn = (state.shortcuts and not paused) and function()
@@ -719,6 +719,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             for p in id:gmatch("[^_]+") do table.insert(parts, p) end
             if #parts == 0 then return id end
             local key  = parts[#parts]
+            -- display a star glyph instead of the word 'star' or 'asterisk'
+            if key == "star" or key == "asterisk" then key = "★" end
             local mods = {}
             for i = 1, #parts-1 do
                 local p = parts[i]
@@ -743,7 +745,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             end
             if not is_ctrl then last_was_non_ctrl = true end
             local key   = pretty_key(s.id)
-            local desc  = trim((s.label or ""):gsub("%s*%b()",""))
+            local desc  = trim(s.label or "")
             local title = key.." : "..(desc~="" and desc or s.id)
             local is_on = shortcuts.is_enabled and shortcuts.is_enabled(s.id) or s.enabled
             table.insert(s_menu, {

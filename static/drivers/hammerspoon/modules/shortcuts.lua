@@ -92,8 +92,6 @@ local function do_transform(transform_func)
     end)
 end
 
--- get_selection_path removed: simplified approach uses Cmd+Option+C for Finder-like apps
-
 -- Center an application's visible standard windows
 local function center_windows_of_app(app)
     if not app then return end
@@ -171,49 +169,7 @@ local awake_timer    = nil
 local awake_alert_id = nil
 local awake_active   = false
 
--- Read chatgpt_url from config.json (falls back to default if missing/invalid)
-local function read_chatgpt_url()
-    local cfg_path = hs.configdir .. "/config.json"
-    local fh = io.open(cfg_path, "r")
-    if not fh then return "https://chat.openai.com" end
-    local content = fh:read("*a"); fh:close()
-    local ok, tbl = pcall(function() return hs.json.decode(content) end)
-    if ok and type(tbl) == "table" and type(tbl.chatgpt_url) == "string" and tbl.chatgpt_url ~= "" then
-        return tbl.chatgpt_url
-    end
-    return "https://chat.openai.com"
-end
 
--- Read hex color (#rrggbb) of the pixel at the given screen position.
--- Captures a 3×3 region and samples the center pixel with Python3.
-local function pixel_hex_at(x, y)
-    local tmpfile = "/tmp/_hs_pixel_cap.png"
-    local cap_cmd = string.format('screencapture -x -R "%d,%d,3,3" "%s"', x - 1, y - 1, tmpfile)
-    hs.execute(cap_cmd)
-    local py = string.format([[
-python3 -c "
-import struct,zlib
-data=open('%s','rb').read()
-w,h=struct.unpack('>II',data[16:24])
-ct=data[25];bpp=4 if ct==6 else 3
-i,chunks=8,b''
-while i<len(data)-12:
-  l=struct.unpack('>I',data[i:i+4])[0];t=data[i+4:i+8]
-  if t==b'IDAT':chunks+=data[i+8:i+8+l]
-  elif t==b'IEND':break
-  i+=l+12
-raw=zlib.decompress(chunks)
-cx=w//2;cy=h//2;off=cy*(1+w*bpp)+1+cx*bpp
-r,g,b=raw[off],raw[off+1],raw[off+2]
-print('#%%02x%%02x%%02x' %% (r,g,b))
-"]], tmpfile)
-    local out = hs.execute(py)
-    if out then
-        local hex = out:match("(#%x%x%x%x%x%x)")
-        if hex then return hex end
-    end
-    return nil
-end
 
 -- Hotkey definitions (create and return the hotkey object when called)
 hotkey_labels.at_hash = "Capture d'écran instantanée"
@@ -253,7 +209,66 @@ hotkey_defs.at_hash = function()
     return obj
 end
 
-hotkey_labels.ctrl_a = "Sélectionner la ligne (Ctrl+A)"
+
+
+hotkey_labels.cmd_star = "Cmd + S (préserve mod.)"
+hotkey_defs.cmd_star = function()
+    local tap
+    local obj = {}
+    tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+        local flags = e:getFlags()
+        if not flags.cmd then return false end
+        local ok, ch = pcall(function() return e:getCharacters() end)
+        if not ok or not ch then return false end
+        if ch ~= "★" and ch ~= "*" and ch ~= "✱" then return false end
+
+        -- build modifiers to send
+        local mods = {}
+        if flags.cmd then table.insert(mods, "cmd") end
+        if flags.shift then table.insert(mods, "shift") end
+        if flags.alt then table.insert(mods, "alt") end
+        if flags.ctrl then table.insert(mods, "ctrl") end
+
+        -- Always send S with the detected modifiers (Cmd/Shift/Alt/Ctrl preserved)
+        if #mods > 0 then
+            eventtap.keyStroke(mods, "s")
+        end
+
+        return true
+    end)
+    tap:start()
+    function obj:delete()
+        if tap then
+            tap:stop()
+            tap = nil
+        end
+    end
+    return obj
+end
+
+
+
+hotkey_labels.cmd_shift_v = "Coller sans mise en forme"
+hotkey_defs.cmd_shift_v = function()
+    return hs.hotkey.bind({"cmd","shift"}, "v", function()
+        local prior = pasteboard.getContents()
+        local plain = pasteboard.getContents() or ""
+        pasteboard.clearContents()
+        pasteboard.setContents(plain)
+        timer.doAfter(0.08, function()
+            -- perform paste with a small key delay
+            eventtap.keyStroke({"cmd"}, "v", 0.02)
+
+            timer.doAfter(0.25, function()
+                if prior and prior ~= "" then pasteboard.setContents(prior) else pasteboard.clearContents() end
+            end)
+        end)
+    end)
+end
+
+
+
+hotkey_labels.ctrl_a = "Sélectionner la ligne"
 hotkey_defs.ctrl_a = function()
     return hs.hotkey.bind({"ctrl"}, "a", function()
         eventtap.keyStroke({"cmd"}, "left")
@@ -261,7 +276,9 @@ hotkey_defs.ctrl_a = function()
     end)
 end
 
-hotkey_labels.ctrl_d = "Ouvrir Téléchargements (Ctrl+D)"
+
+
+hotkey_labels.ctrl_d = "Ouvrir Téléchargements"
 hotkey_defs.ctrl_d = function()
     return hs.hotkey.bind({"ctrl"}, "d", function()
         local home = os.getenv("HOME") or "~"
@@ -279,7 +296,9 @@ hotkey_defs.ctrl_d = function()
     end)
 end
 
-hotkey_labels.ctrl_e = "Ouvrir Finder (Ctrl+E)"
+
+
+hotkey_labels.ctrl_e = "Ouvrir Finder"
 hotkey_defs.ctrl_e = function()
     return hs.hotkey.bind({"ctrl"}, "e", function()
         local home = os.getenv("HOME") or "~"
@@ -297,7 +316,31 @@ hotkey_defs.ctrl_e = function()
     end)
 end
 
-hotkey_labels.ctrl_h = "Capture interactive vers le presse-papiers (Ctrl+H)"
+
+
+hotkey_labels.ctrl_g = "Ouvrir ChatGPT"
+hotkey_defs.ctrl_g = function()
+    return hs.hotkey.bind({"ctrl"}, "g", function()
+        local url = read_chatgpt_url()
+        urlevent.openURL(url)
+    end)
+end
+-- Read chatgpt_url from config.json (falls back to default if missing/invalid)
+local function read_chatgpt_url()
+    local cfg_path = hs.configdir .. "/config.json"
+    local fh = io.open(cfg_path, "r")
+    if not fh then return "https://chat.openai.com" end
+    local content = fh:read("*a"); fh:close()
+    local ok, tbl = pcall(function() return hs.json.decode(content) end)
+    if ok and type(tbl) == "table" and type(tbl.chatgpt_url) == "string" and tbl.chatgpt_url ~= "" then
+        return tbl.chatgpt_url
+    end
+    return "https://chat.openai.com"
+end
+
+
+
+hotkey_labels.ctrl_h = "Capture interactive vers le presse-papiers"
 hotkey_defs.ctrl_h = function()
     return hs.hotkey.bind({"ctrl"}, "h", function()
         -- Launch screencapture asynchronously so Hammerspoon is NOT blocked.
@@ -317,7 +360,7 @@ hotkey_defs.ctrl_h = function()
     end)
 end
 
-hotkey_labels.ctrl_i = "Ouvrir Réglages (Ctrl+I)"
+hotkey_labels.ctrl_i = "Ouvrir Réglages"
 hotkey_defs.ctrl_i = function()
     return hs.hotkey.bind({"ctrl"}, "i", function()
         if not hs.application.launchOrFocus("System Settings") then
@@ -327,7 +370,72 @@ hotkey_defs.ctrl_i = function()
     end)
 end
 
-hotkey_labels.ctrl_s = "Ouvrir / Copier chemin (Ctrl+S)"
+
+
+hotkey_labels.ctrl_m = "Anti-veille"
+hotkey_defs.ctrl_m = function()
+    return hs.hotkey.bind({"ctrl"}, "m", function()
+        if awake_active then
+            -- Second press: disable keep-awake
+            awake_active = false
+            if awake_timer then awake_timer:stop(); awake_timer = nil end
+            if awake_alert_id then
+                hs.alert.closeSpecific(awake_alert_id)
+                awake_alert_id = nil
+            end
+            hs.alert.show("☕ Keep-awake désactivé", 2)
+        else
+            -- First press: enable keep-awake
+            awake_active = true
+            math.randomseed(os.time())
+            -- Persistent on-screen banner for as long as keep-awake is active
+            awake_alert_id = hs.alert.show(
+                "☕ Keep-awake actif — Ctrl+M pour désactiver",
+                math.huge
+            )
+            schedule_awake_tick()
+        end
+    end)
+end
+-- Schedule the next keep-awake tick after a random delay between 1 s and 5 s.
+local function schedule_awake_tick()
+    if not awake_active then return end
+    local interval = math.random(1, 5)  -- seconds
+    awake_timer = timer.doAfter(interval, function()
+        if not awake_active then return end
+        -- Gently jitter the mouse by 1 px then restore (no visible movement)
+        local pos = hs.mouse.absolutePosition()
+        local dx = (math.random(0, 1) == 0) and 1 or -1
+        hs.mouse.absolutePosition({x = pos.x + dx, y = pos.y})
+        timer.doAfter(0.05, function()
+            hs.mouse.absolutePosition(pos)
+        end)
+        -- Send a harmless F18 keystroke (unmapped on macOS, keeps Teams green)
+        eventtap.keyStroke({}, "f18", 0)
+        -- Schedule the next tick recursively
+        schedule_awake_tick()
+    end)
+end
+
+
+
+hotkey_labels.ctrl_o = "Entourer la ligne de parenthèses"
+hotkey_defs.ctrl_o = function()
+    return hs.hotkey.bind({"ctrl"}, "o", function()
+        -- Move to start of line, insert '(', move to end, insert ')'
+        -- hs.eventtap.keyStrokes inserts literal characters regardless of layout
+        eventtap.keyStroke({"cmd"}, "left")
+        hs.eventtap.keyStrokes("(")
+        timer.doAfter(0.04, function()
+            eventtap.keyStroke({"cmd"}, "right")
+            hs.eventtap.keyStrokes(")")
+        end)
+    end)
+end
+
+
+
+hotkey_labels.ctrl_s = "Ouvrir / Copier chemin"
 hotkey_defs.ctrl_s = function()
     return hs.hotkey.bind({"ctrl"}, "s", function()
         local front = hs.application.frontmostApplication()
@@ -393,7 +501,9 @@ hotkey_defs.ctrl_s = function()
     end)
 end
 
-hotkey_labels.ctrl_t = "Casse de titre / minuscules (Ctrl+T)"
+
+
+hotkey_labels.ctrl_t = "Casse de titre / minuscules"
 hotkey_defs.ctrl_t = function()
     return hs.hotkey.bind({"ctrl"}, "t", function()
         do_transform(function(sel)
@@ -403,7 +513,9 @@ hotkey_defs.ctrl_t = function()
     end)
 end
 
-hotkey_labels.ctrl_u = "Majuscules / minuscules (Ctrl+U)"
+
+
+hotkey_labels.ctrl_u = "Majuscules / minuscules"
 hotkey_defs.ctrl_u = function()
     return hs.hotkey.bind({"ctrl"}, "u", function()
         do_transform(function(sel)
@@ -413,61 +525,20 @@ hotkey_defs.ctrl_u = function()
     end)
 end
 
-hotkey_labels.ctrl_g = "Ouvrir ChatGPT (Ctrl+G)"
-hotkey_defs.ctrl_g = function()
-    return hs.hotkey.bind({"ctrl"}, "g", function()
-        local url = read_chatgpt_url()
-        urlevent.openURL(url)
+
+
+hotkey_labels.ctrl_w = "Sélectionner le mot courant"
+hotkey_defs.ctrl_w = function()
+    return hs.hotkey.bind({"ctrl"}, "w", function()
+        -- Move to end of current/next word, then select back to its start
+        eventtap.keyStroke({"alt"}, "right")
+        eventtap.keyStroke({"alt", "shift"}, "left")
     end)
 end
 
--- Schedule the next keep-awake tick after a random delay between 1 s and 5 s.
-local function schedule_awake_tick()
-    if not awake_active then return end
-    local interval = math.random(1, 5)  -- seconds
-    awake_timer = timer.doAfter(interval, function()
-        if not awake_active then return end
-        -- Gently jitter the mouse by 1 px then restore (no visible movement)
-        local pos = hs.mouse.absolutePosition()
-        local dx = (math.random(0, 1) == 0) and 1 or -1
-        hs.mouse.absolutePosition({x = pos.x + dx, y = pos.y})
-        timer.doAfter(0.05, function()
-            hs.mouse.absolutePosition(pos)
-        end)
-        -- Send a harmless F18 keystroke (unmapped on macOS, keeps Teams green)
-        eventtap.keyStroke({}, "f18", 0)
-        -- Schedule the next tick recursively
-        schedule_awake_tick()
-    end)
-end
 
-hotkey_labels.ctrl_m = "Anti-veille (Ctrl+M)"
-hotkey_defs.ctrl_m = function()
-    return hs.hotkey.bind({"ctrl"}, "m", function()
-        if awake_active then
-            -- Second press: disable keep-awake
-            awake_active = false
-            if awake_timer then awake_timer:stop(); awake_timer = nil end
-            if awake_alert_id then
-                hs.alert.closeSpecific(awake_alert_id)
-                awake_alert_id = nil
-            end
-            hs.alert.show("☕ Keep-awake désactivé", 2)
-        else
-            -- First press: enable keep-awake
-            awake_active = true
-            math.randomseed(os.time())
-            -- Persistent on-screen banner for as long as keep-awake is active
-            awake_alert_id = hs.alert.show(
-                "☕ Keep-awake actif — Ctrl+M pour désactiver",
-                math.huge
-            )
-            schedule_awake_tick()
-        end
-    end)
-end
 
-hotkey_labels.ctrl_x = "Copier couleur hex du pixel sous le curseur (Ctrl+X)"
+hotkey_labels.ctrl_x = "Copier couleur hex du pixel sous le curseur"
 hotkey_defs.ctrl_x = function()
     return hs.hotkey.bind({"ctrl"}, "x", function()
         local pos = hs.mouse.absolutePosition()
@@ -480,47 +551,38 @@ hotkey_defs.ctrl_x = function()
         utils.notify("Couleur copiée : " .. hex)
     end)
 end
-
-hotkey_labels.ctrl_o = "Entourer la ligne de parenthèses (Ctrl+O)"
-hotkey_defs.ctrl_o = function()
-    return hs.hotkey.bind({"ctrl"}, "o", function()
-        -- Move to start of line, insert '(', move to end, insert ')'
-        -- hs.eventtap.keyStrokes inserts literal characters regardless of layout
-        eventtap.keyStroke({"cmd"}, "left")
-        hs.eventtap.keyStrokes("(")
-        timer.doAfter(0.04, function()
-            eventtap.keyStroke({"cmd"}, "right")
-            hs.eventtap.keyStrokes(")")
-        end)
-    end)
+-- Read hex color (#rrggbb) of the pixel at the given screen position.
+-- Captures a 3×3 region and samples the center pixel with Python3.
+local function pixel_hex_at(x, y)
+    local tmpfile = "/tmp/_hs_pixel_cap.png"
+    local cap_cmd = string.format('screencapture -x -R "%d,%d,3,3" "%s"', x - 1, y - 1, tmpfile)
+    hs.execute(cap_cmd)
+    local py = string.format([[
+python3 -c "
+import struct,zlib
+data=open('%s','rb').read()
+w,h=struct.unpack('>II',data[16:24])
+ct=data[25];bpp=4 if ct==6 else 3
+i,chunks=8,b''
+while i<len(data)-12:
+  l=struct.unpack('>I',data[i:i+4])[0];t=data[i+4:i+8]
+  if t==b'IDAT':chunks+=data[i+8:i+8+l]
+  elif t==b'IEND':break
+  i+=l+12
+raw=zlib.decompress(chunks)
+cx=w//2;cy=h//2;off=cy*(1+w*bpp)+1+cx*bpp
+r,g,b=raw[off],raw[off+1],raw[off+2]
+print('#%%02x%%02x%%02x' %% (r,g,b))
+"]], tmpfile)
+    local out = hs.execute(py)
+    if out then
+        local hex = out:match("(#%x%x%x%x%x%x)")
+        if hex then return hex end
+    end
+    return nil
 end
 
-hotkey_labels.ctrl_w = "Sélectionner le mot courant (Ctrl+W)"
-hotkey_defs.ctrl_w = function()
-    return hs.hotkey.bind({"ctrl"}, "w", function()
-        -- Move to end of current/next word, then select back to its start
-        eventtap.keyStroke({"alt"}, "right")
-        eventtap.keyStroke({"alt", "shift"}, "left")
-    end)
-end
 
-hotkey_labels.cmd_shift_v = "Coller sans mise en forme (Cmd+Shift+V)"
-hotkey_defs.cmd_shift_v = function()
-    return hs.hotkey.bind({"cmd","shift"}, "v", function()
-        local prior = pasteboard.getContents()
-        local plain = pasteboard.getContents() or ""
-        pasteboard.clearContents()
-        pasteboard.setContents(plain)
-        timer.doAfter(0.08, function()
-            -- perform paste with a small key delay
-            eventtap.keyStroke({"cmd"}, "v", 0.02)
-
-            timer.doAfter(0.25, function()
-                if prior and prior ~= "" then pasteboard.setContents(prior) else pasteboard.clearContents() end
-            end)
-        end)
-    end)
-end
 
 function M.start()
     if started then return end
