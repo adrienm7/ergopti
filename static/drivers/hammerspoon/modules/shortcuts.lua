@@ -168,6 +168,8 @@ local started = false
 local awake_timer    = nil
 local awake_alert_id = nil
 local awake_active   = false
+local awake_origin_pos = nil
+local schedule_awake_tick
 
 
 
@@ -376,7 +378,7 @@ hotkey_labels.ctrl_m = "Anti-veille"
 hotkey_defs.ctrl_m = function()
     return hs.hotkey.bind({"ctrl"}, "m", function()
         if awake_active then
-            -- Second press: disable keep-awake
+            -- disable keep-awake
             awake_active = false
             if awake_timer then awake_timer:stop(); awake_timer = nil end
             if awake_alert_id then
@@ -385,34 +387,71 @@ hotkey_defs.ctrl_m = function()
             end
             hs.alert.show("☕ Keep-awake désactivé", 2)
         else
-            -- First press: enable keep-awake
+            -- enable keep-awake: re-seed and start periodic ticks
             awake_active = true
             math.randomseed(os.time())
-            -- Persistent on-screen banner for as long as keep-awake is active
             awake_alert_id = hs.alert.show(
                 "☕ Keep-awake actif — Ctrl+M pour désactiver",
                 math.huge
             )
+            -- Record the origin position so periodic moves return here
+            local ok, pos = pcall(hs.mouse.absolutePosition)
+            if ok and pos then
+                awake_origin_pos = {x = pos.x, y = pos.y}
+                local screen = hs.mouse.getCurrentScreen() or hs.screen.mainScreen()
+                local frame = screen and screen:frame()
+                local dx = (math.random(0,1) == 0) and -80 or 80
+                local nx = pos.x + dx
+                if frame then
+                    if nx < frame.x then nx = frame.x end
+                    if nx > frame.x + frame.w - 1 then nx = frame.x + frame.w - 1 end
+                end
+                hs.mouse.absolutePosition({x = nx, y = pos.y})
+            end
+            -- start periodic/random ticks after initial move
             schedule_awake_tick()
         end
     end)
 end
 -- Schedule the next keep-awake tick after a random delay between 1 s and 5 s.
-local function schedule_awake_tick()
+schedule_awake_tick = function()
     if not awake_active then return end
-    local interval = math.random(1, 5)  -- seconds
+    -- stop any existing scheduled timer
+    if awake_timer then awake_timer:stop(); awake_timer = nil end
+    -- schedule next action at a random interval between 1 and 5 seconds
+    local interval = math.random(1, 5)
     awake_timer = timer.doAfter(interval, function()
         if not awake_active then return end
-        -- Gently jitter the mouse by 1 px then restore (no visible movement)
-        local pos = hs.mouse.absolutePosition()
-        local dx = (math.random(0, 1) == 0) and 1 or -1
-        hs.mouse.absolutePosition({x = pos.x + dx, y = pos.y})
-        timer.doAfter(0.05, function()
-            hs.mouse.absolutePosition(pos)
-        end)
-        -- Send a harmless F18 keystroke (unmapped on macOS, keeps Teams green)
-        eventtap.keyStroke({}, "f18", 0)
-        -- Schedule the next tick recursively
+        -- ensure we have an origin to orbit around
+        local origin = awake_origin_pos
+        if not origin then
+            local ok, p = pcall(hs.mouse.absolutePosition)
+            if ok and p then origin = {x = p.x, y = p.y} end
+        end
+        if origin then
+            -- pick a random offset around the origin and move there
+            local ox = math.random(-120, 120)
+            local oy = math.random(-80, 80)
+            local tx = origin.x + ox
+            local ty = origin.y + oy
+            -- clamp to screen if possible
+            local screen = hs.mouse.getCurrentScreen() or hs.screen.mainScreen()
+            local frame = screen and screen:frame()
+            if frame then
+                if tx < frame.x then tx = frame.x end
+                if tx > frame.x + frame.w - 1 then tx = frame.x + frame.w - 1 end
+                if ty < frame.y then ty = frame.y end
+                if ty > frame.y + frame.h - 1 then ty = frame.y + frame.h - 1 end
+            end
+            hs.mouse.absolutePosition({x = tx, y = ty})
+            -- short delay then return to origin
+            timer.doAfter(0.2, function()
+                if origin then hs.mouse.absolutePosition({x = origin.x, y = origin.y}) end
+            end)
+            -- send an unmapped F18 keystroke as an extra activity signal
+            pcall(function() eventtap.keyStroke({}, "f18", 0) end)
+        end
+        -- schedule the next random tick
         schedule_awake_tick()
     end)
 end
