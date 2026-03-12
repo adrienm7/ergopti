@@ -148,6 +148,7 @@ repeat = "La touche ★ permet la répétition"
 "asap★" = { output = "le plus rapidement possible", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "atd★" = { output = "attend", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "att★" = { output = "attention", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"au★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "aud★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "aug★" = { output = "augmentation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "auj★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
