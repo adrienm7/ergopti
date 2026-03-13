@@ -148,7 +148,6 @@ repeat = "La touche ★ permet la répétition"
 "asap★" = { output = "le plus rapidement possible", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "atd★" = { output = "attend", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "att★" = { output = "attention", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"au★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "aud★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "aug★" = { output = "augmentation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "auj★" = { output = "aujourd’hui", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -246,7 +245,6 @@ repeat = "La touche ★ permet la répétition"
 "doc★" = { output = "document", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "docs★" = { output = "documents", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dp★" = { output = "de plus", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"dr★" = { output = "de rien", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ds★" = { output = "data science", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dsl★" = { output = "désolé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dst★" = { output = "data scientist", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -610,7 +608,6 @@ repeat = "La touche ★ permet la répétition"
 "x★" = { output = "exemple", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "xg★" = { output = "xgboost", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "xgb★" = { output = "xgboost", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"xp★" = { output = "expérience", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ya★" = { output = "il y a", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "yapa★" = { output = "il n’y a pas", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "yatil★" = { output = "y a-t-il", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
