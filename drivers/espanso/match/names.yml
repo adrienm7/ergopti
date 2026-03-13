@@ -1,0 +1,73 @@
+matches:
+  - trigger: 'Quatar'
+    replace: 'Qatar'
+    propagate_case: true
+  - trigger: 'alexei'
+    replace: 'Alexeï'
+    propagate_case: true
+  - trigger: 'anais'
+    replace: 'Anaïs'
+    propagate_case: true
+  - trigger: 'azerbaidjan'
+    replace: 'Azerbaïdjan'
+    propagate_case: true
+  - trigger: 'benoit'
+    replace: 'Benoît'
+    propagate_case: true
+  - trigger: 'caraibes'
+    replace: 'Caraïbes'
+    propagate_case: true
+  - trigger: 'cleopatre'
+    replace: 'Cléopâtre'
+    propagate_case: true
+  - trigger: 'cléopatre'
+    replace: 'Cléopâtre'
+    propagate_case: true
+  - trigger: 'dubai'
+    replace: 'Dubaï'
+    propagate_case: true
+  - trigger: 'gaetan'
+    replace: 'Gaëtan'
+    propagate_case: true
+  - trigger: 'hanoi'
+    replace: 'Hanoï'
+    propagate_case: true
+  - trigger: 'israel'
+    replace: 'Israël'
+    propagate_case: true
+  - trigger: 'jerome'
+    replace: 'Jérôme'
+    propagate_case: true
+  - trigger: 'joel'
+    replace: 'Joël'
+    propagate_case: true
+  - trigger: 'jérome'
+    replace: 'Jérôme'
+    propagate_case: true
+  - trigger: 'mickael'
+    replace: 'Mickaël'
+    propagate_case: true
+  - trigger: 'noel'
+    replace: 'Noël'
+    propagate_case: true
+  - trigger: 'raphael'
+    replace: 'Raphaël'
+    propagate_case: true
+  - trigger: 'serguei'
+    replace: 'Sergueï'
+    propagate_case: true
+  - trigger: 'shanghai'
+    replace: 'Shanghaï'
+    propagate_case: true
+  - trigger: 'taiwan'
+    replace: 'Taïwan'
+    propagate_case: true
+  - trigger: 'thailande'
+    replace: 'Thaïlande'
+    propagate_case: true
+  - trigger: 'thais'
+    replace: 'Thaïs'
+    propagate_case: true
+  - trigger: 'tolstoi'
+    replace: 'Tolstoï'
+    propagate_case: true
