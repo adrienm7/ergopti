@@ -90,7 +90,7 @@
 		</div>
 		<tiny-space></tiny-space>
 		<span>Version pour l’analyseur Ergo‑L :&nbsp;</span><a
-			href="/drivers/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
+			href="/drivers/old/kalamine/{variante_kalamine}/{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml"
 			download
 			><button
 				>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</button
