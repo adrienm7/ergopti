@@ -58,7 +58,8 @@ jobs:
                   git clone --depth 1 --branch dev https://github.com/${{ github.repository }}.git dev-repo
                   cd dev-repo
                   npm install
-                  npm run build
+                  # Build dev site with a base path so assets/links point to /dev/
+                  BASE_PATH=/dev npm run build
                   cd ..
 
                   # Organize: main at root, dev in /dev
