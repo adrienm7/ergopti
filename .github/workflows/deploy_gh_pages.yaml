@@ -26,9 +26,9 @@ jobs:
         steps:
             # Configuration de Node.js
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
-                  node-version: "20"
+                  node-version: "24"
 
             # Si push sur main : build seulement main
             - name: Build main branch only
