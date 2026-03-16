@@ -619,6 +619,27 @@ function M.has_exact_trigger(trigger)
 	return false
 end
 
+-- Return whether any registered trigger starts with the given prefix.
+-- Used by `personal_info` to avoid stealing input when a TOML trigger
+-- contains an `@` that may be completed in subsequent keystrokes.
+function M.has_trigger_prefix(prefix)
+    for _, m in ipairs(mappings) do
+        if m.trigger:sub(1, #prefix) == prefix then return true end
+    end
+    return false
+end
+
+-- Return whether any registered trigger matches the end (suffix) of `s`.
+-- Used when the buffer may contain preceding characters (e.g. " <@").
+function M.has_trigger_suffix(s)
+    if not s then return false end
+    for _, m in ipairs(mappings) do
+        local t = m.trigger
+        if #s >= #t and s:sub(-#t) == t then return true end
+    end
+    return false
+end
+
 ---------------------------------------------------------------------------
 -- Replacement-emission helpers
 ---------------------------------------------------------------------------
