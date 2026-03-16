@@ -10,6 +10,7 @@
 		versionValue = value;
 		version_mineure_macos = getLatestVersion('macos_keylayout', versionValue);
 	});
+	import { base } from '$app/paths';
 </script>
 
 <h2 id="macos">
@@ -20,7 +21,8 @@
 <div class="download-buttons">
 	{#if version_mineure_macos !== undefined}
 		<a
-			href="/drivers/macos/bundles/zipped_bundles/Ergopti_v{version_mineure_macos}.bundle.zip"
+			href={base +
+				`/drivers/macos/bundles/zipped_bundles/Ergopti_v${version_mineure_macos}.bundle.zip`}
 			download
 		>
 			<button
@@ -180,7 +182,7 @@
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href="/drivers/karabiner/karabiner.json" target="_blank">
+	<a href={base + '/drivers/karabiner/karabiner.json'} target="_blank">
 		<button
 			><i class="icon-karabiner" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
 			karabiner.json</button

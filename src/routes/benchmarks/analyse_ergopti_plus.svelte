@@ -4,6 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
+	import { base } from '$app/paths';
 	let versionValue;
 	version.subscribe((value) => {
 		versionValue = value;
@@ -20,8 +21,8 @@
 		du corpus pour les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB
 		></SFB>s pris en charge par <ErgoptiPlus></ErgoptiPlus>, comme <kbd-output>pt</kbd-output> en
 		<kbd>,t</kbd>, doivent être remplacés. Un
-		<a href="/corpus/conversion_corpus.py" download class="link">simple script Python</a> permet de faire
-		ces modifications.
+		<a href={base + '/corpus/conversion_corpus.py'} download class="link">simple script Python</a> permet
+		de faire ces modifications.
 	</p>
 	<p>
 		Toutefois, modifier le corpus rend la comparaison avec les autres dispositions plus compliquée,

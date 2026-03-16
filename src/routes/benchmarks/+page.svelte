@@ -4,6 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import { version } from '$lib/stores_infos.js';
+	import { base } from '$app/paths';
 	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
 	import AnalyseErgoptiPlus from './analyse_ergopti_plus.svelte';
 	import CommentComparer from './comment_comparer.svelte';
@@ -66,6 +67,13 @@
 		eager: true,
 		query: {
 			enhanced: true
+		}
+
+		function getErgolPdf() {
+			return (
+				base +
+				`/benchmarks/ergol/v2.1/analyse_ergol_ergopti${version_1dfh}_v2.1_${ergol}.pdf`
+			);
 		}
 	});
 	function getImagePath(clavier, corpus) {
@@ -187,16 +195,13 @@
 				<option value="">Standard</option>
 			</select>
 		</div>
-		<a href="/benchmarks/ergol/v2.1/analyse_ergol_ergopti{version_1dfh}_v2.1_{ergol}.pdf"
-			><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo‑L</button></a
-		>
-		<tiny-space></tiny-space>
-		<embed
-			src="/benchmarks/ergol/v2.1/analyse_ergol_ergopti{version_1dfh}_v2.1_{ergol}.pdf"
-			type="application/pdf"
-			width="100%"
-			height="600px"
-		/>
+		{#if true}
+			<a href={getErgolPdf()}
+				><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo‑L</button></a
+			>
+			<tiny-space></tiny-space>
+			<embed src={getErgolPdf()} type="application/pdf" width="100%" height="600px" />
+		{/if}
 
 		<AnalyseErgoptiPlus></AnalyseErgoptiPlus>
 		<ComparateursDispositions></ComparateursDispositions>

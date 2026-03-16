@@ -11,6 +11,7 @@
 	import { detectDev } from '$lib/js/isDev.js';
 	import { page } from '$app/stores';
 	import { discordLink } from '$lib/stores_infos.js';
+	import { base } from '$app/paths';
 
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
@@ -86,7 +87,7 @@
 	{#if isDev}
 		<meta name="robots" content="noindex, nofollow" />
 		<!-- Point canonical to production root to avoid duplicate content SEO issues -->
-		<link rel="canonical" href="/" />
+		<link rel="canonical" href={base + '/'} />
 	{/if}
 </svelte:head>
 
@@ -134,7 +135,7 @@
 			</div>
 		</a>
 	{:else}
-		<a href="/informations#changelog">
+		<a href={base + '/informations#changelog'}>
 			<p>NOUVEAU : Ergopti v2.2.1</p>
 			<p class="subtitle">découvrez les nouveautés</p>
 		</a>

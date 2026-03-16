@@ -3,6 +3,7 @@
 	import ErgoptiPlus from '../components/ErgoptiPlus.svelte';
 
 	import { page } from '$app/stores';
+	import { base } from '$app/paths';
 
 	import { getKeyboardData } from '$lib/keyboard/data/getKeyboardData.js';
 	import { version, layoutData, versionsList, discordLink } from '$lib/stores_infos.js';
@@ -45,6 +46,10 @@
 			window.removeEventListener('resize', toggleOverflowMenu);
 		};
 	});
+
+	function isCurrent(path) {
+		return $page.url && ($page.url.pathname === path || $page.url.pathname === base + path);
+	}
 
 	$effect(() => {
 		getKeyboardData($version)
@@ -110,9 +115,7 @@
 				href="./"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Ergopti"
-				aria-current={$page.url.pathname === '/' || $page.url.pathname === '/dev'
-					? 'page'
-					: undefined}
+				aria-current={isCurrent('/') ? 'page' : undefined}
 			>
 				<i class="icon-keyboard-duotone" style="margin-right:7px;">
 					<span class="path1"></span><span class="path2"></span>
@@ -123,10 +126,7 @@
 				href="ergopti-plus"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Ergopti+"
-				aria-current={$page.url.pathname === '/ergopti-plus' ||
-				$page.url.pathname === '/dev/ergopti-plus'
-					? 'page'
-					: undefined}
+				aria-current={isCurrent('/ergopti-plus') ? 'page' : undefined}
 			>
 				<i class="icon-circle-star" style="margin-right:3px; margin-top:1px">
 					<span class="path1"></span><span class="path2"></span>
@@ -139,10 +139,7 @@
 				href="benchmarks"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Benchmarks"
-				aria-current={$page.url.pathname === '/benchmarks' ||
-				$page.url.pathname === '/dev/benchmarks'
-					? 'page'
-					: undefined}
+				aria-current={isCurrent('/benchmarks') ? 'page' : undefined}
 			>
 				<i class="icon-chart-mixed" style="margin-right:7px;">
 					<span class="path1"></span><span class="path2"></span>
@@ -153,10 +150,7 @@
 				href="utilisation"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Utilisation"
-				aria-current={$page.url.pathname === '/utilisation' ||
-				$page.url.pathname === '/dev/utilisation'
-					? 'page'
-					: undefined}
+				aria-current={isCurrent('/utilisation') ? 'page' : undefined}
 			>
 				<i class="icon-download" style="margin-right:5px">
 					<span class="path1"></span><span class="path2"></span>
@@ -166,10 +160,7 @@
 			<a
 				href="informations"
 				onclick={closeMenu}
-				aria-current={$page.url.pathname === '/informations' ||
-				$page.url.pathname === '/dev/informations'
-					? 'page'
-					: undefined}
+				aria-current={isCurrent('/informations') ? 'page' : undefined}
 				aria-label="Accéder à la page Informations"
 			>
 				<i class="icon-circle-info" style="margin-right:5px; margin-top:2px">

@@ -4,6 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import KeyboardEmulation from '$lib/keyboard/KeyboardEmulation.svelte';
+	import { base } from '$app/paths';
 
 	import magicSampleToml from './magic_sample.toml?raw';
 	let remplacements = {};
@@ -39,7 +40,7 @@
 	remplacementsSample = parseTomlSimple(magicSampleToml);
 
 	if (typeof window !== 'undefined') {
-		fetch('/drivers/hotstrings/magic.toml')
+		fetch(base + '/drivers/hotstrings/magic.toml')
 			.then((response) => response.text())
 			.then((text) => {
 				remplacements = parseTomlSimple(text);
@@ -107,7 +108,7 @@
 
 	onMount(async () => {
 		try {
-			const res = await fetch('/drivers/hotstrings/magickey.toml');
+			const res = await fetch(base + '/drivers/hotstrings/magickey.toml');
 			const text = await res.text();
 			const parsed = parseTomlSections(text);
 			tomlSections = parsed.sections;

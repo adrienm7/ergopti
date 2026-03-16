@@ -4,6 +4,7 @@
 	import SFB from '$lib/components/SFB.svelte';
 
 	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import { base } from '$app/paths';
 </script>
 
 <section>
@@ -166,7 +167,7 @@
 	</p>
 	<p>
 		Attention toutefois, car ces fréquences vont varier selon le texte analysé et la langue de
-		celui-ci. Vous trouverez plus de détails sur la page <a href="/benchmarks" class="link"
+		celui-ci. Vous trouverez plus de détails sur la page <a href={base + '/benchmarks'} class="link"
 			>Benchmarks</a
 		>.
 	</p>
