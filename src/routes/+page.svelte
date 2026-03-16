@@ -21,7 +21,7 @@
 </script>
 
 <svelte:head>
-	<title>Disposition Ergopti</title>
+	<title>Disposition Ergopti test</title>
 	<meta
 		name="description"
 		content="Ergopti, une disposition clavier ergonomique optimisée pour le français, l'anglais et le code"
