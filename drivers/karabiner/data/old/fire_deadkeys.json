@@ -1,0 +1,56 @@
+                    {
+                        "description": "Special keys end deadkeys and fire immediatly",
+                        "manipulators": [
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com.apple.loginwindow$",
+                                            "^com.apple.SecurityAgent$"
+                                        ],
+                                        "type": "frontmost_application_unless"
+                                    }
+                                ],
+                                "from": { "key_code": "return_or_enter" },
+                                "to": [
+                                    { "key_code": "keypad_comma" },
+                                    { "key_code": "return_or_enter" }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com.apple.loginwindow$",
+                                            "^com.apple.SecurityAgent$"
+                                        ],
+                                        "type": "frontmost_application_unless"
+                                    }
+                                ],
+                                "from": { "key_code": "left_arrow" },
+                                "to": [
+                                    { "key_code": "keypad_comma" },
+                                    { "key_code": "left_arrow" }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com.apple.loginwindow$",
+                                            "^com.apple.SecurityAgent$"
+                                        ],
+                                        "type": "frontmost_application_unless"
+                                    }
+                                ],
+                                "from": { "key_code": "right_arrow" },
+                                "to": [
+                                    { "key_code": "keypad_comma" },
+                                    { "key_code": "right_arrow" }
+                                ],
+                                "type": "basic"
+                            }
+                        ]
+                    },
