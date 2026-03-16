@@ -10,6 +10,7 @@
 		versionValue = value;
 		version_mineure_macos = getLatestVersion('macos_keylayout', versionValue);
 	});
+	import { base } from '$app/paths';
 </script>
 
 <h2 id="macos">
@@ -20,7 +21,8 @@
 <div class="download-buttons">
 	{#if version_mineure_macos !== undefined}
 		<a
-			href="/drivers/macos/bundles/zipped_bundles/Ergopti_v{version_mineure_macos}.bundle.zip"
+			href={base +
+				`/drivers/macos/bundles/zipped_bundles/Ergopti_v${version_mineure_macos}.bundle.zip`}
 			download
 		>
 			<button
@@ -177,12 +179,10 @@
 	></i>Karabiner
 </h3>
 
-<BetaWarning tool="Karabiner" />
-
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href="/drivers/karabiner/karabiner.json" target="_blank">
+	<a href={base + '/drivers/karabiner/karabiner.json'} target="_blank">
 		<button
 			><i class="icon-karabiner" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
 			karabiner.json</button
@@ -229,17 +229,6 @@
 		→ <kbd-output>("</kbd-output>, etc. ;
 	</li>
 </ul>
-<p>
-	À noter que le code Karabiner est loin d'être concis, car beaucoup de lignes n’ont qu’une seule
-	accolade ouvrante ou fermante. Ainsi, pour définir un seul comportement, des dizaines de lignes
-	sont nécessaires. En outre, afin de définir les roulements personnalisés, il était nécessaire
-	d’avoir l’information de la dernière touche pressée, ce qui n’est pas disponible par défaut dans
-	Karabiner. C’est pour cela que chaque touche du clavier a été redéfinie pour envoyer le contenu de
-	sa touche, mais aussi mettre à jour une variable contenant la dernière touche pressée. Tout cela
-	entraîne un code Karabiner extrêmement volumineux (des dizaines de milliers de lignes) pour un
-	comportement pourtant très simple. Cela n’a cependant jamais posé de problème en pratique, ni de
-	performances.
-</p>
 
 <h3>
 	<i class="icon-hammerspoon" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
@@ -247,86 +236,44 @@
 	>Hammerspoon
 </h3>
 
-<BetaWarning tool="Hammerspoon" />
+<p>
+	<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> est un outil d'automatisation
+	puissant et open source pour macOS, permettant d'interagir avec le système via des scripts Lua. Cet
+	outil très complet permet de créer des hotstrings sur macOS. Il permet également de définir des gestes
+	personnalisés sur le trackpad.
+</p>
 
 <tiny-space></tiny-space>
 
-<div class="download-buttons">
-	<a href="/drivers/hammerspoon/init.lua" target="_blank">
-		<button
-			><i class="icon-hammerspoon" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
-				><span class="icon-hammerspoon"><span class="path1"></span><span class="path2"></span></span
-				></i
-			>
-			init.lua</button
-		>
-	</a>
-</div>
-
-<p>
-	<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> est un outil d'automatisation
-	puissant et open source pour macOS, permettant d'interagir avec le système via des scripts Lua. Il
-	est particulièrement utile pour définir des gestes personnalisés sur le trackpad et ajouter des fonctionnalités
-	avancées. Voici ce qui est inclus dans le fichier de configuration fourni :
-</p>
-<ul>
-	<li>
-		<strong>Gestes à trois doigts :</strong> Utilisation de swipes à trois doigts pour la navigation
-		dans les onglets :
-		<ul>
-			<li>Swipe gauche/droite : Changer d'onglet (<kbd>Ctrl</kbd> + <kbd>Tab</kbd>) ;</li>
-			<li>Swipe haut : Ouvrir un nouvel onglet (<kbd>Cmd</kbd> + <kbd>T</kbd>) ;</li>
-			<li>Swipe bas : Fermer l'onglet actuel (<kbd>Cmd</kbd> + <kbd>W</kbd>).</li>
-		</ul>
-	</li>
-	<li>
-		<strong>Tap à trois doigts :</strong> Basculer en mode sélection pour faire glisser le curseur et
-		sélectionner du texte sans maintenir de bouton physique enfoncé. Un second tap ou clic désactive
-		ce mode.
-	</li>
-	<li>
-		<strong>Zoom avec scroll :</strong> Maintenir <kbd>Cmd</kbd> et utiliser le scroll pour zoomer (<kbd
-			>Cmd</kbd
-		>
-		+ <kbd>+</kbd>) ou dézoomer (<kbd>Cmd</kbd> + <kbd>-</kbd>).
-	</li>
-</ul>
-
-<p>
-	Le fichier de configuration nécessite également le Spoon <strong>Swipe.spoon</strong> qui est fourni
-	dans le dossier. Pour installer Hammerspoon et cette configuration :
-</p>
+<h4>Processus d’installation</h4>
+<p>Cette méthode facilite les mises à jour depuis le dépôt cloné.</p>
 <ol>
 	<li>
-		Télécharger et installer <a href="https://www.hammerspoon.org/" target="_blank" class="link"
-			>Hammerspoon</a
-		> ;
+		Installer <a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a>.
+		Ne pas le lancer, ou le quitter s’il est déjà ouvert.
 	</li>
-	<li>Copier le fichier <code>init.lua</code> dans <code>~/.hammerspoon/</code> ;</li>
 	<li>
-		Copier le dossier <code>Spoons/</code> (contenant Swipe.spoon) dans
-		<code>~/.hammerspoon/Spoons/</code> ;
+		Cloner le dépôt et se placer dans le dossier cloné :<br />
+		<code> git clone https://github.com/adrienm7/ergopti.git </code><br />
+		<code> cd ergopti </code>
 	</li>
-	<li>Recharger la configuration Hammerspoon depuis l'icône dans la barre de menu.</li>
+	<li>
+		<b>Optionnel :</b> basculer sur la branche dev pour les dernières nouveautés.<br />
+		<code> git checkout dev </code>
+	</li>
+	<li>
+		Pointer Hammerspoon vers le fichier de configuration du dépôt :<br />
+		<code
+			>defaults write org.hammerspoon.Hammerspoon MJConfigFile<br />
+			"/chemin/vers/ergopti/static/drivers/hammerspoon/init.lua"
+		</code>
+		<br />
+		Remplacer <em>/chemin/vers/ergopti</em> par le chemin réel du dossier cloné.
+	</li>
+	<li>Ouvrir Hammerspoon et éventuellement recharger la configuration (Reload Config).</li>
 </ol>
 
-<p>
-	<strong>Note :</strong> Pour éviter les conflits avec les gestes système de macOS, il est
-	recommandé d'aller dans <code>Réglages Système</code> > <code>Trackpad</code> >
-	<code>Plus de gestes</code>
-	et de :
-</p>
-<ul>
-	<li>
-		Configurer <code>Balayer entre les apps en plein écran</code> avec un nombre de doigts différent
-		(par exemple 4) ;
-	</li>
-	<li>
-		Configurer <code>Mission Control</code> avec un nombre de doigts différent (par exemple 4).
-	</li>
-</ul>
-
-<h3>
+<!-- <h3>
 	<i class="icon-alfred" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>Alfred
 </h3>
 
@@ -393,4 +340,4 @@
 	Pour installer ces workflows, il suffit de double-cliquer sur les fichiers
 	<code>.alfredworkflow</code>, ce qui ouvrira Alfred et proposera de les importer. Ces workflows
 	nécessitent la licence Powerpack d'Alfred.
-</p>
+</p> -->

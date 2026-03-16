@@ -12,6 +12,8 @@
 		version_linux = getLatestVersion('linux', value)?.replaceAll('.', '_');
 	});
 
+	import { base } from '$app/paths';
+
 	const cmd = `branch="${branchForInstall()}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/drivers/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
 </script>
 
@@ -90,18 +92,18 @@
 	L'installation nécessite <code>sudo</code>.
 </p>
 <div class="download-buttons">
-	<a href="/drivers/linux/xkb_installation/install.sh" download>
+	<a href={base + '/drivers/linux/xkb_installation/install.sh'} download>
 		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>
 	</a>
-	<a href="/drivers/linux/xkb_installation/detect_installation_method.sh" download>
+	<a href={base + '/drivers/linux/xkb_installation/detect_installation_method.sh'} download>
 		<button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button>
 	</a>
 </div>
 <div class="download-buttons" style="margin-top: 1em;">
-	<a href="/drivers/linux/xkb_installation/xkb_files_installer_clean.py" download>
+	<a href={base + '/drivers/linux/xkb_installation/xkb_files_installer_clean.py'} download>
 		<button><i class="icon-linux"></i> Installateur Clean</button>
 	</a>
-	<a href="/drivers/linux/xkb_installation/xkb_files_installer_legacy.py" download>
+	<a href={base + '/drivers/linux/xkb_installation/xkb_files_installer_legacy.py'} download>
 		<button><i class="icon-linux"></i> Installateur Legacy</button>
 	</a>
 </div>
@@ -228,7 +230,7 @@
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href="/drivers/kanata/kanata.kbd" download>
+	<a href={base + '/drivers/kanata/kanata.kbd'} download>
 		<button
 			><i class="icon-kanata" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
 				><span class="path1"></span><span class="path2"></span><span class="path3"></span></i
