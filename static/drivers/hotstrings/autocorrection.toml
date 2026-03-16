@@ -331,6 +331,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "alexei" = { output = "Alexeï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "anais" = { output = "Anaïs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "azerbaidjan" = { output = "Azerbaïdjan", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bahrein" = { output = "Bahreïn", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "benoit" = { output = "Benoît", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "caraibes" = { output = "Caraïbes", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "cleopatre" = { output = "Cléopâtre", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
