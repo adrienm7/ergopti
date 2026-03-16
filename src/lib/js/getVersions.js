@@ -49,13 +49,13 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			files = import.meta.glob('/static/layouts/kla_ergodox/*.json');
 			break;
 		case 'kalamine_1dk':
-			files = import.meta.glob('/static/pilotes/kalamine/1dk/*.toml');
+			files = import.meta.glob('/static/drivers/old/kalamine/1dk/*.toml');
 			break;
 		case 'kalamine_analyse':
-			files = import.meta.glob('/static/pilotes/kalamine/standard/*_analyse.toml');
+			files = import.meta.glob('/static/drivers/old/kalamine/standard/*_analyse.toml');
 			break;
 		case 'kalamine_standard':
-			files = import.meta.glob('/static/pilotes/kalamine/standard/*.toml', { as: 'url' });
+			files = import.meta.glob('/static/drivers/old/kalamine/standard/*.toml', { as: 'url' });
 			files = Object.fromEntries(
 				Object.entries(files).filter(([key]) => !key.endsWith('_analyse.toml'))
 			);
