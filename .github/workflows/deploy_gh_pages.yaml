@@ -72,6 +72,8 @@ jobs:
             - name: Deploy to gh-pages branch
               run: |
                   cd staging
+                    # Ensure custom domain is preserved for GitHub Pages
+                    echo "ergopti.fr" > CNAME || true
                   git init
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
