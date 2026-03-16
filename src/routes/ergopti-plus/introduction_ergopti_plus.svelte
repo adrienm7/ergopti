@@ -71,48 +71,42 @@
 	<div class="main">
 		<div class="encadre">
 			Cependant, l’utilisation d’<ErgoptiPlus></ErgoptiPlus> nécessite des
-			<strong>outils de programmation de clavier :</strong>
+			<strong>programmes spécifiques :</strong>
 			<ul>
 				<li>
-					Sur Windows, le programme <a
-						class="link"
-						href="https://www.autohotkey.com/"
-						target="_blank">AutoHotkey</a
-					>
-					est utilisé afin de réaliser ces changements. Il donne une immense liberté et est l’implémentation
-					la plus complète d’<ErgoptiPlus></ErgoptiPlus>.
+					Windows : <a class="link" href="https://www.autohotkey.com/" target="_blank">AutoHotkey</a
+					> ;
 				</li>
 				<li>
-					Sur macOS,
+					macOS ;
 					<a href="https://karabiner-elements.pqrs.org/" target="_blank" class="link"
 						>Karabiner Elements</a
 					>
-					et <a href="https://www.alfredapp.com/" target="_blank" class="link">Alfred</a> permettent
-					de se rapprocher de très près de toutes les fonctionnalités d’<ErgoptiPlus></ErgoptiPlus>.
+					(tap-holds et layer de navigation) +
+					<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> (autocorrection,
+					snippets, raccourcis, etc.) ;
 				</li>
 				<li>
-					Sur Linux, les meilleurs outils sont actuellement <a
+					Linux : les meilleurs outils sont actuellement <a
 						class="link"
 						href="https://github.com/jtroo/kanata/"
 						target="_blank">Kanata</a
 					>
-					et
-					<a href="https://espanso.org/" target="_blank" class="link">Espanso</a>. Ce sont des
-					programmes open source et fonctionnant sur tous les OS, mais qui ne sont actuellement pas
-					aussi bons que leurs alternatives sur macOS, et encore moins qu’AutoHotkey sur Windows.
-				</li>
-				<li>
-					Il est aussi possible de programmer le firmware de son clavier (avec <a
-						class="link"
-						href="https://qmk.fm/"
-						target="_blank">QMK</a
-					>
-					ou <a href="https://zmk.dev/" target="_blank" class="link">ZMK</a>) pour bénéficier de ce
-					genre de fonctionnalités quelle que soit la plateforme (Windows, Mac, Linux, etc.).
-					Cependant, cela nécessite beaucoup de travail et là encore toutes les possibilités
-					d’AutoHotkey ne seront pas disponibles.
+					(tap-holds et layer de navigation) +
+					<a href="https://espanso.org/" target="_blank" class="link">Espanso</a> (autocorrection et
+					snippets), mais ils ne sont pas aussi puissants que les outils sur Windows et macOS.
 				</li>
 			</ul>
+			<p>
+				Il est aussi possible de programmer le firmware de son clavier (avec <a
+					class="link"
+					href="https://qmk.fm/"
+					target="_blank">QMK</a
+				>
+				ou <a href="https://zmk.dev/" target="_blank" class="link">ZMK</a>) pour bénéficier de ce
+				genre de fonctionnalités quelle que soit la plateforme (Windows, Mac, Linux, etc.).
+				Cependant, cela nécessiterait beaucoup de travail et le résultat serait très imparfait.
+			</p>
 		</div>
 		<tiny-space></tiny-space>
 		<p>Voici maintenant les nombreuses fonctionnalités d’<ErgoptiPlus /> :</p>
