@@ -12,12 +12,12 @@
 		gestion de chacune des fonctionnalités implémentées :
 	</p>
 	<enhanced:img
-		src="$lib/images/menu_ergopti_plus.jpg"
+		src="$lib/images/ergopti_plus_windows.jpg"
 		alt="Screenshot du menu du script Ergopti+"
 	/>
 	<tiny-space></tiny-space>
 	<enhanced:img
-		src="$lib/images/ergopti_plus_macos.png"
+		src="$lib/images/ergopti_plus_macos.jpg"
 		alt="Screenshot du menu du script Ergopti+ sur macOS"
 	/>
 
