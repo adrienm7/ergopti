@@ -196,10 +196,34 @@ hotfiles[#hotfiles + 1] = "dynamichotstrings"
 local menu = require("modules.menu")
 menu.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, personal_info, module_sections, script_control)
 
----------------------------------------------------------------------------
--- Script control shortcuts (AltGr+Return = pause/resume, AltGr+Backspace = reload)
----------------------------------------------------------------------------
 script_control.start(keymap, shortcuts, gestures, scroll)
+
+-- Watch hotstrings directory and reload Hammerspoon when TOML/index changes
+-- This ensures a `git pull` that updates the hotstrings folder will reload.
+do
+    local reload_timer = nil
+    local function schedule_reload()
+        if reload_timer then
+            reload_timer:stop()
+            reload_timer = nil
+        end
+        -- short debounce to coalesce multiple FS events into a single reload
+        reload_timer = hs.timer.doAfter(0.5, function()
+            hs.notify.new({title = "Hammerspoon", informativeText = "Hotstrings changed — reloading config"}):send()
+            hs.reload()
+        end)
+    end
+
+    local hotstrings_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
+        for _, p in ipairs(paths) do
+            if p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$") then
+                schedule_reload()
+                break
+            end
+        end
+    end)
+    hotstrings_watcher:start()
+end
 
 ---------------------------------------------------------------------------
 -- Shutdown callback: restore macOS gesture prefs before Hammerspoon exits

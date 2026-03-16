@@ -204,14 +204,30 @@ local function interceptor(event, _km_buffer)
         -- Return "suppress" when @ is typed so no hotstring can ever fire on @.
         if _state == STATE_IDLE then
                 if char == "@" then
+                        -- If an explicit TOML trigger matches the buffer + "@",
+                        -- yield to keymap so that exact shortcuts like "<@" are
+                        -- handled by the TOML mapping instead of starting a
+                        -- personal-info combo collection.
+                        local full_trigger = (_km_buffer or "") .. "@"
+                        if _keymap then
+                                local exact = (_keymap.has_exact_trigger and _keymap.has_exact_trigger(full_trigger)) or false
+                                local pref  = (_keymap.has_trigger_prefix and _keymap.has_trigger_prefix(full_trigger)) or false
+                                local suff  = (_keymap.has_trigger_suffix and _keymap.has_trigger_suffix(full_trigger)) or false
+                                print(string.format("[personal_info] debug: buffer='%s' full_trigger='%s' exact=%s pref=%s suff=%s",
+                                    tostring(_km_buffer), tostring(full_trigger), tostring(exact), tostring(pref), tostring(suff)))
+                                if exact or pref or suff then
+                                        return nil
+                                end
+                        end
+
                         _state = STATE_COLLECTING
                         _combo = ""
                         return "suppress"  -- @ appears in field, hotstrings blocked
                 end
-                return nil
-        end
+                        return nil
+                end
 
-        -- ── COLLECTING ────────────────────────────────────────────────────────
+                -- ── COLLECTING ────────────────────────────────────────────────────────
         -- While collecting a combo, ALL characters suppress hotstring matching
         -- so the accumulated @<letters> never accidentally triggers an expansion.
         if _state == STATE_COLLECTING then

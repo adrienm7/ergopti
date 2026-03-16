@@ -8,6 +8,7 @@
 	import InstallationMac from './installation_macos.svelte';
 	import InstallationLinux from './installation_linux.svelte';
 
+	import { discordLink } from '$lib/stores_infos.js';
 	import { version } from '$lib/stores_infos.js';
 	import PageWrapper from '../PageWrapper.svelte';
 
@@ -35,6 +36,13 @@
 		<span style="font-weight:bold;">Note :</span> Après toute installation ou réinstallation, il est
 		important de <strong>toujours penser à redémarrer son ordinateur</strong>. Cela permet d’être
 		certain que la nouvelle version soit prise en compte et évite bien des problèmes.
+	</p>
+	<p>
+		Pour tout problème, vous pouvez être aidé sur le <a
+			href={discordLink}
+			target="_blank"
+			class="text-white"><strong>Serveur Discord</strong> <i class="icon-discord"></i></a
+		>.
 	</p>
 	<tiny-space></tiny-space>
 	<div style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem">

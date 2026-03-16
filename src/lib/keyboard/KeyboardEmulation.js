@@ -3,30 +3,89 @@ import { get } from 'svelte/store';
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
 let magic = {};
 
-function parseTomlSimple(toml) {
+function unescapeTomlString(s) {
+	if (!s && s !== '') return s;
+	return s
+		.replace(/\\\\/g, '\\')
+		.replace(/\\n/g, '\n')
+		.replace(/\\r/g, '\r')
+		.replace(/\\t/g, '\t')
+		.replace(/\\"/g, '"')
+		.replace(/\\'/g, "'")
+		.replace(/\r\n/g, '\n')
+		.replace(/\r/g, '\n');
+}
+
+function parseTomlMagic(toml) {
 	const result = {};
-	for (const line of toml.split('\n')) {
-		// Only match new format: "key" = { output = "value", ... }
-		const match = line.match(/^"([^"]+)"\s*=\s*\{\s*output\s*=\s*"([^"]+)"/);
-		if (match) {
-			result[match[1]] = match[2];
+
+	// Scan file line-by-line and track the current section.
+	// We will ignore any entries that appear under a [[repeat]] table.
+	const lines = toml.split(/\r?\n/);
+	let currentSection = null;
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i].trim();
+		if (!line) continue;
+
+		// Section headers: [[name]] or [name]
+		const arrMatch = line.match(/^\[\[([^\]]+)\]\]/);
+		if (arrMatch) {
+			currentSection = arrMatch[1];
+			continue;
+		}
+		const secMatch = line.match(/^\[([^\]]+)\]/);
+		if (secMatch) {
+			currentSection = secMatch[1];
+			continue;
+		}
+
+		// If we're inside [[repeat]] skip its entries
+		if (currentSection === 'repeat') continue;
+
+		// Try object entry on one line: "key" = { output = "value", ... }
+		const objLineMatch = line.match(/^"([^"]+)"\s*=\s*\{(.*)\}\s*$/);
+		if (objLineMatch) {
+			const key = objLineMatch[1];
+			const body = objLineMatch[2];
+			const outMatch = body.match(/output\s*=\s*("(?:\\.|[^\"])*")/);
+			if (outMatch) {
+				let val = outMatch[1].slice(1, -1);
+				val = unescapeTomlString(val);
+				result[key] = val;
+			}
+			continue;
+		}
+
+		// Try simple key = "value" lines (unquoted key)
+		const kvMatch = line.match(/^([A-Za-z0-9_\-]+)\s*=\s*("(?:\\.|[^\"])*")\s*$/);
+		if (kvMatch) {
+			const key = kvMatch[1];
+			let val = kvMatch[2].slice(1, -1);
+			val = unescapeTomlString(val);
+			result[key] = val;
 		}
 	}
+
 	return result;
 }
 
 // Load magic dynamically via HTTP request (public static directory)
 if (typeof window !== 'undefined') {
-	fetch('/drivers/hotstrings/magic.toml')
+	fetch('/drivers/hotstrings/magickey.toml')
 		.then((response) => response.text())
 		.then((text) => {
-			const parsedMagic = parseTomlSimple(text);
-			// Remove ★ from each key
+			const parsed = parseTomlMagic(text);
+			// Normalize keys: remove ★ and store as lowercase for lookup
 			magic = {};
-			for (const [key, value] of Object.entries(parsedMagic)) {
-				const cleanKey = key.replace(/★/g, '');
-				magic[cleanKey] = value;
+			for (const [k, v] of Object.entries(parsed)) {
+				const cleanKey = k.replace(/★/g, '');
+				// Ignore entries containing a backslash (problematic escapes like /!\\★)
+				if (cleanKey.indexOf('\\') !== -1) continue;
+				magic[cleanKey.toLowerCase()] = v;
 			}
+		})
+		.catch(() => {
+			// swallow fetch errors silently
 		});
 }
 
