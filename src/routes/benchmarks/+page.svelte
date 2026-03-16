@@ -71,10 +71,7 @@
 	});
 
 	function getErgolPdf() {
-		return (
-			base +
-			`/benchmarks/ergol/v2.1/analyse_ergol_ergopti${version_1dfh}_v2.1_${ergol}.pdf`
-		);
+		return base + `/benchmarks/ergol/v2.1/analyse_ergol_ergopti${version_1dfh}_v2.1_${ergol}.pdf`;
 	}
 	function getImagePath(clavier, corpus) {
 		return images[`/src/lib/images/benchmarks/${clavier}/${corpus}.jpg`].default;
