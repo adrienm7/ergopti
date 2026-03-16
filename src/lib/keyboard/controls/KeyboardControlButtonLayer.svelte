@@ -49,7 +49,7 @@
 </script>
 
 <keyboard-control-layer>
-	<select bind:value={layerValue} on:change={() => changeLayer(layerValue)}>
+	<select bind:value={layerValue} onchange={() => changeLayer(layerValue)}>
 		{#each availableLayers as [label, value]}
 			<option {value}>{label}</option>
 		{/each}
