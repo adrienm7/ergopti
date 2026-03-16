@@ -5363,6 +5363,7 @@ if Features["Autocorrection"]["Names"].Enabled {
     CreateHotstring("", "alexei", "Alexeï")
     CreateHotstring("", "anais", "Anaïs")
     CreateHotstring("", "azerbaidjan", "Azerbaïdjan")
+    CreateHotstring("", "bahrein", "Bahreïn")
     CreateHotstring("", "benoit", "Benoît")
     CreateHotstring("", "caraibes", "Caraïbes")
     CreateHotstring("", "cleopatre", "Cléopâtre")
@@ -5575,6 +5576,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "guepe", "guêpe")
 
     ; === H ===
+    ; CreateCaseSensitiveHotstrings("*", "hair", "haïr") ; Conflict with "hair" in English
     CreateCaseSensitiveHotstrings("*", "heroiq", "héroïq")
     CreateCaseSensitiveHotstrings("*", "heroisme", "héroïsme")
     CreateCaseSensitiveHotstrings("*", "héroiq", "héroïq")
