@@ -1,3 +1,4 @@
+; Last modified on 2026-03-17 at 15:59 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -5254,6 +5255,7 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "docker", "Docker")
     CreateHotstring("", "dynatrace", "Dynatrace")
     CreateHotstring("", "ergopti", "Ergopti")
+    CreateHotstring("", "esg", "ESG")
     CreateHotstring("", "facebook", "Facebook")
     CreateHotstring("", "firefox", "Firefox")
     CreateHotstring("", "gcp", "GCP")
@@ -5302,6 +5304,7 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "pr", "PR")
     CreateHotstring("", "qlora", "QLoRA")
     CreateHotstring("", "r", "R")
+    CreateHotstring("", "ram", "RAM")
     CreateHotstring("", "rdc", "RDC")
     CreateHotstring("", "rh", "RH")
     CreateHotstring("", "sas", "SAS")

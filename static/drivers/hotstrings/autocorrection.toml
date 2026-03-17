@@ -376,6 +376,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "docker" = { output = "Docker", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "dynatrace" = { output = "Dynatrace", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ergopti" = { output = "Ergopti", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"esg" = { output = "ESG", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "facebook" = { output = "Facebook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "firefox" = { output = "Firefox", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "gcp" = { output = "GCP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -424,6 +425,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "pr" = { output = "PR", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "qlora" = { output = "QLoRA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "r" = { output = "R", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ram" = { output = "RAM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "rdc" = { output = "RDC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "rh" = { output = "RH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "sas" = { output = "SAS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }

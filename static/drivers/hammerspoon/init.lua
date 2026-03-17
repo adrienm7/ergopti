@@ -207,22 +207,40 @@ do
             reload_timer:stop()
             reload_timer = nil
         end
-        -- short debounce to coalesce multiple FS events into a single reload
         reload_timer = hs.timer.doAfter(0.5, function()
             hs.notify.new({title = "Hammerspoon", informativeText = "Hotstrings changed — reloading config"}):send()
             hs.reload()
         end)
     end
 
-    local hotstrings_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
-        for _, p in ipairs(paths) do
-            if p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$") then
-                schedule_reload()
-                break
+    local function watch_hotstrings()
+        local watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
+            for _, p in ipairs(paths) do
+                if p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$") then
+                    schedule_reload()
+                    break
+                end
+            end
+        end)
+        watcher:start()
+        return watcher
+    end
+
+    -- Watcher sur chaque fichier TOML existant pour garantir la détection de toute modification
+    local function watch_all_tomls()
+        for fname in hs.fs.dir(hotstrings_dir) do
+            if fname:match("%.toml$") or fname:match("_index%.json$") then
+                local fpath = hotstrings_dir .. fname
+                local watcher = hs.pathwatcher.new(fpath, function(paths)
+                    schedule_reload()
+                end)
+                watcher:start()
             end
         end
-    end)
-    hotstrings_watcher:start()
+    end
+
+    watch_hotstrings()
+    watch_all_tomls()
 end
 
 ---------------------------------------------------------------------------
