@@ -605,7 +605,7 @@ local _no_rescan_until = 0
 local function suppress_rescan(duration)
     _no_rescan_until = hs.timer.secondsSinceEpoch() + (duration or 0.5)
     buffer = ""
-    last_click_pos = nil -- MODIFIÉ : Sécurité post-expansion
+    last_click_pos = nil -- Sécurité post-expansion
 end
 function M.suppress_rescan(duration) suppress_rescan(duration) end
 
@@ -768,8 +768,6 @@ end
 ---------------------------------------------------------------------------
 -- UI: Boîte de prévisualisation (Preview Canvas)
 ---------------------------------------------------------------------------
--- Fonction robuste pour tenter d'obtenir la position du curseur de texte via l'API d'accessibilité.
--- Utilisée dans un pcall pour éviter de crasher si l'application ciblée réagit mal.
 local function getCaretPosition()
     local success, pos = pcall(function()
         local ax = require("hs.axuielement")
@@ -779,26 +777,23 @@ local function getCaretPosition()
         local focused = sys:attributeValue("AXFocusedUIElement")
         if not focused then return nil end
         
-        -- Tentative 1 : L'approche standard (récupérer la zone de sélection du texte)
         local range = focused:attributeValue("AXSelectedTextRange")
         if range then
-            local bounds = focused:parameterizedAttributeValue("AXBoundsForRange", range)
-            if bounds and type(bounds) == "table" and bounds.x and bounds.y then
-                -- MODIFIÉ : Ajout de is_exact = true pour signaler une bonne lecture
-                return {x = bounds.x, y = bounds.y, h = bounds.h or 20, is_exact = true}
+            -- On essaie de récupérer la zone du caractère actuel
+            local bounds = focused:parameterizedAttributeValue("AXBoundsForRange", { location = range.location, length = 1 })
+            if not bounds or (bounds.h and bounds.h > 100) then
+                bounds = focused:parameterizedAttributeValue("AXBoundsForRange", { location = range.location, length = 0 })
+            end
+            
+            -- SANITY CHECK : Si la hauteur est absurde (ex: 800px), l'app nous ment et donne la fenêtre entière.
+            if bounds and type(bounds) == "table" and bounds.x and bounds.y and bounds.h then
+                if bounds.h > 0 and bounds.h < 80 then
+                    return {x = bounds.x, y = bounds.y, h = bounds.h, is_exact = true}
+                end
             end
         end
         
-        -- Tentative 2 : Fallback pour des champs de texte simples
-        local role = focused:attributeValue("AXRole")
-        if role == "AXTextField" or role == "AXTextArea" then
-            local elem_pos = focused:attributeValue("AXPosition")
-            local elem_size = focused:attributeValue("AXSize")
-            if elem_pos and elem_size then
-                -- MODIFIÉ : Ajout de is_exact = false
-                return {x = elem_pos.x, y = elem_pos.y + elem_size.h, h = 0, is_exact = false}
-            end
-        end
+        -- On supprime volontairement la "Tentative 2" qui donnait le coin inférieur gauche
         
         return nil
     end)
@@ -818,7 +813,6 @@ preview_canvas:appendElements({
 }, {
     type = "text",
     text = "",
-    -- Plus besoin de textAlignment, on va forcer la position exacte
 })
 
 local function hide_preview()
@@ -832,7 +826,6 @@ local function update_preview(buf)
     end
 
     -- On extrait la fin du buffer depuis le dernier espace
-    -- ([^%s]+ permet de garder la ponctuation si elle fait partie du trigger)
     local last_word = buf:match("([^%s]+)$")
     if not last_word then 
         hide_preview()
@@ -850,7 +843,7 @@ local function update_preview(buf)
     end
 
     if match_repl then
-        -- Nettoyer les tokens genre {Left}, {Enter} pour l'affichage visuel pur
+        -- Nettoyer les tokens pour l'affichage visuel pur
         local clean_repl = text_from_tokens(tokens_from_repl(match_repl))
         
         local styledText = hs.styledtext.new(clean_repl, {
@@ -860,7 +853,6 @@ local function update_preview(buf)
         
         local size = preview_canvas:minimumTextSize(2, styledText)
         
-        -- Définition des marges (padding) pour un centrage parfait
         local padding_x = 12
         local padding_y = 6
         local w = size.w + (padding_x * 2)
@@ -869,14 +861,12 @@ local function update_preview(buf)
         local pos_x, pos_y
         local caret_pos = getCaretPosition()
         
-        -- MODIFIÉ : Section hybride pour tracking avancé vs natif
         if caret_pos and caret_pos.is_exact then
-            -- Position native : pile en dessous du curseur de frappe textuelle
+            -- Position native parfaite
             pos_x = caret_pos.x + 4
             pos_y = caret_pos.y + caret_pos.h + 4
         else
-            -- Si on a tapé plus de ~60 chars, on risque d'être passé à la ligne dans VS Code.
-            -- On invalide l'ancre virtuelle pour éviter que ça sorte de l'écran.
+            -- Si on a tapé plus de ~60 chars, on risque d'être passé à la ligne.
             if chars_typed_since_click > 60 then
                 last_click_pos = nil
             end
@@ -891,14 +881,14 @@ local function update_preview(buf)
                 pos_x = last_click_pos.x + buffer_width + 4
                 pos_y = last_click_pos.y + 20 
             else
-                -- Fallback si l'app (Chrome, Electron...) ne donne pas l'info : à côté de la souris
+                -- Fallback propre : à côté de la souris (plus de bug en bas à gauche)
                 local mouse_pt = hs.mouse.absolutePosition()
                 pos_x = mouse_pt.x + 16
                 pos_y = mouse_pt.y + 16
             end
         end
 
-        -- MODIFIÉ : CLAMP pour s'assurer que la boîte ne sorte pas de l'écran principal
+        -- CLAMP pour s'assurer que la boîte ne sorte pas de l'écran principal
         local screen = hs.screen.mainScreen():frame()
         if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 10 end
         if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 10 end
@@ -928,7 +918,6 @@ end
 local function onKeyDown(e)
     if processing_paused then return false end
     if is_replacing then
-        -- Consume one expected synthetic event; clear the guard once all are done.
         if synthetic_remaining > 0 then
             synthetic_remaining = synthetic_remaining - 1
             if synthetic_remaining <= 0 then
@@ -953,7 +942,7 @@ local function onKeyDown(e)
     end
     last_key_was_complex = is_complex
 
-    -- MODIFIÉ : Annulation de l'ancre virtuelle sur combos clavier
+    -- Annulation de l'ancre virtuelle sur combos clavier
     if flags.cmd or flags.ctrl then
         buffer = ""
         last_click_pos = nil 
@@ -961,11 +950,6 @@ local function onKeyDown(e)
         return false
     end
 
-    -- Give registered interceptors first look at every event (before backspace,
-    -- escape, and getCharacters processing so that Unicode trigger chars like ★
-    -- that produce getCharacters("") are still catchable).
-    -- Interceptors are called in registration order; the chain stops at the
-    -- first non-nil result.
     local _interceptor_suppress = false
     for _, iceptor in ipairs(_interceptors) do
         local result = iceptor(e, buffer)
@@ -973,10 +957,9 @@ local function onKeyDown(e)
         if result == "suppress" then _interceptor_suppress = true; break end
     end
 
-    -- MODIFIÉ : Sécurités Backspace
+    -- Sécurités Backspace
     if keyCode == 51 then -- Backspace
         if flags.cmd or flags.alt then
-            -- Cmd+Backspace (suppr ligne) ou Alt+Backspace (suppr mot)
             buffer = ""
             last_click_pos = nil
             hide_preview()
@@ -992,8 +975,7 @@ local function onKeyDown(e)
         return false
     end
 
-    -- MODIFIÉ : Invalidation de l'ancre sur les touches de mouvement ou de saut
-    -- 53: Echap, 36: Entrée, 48: Tab, 117: Suppr, 123-126: Flèches
+    -- Invalidation de l'ancre sur les touches de mouvement ou de saut
     if keyCode == 53 or keyCode == 36 or keyCode == 48 or keyCode == 117 or (keyCode >= 123 and keyCode <= 126) then
         buffer = ""
         last_click_pos = nil
@@ -1006,7 +988,7 @@ local function onKeyDown(e)
     if not chars or chars == "" then return false end
 
     buffer = buffer .. chars
-    chars_typed_since_click = chars_typed_since_click + utf8_len(chars) -- MODIFIÉ : maj compteur
+    chars_typed_since_click = chars_typed_since_click + utf8_len(chars)
 
     if #buffer > 100 then
         buffer = string.sub(buffer, utf8.offset(buffer, -50) or 1)
@@ -1016,8 +998,6 @@ local function onKeyDown(e)
 
     if _interceptor_suppress then return false end
 
-    -- If a final_result expansion just finished, skip all hotstring matching
-    -- for this event.  The buffer was already cleared by suppress_rescan().
     if rescan_suppressed() then return false end
 
     if time_since_last_key <= allowed_delay then
@@ -1037,37 +1017,19 @@ local function onKeyDown(e)
         local function is_letter_char(c)
             if not c or c == "" then return false end
             if c:match("[%w]") then return true end
-            -- Lua/LuaJIT string.upper does not handle UTF-8 accented characters,
-            -- so we fall back to the known accent tables defined at module level.
             if UPPER_LETTERS[c] or LOWER_LETTERS[c] then return true end
             return string.upper(c) ~= string.lower(c)
         end
         for _, m in ipairs(mappings) do
             local trigger = m.trigger
 
-                -- immediate expansion: trigger ends right at buffer end
                 if utf8_ends_with(buffer, trigger) then
-                    -- Only perform immediate expansion for mappings explicitly marked
-                    -- as auto (m.auto == true). Non-auto mappings must wait for
-                    -- a boundary (space/tab/enter) and are handled by deferred expansion.
                     if not m.auto then
-                        -- skip immediate expansion for non-auto mappings
+                        -- skip
                     else
-                        -- avoid immediate expansion for triggers that start with
-                        -- a non-letter (punctuation/dead-key) because those
-                        -- often represent composing sequences and can steal
-                        -- matches from longer word triggers (e.g. ",e" vs "jeuner").
                         local trig_first = trigger:match("^[%z\1-\127\194-\244][\128-\191]*")
-                        -- Only skip immediate expansion for non-letter-starting triggers
-                        -- when the mapping is NOT allowed is_word-word. If m.is_word==true
-                        -- (comma compose mappings), keep immediate expansion.
-                        -- If the trigger starts with a non-letter (punctuation/dead-key),
-                        -- we normally skip immediate expansion to avoid stealing matches
-                        -- from longer word triggers. However, if the mapping is marked
-                        -- `auto` (auto_expand==true) we should allow immediate expansion
-                        -- (useful for comma compose mappings like ",c").
                         if trig_first and not is_letter_char(trig_first) and not m.is_word and not m.auto then
-                            -- skip immediate expansion; let deferred expansion handle boundary
+                            -- skip
                         else
                             local valid = true
                             if m.is_word and utf8_len(buffer) > utf8_len(trigger) then
@@ -1086,21 +1048,15 @@ local function onKeyDown(e)
                                 local trigger_len = utf8_len(trigger)
                                 local chars_len = utf8_len(chars)
                                 local deletes = trigger_len - chars_len
-                                -- Tokenise the replacement so that {Left}/{Right}/etc. become
-                                -- real key strokes rather than literal characters.
                                 local repl_tokens = tokens_from_repl(m.repl)
                                 local repl_text   = text_from_tokens(repl_tokens)
-                                -- Identity guard: trigger and output are the same string.
-                                -- No keystroke manipulation needed; the triggering char already
-                                -- reached the app naturally and the buffer is already up to date.
+                                
                                 if repl_text == trigger then
                                     if m.final_result then suppress_rescan() end
                                     hide_preview()
                                     return false
                                 end
-                                -- Pre-compute synthetic event count BEFORE emitting anything.
-                                -- Each keyStroke(delete) = 1; text chars = 1 each; key
-                                -- commands ({Left} etc.) = 1 each.
+                                
                                 synthetic_remaining = (deletes > 0 and deletes or 0)
                                     + count_token_events(repl_tokens)
                                 is_replacing = true
@@ -1115,20 +1071,12 @@ local function onKeyDown(e)
 
                                 emit_tokens(repl_tokens)
 
-                                -- Keep everything before the trigger, then append the replacement.
-                                -- utf8.offset(buffer, -trigger_len) gives the byte position of the
-                                -- first character of the trigger inside buffer, so sub(1, pos-1)
-                                -- is exactly the prefix that precedes it.
                                 local trig_start = utf8.offset(buffer, -trigger_len)
                                 buffer = (trig_start and string.sub(buffer, 1, trig_start - 1) or "") .. repl_text
-                                last_click_pos = nil -- MODIFIÉ : On a injecté du texte, l'ancre n'est plus valide
+                                last_click_pos = nil 
 
-                                -- When final_result is set, prevent any further hotstring from
-                                -- re-scanning the expanded text (e.g. "axa" inside an e-mail).
                                 if m.final_result then suppress_rescan() end
 
-                                -- Safety fallback: if the counter somehow gets off, release the
-                                -- guard after 100 ms so the system doesn't stay frozen.
                                 hs.timer.doAfter(0.1, function()
                                     if is_replacing then
                                         is_replacing = false
@@ -1143,10 +1091,6 @@ local function onKeyDown(e)
                     end
                 end
 
-            -- Deferred expansion: expand on boundary chars (non-auto mappings only).
-            -- auto=true mappings are expanded immediately (above) based on the timing
-            -- between the last two chars of the trigger; the boundary char has no role
-            -- and must not re-trigger them.
             if not m.auto and is_terminator(chars) then
                 local end_pos = utf8.offset(buffer, -char_count) or (#buffer + 1)
                 local start_pos = utf8.offset(buffer, -(char_count + utf8_len(trigger)))
@@ -1168,7 +1112,6 @@ local function onKeyDown(e)
                         end
                     end
                     if valid then
-                        -- schedule replacement after the boundary char has been handled by the app
                         if DEBUG_EXPANSION then print("[keymap] scheduling deferred expand trigger=", trigger, "repl=", m.repl, "chars=", chars) end
                         local trigger_len = utf8_len(trigger)
                         local start_trigger = utf8.offset(prefix_before, -utf8_len(trigger))
@@ -1177,9 +1120,6 @@ local function onKeyDown(e)
 
                         local consume_term = terminator_is_consumed(chars)
 
-                        -- Identity guard: trigger and output are the same string.
-                        -- No keystroke manipulation needed; let the boundary char pass
-                        -- through naturally (buffer already has trigger + boundary).
                         if m.repl == trigger then
                             if is_final_mapping then suppress_rescan() end
                             hide_preview()
@@ -1190,9 +1130,7 @@ local function onKeyDown(e)
                             if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
                             local repl_tokens = tokens_from_repl(m.repl)
                             local repl_text   = text_from_tokens(repl_tokens)
-                            -- Pre-compute synthetic event count: trigger deletes + repl events.
-                            -- consume_term: terminator already consumed (e.g. ★), no re-send.
-                            -- Otherwise add 1 per boundary codepoint (re-sent below).
+                            
                             synthetic_remaining = trigger_len
                                 + count_token_events(repl_tokens)
                                 + (consume_term and 0 or utf8_len(chars))
@@ -1200,22 +1138,15 @@ local function onKeyDown(e)
                             
                             hide_preview()
                             
-                            -- delete the trigger characters (caret is after the trigger)
                             for _ = 1, trigger_len do keyStroke({}, 'delete', 0) end
-                            -- type replacement (handles {Left} / {Right} / etc.)
                             emit_tokens(repl_tokens)
-                            -- re-send the boundary char only if it must be preserved
                             if not consume_term then keyStrokes(chars) end
 
-                            -- update buffer: remove trigger, append repl text (and boundary if kept)
                             buffer = before_trigger .. repl_text .. (consume_term and "" or chars)
-                            last_click_pos = nil -- MODIFIÉ : L'expansion rend l'ancre invalide
+                            last_click_pos = nil 
 
-                            -- When final_result is set, prevent any further hotstring from
-                            -- re-scanning the expanded text (e.g. "axa" inside an e-mail).
                             if is_final_mapping then suppress_rescan() end
 
-                            -- Safety fallback in case the counter gets off.
                             hs.timer.doAfter(0.1, function()
                                 if is_replacing then
                                     is_replacing = false
@@ -1225,7 +1156,6 @@ local function onKeyDown(e)
                             end)
                         end)
 
-                        -- consume the boundary event (we re-send it above), avoid double-insert
                         return true
                     end
                 end
@@ -1238,7 +1168,6 @@ end
 
 local tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
--- MODIFIÉ : Enregistre le clic pour l'astuce visuelle
 local mouse_tap = eventtap.new(
     { eventtap.event.types.leftMouseDown,
       eventtap.event.types.rightMouseDown,
