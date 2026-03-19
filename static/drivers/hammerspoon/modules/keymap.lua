@@ -665,22 +665,24 @@ local function update_preview(buf)
         local pos_x, pos_y
         local caret_pos = getCaretPosition()
         
-        -- On récupère l'écran actif (là où est la fenêtre) ou l'écran principal par défaut
+        -- hs.screen:frame() calcule la surface UTILE (il exclut automatiquement le Dock et la barre de menu)
         local fw = hs.window.focusedWindow()
         local screen = fw and fw:screen():frame() or hs.screen.mainScreen():frame()
         
         if caret_pos and caret_pos.is_exact then
-            -- App native : Sous le curseur de texte
-            pos_x = caret_pos.x + 4
-            pos_y = caret_pos.y + caret_pos.h + 4
+            -- App native : Décalage accentué vers la droite et le bas pour ne rien masquer
+            pos_x = caret_pos.x + 15
+            pos_y = caret_pos.y + caret_pos.h + 12
             
-            -- Sécurité : on empêche la bulle de déborder de l'écran
-            if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 10 end
-            if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 10 end
+            -- Sécurité : on empêche la bulle de déborder de l'écran utile
+            if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 5 end
+            if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 5 end
         else
             -- METHODE C : App récalcitrante (Chrome, VS Code) -> Milieu / Bas de l'écran
             pos_x = screen.x + (screen.w / 2) - (w / 2)
-            pos_y = screen.y + screen.h - h - 40 -- 40px de marge pour éviter le Dock
+            -- screen.y + screen.h correspond à la ligne exacte juste au-dessus du Dock.
+            -- On soustrait la hauteur de la boîte (h) et on ajoute 5 pixels de marge.
+            pos_y = screen.y + screen.h - h - 5 
         end
 
         preview_canvas:frame({ x = pos_x, y = pos_y, w = w, h = h })
@@ -833,7 +835,9 @@ local function onKeyDown(e)
                                 hide_preview()
 
                                 if deletes > 0 then
-                                    for _ = 1, deletes do keyStroke({}, 'delete', 0) end
+                                    for _ = 1, deletes do
+                                        keyStroke({}, 'delete', 0)
+                                    end
                                 end
 
                                 emit_tokens(repl_tokens)
@@ -929,7 +933,6 @@ end
 
 local tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
--- On garde juste le tap souris pour vider le buffer proprement au clic
 local mouse_tap = eventtap.new(
     { eventtap.event.types.leftMouseDown,
       eventtap.event.types.rightMouseDown,
