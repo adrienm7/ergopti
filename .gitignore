@@ -20,3 +20,6 @@ static/drivers/hammerspoon/config.json
 static/drivers/hotstrings/.local_ahk_path
 static/drivers/hotstrings/personal.toml
 logs/
+static/drivers/karabiner/pid/doctor
+static/drivers/karabiner/pid/karabiner_console_user_server.pid
+static/drivers/karabiner/log/console_user_server.log

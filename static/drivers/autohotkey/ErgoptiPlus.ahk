@@ -1,4 +1,3 @@
-; Last modified on 2026-03-17 at 15:59 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -5311,6 +5310,7 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "sharepoint", "SharePoint")
     CreateHotstring("", "slm", "SLM")
     CreateHotstring("", "sql", "SQL")
+    CreateHotstring("", "ssd", "SSD")
     CreateHotstring("", "ssh", "SSH")
     CreateHotstring("", "ssl", "SSL")
     CreateHotstring("", "tls", "TLS")
@@ -5378,6 +5378,7 @@ if Features["Autocorrection"]["Names"].Enabled {
     CreateHotstring("", "jerome", "Jérôme")
     CreateHotstring("", "jérome", "Jérôme")
     CreateHotstring("", "joel", "Joël")
+    CreateHotstring("", "koweit", "Koweït")
     ; CreateHotstring("", "michael", "Michaël") ; Probably better to not make it the default, as it is "Michael" Jackson and not Michaël
     CreateHotstring("", "mickael", "Mickaël")
     CreateHotstring("", "noel", "Noël")
@@ -5648,6 +5649,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "naives", "naïves")
     CreateCaseSensitiveHotstrings("*", "naitre", "naître")
     CreateCaseSensitiveHotstrings("*", "noeud", "nœud")
+    CreateCaseSensitiveHotstrings("*", "la notre", "la nôtre")
+    CreateCaseSensitiveHotstrings("*", "le notre", "le nôtre")
 
     ; === O ===
     CreateCaseSensitiveHotstrings("*", "oecuméni", "œcuméni")
@@ -5745,6 +5748,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     ; === V ===
     CreateCaseSensitiveHotstrings("*?", "vetement", "vêtement")
     CreateCaseSensitiveHotstrings("*", "voeu", "vœu")
+    CreateCaseSensitiveHotstrings("*", "la votre", "la vôtre")
+    CreateCaseSensitiveHotstrings("*", "le votre", "le vôtre")
 
     ; === W ===
 
