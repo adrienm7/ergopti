@@ -37,15 +37,8 @@ local function sort_mappings()
 end
 M.sort_mappings = sort_mappings
 
--- Interceptor chain: functions called on every keyDown event in registration
--- order.  Each function(event, km_buffer) may return:
---   "consume"  → keymap returns true  (event fully consumed, no hotstring check)
---   "suppress" → keymap returns false (event reaches apps, but hotstrings skipped)
---   nil / false → pass to next interceptor, then normal keymap processing
--- The chain stops at the first non-nil result.
+-- Interceptor chain
 local _interceptors = {}
-
--- Append fn to the interceptor chain.
 function M.register_interceptor(fn)
     table.insert(_interceptors, fn)
 end
@@ -66,21 +59,15 @@ function M.load_file(name, path)
     sort_mappings()
 end
 
--- Load hotstring entries from a TOML file produced by generate_hotstrings.py.
--- Sections disabled via hs.settings are skipped (their entries are not loaded).
--- Stores section info (name, description, count) in the group record so that
--- the menu can display a sub-menu per section.
 function M.load_toml(name, path)
     local toml_reader = require("lib.toml_reader")
     local data = toml_reader.parse(path)
 
-    -- Register all entries under the parent group name
     current_group = name
     local total = 0
     local sections_info = {}
 
     for _, sec_name in ipairs(data.sections_order) do
-        -- Separator entries: carry ordering info but have no hotstrings.
         if sec_name == '-' then
             table.insert(sections_info, { name = '-', description = '-', count = 0 })
             goto continue_sec
@@ -90,9 +77,6 @@ function M.load_toml(name, path)
             local sec = data.sections[sec_name]
             if not sec then goto continue_sec end
             if sec.is_placeholder then
-                -- Section listed in __Order with a description but no TOML entries:
-                -- handled by a separate Lua module (e.g. personal_info).  Insert
-                -- a placeholder so that the menu renders it at the right position.
                 table.insert(sections_info, {
                     name                  = sec_name,
                     description           = sec.description,
@@ -124,12 +108,8 @@ function M.load_toml(name, path)
     end
 
     current_group = nil
-
-    -- Single sort pass after all entries have been inserted (O(N log N) once
-    -- instead of O(N² log N) from sorting after every M.add call).
     sort_mappings()
 
-    -- Build the seqs list (entries added above are now in mappings)
     local seqs = {}
     for _, m in ipairs(mappings) do
         if m.group == name then table.insert(seqs, m.seq) end
@@ -144,71 +124,48 @@ function M.load_toml(name, path)
         sections         = sections_info,
     }
 
-    print(string.format('[keymap] %s: loaded %d entries in %d sections',
-        name, total, #sections_info))
+    print(string.format('[keymap] %s: loaded %d entries in %d sections', name, total, #sections_info))
 end
 
 -- ── Section-level enable / disable ──────────────────────────────────────────
--- State is persisted via hs.settings (survives reloads).
--- Key pattern: "hotstrings_section_<group>_<section>"
-
--- Return whether a specific section within a TOML group is enabled.
--- Default is true (absent key ≡ enabled).
 function M.is_section_enabled(group_name, section_name)
     local key = "hotstrings_section_" .. group_name .. "_" .. section_name
     return hs.settings.get(key) ~= false
 end
 
--- Rebuild the in-memory mappings for a group immediately, taking the current
--- hs.settings section flags into account (used after a section toggle).
 local function reload_group_inplace(group_name)
     if not M.is_group_enabled(group_name) then return end
-    -- disable_group removes all mappings for this group and marks it disabled.
     M.disable_group(group_name)
-    -- enable_group calls load_toml which re-adds only the enabled sections.
     M.enable_group(group_name)
 end
 
--- Persistently disable a section and rebuild the group immediately.
 function M.disable_section(group_name, section_name)
     local key = "hotstrings_section_" .. group_name .. "_" .. section_name
     hs.settings.set(key, false)
     reload_group_inplace(group_name)
 end
 
--- Re-enable a section (remove the persisted disabled flag) and rebuild immediately.
 function M.enable_section(group_name, section_name)
     local key = "hotstrings_section_" .. group_name .. "_" .. section_name
     hs.settings.set(key, nil)
     reload_group_inplace(group_name)
 end
 
--- Return the ordered list of sections for a TOML group, or nil for Lua groups.
--- Each element: { name, description, count }
 function M.get_sections(name)
     local g = groups[name]
     if not g or not g.sections then return nil end
     return g.sections
 end
 
--- Return the file-level description stored in [_meta] for a TOML group.
 function M.get_meta_description(name)
     local g = groups[name]
     return g and g.meta_description or nil
 end
 
--- Set the current group context for subsequent M.add() calls.
--- Pass nil to clear the context.
--- Used to register Lua-defined entries (e.g. repeat_keys) under a named group
--- so that disable_group / reload_group_inplace manage them correctly.
 function M.set_group_context(name)
     current_group = name
 end
 
--- Per-group callbacks invoked at the end of enable_group(), after load_toml /
--- load_file has run.  Used to re-register Lua-defined entries (e.g. repeat_keys)
--- that are not part of the TOML file but must live in the same group so that
--- disable_group / reload_group_inplace can remove and re-add them correctly.
 local group_post_load_hooks = {}
 
 function M.set_post_load_hook(name, fn)
@@ -226,22 +183,16 @@ function M.disable_group(name)
     rebuild_lookup()
 end
 
--- Return whether a group is currently enabled
 function M.is_group_enabled(name)
     return groups[name] and groups[name].enabled or false
 end
 
--- Return a shallow copy of known groups and their enabled state
 function M.list_groups()
     local out = {}
     for name, g in pairs(groups) do out[name] = g.enabled end
     return out
 end
 
--- Register a pure-Lua group that has no source file.
--- Sections is an array of { name, description, count } tables.
--- Actual hotstring entries must be added by a post_load_hook so that
--- enable_group() can re-register them after a disable_group() call.
 function M.register_lua_group(name, meta_description, sections)
     groups[name] = {
         path             = nil,
@@ -257,7 +208,6 @@ function M.enable_group(name)
     local g = groups[name]
     if not g then return end
     if g.enabled then return end
-    -- Pure-Lua groups have no source file: re-add entries via post_load_hook.
     if g.path == nil then
         g.enabled = true
         if group_post_load_hooks[name] then
@@ -266,17 +216,13 @@ function M.enable_group(name)
         end
         return
     end
-    -- re-load the source (Lua or TOML) to re-add mappings under the same group name
     if g.kind == 'toml' then
         M.load_toml(name, g.path)
     else
         M.load_file(name, g.path)
     end
-    -- Re-run any Lua-defined entries that are not in the source file but belong
-    -- to this group (e.g. repeat_keys entries registered under "magickey").
     if group_post_load_hooks[name] then
         group_post_load_hooks[name]()
-        -- Re-sort because the hook appended entries after load_toml's sort.
         sort_mappings()
     end
 end
@@ -284,9 +230,6 @@ end
 ---------------------------------------------------------------------------
 -- Expansion terminators
 ---------------------------------------------------------------------------
--- Characters that trigger deferred expansion for non-auto hotstrings.
--- Each entry has a unique `key`, a list `chars` of exact byte strings or a
--- `prefix` for variable-length sequences, and a `label` for the menu.
 local TERMINATOR_DEFS = {
     { key = "space",  chars  = { " " },                  label = "Espace" },
     { key = "tab",    chars  = { "\t" },                 label = "Tabulation" },
@@ -295,10 +238,6 @@ local TERMINATOR_DEFS = {
     { key = "comma",  chars  = { "," },                  label = "Virgule (,)" },
     { key = "nbsp",   prefix = "\194\160",               label = "Espace insécable" },
     { key = "nnbsp",  prefix = "\226\128\175",           label = "Espace fine insécable" },
-    -- ★ is listed last so that any hotstring whose trigger already ends with ★
-    -- (auto_expand=true, handled in the immediate path) takes precedence.
-    -- consume=true: the ★ char is deleted along with the trigger and NOT re-sent
-    -- (unlike space/tab/period which are preserved after the replacement).
     { key = "star",   chars  = { "★" },                  label = "Touche ★", consume = true },
 }
 
@@ -322,8 +261,6 @@ local function is_terminator(chars)
     return false
 end
 
--- Return true when the terminator that matches `chars` has consume=true,
--- meaning it must be deleted along with the trigger and NOT re-emitted.
 local function terminator_is_consumed(chars)
     for _, def in ipairs(TERMINATOR_DEFS) do
         if _terminator_enabled[def.key] and def.consume then
@@ -339,17 +276,14 @@ local function terminator_is_consumed(chars)
     return false
 end
 
---- Enable or disable a single terminator character.
 function M.set_terminator_enabled(key, enabled)
     _terminator_enabled[key] = (enabled ~= false)
 end
 
---- Return whether a terminator is currently enabled.
 function M.is_terminator_enabled(key)
     return _terminator_enabled[key] ~= false
 end
 
---- Return the full ordered list of terminator definitions (read-only).
 function M.get_terminator_defs()
     return TERMINATOR_DEFS
 end
@@ -359,58 +293,78 @@ end
 ---------------------------------------------------------------------------
 local BASE_DELAY_SEC = 0.75
 
---- Return the current expansion timing threshold (seconds).
 function M.get_base_delay() return BASE_DELAY_SEC end
-
---- Set the expansion timing threshold (seconds).  Must be >= 0.
-function M.set_base_delay(secs)
-    BASE_DELAY_SEC = math.max(0, secs)
-end
+function M.set_base_delay(secs) BASE_DELAY_SEC = math.max(0, secs) end
 
 local buffer = ""
 local is_replacing = false
--- Number of synthetic keydown events still pending (deletes + replacement chars).
--- is_replacing is cleared once this counter reaches zero instead of a fixed timer,
--- which eliminates the race condition that corrupted the buffer when auto-expanded
--- text was typed faster than the 10 ms timer (e.g. ,ê → ju followed by ' → jusqu').
 local synthetic_remaining = 0
 local last_key_time = 0
 local last_key_was_complex = false
 local seq_counter = 0 
 local DEBUG_EXPANSION = false
 
--- NOUVEAU: Variables pour traquer l'avancée du curseur de façon sécurisée
-local last_click_pos = nil 
-local chars_typed_since_click = 0
+local processing_paused = false
+function M.pause_processing()  processing_paused = true  end
+function M.resume_processing() processing_paused = false end
+function M.is_processing_paused() return processing_paused end
+
+local _no_rescan_until = 0
+local function suppress_rescan(duration)
+    _no_rescan_until = hs.timer.secondsSinceEpoch() + (duration or 0.5)
+    buffer = ""
+end
+function M.suppress_rescan(duration) suppress_rescan(duration) end
+
+local function rescan_suppressed()
+    return hs.timer.secondsSinceEpoch() < _no_rescan_until
+end
+
+function M.has_exact_trigger(trigger)
+    for _, m in ipairs(mappings) do
+        if m.trigger == trigger then return true end
+    end
+    return false
+end
+
+function M.has_trigger_prefix(prefix)
+    for _, m in ipairs(mappings) do
+        if m.trigger:sub(1, #prefix) == prefix then return true end
+    end
+    return false
+end
+
+function M.has_trigger_suffix(s)
+    if not s then return false end
+    for _, m in ipairs(mappings) do
+        local t = m.trigger
+        if #s >= #t and s:sub(-#t) == t then return true end
+    end
+    return false
+end
 
 ---------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
--- UTF-8 utilities (Case & Punctuation)
+-- UTF-8 utilities
 ---------------------------------------------------------------------------
 local UPPER_LETTERS = {
     ['à']='À', ['â']='Â', ['ä']='Ä', ['é']='É', ['è']='È', ['ê']='Ê', ['ë']='Ë',
     ['î']='Î', ['ï']='Ï', ['ô']='Ô', ['ö']='Ö', ['ù']='Ù', ['û']='Û', ['ü']='Ü',
     ['ç']='Ç', ['œ']='Œ', ['æ']='Æ'
 }
-
 local LOWER_LETTERS = {}
 for k, v in pairs(UPPER_LETTERS) do LOWER_LETTERS[v] = k end
 
--- Special symbols for uppercase variants of triggers
 local UPPER_TRIGGERS = {}
 for k, v in pairs(UPPER_LETTERS) do UPPER_TRIGGERS[k] = v end
-UPPER_TRIGGERS["'"] = " ?" -- Espace fine insécable + ?
-UPPER_TRIGGERS[","] = {" :", " ;"} -- Tableau : Espace insécable + : ET Espace fine + ;
-UPPER_TRIGGERS["."] = " :" -- Espace insécable + :
+UPPER_TRIGGERS["'"] = " ?" 
+UPPER_TRIGGERS[","] = {" :", " ;"} 
+UPPER_TRIGGERS["."] = " :" 
 
--- Returns all possible uppercase trigger combinations
 local function trig_upper(s)
     local results = {""}
     for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
         local map_val = UPPER_TRIGGERS[c]
         local uppers = {}
-        
         if type(map_val) == "table" then
             uppers = map_val
         elseif type(map_val) == "string" then
@@ -418,12 +372,9 @@ local function trig_upper(s)
         else
             table.insert(uppers, string.upper(c))
         end
-        
         local new_results = {}
         for _, res in ipairs(results) do
-            for _, u in ipairs(uppers) do
-                table.insert(new_results, res .. u)
-            end
+            for _, u in ipairs(uppers) do table.insert(new_results, res .. u) end
         end
         results = new_results
     end
@@ -436,18 +387,13 @@ local function trig_lower(s)
     end))
 end
 
--- Returns all possible Titlecase trigger strings
 local function trig_title(s)
     local first = s:match("^[%z\1-\127\194-\244][\128-\191]*")
     if not first then return {s} end
-    
     local first_uppers = trig_upper(first)
     local rest = trig_lower(s:sub(#first + 1))
-    
     local results = {}
-    for _, fu in ipairs(first_uppers) do
-        table.insert(results, fu .. rest)
-    end
+    for _, fu in ipairs(first_uppers) do table.insert(results, fu .. rest) end
     return results
 end
 
@@ -464,17 +410,9 @@ local function repl_title(s)
 end
 
 ---------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
 -- Adding shortcuts (hotstrings)
 ---------------------------------------------------------------------------
 function M.add(trigger, replacement, opts)
-    -- New calling convention: M.add(trigger, replacement, {
-    --   is_word = true/false,
-    --   auto_expand = true/false,
-    --   is_case_sensitive = true/false,
-    --   final_result = true/false,  -- when true, expanded text is never re-scanned
-    -- })
     opts = opts or {}
     local is_word = opts.is_word == true
     local is_auto = opts.auto_expand == true
@@ -485,8 +423,7 @@ function M.add(trigger, replacement, opts)
         local k = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a)
         local existing = mappings_lookup[k]
         if existing then
-            if existing.repl == r then return end  -- exact duplicate, skip
-            -- Same trigger with different output: last write wins.
+            if existing.repl == r then return end
             existing.repl = r
             if current_group then existing.group = current_group end
             return
@@ -498,7 +435,7 @@ function M.add(trigger, replacement, opts)
             is_word      = is_word,
             auto         = a,
             seq          = seq_counter,
-            tlen         = utf8.len(t) or #t,  -- pre-cache for sort
+            tlen         = utf8.len(t) or #t,
             final_result = is_final,
         }
         if current_group then entry.group = current_group end
@@ -515,10 +452,6 @@ function M.add(trigger, replacement, opts)
 
     local function add_mapping(t, r)
         add_mapping_raw(t, r, is_auto)
-        -- Do not add space variants for triggers that start with a space character.
-        -- Those come from comma-uppercase expansions (e.g. " :D" from ",d") and
-        -- the leading non-breaking space is intentional; adding a regular-space
-        -- variant would match unintended sequences like " :D" (colon+D smiley).
         local first_is_space = t:match("^[ \194\160\226\128\175]") ~= nil
         if not first_is_space and (t:match(" ") or t:match(" ") or t:match(" ")) then
             add_mapping_raw(set_spaces(t, " "), r, is_auto)  
@@ -531,34 +464,25 @@ function M.add(trigger, replacement, opts)
     local lower_trig = trig_lower(trigger)
     local title_repl = repl_title(base_repl)
     local upper_repl = repl_upper(base_repl)
-    -- If case-sensitive, only add the trigger as provided (preserve case).
+
     if is_case_sensitive then
         add_mapping(trigger, base_repl)
     else
         local title_trigs = trig_title(lower_trig)
         local upper_trigs = trig_upper(lower_trig)
-
-    -- Standard variants
         add_mapping(lower_trig, base_repl)
-        
         for _, tt in ipairs(title_trigs) do
-            if tt ~= lower_trig then 
-                add_mapping(tt, title_repl) 
-            end
+            if tt ~= lower_trig then add_mapping(tt, title_repl) end
         end
-        
         for _, ut in ipairs(upper_trigs) do
             local is_title = false
             for _, tt in ipairs(title_trigs) do
                 if ut == tt then is_title = true; break end
             end
-            if ut ~= lower_trig and not is_title then 
-                add_mapping(ut, upper_repl) 
-            end
+            if ut ~= lower_trig and not is_title then add_mapping(ut, upper_repl) end
         end
     end
 
-    -- Special variant for triggers starting with a comma
     local first_char_source = is_case_sensitive and trigger or trig_lower(trigger)
     local first_char = string.match(first_char_source, "^[%z\1-\127\194-\244][\128-\191]*")
     if first_char == "," then
@@ -566,7 +490,6 @@ function M.add(trigger, replacement, opts)
         if rest ~= "" then
             local short_title_trig = ";" .. trig_lower(rest)
             add_mapping(short_title_trig, title_repl)
-            
             local rest_uppers = trig_upper(rest)
             for _, ru in ipairs(rest_uppers) do
                 local short_upper_trig = ";" .. ru
@@ -576,127 +499,32 @@ function M.add(trigger, replacement, opts)
             end
         end
     end
-
-    -- Sort by descending trigger length is now deferred to the end of
-    -- load_toml / load_file (called once per bulk load, not per entry).
-end
-
----------------------------------------------------------------------------
--- Pause flag: when true, the keydown handler passes all events through
--- without expanding any hotstring. The tap itself keeps running so that
--- script_control shortcuts (pause toggle / reload) remain reachable.
----------------------------------------------------------------------------
-local processing_paused = false
-
-function M.pause_processing()  processing_paused = true  end
-function M.resume_processing() processing_paused = false end
-function M.is_processing_paused() return processing_paused end
-
--- Timestamp (seconds) until which hotstring matching is suppressed after a
--- final_result expansion.  Prevents the expanded text from being re-scanned
--- by other hotstrings (e.g. "axa" inside an e-mail address).
-local _no_rescan_until = 0
-
--- Mark the buffer as off-limits for hotstring matching for `duration` seconds.
--- Also clears the buffer so that residual characters cannot participate in a
--- future match that spans the expansion boundary.
--- Exposed as M.suppress_rescan so external modules (e.g. personal_info) that
--- emit replacement text directly via eventtap can trigger the same protection.
-local function suppress_rescan(duration)
-    _no_rescan_until = hs.timer.secondsSinceEpoch() + (duration or 0.5)
-    buffer = ""
-    last_click_pos = nil -- Sécurité post-expansion
-end
-function M.suppress_rescan(duration) suppress_rescan(duration) end
-
--- Return true when re-scan suppression is currently active.
-local function rescan_suppressed()
-    return hs.timer.secondsSinceEpoch() < _no_rescan_until
-end
-
--- Return whether a case-sensitive TOML trigger is registered in the mappings.
--- Used by personal_info.lua to yield priority to explicit TOML shortcuts like
--- "@am★" so they are never swallowed by the @<letters>★ interceptor.
-function M.has_exact_trigger(trigger)
-    for _, m in ipairs(mappings) do
-        if m.trigger == trigger then return true end
-    end
-    return false
-end
-
--- Return whether any registered trigger starts with the given prefix.
--- Used by `personal_info` to avoid stealing input when a TOML trigger
--- contains an `@` that may be completed in subsequent keystrokes.
-function M.has_trigger_prefix(prefix)
-    for _, m in ipairs(mappings) do
-        if m.trigger:sub(1, #prefix) == prefix then return true end
-    end
-    return false
-end
-
--- Return whether any registered trigger matches the end (suffix) of `s`.
--- Used when the buffer may contain preceding characters (e.g. " <@").
-function M.has_trigger_suffix(s)
-    if not s then return false end
-    for _, m in ipairs(mappings) do
-        local t = m.trigger
-        if #s >= #t and s:sub(-#t) == t then return true end
-    end
-    return false
 end
 
 ---------------------------------------------------------------------------
 -- Replacement-emission helpers
 ---------------------------------------------------------------------------
-
--- UTF-8 aware length helper used both here and inside onKeyDown.
 local function utf8_len(s) return utf8.len(s) or #s end
-
--- Text tokens longer than this (in UTF-8 codepoints) are inserted via
--- clipboard paste (Cmd+V) instead of keyStrokes to avoid per-character
--- timing issues that corrupt long replacements.
 local PASTE_THRESHOLD = 30
 
--- Maps AHK-style {Key} token names to Hammerspoon key names.
--- Token matching is tried with the exact case first, then Title-case.
 local KEY_COMMANDS = {
-    Left      = "left",
-    Right     = "right",
-    Up        = "up",
-    Down      = "down",
-    Home      = "home",
-    End       = "end",
-    Delete    = "forwarddelete",
-    Del       = "forwarddelete",
-    Backspace = "delete",
-    BS        = "delete",
-    Tab       = "tab",
-    Enter     = "return",
-    Return    = "return",
-    Escape    = "escape",
-    Esc       = "escape",
+    Left = "left", Right = "right", Up = "up", Down = "down", Home = "home", End = "end",
+    Delete = "forwarddelete", Del = "forwarddelete", Backspace = "delete", BS = "delete",
+    Tab = "tab", Enter = "return", Return = "return", Escape = "escape", Esc = "escape",
 }
 
--- Split a replacement string into a flat list of tokens.
--- Each token: { kind = "text", value = "..." }
---          or { kind = "key",  value = "<hs-key-name>" }
--- Unrecognised {Foo} sequences are treated as literal text.
 local function tokens_from_repl(repl)
     local tokens = {}
     local i = 1
     while i <= #repl do
         local s, e, name = repl:find("{(%w+)}", i)
         if s then
-            if s > i then
-                table.insert(tokens, { kind = "text", value = repl:sub(i, s - 1) })
-            end
-            -- Try exact case, then Title-case (e.g. "left" → "Left").
+            if s > i then table.insert(tokens, { kind = "text", value = repl:sub(i, s - 1) }) end
             local title = name:sub(1, 1):upper() .. name:sub(2):lower()
             local hs_key = KEY_COMMANDS[name] or KEY_COMMANDS[title]
             if hs_key then
                 table.insert(tokens, { kind = "key", value = hs_key })
             else
-                -- Unknown token – preserve as literal text.
                 table.insert(tokens, { kind = "text", value = "{" .. name .. "}" })
             end
             i = e + 1
@@ -708,12 +536,6 @@ local function tokens_from_repl(repl)
     return tokens
 end
 
--- Emit all tokens as actual key events.
--- Text tokens longer than PASTE_THRESHOLD codepoints are sent via
--- clipboard paste (Cmd+V = 1 synthetic keyDown) instead of keyStrokes
--- (N synthetic keyDowns) to avoid per-character errors on long strings.
--- Returns the number of synthetic keyDown events generated so callers can
--- prime synthetic_remaining correctly.
 local function emit_tokens(tokens)
     local count = 0
     for _, tok in ipairs(tokens) do
@@ -721,14 +543,11 @@ local function emit_tokens(tokens)
             keyStroke({}, tok.value, 0)
             count = count + 1
         elseif utf8_len(tok.value) > PASTE_THRESHOLD then
-            -- Save and restore the clipboard so the user's content is preserved.
             local prev_clip = hs.pasteboard.getContents()
             hs.pasteboard.setContents(tok.value)
             keyStroke({"cmd"}, "v", 0)
-            count = count + 1  -- only the Cmd+V keyDown reaches our eventtap
-            hs.timer.doAfter(1, function()
-                hs.pasteboard.setContents(prev_clip or "")
-            end)
+            count = count + 1
+            hs.timer.doAfter(1, function() hs.pasteboard.setContents(prev_clip or "") end)
         else
             keyStrokes(tok.value)
             count = count + utf8_len(tok.value)
@@ -737,8 +556,6 @@ local function emit_tokens(tokens)
     return count
 end
 
--- Return only the plain-text portion of a replacement (key-command tokens
--- do not contribute printable characters to the tracked buffer).
 local function text_from_tokens(tokens)
     local parts = {}
     for _, tok in ipairs(tokens) do
@@ -747,16 +564,13 @@ local function text_from_tokens(tokens)
     return table.concat(parts)
 end
 
--- Count how many synthetic keyDown events a list of tokens will generate
--- without emitting anything.  Mirrors the logic in emit_tokens exactly:
--- long text tokens count as 1 (the Cmd+V), short ones count per codepoint.
 local function count_token_events(tokens)
     local count = 0
     for _, tok in ipairs(tokens) do
         if tok.kind == "key" then
             count = count + 1
         elseif utf8_len(tok.value) > PASTE_THRESHOLD then
-            count = count + 1  -- Cmd+V = 1 keyDown
+            count = count + 1
         else
             count = count + utf8_len(tok.value)
         end
@@ -766,7 +580,7 @@ end
 
 
 ---------------------------------------------------------------------------
--- UI: Boîte de prévisualisation (Preview Canvas)
+-- UI: Boîte de prévisualisation (Natif + Fallback Fixe)
 ---------------------------------------------------------------------------
 local function getCaretPosition()
     local success, pos = pcall(function()
@@ -779,32 +593,26 @@ local function getCaretPosition()
         
         local range = focused:attributeValue("AXSelectedTextRange")
         if range then
-            -- On essaie de récupérer la zone du caractère actuel
             local bounds = focused:parameterizedAttributeValue("AXBoundsForRange", { location = range.location, length = 1 })
             if not bounds or (bounds.h and bounds.h > 100) then
                 bounds = focused:parameterizedAttributeValue("AXBoundsForRange", { location = range.location, length = 0 })
             end
             
-            -- SANITY CHECK : Si la hauteur est absurde (ex: 800px), l'app nous ment et donne la fenêtre entière.
             if bounds and type(bounds) == "table" and bounds.x and bounds.y and bounds.h then
                 if bounds.h > 0 and bounds.h < 80 then
                     return {x = bounds.x, y = bounds.y, h = bounds.h, is_exact = true}
                 end
             end
         end
-        
-        -- On supprime volontairement la "Tentative 2" qui donnait le coin inférieur gauche
-        
         return nil
     end)
     return success and pos or nil
 end
 
 local preview_canvas = hs.canvas.new({x = 0, y = 0, w = 0, h = 0})
-preview_canvas:level(hs.canvas.windowLevels.cursor) -- Reste au-dessus
+preview_canvas:level(hs.canvas.windowLevels.cursor) 
 preview_canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
 
--- Design type macOS natif (sombre, arrondi)
 preview_canvas:appendElements({
     type = "rectangle",
     action = "fill",
@@ -825,7 +633,6 @@ local function update_preview(buf)
         return
     end
 
-    -- On extrait la fin du buffer depuis le dernier espace
     local last_word = buf:match("([^%s]+)$")
     if not last_word then 
         hide_preview()
@@ -834,7 +641,6 @@ local function update_preview(buf)
 
     local match_repl = nil
 
-    -- On cherche UNIQUEMENT si le mot tapé correspond à un trigger suivi de "★"
     for _, m in ipairs(mappings) do
         if m.trigger == last_word .. "★" then
             match_repl = m.repl
@@ -843,7 +649,6 @@ local function update_preview(buf)
     end
 
     if match_repl then
-        -- Nettoyer les tokens pour l'affichage visuel pur
         local clean_repl = text_from_tokens(tokens_from_repl(match_repl))
         
         local styledText = hs.styledtext.new(clean_repl, {
@@ -852,7 +657,6 @@ local function update_preview(buf)
         })
         
         local size = preview_canvas:minimumTextSize(2, styledText)
-        
         local padding_x = 12
         local padding_y = 6
         local w = size.w + (padding_x * 2)
@@ -861,46 +665,25 @@ local function update_preview(buf)
         local pos_x, pos_y
         local caret_pos = getCaretPosition()
         
+        -- On récupère l'écran actif (là où est la fenêtre) ou l'écran principal par défaut
+        local fw = hs.window.focusedWindow()
+        local screen = fw and fw:screen():frame() or hs.screen.mainScreen():frame()
+        
         if caret_pos and caret_pos.is_exact then
-            -- Position native parfaite
+            -- App native : Sous le curseur de texte
             pos_x = caret_pos.x + 4
             pos_y = caret_pos.y + caret_pos.h + 4
+            
+            -- Sécurité : on empêche la bulle de déborder de l'écran
+            if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 10 end
+            if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 10 end
         else
-            -- Si on a tapé plus de ~60 chars, on risque d'être passé à la ligne.
-            if chars_typed_since_click > 60 then
-                last_click_pos = nil
-            end
-
-            if last_click_pos then
-                local buffer_width = 0
-                if buf and #buf > 0 then
-                    local temp_styled = hs.styledtext.new(buf, {font = {name = ".AppleSystemUIFont", size = 14}})
-                    local temp_sz = preview_canvas:minimumTextSize(1, temp_styled)
-                    buffer_width = temp_sz.w
-                end
-                pos_x = last_click_pos.x + buffer_width + 4
-                pos_y = last_click_pos.y + 20 
-            else
-                -- Fallback propre : à côté de la souris (plus de bug en bas à gauche)
-                local mouse_pt = hs.mouse.absolutePosition()
-                pos_x = mouse_pt.x + 16
-                pos_y = mouse_pt.y + 16
-            end
+            -- METHODE C : App récalcitrante (Chrome, VS Code) -> Milieu / Bas de l'écran
+            pos_x = screen.x + (screen.w / 2) - (w / 2)
+            pos_y = screen.y + screen.h - h - 40 -- 40px de marge pour éviter le Dock
         end
 
-        -- CLAMP pour s'assurer que la boîte ne sorte pas de l'écran principal
-        local screen = hs.screen.mainScreen():frame()
-        if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 10 end
-        if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 10 end
-
-        preview_canvas:frame({
-            x = pos_x,
-            y = pos_y,
-            w = w,
-            h = h
-        })
-        
-        -- Contraint le texte à l'intérieur de la boîte avec les marges
+        preview_canvas:frame({ x = pos_x, y = pos_y, w = w, h = h })
         preview_canvas[2].frame = { x = padding_x, y = padding_y, w = size.w, h = size.h }
         preview_canvas[2].text = styledText
         
@@ -942,10 +725,8 @@ local function onKeyDown(e)
     end
     last_key_was_complex = is_complex
 
-    -- Annulation de l'ancre virtuelle sur combos clavier
     if flags.cmd or flags.ctrl then
         buffer = ""
-        last_click_pos = nil 
         hide_preview()
         return false
     end
@@ -957,11 +738,9 @@ local function onKeyDown(e)
         if result == "suppress" then _interceptor_suppress = true; break end
     end
 
-    -- Sécurités Backspace
-    if keyCode == 51 then -- Backspace
+    if keyCode == 51 then 
         if flags.cmd or flags.alt then
             buffer = ""
-            last_click_pos = nil
             hide_preview()
             return false
         end
@@ -969,17 +748,13 @@ local function onKeyDown(e)
         if #buffer > 0 then
             local offset = utf8.offset(buffer, -1)
             buffer = offset and string.sub(buffer, 1, offset - 1) or ""
-            chars_typed_since_click = math.max(0, chars_typed_since_click - 1)
             update_preview(buffer)
         end
         return false
     end
 
-    -- Invalidation de l'ancre sur les touches de mouvement ou de saut
     if keyCode == 53 or keyCode == 36 or keyCode == 48 or keyCode == 117 or (keyCode >= 123 and keyCode <= 126) then
         buffer = ""
-        last_click_pos = nil
-        chars_typed_since_click = 0
         hide_preview()
         return false
     end
@@ -988,7 +763,6 @@ local function onKeyDown(e)
     if not chars or chars == "" then return false end
 
     buffer = buffer .. chars
-    chars_typed_since_click = chars_typed_since_click + utf8_len(chars)
 
     if #buffer > 100 then
         buffer = string.sub(buffer, utf8.offset(buffer, -50) or 1)
@@ -1008,11 +782,6 @@ local function onKeyDown(e)
             local start = utf8.offset(s, -n)
             if not start then return false end
             return string.sub(s, start) == suffix
-        end
-        local function utf8_sub_from_end(s, n)
-            local start = utf8.offset(s, -n)
-            if not start then return s end
-            return string.sub(s, start)
         end
         local function is_letter_char(c)
             if not c or c == "" then return false end
@@ -1064,16 +833,13 @@ local function onKeyDown(e)
                                 hide_preview()
 
                                 if deletes > 0 then
-                                    for _ = 1, deletes do
-                                        keyStroke({}, 'delete', 0)
-                                    end
+                                    for _ = 1, deletes do keyStroke({}, 'delete', 0) end
                                 end
 
                                 emit_tokens(repl_tokens)
 
                                 local trig_start = utf8.offset(buffer, -trigger_len)
                                 buffer = (trig_start and string.sub(buffer, 1, trig_start - 1) or "") .. repl_text
-                                last_click_pos = nil 
 
                                 if m.final_result then suppress_rescan() end
 
@@ -1081,7 +847,6 @@ local function onKeyDown(e)
                                     if is_replacing then
                                         is_replacing = false
                                         synthetic_remaining = 0
-                                        if DEBUG_EXPANSION then print("[keymap] fallback reset after immediate expand, buffer=", buffer) end
                                     end
                                 end)
 
@@ -1112,7 +877,6 @@ local function onKeyDown(e)
                         end
                     end
                     if valid then
-                        if DEBUG_EXPANSION then print("[keymap] scheduling deferred expand trigger=", trigger, "repl=", m.repl, "chars=", chars) end
                         local trigger_len = utf8_len(trigger)
                         local start_trigger = utf8.offset(prefix_before, -utf8_len(trigger))
                         local before_trigger = (start_trigger and string.sub(prefix_before, 1, start_trigger - 1)) or ""
@@ -1127,7 +891,6 @@ local function onKeyDown(e)
                         end
 
                         hs.timer.doAfter(0, function()
-                            if DEBUG_EXPANSION then print("[keymap] performing deferred expand trigger=", trigger) end
                             local repl_tokens = tokens_from_repl(m.repl)
                             local repl_text   = text_from_tokens(repl_tokens)
                             
@@ -1143,7 +906,6 @@ local function onKeyDown(e)
                             if not consume_term then keyStrokes(chars) end
 
                             buffer = before_trigger .. repl_text .. (consume_term and "" or chars)
-                            last_click_pos = nil 
 
                             if is_final_mapping then suppress_rescan() end
 
@@ -1151,7 +913,6 @@ local function onKeyDown(e)
                                 if is_replacing then
                                     is_replacing = false
                                     synthetic_remaining = 0
-                                    if DEBUG_EXPANSION then print("[keymap] fallback reset after deferred expand, buffer=", buffer) end
                                 end
                             end)
                         end)
@@ -1168,13 +929,12 @@ end
 
 local tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
+-- On garde juste le tap souris pour vider le buffer proprement au clic
 local mouse_tap = eventtap.new(
     { eventtap.event.types.leftMouseDown,
       eventtap.event.types.rightMouseDown,
       eventtap.event.types.middleMouseDown },
     function()
-        last_click_pos = hs.mouse.absolutePosition()
-        chars_typed_since_click = 0
         buffer = ""
         hide_preview()
         return false
