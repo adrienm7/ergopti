@@ -580,9 +580,9 @@ end
 
 
 ---------------------------------------------------------------------------
--- UI: Boîte de prévisualisation (Natif + Fallback Fixe)
+-- UI: Boîte de prévisualisation (Natif + Fallback Cascade Centré)
 ---------------------------------------------------------------------------
-local function getCaretPosition()
+local function getBestUIAnchor()
     local success, pos = pcall(function()
         local ax = require("hs.axuielement")
         local sys = ax.systemWideElement()
@@ -591,6 +591,7 @@ local function getCaretPosition()
         local focused = sys:attributeValue("AXFocusedUIElement")
         if not focused then return nil end
         
+        -- 1. Tentative : Position exacte du curseur (Caret) -> Natif
         local range = focused:attributeValue("AXSelectedTextRange")
         if range then
             local bounds = focused:parameterizedAttributeValue("AXBoundsForRange", { location = range.location, length = 1 })
@@ -600,10 +601,29 @@ local function getCaretPosition()
             
             if bounds and type(bounds) == "table" and bounds.x and bounds.y and bounds.h then
                 if bounds.h > 0 and bounds.h < 80 then
-                    return {x = bounds.x, y = bounds.y, h = bounds.h, is_exact = true}
+                    return { x = bounds.x, y = bounds.y, h = bounds.h, type = "caret" }
                 end
             end
         end
+
+        -- 2. Tentative : Position de l'élément de saisie (Input Box) -> Centré en bas de la box
+        local frame = focused:attributeValue("AXFrame")
+        if frame and type(frame) == "table" and frame.x and frame.y and frame.w and frame.h then
+            return { 
+                x = frame.x + (frame.w / 2), -- Milieu horizontal de la box
+                y = frame.y + frame.h,       -- Bas de la box
+                h = 0, 
+                type = "input_box" 
+            }
+        end
+
+        -- 3. Tentative : Fenêtre active (en bas au centre de la fenêtre)
+        local win = hs.window.focusedWindow()
+        if win then
+            local wf = win:frame()
+            return { x = wf.x + (wf.w / 2), y = wf.y + wf.h - 40, h = 0, type = "window" }
+        end
+
         return nil
     end)
     return success and pos or nil
@@ -663,27 +683,36 @@ local function update_preview(buf)
         local h = size.h + (padding_y * 2)
 
         local pos_x, pos_y
-        local caret_pos = getCaretPosition()
+        local anchor = getBestUIAnchor()
         
-        -- hs.screen:frame() calcule la surface UTILE (il exclut automatiquement le Dock et la barre de menu)
         local fw = hs.window.focusedWindow()
         local screen = fw and fw:screen():frame() or hs.screen.mainScreen():frame()
         
-        if caret_pos and caret_pos.is_exact then
-            -- App native : Décalage accentué vers la droite et le bas pour ne rien masquer
-            pos_x = caret_pos.x + 15
-            pos_y = caret_pos.y + caret_pos.h + 18
-            
-            -- Sécurité : on empêche la bulle de déborder de l'écran utile
-            if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 5 end
-            if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 5 end
+        if anchor then
+            if anchor.type == "caret" then
+                -- App native : Décalage accentué vers la droite et le bas pour ne rien masquer
+                pos_x = anchor.x + 15
+                pos_y = anchor.y + anchor.h + 18
+            else
+                -- Input Box ou Window : Centré horizontalement sur l'ancre
+                pos_x = anchor.x - (w / 2)
+                pos_y = anchor.y + 5
+                
+                -- Si l'ancre est trop basse (sort de l'écran utile), on remonte la bulle au dessus
+                if pos_y + h > screen.y + screen.h then
+                    pos_y = anchor.y - h - 5
+                end
+            end
         else
-            -- METHODE C : App récalcitrante (Chrome, VS Code) -> Milieu / Bas de l'écran
+            -- Fallback Ultime : Centre / Bas de l'écran utile
             pos_x = screen.x + (screen.w / 2) - (w / 2)
-            -- screen.y + screen.h correspond à la ligne exacte juste au-dessus du Dock.
-            -- On soustrait la hauteur de la boîte (h) et on ajoute 5 pixels de marge.
             pos_y = screen.y + screen.h - h - 5 
         end
+
+        -- Sécurité Globale : on empêche la bulle de déborder de l'écran utile
+        if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 5 end
+        if pos_x < screen.x then pos_x = screen.x + 5 end
+        if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 5 end
 
         preview_canvas:frame({ x = pos_x, y = pos_y, w = w, h = h })
         preview_canvas[2].frame = { x = padding_x, y = padding_y, w = size.w, h = size.h }
