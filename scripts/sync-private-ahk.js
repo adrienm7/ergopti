@@ -27,5 +27,25 @@ if (!fs.existsSync(privatePath)) {
 
 const publicPath = path.join('static', 'drivers', 'autohotkey', 'ErgoptiPlus.ahk');
 
-fs.copyFileSync(privatePath, publicPath);
-console.log(`✅ Synced private AHK → ${publicPath}`);
+// Read private file content
+const privateContent = fs.readFileSync(privatePath, 'utf8');
+const lines = privateContent.split('\n');
+
+// Format date line
+const now = new Date();
+const pad = (n) => String(n).padStart(2, '0');
+const offsetMin = -now.getTimezoneOffset();
+const sign = offsetMin >= 0 ? '+' : '-';
+const offsetH = Math.floor(Math.abs(offsetMin) / 60);
+const datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+const timePart = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+const dateLine = `; Last modified on ${datePart} at ${timePart} (UTC${sign}${offsetH})`;
+
+// Replace or insert date line
+const firstLine = lines[0] ? lines[0].replace(/^\uFEFF/, '') : '';
+const hasDateLine = !!firstLine.match(/^; (Created|Last modified) on /);
+const rest = hasDateLine ? lines.slice(1).join('\n') : privateContent;
+const updated = dateLine + '\n' + rest;
+
+fs.writeFileSync(publicPath, updated, 'utf8');
+console.log(`✅ Synced private AHK → ${publicPath} (date line added)`);
