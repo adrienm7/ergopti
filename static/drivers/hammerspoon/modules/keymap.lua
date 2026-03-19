@@ -672,7 +672,7 @@ local function update_preview(buf)
         if caret_pos and caret_pos.is_exact then
             -- App native : Décalage accentué vers la droite et le bas pour ne rien masquer
             pos_x = caret_pos.x + 15
-            pos_y = caret_pos.y + caret_pos.h + 12
+            pos_y = caret_pos.y + caret_pos.h + 18
             
             -- Sécurité : on empêche la bulle de déborder de l'écran utile
             if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 5 end
