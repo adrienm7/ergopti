@@ -379,6 +379,10 @@ local last_key_was_complex = false
 local seq_counter = 0 
 local DEBUG_EXPANSION = false
 
+-- NOUVEAU: Variables pour traquer l'avancée du curseur de façon sécurisée
+local last_click_pos = nil 
+local chars_typed_since_click = 0
+
 ---------------------------------------------------------------------------
 ---------------------------------------------------------------------------
 ---------------------------------------------------------------------------
@@ -601,6 +605,7 @@ local _no_rescan_until = 0
 local function suppress_rescan(duration)
     _no_rescan_until = hs.timer.secondsSinceEpoch() + (duration or 0.5)
     buffer = ""
+    last_click_pos = nil -- MODIFIÉ : Sécurité post-expansion
 end
 function M.suppress_rescan(duration) suppress_rescan(duration) end
 
@@ -779,7 +784,8 @@ local function getCaretPosition()
         if range then
             local bounds = focused:parameterizedAttributeValue("AXBoundsForRange", range)
             if bounds and type(bounds) == "table" and bounds.x and bounds.y then
-                return {x = bounds.x, y = bounds.y, h = bounds.h or 20}
+                -- MODIFIÉ : Ajout de is_exact = true pour signaler une bonne lecture
+                return {x = bounds.x, y = bounds.y, h = bounds.h or 20, is_exact = true}
             end
         end
         
@@ -789,8 +795,8 @@ local function getCaretPosition()
             local elem_pos = focused:attributeValue("AXPosition")
             local elem_size = focused:attributeValue("AXSize")
             if elem_pos and elem_size then
-                -- On retourne le coin bas-gauche du champ comme approximation
-                return {x = elem_pos.x, y = elem_pos.y + elem_size.h, h = 0}
+                -- MODIFIÉ : Ajout de is_exact = false
+                return {x = elem_pos.x, y = elem_pos.y + elem_size.h, h = 0, is_exact = false}
             end
         end
         
@@ -863,16 +869,39 @@ local function update_preview(buf)
         local pos_x, pos_y
         local caret_pos = getCaretPosition()
         
-        if caret_pos then
+        -- MODIFIÉ : Section hybride pour tracking avancé vs natif
+        if caret_pos and caret_pos.is_exact then
             -- Position native : pile en dessous du curseur de frappe textuelle
             pos_x = caret_pos.x + 4
             pos_y = caret_pos.y + caret_pos.h + 4
         else
-            -- Fallback si l'app (Chrome, Electron...) ne donne pas l'info : à côté de la souris
-            local mouse_pt = hs.mouse.absolutePosition()
-            pos_x = mouse_pt.x + 16
-            pos_y = mouse_pt.y + 16
+            -- Si on a tapé plus de ~60 chars, on risque d'être passé à la ligne dans VS Code.
+            -- On invalide l'ancre virtuelle pour éviter que ça sorte de l'écran.
+            if chars_typed_since_click > 60 then
+                last_click_pos = nil
+            end
+
+            if last_click_pos then
+                local buffer_width = 0
+                if buf and #buf > 0 then
+                    local temp_styled = hs.styledtext.new(buf, {font = {name = ".AppleSystemUIFont", size = 14}})
+                    local temp_sz = preview_canvas:minimumTextSize(1, temp_styled)
+                    buffer_width = temp_sz.w
+                end
+                pos_x = last_click_pos.x + buffer_width + 4
+                pos_y = last_click_pos.y + 20 
+            else
+                -- Fallback si l'app (Chrome, Electron...) ne donne pas l'info : à côté de la souris
+                local mouse_pt = hs.mouse.absolutePosition()
+                pos_x = mouse_pt.x + 16
+                pos_y = mouse_pt.y + 16
+            end
         end
+
+        -- MODIFIÉ : CLAMP pour s'assurer que la boîte ne sorte pas de l'écran principal
+        local screen = hs.screen.mainScreen():frame()
+        if pos_x + w > screen.x + screen.w then pos_x = screen.x + screen.w - w - 10 end
+        if pos_y + h > screen.y + screen.h then pos_y = screen.y + screen.h - h - 10 end
 
         preview_canvas:frame({
             x = pos_x,
@@ -924,8 +953,10 @@ local function onKeyDown(e)
     end
     last_key_was_complex = is_complex
 
+    -- MODIFIÉ : Annulation de l'ancre virtuelle sur combos clavier
     if flags.cmd or flags.ctrl then
         buffer = ""
+        last_click_pos = nil 
         hide_preview()
         return false
     end
@@ -942,17 +973,31 @@ local function onKeyDown(e)
         if result == "suppress" then _interceptor_suppress = true; break end
     end
 
+    -- MODIFIÉ : Sécurités Backspace
     if keyCode == 51 then -- Backspace
+        if flags.cmd or flags.alt then
+            -- Cmd+Backspace (suppr ligne) ou Alt+Backspace (suppr mot)
+            buffer = ""
+            last_click_pos = nil
+            hide_preview()
+            return false
+        end
+
         if #buffer > 0 then
             local offset = utf8.offset(buffer, -1)
             buffer = offset and string.sub(buffer, 1, offset - 1) or ""
+            chars_typed_since_click = math.max(0, chars_typed_since_click - 1)
             update_preview(buffer)
         end
         return false
     end
 
-    if keyCode == 53 or (keyCode >= 123 and keyCode <= 126) then -- Escape or Arrow keys
+    -- MODIFIÉ : Invalidation de l'ancre sur les touches de mouvement ou de saut
+    -- 53: Echap, 36: Entrée, 48: Tab, 117: Suppr, 123-126: Flèches
+    if keyCode == 53 or keyCode == 36 or keyCode == 48 or keyCode == 117 or (keyCode >= 123 and keyCode <= 126) then
         buffer = ""
+        last_click_pos = nil
+        chars_typed_since_click = 0
         hide_preview()
         return false
     end
@@ -961,6 +1006,8 @@ local function onKeyDown(e)
     if not chars or chars == "" then return false end
 
     buffer = buffer .. chars
+    chars_typed_since_click = chars_typed_since_click + utf8_len(chars) -- MODIFIÉ : maj compteur
+
     if #buffer > 100 then
         buffer = string.sub(buffer, utf8.offset(buffer, -50) or 1)
     end
@@ -1074,6 +1121,7 @@ local function onKeyDown(e)
                                 -- is exactly the prefix that precedes it.
                                 local trig_start = utf8.offset(buffer, -trigger_len)
                                 buffer = (trig_start and string.sub(buffer, 1, trig_start - 1) or "") .. repl_text
+                                last_click_pos = nil -- MODIFIÉ : On a injecté du texte, l'ancre n'est plus valide
 
                                 -- When final_result is set, prevent any further hotstring from
                                 -- re-scanning the expanded text (e.g. "axa" inside an e-mail).
@@ -1161,6 +1209,7 @@ local function onKeyDown(e)
 
                             -- update buffer: remove trigger, append repl text (and boundary if kept)
                             buffer = before_trigger .. repl_text .. (consume_term and "" or chars)
+                            last_click_pos = nil -- MODIFIÉ : L'expansion rend l'ancre invalide
 
                             -- When final_result is set, prevent any further hotstring from
                             -- re-scanning the expanded text (e.g. "axa" inside an e-mail).
@@ -1189,13 +1238,14 @@ end
 
 local tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
--- Clear the buffer whenever the user repositions the cursor with the mouse,
--- otherwise stale typed characters cause false "inside a word" rejections.
+-- MODIFIÉ : Enregistre le clic pour l'astuce visuelle
 local mouse_tap = eventtap.new(
     { eventtap.event.types.leftMouseDown,
       eventtap.event.types.rightMouseDown,
       eventtap.event.types.middleMouseDown },
     function()
+        last_click_pos = hs.mouse.absolutePosition()
+        chars_typed_since_click = 0
         buffer = ""
         hide_preview()
         return false
