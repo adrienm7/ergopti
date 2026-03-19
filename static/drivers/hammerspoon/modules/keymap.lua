@@ -776,10 +776,7 @@ preview_canvas:appendElements({
 }, {
     type = "text",
     text = "",
-    textColor = {white = 1.0, alpha = 1.0},
-    textSize = 14,
-    textAlignment = "center",
-    textFont = ".AppleSystemUIFont" -- Police système macOS
+    -- Plus besoin de textAlignment, on va forcer la position exacte
 })
 
 local function hide_preview()
@@ -792,8 +789,9 @@ local function update_preview(buf)
         return
     end
 
-    -- On extrait le dernier mot tapé (sans les espaces)
-    local last_word = buf:match("([^%s%p]+)$") or buf:match("(%S+)$")
+    -- On extrait la fin du buffer depuis le dernier espace
+    -- ([^%s]+ permet de garder la ponctuation si elle fait partie du trigger)
+    local last_word = buf:match("([^%s]+)$")
     if not last_word then 
         hide_preview()
         return 
@@ -801,21 +799,11 @@ local function update_preview(buf)
 
     local match_repl = nil
 
-    -- 1. Cherche d'abord une correspondance exacte (pour les triggers "deferred" en attente d'espace)
+    -- On cherche UNIQUEMENT si le mot tapé correspond à un trigger suivi de "★"
     for _, m in ipairs(mappings) do
-        if m.trigger == last_word then
+        if m.trigger == last_word .. "★" then
             match_repl = m.repl
             break
-        end
-    end
-
-    -- 2. Sinon, cherche une correspondance partielle (seulement si au moins 2 lettres tapées pour éviter de flasher)
-    if not match_repl and #last_word >= 2 then
-        for _, m in ipairs(mappings) do
-            if m.trigger:sub(1, #last_word) == last_word then
-                match_repl = m.repl
-                break
-            end
         end
     end
 
@@ -829,10 +817,14 @@ local function update_preview(buf)
         })
         
         local size = preview_canvas:minimumTextSize(2, styledText)
-        local w = math.max(40, size.w + 16)
-        local h = size.h + 8
+        
+        -- Définition des marges (padding) pour un centrage parfait
+        local padding_x = 12
+        local padding_y = 6
+        local w = size.w + (padding_x * 2)
+        local h = size.h + (padding_y * 2)
 
-        -- Positionnement : décalé légèrement en bas à droite de la souris
+        -- Position globale de la fenêtre par rapport à la souris
         local mouse_pt = hs.mouse.absolutePosition()
         preview_canvas:frame({
             x = mouse_pt.x + 16,
@@ -841,7 +833,10 @@ local function update_preview(buf)
             h = h
         })
         
+        -- Contraint le texte à l'intérieur de la boîte avec les marges
+        preview_canvas[2].frame = { x = padding_x, y = padding_y, w = size.w, h = size.h }
         preview_canvas[2].text = styledText
+        
         preview_canvas:show()
     else
         hide_preview()
