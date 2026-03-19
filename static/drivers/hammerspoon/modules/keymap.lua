@@ -763,6 +763,42 @@ end
 ---------------------------------------------------------------------------
 -- UI: Boîte de prévisualisation (Preview Canvas)
 ---------------------------------------------------------------------------
+-- Fonction robuste pour tenter d'obtenir la position du curseur de texte via l'API d'accessibilité.
+-- Utilisée dans un pcall pour éviter de crasher si l'application ciblée réagit mal.
+local function getCaretPosition()
+    local success, pos = pcall(function()
+        local ax = require("hs.axuielement")
+        local sys = ax.systemWideElement()
+        if not sys then return nil end
+        
+        local focused = sys:attributeValue("AXFocusedUIElement")
+        if not focused then return nil end
+        
+        -- Tentative 1 : L'approche standard (récupérer la zone de sélection du texte)
+        local range = focused:attributeValue("AXSelectedTextRange")
+        if range then
+            local bounds = focused:parameterizedAttributeValue("AXBoundsForRange", range)
+            if bounds and type(bounds) == "table" and bounds.x and bounds.y then
+                return {x = bounds.x, y = bounds.y, h = bounds.h or 20}
+            end
+        end
+        
+        -- Tentative 2 : Fallback pour des champs de texte simples
+        local role = focused:attributeValue("AXRole")
+        if role == "AXTextField" or role == "AXTextArea" then
+            local elem_pos = focused:attributeValue("AXPosition")
+            local elem_size = focused:attributeValue("AXSize")
+            if elem_pos and elem_size then
+                -- On retourne le coin bas-gauche du champ comme approximation
+                return {x = elem_pos.x, y = elem_pos.y + elem_size.h, h = 0}
+            end
+        end
+        
+        return nil
+    end)
+    return success and pos or nil
+end
+
 local preview_canvas = hs.canvas.new({x = 0, y = 0, w = 0, h = 0})
 preview_canvas:level(hs.canvas.windowLevels.cursor) -- Reste au-dessus
 preview_canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
@@ -824,11 +860,23 @@ local function update_preview(buf)
         local w = size.w + (padding_x * 2)
         local h = size.h + (padding_y * 2)
 
-        -- Position globale de la fenêtre par rapport à la souris
-        local mouse_pt = hs.mouse.absolutePosition()
+        local pos_x, pos_y
+        local caret_pos = getCaretPosition()
+        
+        if caret_pos then
+            -- Position native : pile en dessous du curseur de frappe textuelle
+            pos_x = caret_pos.x + 4
+            pos_y = caret_pos.y + caret_pos.h + 4
+        else
+            -- Fallback si l'app (Chrome, Electron...) ne donne pas l'info : à côté de la souris
+            local mouse_pt = hs.mouse.absolutePosition()
+            pos_x = mouse_pt.x + 16
+            pos_y = mouse_pt.y + 16
+        end
+
         preview_canvas:frame({
-            x = mouse_pt.x + 16,
-            y = mouse_pt.y + 16,
+            x = pos_x,
+            y = pos_y,
             w = w,
             h = h
         })
