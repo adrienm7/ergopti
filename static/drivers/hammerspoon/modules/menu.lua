@@ -11,7 +11,7 @@ local llm_mod = require("modules.llm")
 local gestures_mod = require("modules.gestures")
 local keymap_mod_ref = require("modules.keymap")
 
--- Table globale pour sécuriser les tâches en arrière-plan (empêche le Garbage Collector de les tuer)
+-- Global table to secure background tasks (prevents Garbage Collector from killing them)
 M._active_tasks = {}
 
 -- User-facing labels for gesture slots
@@ -176,17 +176,17 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         return required_disk, required_ram
     end
 
-    -- Fonction de création d'une barre de progression texte
+    -- Function to create a text-based progress bar
     local function create_progress_bar(percent_str)
         local p = tonumber(percent_str) or 0
         local length = 10
         local filled = math.floor((p / 100) * length)
         local empty = length - filled
-        -- Caractères : ■ (rempli), □ (vide)
+        -- Characters: ■ (filled), □ (empty)
         return string.rep("■", filled) .. string.rep("□", empty)
     end
 
-    local function install_ollama_auto()
+    local function install_ollama_auto(target_model)
         local function pull_model()
             local ollama_bin = get_ollama_path()
             if not ollama_bin then
@@ -194,46 +194,63 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 return
             end
 
-            -- Feedback visuel immédiat
-            hs.notify.new({title="Ergopti+ AI", informativeText="🚀 Lancement du téléchargement de " .. state.llm_model .. "..."}):send()
+            -- Immediate visual feedback
+            hs.notify.new({title="Ergopti+ AI", informativeText="🚀 Lancement du téléchargement de " .. target_model .. "..."}):send()
             update_icon("📥 Démarrage...")
             
-            local task_id = "pull_" .. os.time()
+            local task_id = "download"
             M._active_tasks[task_id] = hs.task.new(ollama_bin, function(exitCode, stdOut, stdErr)
-                -- Nettoyage de la tâche une fois finie
+                -- Clean up task when finished
                 M._active_tasks[task_id] = nil
                 update_icon() 
                 
+                -- Rebuild menu to remove the "Cancel" button
+                updateMenu()
+                
+                -- Check if task was manually terminated (SIGTERM = 15)
+                if exitCode == 15 then
+                    hs.notify.new({title="Ergopti+ AI", informativeText="🛑 Téléchargement annulé par l'utilisateur."}):send()
+                    return
+                end
+
                 local output = (stdOut or "") .. (stdErr or "")
                 local is_not_found = output:lower():find("not found") or output:lower():find("error")
                 
                 if exitCode == 0 and not is_not_found then
-                    hs.notify.new({title="Ergopti+ AI", informativeText="✅ Modèle " .. state.llm_model .. " téléchargé avec succès !"}):send()
+                    -- ONLY save preferences and switch model if download is 100% successful
+                    state.llm_model = target_model
+                    if keymap and keymap.set_llm_model then keymap.set_llm_model(target_model) end
+                    save_prefs()
+                    
+                    hs.notify.new({title="Ergopti+ AI", informativeText="✅ Modèle " .. target_model .. " téléchargé avec succès !"}):send()
                     hs.timer.doAfter(1, hs.reload)
                 else
-                    hs.notify.new({title="Ergopti+ AI", informativeText="❌ Échec du téléchargement du modèle " .. state.llm_model}):send()
+                    hs.notify.new({title="Ergopti+ AI", informativeText="❌ Échec du téléchargement du modèle " .. target_model}):send()
                     hs.dialog.blockAlert("Erreur de modèle", 
-                        "Le modèle [" .. state.llm_model .. "] n'a pas pu être téléchargé.\n\nDétails : " .. output:sub(1, 150) .. "...", 
+                        "Le modèle [" .. target_model .. "] n'a pas pu être téléchargé.\n\nDétails : " .. output:sub(1, 150) .. "...", 
                         "OK", nil, "critical")
                 end
             end, function(task, stdOut, stdErr)
                 local out = (stdOut or "") .. (stdErr or "")
-                -- Recherche d'un pourcentage dans le flux (ex: 42%)
+                -- Search for a percentage in the stream (e.g., 42%)
                 local percent = out:match("(%d+)%%")
                 
                 if percent then
                     local bar = create_progress_bar(percent)
                     update_icon("📥 " .. bar .. " " .. percent .. "%")
                 elseif out:lower():find("pulling") or out:lower():find("downloading") then
-                    -- Si on voit l'action mais pas encore de %, on rassure l'utilisateur
+                    -- If we see the action but no % yet, reassure the user
                     update_icon("📥 Récupération...")
                 end
                 
-                return true -- IMPORTANT: Indique à Hammerspoon de continuer à lire le flux
-            end, {"pull", state.llm_model})
+                return true -- IMPORTANT: Tells Hammerspoon to keep reading the stream
+            end, {"pull", target_model})
             
-            -- Lancement effectif
+            -- Actual launch
             M._active_tasks[task_id]:start()
+            
+            -- Rebuild menu immediately to show the "Cancel" button
+            updateMenu()
         end
 
         if get_ollama_path() then
@@ -246,7 +263,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 cp -R /tmp/ollama_app/Ollama.app /Applications/
             ]]
             
-            local task_id = "install_" .. os.time()
+            local task_id = "install"
             M._active_tasks[task_id] = hs.task.new("/bin/bash", function(code)
                 M._active_tasks[task_id] = nil
                 if code == 0 then 
@@ -261,8 +278,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         end
     end
 
-    local function check_ram_and_install(model_name, on_cancel)
-        local required_disk, required_ram = get_model_requirements(model_name)
+    local function check_ram_and_install(target_model, on_cancel)
+        local required_disk, required_ram = get_model_requirements(target_model)
         
         local sys_ram_gb = math.ceil((tonumber(hs.execute("sysctl -n hw.memsize")) or 0) / (1024^3))
         local free_disk_gb = tonumber(hs.execute("df -g / | awk 'NR==2 {print $4}'")) or 0
@@ -287,7 +304,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         end
 
         if #warnings > 0 then
-            local msg = "Analyse du modèle '" .. model_name .. "' :\n\n" .. table.concat(warnings, "\n\n")
+            local msg = "Analyse du modèle '" .. target_model .. "' :\n\n" .. table.concat(warnings, "\n\n")
             
             if is_critical then
                 hs.dialog.blockAlert("Téléchargement bloqué", msg, "Annuler", nil, "critical")
@@ -304,10 +321,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             end
         end
         
-        state.llm_model = model_name
-        if keymap and keymap.set_llm_model then keymap.set_llm_model(model_name) end
-        save_prefs()
-        install_ollama_auto()
+        -- Start installation (saving is deferred until success)
+        install_ollama_auto(target_model)
     end
 
     -- Initial setup logic
@@ -762,9 +777,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
         local function trigger_model_change(new_model)
             llm_mod.check_availability(new_model, function()
+                -- Direct switch if model is already downloaded
                 state.llm_model = new_model
                 if keymap and keymap.set_llm_model then keymap.set_llm_model(new_model) end
-                save_prefs(); updateMenu()
+                save_prefs()
+                updateMenu()
                 hs.notify.new({title="Ergopti+ AI", informativeText="✅ Modèle bien changé pour : " .. new_model}):send()
             end, function(needs_ollama)
                 if needs_ollama then
@@ -789,6 +806,20 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         }
         
         local models_menu = {}
+        
+        -- Insert Cancel button at the very top if a download is running
+        if M._active_tasks["download"] then
+            table.insert(models_menu, {
+                title = "🛑 Annuler le téléchargement en cours",
+                fn = function()
+                    if M._active_tasks["download"] then
+                        M._active_tasks["download"]:terminate()
+                    end
+                end
+            })
+            table.insert(models_menu, {title = "-"})
+        end
+
         for i, group in ipairs(preset_groups) do
             for _, m in ipairs(group) do
                 local _, ram = get_model_requirements(m)
