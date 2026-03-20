@@ -133,15 +133,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     -- ==========================================
-    -- 3. Ollama Installer Logic
+    -- 3. Ollama Installer & RAM Check Logic
     -- ==========================================
     local function install_ollama_auto()
         local function pull_model()
             hs.notify.new({title="Ergopti+ AI", informativeText="Étape 2/2 : Téléchargement du modèle " .. state.llm_model}):send()
             
-            -- Utilisation de /usr/bin/env pour localiser ollama dynamiquement si possible
             local task = hs.task.new("/bin/sh", function(pull_code, stdOut, stdErr)
-                -- Récupération propre de la sortie standard et des erreurs
                 local output = (stdOut or "") .. (stdErr or "")
                 local is_not_found = output:lower():find("not found") or output:lower():find("error")
                 
@@ -156,7 +154,6 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 end
             end, {"-c", "/usr/local/bin/ollama pull " .. state.llm_model .. " 2>&1"})
             
-            -- Lancement de la tâche
             task:start()
         end
 
@@ -179,6 +176,56 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 end
             end, {"-c", install_script}):start()
         end
+    end
+
+    -- Nouvelle fonction : Vérification RAM et Installation
+    local function check_ram_and_install(model_name, on_cancel)
+        local name = model_name:lower()
+        local total_b = 0
+        
+        -- Extraction des paramètres (ex: 8x7b, 14b, 1.5b)
+        local experts, size = name:match("(%d+)x([%d%.]+)b")
+        if experts and size then
+            total_b = tonumber(experts) * tonumber(size)
+        else
+            local b = name:match("([%d%.]+)b")
+            if b then total_b = tonumber(b) end
+        end
+        
+        -- Cas de fallback si aucun paramètre n'est trouvé dans le nom
+        if total_b == 0 then
+            if name:find("llama3") then total_b = 8
+            elseif name:find("mistral") or name:find("qwen") then total_b = 7
+            elseif name:find("gemma") then total_b = 9
+            elseif name:find("phi") then total_b = 4
+            elseif name:find("mixtral") then total_b = 47
+            else total_b = 8 end -- Modèle standard 8B par défaut
+        end
+        
+        -- Calcul estimatif : ~0.7 Go par milliard de paramètres + 2 Go marge (contexte/overhead)
+        local required_ram = math.ceil((total_b * 0.7) + 2.0)
+        
+        -- Récupération de la RAM système du Mac (en octets -> Go)
+        local sys_ram_bytes = tonumber(hs.execute("sysctl -n hw.memsize")) or 0
+        local sys_ram_gb = math.ceil(sys_ram_bytes / (1024^3))
+        
+        if sys_ram_gb > 0 and sys_ram_gb < required_ram then
+            local msg = string.format(
+                "Votre Mac dispose de %d Go de RAM.\nLe modèle '%s' nécessite environ %d Go de RAM pour fonctionner de manière fluide.\n\nLe télécharger risque de saturer votre mémoire et de ralentir fortement votre système.\n\nVoulez-vous vraiment continuer ?",
+                sys_ram_gb, model_name, required_ram
+            )
+            local choice = hs.dialog.blockAlert("⚠️ Avertissement : RAM insuffisante ?", msg, "Continuer quand même", "Annuler", "warning")
+            if choice == "Annuler" then
+                if on_cancel then on_cancel() end
+                return
+            end
+        end
+        
+        -- Si OK ou si l'utilisateur force, on applique le modèle et on lance le DL
+        state.llm_model = model_name
+        if keymap and keymap.set_llm_model then keymap.set_llm_model(model_name) end
+        save_prefs()
+        install_ollama_auto()
     end
 
     -- Initial setup logic
@@ -265,7 +312,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             end
         end
 
-        -- Startup Check (Installer automatiquement l'IA à GAUCHE pour être BLEU)
+        -- Startup Check
         if state.llm_enabled then
             llm_mod.check_availability(state.llm_model, nil, function(needs_ollama)
                 local msg = needs_ollama and "Ollama n'est pas lancé ou installé." 
@@ -277,7 +324,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         "Installer automatiquement l'IA", "Plus tard", "informational")
                     
                     if choice == "Installer automatiquement l'IA" then
-                        install_ollama_auto()
+                        check_ram_and_install(state.llm_model, function()
+                            state.llm_enabled = false
+                            if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
+                            save_prefs(); updateMenu()
+                        end)
                     else
                         state.llm_enabled = false
                         if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
@@ -488,7 +539,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         if conflict then
                             hs.timer.doAfter(0.3, function()
                                 hs.focus()
-                                local clicked = hs.dialog.blockAlert("⚠️  Conflit potentiel", conflict.msg, "Installer automatiquement l'IA", "Plus tard", "warning")
+                                local clicked = hs.dialog.blockAlert("⚠️  Conflit potentiel", conflict.msg, "Ouvrir Réglages", "Plus tard", "warning")
                                 if clicked == "Ouvrir Réglages" then hs.execute(string.format("open '%s'", conflict.url)) end
                             end)
                         end
@@ -624,13 +675,16 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                             local msg = needs_ollama and "Pour utiliser l'IA, il faut installer Ollama."
                                         or ("Le modèle [" .. state.llm_model .. "] est manquant.")
                             
-                            -- ACTION À GAUCHE POUR ÊTRE BLEUE SUR MACOS
                             local choice = hs.dialog.blockAlert("Installation requise", 
                                 msg .. " Souhaitez-vous procéder au téléchargement automatique ?", 
                                 "Installer automatiquement l'IA", "Plus tard", "informational")
                             
                             if choice == "Installer automatiquement l'IA" then
-                                install_ollama_auto()
+                                check_ram_and_install(state.llm_model, function()
+                                    state.llm_enabled = false
+                                    if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
+                                    save_prefs(); updateMenu()
+                                end)
                             else
                                 state.llm_enabled = false
                                 if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
@@ -664,10 +718,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                                         "Télécharger maintenant", "Plus tard", "informational")
                                     
                                     if choice == "Télécharger maintenant" then
-                                        state.llm_model = new_model
-                                        if keymap and keymap.set_llm_model then keymap.set_llm_model(new_model) end
-                                        save_prefs()
-                                        install_ollama_auto() 
+                                        check_ram_and_install(new_model)
                                     end
                                 end
                             end)
@@ -805,7 +856,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             local secs = keymap and keymap.get_sections and keymap.get_sections(name) or nil
             if secs then
                 section_states[name] = {}
-                for _, sec in ipairs(sections) do
+                for _, sec in ipairs(secs) do
                     if sec.name ~= '-' and not sec.is_module_placeholder then section_states[name][sec.name] = enabled end
                 end
             end
