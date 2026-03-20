@@ -1,4 +1,4 @@
--- gestures.lua
+-- modules/gestures.lua
 -- Each gesture slot is independently assignable to an action.
 -- "Axis" slots (←/→ or /\) → actions with prev/next direction.
 -- "Single" slots (tap, ↑↓)  → actions without direction.
@@ -6,6 +6,28 @@
 local utils = require("lib.utils")
 local touchdevice = require("hs._asm.undocumented.touchdevice")
 local M = {}
+
+-- ==========================================
+-- Default Configuration
+-- ==========================================
+M.DEFAULT_GESTURES = {
+    tap_3         = "none",
+    tap_4         = "none",
+    tap_5         = "none",
+    swipe_2_diag  = "none",
+    swipe_3_horiz = "none",
+    swipe_3_diag  = "none",
+    swipe_3_up    = "none",
+    swipe_3_down  = "none",
+    swipe_4_horiz = "none",
+    swipe_4_diag  = "none",
+    swipe_4_up    = "none",
+    swipe_4_down  = "none",
+    swipe_5_horiz = "none",
+    swipe_5_diag  = "none",
+    swipe_5_up    = "none",
+    swipe_5_down  = "none",
+}
 
 -- ── macOS system gesture conflicts ─────────────────────────────────────────────
 -- On macOS Sequoia+, `defaults write` + `killall Dock` does NOT reliably disable
@@ -20,57 +42,57 @@ local M = {}
 -- Each group maps a human-readable description to the slots that conflict with
 -- a built-in macOS gesture, plus the exact path to toggle it in System Settings.
 local MACOS_GESTURE_GROUPS = {
-	{
-		key         = "tap_3_conflict",
-		slots       = { "tap_3" },
-		description = "Tap 3 doigts — Recherche & détection de données",
-		hint        = "Réglages Système › Trackpad › Pointer & cliquer\n→ Décocher « Recherche et détection de données »",
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
-	},
-	{
-		key         = "swipe_3_horiz_conflict",
-		slots       = { "swipe_3_horiz" },
-		description = "Glisser 3 doigts gauche/droite — Pages / Passer d'un espace",
-		hint        = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Faire défiler entre les pages » et « Passer d'un espace à l'autre »",
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
-	},
-	{
-		key         = "swipe_3_vert_conflict",
-		slots       = { "swipe_3_up", "swipe_3_down" },
-		description = "Glisser 3 doigts haut/bas — Mission Control & App Exposé",
-		hint        = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Mission Control » et « Exposé de l'app »",
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
-	},
-	{
-		key         = "swipe_4_horiz_conflict",
-		slots       = { "swipe_4_horiz", "swipe_5_horiz" },
-		description = "Glisser 4/5 doigts gauche/droite — Passer d'un espace à l'autre",
-		hint        = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Passer d'un espace à l'autre »",
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
-	},
-	{
-		key         = "swipe_4_vert_conflict",
-		slots       = { "swipe_4_up", "swipe_4_down", "swipe_5_up", "swipe_5_down" },
-		description = "Glisser 4/5 doigts haut/bas — Mission Control & App Exposé",
-		hint        = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Mission Control » et « Exposé de l'app »",
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
-	},
+    {
+        key          = "tap_3_conflict",
+        slots        = { "tap_3" },
+        description  = "Tap 3 doigts — Recherche & détection de données",
+        hint         = "Réglages Système › Trackpad › Pointer & cliquer\n→ Décocher « Recherche et détection de données »",
+        settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+    },
+    {
+        key          = "swipe_3_horiz_conflict",
+        slots        = { "swipe_3_horiz" },
+        description  = "Glisser 3 doigts gauche/droite — Pages / Passer d'un espace",
+        hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Faire défiler entre les pages » et « Passer d'un espace à l'autre »",
+        settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+    },
+    {
+        key          = "swipe_3_vert_conflict",
+        slots        = { "swipe_3_up", "swipe_3_down" },
+        description  = "Glisser 3 doigts haut/bas — Mission Control & App Exposé",
+        hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Mission Control » et « Exposé de l'app »",
+        settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+    },
+    {
+        key          = "swipe_4_horiz_conflict",
+        slots        = { "swipe_4_horiz", "swipe_5_horiz" },
+        description  = "Glisser 4/5 doigts gauche/droite — Passer d'un espace à l'autre",
+        hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Passer d'un espace à l'autre »",
+        settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+    },
+    {
+        key          = "swipe_4_vert_conflict",
+        slots        = { "swipe_4_up", "swipe_4_down", "swipe_5_up", "swipe_5_down" },
+        description  = "Glisser 4/5 doigts haut/bas — Mission Control & App Exposé",
+        hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Mission Control » et « Exposé de l'app »",
+        settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+    },
 }
 
 -- Reverse lookup: slot name → group
 local SLOT_TO_GROUP = {}
 for _, grp in ipairs(MACOS_GESTURE_GROUPS) do
-	for _, slot in ipairs(grp.slots) do
-		SLOT_TO_GROUP[slot] = grp
-	end
+    for _, slot in ipairs(grp.slots) do
+        SLOT_TO_GROUP[slot] = grp
+    end
 end
 
 -- Returns true when at least one slot in the group has a non-none action.
 local function group_has_active_slot(grp, ga_table)
-	for _, slot in ipairs(grp.slots) do
-		if (ga_table[slot] or "none") ~= "none" then return true end
-	end
-	return false
+    for _, slot in ipairs(grp.slots) do
+        if (ga_table[slot] or "none") ~= "none" then return true end
+    end
+    return false
 end
 
 -- Public: called when a slot's action changes.
@@ -78,35 +100,34 @@ end
 -- system gesture (i.e. the slot belongs to a conflict group and the action
 -- is not "none"), so that menu.lua can show a warning every time.
 function M.on_action_changed(slot, new_action)
-	if new_action == "none" then return nil end
-	local grp = SLOT_TO_GROUP[slot]
-	if not grp then return nil end
-	-- A line of dashes forces the blockAlert dialog to be wide enough.
-	local sep = string.rep("─", 26)
-	return {
-		msg = string.format(
-			"%s\n"
-			.. "Ce geste est peut-être géré par macOS :\n"
-			.. "« %s »\n\n"
-			.. "Si c'est le cas, macOS et Hammerspoon réagiront tous deux en même temps :\n"
-			.. "les deux comportements seront envoyés simultanément.\n\n"
-			.. "Si encore actif, désactivez-le ici :\n"
-			.. "%s\n%s",
-			sep, grp.description, grp.hint, sep),
-		url = grp.settings_url,
-	}
+    if new_action == "none" then return nil end
+    local grp = SLOT_TO_GROUP[slot]
+    if not grp then return nil end
+    -- A line of dashes forces the blockAlert dialog to be wide enough.
+    local sep = string.rep("─", 26)
+    return {
+        msg = string.format(
+            "%s\n"
+            .. "Ce geste est peut-être géré par macOS :\n"
+            .. "« %s »\n\n"
+            .. "Si c'est le cas, macOS et Hammerspoon réagiront tous deux en même temps :\n"
+            .. "les deux comportements seront envoyés simultanément.\n\n"
+            .. "Si encore actif, désactivez-le ici :\n"
+            .. "%s\n%s",
+            sep, grp.description, grp.hint, sep),
+        url = grp.settings_url,
+    }
 end
 
 -- Public: log active conflicts at startup; no automatic pref changes.
--- (Programmatic pref changes do not work on macOS Sequoia+.)
 function M.apply_all_overrides()
-	for _, grp in ipairs(MACOS_GESTURE_GROUPS) do
-		if group_has_active_slot(grp, M.get_all_actions()) then
-			print(string.format(
-				"[gestures] conflict active: '%s' — user must disable in System Settings",
-				grp.description))
-		end
-	end
+    for _, grp in ipairs(MACOS_GESTURE_GROUPS) do
+        if group_has_active_slot(grp, M.get_all_actions()) then
+            print(string.format(
+                "[gestures] conflict active: '%s' — user must disable in System Settings",
+                grp.description))
+        end
+    end
 end
 
 -- Public: no-op; we never modify system prefs, so nothing to restore.
@@ -119,7 +140,6 @@ local TAP_MAX_DELTA  = 2.0
 local SWIPE_MIN      = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
 local SWIPE_MIN_2    = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 local DIAG_MIN_2     = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
-                               -- (avoids tiny scroll micro-movements being read as diag)
 local DIAG_MAX_RATIO = 2.0    -- max dx/dy ratio for a movement to be considered diagonal
 
 -- ── Natural scroll ────────────────────────────────────────────────────────────
@@ -131,7 +151,6 @@ local naturalScroll = readNaturalScroll()
 function M.isNaturalScroll() return naturalScroll end
 
 -- ── Selection mode ────────────────────────────────────────────────────────────
--- Declared early so that action closures can reference these variables.
 local leftClickPressed = false
 local mouseEventTap    = nil
 local gesturesEnabled  = true
@@ -200,7 +219,6 @@ local function winNav(goNext)
 end
 
 local function spaceNav(goNext)
-    -- Add ability to cycle through spaces when on the first or last one
     local ok, spaces = pcall(function() return require("hs.spaces") end)
     if ok and spaces then
         local screen = hs.screen.mainScreen()
@@ -233,8 +251,6 @@ local function spaceNav(goNext)
             end
         end
     end
-    -- Fallback: send Ctrl+Left/Ctrl+Right via AppleScript when hs.spaces
-    -- lookup is not available or fails.
     hs.osascript.applescript(string.format(
         'tell application "System Events" to key code %d using {control down}',
         goNext and 124 or 123))
@@ -242,14 +258,9 @@ end
 
 -- ── Action registry ──────────────────────────────────────────────────────────
 local AX, SG = {}, {}
--- scalable=true: the action is fired N times proportionally to drag distance.
--- Suitable for continuous actions (volume, brightness, cursor).
--- Not scalable: discrete one-shot actions (next track, change space, tab...).
 local function ax(n,lbl,p,nx,scalable) AX[n]={label=lbl, prev=p, next=nx, scalable=scalable} end
 local function sg(n,lbl,fn)            SG[n]={label=lbl, fn=fn} end
 
--- Divisor for step count: floor(dist / SCALE_DIV).
--- Increase to fire less often, decrease to fire more.
 local SCALE_DIV = 3.5
 
 -- Axis actions (prev / next) — scalable=true for continuous actions
@@ -282,7 +293,7 @@ ax("document",   "Document (début/fin)",
     function() hs.eventtap.keyStroke({"cmd"},"up")   end,
     function() hs.eventtap.keyStroke({"cmd"},"down") end)
 
--- Actions simples
+-- Single actions
 sg("none",            "Désactivé",            function() end)
 sg("selection_toggle","Toggle sélection",     toggleSelection)
 sg("lookup",          "Définition du mot",    triggerLookup)
@@ -315,7 +326,6 @@ sg("para_next",       "Paragraphe suivant",   function() hs.eventtap.keyStroke({
 sg("doc_start",       "Début du document",    function() hs.eventtap.keyStroke({"cmd"},"up")    end)
 sg("doc_end",         "Fin du document",      function() hs.eventtap.keyStroke({"cmd"},"down")  end)
 
--- Lists exposed to the menu (display order)
 M.AX_NAMES = {
     "none","tabs","windows","spaces",
     "volume","brightness","tracks",
@@ -339,27 +349,12 @@ function M.get_action_label(name)
     return name
 end
 
--- ── Slots and default values ────────────────────────────────────────────────
-local ga = {
-    tap_3         = "none",
-    tap_4         = "none",
-    tap_5         = "none",
-    swipe_2_diag  = "none",
-    swipe_3_horiz = "none",
-    swipe_3_diag  = "none",
-    swipe_3_up    = "none",
-    swipe_3_down  = "none",
-    swipe_4_horiz = "none",
-    swipe_4_diag  = "none",
-    swipe_4_up    = "none",
-    swipe_4_down  = "none",
-    swipe_5_horiz = "none",
-    swipe_5_diag  = "none",
-    swipe_5_up    = "none",
-    swipe_5_down  = "none",
-}
+-- Initialize gesture actions with defaults
+local ga = {}
+for k, v in pairs(M.DEFAULT_GESTURES) do
+    ga[k] = v
+end
 
--- Axis vs single distinction (determines which sub-menu to display)
 M.AXIS_SLOTS   = {
     "swipe_2_diag",
     "swipe_3_horiz","swipe_3_diag",
@@ -385,8 +380,6 @@ local function doSingle(slot)
     if s then s.fn() end
 end
 
--- Fire an axis action ONCE in the goNext direction.
--- Used both in real-time (scalable) and at commit time (non-scalable).
 local function fireAxis(slot, goNext)
     local a = AX[ga[slot]]
     if not a then return end
@@ -419,16 +412,6 @@ local function stopScrollBlock()
 end
 
 -- ── State machine ────────────────────────────────────────────────────────────
--- Architecture:
---   - Non-scalable actions: direction computed at commit time from endPos
---     (no real-time locking, avoids all jitter issues)
---   - Scalable actions: angular lock acquired as soon as movement exceeds the
---     threshold; gs.lifting freezes state when fingers start lifting
---
--- Direction by angle (atan2):
---   vert  : angle > 35° from horizontal  (adx < ady × tan55° ≈ ady × 1.43)
---   horiz : angle < 20° from horizontal  (adx > ady × tan70° ≈ ady × 2.75 — NOTE: inverted angles)
---   diag  : between 20° and 35°
 local gs = {}
 local function resetGS()
     stopScrollBlock()
@@ -464,12 +447,6 @@ local function slotForDir(mf, dir)
     return nil
 end
 
--- Compute movement direction from dx/dy by angle.
--- Returns "vert", "horiz", "diag", or nil when distance is insufficient.
--- Thresholds:
---   vert  : angle >= 35° from horiz  (adx < ady × tan55° ≈ ady × 1.43 → wide zone)
---   horiz : angle <= 20° from horiz  (adx > ady × tan70° ≈ ady × 2.75)
---   diag  : between 20° and 35°, with minimum distance on both axes
 local function computeDir(dx, dy, mf)
     local adx  = math.abs(dx)
     local ady  = math.abs(dy)
@@ -477,14 +454,13 @@ local function computeDir(dx, dy, mf)
     local min  = (mf == 2) and SWIPE_MIN_2 or SWIPE_MIN
     if dist < min then return nil end
 
-    local angle = math.deg(math.atan(ady, adx))   -- 0=horiz, 90=vert
+    local angle = math.deg(math.atan(ady, adx))
 
-    if     angle >= 35 then return "vert"          -- wide zone for vertical
+    if     angle >= 35 then return "vert"
     elseif angle <= 20 then return "horiz"
     else
         local diagMin = (mf == 2) and DIAG_MIN_2 or min
         if adx >= diagMin and ady >= diagMin then return "diag" end
-        -- Between 20° and 35° but diagonal distance insufficient → pick dominant axis
         if adx >= ady then return "horiz" else return "vert" end
     end
 end
@@ -503,7 +479,7 @@ local function commitGesture(now)
     local elapsed = now - gs.startTime
     local mf      = gs.maxFingers
 
-    -- Tap
+    -- Tap detection
     if elapsed <= TAP_MAX_SEC and (adx + ady) < TAP_MAX_DELTA then
         if     mf == 3 then doSingle("tap_3")
         elseif mf == 4 then doSingle("tap_4")
@@ -511,12 +487,9 @@ local function commitGesture(now)
         return
     end
 
-    -- Final direction computed here for all non-scalable actions.
-    -- gs.lockedDir is intentionally ignored; the real final position is used.
     local dir = computeDir(dx, dy, mf)
     if not dir then return end
 
-    -- Vertical: single actions
     if dir == "vert" then
         local goDown = dy > 0
         if     mf == 3 then doSingle(goDown and "swipe_3_down" or "swipe_3_up")
@@ -525,17 +498,13 @@ local function commitGesture(now)
         return
     end
 
-    -- Horiz/diag : if diagonal and disabled, fall back to dominant axis.
-    -- This gives more tolerance for horiz/vert detection when diag is unused.
     if dir == "diag" then
         local diag_slot = slotForDir(mf, dir)
         if not diag_slot or ga[diag_slot] == "none" then
-            -- Re-classify as horizontal or vertical based on dominant axis
             dir = (adx >= ady) and "horiz" or "vert"
         end
     end
 
-    -- Vertical (re-evaluated after possible diagonal fallback)
     if dir == "vert" then
         local goDown = dy > 0
         if     mf == 3 then doSingle(goDown and "swipe_3_down" or "swipe_3_up")
@@ -544,12 +513,11 @@ local function commitGesture(now)
         return
     end
 
-    -- Horiz/diag: do nothing when the action is disabled
     local slot = slotForDir(mf, dir)
     if not slot then return end
     if ga[slot] == "none" then return end
     if isScalableSlot(slot) then
-        -- Scalable: already fired in real time, nothing to do here
+        -- Scalable logic handled during movement
     else
         local sd = signedDist(gs.endPos)
         if math.abs(sd) >= SWIPE_MIN then fireAxis(slot, sd > 0) end
@@ -586,21 +554,17 @@ local function onFrame(touches)
             end
             gs.endPos = pos
 
-            -- Freeze if still inside the tap window with a small movement
             local adx_now = math.abs(pos.x - gs.startPos.x)
             local ady_now = math.abs(pos.y - gs.startPos.y)
             if (now - gs.startTime) < TAP_MAX_SEC and (adx_now + ady_now) < TAP_MAX_DELTA then
                 return
             end
 
-            -- Scalable real-time: angular lock + step firing
             if not gs.lifting then
                 if gs.lockedDir == nil then
                     local dx = pos.x - gs.startPos.x
                     local dy = pos.y - gs.startPos.y
                     local tentative = computeDir(dx, dy, gs.maxFingers)
-                    -- If diagonal slot is unused, reallocate to dominant axis so
-                    -- scalable actions get the right lock direction immediately.
                     if tentative == "diag" then
                         local diag_slot = slotForDir(gs.maxFingers, tentative)
                         if not diag_slot or ga[diag_slot] == "none" then

@@ -445,12 +445,28 @@ function M.start(base_dir, keymap_module)
 	_keymap    = keymap_module  -- store for TOML-priority lookup
 
 	-- Register interceptor once; subsequent enable/disable only flip _enabled.
-	if keymap_module and type(keymap_module.register_interceptor) == "function" then
-		keymap_module.register_interceptor(interceptor)
-		print("[personal_info] Interceptor registered in keymap.")
-	else
-		print("[personal_info] WARNING: keymap_module not provided or missing register_interceptor.")
-	end
+    if keymap_module and type(keymap_module.register_interceptor) == "function" then
+        keymap_module.register_interceptor(interceptor)
+        print("[personal_info] Interceptor registered in keymap.")
+    else
+        print("[personal_info] WARNING: keymap_module not provided or missing register_interceptor.")
+    end
+
+    if keymap_module and type(keymap_module.register_preview_provider) == "function" then
+        keymap_module.register_preview_provider(function(buf)
+            if not _enabled then return nil end
+            -- Cherche "@" suivi de lettres ascii à la toute fin du buffer
+            local match = buf:match("@([a-z]+)$")
+            if match then
+                local parts = resolve_combo(match)
+                if #parts > 0 then
+                    -- Utilise un symbole visuel pour représenter les tabulations (\t)
+                    return table.concat(parts, " ⇥ ")
+                end
+            end
+            return nil
+        end)
+    end
 
 	local letter_count = 0
 	for _ in pairs(_letters) do letter_count = letter_count + 1 end
