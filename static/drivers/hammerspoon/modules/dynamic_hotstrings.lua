@@ -178,7 +178,21 @@ function M.start(keymap_module)
 	-- Register the interceptor into keymap's chain.
 	keymap_module.register_interceptor(interceptor)
 
-	print("[dynamic_hotstrings] Started — group: " .. GROUP_NAME)
-end
+    if keymap_module.register_preview_provider then
+            keymap_module.register_preview_provider(function(buf)
+                for _, rule in ipairs(_rules) do
+                    if _km and _km.is_section_enabled(GROUP_NAME, rule.section) then
+                        local suf = rule.suffix
+                        if #suf > 0 and buf:sub(-(#suf)) == suf then
+                            return rule.resolver()
+                        end
+                    end
+                end
+                return nil
+            end)
+        end
+
+        print("[dynamic_hotstrings] Started — group: " .. GROUP_NAME)
+    end
 
 return M

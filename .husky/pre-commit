@@ -10,8 +10,24 @@ npm run clean-ahk
 # Update "Last modified on" date in ErgoptiPlus.ahk (cross-platform via Node.js)
 node scripts/update-ahk-date.js
 
-# Stage any changes made by the cleanup and the date update
-git add static/drivers/autohotkey/*.ahk
+# --- DÉBUT DE LA MODIFICATION ---
+FILE="static/drivers/autohotkey/ErgoptiPlus.ahk"
+
+# On récupère HEAD, on enlève la ligne 1, on supprime les \r (Windows), on hash
+HASH_HEAD=$(git show HEAD:"$FILE" 2>/dev/null | tail -n +2 | tr -d '\r' | git hash-object --stdin)
+
+# On fait pareil avec le fichier local
+HASH_LOCAL=$(tail -n +2 "$FILE" | tr -d '\r' | git hash-object --stdin)
+
+if [ "$HASH_HEAD" = "$HASH_LOCAL" ]; then
+  echo "ErgoptiPlus.ahk unchanged (except line 1), not staged. Restoring original file..."
+  
+  # On restaure le fichier à l'état de HEAD (annule le changement de date localement)
+  git restore "$FILE"
+else
+  git add "$FILE"
+fi
+# --- FIN DE LA MODIFICATION ---
 
 # Regenerate TOML hotstrings from the (now cleaned) AHK file
 uv run python static/drivers/hotstrings/0_generate_hotstrings.py
