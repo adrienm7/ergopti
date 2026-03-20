@@ -6,6 +6,9 @@ local menubar = hs.menubar
 local pathwatcher = hs.pathwatcher
 local utils = require("lib.utils")
 
+-- Load only required modules
+local llm_mod = require("modules.llm")
+
 -- Global table to secure background tasks (prevents Garbage Collector from killing them)
 M._active_tasks = {}
 
@@ -69,13 +72,16 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     local state = {
         keymap = true, gestures = true, scroll = true, shortcuts = true, personal_info = true, 
         hotstrings = {}, chatgpt_url = "https://chat.openai.com", sections_order_overrides = {}, 
-        terminator_states = {}, expansion_delay = keymap_mod_ref.DEFAULT_BASE_DELAY_SEC, 
+        terminator_states = {}, 
+        -- Safely fetch expansion_delay from the injected keymap object, default to 0.05 if nil
+        expansion_delay = (keymap and keymap.DEFAULT_BASE_DELAY_SEC) or 0.05, 
         script_control_shortcuts = {return_key = "pause", backspace = "reload"}, 
         script_control_enabled = true, ahk_source_path = "", 
         preview_enabled = true, 
-        llm_enabled = llm_mod.DEFAULT_LLM_ENABLED, 
-        llm_debounce = llm_mod.DEFAULT_LLM_DEBOUNCE, 
-        llm_model = llm_mod.DEFAULT_LLM_MODEL
+        -- Safely load LLM defaults
+        llm_enabled = llm_mod and llm_mod.DEFAULT_LLM_ENABLED or false, 
+        llm_debounce = llm_mod and llm_mod.DEFAULT_LLM_DEBOUNCE or 0.5, 
+        llm_model = llm_mod and llm_mod.DEFAULT_LLM_MODEL or "llama3.2"
     }
     
     local updateMenu -- Forward declaration
@@ -789,7 +795,6 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     if needs_ollama then
                         hs.dialog.blockAlert("Ollama absent", "Ollama ne semble pas être lancé ou installé.", "OK")
                     else
-                        -- Removed the double prompt! Directly show the requirements and ask to download.
                         check_ram_and_install(new_model)
                     end
                 end)
