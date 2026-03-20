@@ -77,7 +77,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         preview_enabled = true, 
         llm_enabled = llm_mod.DEFAULT_LLM_ENABLED, 
         llm_debounce = llm_mod.DEFAULT_LLM_DEBOUNCE, 
-        llm_model = llm_mod.DEFAULT_LLM_MODEL
+        llm_model = llm_mod.DEFAULT_LLM_MODEL,
+        download_task = nil -- PROTECTS THE BACKGROUND TASK FROM GARBAGE COLLECTION
     }
     
     local updateMenu -- Forward declaration
@@ -143,6 +144,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- 3. Ollama Installer & System Checks
     -- ==========================================
     
+    -- Find the actual path of Ollama (Apple Silicon vs Intel)
+    local function get_ollama_path()
+        if hs.fs.attributes("/opt/homebrew/bin/ollama") then return "/opt/homebrew/bin/ollama" end
+        if hs.fs.attributes("/usr/local/bin/ollama") then return "/usr/local/bin/ollama" end
+        return nil
+    end
+
     -- Helper to calculate required disk and RAM based on model parameters
     local function get_model_requirements(model_name)
         local name = model_name:lower()
@@ -177,11 +185,18 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
     local function install_ollama_auto()
         local function pull_model()
+            local ollama_bin = get_ollama_path()
+            if not ollama_bin then
+                hs.notify.new({title="Ergopti+ AI", informativeText="❌ Impossible de trouver l'exécutable Ollama."}):send()
+                return
+            end
+
             hs.notify.new({title="Ergopti+ AI", informativeText="Téléchargement de " .. state.llm_model .. "...\nRegardez la barre des menus pour la progression."}):send()
             update_icon("📥 0%")
             
-            -- Use a stream callback to read the percentage
-            local task = hs.task.new("/usr/local/bin/ollama", function(exitCode, stdOut, stdErr)
+            -- Use state.download_task to prevent Lua from garbage collecting the task
+            state.download_task = hs.task.new(ollama_bin, function(exitCode, stdOut, stdErr)
+                state.download_task = nil -- Free task memory
                 update_icon() -- Reset
                 local output = (stdOut or "") .. (stdErr or "")
                 local is_not_found = output:lower():find("not found") or output:lower():find("error")
@@ -205,10 +220,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 return true
             end, {"pull", state.llm_model})
             
-            task:start()
+            state.download_task:start()
         end
 
-        if hs.fs.attributes("/usr/local/bin/ollama") then
+        if get_ollama_path() then
             pull_model()
         else
             hs.notify.new({title="Ergopti+ AI", informativeText="Étape 1/2 : Installation de l'application Ollama..."}):send()
@@ -713,7 +728,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- Helper to get installed models dynamically
     local function get_installed_models()
         local installed = {}
-        local output = hs.execute("/usr/local/bin/ollama list 2>/dev/null")
+        local ollama_bin = get_ollama_path() or "/usr/local/bin/ollama"
+        local output = hs.execute(ollama_bin .. " list 2>/dev/null")
         if output then
             for line in output:gmatch("[^\r\n]+") do
                 local name = line:match("^(%S+)")
