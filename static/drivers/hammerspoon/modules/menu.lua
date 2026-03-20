@@ -38,15 +38,22 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- ==========================================
     -- 1. Core Menu Logic & Icons
     -- ==========================================
-    local function update_icon()
+    local function update_icon(custom_text)
         local is_paused = script_control and script_control.is_paused() or false
         local logo_file = is_paused and "logo_black.png" or "logo_white.png"
         local icon_path = base_dir .. "images/" .. logo_file
         local ico = image.imageFromPath(icon_path)
+        
+        if custom_text then
+            myMenu:setTitle(custom_text)
+        else
+            myMenu:setTitle("") -- Reset title
+        end
+
         if ico then
             pcall(function() if ico.setSize then ico:setSize({w=18,h=18}) end end)
             myMenu:setIcon(ico, false)
-        else
+        elseif not custom_text then
             myMenu:setTitle("🔨")
         end
     end
@@ -133,26 +140,70 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     end
 
     -- ==========================================
-    -- 3. Ollama Installer & RAM Check Logic
+    -- 3. Ollama Installer & System Checks
     -- ==========================================
+    
+    -- Helper to calculate required disk and RAM based on model parameters
+    local function get_model_requirements(model_name)
+        local name = model_name:lower()
+        local total_b = 0
+        
+        -- Extract parameters (e.g., 8x7b, 14b, 1.5b)
+        local experts, size = name:match("(%d+)x([%d%.]+)b")
+        if experts and size then
+            total_b = tonumber(experts) * tonumber(size)
+        else
+            local b = name:match("([%d%.]+)b")
+            if b then total_b = tonumber(b) end
+        end
+        
+        -- Fallback if no parameter is found in the name
+        if total_b == 0 then
+            if name:find("llama3%.2") then total_b = 3
+            elseif name:find("llama3") then total_b = 8
+            elseif name:find("mistral") or name:find("qwen") then total_b = 7
+            elseif name:find("gemma2") then total_b = 9
+            elseif name:find("phi3") then total_b = 4
+            elseif name:find("mixtral") then total_b = 47
+            else total_b = 8 end
+        end
+        
+        -- Estimated calculation: Disk (~0.6 GB per billion) / RAM (~0.7 GB per billion + 2 GB)
+        local required_disk = math.ceil(total_b * 0.6 + 0.5)
+        local required_ram = math.ceil(total_b * 0.7 + 2.0)
+        
+        return required_disk, required_ram
+    end
+
     local function install_ollama_auto()
         local function pull_model()
-            hs.notify.new({title="Ergopti+ AI", informativeText="Étape 2/2 : Téléchargement du modèle " .. state.llm_model}):send()
+            hs.notify.new({title="Ergopti+ AI", informativeText="Téléchargement de " .. state.llm_model .. "...\nRegardez la barre des menus pour la progression."}):send()
+            update_icon("📥 0%")
             
-            local task = hs.task.new("/bin/sh", function(pull_code, stdOut, stdErr)
+            -- Use a stream callback to read the percentage
+            local task = hs.task.new("/usr/local/bin/ollama", function(exitCode, stdOut, stdErr)
+                update_icon() -- Reset
                 local output = (stdOut or "") .. (stdErr or "")
                 local is_not_found = output:lower():find("not found") or output:lower():find("error")
                 
-                if pull_code == 0 and not is_not_found then
+                if exitCode == 0 and not is_not_found then
                     hs.notify.new({title="Ergopti+ AI", informativeText="✅ Modèle " .. state.llm_model .. " téléchargé avec succès !"}):send()
                     hs.timer.doAfter(1, hs.reload)
                 else
                     hs.notify.new({title="Ergopti+ AI", informativeText="❌ Échec du téléchargement du modèle " .. state.llm_model}):send()
                     hs.dialog.blockAlert("Erreur de modèle", 
-                        "Le modèle [" .. state.llm_model .. "] n'a pas pu être téléchargé.\n\nVérifiez son nom sur ollama.com/library\n\nDétails : " .. output:sub(1, 100) .. "...", 
+                        "Le modèle [" .. state.llm_model .. "] n'a pas pu être téléchargé.\n\nDétails : " .. output:sub(1, 150) .. "...", 
                         "OK", nil, "critical")
                 end
-            end, {"-c", "/usr/local/bin/ollama pull " .. state.llm_model .. " 2>&1"})
+            end, function(task, stdOut, stdErr)
+                -- Stream parser for the progress bar
+                local out = stdOut or stdErr or ""
+                local percent = out:match("(%d+)%%")
+                if percent then
+                    update_icon("📥 " .. percent .. "%")
+                end
+                return true
+            end, {"pull", state.llm_model})
             
             task:start()
         end
@@ -169,59 +220,63 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             
             hs.task.new("/bin/bash", function(code)
                 if code == 0 then 
-                    hs.notify.new({title="Ergopti+ AI", informativeText="✅ Application Ollama installée avec succès."}):send()
+                    hs.notify.new({title="Ergopti+ AI", informativeText="✅ Application Ollama installée. Lancement du téléchargement."}):send()
                     pull_model()
                 else 
-                    hs.notify.new({title="Ergopti+ AI", informativeText="❌ Erreur lors de l'installation du binaire Ollama."}):send() 
+                    hs.notify.new({title="Ergopti+ AI", informativeText="❌ Erreur lors de l'installation d'Ollama."}):send() 
                 end
             end, {"-c", install_script}):start()
         end
     end
 
-    -- Nouvelle fonction : Vérification RAM et Installation
     local function check_ram_and_install(model_name, on_cancel)
-        local name = model_name:lower()
-        local total_b = 0
+        local required_disk, required_ram = get_model_requirements(model_name)
         
-        -- Extraction des paramètres (ex: 8x7b, 14b, 1.5b)
-        local experts, size = name:match("(%d+)x([%d%.]+)b")
-        if experts and size then
-            total_b = tonumber(experts) * tonumber(size)
-        else
-            local b = name:match("([%d%.]+)b")
-            if b then total_b = tonumber(b) end
-        end
-        
-        -- Cas de fallback si aucun paramètre n'est trouvé dans le nom
-        if total_b == 0 then
-            if name:find("llama3") then total_b = 8
-            elseif name:find("mistral") or name:find("qwen") then total_b = 7
-            elseif name:find("gemma") then total_b = 9
-            elseif name:find("phi") then total_b = 4
-            elseif name:find("mixtral") then total_b = 47
-            else total_b = 8 end -- Modèle standard 8B par défaut
-        end
-        
-        -- Calcul estimatif : ~0.7 Go par milliard de paramètres + 2 Go marge (contexte/overhead)
-        local required_ram = math.ceil((total_b * 0.7) + 2.0)
-        
-        -- Récupération de la RAM système du Mac (en octets -> Go)
-        local sys_ram_bytes = tonumber(hs.execute("sysctl -n hw.memsize")) or 0
-        local sys_ram_gb = math.ceil(sys_ram_bytes / (1024^3))
-        
+        -- Retrieve Mac system RAM (in bytes -> GB) and Disk (GB)
+        local sys_ram_gb = math.ceil((tonumber(hs.execute("sysctl -n hw.memsize")) or 0) / (1024^3))
+        local free_disk_gb = tonumber(hs.execute("df -g / | awk 'NR==2 {print $4}'")) or 0
+
+        local warnings = {}
+        local is_critical = false
+
+        -- RAM Analysis
         if sys_ram_gb > 0 and sys_ram_gb < required_ram then
-            local msg = string.format(
-                "Votre Mac dispose de %d Go de RAM.\nLe modèle '%s' nécessite environ %d Go de RAM pour fonctionner de manière fluide.\n\nLe télécharger risque de saturer votre mémoire et de ralentir fortement votre système.\n\nVoulez-vous vraiment continuer ?",
-                sys_ram_gb, model_name, required_ram
-            )
-            local choice = hs.dialog.blockAlert("⚠️ Avertissement : RAM insuffisante ?", msg, "Continuer quand même", "Annuler", "warning")
+            table.insert(warnings, string.format("🔴 RAM insuffisante : Ce modèle requiert ~%d Go de RAM (Vous avez %d Go). Risque majeur de ralentissement de votre Mac.", required_ram, sys_ram_gb))
+        end
+
+        -- Disk Analysis
+        if free_disk_gb > 0 then
+            local remaining_after = free_disk_gb - required_disk
+            if remaining_after < 2 then
+                is_critical = true
+                table.insert(warnings, string.format("❌ Disque saturé : Ce modèle pèse ~%d Go. Il ne vous restera plus que %d Go sur votre Mac. Installation impossible pour la sécurité du système.", required_disk, remaining_after))
+            elseif remaining_after < 15 then
+                table.insert(warnings, string.format("⚠️ Espace disque limite : Ce modèle pèse ~%d Go. Il ne vous restera que %d Go après l'installation.", required_disk, remaining_after))
+            else
+                table.insert(warnings, string.format("ℹ️ Espace disque OK : Ce modèle pèsera environ %d Go (Il vous restera %d Go libres).", required_disk, remaining_after))
+            end
+        end
+
+        -- Display alert
+        if #warnings > 0 then
+            local msg = "Analyse du modèle '" .. model_name .. "' :\n\n" .. table.concat(warnings, "\n\n")
+            
+            if is_critical then
+                hs.dialog.blockAlert("Téléchargement bloqué", msg, "Annuler", nil, "critical")
+                if on_cancel then on_cancel() end
+                return
+            end
+
+            local alert_type = (msg:find("🔴") or msg:find("⚠️")) and "warning" or "informational"
+            local choice = hs.dialog.blockAlert("Confirmer le téléchargement", msg .. "\n\nVoulez-vous procéder au téléchargement ?", "Télécharger", "Annuler", alert_type)
+            
             if choice == "Annuler" then
                 if on_cancel then on_cancel() end
                 return
             end
         end
         
-        -- Si OK ou si l'utilisateur force, on applique le modèle et on lance le DL
+        -- Execution
         state.llm_model = model_name
         if keymap and keymap.set_llm_model then keymap.set_llm_model(model_name) end
         save_prefs()
@@ -659,6 +714,60 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         local paused = script_control and script_control.is_paused() or false
         local cur_debounce_ms = math.floor(state.llm_debounce * 1000 + 0.5)
 
+        -- Model change function
+        local function trigger_model_change(new_model)
+            llm_mod.check_availability(new_model, function()
+                state.llm_model = new_model
+                if keymap and keymap.set_llm_model then keymap.set_llm_model(new_model) end
+                save_prefs(); updateMenu()
+            end, function(needs_ollama)
+                if needs_ollama then
+                    hs.dialog.blockAlert("Ollama absent", "Ollama ne semble pas être lancé.", "OK")
+                else
+                    check_ram_and_install(new_model)
+                end
+            end)
+        end
+
+        -- Build the models dropdown list grouped by provider, sorted by weight
+        local preset_groups = {
+            {"llama3.2:1b", "llama3.2", "llama3.1"},                       -- Meta / Llama
+            {"qwen2.5:0.5b", "qwen2.5:1.5b", "qwen2.5:7b", "qwen2.5:14b"}, -- Alibaba / Qwen
+            {"mistral", "mixtral:8x7b"},                                   -- Mistral AI
+            {"gemma2:2b", "gemma2", "gemma2:27b"},                         -- Google / Gemma
+            {"phi3", "phi3:14b"}                                           -- Microsoft / Phi
+        }
+        
+        local models_menu = {}
+        for i, group in ipairs(preset_groups) do
+            for _, m in ipairs(group) do
+                local _, ram = get_model_requirements(m)
+                table.insert(models_menu, {
+                    title = string.format("%s (~%d Go RAM)", m, ram),
+                    checked = (state.llm_model == m),
+                    fn = not paused and function() trigger_model_change(m) end or nil
+                })
+            end
+            if i < #preset_groups then
+                table.insert(models_menu, {title = "-"})
+            end
+        end
+        
+        table.insert(models_menu, {title = "-"})
+        table.insert(models_menu, {
+            title = "Autre modèle (Saisie manuelle)...",
+            fn = not paused and function()
+                local btn, raw = hs.dialog.textPrompt(
+                    "Modèle IA personnalisé",
+                    "Entrez le nom exact du modèle Ollama à utiliser :",
+                    state.llm_model, "OK", "Annuler"
+                )
+                if btn == "OK" and raw ~= "" then
+                    trigger_model_change(raw:match("^%s*(.-)%s*$"))
+                end
+            end or nil
+        })
+
         return {
             title = "Prédiction par IA (LLM)",
             menu = {
@@ -673,13 +782,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                             save_prefs(); updateMenu()
                         end, function(needs_ollama)
                             local msg = needs_ollama and "Pour utiliser l'IA, il faut installer Ollama."
-                                        or ("Le modèle [" .. state.llm_model .. "] est manquant.")
+                                                      or ("Le modèle [" .. state.llm_model .. "] est manquant.")
                             
                             local choice = hs.dialog.blockAlert("Installation requise", 
-                                msg .. " Souhaitez-vous procéder au téléchargement automatique ?", 
-                                "Installer automatiquement l'IA", "Plus tard", "informational")
+                                msg .. " Souhaitez-vous procéder au téléchargement ?", 
+                                "Installer", "Plus tard", "informational")
                             
-                            if choice == "Installer automatiquement l'IA" then
+                            if choice == "Installer" then
                                 check_ram_and_install(state.llm_model, function()
                                     state.llm_enabled = false
                                     if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
@@ -695,35 +804,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 },
                 { title = "-" },
                 {
-                    title = string.format("Modèle IA : %s...", state.llm_model),
+                    title = string.format("Modèle IA : %s", state.llm_model),
                     disabled = paused or nil,
-                    fn = not paused and function()
-                        local btn, raw = hs.dialog.textPrompt(
-                            "Modèle IA",
-                            "Entrez le nom exact du modèle Ollama à utiliser :",
-                            state.llm_model, "OK", "Annuler"
-                        )
-                        if btn == "OK" and raw ~= "" then
-                            local new_model = raw:match("^%s*(.-)%s*$")
-                            llm_mod.check_availability(new_model, function()
-                                state.llm_model = new_model
-                                if keymap and keymap.set_llm_model then keymap.set_llm_model(new_model) end
-                                save_prefs(); updateMenu()
-                            end, function(needs_ollama)
-                                if needs_ollama then
-                                    hs.dialog.blockAlert("Ollama absent", "Ollama ne semble pas être lancé.", "OK")
-                                else
-                                    local choice = hs.dialog.blockAlert("Modèle absent", 
-                                        "Le modèle [" .. new_model .. "] n'est pas encore téléchargé.", 
-                                        "Télécharger maintenant", "Plus tard", "informational")
-                                    
-                                    if choice == "Télécharger maintenant" then
-                                        check_ram_and_install(new_model)
-                                    end
-                                end
-                            end)
-                        end
-                    end or nil
+                    menu = models_menu
                 },
                 {
                     title = string.format("Délai de réflexion IA : %d ms...", cur_debounce_ms),
@@ -974,7 +1057,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         table.insert(items, {title="Quitter Hammerspoon", fn=function() hs.timer.doAfter(0.1, function() os.exit(0) end) end})
         
         myMenu:setMenu({})
-        hs.timer.doAfter(0.02, function() update_icon(); myMenu:setMenu(items) end)
+        hs.timer.doAfter(0.02, function() myMenu:setMenu(items) end)
     end
 
     updateMenu()
