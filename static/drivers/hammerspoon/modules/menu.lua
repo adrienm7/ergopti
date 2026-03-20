@@ -709,10 +709,29 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
         return { title = "Paramètres Hotstrings", menu = menu }
     end
+    
+    -- Helper to get installed models dynamically
+    local function get_installed_models()
+        local installed = {}
+        local output = hs.execute("/usr/local/bin/ollama list 2>/dev/null")
+        if output then
+            for line in output:gmatch("[^\r\n]+") do
+                local name = line:match("^(%S+)")
+                if name and name ~= "NAME" then
+                    installed[name] = true
+                    if name:match(":latest$") then
+                        installed[name:gsub(":latest$", "")] = true
+                    end
+                end
+            end
+        end
+        return installed
+    end
 
     local function buildLlmItem()
         local paused = script_control and script_control.is_paused() or false
         local cur_debounce_ms = math.floor(state.llm_debounce * 1000 + 0.5)
+        local installed_models = get_installed_models()
 
         -- Model change function
         local function trigger_model_change(new_model)
@@ -720,11 +739,18 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 state.llm_model = new_model
                 if keymap and keymap.set_llm_model then keymap.set_llm_model(new_model) end
                 save_prefs(); updateMenu()
+                hs.notify.new({title="Ergopti+ AI", informativeText="✅ Modèle bien changé pour : " .. new_model}):send()
             end, function(needs_ollama)
                 if needs_ollama then
                     hs.dialog.blockAlert("Ollama absent", "Ollama ne semble pas être lancé.", "OK")
                 else
-                    check_ram_and_install(new_model)
+                    -- Double prompt: Missing model notice, then RAM/Disk evaluation
+                    local choice = hs.dialog.blockAlert("Modèle absent", 
+                        "Le modèle [" .. new_model .. "] n'est pas encore téléchargé.\nSouhaitez-vous le télécharger maintenant ?", 
+                        "Télécharger", "Annuler", "informational")
+                    if choice == "Télécharger" then
+                        check_ram_and_install(new_model)
+                    end
                 end
             end)
         end
@@ -742,8 +768,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         for i, group in ipairs(preset_groups) do
             for _, m in ipairs(group) do
                 local _, ram = get_model_requirements(m)
+                local is_installed = installed_models[m] or installed_models[m..":latest"]
+                local prefix = is_installed and "✅ " or "  "
+                
                 table.insert(models_menu, {
-                    title = string.format("%s (~%d Go RAM)", m, ram),
+                    title = string.format("%s%s (~%d Go RAM)", prefix, m, ram),
                     checked = (state.llm_model == m),
                     fn = not paused and function() trigger_model_change(m) end or nil
                 })
@@ -755,7 +784,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         
         table.insert(models_menu, {title = "-"})
         table.insert(models_menu, {
-            title = "Autre modèle (Saisie manuelle)...",
+            title = "  Autre modèle (Saisie manuelle)...",
             fn = not paused and function()
                 local btn, raw = hs.dialog.textPrompt(
                     "Modèle IA personnalisé",
