@@ -6,11 +6,6 @@ local menubar = hs.menubar
 local pathwatcher = hs.pathwatcher
 local utils = require("lib.utils")
 
--- Load modules to access their constants
-local llm_mod = require("modules.llm")
-local gestures_mod = require("modules.gestures")
-local keymap_mod_ref = require("modules.keymap")
-
 -- Global table to secure background tasks (prevents Garbage Collector from killing them)
 M._active_tasks = {}
 
@@ -146,7 +141,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
     -- 3. Ollama Installer & System Checks
     -- ==========================================
     
+    -- Dynamically find the Ollama path
     local function get_ollama_path()
+        local path = hs.execute("which ollama 2>/dev/null")
+        if path and path ~= "" then return path:gsub("%s+", "") end
         if hs.fs.attributes("/opt/homebrew/bin/ollama") then return "/opt/homebrew/bin/ollama" end
         if hs.fs.attributes("/usr/local/bin/ollama") then return "/usr/local/bin/ollama" end
         return nil
@@ -182,7 +180,6 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         local length = 10
         local filled = math.floor((p / 100) * length)
         local empty = length - filled
-        -- Characters: ■ (filled), □ (empty)
         return string.rep("■", filled) .. string.rep("□", empty)
     end
 
@@ -197,14 +194,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             -- Immediate visual feedback
             hs.notify.new({title="Ergopti+ AI", informativeText="🚀 Lancement du téléchargement de " .. target_model .. "..."}):send()
             update_icon("📥 Démarrage...")
-            
+
             local task_id = "download"
-            M._active_tasks[task_id] = hs.task.new(ollama_bin, function(exitCode, stdOut, stdErr)
+            local task = hs.task.new(ollama_bin, function(exitCode, stdOut, stdErr)
                 -- Clean up task when finished
                 M._active_tasks[task_id] = nil
                 update_icon() 
-                
-                -- Rebuild menu to remove the "Cancel" button
                 updateMenu()
                 
                 -- Check if task was manually terminated (SIGTERM = 15)
@@ -230,7 +225,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                         "Le modèle [" .. target_model .. "] n'a pas pu être téléchargé.\n\nDétails : " .. output:sub(1, 150) .. "...", 
                         "OK", nil, "critical")
                 end
-            end, function(task, stdOut, stdErr)
+            end, function(t, stdOut, stdErr)
                 local out = (stdOut or "") .. (stdErr or "")
                 -- Search for a percentage in the stream (e.g., 42%)
                 local percent = out:match("(%d+)%%")
@@ -239,18 +234,16 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                     local bar = create_progress_bar(percent)
                     update_icon("📥 " .. bar .. " " .. percent .. "%")
                 elseif out:lower():find("pulling") or out:lower():find("downloading") then
-                    -- If we see the action but no % yet, reassure the user
                     update_icon("📥 Récupération...")
                 end
                 
                 return true -- IMPORTANT: Tells Hammerspoon to keep reading the stream
             end, {"pull", target_model})
             
-            -- Actual launch
-            M._active_tasks[task_id]:start()
-            
-            -- Rebuild menu immediately to show the "Cancel" button
+            -- Store task and update menu to show cancel button BEFORE starting
+            M._active_tasks[task_id] = task
             updateMenu()
+            task:start()
         end
 
         if get_ollama_path() then
@@ -264,7 +257,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             ]]
             
             local task_id = "install"
-            M._active_tasks[task_id] = hs.task.new("/bin/bash", function(code)
+            local task = hs.task.new("/bin/bash", function(code)
                 M._active_tasks[task_id] = nil
                 if code == 0 then 
                     hs.notify.new({title="Ergopti+ AI", informativeText="✅ Application Ollama installée. Lancement du téléchargement."}):send()
@@ -274,7 +267,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                 end
             end, {"-c", install_script})
             
-            M._active_tasks[task_id]:start()
+            M._active_tasks[task_id] = task
+            task:start()
         end
     end
 
@@ -288,24 +282,27 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         local is_critical = false
 
         if sys_ram_gb > 0 and sys_ram_gb < required_ram then
-            table.insert(warnings, string.format("🔴 RAM insuffisante : Ce modèle requiert ~%d Go de RAM (Vous avez %d Go). Risque de ralentissement massif.", required_ram, sys_ram_gb))
+            table.insert(warnings, string.format("🔴 RAM : %d Go (Ce modèle requiert ~%d Go). Risque de ralentissement massif.", sys_ram_gb, required_ram))
+        else
+            table.insert(warnings, string.format("✅ RAM : %d Go OK (Requiert ~%d Go).", sys_ram_gb, required_ram))
         end
 
         if free_disk_gb > 0 then
             local remaining_after = free_disk_gb - required_disk
             if remaining_after < 2 then
                 is_critical = true
-                table.insert(warnings, string.format("❌ Disque saturé : Il ne restera que %d Go sur votre Mac. Installation bloquée.", remaining_after))
+                table.insert(warnings, string.format("❌ Disque : Il ne restera que %d Go sur votre Mac. Installation bloquée.", remaining_after))
             elseif remaining_after < 15 then
-                table.insert(warnings, string.format("⚠️ Espace disque limite : Il ne restera que %d Go après l'installation.", remaining_after))
+                table.insert(warnings, string.format("⚠️ Disque : Il ne restera que %d Go après téléchargement (Poids : ~%d Go).", remaining_after, required_disk))
             else
-                table.insert(warnings, string.format("ℹ️ Espace disque OK : Ce modèle pèsera ~%d Go.", required_disk))
+                table.insert(warnings, string.format("✅ Disque : OK (Poids : ~%d Go).", required_disk))
             end
         end
 
-        if #warnings > 0 then
-            local msg = "Analyse du modèle '" .. target_model .. "' :\n\n" .. table.concat(warnings, "\n\n")
-            
+        local msg = "Modèle ciblé : " .. target_model .. "\n\n" .. table.concat(warnings, "\n")
+        
+        -- Delay the dialog by 0.1s to avoid macOS threading crashes when closing another dialog
+        hs.timer.doAfter(0.1, function()
             if is_critical then
                 hs.dialog.blockAlert("Téléchargement bloqué", msg, "Annuler", nil, "critical")
                 if on_cancel then on_cancel() end
@@ -313,16 +310,14 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             end
 
             local alert_type = (msg:find("🔴") or msg:find("⚠️")) and "warning" or "informational"
-            local choice = hs.dialog.blockAlert("Confirmer le téléchargement", msg .. "\n\nVoulez-vous procéder au téléchargement en arrière-plan ?", "Télécharger", "Annuler", alert_type)
+            local choice = hs.dialog.blockAlert("Installation requise", msg .. "\n\nCe modèle n'est pas installé.\nVoulez-vous lancer le téléchargement en arrière-plan ?", "Télécharger", "Annuler", alert_type)
             
-            if choice == "Annuler" then
+            if choice == "Télécharger" then
+                install_ollama_auto(target_model)
+            else
                 if on_cancel then on_cancel() end
-                return
             end
-        end
-        
-        -- Start installation (saving is deferred until success)
-        install_ollama_auto(target_model)
+        end)
     end
 
     -- Initial setup logic
@@ -409,27 +404,32 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
             end
         end
 
-        -- Startup Check
+        -- Startup Check (Unified dialog logic to avoid overlapping dialog crashes)
         if state.llm_enabled then
             llm_mod.check_availability(state.llm_model, nil, function(needs_ollama)
-                local msg = needs_ollama and "Ollama n'est pas lancé ou installé." 
-                                          or ("Le modèle [" .. state.llm_model .. "] n'est pas téléchargé.")
-                
                 hs.timer.doAfter(1, function()
-                    local choice = hs.dialog.blockAlert("IA non configurée", 
-                        msg .. "\n\nSouhaitez-vous régler cela maintenant ?", 
-                        "Installer automatiquement", "Plus tard", "informational")
-                    
-                    if choice == "Installer automatiquement" then
+                    if needs_ollama then
+                        local choice = hs.dialog.blockAlert("Ollama absent", 
+                            "Pour utiliser l'IA, il faut installer l'application Ollama.\nSouhaitez-vous l'installer maintenant ?", 
+                            "Installer", "Plus tard", "informational")
+                        if choice == "Installer" then
+                            check_ram_and_install(state.llm_model, function()
+                                state.llm_enabled = false
+                                if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
+                                save_prefs(); updateMenu()
+                            end)
+                        else
+                            state.llm_enabled = false
+                            if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
+                            save_prefs(); updateMenu()
+                        end
+                    else
+                        -- Ollama is present, but model is missing
                         check_ram_and_install(state.llm_model, function()
                             state.llm_enabled = false
                             if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
                             save_prefs(); updateMenu()
                         end)
-                    else
-                        state.llm_enabled = false
-                        if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
-                        save_prefs(); updateMenu()
                     end
                 end)
             end)
@@ -777,23 +777,22 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
 
         local function trigger_model_change(new_model)
             llm_mod.check_availability(new_model, function()
-                -- Direct switch if model is already downloaded
+                -- Model already exists: simple switch
                 state.llm_model = new_model
                 if keymap and keymap.set_llm_model then keymap.set_llm_model(new_model) end
                 save_prefs()
                 updateMenu()
                 hs.notify.new({title="Ergopti+ AI", informativeText="✅ Modèle bien changé pour : " .. new_model}):send()
             end, function(needs_ollama)
-                if needs_ollama then
-                    hs.dialog.blockAlert("Ollama absent", "Ollama ne semble pas être lancé.", "OK")
-                else
-                    local choice = hs.dialog.blockAlert("Modèle absent", 
-                        "Le modèle [" .. new_model .. "] n'est pas encore téléchargé.\nSouhaitez-vous le télécharger maintenant ?", 
-                        "Télécharger", "Annuler", "informational")
-                    if choice == "Télécharger" then
+                -- Delay to avoid dialog crash conflicts if another dialog just closed
+                hs.timer.doAfter(0.1, function()
+                    if needs_ollama then
+                        hs.dialog.blockAlert("Ollama absent", "Ollama ne semble pas être lancé ou installé.", "OK")
+                    else
+                        -- Removed the double prompt! Directly show the requirements and ask to download.
                         check_ram_and_install(new_model)
                     end
-                end
+                end)
             end)
         end
 
@@ -807,13 +806,14 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
         
         local models_menu = {}
         
-        -- Insert Cancel button at the very top if a download is running
+        -- Cancel button explicitly added at the top if a task exists
         if M._active_tasks["download"] then
             table.insert(models_menu, {
                 title = "🛑 Annuler le téléchargement en cours",
                 fn = function()
-                    if M._active_tasks["download"] then
-                        M._active_tasks["download"]:terminate()
+                    local t = M._active_tasks["download"]
+                    if t and type(t) == "userdata" and t.terminate then
+                        t:terminate()
                     end
                 end
             })
@@ -865,24 +865,30 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts, person
                             if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(state.llm_enabled) end
                             save_prefs(); updateMenu()
                         end, function(needs_ollama)
-                            local msg = needs_ollama and "Pour utiliser l'IA, il faut installer Ollama."
-                                                      or ("Le modèle [" .. state.llm_model .. "] est manquant.")
-                            
-                            local choice = hs.dialog.blockAlert("Installation requise", 
-                                msg .. " Souhaitez-vous procéder au téléchargement ?", 
-                                "Installer", "Plus tard", "informational")
-                            
-                            if choice == "Installer" then
-                                check_ram_and_install(state.llm_model, function()
-                                    state.llm_enabled = false
-                                    if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
-                                    save_prefs(); updateMenu()
-                                end)
-                            else
-                                state.llm_enabled = false
-                                if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
-                                save_prefs(); updateMenu()
-                            end
+                            hs.timer.doAfter(0.1, function()
+                                if needs_ollama then
+                                    local choice = hs.dialog.blockAlert("Installation requise", 
+                                        "Pour utiliser l'IA, il faut installer l'application Ollama.\nSouhaitez-vous procéder à l'installation ?", 
+                                        "Installer", "Plus tard", "informational")
+                                    if choice == "Installer" then
+                                        check_ram_and_install(state.llm_model, function()
+                                            state.llm_enabled = false
+                                            if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
+                                            save_prefs(); updateMenu()
+                                        end)
+                                    else
+                                        state.llm_enabled = false
+                                        if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
+                                        save_prefs(); updateMenu()
+                                    end
+                                else
+                                    check_ram_and_install(state.llm_model, function()
+                                        state.llm_enabled = false
+                                        if keymap and keymap.set_llm_enabled then keymap.set_llm_enabled(false) end
+                                        save_prefs(); updateMenu()
+                                    end)
+                                end
+                            end)
                         end)
                     end or nil
                 },
