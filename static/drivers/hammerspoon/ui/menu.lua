@@ -201,6 +201,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 
     --- Saves current state and preferences to the JSON config file.
     local function save_prefs()
+        -- Temporarily suppress the file watcher so it doesn't instantly reload Hammerspoon
+        -- when we legitimately save preferences via the menu interaction.
+        _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 1.0
+
         local section_states = {}
         for _, f in ipairs(hotfiles or {}) do
             local name = get_group_name(f)
@@ -247,7 +251,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         -- Merge new preferences into existing structure
         for k, v in pairs(prefs) do existing[k] = v end
 
-        local ok, encoded = pcall(hs.json.encode, existing)
+        -- Pass 'true' to hs.json.encode to format the JSON output with newlines and indentation (pretty-print)
+        local ok, encoded = pcall(hs.json.encode, existing, true)
         if ok and encoded then
             local fh = io.open(prefs_file, "w")
             if fh then fh:write(encoded); fh:close() end
@@ -1121,7 +1126,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
     local function reloadConfig(files)
         if hs.timer.secondsSinceEpoch() < _suppress_watcher_until then return end
         for _, file in pairs(files) do
-            if file:sub(-4) == ".lua" then do_reload("watcher"); return end
+            local filename = file:match("[^/]+$")
+            if file:sub(-4) == ".lua" or filename == "config.json" then 
+                do_reload("watcher")
+                return 
+            end
         end
     end
     local configWatcher = hs.pathwatcher.new(base_dir, reloadConfig):start()
