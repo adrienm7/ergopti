@@ -133,13 +133,13 @@ function M.create(deps)
     local function pull_model(target_model)
         local ollama_bin = get_ollama_path()
         if not ollama_bin then
-            notify("\226\157\140 Ollama introuvable", "Impossible de localiser l'exécutable ollama.")
+            notify("❌ Ollama introuvable", "Impossible de localiser l’exécutable ollama.")
             return
         end
 
         -- Immediate feedback so the user knows something started
-        notify("\226\143\167 Téléchargement démarré", target_model .. " se télécharge en arri\195\168re-plan\226\128\166")
-        update_icon("\240\159\147\165 Démarrage\226\128\166")
+        notify("\226\143\167 Téléchargement démarré", target_model .. " se télécharge en arrière-plan…")
+        update_icon("\240\159\147\165 Démarrage…")
 
         local task_id = "download"
         local task = hs.task.new(
@@ -149,7 +149,7 @@ function M.create(deps)
                 update_icon(); update_menu()
 
                 if exit_code == 15 then
-                    notify("\240\159\233\141 Annulé", "Téléchargement de " .. target_model .. " interrompu.")
+                    notify("🛑 Annulé", "Téléchargement de " .. target_model .. " interrompu.")
                     return
                 end
 
@@ -160,14 +160,14 @@ function M.create(deps)
                     state.llm_model = target_model
                     if keymap and keymap.set_llm_model then keymap.set_llm_model(target_model) end
                     save_prefs()
-                    notify("🟢  MODELE INSTALLE", target_model .. " est pr\195\170t \195\160 l'emploi.")
+                    notify("🟢  MODÈLE INSTALLÉ", target_model .. " est prêt à l’emploi.")
                     hs.timer.doAfter(1, hs.reload)
                 else
-                    notify("\226\157\140 Échec du téléchargement", target_model .. " \226\128\148 " .. output:sub(1, 80))
+                    notify("❌ Échec du téléchargement", target_model .. " — " .. output:sub(1, 80))
                     hs.dialog.blockAlert(
-                        "Erreur de mod\195\168le",
-                        "Le mod\195\168le [" .. target_model .. "] n'a pas pu \195\170tre téléchargé.\n\n"
-                        .. "Détails" .. NBSP .. ": " .. output:sub(1, 150) .. "\226\128\166",
+                        "Erreur de modèle",
+                        "Le modèle [" .. target_model .. "] n'a pas pu être téléchargé.\n\n"
+                        .. "Détails" .. NBSP .. ": " .. output:sub(1, 150) .. "…",
                         "OK", nil, "critical"
                     )
                 end
@@ -178,7 +178,7 @@ function M.create(deps)
                 if percent then
                     update_icon("\240\159\147\165 " .. make_progress_bar(percent) .. " " .. percent .. "%")
                 elseif out:lower():find("pulling") or out:lower():find("downloading") then
-                    update_icon("\240\159\147\165 Récupération\226\128\166")
+                    update_icon("\240\159\147\165 Récupération…")
                 end
                 return true
             end,
@@ -196,15 +196,15 @@ function M.create(deps)
 -- ====================================
 
     local function install_ollama_then_pull(target_model)
-        notify("Étape 1/2" .. NBSP .. ": Installation", "Téléchargement de l'application Ollama\226\128\166")
+        notify("Étape 1/2" .. NBSP .. ": Installation", "Téléchargement de l'application Ollama…")
         local task_id = "install"
         local task = hs.task.new("/bin/bash", function(code)
             active_tasks[task_id] = nil
             if code == 0 then
-                notify("🟢 Ollama installé", "Lancement du téléchargement du mod\195\168le\226\128\166")
+                notify("🟢 Ollama installé", "Lancement du téléchargement du modèle…")
                 pull_model(target_model)
             else
-                notify("\226\157\140 Échec installation", "L'installation d'Ollama a échoué.")
+                notify("❌ Échec installation", "L'installation d'Ollama a échoué.")
             end
         end, { "-c", [[
             curl -L https://ollama.com/download/ollama-darwin-universal.zip -o /tmp/ollama.zip
@@ -237,7 +237,7 @@ function M.create(deps)
 
         if sys_ram_gb > 0 and sys_ram_gb < req_ram then
             table.insert(warnings, string.format(
-                "\240\159\224\180 RAM" .. NBSP .. ": %d Go (requiert ~%d Go). Risque de lenteur.",
+                "⚠️ RAM" .. NBSP .. ": %d Go (requiert ~%d Go). Risque de lenteur.",
                 sys_ram_gb, req_ram))
         else
             table.insert(warnings, string.format(
@@ -249,7 +249,7 @@ function M.create(deps)
             if remaining < 2 then
                 is_critical = true
                 table.insert(warnings, string.format(
-                    "\226\157\140 Disque" .. NBSP .. ": seulement %d Go restant apr\195\168s installation. Bloqué.", remaining))
+                    "❌ Disque" .. NBSP .. ": seulement %d Go restant après installation. Bloqué.", remaining))
             elseif remaining < 15 then
                 table.insert(warnings, string.format(
                     "\226\154\160\239\184\143 Disque" .. NBSP .. ": %d Go restants (poids" .. NBSP .. ": ~%d Go).",
@@ -260,7 +260,7 @@ function M.create(deps)
             end
         end
 
-        local msg = "Mod\195\168le ciblé" .. NBSP .. ": " .. target_model .. "\n\n"
+        local msg = "Modèle ciblé" .. NBSP .. ": " .. target_model .. "\n\n"
                     .. table.concat(warnings, "\n")
 
         hs.timer.doAfter(0.1, function()
@@ -270,12 +270,12 @@ function M.create(deps)
                 return
             end
 
-            local alert_type = (msg:find("\240\159\224\180") or msg:find("\226\154\160\239\184\143"))
+            local alert_type = (msg:find("⚠️") or msg:find("\226\154\160\239\184\143"))
                                 and "warning" or "informational"
             local choice = hs.dialog.blockAlert(
                 "Installation requise",
-                msg .. "\n\nCe mod\195\168le n'est pas installé.\n"
-                .. "Voulez-vous lancer le téléchargement en arri\195\168re-plan" .. NBSP .. "?",
+                msg .. "\n\nCe modèle n’est pas installé.\n"
+                .. "Voulez-vous lancer le téléchargement en arrière-plan" .. NBSP .. "?",
                 "Télécharger", "Annuler", alert_type
             )
 
@@ -343,7 +343,7 @@ function M.create(deps)
 
         local function switch_model(new_model)
             -- Immediate feedback: user clicked, something is happening
-            notify("\226\143\167 Vérification\226\128\166", "Contr\195\180le du mod\195\168le " .. new_model .. "\226\128\166")
+            notify("\226\143\167 Vérification…", "Contrôle du modèle " .. new_model .. "…")
 
             llm_mod.check_availability(new_model,
                 function()
@@ -356,7 +356,7 @@ function M.create(deps)
                     hs.timer.doAfter(0.1, function()
                         if needs_ollama then
                             hs.dialog.blockAlert("Ollama absent",
-                                "Ollama ne semble pas \195\170tre lancé ou installé.", "OK")
+                                "Ollama ne semble pasêtre lancé ou installé.", "OK")
                         else
                             check_system_and_install(new_model)
                         end
@@ -374,7 +374,7 @@ function M.create(deps)
         -- Cancel button pinned at top when a download is active
         if active_tasks["download"] then
             table.insert(models_menu, {
-                title = "\240\159\233\141 Annuler le téléchargement en cours",
+                title = "🛑 Annuler le téléchargement en cours",
                 fn    = function()
                     local t = active_tasks["download"]
                     if t and type(t) == "userdata" and t.terminate then t:terminate() end
@@ -399,11 +399,11 @@ function M.create(deps)
 
         table.insert(models_menu, { title = "-" })
         table.insert(models_menu, {
-            title = "  Autre mod\195\168le (saisie manuelle)\226\128\166",
+            title = "  Autre modèle (saisie manuelle)…",
             fn    = not paused and function()
                 local btn, raw = hs.dialog.textPrompt(
-                    "Mod\195\168le IA personnalisé",
-                    "Entrez le nom exact du mod\195\168le Ollama" .. NBSP .. ":",
+                    "Modèle IA personnalisé",
+                    "Entrez le nom exact du modèle Ollama" .. NBSP .. ":",
                     state.llm_model, "OK", "Annuler"
                 )
                 if btn == "OK" and raw and raw ~= "" then
@@ -413,14 +413,81 @@ function M.create(deps)
         })
 
 -- ===========================================
--- ======= 7.3 Top-Level Item Assembly =======
+-- ======= 7.3 Advanced Settings Menu ========
+-- ===========================================
+
+        local advanced_menu = {
+            {
+                title = "Contexte" .. NBSP .. ": " .. state.llm_context_length .. " derniers caractères.",
+                disabled = paused or nil,
+                fn = not paused and function()
+                    local btn, raw = hs.dialog.textPrompt("Longueur du contexte", 
+                        "Entrez le nombre de caractères gardés en mémoire (ex: 500) :", 
+                        tostring(state.llm_context_length), "OK", "Annuler")
+                    if btn == "OK" and tonumber(raw) then
+                        state.llm_context_length = tonumber(raw)
+                        if keymap and keymap.set_llm_context_length then 
+                            keymap.set_llm_context_length(state.llm_context_length) 
+                        end
+                        save_prefs(); update_menu()
+                    end
+                end or nil
+            },
+            {
+                title = "Reset contexte sur clic/flèches",
+                checked = state.llm_reset_on_nav,
+                disabled = paused or nil,
+                fn = not paused and function()
+                    state.llm_reset_on_nav = not state.llm_reset_on_nav
+                    if keymap and keymap.set_llm_reset_on_nav then 
+                        keymap.set_llm_reset_on_nav(state.llm_reset_on_nav) 
+                    end
+                    save_prefs(); update_menu()
+                end or nil
+            },
+            {
+                title = "Température" .. NBSP .. ": " .. state.llm_temperature,
+                disabled = paused or nil,
+                fn = not paused and function()
+                    local btn, raw = hs.dialog.textPrompt("Température du LLM", 
+                        "Nombre décimal entre 0.0 (prévisible) et 1.0 (créatif)" .. NBSP .. ":", 
+                        tostring(state.llm_temperature), "OK", "Annuler")
+                    if btn == "OK" and tonumber(raw) then
+                        state.llm_temperature = tonumber(raw)
+                        if keymap and keymap.set_llm_temperature then 
+                            keymap.set_llm_temperature(state.llm_temperature) 
+                        end
+                        save_prefs(); update_menu()
+                    end
+                end or nil
+            },
+            {
+                title = "Longueur max. de prédiction : " .. state.llm_max_predict .. " tokens",
+                disabled = paused or nil,
+                fn = not paused and function()
+                    local btn, raw = hs.dialog.textPrompt("Prédiction maximale", 
+                        "Nombre maximum de mots/tokens générés par l'IA (ex: 40) :", 
+                        tostring(state.llm_max_predict), "OK", "Annuler")
+                    if btn == "OK" and tonumber(raw) then
+                        state.llm_max_predict = tonumber(raw)
+                        if keymap and keymap.set_llm_max_predict then 
+                            keymap.set_llm_max_predict(state.llm_max_predict) 
+                        end
+                        save_prefs(); update_menu()
+                    end
+                end or nil
+            }
+        }
+
+-- ===========================================
+-- ======= 7.4 Top-Level Item Assembly =======
 -- ===========================================
 
         return {
-            title = "Prédiction par IA (LLM)",
+            title = "Intelligence Artificielle",
             menu  = {
                 {
-                    title    = "Activer l'IA",
+                    title    = "Activer les suggestions IA (LLM)",
                     checked  = (state.llm_enabled and not paused) or nil,
                     disabled = paused or nil,
                     fn       = not paused and function()
@@ -432,9 +499,9 @@ function M.create(deps)
                                 end
                                 save_prefs(); update_menu()
                                 if state.llm_enabled then
-                                    notify("🟢 ACTIVÉ", "IA (LLM) activée.")
+                                    notify("🟢 ACTIVÉ", "Suggestions IA activées.")
                                 else
-                                    notify("🔴 DÉSACTIVÉ", "IA (LLM) désactivée.")
+                                    notify("🔴 DÉSACTIVÉ", "Suggestions IA désactivées.")
                                 end
                             end,
                             function(needs_ollama)
@@ -442,7 +509,7 @@ function M.create(deps)
                                     if needs_ollama then
                                         local choice = hs.dialog.blockAlert(
                                             "Installation requise",
-                                            "Pour utiliser l'IA, il faut installer Ollama.\n"
+                                            "Pour utiliser l’IA, il faut installer Ollama.\n"
                                             .. "Souhaitez-vous procéder" .. NBSP .. "?",
                                             "Installer", "Plus tard", "informational"
                                         )
@@ -461,24 +528,24 @@ function M.create(deps)
                 },
                 { title = "-" },
                 {
-                    title    = "Mod\195\168le IA" .. NBSP .. ": " .. state.llm_model,
+                    title    = "Modèle" .. NBSP .. ": " .. state.llm_model,
                     disabled = paused or nil,
                     menu     = models_menu,
                 },
                 {
-                    title    = "Délai de réflexion IA" .. NBSP .. ": " .. debounce_ms .. " ms\226\128\166",
+                    title    = "Délai avant suggestion IA" .. NBSP .. ": " .. debounce_ms .. " ms…",
                     disabled = paused or nil,
                     fn       = not paused and function()
                         local btn, raw = hs.dialog.textPrompt(
-                            "Délai de l'IA",
-                            "Délai avant déclenchement du LLM (en ms)" .. NBSP .. ":",
+                            "Délai avant suggestion IA",
+                            "L’IA s’active après ce temps d’inactivité au clavier (ex: 500 = une demi-seconde).\n\n⚠️ L’IA locale demande beaucoup de ressources :\n• Court (ex: 200) : Très réactif, mais fait chauffer le Mac et vide la batterie.\n• Long (ex: 1000) : Plus discret, préserve l’autonomie et la température.\n\nDélai (en ms)" .. NBSP .. ":",
                             tostring(debounce_ms), "OK", "Annuler"
                         )
                         if btn ~= "OK" then return end
                         local val = tonumber(raw)
                         if not val or val < 0 or val ~= math.floor(val) then
                             hs.notify.new({ title = "Délai invalide",
-                                informativeText = "Veuillez saisir un entier \226\137\165 0." }):send()
+                                informativeText = "Veuillez saisir un entier ≥ 0." }):send()
                             return
                         end
                         state.llm_debounce = val / 1000
@@ -488,6 +555,12 @@ function M.create(deps)
                         save_prefs(); update_menu()
                     end or nil,
                 },
+                { title = "-" },
+                {
+                    title    = "Paramètres avancés…",
+                    disabled = paused or nil,
+                    menu     = advanced_menu,
+                }
             },
         }
     end
@@ -507,8 +580,8 @@ function M.create(deps)
                 if needs_ollama then
                     local choice = hs.dialog.blockAlert(
                         "Ollama absent",
-                        "Pour utiliser l'IA, il faut installer Ollama.\n"
-                        .. "Souhaitez-vous l'installer maintenant" .. NBSP .. "?",
+                        "Pour utiliser l’IA, il faut installer Ollama.\n"
+                        .. "Souhaitez-vous l’installer maintenant" .. NBSP .. "?",
                         "Installer", "Plus tard", "informational"
                     )
                     if choice == "Installer" then
