@@ -60,7 +60,8 @@ jobs:
                     echo "No changes to commit"
                     exit 0
                   fi
-                  git commit -m "ci: recompile ErgoptiPlus.exe"
+                  $datetime = Get-Date -Format 'yyyy-MM-dd HH:mm'
+                  git commit -m "ci: recompile ErgoptiPlus.exe [$datetime]"
                   git checkout -b ci/recompile-exe
                   git push origin ci/recompile-exe --force
                   EXISTING_PR=$(gh pr list --head ci/recompile-exe --base "$GITHUB_REF_NAME" --json number --jq '.[0].number')
