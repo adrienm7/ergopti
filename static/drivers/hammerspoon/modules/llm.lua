@@ -14,7 +14,7 @@ local SYSTEM_PROMPT = [[You are a strict text autocorrection and completion engi
 CRITICAL RULES:
 1. You receive a PREFIX (full context) and a TAIL (the last ~5-7 words).
 2. Format: Two lines starting with "TAIL_CORRECTED:" and "NEXT_WORDS:".
-3. TAIL_CORRECTED: Fix spelling, grammar, and accents in the TAIL. Do not change the meaning.
+3. TAIL_CORRECTED: Fix spelling, grammar, and accents ONLY in the current, incomplete sentence. Do NOT alter completed sentences, and NEVER change terminal punctuation (like periods) into commas. Do not change the meaning.
 4. NEXT_WORDS: Predict 1 to 5 words to continue the thought. If the sentence is complete, leave it empty.
 5. Code/Technical: If the context is code, maintain strict syntax.
 
@@ -55,6 +55,12 @@ PREFIX: "On se voit a quelle heur"
 TAIL: "voit a quelle heur"
 TAIL_CORRECTED: voit à quelle heure
 NEXT_WORDS: demain ?
+
+Example 7 (Multiple sentences context):
+PREFIX: "C'est bon. je te"
+TAIL: "C'est bon. je te"
+TAIL_CORRECTED: C'est bon. Je te
+NEXT_WORDS: l'envoie demain.
 ]]
 
 -- ==========================================
@@ -92,7 +98,7 @@ end
 -- LLM Prediction Logic
 -- ==========================================
 
-function M.fetch_llm_prediction(full_text, tail_text, model_name, on_success, on_fail)
+function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature, max_predict, on_success, on_fail)
     local user_prompt = string.format('PREFIX: "%s"\nTAIL: "%s"', full_text, tail_text)
     local payload = {
         model = model_name,
@@ -102,8 +108,8 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, on_success, on
         },
         stream = false,
         options = { 
-            temperature = 0.1, 
-            num_predict = 40, 
+            temperature = temperature, 
+            num_predict = max_predict, 
             stop = {"\n\n", "PREFIX:", "TAIL:"} 
         }
     }
@@ -124,14 +130,13 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, on_success, on
         
         if not tc or not nw then return on_fail() end
         
-        -- Sanitize outputs: trim and normalize smart quotes
-        tc = tc:gsub('^"', ""):gsub('"$', ""):match("^%s*(.-)%s*$"):gsub("'", "’")
-        nw = nw:match("^(.-)%s*$"):gsub("'", "’")
+        -- Sanitize outputs: trim whitespace and quotes. Trust the LLM for apostrophe formatting.
+        tc = tc:gsub('^"', ""):gsub('"$', ""):gsub("^%s+", ""):gsub("%s+$", "")
+        nw = nw:gsub("^%s+", ""):gsub("%s+$", "")
         
         if tc == "" and nw == "" then return on_fail() end
 
-        -- Normalize tail_text apostrophes for a fair comparison with tc
-        local normalized_tail = tail_text:gsub("'", "’")
+        -- Append trailing space to TAIL_CORRECTED if the original tail had one
         local tail_trailing_space = tail_text:match("(%s+)$")
         if tail_trailing_space and not tc:match("%s$") then
             tc = tc .. tail_trailing_space
@@ -139,6 +144,8 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, on_success, on
 
         local last_char = utils.utf8_sub(tc, -1)
         local first_char = utils.utf8_sub(nw, 1, 1)
+        
+        -- We only skip adding a space if the word starts with punctuation, or the tail ends with an apostrophe/hyphen
         local needs_space = not (last_char:match("[%s'’%-]") or first_char:match("[%s.,;)%}%%%]]") or nw == "")
         if needs_space then nw = " " .. nw end
 
@@ -146,13 +153,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, on_success, on
         local tc_len = utils.utf8_len(tc)
         if tc_len < tail_len * 0.7 then return on_fail() end
 
-        -- Use normalized_tail to calculate common length and deletes
-        local common_len = utils.get_common_prefix_utf8(normalized_tail, tc)
+        -- Use raw tail_text for calculations to avoid artificial highlights on unchanged apostrophes
+        local common_len = utils.get_common_prefix_utf8(tail_text, tc)
         local deletes = tail_len - common_len
         local to_type = utils.utf8_sub(tc, common_len + 1) .. nw
 
-        -- Pass normalized_tail to avoid highlights on identical apostrophes
-        local chunks = utils.diff_strings(normalized_tail, tc)
+        local chunks = utils.diff_strings(tail_text, tc)
         on_success(deletes, to_type, nw, chunks)
     end)
 end

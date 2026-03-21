@@ -1,7 +1,10 @@
+-- ===========================================================================
 -- ui/menu.lua
+--
 -- Menubar UI: assembles the Ergopti+ status-bar menu, owns preference
 -- persistence (config.json), and drives the config file watcher.
 -- LLM-specific logic is delegated to ui/menu_llm.lua.
+-- ===========================================================================
 
 local M = {}
 
@@ -11,10 +14,11 @@ local llm_mod   = require("modules.llm")
 local menu_llm  = require("ui.menu_llm")
 
 local NBSP  = "\194\160"      -- U+00A0  non-breaking space   (before :)
-local NNBSP = "\226\128\175"  -- U+202F  narrow no-break sp.  (before !  ?)
+local NNBSP = "\226\128\175"  -- U+202F  narrow no-break space (before !  ?)
 
 M._active_tasks = {}
 
+-- UI Labels for gesture slots (kept in French for the interface)
 local SLOT_LABELS = {
     tap_3         = "Tap 3 doigts",
     tap_4         = "Tap 4 doigts",
@@ -34,6 +38,11 @@ local SLOT_LABELS = {
     swipe_5_down  = "Swipe 5 doigts \226\134\147",
 }
 
+-- Utility to safely extract group names by stripping known extensions
+local function get_group_name(file)
+    return file:match("^(.*)%.lua$") or file:match("^(.*)%.toml$") or file
+end
+
 -- ====================================
 -- ====================================
 -- ====================================
@@ -42,21 +51,22 @@ local SLOT_LABELS = {
 -- ====================================
 -- ====================================
 
----@param base_dir        string
----@param hotfiles        table
----@param gestures        table
----@param scroll          table
----@param keymap          table
----@param shortcuts       table
----@param personal_info   table
----@param module_sections table
----@param script_control  table
+--- Initialises the UI menu and all its sub-components.
+--- @param base_dir        string Directory path of the main script
+--- @param hotfiles        table  List of parsed hotstring file names
+--- @param gestures        table  Gestures module reference
+--- @param scroll          table  Scroll module reference
+--- @param keymap          table  Keymap module reference
+--- @param shortcuts       table  Shortcuts module reference
+--- @param personal_info   table  Personal info module reference
+--- @param module_sections table  Additional section descriptions for modules
+--- @param script_control  table  Script control module reference
 function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                  personal_info, module_sections, script_control)
 
     base_dir = base_dir or (hs.configdir .. "/")
     local myMenu  = hs.menubar.new()
-    local updateMenu  -- forward declaration
+    local updateMenu  -- Forward declaration
 
 -- ======================================
 -- ======================================
@@ -66,26 +76,32 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ======================================
 -- ======================================
 
+    --- Updates the menubar icon based on the script's paused state.
+    --- @param custom_text string|nil Optional text to display next to the icon.
     local function update_icon(custom_text)
         local paused    = script_control and script_control.is_paused() or false
         local logo_file = paused and "logo_black.png" or "logo_white.png"
         local ico       = hs.image.imageFromPath(base_dir .. "images/" .. logo_file)
+        
         myMenu:setTitle(custom_text and (" " .. custom_text) or "")
+        
         if ico then
             pcall(function() if ico.setSize then ico:setSize({ w = 18, h = 18 }) end end)
             myMenu:setIcon(ico, false)
         elseif not custom_text then
-            myMenu:setTitle("\240\159\148\168")
+            myMenu:setTitle("\240\159\148\168") -- Fallback emoji (hammer)
         end
     end
     update_icon()
 
     local _suppress_watcher_until = 0
 
+    --- Triggers a safe reload of the Hammerspoon configuration.
+    --- @param source string Indicates what triggered the reload ("watcher" or manual).
     local function do_reload(source)
         local msg = source == "watcher"
-            and "Fichiers modifiés \226\128\148 Rechargement\226\128\166"
-            or  "Rechargement du script\226\128\166"
+            and "Fichiers modifiés — Rechargement…"
+            or  "Rechargement du script…"
         pcall(utils.notify, msg)
         hs.timer.doAfter(0.25, function() hs.reload() end)
     end
@@ -98,7 +114,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ======================================
 -- ======================================
 
-    -- Two-line notification: uppercase bold title + feature label below.
+    --- Displays a two-line notification for feature toggles.
+    --- @param label string The name of the feature being toggled.
+    --- @param is_enabled boolean The new state of the feature.
     local function notify_feature(label, is_enabled)
         pcall(function()
             hs.notify.new({
@@ -118,19 +136,18 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ============================================
 -- ============================================
 
-
     -- ===============================
--- ======= 4.1 State Table =======
--- ===============================
+    -- ======= 4.1 State Table =======
+    -- ===============================
 
     local state = {
-        keymap           = true,
-        gestures         = true,
-        scroll           = true,
-        shortcuts        = true,
-        personal_info    = true,
-        hotstrings       = {},
-        chatgpt_url      = "https://chat.openai.com",
+        keymap                   = true,
+        gestures                 = true,
+        scroll                   = true,
+        shortcuts                = true,
+        personal_info            = true,
+        hotstrings               = {},
+        chatgpt_url              = "https://chat.openai.com",
         sections_order_overrides = {},
         terminator_states        = {},
         expansion_delay          = (keymap and keymap.DEFAULT_BASE_DELAY_SEC) or 0.05,
@@ -138,22 +155,42 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         script_control_enabled   = true,
         ahk_source_path          = "",
         preview_enabled          = true,
-        llm_enabled   = llm_mod and llm_mod.DEFAULT_LLM_ENABLED  or false,
-        llm_debounce  = llm_mod and llm_mod.DEFAULT_LLM_DEBOUNCE or 0.5,
-        llm_model     = llm_mod and llm_mod.DEFAULT_LLM_MODEL    or "llama3.2",
+        llm_enabled              = llm_mod and llm_mod.DEFAULT_LLM_ENABLED  or false,
+        llm_debounce             = llm_mod and llm_mod.DEFAULT_LLM_DEBOUNCE or 0.5,
+        llm_model                = llm_mod and llm_mod.DEFAULT_LLM_MODEL    or "llama3.2",
+        trigger_char             = "★",
+        llm_context_length       = 500,
+        llm_reset_on_nav         = true,
+        llm_temperature          = 0.1,
+        llm_max_predict          = 40,
     }
 
+    --- Utility to dynamically replace the default trigger star with the user's chosen character.
+    --- @param text string|nil The string to process.
+    --- @return string|nil The processed string.
+    local function applyTriggerChar(text)
+        if type(text) ~= "string" then return text end
+        -- Escape '%' in the trigger character to prevent Lua pattern matching errors in gsub
+        local safe_repl = state.trigger_char:gsub("%%", "%%%%")
+        local res = text:gsub("★", safe_repl)
+        -- Replace direct unicode star just in case
+        res = res:gsub("\226\152\133", safe_repl) 
+        return res
+    end
+
     for _, f in ipairs(hotfiles or {}) do
-        local name = f:match("^(.*)%.lua$") or f
+        local name = get_group_name(f)
         state.hotstrings[name] = true
     end
 
     local prefs_file = base_dir .. "config.json"
 
     -- ===================================
--- ======= 4.2 Preferences I/O =======
--- ===================================
+    -- ======= 4.2 Preferences I/O =======
+    -- ===================================
 
+    --- Loads preferences from the JSON config file.
+    --- @return table Parsed configuration dictionary.
     local function load_prefs()
         local fh = io.open(prefs_file, "r")
         if not fh then return {} end
@@ -162,10 +199,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         return (ok and type(tbl) == "table") and tbl or {}
     end
 
+    --- Saves current state and preferences to the JSON config file.
     local function save_prefs()
         local section_states = {}
         for _, f in ipairs(hotfiles or {}) do
-            local name = f:match("^(.*)%.lua$") or f
+            local name = get_group_name(f)
             local secs = keymap and keymap.get_sections and keymap.get_sections(name) or nil
             if secs then
                 section_states[name] = {}
@@ -188,11 +226,16 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             gesture_actions = gestures.get_all_actions(),
             script_control_shortcuts = state.script_control_shortcuts,
             script_control_enabled   = state.script_control_enabled,
-            ahk_source_path  = state.ahk_source_path,
-            preview_enabled  = state.preview_enabled,
-            llm_enabled      = state.llm_enabled,
-            llm_debounce     = state.llm_debounce,
-            llm_model        = state.llm_model,
+            ahk_source_path          = state.ahk_source_path,
+            preview_enabled          = state.preview_enabled,
+            llm_enabled              = state.llm_enabled,
+            llm_debounce             = state.llm_debounce,
+            llm_model                = state.llm_model,
+            trigger_char             = state.trigger_char,
+            llm_context_length       = state.llm_context_length,
+            llm_reset_on_nav         = state.llm_reset_on_nav,
+            llm_temperature          = state.llm_temperature,
+            llm_max_predict          = state.llm_max_predict,
         }
 
         if shortcuts and type(shortcuts.list_shortcuts) == "function" then
@@ -201,6 +244,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             end
         end
 
+        -- Merge new preferences into existing structure
         for k, v in pairs(prefs) do existing[k] = v end
 
         local ok, encoded = pcall(hs.json.encode, existing)
@@ -208,7 +252,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             local fh = io.open(prefs_file, "w")
             if fh then fh:write(encoded); fh:close() end
         else
-            hs.printf("[ui/menu] save_prefs failed\226\128\148 %s", tostring(encoded))
+            hs.printf("[ui/menu] save_prefs failed— %s", tostring(encoded))
         end
     end
 
@@ -227,9 +271,10 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         local saved         = load_prefs()
         local config_absent = (next(saved) == nil)
 
+        -- If no config exists, set default states for sections
         if config_absent then
             for _, f in ipairs(hotfiles or {}) do
-                local name = f:match("^(.*)%.lua$") or f
+                local name = get_group_name(f)
                 local secs = keymap and keymap.get_sections and keymap.get_sections(name) or nil
                 if secs then
                     for _, sec in ipairs(secs) do
@@ -238,25 +283,44 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                         end
                     end
                 end
-                keymap.disable_group(name)
-                keymap.enable_group(name)
+                if keymap then
+                    keymap.disable_group(name)
+                    keymap.enable_group(name)
+                end
             end
         end
 
+        -- Restore saved configuration into state
         if type(saved) == "table" then
-            if saved.keymap           ~= nil then state.keymap           = saved.keymap           end
-            if saved.gestures         ~= nil then state.gestures         = saved.gestures         end
-            if saved.scroll           ~= nil then state.scroll           = saved.scroll           end
-            if saved.shortcuts        ~= nil then state.shortcuts        = saved.shortcuts        end
-            if saved.personal_info    ~= nil then state.personal_info    = saved.personal_info    end
-            if saved.chatgpt_url      ~= nil then state.chatgpt_url      = saved.chatgpt_url      end
-            if saved.preview_enabled  ~= nil then state.preview_enabled  = saved.preview_enabled  end
-            if saved.llm_enabled      ~= nil then state.llm_enabled      = saved.llm_enabled      end
+            if type(saved.trigger_char) == "string" then state.trigger_char = saved.trigger_char end
+            if saved.keymap           ~= nil then state.keymap           = saved.keymap          end
+            if saved.gestures         ~= nil then state.gestures         = saved.gestures        end
+            if saved.scroll           ~= nil then state.scroll           = saved.scroll          end
+            if saved.shortcuts        ~= nil then state.shortcuts        = saved.shortcuts       end
+            if saved.personal_info    ~= nil then state.personal_info    = saved.personal_info   end
+            if saved.chatgpt_url      ~= nil then state.chatgpt_url      = saved.chatgpt_url     end
+            if saved.preview_enabled  ~= nil then state.preview_enabled  = saved.preview_enabled end
+            if saved.llm_enabled      ~= nil then state.llm_enabled      = saved.llm_enabled     end
             if type(saved.llm_debounce) == "number" then state.llm_debounce = saved.llm_debounce end
             if type(saved.llm_model)    == "string" then state.llm_model    = saved.llm_model    end
-            if type(saved.sections_order_overrides) == "table" then
-                state.sections_order_overrides = saved.sections_order_overrides
+            if type(saved.llm_context_length) == "number" then state.llm_context_length = saved.llm_context_length end
+            if saved.llm_reset_on_nav         ~= nil      then state.llm_reset_on_nav   = saved.llm_reset_on_nav   end
+            if type(saved.llm_temperature)    == "number" then state.llm_temperature    = saved.llm_temperature    end
+            if type(saved.llm_max_predict)    == "number" then state.llm_max_predict    = saved.llm_max_predict    end
+            if type(saved.sections_order_overrides) == "table" then state.sections_order_overrides = saved.sections_order_overrides end
+
+            -- Restore section states directly from config.json to hs.settings BEFORE groups load
+            if type(saved.section_states) == "table" then
+                for group_name, secs in pairs(saved.section_states) do
+                    if type(secs) == "table" then
+                        for sec_name, sec_enabled in pairs(secs) do
+                            local key = "hotstrings_section_" .. group_name .. "_" .. sec_name
+                            hs.settings.set(key, sec_enabled == false and false or nil)
+                        end
+                    end
+                end
             end
+
             if type(saved.terminator_states) == "table" then
                 state.terminator_states = saved.terminator_states
                 for key, enabled in pairs(saved.terminator_states) do
@@ -291,15 +355,22 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             gestures.apply_all_overrides()
         end
 
+        -- Apply state settings to the keymap module
         if keymap then
-            if keymap.set_preview_enabled then keymap.set_preview_enabled(state.preview_enabled) end
-            if keymap.set_llm_enabled     then keymap.set_llm_enabled(state.llm_enabled)         end
-            if keymap.set_llm_debounce    then keymap.set_llm_debounce(state.llm_debounce)       end
-            if keymap.set_llm_model       then keymap.set_llm_model(state.llm_model)             end
+            if keymap.set_preview_enabled    then keymap.set_preview_enabled(state.preview_enabled)       end
+            if keymap.set_llm_enabled        then keymap.set_llm_enabled(state.llm_enabled)               end
+            if keymap.set_llm_debounce       then keymap.set_llm_debounce(state.llm_debounce)             end
+            if keymap.set_llm_model          then keymap.set_llm_model(state.llm_model)                   end
+            if keymap.set_trigger_char       then keymap.set_trigger_char(state.trigger_char)             end
+            if keymap.set_llm_context_length then keymap.set_llm_context_length(state.llm_context_length) end
+            if keymap.set_llm_reset_on_nav   then keymap.set_llm_reset_on_nav(state.llm_reset_on_nav)     end
+            if keymap.set_llm_temperature    then keymap.set_llm_temperature(state.llm_temperature)       end
+            if keymap.set_llm_max_predict    then keymap.set_llm_max_predict(state.llm_max_predict)       end
         end
 
-        if state.keymap    then keymap.start()        else keymap.stop()          end
-        if state.gestures  then gestures.enable_all() else gestures.disable_all() end
+        -- Start or stop modules based on loaded state
+        if state.keymap    then keymap.start()         else keymap.stop()          end
+        if state.gestures  then gestures.enable_all()  else gestures.disable_all() end
         if state.scroll    then scroll.start()         else scroll.stop()          end
         if state.shortcuts then shortcuts.start()      else shortcuts.stop()       end
         if personal_info then
@@ -307,7 +378,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         end
 
         for name, enabled in pairs(state.hotstrings) do
-            if enabled then keymap.enable_group(name) else keymap.disable_group(name) end
+            if enabled then
+                -- Force reload so the group picks up the newly restored hs.settings
+                keymap.disable_group(name)
+                keymap.enable_group(name)
+            else
+                keymap.disable_group(name)
+            end
         end
 
         if type(saved) == "table" and type(saved.shortcut_keys) == "table" then
@@ -319,7 +396,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         if config_absent then save_prefs() end
     end
 
-    -- ====================================
+-- ====================================
 -- ====================================
 -- ====================================
 -- ========== 6. LLM HANDLER ==========
@@ -397,22 +474,31 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ===========================================
 -- ===========================================
 
-
     -- ==================================
--- ======= 8.1 Shared Helpers =======
--- ==================================
+    -- ======= 8.1 Shared Helpers =======
+    -- ==================================
 
+    --- Checks if a specific group is enabled.
+    --- @param name string Group name.
+    --- @return boolean
     local function groupEnabled(name)
         return (keymap and type(keymap.is_group_enabled) == "function"
                 and keymap.is_group_enabled(name))
             or (state.hotstrings[name] ~= false)
     end
 
+    --- Retrieves the display label for a group, processing the trigger char dynamically.
+    --- @param name string Group name.
+    --- @return string Display label.
     local function groupLabel(name)
         local meta = keymap and keymap.get_meta_description and keymap.get_meta_description(name)
-        return (meta and meta ~= "") and meta or name:gsub("_", " ")
+        local lbl = (meta and meta ~= "") and meta or name:gsub("_", " ")
+        return applyTriggerChar(lbl)
     end
 
+    --- Returns an action function to toggle a group's state.
+    --- @param name string Group name.
+    --- @return function
     local function toggleGroupFn(name)
         return function()
             state.hotstrings[name] = not groupEnabled(name)
@@ -428,6 +514,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         end
     end
 
+    --- Returns an action function to toggle a specific section within a group.
+    --- @param group_name string Group name.
+    --- @param sec_name string Section name.
+    --- @param sec_label string Formatted section label for notifications.
+    --- @return function
     local function toggleSectionFn(group_name, sec_name, sec_label)
         return function()
             local will_enable = not keymap.is_section_enabled(group_name, sec_name)
@@ -438,22 +529,24 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 keymap.disable_section(group_name, sec_name)
             end
             save_prefs()
-            notify_feature(sec_label or sec_name, will_enable)
+            notify_feature(applyTriggerChar(sec_label or sec_name), will_enable)
             updateMenu()
         end
     end
 
-    local buildPersonalInfoItems  -- forward declaration
+    local buildPersonalInfoItems  -- Forward declaration
 
     -- ==============================
--- ======= 8.2 Hotstrings =======
--- ==============================
+    -- ======= 8.2 Hotstrings =======
+    -- ==============================
 
+    --- Builds the menu items hierarchy for all hotstring groups.
+    --- @return table List of menu item definitions.
     local function buildHotstringsItems()
         local paused    = script_control and script_control.is_paused() or false
         local top_names = {}
         for _, f in ipairs(hotfiles or {}) do
-            top_names[#top_names + 1] = f:match("^(.*)%.lua$") or f
+            top_names[#top_names + 1] = get_group_name(f)
         end
         if #top_names == 0 then return {} end
 
@@ -513,8 +606,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                         local ms_entry = ms and ms[sec.name]
                         local mod_id   = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
                         if mod_id == "personal_info" then
-                            local pi_items = buildPersonalInfoItems(
-                                type(ms_entry) == "table" and ms_entry.description or nil)
+                            local ms_desc = type(ms_entry) == "table" and ms_entry.description or nil
+                            local pi_items = buildPersonalInfoItems(applyTriggerChar(ms_desc))
                             if pi_items then
                                 for _, pi in ipairs(pi_items) do
                                     if pi.checked ~= nil and paused then pi.checked = nil end
@@ -527,6 +620,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                         local sec_on = keymap.is_section_enabled(name, sec.name)
                         local lbl    = (sec.description and sec.description ~= "")
                                        and sec.description or sec.name:gsub("_", " ")
+                        lbl = applyTriggerChar(lbl)
                         sec_menu[#sec_menu + 1] = {
                             title    = sec.count ~= nil and (lbl .. " (" .. sec.count .. ")") or lbl,
                             checked  = (sec_on and not paused) or nil,
@@ -544,11 +638,15 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
     end
 
     -- =================================
--- ======= 8.3 Personal Info =======
--- =================================
+    -- ======= 8.3 Personal Info =======
+    -- =================================
 
+    --- Builds the menu item structure for personal information options.
+    --- @param description string Label for the menu item.
+    --- @return table|nil Menu structure.
     buildPersonalInfoItems = function(description)
         if not personal_info then return nil end
+        description = applyTriggerChar(description)
         return {
             {
                 title   = description,
@@ -563,16 +661,18 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 end,
             },
             {
-                title = "   \226\134\179 Modifier les informations\226\128\166",
+                title = "   ↳ Modifier les informations…",
                 fn    = function() hs.timer.doAfter(0.1, personal_info.open_editor) end,
             },
         }
     end
 
--- ======================================
--- ======= 8.4 Hotstring Settings =======
--- ======================================
+    -- ======================================
+    -- ======= 8.4 Hotstring Settings =======
+    -- ======================================
 
+    --- Builds the hotstring settings and configuration menu block.
+    --- @return table Menu structure.
     local function buildHotstringsManagementItem()
         local paused = script_control and script_control.is_paused() or false
         local menu   = {}
@@ -598,7 +698,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         for _, def in ipairs(defs) do
             local enabled_t = keymap.is_terminator_enabled(def.key)
             exp_sub[#exp_sub + 1] = {
-                title    = def.label,
+                title    = applyTriggerChar(def.label),
                 checked  = (enabled_t and not paused) or nil,
                 disabled = paused or nil,
                 fn       = not paused and (function(k, lbl) return function()
@@ -606,7 +706,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                     keymap.set_terminator_enabled(k, nv)
                     state.terminator_states[k] = nv
                     save_prefs()
-                    notify_feature("Expanseur" .. NBSP .. ": " .. lbl, nv)
+                    notify_feature("Expanseur" .. NBSP .. ": " .. applyTriggerChar(lbl), nv)
                     updateMenu()
                 end end)(def.key, def.label) or nil,
             }
@@ -616,31 +716,59 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         local current_ms = math.floor(
             ((keymap and keymap.get_base_delay and keymap.get_base_delay()) or state.expansion_delay) * 1000 + 0.5)
         table.insert(menu, {
-            title    = "Délai maximal d'expansion" .. NBSP .. ": " .. current_ms .. " ms\226\128\166",
+            title    = "Délai maximal d'expansion" .. NBSP .. ": " .. current_ms .. " ms…",
             disabled = paused or nil,
             fn       = not paused and function()
                 local btn, raw = hs.dialog.textPrompt(
                     "Délai maximal d'expansion",
-                    "Entrez le délai en millisecondes (entier \226\137\165 0)" .. NBSP .. ":",
+                    "Entrez le délai en millisecondes (entier ≥ 0)" .. NBSP .. ":",
                     tostring(current_ms), "OK", "Annuler")
                 if btn ~= "OK" then return end
                 local val = tonumber(raw)
                 if not val or val < 0 or val ~= math.floor(val) then
                     hs.notify.new({ title = "Délai invalide",
-                        informativeText = "Veuillez saisir un entier \226\137\165 0." }):send(); return
+                        informativeText = "Veuillez saisir un entier ≥ 0." }):send(); return
                 end
                 keymap.set_base_delay(val / 1000); state.expansion_delay = val / 1000
                 save_prefs(); updateMenu()
             end or nil,
         })
 
-        return { title = "Param\195\168tres Hotstrings", menu = menu }
+        -- Option to dynamically change the trigger character
+        table.insert(menu, { title = "-" })
+        table.insert(menu, {
+            title    = "Caractère de déclenchement" .. NBSP .. ": " .. state.trigger_char,
+            disabled = paused or nil,
+            fn       = not paused and function()
+                local btn, raw = hs.dialog.textPrompt(
+                    "Caractère de déclenchement",
+                    "Entrez le caractère à utiliser (actuel : " .. state.trigger_char .. ")" .. NBSP .. ":",
+                    state.trigger_char, "OK", "Annuler"
+                )
+                if btn == "OK" and raw ~= nil and raw ~= "" then
+                    -- Extract only the first valid character (useful if the user pasted a word)
+                    local new_char = raw:match("^([%z\1-\127\194-\244][\128-\191]*)") or raw:sub(1,1)
+                    if new_char and new_char ~= state.trigger_char then
+                        state.trigger_char = new_char
+                        if keymap and keymap.set_trigger_char then
+                            keymap.set_trigger_char(new_char)
+                        end
+                        save_prefs()
+                        -- A forced reload is necessary to correctly re-evaluate core triggers
+                        do_reload("menu")
+                    end
+                end
+            end or nil,
+        })
+        return { title = "Paramètres Hotstrings", menu = menu }
     end
 
     -- ============================
--- ======= 8.5 Gestures =======
--- ============================
+    -- ======= 8.5 Gestures =======
+    -- ============================
 
+    --- Builds the trackpad gestures menu block.
+    --- @return table Menu structure.
     local function buildGesturesItem()
         local paused = script_control and script_control.is_paused() or false
         local item   = {
@@ -716,6 +844,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ======= 8.6 Shortcuts =======
 -- =============================
 
+    --- Builds the quick shortcuts menu block.
+    --- @return table Menu structure.
     local function buildRaccourcisItem()
         local paused = script_control and script_control.is_paused() or false
         local item   = {
@@ -734,7 +864,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             for p in id:gmatch("[^_]+") do table.insert(parts, p) end
             if #parts == 0 then return id end
             local key = parts[#parts]
-            if key == "star" or key == "asterisk" then key = "\226\152\133" end
+            if key == "star" or key == "asterisk" then key = state.trigger_char end
             local mods = {}
             for i = 1, #parts - 1 do
                 local p = parts[i]
@@ -766,7 +896,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             if not is_ctrl then last_was_non_ctrl = true end
 
             local is_on = shortcuts.is_enabled and shortcuts.is_enabled(s.id) or s.enabled
-            local desc  = (s.label or ""):gsub("^%s*(.-)%s*$", "%1")
+            local desc  = applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
             table.insert(s_menu, {
                 title    = pretty_key(s.id) .. NBSP .. ": " .. (desc ~= "" and desc or s.id),
                 checked  = (is_on and not paused) or nil,
@@ -779,7 +909,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             })
             if s.id == "ctrl_g" then
                 table.insert(s_menu, {
-                    title    = "   \226\134\179 Modifier l'URL ChatGPT\226\128\166",
+                    title    = "   ↳ Modifier l'URL ChatGPT…",
                     disabled = paused or nil,
                     fn       = not paused and function()
                         local clicked, url = hs.dialog.textPrompt("URL ChatGPT",
@@ -800,6 +930,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ======= 8.7 Script Control =======
 -- ==================================
 
+    --- Builds the script flow control options menu block.
+    --- @return table|nil Menu structure.
     local function buildScriptControlItem()
         if not script_control then return nil end
         local paused     = script_control.is_paused()
@@ -826,9 +958,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         end
 
         local cur_return = state.script_control_shortcuts.return_key or "none"
-        local cur_back   = state.script_control_shortcuts.backspace   or "none"
+        local cur_back   = state.script_control_shortcuts.backspace  or "none"
         return {
-            title   = "Contr\195\180le du script",
+            title   = "Contrôle du script",
             checked = (enabled and not paused) or nil,
             fn      = function()
                 state.script_control_enabled = not state.script_control_enabled
@@ -840,7 +972,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                     script_control.set_shortcut_action("backspace",  "none")
                 end
                 save_prefs()
-                notify_feature("Contr\195\180le du script", state.script_control_enabled)
+                notify_feature("Contrôle du script", state.script_control_enabled)
                 updateMenu()
             end,
             menu = {
@@ -849,7 +981,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 { title = "Option droite + \226\140\171" .. NBSP .. ": " .. (act_labels[cur_back] or cur_back),
                    disabled = not enabled or paused or nil, menu = key_submenu("backspace") },
                 { title = "-" },
-                { title    = "Chemin du script AHK\226\128\166",
+                { title    = "Chemin du script AHK…",
                    disabled = paused or nil,
                    fn       = not paused and function()
                     local btn, path = hs.dialog.textPrompt("Script AHK",
@@ -867,7 +999,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ======= 8.8 Bulk Enable / Disable =======
 -- =========================================
 
-    -- *** FIX: Apply changes in-place without hs.reload().
+    -- Applies changes in-place without triggering a full hs.reload().
     --   1. Update state + hs.settings for sections
     --   2. Force-disable then re-enable every TOML group (triggers load_toml
     --      which re-reads hs.settings, correctly loading/omitting sections)
@@ -919,7 +1051,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         end
 
         save_prefs()
-        notify_feature(enabled and "Tout activé" or "Tout désactivé", enabled)
+        notify_feature(enabled and "Toutes les fonctionnalités ont été activées." or "Toutes les fonctionnalités ont été désactivées.", enabled)
         updateMenu()
     end
 
@@ -954,9 +1086,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         if sc then table.insert(items, sc) end
 
         table.insert(items, { title = "-" })
-        table.insert(items, { title = "🟩 Tout activer",
+        table.insert(items, { title = "🟩 Activer toutes les fonctionnalités",
             fn = function() set_all_enabled(true)  end })
-        table.insert(items, { title = "🟥 Tout désactiver",
+        table.insert(items, { title = "🟥 Désactiver toutes les fonctionnalités",
             fn = function() set_all_enabled(false) end })
         table.insert(items, { title = "-" })
         table.insert(items, { title = "Ouvrir init.lua",
@@ -984,6 +1116,8 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 -- ======================================
 -- ======================================
 
+    --- Triggered when files in the script directory change.
+    --- @param files table List of changed file paths.
     local function reloadConfig(files)
         if hs.timer.secondsSinceEpoch() < _suppress_watcher_until then return end
         for _, file in pairs(files) do
@@ -995,7 +1129,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
     M._menu    = myMenu
     M._watcher = configWatcher
 
-    pcall(utils.notify, "Script pr\195\170t\194\160! \240\159\154\128")
+    pcall(utils.notify, "Script prêt" .. NBSP .. "! 🚀")
     return myMenu, configWatcher
 end
 

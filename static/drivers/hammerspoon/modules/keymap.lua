@@ -58,6 +58,7 @@ local mappings           = {}   -- flat list sorted longest-trigger-first
 local mappings_lookup    = {}   -- "trigger\0is_word\0auto" → entry (fast dedup)
 local _interceptors      = {}   -- fn(event, buffer) callbacks
 local _preview_providers = {}   -- fn(buffer) → replacement|nil (dynamic hotstrings)
+local current_trigger_char   = "★"
 local group_post_load_hooks = {}
 
 local BASE_DELAY_SEC       = M.DEFAULT_BASE_DELAY_SEC
@@ -75,6 +76,12 @@ local llm_enabled            = llm.DEFAULT_LLM_ENABLED
 local llm_debounce_time      = llm.DEFAULT_LLM_DEBOUNCE
 local preview_enabled        = true
 
+-- Advanced LLM state
+local llm_context_length     = 500
+local llm_reset_on_nav       = true
+local llm_temperature        = 0.1
+local llm_max_predict        = 40
+
 -- ==========================================
 -- ==========================================
 -- ==========================================
@@ -85,6 +92,18 @@ local preview_enabled        = true
 
 ---@param model_name string
 function M.set_llm_model(model_name) current_llm_model = model_name end
+
+---@param len number
+function M.set_llm_context_length(len) llm_context_length = len end
+
+---@param reset boolean
+function M.set_llm_reset_on_nav(reset) llm_reset_on_nav = reset end
+
+---@param temp number
+function M.set_llm_temperature(temp) llm_temperature = temp end
+
+---@param max number
+function M.set_llm_max_predict(max) llm_max_predict = max end
 
 --- Disable hides any pending prediction and stops the debounce timer.
 ---@param enabled boolean
@@ -268,6 +287,21 @@ function M.is_section_enabled(group_name, section_name)
     return hs.settings.get("hotstrings_section_" .. group_name .. "_" .. section_name) ~= false
 end
 
+--- Scans all active groups to see if the dynamic 'repeat' section is enabled anywhere
+---@return boolean
+function M.is_repeat_feature_enabled()
+    for name, g in pairs(groups) do
+        if g.enabled and g.sections then
+            for _, sec in ipairs(g.sections) do
+                if sec.name == "repeat" then
+                    return M.is_section_enabled(name, "repeat")
+                end
+            end
+        end
+    end
+    return false
+end
+
 ---@param group_name   string
 ---@param section_name string
 function M.disable_section(group_name, section_name)
@@ -370,14 +404,14 @@ end
 -- Terminators are characters that trigger manual hotstring expansion.
 -- consume=true means the terminator character is swallowed (not re-emitted).
 local TERMINATOR_DEFS = {
-    { key = "space",  chars  = { " " },          label = "Espace"                },
-    { key = "tab",    chars  = { "\t" },          label = "Tabulation"            },
+    { key = "space",  chars  = { " " },        label = "Espace"                },
+    { key = "tab",    chars  = { "\t" },        label = "Tabulation"            },
     { key = "enter",  chars  = { "\r", "\n" },    label = "Entrée"                },
-    { key = "period", chars  = { "." },           label = "Point (.)"             },
-    { key = "comma",  chars  = { "," },           label = "Virgule (,)"           },
+    { key = "period", chars  = { "." },          label = "Point (.)"             },
+    { key = "comma",  chars  = { "," },          label = "Virgule (,)"           },
     { key = "nbsp",   prefix = "\194\160",        label = "Espace insécable"      },
     { key = "nnbsp",  prefix = "\226\128\175",    label = "Espace fine insécable" },
-    { key = "star",   chars  = { "★" },           label = "Touche ★", consume = true },
+    { key = "star",   chars  = { current_trigger_char }, label = "Touche " .. current_trigger_char, consume = true },
 }
 
 local _terminator_enabled = {}
@@ -418,6 +452,19 @@ function M.is_terminator_enabled(key)           return _terminator_enabled[key] 
 ---@return table
 function M.get_terminator_defs()                return TERMINATOR_DEFS                          end
 
+--- Sets the dynamic character to use instead of the star
+---@param char string
+function M.set_trigger_char(char)
+    current_trigger_char = char
+    -- Dynamically update the associated expander
+    for _, def in ipairs(TERMINATOR_DEFS) do
+        if def.key == "star" then
+            def.chars = { char }
+            def.label = "Touche " .. char
+        end
+    end
+end
+
 -- ===============================================
 -- ===============================================
 -- ===============================================
@@ -432,6 +479,11 @@ function M.get_terminator_defs()                return TERMINATOR_DEFS          
 ---@param replacement string
 ---@param opts        table|nil  { is_word, auto_expand, is_case_sensitive, final_result }
 function M.add(trigger, replacement, opts)
+    -- If the magickey has been customized, replace the hardcoded "★" in triggers with the current character.
+    if current_trigger_char ~= "★" then
+        trigger = trigger:gsub("★", current_trigger_char)
+    end
+
     opts = opts or {}
     local is_word           = opts.is_word            == true
     local is_auto           = opts.auto_expand        == true
@@ -630,7 +682,8 @@ function M._perform_llm_check()
         grey   = { white = 0.6, alpha = 1.0 },
     }
 
-    llm.fetch_llm_prediction(buffer, tail, current_llm_model,
+    -- Pass dynamically assigned temperature and max_predict down to the prediction logic
+    llm.fetch_llm_prediction(buffer, tail, current_llm_model, llm_temperature, llm_max_predict,
         function(deletes, to_type, new_word, chunks)
             current_llm_prediction = { deletes = deletes, to_type = to_type }
 
@@ -688,7 +741,7 @@ local function update_preview(buf)
 
     if not match_repl then
         for _, m in ipairs(mappings) do
-            if m.trigger == last_word .. "★" then
+            if m.trigger == last_word .. current_trigger_char then
                 local clean = plain_text(tokens_from_repl(m.repl))
                 if clean ~= last_word then match_repl = m.repl; break end
             elseif m.trigger == last_word then
@@ -701,7 +754,21 @@ local function update_preview(buf)
         end
     end
 
-    if match_repl then
+    -- Filter the repetition due to fallback so it doesn't appear in the tooltip
+    local is_fallback_repetition = false
+    if match_repl and M.is_repeat_feature_enabled() then
+        local clean = plain_text(tokens_from_repl(match_repl))
+        local last_char_offset = utf8.offset(last_word, -1)
+        if last_char_offset then
+            local last_char = last_word:sub(last_char_offset)
+            -- If the suggestion exactly matches the repeated letter (e.g., "i" -> "ii")
+            if clean == last_word .. last_char then
+                is_fallback_repetition = true
+            end
+        end
+    end
+
+    if match_repl and not is_fallback_repetition then
         tooltip.show(plain_text(tokens_from_repl(match_repl)), false, preview_enabled)
     else
         tooltip.hide()
@@ -776,7 +843,7 @@ local function onKeyDown(e)
             current_llm_prediction = nil
             return true
         end
-        buffer = ""
+        if llm_reset_on_nav then buffer = "" end
         tooltip.hide()
         return false
     end
@@ -792,13 +859,18 @@ local function onKeyDown(e)
     local allowed_delay = BASE_DELAY_SEC * ((is_complex or last_key_was_complex) and 2 or 1)
     last_key_was_complex = is_complex
 
+    -- Unconditionally clear buffer for destructive commands like Cmd+A, Cmd+C, Ctrl+ shortcuts
     if flags.cmd or flags.ctrl then
-        buffer = ""; tooltip.hide(); return false
+        buffer = ""
+        tooltip.hide(); return false
     end
 
     if keyCode == 51 then  -- Backspace
         if flags.cmd or flags.alt then
-            buffer = ""; tooltip.hide(); return false
+            -- Unconditionally clear buffer because Cmd+Del deletes a line, Alt+Del deletes a word
+            -- This thoroughly breaks the tracked buffer state.
+            buffer = ""
+            tooltip.hide(); return false
         end
         if #buffer > 0 then
             local offset = utf8.offset(buffer, -1)
@@ -813,15 +885,17 @@ local function onKeyDown(e)
     if keyCode == 117 or keyCode == 115 or keyCode == 116
         or keyCode == 119 or keyCode == 121
         or (keyCode >= 123 and keyCode <= 126) then
-        buffer = ""; tooltip.hide(); return false
+        if llm_reset_on_nav then buffer = "" end
+        tooltip.hide(); return false
     end
 
     local chars = e:getCharacters(false)
     if not chars or chars == "" then return false end
 
     buffer = buffer .. chars
-    if #buffer > 500 then
-        buffer = buffer:sub(utf8.offset(buffer, -500) or 1)
+    -- Truncate buffer size to prevent infinite growth using customizable variable
+    if #buffer > llm_context_length then
+        buffer = buffer:sub(utf8.offset(buffer, -llm_context_length) or 1)
     end
 
     update_preview(buffer)
@@ -874,8 +948,8 @@ local function onKeyDown(e)
                     for _ = 1, deletes do keyStroke({}, "delete", 0) end
                     local emitted = (repl_text == m.repl) and emit_text(to_type) or emit_tokens(tokens)
 
-                    local tstart = utf8.offset(buffer, -deletes)
-                    buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. to_type
+                    local tstart = utf8.offset(buffer, -text_utils.utf8_len(trigger))
+                    buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text
 
                     if m.final_result then M.suppress_rescan() end
                     hs.timer.doAfter(0.05 + (deletes + emitted) * 0.005, function()
@@ -938,9 +1012,9 @@ local function onKeyDown(e)
                                 emitted = emitted + text_utils.utf8_len(chars)
                             end
 
-                            local tstart = utf8.offset(buffer, -deletes)
+                            local tstart = utf8.offset(buffer, -(char_len + trig_len))
                             buffer = (tstart and buffer:sub(1, tstart - 1) or "")
-                                     .. to_type
+                                     .. repl_text
                                      .. (consume_term and "" or chars)
 
                             if m.final_result then M.suppress_rescan() end
@@ -956,9 +1030,38 @@ local function onKeyDown(e)
         end
     end
 
+    -- =================================================
+    -- ===== 9.5 Dynamic Fallback (Repetition) =========
+    -- =================================================
+    -- Executes only if no trigger intercepted the keystroke
+    if M.is_repeat_feature_enabled() and chars == current_trigger_char then
+        local char_len = text_utils.utf8_len(chars)
+        local buf_len  = text_utils.utf8_len(buffer)
+        
+        if buf_len > char_len then
+            local before = buffer:sub(1, utf8.offset(buffer, -char_len) - 1)
+            local last_char_offset = utf8.offset(before, -1)
+            
+            if last_char_offset then
+                local last_char = before:sub(last_char_offset)
+                
+                is_replacing = true
+                tooltip.hide()
+                
+                keyStrokes(last_char)
+                
+                local tstart = utf8.offset(buffer, -char_len)
+                buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. last_char
+                
+                hs.timer.doAfter(0.05, function() is_replacing = false end)
+                return true
+            end
+        end
+    end
+
     -- Enter/Tab not consumed as terminators still break word context
     if keyCode == 36 or keyCode == 48 then
-        buffer = ""
+        if llm_reset_on_nav then buffer = "" end
     end
 
     return false
@@ -974,7 +1077,7 @@ end
 
 local tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
--- Any mouse click breaks word context
+-- Any mouse click breaks word context conditionally
 local mouse_tap = eventtap.new(
     {
         eventtap.event.types.leftMouseDown,
@@ -982,7 +1085,8 @@ local mouse_tap = eventtap.new(
         eventtap.event.types.middleMouseDown,
     },
     function()
-        buffer = ""; tooltip.hide(); current_llm_prediction = nil; return false
+        if llm_reset_on_nav then buffer = "" end
+        tooltip.hide(); current_llm_prediction = nil; return false
     end
 )
 

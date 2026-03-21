@@ -16,7 +16,6 @@ local keymap             = require("modules.keymap")
 local shortcuts          = require("modules.shortcuts")
 local personal_info      = require("modules.personal_info")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
-local repeat_keys        = require("modules.repeat_keys")
 local script_control     = require("modules.script_control")
 local menu               = require("ui.menu")   -- moved from modules/menu.lua
 
@@ -51,25 +50,40 @@ local config_file    = base_dir .. "config.json"
 -- =======================================
 -- =======================================
 
--- Restore section-enabled states from config.json into hs.settings BEFORE
--- any TOML is parsed, so is_section_enabled() returns the correct value
--- during the initial load_toml() calls below.
+-- Restore section-enabled states and global trigger char from config.json
+-- BEFORE any TOML is parsed.
+local global_trigger_char = "★"
+
 do
     local fh = io.open(config_file, "r")
     if fh then
         local raw = fh:read("*a"); fh:close()
         local ok, cfg = pcall(hs.json.decode, raw)
-        if ok and type(cfg) == "table" and type(cfg.section_states) == "table" then
-            for grp, secs in pairs(cfg.section_states) do
-                if type(secs) == "table" then
-                    for sec_name, enabled in pairs(secs) do
-                        local key = "hotstrings_section_" .. grp .. "_" .. sec_name
-                        hs.settings.set(key, enabled ~= false and nil or false)
+        if ok and type(cfg) == "table" then
+            
+            -- 1. Read the global trigger character
+            if type(cfg.trigger_char) == "string" then
+                global_trigger_char = cfg.trigger_char
+            end
+
+            -- 2. Restore section states
+            if type(cfg.section_states) == "table" then
+                for grp, secs in pairs(cfg.section_states) do
+                    if type(secs) == "table" then
+                        for sec_name, enabled in pairs(secs) do
+                            local key = "hotstrings_section_" .. grp .. "_" .. sec_name
+                            hs.settings.set(key, enabled ~= false and nil or false)
+                        end
                     end
                 end
             end
         end
     end
+end
+
+-- Pass the loaded trigger char to keymap before loading files
+if keymap.set_trigger_char then
+    keymap.set_trigger_char(global_trigger_char)
 end
 
 -- =================================================
@@ -153,21 +167,13 @@ end
 -- ========================================
 -- ========================================
 
-local function register_repeat_keys()
-    keymap.set_group_context("magickey")
-    repeat_keys.start(keymap)
-    keymap.set_group_context(nil)
-end
-register_repeat_keys()
 keymap.sort_mappings()
-keymap.set_post_load_hook("magickey", register_repeat_keys)
-
 personal_info.start(base_dir, keymap)
 
 dynamic_hotstrings.start(keymap)
 dynamic_hotstrings.register_personal_data(
     personal_info.get_info(),
-    personal_info.get_trigger_char()
+    global_trigger_char -- Changed: passing the global char instead of personal_info's
 )
 table.insert(hotfiles, "dynamichotstrings")
 
@@ -201,7 +207,7 @@ do
         reload_timer = hs.timer.doAfter(0.5, function()
             hs.notify.new({
                 title           = "Hammerspoon",
-                informativeText = "Hotstrings modifiés \226\128\148 rechargement\226\128\166",
+                informativeText = "Hotstrings modifiés — rechargement…",
             }):send()
             hs.reload()
         end)
