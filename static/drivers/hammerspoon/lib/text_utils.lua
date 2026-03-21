@@ -224,4 +224,19 @@ function M.is_letter_char(c)
     return string.upper(c) ~= string.lower(c)
 end
 
+function M.utf8_ends_with(s, suffix)
+    if not s or not suffix then return false end
+    local n     = M.utf8_len(suffix)
+    local start = utf8.offset(s, -n)
+    return start and s:sub(start) == suffix or false
+end
+
+function M.contains_high_unicode(s)
+    if not s then return false end
+    for _, c in utf8.codes(s) do
+        if c > 0xFFFF then return true end
+    end
+    return false
+end
+
 return M

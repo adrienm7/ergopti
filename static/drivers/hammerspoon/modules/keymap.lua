@@ -575,6 +575,12 @@ end
 -- ======================================
 -- ======================================
 
+-- Check if a string should be pasted instead of typed (long strings or emojis)
+local function should_paste(text)
+    if text_utils.utf8_len(text) > PASTE_THRESHOLD then return true end
+    return text_utils.contains_high_unicode(text)
+end
+
 -- Parse {KEY} tokens in a replacement string into a typed token list.
 ---@param  repl   string
 ---@return table  List of { kind:"text"|"key", value:string }
@@ -609,7 +615,7 @@ local function emit_tokens(tokens)
         if tok.kind == "key" then
             keyStroke({}, tok.value, 0)
             count = count + 1
-        elseif text_utils.utf8_len(tok.value) > PASTE_THRESHOLD then
+        elseif should_paste(tok.value) then
             local prev = hs.pasteboard.getContents()
             hs.pasteboard.setContents(tok.value)
             keyStroke({ "cmd" }, "v", 0)
@@ -623,11 +629,11 @@ local function emit_tokens(tokens)
     return count
 end
 
--- Emit a plain string. Uses clipboard for long strings.
+-- Emit a plain string. Uses clipboard for long strings or emojis.
 ---@param  text   string
 ---@return number  events fired
 local function emit_text(text)
-    if text_utils.utf8_len(text) > PASTE_THRESHOLD then
+    if should_paste(text) then
         local prev = hs.pasteboard.getContents()
         hs.pasteboard.setContents(text)
         keyStroke({ "cmd" }, "v", 0)
@@ -784,12 +790,6 @@ end
 -- ===============================================
 -- ===============================================
 
-local function utf8_ends_with(s, suffix)
-    local n     = text_utils.utf8_len(suffix)
-    local start = utf8.offset(s, -n)
-    return start and s:sub(start) == suffix or false
-end
-
 local function onKeyDown(e)
     if processing_paused then return false end
 
@@ -912,7 +912,7 @@ local function onKeyDown(e)
             local trigger = m.trigger
 
             -- === Auto-expansion ===
-            if utf8_ends_with(buffer, trigger) and m.auto then
+            if text_utils.utf8_ends_with(buffer, trigger) and m.auto then
                 local valid = true
 
                 if m.is_word and text_utils.utf8_len(buffer) > text_utils.utf8_len(trigger)
