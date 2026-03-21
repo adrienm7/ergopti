@@ -88,7 +88,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "chaine" = { output = "chaîne", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chaîned" = { output = "chained", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chainé" = { output = "chaîné", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-"chassis" = { output = "châssis", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"chassis" = { output = "châssis", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chateau" = { output = "château", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chatier" = { output = "châtier", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "chatiment" = { output = "châtiment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -126,9 +126,9 @@ accents = "Autocorrection des accents de très nombreux mots"
 "diplomé" = { output = "diplômé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "drole" = { output = "drôle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dument" = { output = "dûment", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
-"egoisme" = { output = "egoïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"egoisme" = { output = "égoïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "égoisme" = { output = "égoïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"egoiste" = { output = "egoïste", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"egoiste" = { output = "égoïste", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "égoiste" = { output = "égoïste", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "elle-meme" = { output = "elle-même", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "elles-meme" = { output = "elles-mêmes", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -275,7 +275,6 @@ accents = "Autocorrection des accents de très nombreux mots"
 "pecher" = { output = "pêcher", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "peches" = { output = "pêches", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "pecheu" = { output = "pêcheu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"pentecote" = { output = "Pentecôte", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "phoenix" = { output = "phœnix", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "photovoltai" = { output = "photovoltaï", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "piqure" = { output = "piqûre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -332,6 +331,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "le votre" = { output = "le vôtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 [[names]]
+"aid" = { output = "Aïd", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "alexei" = { output = "Alexeï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "anais" = { output = "Anaïs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "azerbaidjan" = { output = "Azerbaïdjan", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -343,6 +343,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "dubai" = { output = "Dubaï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "gaetan" = { output = "Gaëtan", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "hanoi" = { output = "Hanoï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"héloise" = { output = "Héloïse", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "israel" = { output = "Israël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "jerome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "jérome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -350,7 +351,9 @@ accents = "Autocorrection des accents de très nombreux mots"
 "koweit" = { output = "Koweït", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "mickael" = { output = "Mickaël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "noel" = { output = "Noël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
-"Quatar" = { output = "Qatar", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"pentecote" = { output = "Pentecôte", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"quatar" = { output = "Qatar", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"quatari" = { output = "qatari", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "raphael" = { output = "Raphaël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "serguei" = { output = "Sergueï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "shanghai" = { output = "Shanghaï", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -366,8 +369,11 @@ accents = "Autocorrection des accents de très nombreux mots"
 "aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "axa" = { output = "AXA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "azure devops" = { output = "Azure DevOps", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bbc" = { output = "BBC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bbq" = { output = "BBQ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "bdd" = { output = "BDD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "bdds" = { output = "BDDs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bic" = { output = "BIC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "catboost" = { output = "CatBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "citroen" = { output = "Citroën", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -391,6 +397,7 @@ accents = "Autocorrection des accents de très nombreux mots"
 "hammerspoon" = { output = "Hammerspoon", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ht" = { output = "HT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"iban" = { output = "IBAN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "insee" = { output = "INSEE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "instagram" = { output = "Instagram", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "intellij" = { output = "IntelliJ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -416,10 +423,12 @@ accents = "Autocorrection des accents de très nombreux mots"
 "mlops" = { output = "MLOps", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "nlp" = { output = "NLP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ny" = { output = "NY", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ok" = { output = "OK", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "optimot" = { output = "Optimot", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "onedrive" = { output = "OneDrive", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "onenote" = { output = "OneNote", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"onu" = { output = "ONU", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "openshift" = { output = "OpenShift", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "opentelemetry" = { output = "OpenTelemetry", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -431,8 +440,10 @@ accents = "Autocorrection des accents de très nombreux mots"
 "qlora" = { output = "QLoRA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "r" = { output = "R", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ram" = { output = "RAM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"raid" = { output = "RAID", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "rdc" = { output = "RDC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "rh" = { output = "RH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rib" = { output = "RIB", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "sas" = { output = "SAS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "slm" = { output = "SLM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -440,8 +451,10 @@ accents = "Autocorrection des accents de très nombreux mots"
 "ssd" = { output = "SSD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ssh" = { output = "SSH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ssl" = { output = "SSL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"swift" = { output = "SWIFT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "tls" = { output = "TLS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ttc" = { output = "TTC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"uno" = { output = "UNO", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "url" = { output = "URL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "vscode" = { output = "VSCode", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "wikipedia" = { output = "Wikipedia", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }

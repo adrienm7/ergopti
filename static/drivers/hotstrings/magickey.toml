@@ -157,6 +157,7 @@ repeat = "La touche ★ permet la répétition"
 "avv★" = { output = "avez-vous", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "avvd★" = { output = "avez-vous déjà", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "b★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"bb★" = { output = "barbecue", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "bc★" = { output = "because", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "bcp★" = { output = "beaucoup", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "bdd★" = { output = "base de données", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -203,6 +204,7 @@ repeat = "La touche ★ permet la répétition"
 "contrib★" = { output = "contribution", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "couv★" = { output = "couverture", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "cpd★" = { output = "cependant", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"cq★" = { output = "ce que", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "cr★" = { output = "compte-rendu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ct★" = { output = "c’était", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ctb★" = { output = "c’est très bien", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -368,6 +370,7 @@ repeat = "La touche ★ permet la répétition"
 "kdo" = { output = "cadeau", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "kn★" = { output = "construction", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "l★" = { output = "elle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"la★" = { output = "Los Angeles", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "lê★" = { output = "l’être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ledt★" = { output = "l’emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "lex★" = { output = "l’exemple", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -427,6 +430,7 @@ repeat = "La touche ★ permet la répétition"
 "nrj★" = { output = "énergie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ns★" = { output = "nous", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "num★" = { output = "numéro", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ny★" = { output = "New York", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "o-★" = { output = "au moins", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "o+★" = { output = "au plus", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "obj★" = { output = "objectif", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
