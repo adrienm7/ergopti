@@ -38,36 +38,46 @@ if (!privatePath || !existsSync(privatePath)) {
 }
 
 // Helper: try local pm2 binary, fallback to `npx pm2` if it fails on Windows.
-function runPm2(args) {
+function runPm2(args, customOptions = {}) {
+	const isWindows = os.platform() === 'win32';
+	const execOptions = {
+		cwd: PROJECT_DIR,
+		stdio: 'inherit',
+		shell: isWindows,
+		...customOptions // Permet de surcharger stdio si besoin
+	};
+
 	try {
-		execFileSync(PM2, args, { cwd: PROJECT_DIR, stdio: 'inherit' });
+		execFileSync(PM2, args, execOptions);
 		return;
 	} catch (e) {
-		console.warn('⚠️  pm2 local binary failed, trying fallbacks (npx.cmd / npx).');
+		if (args[0] !== 'ping') {
+			console.warn('⚠️  pm2 local binary failed, trying fallbacks (npx.cmd / npx).');
+		}
 	}
 
-	// Try npx variants (prefer npx.cmd on Windows), then a cmd.exe fallback.
-	const npxCandidates = os.platform() === 'win32' ? ['npx.cmd', 'npx'] : ['npx'];
+	// Try npx variants (prefer npx.cmd on Windows)
+	const npxCandidates = isWindows ? ['npx.cmd', 'npx'] : ['npx'];
 	for (const npxCmd of npxCandidates) {
 		try {
-			execFileSync(npxCmd, ['pm2', ...args], { cwd: PROJECT_DIR, stdio: 'inherit' });
+			execFileSync(npxCmd, ['pm2', ...args], execOptions);
 			return;
 		} catch {
 			// try next candidate
 		}
 	}
 
-	// Final attempt: run via cmd /c (works when npx is a shell command)
-	if (os.platform() === 'win32') {
-		execFileSync('cmd', ['/c', 'npx', 'pm2', ...args], { cwd: PROJECT_DIR, stdio: 'inherit' });
-		return;
+	if (args[0] !== 'ping') {
+		throw new Error('pm2 invocation failed (all fallbacks exhausted)');
 	}
-
-	// If all fallbacks failed, throw to let caller handle the error.
-	throw new Error('pm2 invocation failed (all fallbacks exhausted)');
 }
 
-// Stop existing instance if running, then start fresh.
+// 1. Force PM2 to start its daemon entirely detached from our terminal
+try {
+	runPm2(['ping'], { stdio: 'ignore' });
+} catch {}
+
+// 2. Stop existing instance if running, then start fresh.
 try {
 	runPm2(['delete', APP_NAME]);
 } catch {}
@@ -78,7 +88,7 @@ runPm2([
 	'--name',
 	APP_NAME,
 	'--interpreter',
-	process.execPath,
+	'node',
 	'--cwd',
 	PROJECT_DIR,
 	'--output',
@@ -88,8 +98,7 @@ runPm2([
 	'--time'
 ]);
 
-// Save the pm2 process list so it survives reboots (requires pm2 startup to
-// have been configured once).
+// 3. Save the pm2 process list
 runPm2(['save']);
 
 console.log(`

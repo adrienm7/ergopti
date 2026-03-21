@@ -1,4 +1,4 @@
-; Last modified on 2026-03-20 at 02:06 (UTC+1)
+; Last modified on 2026-03-21 at 13:44 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -5240,8 +5240,11 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "aws", "AWS")
     CreateHotstring("", "axa", "AXA")
     CreateHotstring("", "azure devops", "Azure DevOps")
+    CreateHotstring("", "bbc", "BBC")
+    CreateHotstring("", "bbq", "BBQ")
     CreateHotstring("", "bdd", "BDD")
     CreateHotstring("", "bdds", "BDDs")
+    CreateHotstring("", "bic", "BIC")
     CreateHotstring("", "catboost", "CatBoost")
     CreateHotstring("", "chatgpt", "ChatGPT")
     CreateHotstring("", "citroen", "Citroën")
@@ -5265,6 +5268,7 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "hammerspoon", "Hammerspoon")
     CreateHotstring("", "ht", "HT")
     CreateHotstring("", "ia", "IA")
+    CreateHotstring("", "iban", "IBAN")
     CreateHotstring("", "insee", "INSEE")
     CreateHotstring("", "instagram", "Instagram")
     CreateHotstring("", "intellij", "IntelliJ")
@@ -5290,10 +5294,12 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "mlops", "MLOps")
     CreateHotstring("", "nasa", "NASA")
     CreateHotstring("", "nlp", "NLP")
+    CreateHotstring("", "ny", "NY")
     CreateHotstring("", "ok", "OK")
     CreateHotstring("", "optimot", "Optimot")
     CreateHotstring("", "onedrive", "OneDrive")
     CreateHotstring("", "onenote", "OneNote")
+    CreateHotstring("", "onu", "ONU")
     CreateHotstring("", "openshift", "OpenShift")
     CreateHotstring("", "opentelemetry", "OpenTelemetry")
     CreateHotstring("", "outlook", "Outlook")
@@ -5305,8 +5311,10 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "qlora", "QLoRA")
     CreateHotstring("", "r", "R")
     CreateHotstring("", "ram", "RAM")
+    CreateHotstring("", "raid", "RAID")
     CreateHotstring("", "rdc", "RDC")
     CreateHotstring("", "rh", "RH")
+    CreateHotstring("", "rib", "RIB")
     CreateHotstring("", "sas", "SAS")
     CreateHotstring("", "sharepoint", "SharePoint")
     CreateHotstring("", "slm", "SLM")
@@ -5314,8 +5322,10 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "ssd", "SSD")
     CreateHotstring("", "ssh", "SSH")
     CreateHotstring("", "ssl", "SSL")
+    CreateHotstring("", "swift", "SWIFT")
     CreateHotstring("", "tls", "TLS")
     CreateHotstring("", "ttc", "TTC")
+    CreateHotstring("", "uno", "UNO")
     CreateHotstring("", "url", "URL")
     CreateHotstring("", "vscode", "VSCode")
     CreateHotstring("", "wikipedia", "Wikipedia")
@@ -5364,6 +5374,7 @@ if Features["Autocorrection"]["Caps"].Enabled {
 ; ===========================================
 
 if Features["Autocorrection"]["Names"].Enabled {
+    CreateHotstring("", "aid", "Aïd")
     CreateHotstring("", "alexei", "Alexeï")
     CreateHotstring("", "anais", "Anaïs")
     CreateHotstring("", "azerbaidjan", "Azerbaïdjan")
@@ -5375,6 +5386,7 @@ if Features["Autocorrection"]["Names"].Enabled {
     CreateHotstring("", "dubai", "Dubaï")
     CreateHotstring("", "gaetan", "Gaëtan")
     CreateHotstring("", "hanoi", "Hanoï")
+    CreateHotstring("", "héloise", "Héloïse")
     CreateHotstring("", "israel", "Israël")
     CreateHotstring("", "jerome", "Jérôme")
     CreateHotstring("", "jérome", "Jérôme")
@@ -5383,7 +5395,9 @@ if Features["Autocorrection"]["Names"].Enabled {
     ; CreateHotstring("", "michael", "Michaël") ; Probably better to not make it the default, as it is "Michael" Jackson and not Michaël
     CreateHotstring("", "mickael", "Mickaël")
     CreateHotstring("", "noel", "Noël")
-    CreateHotstring("*", "Quatar", "Qatar") ; We can use it with the QU feature that way
+    CreateHotstring("", "pentecote", "Pentecôte")
+    CreateHotstring("", "quatar", "Qatar") ; We can use it with the QU feature that way
+    CreateHotstring("*", "quatari", "qatari") ; We can use it with the QU feature that way
     CreateHotstring("", "raphael", "Raphaël")
     CreateHotstring("", "serguei", "Sergueï")
     CreateHotstring("", "shanghai", "Shanghaï")
@@ -5467,7 +5481,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*?", "chaine", "chaîne")
     CreateCaseSensitiveHotstrings("*?", "chaîned", "chained")
     CreateCaseSensitiveHotstrings("*?", "chainé", "chaîné")
-    CreateCaseSensitiveHotstrings("", "chassis", "châssis")
+    CreateCaseSensitiveHotstrings("*", "chassis", "châssis")
     CreateCaseSensitiveHotstrings("*", "chateau", "château")
     CreateCaseSensitiveHotstrings("*", "chatier", "châtier")
     CreateCaseSensitiveHotstrings("*", "chatiment", "châtiment")
@@ -5510,9 +5524,9 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "dument", "dûment")
 
     ; === E ===
-    CreateCaseSensitiveHotstrings("*", "egoisme", "egoïsme")
+    CreateCaseSensitiveHotstrings("*", "egoisme", "égoïsme")
     CreateCaseSensitiveHotstrings("*", "égoisme", "égoïsme")
-    CreateCaseSensitiveHotstrings("*", "egoiste", "egoïste")
+    CreateCaseSensitiveHotstrings("*", "egoiste", "égoïste")
     CreateCaseSensitiveHotstrings("*", "égoiste", "égoïste")
     CreateCaseSensitiveHotstrings("*", "elle-meme", "elle-même")
     CreateCaseSensitiveHotstrings("*", "elles-meme", "elles-mêmes")
@@ -5682,7 +5696,6 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "pecher", "pêcher")
     CreateCaseSensitiveHotstrings("", "peches", "pêches")
     CreateCaseSensitiveHotstrings("*", "pecheu", "pêcheu")
-    CreateCaseSensitiveHotstrings("*", "pentecote", "Pentecôte")
     CreateCaseSensitiveHotstrings("*", "phoenix", "phœnix")
     CreateCaseSensitiveHotstrings("*", "photovoltai", "photovoltaï")
     CreateCaseSensitiveHotstrings("*", "piqure", "piqûre")
@@ -6087,6 +6100,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
 
     ; === B ===
     CreateCaseSensitiveHotstrings("*", "b" . ScriptInformation["MagicKey"], "bonjour")
+    CreateCaseSensitiveHotstrings("*", "bb" . ScriptInformation["MagicKey"], "barbecue")
     CreateCaseSensitiveHotstrings("*", "bc" . ScriptInformation["MagicKey"], "because")
     CreateCaseSensitiveHotstrings("*", "bcp" . ScriptInformation["MagicKey"], "beaucoup")
     CreateCaseSensitiveHotstrings("*", "bdd" . ScriptInformation["MagicKey"], "base de données")
@@ -6135,6 +6149,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "contrib" . ScriptInformation["MagicKey"], "contribution")
     CreateCaseSensitiveHotstrings("*", "couv" . ScriptInformation["MagicKey"], "couverture")
     CreateCaseSensitiveHotstrings("*", "cpd" . ScriptInformation["MagicKey"], "cependant")
+    CreateCaseSensitiveHotstrings("*", "cq" . ScriptInformation["MagicKey"], "ce que")
     CreateCaseSensitiveHotstrings("*", "cr" . ScriptInformation["MagicKey"], "compte-rendu")
     CreateCaseSensitiveHotstrings("*", "ct" . ScriptInformation["MagicKey"], "c’était")
     CreateCaseSensitiveHotstrings("*", "ctb" . ScriptInformation["MagicKey"], "c’est très bien")
@@ -6318,6 +6333,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
 
     ; === L ===
     CreateCaseSensitiveHotstrings("*", "l" . ScriptInformation["MagicKey"], "elle")
+    CreateCaseSensitiveHotstrings("*", "la" . ScriptInformation["MagicKey"], "Los Angeles")
     CreateCaseSensitiveHotstrings("*", "lê" . ScriptInformation["MagicKey"], "l’être")
     CreateCaseSensitiveHotstrings("*", "ledt" . ScriptInformation["MagicKey"], "l’emploi du temps")
     CreateCaseSensitiveHotstrings("*", "lex" . ScriptInformation["MagicKey"], "l’exemple")
@@ -6381,6 +6397,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "nrj" . ScriptInformation["MagicKey"], "énergie")
     CreateCaseSensitiveHotstrings("*", "ns" . ScriptInformation["MagicKey"], "nous")
     CreateCaseSensitiveHotstrings("*", "num" . ScriptInformation["MagicKey"], "numéro")
+    CreateCaseSensitiveHotstrings("*", "ny" . ScriptInformation["MagicKey"], "New York")
 
     ; === O ===
     CreateCaseSensitiveHotstrings("*", "o-" . ScriptInformation["MagicKey"], "au moins")
