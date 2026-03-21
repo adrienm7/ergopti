@@ -1,4 +1,4 @@
-; Last modified on 2026-03-21 at 13:44 (UTC+1)
+; Last modified on 2026-03-21 at 16:55 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -5023,6 +5023,11 @@ if Features["Autocorrection"]["Errors"].Enabled {
     )
     CreateCaseSensitiveHotstrings(
         "*?", "uio", "uoi",
+        Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
+    )
+    ; Specific edge case of replacing uei by uie
+    CreateCaseSensitiveHotstrings(
+        "*?", "accuei", "accuei",
         Map("TimeActivationSeconds", Features["Autocorrection"]["Errors"].TimeActivationSeconds)
     )
     CreateCaseSensitiveHotstrings(
