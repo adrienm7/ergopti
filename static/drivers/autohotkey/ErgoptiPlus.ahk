@@ -1,4 +1,4 @@
-; Last modified on 2026-03-21 at 16:55 (UTC+1)
+; Last modified on 2026-03-23 at 10:23 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -5214,9 +5214,9 @@ if Features["Autocorrection"]["MinusApostrophe"].Enabled {
     CreateCaseSensitiveHotstrings("*?", "z'v", "z-v")
 }
 
-; ====================================================================
+; =====================================================================
 ; ======= 8.3.1) Phone number & social security auto-complete =========
-; ====================================================================
+; =====================================================================
 
 if Features["Autocorrection"]["PhoneNumberAutoComplete"].Enabled {
     CreateHotstring("*", "+33" . SubStr(PersonalInformation["PhoneNumber"], 1, 2), "+33" . PersonalInformation[
@@ -5240,6 +5240,7 @@ if Features["Autocorrection"]["PhoneNumberAutoComplete"].Enabled {
 if Features["Autocorrection"]["Caps"].Enabled {
     ; CreateHotstring("", "ai", "AI") ; conflict with j’"ai"
     CreateHotstring("", "adaboost", "AdaBoost")
+    CreateHotstring("", "adn", "ADN")
     CreateHotstring("", "api", "API")
     CreateHotstring("", "autohotkey", "AutoHotkey")
     CreateHotstring("", "aws", "AWS")
@@ -5260,6 +5261,7 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "data science", "Data Science")
     CreateHotstring("", "data scientist", "Data Scientist")
     CreateHotstring("", "databricks", "Databricks")
+    CreateHotstring("", "dna", "DNA")
     CreateHotstring("", "docker", "Docker")
     CreateHotstring("", "dynatrace", "Dynatrace")
     CreateHotstring("", "ergopti", "Ergopti")
@@ -5328,6 +5330,7 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "ssh", "SSH")
     CreateHotstring("", "ssl", "SSL")
     CreateHotstring("", "swift", "SWIFT")
+    CreateHotstring("", "tiktok", "TikTok")
     CreateHotstring("", "tls", "TLS")
     CreateHotstring("", "ttc", "TTC")
     CreateHotstring("", "uno", "UNO")
@@ -5400,6 +5403,7 @@ if Features["Autocorrection"]["Names"].Enabled {
     ; CreateHotstring("", "michael", "Michaël") ; Probably better to not make it the default, as it is "Michael" Jackson and not Michaël
     CreateHotstring("", "mickael", "Mickaël")
     CreateHotstring("", "noel", "Noël")
+    CreateHotstring("", "paques", "Pâques")
     CreateHotstring("", "pentecote", "Pentecôte")
     CreateHotstring("", "quatar", "Qatar") ; We can use it with the QU feature that way
     CreateHotstring("*", "quatari", "qatari") ; We can use it with the QU feature that way
@@ -5439,6 +5443,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "apprete", "apprête")
     CreateCaseSensitiveHotstrings("", "appreter", "apprêter")
     CreateCaseSensitiveHotstrings("", "apre", "âpre")
+    CreateCaseSensitiveHotstrings("", "apres", "âpres")
     CreateCaseSensitiveHotstrings("*", "archaique", "archaïque")
     CreateCaseSensitiveHotstrings("*", "archaisme", "archaïsme")
     CreateCaseSensitiveHotstrings("", "archeveque", "archevêque")
@@ -5688,6 +5693,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     ; === P ===
     CreateCaseSensitiveHotstrings("*", "paella", "paëlla")
     CreateCaseSensitiveHotstrings("*", "palir", "pâlir")
+    CreateCaseSensitiveHotstrings("*", "paquerette", "pâquerette")
     CreateCaseSensitiveHotstrings("*?", "parait", "paraît")
     CreateCaseSensitiveHotstrings("*?", "paranoia", "paranoïa")
     CreateCaseSensitiveHotstrings("", "paté", "pâté")
@@ -5701,6 +5707,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "pecher", "pêcher")
     CreateCaseSensitiveHotstrings("", "peches", "pêches")
     CreateCaseSensitiveHotstrings("*", "pecheu", "pêcheu")
+    CreateCaseSensitiveHotstrings("*", "pentecote", "Pentecôte")
     CreateCaseSensitiveHotstrings("*", "phoenix", "phœnix")
     CreateCaseSensitiveHotstrings("*", "photovoltai", "photovoltaï")
     CreateCaseSensitiveHotstrings("*", "piqure", "piqûre")
@@ -5748,6 +5755,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
 
     ; === T ===
     CreateCaseSensitiveHotstrings("*", "tantot", "tantôt")
+    CreateCaseSensitiveHotstrings("", "tatons", "tâtons")
     CreateCaseSensitiveHotstrings("", "tete", "tête")
     CreateCaseSensitiveHotstrings("", "tetes", "têtes")
     CreateCaseSensitiveHotstrings("*", "theatr", "théâtr")
