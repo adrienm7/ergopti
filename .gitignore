@@ -1,5 +1,7 @@
+# OS generated files
 .DS_Store
 
+# NPM and SvelteKit files
 node_modules
 /.svelte-kit
 /package
@@ -7,20 +9,23 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 /build/
 
+# Python files
 __pycache__
 .env
 .env.*
 !.env.example
 
+# Other files to exclude
+logs/
 static/corpus/modifie/
-
 static/version.json
 version.json
+
+# Personal configuration files
 static/drivers/hammerspoon/config.json
+static/drivers/hammerspoon/custom.toml
 static/drivers/hotstrings/.local_ahk_path
 static/drivers/hotstrings/personal.toml
-logs/
-static/drivers/karabiner/pid/doctor
-static/drivers/karabiner/pid/karabiner_console_user_server.pid
-static/drivers/karabiner/log/console_user_server.log
-static/drivers/hammerspoon/custom.toml
+static/drivers/karabiner/pid/
+static/drivers/karabiner/log/
+
