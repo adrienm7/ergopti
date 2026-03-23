@@ -1,4 +1,4 @@
-; Last modified on 2026-03-23 at 10:23 (UTC+1)
+; Last modified on 2026-03-23 at 11:49 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -6127,6 +6127,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "br" . ScriptInformation["MagicKey"], "bonjour")
     CreateCaseSensitiveHotstrings("*", "bsr" . ScriptInformation["MagicKey"], "bonsoir")
     CreateCaseSensitiveHotstrings("*", "bv" . ScriptInformation["MagicKey"], "bravo")
+    CreateCaseSensitiveHotstrings("*", "bvd" . ScriptInformation["MagicKey"], "boulevard")
     CreateCaseSensitiveHotstrings("*", "bvn" . ScriptInformation["MagicKey"], "bienvenue")
     CreateCaseSensitiveHotstrings("*", "bwe" . ScriptInformation["MagicKey"], "bon week-end")
     CreateCaseSensitiveHotstrings("*", "bwk" . ScriptInformation["MagicKey"], "bon week-end")
@@ -6298,6 +6299,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "his" . ScriptInformation["MagicKey"], "historique")
     CreateCaseSensitiveHotstrings("*", "histo" . ScriptInformation["MagicKey"], "historique")
     CreateCaseSensitiveHotstrings("*", "hs" . ScriptInformation["MagicKey"], "hammerspoon")
+    CreateCaseSensitiveHotstrings("*", "htu" . ScriptInformation["MagicKey"], "how to use")
     CreateCaseSensitiveHotstrings("*", "hyp" . ScriptInformation["MagicKey"], "hypothèse")
 
     ; === I ===
