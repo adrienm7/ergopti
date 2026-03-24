@@ -1608,6 +1608,11 @@ function M.init(toml_path, keymap_mod, update_menu_fn)
     _keymap      = keymap_mod
     _update_menu = update_menu_fn
     ensure_file()
+
+    -- NOUVEAU : Enregistrer le titre de la fenêtre pour que le keymap l'ignore
+    if _keymap and _keymap.ignore_window_title then
+        _keymap.ignore_window_title("Hotstrings Personnels")
+    end
 end
 
 function M.set_update_menu(fn)     _update_menu = fn     end

@@ -147,7 +147,7 @@ function M.show(model_name, on_cancel)
 
     _wv = hs.webview.new({x=x, y=y, w=W, h=H}, {}, _ucc)
     _wv:windowStyle({"titled","closable","nonactivating"})
-    _wv:windowTitle("Téléchargement Ollama")
+    _wv:windowTitle("Téléchargement du modèle")
     _wv:level(hs.drawing.windowLevels.floating)
     _wv:allowGestures(false)
     _wv:allowNewWindows(false)

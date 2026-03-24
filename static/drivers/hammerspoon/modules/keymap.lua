@@ -37,8 +37,8 @@ local KEY_COMMANDS = {
 }
 
 local NUM_KEYCODES = {
-    [18]=2, [19]=3, [20]=4, [21]=5, [23]=6,
-    [22]=7, [26]=8, [28]=9, [25]=10, [29]=11,
+    [18]=1, [19]=2, [20]=3, [21]=4, [23]=5,
+    [22]=6, [26]=7, [28]=8, [25]=9, [29]=10,
 }
 
 -- =====================================
@@ -54,6 +54,10 @@ local _preview_providers = {}
 local current_trigger_char  = "★"
 local group_post_load_hooks = {}
 
+-- Tables pour stocker dynamiquement les fenêtres à ignorer
+local _ignored_window_titles   = {}
+local _ignored_window_patterns = {}
+
 local BASE_DELAY_SEC       = M.DEFAULT_BASE_DELAY_SEC
 local buffer               = ""
 local is_replacing         = false
@@ -65,7 +69,9 @@ local _no_rescan_until     = 0
 
 local _pending_predictions = {}
 local _predictions_active  = false
+local _enter_validates_pred = false 
 
+local _llm_request_id = 0
 local _shift_side = nil
 
 local current_llm_model       = llm.DEFAULT_LLM_MODEL
@@ -81,8 +87,10 @@ local llm_num_predictions     = llm.DEFAULT_LLM_NUM_PREDICTIONS or 3
 local llm_excluded_apps       = {}
 local llm_arrow_nav_enabled   = false
 local llm_arrow_nav_mods      = {}
-local llm_show_model_name     = false
+local llm_show_info_bar       = true
 local llm_pred_indent         = 0
+local llm_pred_shortcut_mod   = "ctrl"
+local llm_sequential_mode     = llm.DEFAULT_LLM_SEQUENTIAL_MODE or false
 
 if tooltip.set_navigate_callback then
     tooltip.set_navigate_callback(function(_) end)
@@ -100,9 +108,22 @@ function M.set_llm_max_predict(p)         llm_max_predict        = p          en
 function M.set_llm_num_predictions(n)     llm_num_predictions    = n          end
 function M.set_llm_arrow_nav_enabled(v)   llm_arrow_nav_enabled  = v          end
 function M.set_llm_arrow_nav_mods(m)      llm_arrow_nav_mods     = m or {}    end
-function M.set_llm_show_model_name(v)     llm_show_model_name    = v          end
+function M.set_llm_show_info_bar(v)       llm_show_info_bar      = v          end
 function M.set_llm_pred_indent(v)         llm_pred_indent        = math.max(0,math.min(5,math.floor(tonumber(v) or 0))) end
+function M.set_llm_pred_shortcut_mod(m)   llm_pred_shortcut_mod  = m or "ctrl" end
+function M.set_llm_sequential_mode(v)     llm_sequential_mode    = v == true  end
 function M.get_llm_enabled()              return llm_enabled                  end
+
+function M.set_llm_show_model_name(v)     llm_show_info_bar = v end
+
+-- Fonctions pour enregistrer dynamiquement des fenêtres à ignorer
+function M.ignore_window_title(title)
+    _ignored_window_titles[title] = true
+end
+
+function M.ignore_window_pattern(pattern)
+    table.insert(_ignored_window_patterns, pattern)
+end
 
 function M.set_llm_excluded_apps(apps)
     llm_excluded_apps = type(apps) == "table" and apps or {}
@@ -112,8 +133,10 @@ function M.set_llm_enabled(enabled)
     llm_enabled = enabled
     if not enabled then
         tooltip.hide()
-        _pending_predictions = {}
-        _predictions_active  = false
+        _pending_predictions  = {}
+        _predictions_active   = false
+        _enter_validates_pred = false
+        _llm_request_id       = _llm_request_id + 1
         if M._llm_timer and M._llm_timer:running() then M._llm_timer:stop() end
     end
 end
@@ -322,8 +345,8 @@ local TERMINATOR_DEFS = {
     { key = "comma",        chars  = { "," },        label = "Virgule (,)"           },
     { key = "parenright",   chars  = { ")" },        label = "Parenthèse fermante )" },
     { key = "bracketright", chars  = { "]" },        label = "Crochet fermant ]"     },
-    { key = "nbsp",         prefix = "\194\160",     label = "Espace insécable"      },
-    { key = "nnbsp",        prefix = "\226\128\175", label = "Espace fine insécable" },
+    { key = "nbsp",         prefix = " ",            label = "Espace insécable"      },
+    { key = "nnbsp",        prefix = " ",            label = "Espace fine insécable" },
     { key = "star",         chars  = { current_trigger_char }, label = "Touche " .. current_trigger_char, consume = true },
 }
 
@@ -380,7 +403,7 @@ function M.add(trigger, replacement, opts)
     local is_auto           = opts.auto_expand        == true
     local is_case_sensitive = opts.is_case_sensitive  == true
     local is_final          = opts.final_result       == true
-    
+
     if replacement:match("\n") or replacement:match("{Tab}") or replacement:match("{Enter}") or replacement:match("{Return}") then
         is_final = true
     end
@@ -407,8 +430,8 @@ function M.add(trigger, replacement, opts)
         add_raw(t, r, is_auto)
         local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
         if not starts_with_space and t:match(" ") then
-            add_raw((t:gsub(" ", "\194\160")),     r, is_auto)
-            add_raw((t:gsub(" ", "\226\128\175")), r, is_auto)
+            add_raw((t:gsub(" ", " ")),     r, is_auto)
+            add_raw((t:gsub(" ", " ")), r, is_auto)
         end
     end
 
@@ -535,8 +558,9 @@ end
 -- =============================================
 
 local function reset_predictions()
-    _pending_predictions = {}
-    _predictions_active  = false
+    _pending_predictions  = {}
+    _predictions_active   = false
+    _enter_validates_pred = false
     tooltip.hide()
 end
 
@@ -548,15 +572,93 @@ local function apply_prediction(idx)
     local deletes = pred.deletes or 0
     local to_type = pred.to_type or ""
 
+    -- ==============================================================
+    -- FUZZY OVERLAP RESOLVER : ANTI-DOUBLONS INTÉGRÉ
+    -- ==============================================================
+    -- Si deletes = 0 mais qu'il y a un risque que to_type répète 
+    -- avec des fautes ou des espaces ce qui est déjà à l'écran.
+    if to_type ~= "" then
+        local cb = buffer:gsub("​", "")
+        local words = {}
+        for w in cb:gmatch("%S+%s*") do table.insert(words, w) end
+        
+        -- On isole le tout premier mot de ce que le modèle veut taper
+        local tt_first_word = to_type:match("^%s*([^%s]+)")
+        
+        if tt_first_word then
+            -- Algorithme de similarité floue pour tolérer les typos
+            local function words_are_similar(w1, w2)
+                w1 = w1:lower():gsub("[%s%p]+", "")
+                w2 = w2:lower():gsub("[%s%p]+", "")
+                if w1 == w2 then return true end
+                if #w1 < 3 or #w2 < 3 then return false end
+                
+                -- Si ça commence pareil et que la longueur est très proche
+                if w1:sub(1,1) == w2:sub(1,1) and math.abs(#w1 - #w2) <= 2 then
+                    local matches = 0
+                    for i = 1, math.min(#w1, #w2) do
+                        if w1:sub(i,i) == w2:sub(i,i) then matches = matches + 1 end
+                    end
+                    -- Tolérance de 2 caractères différents max
+                    if matches >= math.min(#w1, #w2) - 2 then return true end
+                end
+                
+                -- Si l'un est contenu dans l'autre (ex: "pom", "pomme")
+                if #w1 >= 3 and (w2:find(w1, 1, true) or w1:find(w2, 1, true)) then
+                    return true
+                end
+                return false
+            end
+
+            -- On inspecte les 6 derniers mots du buffer pour trouver un point d'ancrage
+            local tail_start = math.max(1, #words - 6)
+            for i = tail_start, #words do
+                if words_are_similar(words[i], tt_first_word) then
+                    -- Trouvé ! On va écraser tout le buffer à partir de ce mot-là
+                    local del_count = 0
+                    for j = i, #words do
+                        del_count = del_count + text_utils.utf8_len(words[j])
+                    end
+                    -- On ne met à jour deletes que si on a trouvé un meilleur/plus long overlap
+                    if deletes < del_count then
+                        deletes = del_count
+                    end
+                    break
+                end
+            end
+        end
+    end
+    -- ==============================================================
+
+    -- ==============================================================
+    -- SMART SPACING : AJOUT AUTOMATIQUE D'ESPACE SI NÉCESSAIRE
+    -- ==============================================================
+    if deletes == 0 and to_type ~= "" then
+        local clean_buf = buffer:gsub("​", "")
+        if clean_buf ~= "" then
+            -- Vérifie si la phrase de l'utilisateur se termine par un espace (ASCII, insécable, fine)
+            local ends_with_space = clean_buf:match("%s$") or clean_buf:match("\194\160$") or clean_buf:match("\226\128\175$")
+            -- Vérifie si la prédiction du modèle commence par un espace
+            local starts_with_space = to_type:match("^%s") or to_type:match("^\194\160") or to_type:match("^\226\128\175")
+            -- On n'ajoute pas d'espace si on va taper de la ponctuation collée (-il, ., etc.)
+            local starts_with_punct = to_type:match("^[.,;:%?!'\"%)%]]")
+            
+            if not ends_with_space and not starts_with_space and not starts_with_punct then
+                to_type = " " .. to_type
+            end
+        end
+    end
+    -- ==============================================================
+
     is_replacing = true
     for _ = 1, deletes do keyStroke(nil, "delete", 0) end
     local emitted = emit_text(to_type)
 
     if deletes == 0 then
-        buffer = buffer .. to_type .. "\226\128\139"
+        buffer = buffer .. to_type .. "​"
     else
         local start = utf8.offset(buffer, -deletes)
-        buffer = (start and buffer:sub(1, start - 1) or "") .. to_type .. "\226\128\139"
+        buffer = (start and buffer:sub(1, start - 1) or "") .. to_type .. "​"
     end
 
     local delay = 0.05 + (deletes + emitted) * 0.005
@@ -570,14 +672,45 @@ local function apply_prediction(idx)
     return true
 end
 
+local _ignored_win_cache_time  = 0
+local _ignored_win_cache_value = false
+
+local function is_ignored_window()
+    local now = hs.timer.secondsSinceEpoch()
+    if now - _ignored_win_cache_time < 0.5 then return _ignored_win_cache_value end
+    _ignored_win_cache_time = now
+    
+    _ignored_win_cache_value = false
+    local app = hs.application.frontmostApplication()
+    if not app then return false end
+
+    local ok, win = pcall(function() return app:focusedWindow() end)
+    if not ok or not win then return false end
+
+    local ok_title, title = pcall(function() return win:title() end)
+    if not ok_title or not title then return false end
+
+    if _ignored_window_titles[title] then
+        _ignored_win_cache_value = true
+        return true
+    end
+
+    for _, pat in ipairs(_ignored_window_patterns) do
+        if title:match(pat) then
+            _ignored_win_cache_value = true
+            return true
+        end
+    end
+
+    return false
+end
+
 local function llm_suppressed_for_app()
+    if is_ignored_window() then return true end
+
     local frontApp = hs.application.frontmostApplication()
     if not frontApp then return false end
-    local ok, win = pcall(function() return frontApp:focusedWindow() end)
-    if ok and win then
-        local ok_title, title = pcall(function() return win:title() end)
-        if ok_title and title == "Hotstrings Personnels" then return true end
-    end
+    
     local appName = frontApp:name() or ""
     for _, excluded in ipairs(llm_excluded_apps) do
         if excluded == appName then return true end
@@ -597,33 +730,90 @@ local function arrow_mods_match(flags)
     return true
 end
 
+local function pred_shortcut_mod_matches(flags)
+    local mod_str = llm_pred_shortcut_mod or "ctrl"
+    local req = {}
+    for p in mod_str:gmatch("[^+]+") do req[p] = true end
+    for _, m in ipairs({"cmd", "ctrl", "alt", "shift"}) do
+        if req[m] and not flags[m] then return false end
+        if not req[m] and flags[m] then return false end
+    end
+    return true
+end
+
+local function build_info_bar(model_name, elapsed_ms)
+    if not model_name or model_name == "" then return nil end
+    if elapsed_ms and elapsed_ms > 0 then
+        local secs = elapsed_ms / 1000
+        local time_str
+        if secs < 10 then
+            time_str = string.format("%.1fs", secs)
+        else
+            time_str = string.format("%ds", math.floor(secs + 0.5))
+        end
+        return model_name .. " · " .. time_str
+    end
+    return model_name
+end
+
 function M._perform_llm_check()
     if not llm_enabled then return end
     if llm_suppressed_for_app() then return end
 
-    local clean_buffer = buffer:gsub("\226\128\139", "")
+    local clean_buffer = buffer:gsub("​", "")
     local words = {}
     for w in clean_buffer:gmatch("%S+%s*") do table.insert(words, w) end
     if #words == 0 then return end
     local tail = table.concat(words, "", math.max(1, #words - 4))
     if not tail or #tail < 2 then return end
 
-    tooltip.show("⏳ ...", true, preview_enabled)
+    tooltip.show("⏳ Génération en cours...", true, preview_enabled)
 
     local num_pred = math.max(1, math.floor(tonumber(llm_num_predictions) or 3))
+
+    _llm_request_id = _llm_request_id + 1
+    local my_request_id = _llm_request_id
 
     llm.fetch_llm_prediction(
         clean_buffer, tail,
         current_llm_model, llm_temperature, llm_max_predict,
         num_pred,
-        function(predictions)
-            if not predictions or #predictions == 0 then reset_predictions(); return end
-            _pending_predictions = predictions
+        function(predictions, elapsed_ms)
+            if _llm_request_id ~= my_request_id then return end
+            
+            -- ==============================================================
+            -- FILTRE ANTI-HALUCINATION (POUR LES PETITS MODÈLES)
+            -- ==============================================================
+            local valid_preds = {}
+            for _, p in ipairs(predictions) do
+                if p.to_type then
+                    -- Nettoyage ferme des "..." de réflexion ou de coupe
+                    local tt = p.to_type:gsub("^%.%.%.%s*", ""):gsub("%s*%.%.%.$", "")
+                    if tt ~= "" and tt ~= "..." then
+                        p.to_type = tt
+                        table.insert(valid_preds, p)
+                    end
+                end
+            end
+            -- ==============================================================
+
+            if #valid_preds == 0 then reset_predictions(); return end
+            
+            _pending_predictions = valid_preds
             _predictions_active  = true
-            local mn = llm_show_model_name and current_llm_model or nil
-            tooltip.show_predictions(predictions, 1, preview_enabled, mn, llm_pred_indent)
+            local info = llm_show_info_bar
+                and build_info_bar(current_llm_model, elapsed_ms)
+                or  nil
+            tooltip.show_predictions(
+                valid_preds, 1, preview_enabled,
+                info, llm_pred_shortcut_mod, llm_pred_indent
+            )
         end,
-        function() reset_predictions() end
+        function()
+            if _llm_request_id ~= my_request_id then return end
+            reset_predictions()
+        end,
+        llm_sequential_mode
     )
 end
 
@@ -633,9 +823,17 @@ local function update_preview(buf)
     if M._llm_timer and M._llm_timer:running() then M._llm_timer:stop() end
     reset_predictions()
 
-    if not buf or #buf == 0 then tooltip.hide(); return end
+    if not buf or #buf == 0 then 
+        tooltip.hide()
+        return 
+    end
+    
     local last_word = buf:match("([^%s]+)$")
-    if not last_word then tooltip.hide(); return end
+    if not last_word then 
+        tooltip.hide()
+        if llm_enabled and M._llm_timer then M._llm_timer:start() end
+        return 
+    end
 
     local match_repl = nil
     for _, provider in ipairs(_preview_providers) do
@@ -670,6 +868,7 @@ local function update_preview(buf)
     end
 
     if match_repl and not is_fallback_repetition then
+        _llm_request_id = _llm_request_id + 1
         tooltip.show(plain_text(tokens_from_repl(match_repl)), false, preview_enabled)
     else
         tooltip.hide()
@@ -681,41 +880,35 @@ end
 -- ========== 9. KEYBOARD EVENT HANDLER ==========
 -- ===============================================
 
-local _editor_cache_time  = 0
-local _editor_cache_value = false
-local function in_hotstring_editor()
-    local now = hs.timer.secondsSinceEpoch()
-    if now - _editor_cache_time < 0.5 then return _editor_cache_value end
-    _editor_cache_time = now
-    local app = hs.application.frontmostApplication()
-    if not app then _editor_cache_value = false; return false end
-    
-    local ok, win = pcall(function() return app:focusedWindow() end)
-    if not ok or not win then _editor_cache_value = false; return false end
-    
-    local ok_title, title = pcall(function() return win:title() end)
-    _editor_cache_value = (ok_title and title == "Hotstrings Personnels")
-    return _editor_cache_value
-end
-
 local function onKeyDown(e)
     if processing_paused then return false end
     local keyCode = e:getKeyCode()
     local flags   = e:getFlags()
 
-    local in_editor = in_hotstring_editor()
+    local is_ignored = is_ignored_window()
 
-    if not in_editor and _predictions_active and flags.cmd
-        and not flags.shift and not flags.alt and not flags.ctrl then
+    if keyCode == 36 and not is_ignored and _predictions_active then
+        if _enter_validates_pred then
+            local idx = tooltip.get_current_index and tooltip.get_current_index() or 1
+            apply_prediction(idx)
+            return true
+        else
+            reset_predictions()
+        end
+    end
+
+    if not is_ignored and _predictions_active
+        and pred_shortcut_mod_matches(flags) then
         local n = NUM_KEYCODES[keyCode]
         if n and n <= #_pending_predictions then
             return apply_prediction(n)
         end
     end
 
-    if not in_editor and keyCode == 48 and _predictions_active and #_pending_predictions > 0 then
+    if not is_ignored and keyCode == 48 and _predictions_active and #_pending_predictions > 0 then
         if flags.shift then
             if #_pending_predictions > 1 then
+                _enter_validates_pred = true 
                 if _shift_side == "left" then
                     if tooltip.navigate then tooltip.navigate(-1) end
                 else
@@ -741,11 +934,11 @@ local function onKeyDown(e)
     end
 
     if keyCode == 53 then
-        if not in_editor and _predictions_active then
+        if not is_ignored and _predictions_active then
             reset_predictions(); return true
         end
         if llm_reset_on_nav then buffer = "" end
-        if not in_editor then tooltip.hide() end
+        if not is_ignored then tooltip.hide() end
         return false
     end
 
@@ -760,20 +953,20 @@ local function onKeyDown(e)
 
     if flags.cmd or flags.ctrl then
         buffer = ""
-        if not in_editor then tooltip.hide() end
+        if not is_ignored then tooltip.hide() end
         return false
     end
 
     if keyCode == 51 then
         if flags.cmd or flags.alt then
             buffer = ""
-            if not in_editor then tooltip.hide() end
+            if not is_ignored then tooltip.hide() end
             return false
         end
         if #buffer > 0 then
             local offset = utf8.offset(buffer, -1)
             buffer = offset and buffer:sub(1, offset - 1) or ""
-            if not in_editor then update_preview(buffer) end
+            if not is_ignored then update_preview(buffer) end
         end
         return false
     end
@@ -782,22 +975,24 @@ local function onKeyDown(e)
         or keyCode == 119 or keyCode == 121
         or (keyCode >= 123 and keyCode <= 126) then
 
-        if not in_editor and _predictions_active and #_pending_predictions > 1
+        if not is_ignored and _predictions_active and #_pending_predictions > 1
             and llm_arrow_nav_enabled
             and (keyCode >= 123 and keyCode <= 126) then
             if arrow_mods_match(flags) then
                 local is_prev = (keyCode == 123 or keyCode == 126)
                 local is_next = (keyCode == 124 or keyCode == 125)
                 if is_prev then
+                    _enter_validates_pred = true
                     if tooltip.navigate then tooltip.navigate(-1) end; return true
                 elseif is_next then
+                    _enter_validates_pred = true
                     if tooltip.navigate then tooltip.navigate(1) end; return true
                 end
             end
         end
 
         if llm_reset_on_nav then buffer = "" end
-        if not in_editor then tooltip.hide() end
+        if not is_ignored then tooltip.hide() end
         return false
     end
 
@@ -809,7 +1004,7 @@ local function onKeyDown(e)
         buffer = buffer:sub(utf8.offset(buffer, -llm_context_length) or 1)
     end
 
-    if not in_editor then update_preview(buffer) end
+    if not is_ignored then update_preview(buffer) end
 
     if suppress_triggers or rescan_suppressed() then return false end
 
@@ -836,11 +1031,11 @@ local function onKeyDown(e)
                             local repl_text = plain_text(tokens)
                             if repl_text == trigger then
                                 if m.final_result then M.suppress_rescan() end
-                                if not in_editor then tooltip.hide() end
+                                if not is_ignored then tooltip.hide() end
                                 return true
                             end
 
-                            local char_offset = in_editor and 0 or char_len
+                            local char_offset = is_ignored and 0 or char_len
                             local deletes, to_type = text_utils.utf8_len(trigger) - char_offset, repl_text
 
                             if repl_text == m.repl then
@@ -851,17 +1046,17 @@ local function onKeyDown(e)
                             end
 
                             is_replacing = true
-                            if not in_editor then tooltip.hide() end
+                            if not is_ignored then tooltip.hide() end
                             for _ = 1, deletes do keyStroke({}, "delete", 0) end
                             local emitted = (repl_text == m.repl) and emit_text(to_type) or emit_tokens(tokens)
-                            
+
                             local tstart = utf8.offset(buffer, -text_utils.utf8_len(trigger))
-                            buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text .. "\226\128\139"
-                            
+                            buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text .. "​"
+
                             local base_delay = m.final_result and 0.5 or 0.05
                             local multiplier = m.final_result and 0.015 or 0.005
                             hs.timer.doAfter(base_delay + (deletes + emitted) * multiplier, function() is_replacing = false end)
-                            
+
                             if m.final_result then M.suppress_rescan(1.0) end
                             return true
                         end
@@ -886,7 +1081,7 @@ local function onKeyDown(e)
                                 local consume_term = terminator_is_consumed(chars)
                                 if m.repl == trigger then
                                     if m.final_result then M.suppress_rescan() end
-                                    if not in_editor then tooltip.hide() end
+                                    if not is_ignored then tooltip.hide() end
                                     return true
                                 end
 
@@ -899,9 +1094,9 @@ local function onKeyDown(e)
                                         deletes = trig_len - common
                                         to_type = text_utils.utf8_sub(repl_text, common + 1)
                                     end
-                                    if in_editor then deletes = deletes + char_len end
+                                    if is_ignored then deletes = deletes + char_len end
                                     is_replacing = true
-                                    if not in_editor then tooltip.hide() end
+                                    if not is_ignored then tooltip.hide() end
                                     for _ = 1, deletes do keyStroke({}, "delete", 0) end
                                     local emitted = (repl_text == m.repl) and emit_text(to_type) or emit_tokens(tokens)
                                     if not consume_term then
@@ -913,16 +1108,16 @@ local function onKeyDown(e)
                                     end
                                     local tstart = utf8.offset(buffer, -(char_len + trig_len))
                                     buffer = (tstart and buffer:sub(1, tstart - 1) or "")
-                                             .. repl_text .. (consume_term and "" or chars) .. "\226\128\139"
-                                    
+                                             .. repl_text .. (consume_term and "" or chars) .. "​"
+
                                     local base_delay = m.final_result and 0.5 or 0.05
                                     local multiplier = m.final_result and 0.015 or 0.005
                                     hs.timer.doAfter(base_delay + (deletes + emitted) * multiplier, function() is_replacing = false end)
-                                    
+
                                     if m.final_result then M.suppress_rescan(1.0) end
                                 end
 
-                                if in_editor then do_expansion() else hs.timer.doAfter(0, do_expansion) end
+                                if is_ignored then do_expansion() else hs.timer.doAfter(0, do_expansion) end
                                 return true
                             end
                         end
@@ -939,10 +1134,10 @@ local function onKeyDown(e)
                 local last_char_offset = utf8.offset(before, -1)
                 if last_char_offset then
                     local last_char = before:sub(last_char_offset)
-                    if last_char ~= "" and not last_char:match("^%s$") and last_char ~= "\226\128\139" then
+                    if last_char ~= "" and not last_char:match("^%s$") and last_char ~= "​" then
                         is_replacing = true
-                        if not in_editor then tooltip.hide() end
-                        if in_editor then keyStroke({}, "delete", 0) end
+                        if not is_ignored then tooltip.hide() end
+                        if is_ignored then keyStroke({}, "delete", 0) end
                         keyStrokes(last_char)
                         local tstart = utf8.offset(buffer, -char_len)
                         buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. last_char
@@ -955,7 +1150,7 @@ local function onKeyDown(e)
         return false
     end
 
-    if in_editor then
+    if is_ignored then
         hs.timer.doAfter(0, check_triggers)
     else
         if check_triggers() then return true end
