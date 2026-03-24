@@ -10,16 +10,13 @@ local llm_mod   = require("modules.llm")
 local menu_llm  = require("ui.menu_llm")
 local hotstring_editor = require("ui.hotstring_editor")
 
-local NBSP  = "\194\160"      -- U+00A0
-local NNBSP = "\226\128\175"  -- U+202F
-
 M._active_tasks = {}
 
 local function fmt_count(n)
     local s = tostring(math.floor(n + 0.5))
     local r = ""
     for i = 1, #s do
-        if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. NNBSP end
+        if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
         r = r .. s:sub(i, i)
     end
     return r
@@ -29,19 +26,19 @@ local SLOT_LABELS = {
     tap_3         = "Tap 3 doigts",
     tap_4         = "Tap 4 doigts",
     tap_5         = "Tap 5 doigts",
-    swipe_2_diag  = "Swipe 2 doigts \226\134\151/\226\134\153",
-    swipe_3_horiz = "Swipe 3 doigts \226\134\144/\226\134\146",
-    swipe_3_diag  = "Swipe 3 doigts \226\134\151/\226\134\153",
-    swipe_3_up    = "Swipe 3 doigts \226\134\145",
-    swipe_3_down  = "Swipe 3 doigts \226\134\147",
-    swipe_4_horiz = "Swipe 4 doigts \226\134\144/\226\134\146",
-    swipe_4_diag  = "Swipe 4 doigts \226\134\151/\226\134\153",
-    swipe_4_up    = "Swipe 4 doigts \226\134\145",
-    swipe_4_down  = "Swipe 4 doigts \226\134\147",
-    swipe_5_horiz = "Swipe 5 doigts \226\134\144/\226\134\146",
-    swipe_5_diag  = "Swipe 5 doigts \226\134\151/\226\134\153",
-    swipe_5_up    = "Swipe 5 doigts \226\134\145",
-    swipe_5_down  = "Swipe 5 doigts \226\134\147",
+    swipe_2_diag  = "Swipe 2 doigts ↖/↘",
+    swipe_3_horiz = "Swipe 3 doigts ←/→",
+    swipe_3_diag  = "Swipe 3 doigts ↖/↘",
+    swipe_3_up    = "Swipe 3 doigts ↑",
+    swipe_3_down  = "Swipe 3 doigts ↓",
+    swipe_4_horiz = "Swipe 4 doigts ←/→",
+    swipe_4_diag  = "Swipe 4 doigts ↖/↘",
+    swipe_4_up    = "Swipe 4 doigts ↑",
+    swipe_4_down  = "Swipe 4 doigts ↓",
+    swipe_5_horiz = "Swipe 5 doigts ←/→",
+    swipe_5_diag  = "Swipe 5 doigts ↖/↘",
+    swipe_5_up    = "Swipe 5 doigts ↑",
+    swipe_5_down  = "Swipe 5 doigts ↓",
 }
 
 local function get_group_name(file)
@@ -64,7 +61,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             pcall(function() if ico.setSize then ico:setSize({ w = 18, h = 18 }) end end)
             myMenu:setIcon(ico, false)
         elseif not custom_text then
-            myMenu:setTitle("\240\159\148\168")
+            myMenu:setTitle("🔧")
         end
     end
     update_icon()
@@ -106,7 +103,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         llm_enabled              = llm_mod and llm_mod.DEFAULT_LLM_ENABLED  or false,
         llm_debounce             = llm_mod and llm_mod.DEFAULT_LLM_DEBOUNCE or 0.5,
         llm_model                = llm_mod and llm_mod.DEFAULT_LLM_MODEL    or "llama3.2",
-        trigger_char             = "\226\152\133",   -- ★
+        trigger_char             = "★",   -- ★
         llm_context_length       = 500,
         llm_reset_on_nav         = true,
         llm_temperature          = 0.1,
@@ -114,10 +111,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         llm_num_predictions      = (llm_mod and llm_mod.DEFAULT_LLM_NUM_PREDICTIONS or 3),
         llm_arrow_nav_enabled    = false,
         llm_arrow_nav_mods       = {},
-        llm_show_model_name      = false,
+        llm_show_info_bar        = false,
+        llm_pred_shortcut_mod    = "ctrl",
         llm_pred_indent          = 0,
         llm_user_models          = {},
         llm_disabled_apps        = {},
+        llm_active_profile       = "standard",
+        llm_user_profiles        = {},
         custom_editor_shortcut   = nil,
         custom_default_section   = nil,
         custom_close_on_add      = false,
@@ -126,7 +126,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
     local function applyTriggerChar(text)
         if type(text) ~= "string" then return text end
         local safe_repl = state.trigger_char:gsub("%%", "%%%%")
-        return text:gsub("\226\152\133", safe_repl)
+        return text:gsub("★", safe_repl)
     end
 
     for _, f in ipairs(hotfiles or {}) do
@@ -186,10 +186,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             llm_num_predictions      = state.llm_num_predictions,
             llm_arrow_nav_enabled    = state.llm_arrow_nav_enabled,
             llm_arrow_nav_mods       = state.llm_arrow_nav_mods,
-            llm_show_model_name      = state.llm_show_model_name,
+            llm_show_info_bar        = state.llm_show_info_bar,
+            llm_pred_shortcut_mod    = state.llm_pred_shortcut_mod,
             llm_pred_indent          = state.llm_pred_indent,
             llm_user_models          = state.llm_user_models,
             llm_disabled_apps        = state.llm_disabled_apps,
+            llm_active_profile       = state.llm_active_profile or "standard",
+            llm_user_profiles        = state.llm_user_profiles  or {},
             custom_editor_shortcut   = state.custom_editor_shortcut or false,
             custom_default_section   = state.custom_default_section or false,
             custom_close_on_add      = state.custom_close_on_add,
@@ -251,11 +254,18 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             if type(saved.llm_num_predictions)  == "number"  then state.llm_num_predictions  = saved.llm_num_predictions  end
             if saved.llm_arrow_nav_enabled ~= nil        then state.llm_arrow_nav_enabled = saved.llm_arrow_nav_enabled end
             if type(saved.llm_arrow_nav_mods) == "table" then state.llm_arrow_nav_mods    = saved.llm_arrow_nav_mods    end
-            if saved.llm_show_model_name ~= nil          then state.llm_show_model_name   = saved.llm_show_model_name   end
-            if type(saved.llm_pred_indent)  == "number"   then state.llm_pred_indent       = saved.llm_pred_indent       end
+            if saved.llm_show_info_bar ~= nil          then state.llm_show_info_bar   = saved.llm_show_info_bar   end
+            if type(saved.llm_pred_shortcut_mod) == "string" then state.llm_pred_shortcut_mod = saved.llm_pred_shortcut_mod end
+            if type(saved.llm_pred_indent)  == "number"  then state.llm_pred_indent       = saved.llm_pred_indent       end
             if type(saved.llm_user_models) == "table"     then state.llm_user_models       = saved.llm_user_models       end
             if type(saved.sections_order_overrides) == "table" then state.sections_order_overrides = saved.sections_order_overrides end
             if type(saved.llm_disabled_apps) == "table" then state.llm_disabled_apps = saved.llm_disabled_apps end
+            if type(saved.llm_active_profile) == "string" then
+                state.llm_active_profile = saved.llm_active_profile
+            end
+            if type(saved.llm_user_profiles) == "table" then
+                state.llm_user_profiles = saved.llm_user_profiles
+            end
 
             if type(saved.custom_editor_shortcut) == "table" then
                 state.custom_editor_shortcut = saved.custom_editor_shortcut
@@ -319,21 +329,22 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         end
 
         if keymap then
-            if keymap.set_preview_enabled     then keymap.set_preview_enabled(state.preview_enabled)           end
-            if keymap.set_llm_enabled         then keymap.set_llm_enabled(state.llm_enabled)                   end
-            if keymap.set_llm_debounce        then keymap.set_llm_debounce(state.llm_debounce)                 end
-            if keymap.set_llm_model           then keymap.set_llm_model(state.llm_model)                       end
-            if keymap.set_trigger_char        then keymap.set_trigger_char(state.trigger_char)                 end
-            if keymap.set_llm_context_length  then keymap.set_llm_context_length(state.llm_context_length)     end
-            if keymap.set_llm_reset_on_nav    then keymap.set_llm_reset_on_nav(state.llm_reset_on_nav)         end
-            if keymap.set_llm_temperature     then keymap.set_llm_temperature(state.llm_temperature)           end
-            if keymap.set_llm_max_predict     then keymap.set_llm_max_predict(state.llm_max_predict)           end
-            if keymap.set_llm_num_predictions then keymap.set_llm_num_predictions(state.llm_num_predictions)   end
+            if keymap.set_preview_enabled     then keymap.set_preview_enabled(state.preview_enabled)             end
+            if keymap.set_llm_enabled         then keymap.set_llm_enabled(state.llm_enabled)                     end
+            if keymap.set_llm_debounce        then keymap.set_llm_debounce(state.llm_debounce)                   end
+            if keymap.set_llm_model           then keymap.set_llm_model(state.llm_model)                         end
+            if keymap.set_trigger_char        then keymap.set_trigger_char(state.trigger_char)                   end
+            if keymap.set_llm_context_length  then keymap.set_llm_context_length(state.llm_context_length)       end
+            if keymap.set_llm_reset_on_nav    then keymap.set_llm_reset_on_nav(state.llm_reset_on_nav)           end
+            if keymap.set_llm_temperature     then keymap.set_llm_temperature(state.llm_temperature)             end
+            if keymap.set_llm_max_predict     then keymap.set_llm_max_predict(state.llm_max_predict)             end
+            if keymap.set_llm_num_predictions then keymap.set_llm_num_predictions(state.llm_num_predictions)     end
             if keymap.set_llm_arrow_nav_enabled then keymap.set_llm_arrow_nav_enabled(state.llm_arrow_nav_enabled) end
-            if keymap.set_llm_arrow_nav_mods  then keymap.set_llm_arrow_nav_mods(state.llm_arrow_nav_mods)     end
-            if keymap.set_llm_show_model_name then keymap.set_llm_show_model_name(state.llm_show_model_name)   end
-            if keymap.set_llm_pred_indent     then keymap.set_llm_pred_indent(state.llm_pred_indent)           end
-            if keymap.set_llm_disabled_apps   then keymap.set_llm_disabled_apps(state.llm_disabled_apps)       end
+            if keymap.set_llm_arrow_nav_mods  then keymap.set_llm_arrow_nav_mods(state.llm_arrow_nav_mods)       end
+            if keymap.set_llm_show_info_bar   then keymap.set_llm_show_info_bar(state.llm_show_info_bar)         end
+            if keymap.set_llm_pred_shortcut_mod then keymap.set_llm_pred_shortcut_mod(state.llm_pred_shortcut_mod) end
+            if keymap.set_llm_pred_indent     then keymap.set_llm_pred_indent(state.llm_pred_indent)             end
+            if keymap.set_llm_disabled_apps   then keymap.set_llm_disabled_apps(state.llm_disabled_apps)         end
         end
         if hotstring_editor.set_trigger_char then
             hotstring_editor.set_trigger_char(state.trigger_char)
@@ -616,7 +627,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 end,
             },
             {
-                title = "   \226\134\179 Modifier les informations\226\128\166",
+                title = "   ↳ Modifier les informations…",
                 fn    = function() hs.timer.doAfter(0.1, personal_info.open_editor) end,
             },
         }
@@ -720,7 +731,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         local delay_default_ms = math.floor(((keymap and keymap.DEFAULT_BASE_DELAY_SEC) or 0.75) * 1000 + 0.5)
 
         table.insert(menu, {
-            title    = "Afficher la pr\195\169visualisation (Bulle)",
+            title    = "Afficher la prévisualisation (Bulle)",
             checked  = (state.preview_enabled and not paused) or nil,
             disabled = paused or nil,
             fn       = not paused and function()
@@ -729,7 +740,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                     keymap.set_preview_enabled(state.preview_enabled)
                 end
                 save_prefs()
-                notify_feature("Pr\195\169visualisation", state.preview_enabled)
+                notify_feature("Prévisualisation", state.preview_enabled)
                 updateMenu()
             end or nil,
         })
@@ -751,7 +762,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                     end
                     state.terminator_states[k] = nv
                     save_prefs()
-                    notify_feature("Expanseur" .. NBSP .. ": " .. applyTriggerChar(lbl), nv)
+                    notify_feature("Expanseur : " .. applyTriggerChar(lbl), nv)
                     updateMenu()
                 end end)(def.key, def.label) or nil,
             }
@@ -761,18 +772,18 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         local current_ms = math.floor(
             ((keymap and keymap.get_base_delay and keymap.get_base_delay()) or state.expansion_delay) * 1000 + 0.5)
         table.insert(menu, {
-            title    = "D\195\169lai maximal d'expansion" .. NBSP .. ": " .. current_ms .. " ms\226\128\166",
+            title    = "Délai maximal d'expansion : " .. current_ms .. " ms…",
             disabled = paused or nil,
             fn       = not paused and function()
                 local btn, raw = hs.dialog.textPrompt(
-                    "D\195\169lai maximal d'expansion",
-                    "Entrez le d\195\169lai en millisecondes (entier \226\137\165 0)" .. NBSP .. ":",
+                    "Délai maximal d'expansion",
+                    "Entrez le délai en millisecondes (entier ≥ 0) :",
                     tostring(current_ms), "OK", "Annuler")
                 if btn ~= "OK" then return end
                 local val = tonumber(raw)
                 if not val or val < 0 or val ~= math.floor(val) then
-                    hs.notify.new({ title = "D\195\169lai invalide",
-                        informativeText = "Veuillez saisir un entier \226\137\165 0." }):send(); return
+                    hs.notify.new({ title = "Délai invalide",
+                        informativeText = "Veuillez saisir un entier ≥ 0." }):send(); return
                 end
                 if keymap and keymap.set_base_delay then keymap.set_base_delay(val / 1000) end
                 state.expansion_delay = val / 1000
@@ -780,7 +791,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             end or nil,
         })
         table.insert(menu, {
-            title    = "   \226\134\179 R\195\169initialiser (d\195\169faut" .. NBSP .. ": " .. delay_default_ms .. " ms)",
+            title    = "   ↳ Réinitialiser (défaut : " .. delay_default_ms .. " ms)",
             disabled = (paused or current_ms == delay_default_ms) or nil,
             fn       = (not paused and current_ms ~= delay_default_ms) and function()
                 local def = (keymap and keymap.DEFAULT_BASE_DELAY_SEC) or 0.75
@@ -792,12 +803,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 
         table.insert(menu, { title = "-" })
         table.insert(menu, {
-            title    = "Caract\195\168re de d\195\169clenchement" .. NBSP .. ": " .. state.trigger_char,
+            title    = "Caractère de déclenchement : " .. state.trigger_char,
             disabled = paused or nil,
             fn       = not paused and function()
                 local btn, raw = hs.dialog.textPrompt(
-                    "Caract\195\168re de d\195\169clenchement",
-                    "Entrez le caract\195\168re \195\160 utiliser (actuel" .. NBSP .. ": " .. state.trigger_char .. ")" .. NBSP .. ":",
+                    "Caractère de déclenchement",
+                    "Entrez le caractère à utiliser (actuel : " .. state.trigger_char .. ") :",
                     state.trigger_char, "OK", "Annuler"
                 )
                 if btn == "OK" and raw ~= nil and raw ~= "" then
@@ -817,16 +828,16 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             end or nil,
         })
         table.insert(menu, {
-            title    = "   \226\134\179 R\195\169initialiser (d\195\169faut" .. NBSP .. ": \226\152\133)",
-            disabled = (paused or state.trigger_char == "\226\152\133") or nil,
-            fn       = (not paused and state.trigger_char ~= "\226\152\133") and function()
-                state.trigger_char = "\226\152\133"
-                if keymap and keymap.set_trigger_char then keymap.set_trigger_char("\226\152\133") end
+            title    = "   ↳ Réinitialiser (défaut : ★)",
+            disabled = (paused or state.trigger_char == "★") or nil,
+            fn       = (not paused and state.trigger_char ~= "★") and function()
+                state.trigger_char = "★"
+                if keymap and keymap.set_trigger_char then keymap.set_trigger_char("★") end
                 save_prefs(); do_reload("menu")
             end or nil,
         })
 
-        return { title = "Param\195\168tres Hotstrings", menu = menu }
+        return { title = "Paramètres Hotstrings", menu = menu }
     end
 
     local function buildGesturesItem()
@@ -863,9 +874,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                             hs.timer.doAfter(0.3, function()
                                 hs.focus()
                                 local clicked = hs.dialog.blockAlert(
-                                    "\226\154\160\239\184\143  Conflit potentiel", conflict.msg,
-                                    "Ouvrir R\195\169glages", "Plus tard", "warning")
-                                if clicked == "Ouvrir R\195\169glages" then
+                                    "⚠️  Conflit potentiel", conflict.msg,
+                                    "Ouvrir Réglages", "Plus tard", "warning")
+                                if clicked == "Ouvrir Réglages" then
                                     hs.execute(string.format("open '%s'", conflict.url))
                                 end
                             end)
@@ -874,7 +885,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 })
             end
             return {
-                title    = slotLbl .. NBSP .. ": " .. actionLbl,
+                title    = slotLbl .. " : " .. actionLbl,
                 disabled = not state.gestures or paused or nil,
                 menu     = submenu,
             }
@@ -934,7 +945,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 
         local s_menu = {}
         table.insert(s_menu, {
-            title    = "Layer (Left Command) + Scroll" .. NBSP .. ": Volume",
+            title    = "Layer (Left Command) + Scroll : Volume",
             checked  = (state.scroll and not paused) or nil,
             disabled = not state.shortcuts or not scroll or paused or nil,
             fn       = (state.shortcuts and scroll and not paused) and function()
@@ -957,7 +968,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 local is_on = shortcuts.is_enabled and shortcuts.is_enabled(s.id) or s.enabled
                 local desc  = applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
                 table.insert(s_menu, {
-                    title    = pretty_key(s.id) .. NBSP .. ": " .. (desc ~= "" and desc or s.id),
+                    title    = pretty_key(s.id) .. " : " .. (desc ~= "" and desc or s.id),
                     checked  = (is_on and not paused) or nil,
                     disabled = not state.shortcuts or paused or nil,
                     fn       = (state.shortcuts and not paused) and (function(id) return function()
@@ -972,11 +983,11 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 })
                 if s.id == "ctrl_g" then
                     table.insert(s_menu, {
-                        title    = "   \226\134\179 Modifier l'URL ChatGPT\226\128\166",
+                        title    = "   ↳ Modifier l'URL ChatGPT…",
                         disabled = paused or nil,
                         fn       = not paused and function()
                             local clicked, url = hs.dialog.textPrompt("URL ChatGPT",
-                                "URL ouverte par Ctrl+G" .. NBSP .. ":",
+                                "URL ouverte par Ctrl+G :",
                                 state.chatgpt_url or "", "OK", "Annuler")
                             if clicked == "OK" and url ~= nil and url ~= "" then
                                 state.chatgpt_url = url; save_prefs(); updateMenu()
@@ -1018,7 +1029,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         local cur_return = state.script_control_shortcuts.return_key or "none"
         local cur_back   = state.script_control_shortcuts.backspace  or "none"
         return {
-            title   = "Contr\195\180le du script",
+            title   = "Contrôle du script",
             checked = (enabled and not paused) or nil,
             fn      = function()
                 state.script_control_enabled = not state.script_control_enabled
@@ -1030,20 +1041,20 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                     script_control.set_shortcut_action("backspace",  "none")
                 end
                 save_prefs()
-                notify_feature("Contr\195\180le du script", state.script_control_enabled)
+                notify_feature("Contrôle du script", state.script_control_enabled)
                 updateMenu()
             end,
             menu = {
-                { title = "Option droite + \226\134\169" .. NBSP .. ": " .. (act_labels[cur_return] or cur_return),
+                { title = "Option droite + ↩ : " .. (act_labels[cur_return] or cur_return),
                    disabled = not enabled or paused or nil, menu = key_submenu("return_key") },
-                { title = "Option droite + \226\140\171" .. NBSP .. ": " .. (act_labels[cur_back] or cur_back),
+                { title = "Option droite + ⌫ : " .. (act_labels[cur_back] or cur_back),
                    disabled = not enabled or paused or nil, menu = key_submenu("backspace") },
                 { title = "-" },
-                { title    = "Chemin du script AHK\226\128\166",
+                { title    = "Chemin du script AHK…",
                    disabled = paused or nil,
                    fn       = not paused and function()
                     local btn, path = hs.dialog.textPrompt("Script AHK",
-                        "Chemin du fichier AHK source" .. NBSP .. ":",
+                        "Chemin du fichier AHK source :",
                         state.ahk_source_path or "", "OK", "Annuler")
                     if btn == "OK" and path ~= nil then
                         state.ahk_source_path = path; save_prefs(); updateMenu()
@@ -1135,7 +1146,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             end
         end
 
-        local base_title = "\226\156\143\239\184\143 Hotstrings Personnels"
+        local base_title = "✏️ Hotstrings Personnels"
         local title_str  = total_count > 0
             and (base_title .. " (" .. fmt_count(total_count) .. ")")
             or  base_title
@@ -1154,7 +1165,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             local sc = state.custom_editor_shortcut
             if not sc or sc == false then return "Aucun" end
             if sc_is_default(sc) then
-                return "Ctrl+" .. state.trigger_char .. NBSP .. "(d\195\169faut)"
+                return "Ctrl+" .. state.trigger_char .. " (défaut)"
             end
             local mods_str = table.concat(sc.mods or {}, "+")
             return mods_str ~= "" and (mods_str .. "+" .. (sc.key or "?"):upper())
@@ -1232,13 +1243,13 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         local already_def = sc_is_default(state.custom_editor_shortcut)
         local sc_menu = {
             {
-                title   = "Aucun (d\195\169sactiver)",
+                title   = "Aucun (désactiver)",
                 checked = (state.custom_editor_shortcut == false) or nil,
                 fn      = function() apply_shortcut(nil, nil) end,
             },
             { title = "-" },
             {
-                title = "Personnaliser\226\128\166",
+                title = "Personnaliser…",
                 fn    = function()
                     local current_str = ""
                     if type(state.custom_editor_shortcut) == "table" then
@@ -1246,10 +1257,9 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                             .. "+" .. (state.custom_editor_shortcut.key or "")
                     end
                     local btn, raw = hs.dialog.textPrompt(
-                        "Raccourci personnalis\195\169",
-                        "Format" .. NBSP .. ": mods+touche  (ex" .. NBSP
-                            .. ": cmd+alt+p  ou  ctrl+shift+e)\n"
-                            .. "Mods disponibles" .. NBSP .. ": cmd, alt, ctrl, shift",
+                        "Raccourci personnalisé",
+                        "Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
+                            .. "Mods disponibles : cmd, alt, ctrl, shift",
                         current_str, "OK", "Annuler"
                     )
                     if btn ~= "OK" or not raw or raw == "" then return end
@@ -1269,8 +1279,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
                 end,
             },
             {
-                title    = "   \226\134\179 R\195\169initialiser (d\195\169faut" .. NBSP
-                           .. ": Ctrl+" .. state.trigger_char .. ")",
+                title    = "   ↳ Réinitialiser (défaut : Ctrl+" .. state.trigger_char .. ")",
                 disabled = already_def or nil,
                 fn       = not already_def and function()
                     apply_shortcut(def_sc.mods, def_sc.key)
@@ -1278,13 +1287,12 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             },
             { title = "-" },
             {
-                title = "Cat\195\169gorie par d\195\169faut" .. NBSP
-                        .. ": " .. default_section_label(),
+                title = "Catégorie par défaut : " .. default_section_label(),
                 menu  = cat_menu,
             },
             { title = "-" },
             {
-                title   = "Fermer apr\195\168s ajout (raccourci)",
+                title   = "Fermer après ajout (raccourci)",
                 checked = state.custom_close_on_add or nil,
                 fn      = function()
                     state.custom_close_on_add = not state.custom_close_on_add
@@ -1298,14 +1306,14 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
 
         local menu_items = {
             {
-                title    = "Ouvrir l'\195\169diteur",
+                title    = "Ouvrir l'éditeur",
                 disabled = paused or nil,
                 fn       = not paused and function()
                     hs.timer.doAfter(0, function() hotstring_editor.open() end)
                 end or nil,
             },
             {
-                title = "Raccourci" .. NBSP .. ": " .. sc_label(),
+                title = "Raccourci : " .. sc_label(),
                 menu  = sc_menu,
             },
         }
@@ -1361,115 +1369,6 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         }
     end
 
-    local function openAppPicker(on_select)
-        local raw = hs.execute(
-            'find /Applications "$HOME/Applications" -maxdepth 2 -name "*.app"'
-            .. ' -not -name ".*" 2>/dev/null | sort')
-        local choices = {}
-        local seen    = {}
-        for app_path in raw:gmatch("[^\n]+") do
-            local name = app_path:match("([^/]+)%.app$")
-            if name and not seen[app_path] then
-                seen[app_path] = true
-                local info = hs.application.infoForBundlePath(app_path)
-                local bid  = info and info.CFBundleIdentifier
-                local icon = nil
-                if bid then
-                    local ok, img = pcall(hs.image.imageFromAppBundle, bid)
-                    if ok and img then
-                        pcall(function() img:setSize({w = 18, h = 18}) end)
-                        icon = img
-                    end
-                end
-                table.insert(choices, {
-                    text     = name,
-                    subText  = app_path,
-                    image    = icon,
-                    bundleID = bid,
-                    appPath  = app_path,
-                })
-            end
-        end
-        table.sort(choices, function(a, b)
-            return a.text:lower() < b.text:lower()
-        end)
-
-        local chooser = hs.chooser.new(function(choice)
-            if choice then on_select(choice) end
-        end)
-        chooser:placeholderText("Rechercher une application\226\128\166")
-        chooser:choices(choices)
-        chooser:bgDark(false)
-        chooser:show()
-    end
-
-    local function buildLLMDisabledAppsSubmenu()
-        local apps = state.llm_disabled_apps or {}
-        local menu  = {}
-
-        for i, app in ipairs(apps) do
-            local icon = nil
-            if app.bundleID then
-                local ok, img = pcall(hs.image.imageFromAppBundle, app.bundleID)
-                if ok and img then
-                    pcall(function() img:setSize({w = 16, h = 16}) end)
-                    icon = img
-                end
-            end
-            local idx = i
-            local styled_title = hs.styledtext.new(
-                (app.name or "?") .. "\t\226\156\149",
-                {
-                    paragraphStyle = {
-                        tabStops = { { location = 260, alignment = "right" } }
-                    },
-                }
-            )
-            table.insert(menu, {
-                title = styled_title,
-                image = icon,
-                fn    = function()
-                    table.remove(state.llm_disabled_apps, idx)
-                    if keymap and keymap.set_llm_disabled_apps then
-                        keymap.set_llm_disabled_apps(state.llm_disabled_apps)
-                    end
-                    save_prefs()
-                    updateMenu()
-                end,
-            })
-        end
-
-        if #menu > 0 then table.insert(menu, { title = "-" }) end
-
-        table.insert(menu, {
-            title = "+ Ajouter une application\226\128\166",
-            fn    = function()
-                hs.timer.doAfter(0.1, function()
-                    openAppPicker(function(choice)
-                        if not state.llm_disabled_apps then
-                            state.llm_disabled_apps = {}
-                        end
-                        for _, a in ipairs(state.llm_disabled_apps) do
-                            if a.appPath == choice.appPath then return end
-                        end
-                        table.insert(state.llm_disabled_apps, {
-                            name     = choice.text,
-                            appPath  = choice.appPath,
-                            bundleID = choice.bundleID,
-                        })
-                        if keymap and keymap.set_llm_disabled_apps then
-                            keymap.set_llm_disabled_apps(state.llm_disabled_apps)
-                        end
-                        save_prefs()
-                        updateMenu()
-                    end)
-                end)
-            end,
-        })
-
-        return menu
-    end
-
     updateMenu = function()
         local items = {}
         table.insert(items, {
@@ -1490,45 +1389,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         table.insert(items, buildCustomEditorItem())
 
         table.insert(items, { title = "-" })
-        local paused   = script_control and script_control.is_paused() or false
         local llm_item = llm_handler.build_item()
-        if type(llm_item) == "table" then
-            llm_item.checked = (state.llm_enabled and not paused) or nil
-            llm_item.fn = function()
-                state.llm_enabled = not state.llm_enabled
-                if keymap and keymap.set_llm_enabled then
-                    keymap.set_llm_enabled(state.llm_enabled)
-                end
-                save_prefs()
-                notify_feature("Intelligence artificielle", state.llm_enabled)
-                updateMenu()
-            end
-            if type(llm_item.menu) == "table" then
-                local filtered = {}
-                for _, sub in ipairs(llm_item.menu) do
-                    local t = type(sub.title) == "string" and sub.title:lower() or ""
-                    if not t:match("activ") then
-                        table.insert(filtered, sub)
-                    end
-                end
-                while #filtered > 0 and filtered[1].title == "-" do
-                    table.remove(filtered, 1)
-                end
-                llm_item.menu = filtered
-            end
-            if type(llm_item.menu) ~= "table" then llm_item.menu = {} end
-            local disabled_count = #(state.llm_disabled_apps or {})
-            local apps_label = "D\195\169sactiv\195\169 dans"
-                .. (disabled_count > 0
-                    and (" " .. disabled_count .. " application"
-                         .. (disabled_count >= 2 and "s" or ""))
-                    or  " ces applications")
-            table.insert(llm_item.menu, { title = "-" })
-            table.insert(llm_item.menu, {
-                title = apps_label,
-                menu  = buildLLMDisabledAppsSubmenu(),
-            })
-        end
         if llm_item then table.insert(items, llm_item) end
 
         table.insert(items, { title = "-" })
@@ -1578,7 +1439,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
     M._menu    = myMenu
     M._watcher = configWatcher
 
-    pcall(utils.notify, "Script pr\195\170t" .. NBSP .. "! \240\159\154\128")
+    pcall(utils.notify, "Script prêt ! 🚀")
     return myMenu, configWatcher
 end
 
