@@ -1146,7 +1146,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             end
         end
 
-        local base_title = "✏️ Hotstrings Personnels"
+        local base_title = "Hotstrings personnels"
         local title_str  = total_count > 0
             and (base_title .. " (" .. fmt_count(total_count) .. ")")
             or  base_title
@@ -1292,7 +1292,7 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
             },
             { title = "-" },
             {
-                title   = "Fermer après ajout (raccourci)",
+                title   = "Fermer l’UI après ajout d’une hotstring avec le raccourci",
                 checked = state.custom_close_on_add or nil,
                 fn      = function()
                     state.custom_close_on_add = not state.custom_close_on_add
@@ -1403,20 +1403,20 @@ function M.start(base_dir, hotfiles, gestures, scroll, keymap, shortcuts,
         if sc then table.insert(items, sc) end
 
         table.insert(items, { title = "-" })
-        table.insert(items, { title = "🟩 Activer toutes les fonctionnalités",
+        table.insert(items, { title = "☑ Activer toutes les fonctionnalités",
             fn = function() set_all_enabled(true)  end })
-        table.insert(items, { title = "🟥 Désactiver toutes les fonctionnalités",
+        table.insert(items, { title = "☐ Désactiver toutes les fonctionnalités",
             fn = function() set_all_enabled(false) end })
         table.insert(items, { title = "-" })
         table.insert(items, { title = "Ouvrir init.lua",
             fn = function() hs.execute('open "' .. base_dir .. 'init.lua"') end })
-        table.insert(items, { title = "Console Hammerspoon",
+        table.insert(items, { title = "Console",
             fn = function() hs.openConsole() end })
-        table.insert(items, { title = "Préférences Hammerspoon",
+        table.insert(items, { title = "Préférences",
             fn = function() hs.openPreferences() end })
-        table.insert(items, { title = "Recharger la configuration",
+        table.insert(items, { title = "Recharger",
             fn = function() do_reload() end })
-        table.insert(items, { title = "Quitter Hammerspoon",
+        table.insert(items, { title = "Quitter",
             fn = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end })
 
         myMenu:setMenu({})
