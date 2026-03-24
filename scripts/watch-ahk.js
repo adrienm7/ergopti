@@ -50,7 +50,7 @@ if (!uvPath) {
 
 const scripts = [
 	path.join(PROJECT_DIR, 'scripts', 'sync-private-ahk.js'),
-	path.join(PROJECT_DIR, 'remove_ahk_personal_configuration.js'),
+	path.join(PROJECT_DIR, 'scripts', 'remove_ahk_personal_configuration.js'),
 	path.join(PROJECT_DIR, 'scripts', 'update-ahk-date.js')
 ];
 
