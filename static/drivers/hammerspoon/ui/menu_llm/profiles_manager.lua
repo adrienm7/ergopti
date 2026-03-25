@@ -141,7 +141,7 @@ local function build_profile_menu(deps)
                         fn    = function()
                             pcall(hs.focus)
                             local ok_c, choice = pcall(hs.dialog.blockAlert, 
-                                "Supprimer \"" .. (profile.label or "") .. "\" ?", 
+                                "Supprimer \"" .. (profile.label or "") .. "\" ?", 
                                 "Ce profil personnalisé sera supprimé définitivement.", 
                                 "Supprimer", "Annuler", "critical")
                                 

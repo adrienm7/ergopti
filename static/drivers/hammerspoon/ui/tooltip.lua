@@ -56,8 +56,9 @@ local _state = {
     raw_predictions = {},
     current_index   = 1,
     on_navigate     = nil,
+    on_accept       = nil,
     info_bar        = nil,
-    shortcut_mod    = "ctrl",
+    shortcut_mod    = "alt",
     indent          = 0,
     fixed_width     = nil,
     timeout_sec     = 2.5,  -- Default auto-hide timeout for normal hotstrings
@@ -67,6 +68,12 @@ local _state = {
 
 local _watchers = {}
 local _idle_timer = nil
+
+-- macOS hardware keycodes for number keys 1 to 0
+local num_keycodes = {
+    [18] = 1, [19] = 2, [20] = 3, [21] = 4, [23] = 5,
+    [22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10
+}
 
 --- Automatically hides the tooltip if the user stops typing
 local function reset_idle_timer()
@@ -117,10 +124,40 @@ local function start_watchers()
         if kc >= 123 and kc <= 126 then return false end -- Ignore Arrow keys
         
         local flags = e:getFlags()
-        local mod = _state.shortcut_mod or "ctrl"
+        local mod = _state.shortcut_mod or "alt"
         
-        -- Strict tolerance for numpad keys combined with the correct modifier (LLM shortcuts)
-        if flags[mod] and (kc >= 18 and kc <= 29) then return false end
+        -- Priority interception: Selection shortcuts (1-0)
+        if mod ~= "none" then
+            local match_all = true
+            local req_flags = {}
+            for m in mod:gmatch("[^+]+") do
+                req_flags[m] = true
+                if not flags[m] then match_all = false; break end
+            end
+            
+            -- Strict check: no OTHER modifier should be pressed
+            if match_all then
+                for k, v in pairs(flags) do
+                    if v and not req_flags[k] and (k == "cmd" or k == "alt" or k == "shift" or k == "ctrl") then
+                        match_all = false; break
+                    end
+                end
+            end
+            
+            if match_all and num_keycodes[kc] then
+                local idx = num_keycodes[kc]
+                local n_preds = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+                
+                if idx <= n_preds then
+                    if type(_state.on_accept) == "function" then
+                        _state.on_accept(idx)
+                    end
+                end
+                
+                -- RETURN TRUE: We fully consume the keystroke so macOS never receives it
+                return true
+            end
+        end
         
         -- Ignore raw modifier presses (Shift, Ctrl, Alt, Cmd) to prevent premature dismissal
         if kc == 54 or kc == 55 or kc == 56 or kc == 58 or kc == 59 or kc == 60 then
@@ -235,7 +272,7 @@ local C_INFO_BAR = { white = 0.30, alpha = 1.0 }
 local C_SEP      = { white = 1.00, alpha = 0.09 }
 local C_INVIS    = { white = 0.00, alpha = 0.00 }
 
-local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧" }
+local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧", ["cmd+shift"] = "⌘⇧" }
 
 
 
@@ -333,7 +370,6 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         PREFIX_OTHER = ind_str
     end
 
-    local mod_sym = MOD_SYMBOL[shortcut_mod or "ctrl"] or "⌃"
     local result = nil
     local gap    = hs.styledtext.new("\n", { font = { name = FONT, size = 3 }, color = C_INVIS })
 
@@ -349,7 +385,8 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         end
 
         local cmd_str = ""
-        if n > 1 then
+        if n > 1 and shortcut_mod ~= "none" then
+            local mod_sym = MOD_SYMBOL[shortcut_mod] or "⌃"
             if i <= 9 then cmd_str = "   " .. mod_sym .. i
             elseif i == 10 then cmd_str = "   " .. mod_sym .. "0"
             end
@@ -549,6 +586,9 @@ end
 --- Assigns a callback executed when the user navigates through predictions
 function M.set_navigate_callback(fn) _state.on_navigate = fn end
 
+--- Assigns a callback executed when the user explicitly accepts a prediction via shortcut
+function M.set_accept_callback(fn) _state.on_accept = fn end
+
 --- Retrieves the currently highlighted prediction index
 function M.get_current_index()       return _state.current_index end
 
@@ -576,7 +616,7 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     _state.raw_predictions = predictions
     _state.current_index   = current_index
     _state.info_bar        = (info_bar and tostring(info_bar) ~= "") and tostring(info_bar) or nil
-    _state.shortcut_mod    = shortcut_mod or "ctrl"
+    _state.shortcut_mod    = shortcut_mod or "alt"
     _state.indent          = math.max(0, math.min(5, math.floor(tonumber(indent) or 0)))
     _state.current_is_llm  = true -- Ensure extended timeout is used
 

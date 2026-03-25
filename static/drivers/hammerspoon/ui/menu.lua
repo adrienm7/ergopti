@@ -811,7 +811,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
             end
         end
         table.insert(menu, { title = "Expanseurs", disabled = paused or nil, menu = exp_sub })
-        table.insert(menu, { title = "-" })
 
         local delay_menu = {}
 
@@ -860,8 +859,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         end
 
         local def_base = (keymap and keymap.DEFAULT_BASE_DELAY_SEC) or 0.75
-        table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
-        table.insert(delay_menu, { title = "-" })
         table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", DEFAULT_DELAYS.STAR_TRIGGER, false))
         table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", DEFAULT_DELAYS.dynamichotstrings, false))
         table.insert(delay_menu, make_delay_item("Autocorrections", "autocorrection", DEFAULT_DELAYS.autocorrection, false))
@@ -870,6 +867,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         table.insert(delay_menu, make_delay_item("Réductions de distances", "distancesreduction", DEFAULT_DELAYS.distancesreduction, false))
         
         table.insert(delay_menu, { title = "-" })
+        table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
+        table.insert(delay_menu, { title = "-" })
+
         table.insert(delay_menu, {
             title    = "Réinitialiser tous les délais",
             disabled = paused or nil,
@@ -896,12 +896,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         table.insert(menu, { title = "-" })
 
         table.insert(menu, {
-            title    = "Caractère de déclenchement : " .. state.trigger_char,
+            title    = "Touche magique : " .. state.trigger_char,
             disabled = paused or nil,
             fn       = not paused and function()
                 local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
-                    "Caractère de déclenchement",
-                    "Entrez le caractère à utiliser (actuel : " .. state.trigger_char .. ") :",
+                    "Touche magique",
+                    "Entrez le caractère à utiliser pour remplacer le ★ :",
                     state.trigger_char, "OK", "Annuler"
                 )
                 if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
@@ -1181,12 +1181,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         local already_def = sc_is_default(state.custom_editor_shortcut)
         local sc_menu = {
             {
-                title   = "Aucun (désactiver)",
-                checked = (state.custom_editor_shortcut == false) or nil,
-                fn      = function() apply_shortcut(nil, nil) end,
-            },
-            { title = "-" },
-            {
                 title = "Personnaliser…",
                 fn    = function()
                     local current_str = ""
@@ -1197,11 +1191,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
                     local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
                         "Raccourci personnalisé",
                         "Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
-                            .. "Mods disponibles : cmd, alt, ctrl, shift",
+                            .. "Mods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
                         current_str, "OK", "Annuler"
                     )
-                    if not ok_p or btn ~= "OK" or type(raw) ~= "string" or raw == "" then return end
+                    if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
                     raw = raw:match("^%s*(.-)%s*$"):lower()
+                    if raw == "" then
+                        apply_shortcut(nil, nil)
+                        return
+                    end
                     local parts = {}
                     for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
                     if #parts < 1 then return end
@@ -1223,12 +1221,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
                     apply_shortcut(def_sc.mods, def_sc.key)
                 end or nil,
             },
-            { title = "-" },
             {
                 title = "Catégorie par défaut : " .. default_section_label(),
                 menu  = cat_menu,
             },
-            { title = "-" },
             {
                 title   = "Fermer l’UI après ajout d’une hotstring avec le raccourci",
                 checked = state.custom_close_on_add or nil,
@@ -1244,7 +1240,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 
         local menu_items = {
             {
-                title    = "Ouvrir l’éditeur",
+                title    = "Ouvrir l’éditeur de hotstrings",
                 disabled = paused or nil,
                 fn       = not paused and function()
                     hs.timer.doAfter(0, function() pcall(hotstring_editor.open) end)
@@ -1398,7 +1394,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         return item
     end
 
-    local function buildRaccourcisItem()
+    local function buildShortcutsItem()
         if not shortcuts then return nil end
         local paused = script_control and type(script_control.is_paused) == "function" and script_control.is_paused() or false
         local item   = {
@@ -1664,7 +1660,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         local g_item = buildGesturesItem()
         if g_item then table.insert(items, g_item) end
         
-        local r_item = buildRaccourcisItem()
+        local r_item = buildShortcutsItem()
         if r_item then table.insert(items, r_item) end
 
         local sc = buildScriptControlItem()
@@ -1717,7 +1713,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
     M._menu    = myMenu
     M._watcher = configWatcher
 
-    pcall(notifications.notify, "Script prêt ! 🚀")
+    pcall(notifications.notify, "Script prêt ! 🚀")
     return myMenu, configWatcher
 end
 

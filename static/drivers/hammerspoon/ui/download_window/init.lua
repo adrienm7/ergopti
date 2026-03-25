@@ -235,7 +235,7 @@ function M.complete(success, _model_name)
     if not _wv then return end
     
     local is_ok = success == true
-    local msg   = is_ok and "✅ Installation terminée !" or "❌ Échec du téléchargement"
+    local msg   = is_ok and "✅ Installation terminée !" or "❌ Échec du téléchargement"
     local js    = string.format("done(%s,%s); showLog()", is_ok and "true" or "false", js_str(msg))
     
     if _ready then 

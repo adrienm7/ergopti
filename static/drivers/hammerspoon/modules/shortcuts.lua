@@ -196,8 +196,8 @@ local function center_frontmost_after(delay)
     end)
 end
 
--- List of Finder-like file managers and helper to detect them
-local fm_list = {"finder", "qspace", "path finder", "forklift", "commander one", "totalfinder", "xtrafinder"}
+-- Prioritized list of Finder-like file managers
+local fm_list = {"qspace", "path finder", "forklift", "commander one", "totalfinder", "xtrafinder", "finder"}
 
 --- Checks if a given app name belongs to a known file manager
 --- @param appname string Name of the application
@@ -210,9 +210,6 @@ local function is_finder_like(appname)
     end
     return false
 end
-
--- Prioritized list of apps to try for `Ctrl+E` (Qspace first).
-local fm_candidates = {"Qspace", "QSpace", "qspace", "Path Finder", "Forklift", "Commander One", "TotalFinder", "XtraFinder"}
 
 --- Attempts to launch or focus the first available application from a list
 --- @param apps table List of application names
@@ -231,7 +228,6 @@ local function launch_first_available(apps)
             local ok_name, an = pcall(function() return a:name() end)
             if ok_name and an and an:lower():find(lname, 1, true) then
                 pcall(function() a:activate() end)
-                notifications.notify("Opened: " .. an)
                 return true
             end
         end
@@ -239,7 +235,6 @@ local function launch_first_available(apps)
         -- Try to launch/focus by exact name
         local ok_launch, success = pcall(hs.application.launchOrFocus, name)
         if ok_launch and success then
-            notifications.notify("Opened: " .. name)
             return true
         end
     end
@@ -500,7 +495,7 @@ hotkey_defs.ctrl_m = function()
     end)
 end
 
-hotkey_labels.ctrl_x = "Copier couleur hex du pixel sous le curseur"
+hotkey_labels.ctrl_x = "Copier la couleur hex du pixel sous le curseur"
 hotkey_defs.ctrl_x = function()
     return hs.hotkey.bind({"ctrl"}, "x", function()
         local ok, pos = pcall(hs.mouse.absolutePosition)
@@ -517,8 +512,8 @@ hotkey_defs.ctrl_x = function()
     end)
 end
 
-hotkey_labels.layer_scroll_volume = "Layer (Left Command) + Scroll : Volume"
-hotkey_defs.layer_scroll_volume = function()
+hotkey_labels.layer_scroll = "Volume"
+hotkey_defs.layer_scroll = function()
     local left_cmd_physical = false
     local f19_keycode = hs.keycodes.map["f19"]
 
@@ -671,7 +666,7 @@ hotkey_defs.ctrl_o = function()
     end)
 end
 
-hotkey_labels.ctrl_t = "Casse de titre / minuscules"
+hotkey_labels.ctrl_t = "Toggle Casse De Titre / minuscules"
 hotkey_defs.ctrl_t = function()
     return hs.hotkey.bind({"ctrl"}, "t", function()
         do_transform(function(sel)
@@ -681,7 +676,7 @@ hotkey_defs.ctrl_t = function()
     end)
 end
 
-hotkey_labels.ctrl_u = "Majuscules / minuscules"
+hotkey_labels.ctrl_u = "Toggle MAJUSCULES / minuscules"
 hotkey_defs.ctrl_u = function()
     return hs.hotkey.bind({"ctrl"}, "u", function()
         do_transform(function(sel)
@@ -712,7 +707,7 @@ hotkey_defs.ctrl_d = function()
         local home = os.getenv("HOME") or "~"
         
         -- Try to bring a preferred file manager forward, then open Downloads
-        if not launch_first_available(fm_candidates) then
+        if not launch_first_available(fm_list) then
             -- Fallback to system opener
             pcall(hs.execute, "open \"" .. home .. "/Downloads\"")
         else
@@ -731,7 +726,7 @@ hotkey_defs.ctrl_e = function()
         local home = os.getenv("HOME") or "~"
         
         -- Try to bring a preferred file manager forward, then open Home
-        if not launch_first_available(fm_candidates) then
+        if not launch_first_available(fm_list) then
             pcall(hs.execute, "open \"" .. home .. "/Downloads\"")   
         else
             timer.doAfter(0.12, function()
@@ -742,7 +737,7 @@ hotkey_defs.ctrl_e = function()
     end)
 end
 
-hotkey_labels.ctrl_g = "Ouvrir ChatGPT"
+hotkey_labels.ctrl_g = "Ouvrir ChatGPT (" .. read_chatgpt_url() .. ")"
 hotkey_defs.ctrl_g = function()
     return hs.hotkey.bind({"ctrl"}, "g", function()
         local url = read_chatgpt_url()
