@@ -903,4 +903,28 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
     end
 end
 
+--- Utility to correctly match current keyboard modifiers from an event
+--- @param eventFlags table The flags from event:getFlags()
+--- @param targetMods table The configured modifiers array (e.g. {"alt"} or {"none"})
+--- @return boolean True if it perfectly matches
+function M.check_modifiers(eventFlags, targetMods)
+    if type(targetMods) ~= "table" then return false end
+    if #targetMods == 1 and targetMods[1] == "none" then return false end
+    
+    -- We create a strict map of target modifiers to evaluate ONLY these 4 keys
+    -- This allows us to ignore the "fn" or "numericpad" flags often sent by macOS with arrow keys
+    local target_map = { cmd = false, alt = false, shift = false, ctrl = false }
+    for _, mod in ipairs(targetMods) do
+        if target_map[mod] ~= nil then target_map[mod] = true end
+    end
+    
+    -- We verify strictly that the event state matches the desired state for each modifier
+    if (eventFlags.cmd or false)   ~= target_map.cmd   then return false end
+    if (eventFlags.alt or false)   ~= target_map.alt   then return false end
+    if (eventFlags.shift or false) ~= target_map.shift then return false end
+    if (eventFlags.ctrl or false)  ~= target_map.ctrl  then return false end
+    
+    return true
+end
+
 return M

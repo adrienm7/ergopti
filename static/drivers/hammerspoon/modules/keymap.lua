@@ -54,6 +54,10 @@ local M = {}
 -- ====================================
 -- ====================================
 
+-- LLM prediction defaults
+M.llm_nav_modifiers_default = {}
+M.llm_val_modifiers_default = {"alt"}
+
 M.DEFAULT_BASE_DELAY_SEC = 0.75
 
 -- Allowed time gap between two keystrokes (in seconds) depending on the feature
@@ -122,12 +126,10 @@ local llm_reset_on_nav         = true
 local llm_temperature          = 0.1
 local llm_max_predict          = 40
 local llm_num_predictions      = llm.DEFAULT_LLM_NUM_PREDICTIONS or 3
+
 local llm_excluded_apps        = {}
-local llm_arrow_nav_enabled    = false
-local llm_arrow_nav_mods       = {}
 local llm_show_info_bar        = true
-local llm_pred_indent          = 0
-local llm_pred_shortcut_mod    = "alt"
+local llm_pred_indent          = -3
 local llm_sequential_mode      = llm.DEFAULT_LLM_SEQUENTIAL_MODE or false
 
 if tooltip.set_navigate_callback then
@@ -150,11 +152,8 @@ function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) e
 function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
 function M.set_llm_max_predict(p)         llm_max_predict        = math.max(1, tonumber(p) or 40) end
 function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or 3) end
-function M.set_llm_arrow_nav_enabled(v)   llm_arrow_nav_enabled  = (v == true) end
-function M.set_llm_arrow_nav_mods(m)      llm_arrow_nav_mods     = type(m) == "table" and m or {} end
 function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
-function M.set_llm_pred_indent(v)         llm_pred_indent        = math.max(0, math.min(5, math.floor(tonumber(v) or 0))) end
-function M.set_llm_pred_shortcut_mod(m)   llm_pred_shortcut_mod  = tostring(m or "alt") end
+function M.set_llm_pred_indent(v)         llm_pred_indent        = math.floor(tonumber(v) or 0) end
 function M.set_llm_sequential_mode(v)     llm_sequential_mode    = (v == true) end
 function M.get_llm_enabled()              return llm_enabled end
 function M.set_llm_show_model_name(v)     llm_show_info_bar      = (v == true) end
@@ -421,7 +420,7 @@ end
 -- ==============================
 -- ==============================
 
--- UI Labels remain in French as requested for user display
+-- UI Labels remain in French for user display
 local TERMINATOR_DEFS = {
     { key = "space",        chars  = { " " },        label = "Espace"                },
     { key = "tab",          chars  = { "\t" },       label = "Tabulation"            },
@@ -661,29 +660,6 @@ local function llm_suppressed_for_app()
     return false
 end
 
-local function arrow_mods_match(flags)
-    local req = {}
-    for _, mod in ipairs(llm_arrow_nav_mods) do
-        if not flags[mod] then return false end
-        req[mod] = true
-    end
-    for _, mod in ipairs({"cmd", "shift", "alt", "ctrl"}) do
-        if flags[mod] and not req[mod] then return false end
-    end
-    return true
-end
-
-local function pred_shortcut_mod_matches(flags)
-    local mod_str = llm_pred_shortcut_mod or "alt"
-    local req = {}
-    for p in mod_str:gmatch("[^+]+") do req[p] = true end
-    for _, m in ipairs({"cmd", "ctrl", "alt", "shift"}) do
-        if req[m] and not flags[m] then return false end
-        if not req[m] and flags[m] then return false end
-    end
-    return true
-end
-
 local function build_info_bar(model_name, elapsed_ms)
     if not model_name or model_name == "" then return nil end
     if elapsed_ms and elapsed_ms > 0 then
@@ -735,8 +711,24 @@ function M._perform_llm_check()
                 _pending_predictions = valid_preds
                 _predictions_active  = true
                 local info = llm_show_info_bar and build_info_bar(current_llm_model, elapsed_ms) or nil
+                
+                local val_mods = hs.settings.get("llm_val_modifiers") or M.llm_val_modifiers_default
+                local val_mod_str = "none"
+                if llm_num_predictions > 1 and not (#val_mods == 1 and val_mods[1] == "none") then
+                    val_mod_str = (#val_mods == 0) and "\226\128\139" or table.concat(val_mods, "+")
+                end
+                
+                local nav_mods = hs.settings.get("llm_nav_modifiers") or M.llm_nav_modifiers_default
+                local nav_mod_str = "none"
+                if #nav_mods > 0 and not (#nav_mods == 1 and nav_mods[1] == "none") then
+                    nav_mod_str = table.concat(nav_mods, "+")
+                    nav_mod_str = nav_mod_str:gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
+                elseif #nav_mods == 0 then
+                    nav_mod_str = ""
+                end
+
                 if tooltip.show_predictions then
-                    tooltip.show_predictions(valid_preds, 1, preview_enabled, info, llm_pred_shortcut_mod, llm_pred_indent)
+                    tooltip.show_predictions(valid_preds, 1, preview_enabled, info, val_mod_str, llm_pred_indent, nav_mod_str)
                 end
             end,
             function()
@@ -1008,6 +1000,16 @@ end
 -- =========================================
 -- =========================================
 
+-- Helper to split modifier strings like {"cmd+shift"} into {"cmd", "shift"}
+local function split_mods(mod_array)
+    local res = {}
+    if type(mod_array) ~= "table" then return res end
+    for _, m in ipairs(mod_array) do
+        for p in m:gmatch("[^+]+") do table.insert(res, p) end
+    end
+    return res
+end
+
 local function onKeyDown(e)
     if processing_paused then return false end
 
@@ -1022,7 +1024,9 @@ local function onKeyDown(e)
     end
 
     -- Word timeout: clear the buffer if the user took a long pause
-    if dt > M.WORD_TIMEOUT_SEC then
+    -- Give more time if LLM prediction is actively displayed
+    local timeout = _predictions_active and 12.0 or M.WORD_TIMEOUT_SEC
+    if dt > timeout then
         buffer = ""
         reset_predictions()
     end
@@ -1047,8 +1051,10 @@ local function onKeyDown(e)
         return false 
     end
 
-    -- 2. Handles LLM Prediction Execution (Enter / Numbers / Tab)
+    -- 2. Handles LLM Prediction Execution (Enter / Numbers / Tab / Arrows)
     if not is_ignored and _predictions_active then
+        
+        -- Enter to validate immediately
         if keyCode == 36 then
             if _enter_validates_pred then
                 local idx = tooltip.get_current_index and tooltip.get_current_index() or 1
@@ -1058,16 +1064,28 @@ local function onKeyDown(e)
             end
         end
 
-        if pred_shortcut_mod_matches(flags) then
+        -- Numeric validation logic
+        local val_mods = split_mods(hs.settings.get("llm_val_modifiers") or M.llm_val_modifiers_default)
+        if #_pending_predictions > 1 and llm.check_modifiers(flags, val_mods) then
             local n = NUM_KEYCODES[keyCode]
             if n and n <= #_pending_predictions then return apply_prediction(n) end
         end
 
+        -- Arrow navigation logic
+        local nav_mods = split_mods(hs.settings.get("llm_nav_modifiers") or M.llm_nav_modifiers_default)
+        if #_pending_predictions > 1 and (keyCode >= 123 and keyCode <= 126) and llm.check_modifiers(flags, nav_mods) then
+            _enter_validates_pred = true
+            local nav_dir = (keyCode == 123 or keyCode == 126) and -1 or 1
+            if tooltip.navigate then tooltip.navigate(nav_dir) end
+            return true
+        end
+
+        -- Tab fallback logic
         if keyCode == 48 and #_pending_predictions > 0 then
             if flags.shift then
                 if #_pending_predictions > 1 then
                     _enter_validates_pred = true 
-                    local nav_dir = _shift_side == "left" and -1 or 1
+                    local nav_dir = (_shift_side == "right") and 1 or -1
                     if tooltip.navigate then tooltip.navigate(nav_dir) end
                     return true
                 end
@@ -1121,15 +1139,6 @@ local function onKeyDown(e)
     -- Handle Arrow Keys
     if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
         or (keyCode >= 123 and keyCode <= 126) then
-
-        if not is_ignored and _predictions_active and #_pending_predictions > 1 and llm_arrow_nav_enabled then
-            if (keyCode >= 123 and keyCode <= 126) and arrow_mods_match(flags) then
-                _enter_validates_pred = true
-                local nav_dir = (keyCode == 123 or keyCode == 126) and -1 or 1
-                if tooltip.navigate then tooltip.navigate(nav_dir) end
-                return true
-            end
-        end
 
         if llm_reset_on_nav then buffer = "" end
         if not is_ignored and tooltip.hide then tooltip.hide() end
@@ -1230,12 +1239,12 @@ local shift_tap = eventtap.new(
     function(e)
         local kc = e:getKeyCode()
         local f  = e:getFlags()
-        if kc == 56 then
-            _shift_side = f.shift and "left" or (_shift_side == "left" and nil or _shift_side)
-        elseif kc == 60 then
-            _shift_side = f.shift and "right" or (_shift_side == "right" and nil or _shift_side)
-        elseif not f.shift then
+        if not f.shift then
             _shift_side = nil
+        elseif kc == 56 then
+            _shift_side = "left"
+        elseif kc == 60 then
+            _shift_side = "right"
         end
         return false
     end
