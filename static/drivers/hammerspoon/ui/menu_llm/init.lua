@@ -42,6 +42,23 @@ local function format_mod_string(m_str)
     return res == "" and "⌃" or res
 end
 
+--- Helper to generate dynamic titles for shortcut menus
+--- @param action string The action label (e.g. "Naviguer")
+--- @param mods table Array of modifiers
+--- @param none_label string Text to display if no modifiers are required
+--- @param mod_label string Text to display next to the modifier symbol
+--- @return string The combined title
+local function format_shortcut_title(action, mods, none_label, mod_label)
+    if not mods or (#mods == 1 and mods[1] == "none") then
+        return action .. " : Désactivé"
+    elseif #mods == 0 then
+        return action .. " : " .. none_label
+    else
+        local sym = format_mod_string(table.concat(mods, "+"))
+        return action .. " : " .. sym .. " " .. mod_label
+    end
+end
+
 
 
 
@@ -140,34 +157,6 @@ function M.create(deps)
         return m
     end
 
-    local function build_pred_shortcut_menu()
-        local m = {}
-        local options = {
-            { label = "Désactivé", val = "none" },
-            { label = "Ctrl (⌃)", val = "ctrl" },
-            { label = "Option/Alt (⌥)", val = "alt" },
-            { label = "Cmd (⌘)", val = "cmd" },
-            { label = "Shift (⇧)", val = "shift" },
-            { label = "Cmd + Shift (⌘⇧)", val = "cmd+shift" }
-        }
-        
-        for _, opt in ipairs(options) do
-            table.insert(m, {
-                title   = opt.label,
-                checked = (state.llm_pred_shortcut_mod == opt.val),
-                fn      = function()
-                    state.llm_pred_shortcut_mod = opt.val
-                    if keymap and type(keymap.set_llm_pred_shortcut_mod) == "function" then
-                        pcall(keymap.set_llm_pred_shortcut_mod, opt.val)
-                    end
-                    save_prefs()
-                    update_menu()
-                end
-            })
-        end
-        return m
-    end
-
 
 
     -- ===================================
@@ -199,8 +188,8 @@ function M.create(deps)
         -- --- 2. PERFORMANCE & STRATEGY ---
         table.insert(main_menu, { title = "— COMPORTEMENT & PERFORMANCES —", disabled = true })
 
-        table.insert(main_menu, profiles_mgr.get_menu_item())
         table.insert(main_menu, { title = "Nombre de suggestions : " .. state.llm_num_predictions, menu = build_num_pred_menu() })
+        table.insert(main_menu, profiles_mgr.get_menu_item())
         
         table.insert(main_menu, { title = "Délai d’inactivité : " .. math.floor(state.llm_debounce * 1000) .. " ms…", fn = settings_mgr.set_debounce })
         table.insert(main_menu, { title = "Tokens max générés : " .. state.llm_max_predict, fn = settings_mgr.set_max_predict })
@@ -240,18 +229,41 @@ function M.create(deps)
             end
         })
 
-        local shortcut_title = "Raccourcis de sélection : "
-        if state.llm_pred_shortcut_mod == "none" then
-            shortcut_title = shortcut_title .. "Désactivé"
+        -- Retrieve configurations and synchronize them with keymap.lua
+        local nav_mods = hs.settings.get("llm_nav_modifiers")
+        if nav_mods == nil then nav_mods = keymap and keymap.llm_nav_modifiers_default or {} end
+        if keymap and type(keymap.set_llm_nav_modifiers) == "function" then pcall(keymap.set_llm_nav_modifiers, nav_mods) end
+        
+        local val_mods = hs.settings.get("llm_val_modifiers")
+        if val_mods == nil then val_mods = keymap and keymap.llm_val_modifiers_default or {"alt"} end
+        if keymap and type(keymap.set_llm_val_modifiers) == "function" then pcall(keymap.set_llm_val_modifiers, val_mods) end
+
+        -- Formatting dynamic titles
+        local nav_title = ""
+        if state.llm_num_predictions < 2 then
+            nav_title = "Modificateur navigation (↑/← et ↓/→) : Désactivé (1 suggestion)"
         else
-            local mod_sym = format_mod_string(state.llm_pred_shortcut_mod)
-            shortcut_title = shortcut_title .. mod_sym .. "1 – " .. mod_sym .. "0"
+            nav_title = format_shortcut_title("Naviguer dans les suggestions (↑/← et ↓/→)", nav_mods, "Flèches seules", "Flèches")
         end
 
         table.insert(main_menu, {
-            title    = shortcut_title,
+            title    = nav_title,
             disabled = (state.llm_num_predictions < 2),
-            menu     = build_pred_shortcut_menu()
+            menu     = settings_mgr.build_nav_modifier_menu()
+        })
+
+        local val_title = ""
+        if state.llm_num_predictions < 2 then
+            val_title = "Modificateur sélection (chiffres) : Désactivé (1 suggestion)"
+        else
+            local range_str = (state.llm_num_predictions == 10) and "1-0" or ("1-" .. state.llm_num_predictions)
+            val_title = format_shortcut_title("Sélectionner la suggestion n° (" .. range_str .. ")", val_mods, "Chiffres seuls", "Chiffres")
+        end
+
+        table.insert(main_menu, {
+            title    = val_title,
+            disabled = (state.llm_num_predictions < 2),
+            menu     = settings_mgr.build_val_modifier_menu()
         })
 
         table.insert(main_menu, { title = "Indentation automatique", menu = settings_mgr.build_indent_menu() })

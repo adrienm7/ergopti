@@ -180,7 +180,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         llm_arrow_nav_mods       = {},
         llm_show_info_bar        = false,
         llm_pred_shortcut_mod    = "ctrl",
-        llm_pred_indent          = 0,
+        llm_pred_indent          = -3,
         llm_user_models          = {},
         llm_disabled_apps        = {},
         llm_active_profile       = "standard",
@@ -1072,17 +1072,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
         local custom_sections = keymap and type(keymap.get_sections) == "function" and keymap.get_sections("custom") or nil
         local custom_enabled  = groupEnabled("custom")
 
-        local total_count = 0
-        if type(custom_sections) == "table" then
+        local total_count, has_count = 0, false
+        if custom_enabled and type(custom_sections) == "table" then
             for _, sec in ipairs(custom_sections) do
-                if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder and sec.count ~= nil then
-                    total_count = total_count + tonumber(sec.count)
+                if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
+                    and (keymap and type(keymap.is_section_enabled) == "function" and keymap.is_section_enabled("custom", sec.name)) then
+                    if sec.count ~= nil then has_count = true; total_count = total_count + tonumber(sec.count) end
                 end
             end
         end
 
         local base_title = "Hotstrings personnels"
-        local title_str  = total_count > 0
+        local title_str  = has_count
             and (base_title .. " (" .. fmt_count(total_count) .. ")")
             or  base_title
 
@@ -1100,10 +1101,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
             local sc = state.custom_editor_shortcut
             if not sc or sc == false then return "Aucun" end
             if sc_is_default(sc) then
-                return "Ctrl+" .. state.trigger_char .. " (défaut)"
+                return "Ctrl + " .. state.trigger_char .. " (défaut)"
             end
             local mods_str = table.concat(sc.mods or {}, "+")
-            return mods_str ~= "" and (mods_str .. "+" .. (sc.key or "?"):upper())
+            return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
                     or (sc.key or "?"):upper()
         end
         local function apply_shortcut(mods, key)

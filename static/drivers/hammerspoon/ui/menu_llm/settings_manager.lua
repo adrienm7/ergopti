@@ -8,6 +8,7 @@
 -- Includes a dedicated menu builder for indentation preferences.
 -- ===========================================================================
 
+local keymap = require("modules.keymap")
 local M = {}
 
 
@@ -112,12 +113,12 @@ function M.new(deps)
     --- @return table The Hammerspoon menu structure
     function obj.build_indent_menu()
         local menu = {}
-        local current = math.max(0, math.min(5, math.floor(tonumber(deps.state.llm_pred_indent) or 0)))
+        local current = math.floor(tonumber(deps.state.llm_pred_indent) or 0)
         local paused  = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 
-        for i = 0, 5 do
+        for i = -7, 7 do
             table.insert(menu, {
-                title   = i == 0 and "0 — aucune" or (i .. " espace" .. (i > 1 and "s" or "")),
+                title   = ((i == -1 or i == 0 or i == 1) and i .. " espace") or (i .. " espaces"),
                 checked = (i == current) or nil,
                 fn      = not paused and function()
                     deps.state.llm_pred_indent = i
@@ -130,6 +131,50 @@ function M.new(deps)
             })
         end
         return menu
+    end
+
+    --- Dynamic builder for modifier menus
+    local function build_modifier_menu(key, default_mods, hs_fn)
+        local current_mods = hs.settings.get(key)
+        if current_mods == nil then current_mods = default_mods end
+        local current_str = table.concat(current_mods, "+")
+        local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
+
+        local opts = {
+            {title = "Désactivé", mods = {"none"}}, 
+            {title = "Aucun modificateur", mods = {}},
+            {title = "⇧ Shift", mods = {"shift"}}, 
+            {title = "⌘ Cmd", mods = {"cmd"}},
+            {title = "⌥ Option", mods = {"alt"}}, 
+            {title = "⌃ Ctrl", mods = {"ctrl"}},
+            {title = "⌘⇧ Cmd + Shift", mods = {"cmd", "shift"}},
+            {title = "⌥⇧ Option + Shift", mods = {"alt", "shift"}}
+        }
+        
+        local menu = {}
+        for _, opt in ipairs(opts) do
+            table.insert(menu, {
+                title = opt.title,
+                checked = (table.concat(opt.mods, "+") == current_str) or nil,
+                fn = not paused and function()
+                    hs.settings.set(key, opt.mods)
+                    if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
+                        pcall(deps.keymap[hs_fn], opt.mods)
+                    end
+                    pcall(deps.save_prefs)
+                    pcall(deps.update_menu)
+                end or nil
+            })
+        end
+        return menu
+    end
+
+    function obj.build_nav_modifier_menu()
+        return build_modifier_menu("llm_nav_modifiers", keymap.llm_nav_modifiers_default, "set_llm_nav_modifiers")
+    end
+
+    function obj.build_val_modifier_menu()
+        return build_modifier_menu("llm_val_modifiers", keymap.llm_val_modifiers_default, "set_llm_val_modifiers")
     end
 
     return obj

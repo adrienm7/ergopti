@@ -59,6 +59,7 @@ local _state = {
     on_accept       = nil,
     info_bar        = nil,
     shortcut_mod    = "alt",
+    nav_mod_str     = "none",
     indent          = 0,
     fixed_width     = nil,
     timeout_sec     = 2.5,  -- Default auto-hide timeout for normal hotstrings
@@ -350,24 +351,22 @@ end
 -- ==============================
 
 --- Assembles all lines and bottom hints into styled blocks ready for rendering
-local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod, indent)
+local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod, indent, nav_mod_str)
     local n = type(raw_preds) == "table" and #raw_preds or 0
     if n == 0 then return { preds = hs.styledtext.new("") } end
-
-    indent = math.max(0, math.min(5, math.floor(tonumber(indent) or 0)))
-    local ind_str = string.rep(" ", indent)
 
     local PREFIX_SEL, PREFIX_OTHER
 
     if n == 1 then
-        PREFIX_SEL   = ind_str .. "✨ "
+        PREFIX_SEL   = "✨ "
         PREFIX_OTHER = ""
-    elseif indent == 0 then
-        PREFIX_SEL   = "✨ "
-        PREFIX_OTHER = "  " -- Special case: add 2 spaces to align under the ✨ emoji
+    elseif n >= 2 and indent > 0 then
+        PREFIX_SEL   = string.rep(" ", indent) .. "✨ "
+        PREFIX_OTHER = ""
     else
-        PREFIX_SEL   = ind_str .. "✨ "
-        PREFIX_OTHER = ind_str
+        -- Case of negative indent values
+        PREFIX_SEL   = "✨ "
+        PREFIX_OTHER = string.rep("_", indent * -1) -- Using a space doesn’t work here for an unknown reason
     end
 
     local result = nil
@@ -403,13 +402,18 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         result = result and (result .. gap .. line) or line
     end
 
-    local SP = "      " -- 6 mathematical spaces for visual padding
+    local SP = string.rep(" ", 6) -- 6 mathematical spaces for visual padding
     local hint_st
     
     if n > 1 then
-        -- UI string kept in French as requested
+        local left_hint  = "⇧G + Tab"
+        local right_hint = "⇧D + Tab"
+        if nav_mod_str ~= "none" then
+            left_hint  = left_hint  .. " ou " .. (nav_mod_str .. " + " or "") .. "↑/←"
+            right_hint = right_hint .. " ou " .. (nav_mod_str .. " + " or "") .. "↓/→"
+        end
         hint_st = hs.styledtext.new(
-            "⇧G+Tab ◀" .. SP .. "Tab = accepter" .. SP .. "▶ ⇧D+Tab",
+            left_hint .. SP .. " ◀" .. SP .. "Tab = accepter" .. SP .. "▶ " .. SP .. right_hint,
             { font = { name = FONT, size = SIZE_HINT }, color = C_HINT, paragraphStyle = { alignment = "center" } }
         )
     else
@@ -599,7 +603,7 @@ function M.navigate(delta)
     if n < 2 then return end
     
     _state.current_index = ((_state.current_index - 1 + delta) % n) + 1
-    render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent))
+    render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str))
     
     if type(_state.on_navigate) == "function" then 
         pcall(_state.on_navigate, _state.current_index) 
@@ -608,7 +612,7 @@ function M.navigate(delta)
 end
 
 --- Displays multiple LLM predictions with full UI capabilities
-function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent)
+function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mod_str)
     if not enabled then return end
     if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
     
@@ -617,12 +621,13 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     _state.current_index   = current_index
     _state.info_bar        = (info_bar and tostring(info_bar) ~= "") and tostring(info_bar) or nil
     _state.shortcut_mod    = shortcut_mod or "alt"
-    _state.indent          = math.max(0, math.min(5, math.floor(tonumber(indent) or 0)))
+    _state.nav_mod_str     = nav_mod_str or "none"
+    _state.indent          = math.floor(tonumber(indent) or 0)
     _state.current_is_llm  = true -- Ensure extended timeout is used
 
     local max_width = 0
     for i = 1, #predictions do
-        local b = assemble_blocks(predictions, i, _state.info_bar, _state.shortcut_mod, _state.indent)
+        local b = assemble_blocks(predictions, i, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str)
         local w_preds = canvas:minimumTextSize(2, b.preds).w
         
         local sz_hint = b.hint_st and canvas:minimumTextSize(2, b.hint_st) or {w=0}
@@ -646,7 +651,7 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     end
     _state.fixed_width = max_width
 
-    render(assemble_blocks(predictions, current_index, _state.info_bar, _state.shortcut_mod, _state.indent))
+    render(assemble_blocks(predictions, current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str))
 end
 
 --- Displays simple tooltip content (Hotstrings or Loading state)
