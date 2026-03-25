@@ -1,26 +1,57 @@
 -- ui/tooltip.lua
+
+-- ===========================================================================
+-- Tooltip UI Module.
+--
+-- Handles the rendering and lifecycle of the on-screen tooltip used for
+-- both standard hotstring previews and LLM predictions.
+--
+-- Features:
+--   - Zero-lag rendering using a pre-allocated hs.canvas.
+--   - Smart positioning (context-aware anchor resolution via Accessibility API).
+--   - Auto-hide mechanics based on inactivity timers and mouse/keyboard events.
+--   - Diff-styled text rendering to highlight insertions cleanly.
+-- ===========================================================================
+
 local M = {}
 
 local ok_bridge, vscode_bridge = pcall(require, "lib.vscode_bridge")
 if not ok_bridge then vscode_bridge = nil end
 
--- ─────────────────────────────────────────────────────────
--- 1. CANVAS (5 éléments statiques pré-alloués = Zéro Lag)
--- ─────────────────────────────────────────────────────────
-local canvas = hs.canvas.new({ x = 0, y = 0, w = 0, h = 0 })
-canvas:level(hs.canvas.windowLevels.cursor)
-canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
-canvas:appendElements(
-    { type = "rectangle", action = "fill", fillColor = { white = 0.10, alpha = 0.97 }, roundedRectRadii = { xRadius = 7, yRadius = 7 } },
-    { type = "text" },      -- [2] Prédictions
-    { type = "rectangle" }, -- [3] Séparateur pleine largeur
-    { type = "text" },      -- [4] Raccourcis (Hint) OU Combinaison (Hint + Info)
-    { type = "text" }       -- [5] Info Bar (Temps) si non combinée
-)
 
--- ─────────────────────────────────────────────────────────
--- 2. ÉTAT ET ÉCOUTEURS D'ÉVÉNEMENTS
--- ─────────────────────────────────────────────────────────
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 1/ Canvas Setup =======
+-- ===============================
+-- ===============================
+
+-- Pre-allocate the 5 static elements to ensure zero lag during rendering
+local canvas = hs.canvas.new({ x = 0, y = 0, w = 0, h = 0 })
+if canvas then
+    canvas:level(hs.canvas.windowLevels.cursor)
+    canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
+    canvas:appendElements(
+        { type = "rectangle", action = "fill", fillColor = { white = 0.10, alpha = 0.97 }, roundedRectRadii = { xRadius = 7, yRadius = 7 } },
+        { type = "text" },      -- [2] Predictions (Main text block)
+        { type = "rectangle" }, -- [3] Full-width separator line
+        { type = "text" },      -- [4] Hint / Shortcut OR Combined (Hint + Info)
+        { type = "text" }       -- [5] Info Bar (Time/Model) if not combined
+    )
+end
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 2/ State & Watchers =======
+-- ===================================
+-- ===================================
+
 local _state = {
     raw_predictions = {},
     current_index   = 1,
@@ -29,43 +60,69 @@ local _state = {
     shortcut_mod    = "ctrl",
     indent          = 0,
     fixed_width     = nil,
+    timeout_sec     = 2.5,  -- Default auto-hide timeout for normal hotstrings
+    llm_timeout_sec = 12.0, -- Extended auto-hide timeout for LLM reading
+    current_is_llm  = false,
 }
 
 local _watchers = {}
+local _idle_timer = nil
 
-local function stop_watchers()
-    for _, w in ipairs(_watchers) do w:stop() end
-    _watchers = {}
+--- Automatically hides the tooltip if the user stops typing
+local function reset_idle_timer()
+    if _idle_timer and type(_idle_timer.stop) == "function" then 
+        _idle_timer:stop() 
+    end
+    
+    local active_timeout = _state.current_is_llm and _state.llm_timeout_sec or _state.timeout_sec
+    if active_timeout > 0 then
+        _idle_timer = hs.timer.doAfter(active_timeout, M.hide)
+    end
 end
 
+--- Stops all active event watchers and clears the idle timer
+local function stop_watchers()
+    for _, w in ipairs(_watchers) do 
+        if w and type(w.stop) == "function" then w:stop() end 
+    end
+    _watchers = {}
+    
+    if _idle_timer and type(_idle_timer.stop) == "function" then 
+        _idle_timer:stop()
+        _idle_timer = nil
+    end
+end
+
+--- Starts listening for events that should naturally dismiss the tooltip
 local function start_watchers()
     stop_watchers()
+    reset_idle_timer()
     
     local evTypes = hs.eventtap.event.types
     
-    -- Fermer la bulle au mouvement de souris ou au clic
-    local w_mouse = hs.eventtap.new({evTypes.mouseMoved, evTypes.leftMouseDown, evTypes.rightMouseDown, evTypes.scrollWheel}, function(e)
+    -- Hide tooltip on mouse movement or click
+    local w_mouse = hs.eventtap.new({evTypes.mouseMoved, evTypes.leftMouseDown, evTypes.rightMouseDown, evTypes.scrollWheel}, function(_)
         M.hide()
         return false
     end)
     w_mouse:start()
     table.insert(_watchers, w_mouse)
 
-    -- Fermer la bulle à la frappe d'une touche "normale"
+    -- Hide tooltip on standard keypresses
     local w_key = hs.eventtap.new({evTypes.keyDown}, function(e)
         local kc = e:getKeyCode()
         
-        if kc == 48 or kc == 36 then return false end -- Tab & Entrée gérés dans keymap.lua
-        if kc >= 123 and kc <= 126 then return false end -- Flèches ignorées
+        -- Ignored keys (Tab & Enter are handled directly by keymap.lua to accept predictions)
+        if kc == 48 or kc == 36 then return false end 
+        if kc >= 123 and kc <= 126 then return false end -- Ignore Arrow keys
         
         local flags = e:getFlags()
         local mod = _state.shortcut_mod or "ctrl"
-        if flags[mod] then
-            -- Tolérance stricte pour les touches numériques avec le bon modificateur
-            if (kc >= 18 and kc <= 29) then return false end
-        end
         
-        -- On ignore les pressions pures sur des touches modificatrices
+        -- Strict tolerance for numpad keys combined with the correct modifier (LLM shortcuts)
+        if flags[mod] and (kc >= 18 and kc <= 29) then return false end
+        
+        -- Ignore raw modifier presses (Shift, Ctrl, Alt, Cmd) to prevent premature dismissal
         if kc == 54 or kc == 55 or kc == 56 or kc == 58 or kc == 59 or kc == 60 then
             return false
         end
@@ -77,48 +134,85 @@ local function start_watchers()
     table.insert(_watchers, w_key)
 end
 
--- ─────────────────────────────────────────────────────────
--- 3. ANCHOR
--- ─────────────────────────────────────────────────────────
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 3/ Anchor Resolution =======
+-- ====================================
+-- ====================================
+
+--- Resolves the best screen coordinates to display the tooltip based on the current context
+--- @return table|nil Table containing x, y, and optionally h and type, or nil if resolution fails
 local function resolve_anchor()
-    if vscode_bridge and vscode_bridge.is_vscode() then
+    -- Native VSCode integration check
+    if vscode_bridge and type(vscode_bridge.is_vscode) == "function" and vscode_bridge.is_vscode() then
         local ok, pos = pcall(vscode_bridge.estimate_position)
-        if ok and pos then return pos end
+        if ok and type(pos) == "table" then return pos end
     end
+    
+    -- Accessibility API evaluation
     local ax_ok, pos = pcall(function()
-        local ax      = require("hs.axuielement")
+        local ax = require("hs.axuielement")
         local focused = ax.systemWideElement():attributeValue("AXFocusedUIElement")
         if not focused then return nil end
+        
+        -- 1. Try text range selection
         local range = focused:attributeValue("AXSelectedTextRange")
-        if range then
+        if range and type(range) == "table" then
             local b = focused:parameterizedAttributeValue("AXBoundsForRange", { location = range.location, length = 0 })
-            if b and type(b) == "table" and b.x and b.y and b.h and b.h > 0 and b.h < 80 then return { x = b.x, y = b.y, h = b.h, type = "caret" } end
+            if b and type(b) == "table" and b.x and b.y and b.h and b.h > 0 and b.h < 80 then 
+                return { x = b.x, y = b.y, h = b.h, type = "caret" } 
+            end
         end
+        
+        -- 2. Try line number detection
         local ln = focused:attributeValue("AXInsertionPointLineNumber")
         if ln then
             local lr = focused:parameterizedAttributeValue("AXRangeForLine", ln)
             if lr then
                 local b = focused:parameterizedAttributeValue("AXBoundsForRange", lr)
-                if b and b.h and b.h > 0 and b.h < 80 then return { x = b.x, y = b.y, h = b.h, type = "caret" } end
+                if b and type(b) == "table" and b.x and b.y and b.h and b.h > 0 and b.h < 80 then 
+                    return { x = b.x, y = b.y, h = b.h, type = "caret" } 
+                end
             end
         end
+        
+        -- 3. Fallback to input box container frame
         local f = focused:attributeValue("AXFrame")
-        if f and f.x and f.y and f.w and f.h then return { x = f.x + f.w / 2, y = f.y + f.h, h = 0, type = "input_box" } end
+        if f and type(f) == "table" and f.x and f.y and f.w and f.h then 
+            return { x = f.x + f.w / 2, y = f.y + f.h, h = 0, type = "input_box" } 
+        end
+        
         return nil
     end)
-    if ax_ok and pos then return pos end
+    
+    if ax_ok and type(pos) == "table" then return pos end
 
+    -- Absolute fallback to the center-bottom of the active window bounds
     local win = hs.window.focusedWindow()
     if win then
         local ok, f = pcall(function() return win:frame() end)
-        if ok and f then return { x = f.x + f.w / 2, y = f.y + f.h - 40, h = 0, type = "window" } end
+        if ok and f and type(f) == "table" then 
+            return { x = f.x + f.w / 2, y = f.y + f.h - 40, h = 0, type = "window" } 
+        end
     end
+    
     return nil
 end
 
--- ─────────────────────────────────────────────────────────
--- 4. COULEURS & POLICES
--- ─────────────────────────────────────────────────────────
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 4/ Colors & Fonts =======
+-- =================================
+-- =================================
+
 local FONT      = ".AppleSystemUIFont"
 local FONT_BOLD = ".AppleSystemUIFontBold"
 local SIZE_MAIN = 14
@@ -139,23 +233,32 @@ local C_CMD_DIM  = { white = 0.45, alpha = 1.0 }
 local C_HINT     = { white = 0.40, alpha = 1.0 }
 local C_INFO_BAR = { white = 0.30, alpha = 1.0 } 
 local C_SEP      = { white = 1.00, alpha = 0.09 }
-local C_SEP_INFO = { white = 1.00, alpha = 0.06 }
 local C_INVIS    = { white = 0.00, alpha = 0.00 }
 
 local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧" }
 
--- ─────────────────────────────────────────────────────────
--- 5. CONSTRUCTION D'UNE LIGNE
--- ─────────────────────────────────────────────────────────
 
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 5/ Text Formatting =======
+-- ==================================
+-- ==================================
+
+--- Safely appends styled segments to a result string
 local function append_seg(result, s, color, is_bold)
-    if not s or s == "" then return result end
+    if not s or tostring(s) == "" then return result end
     local fn  = is_bold and FONT_BOLD or FONT
-    local seg = hs.styledtext.new(s, { font = { name = fn, size = SIZE_MAIN }, color = color })
+    local seg = hs.styledtext.new(tostring(s), { font = { name = fn, size = SIZE_MAIN }, color = color })
     return result and (result .. seg) or seg
 end
 
+--- Builds a single line of text reflecting the diff states (insert, equal, new word)
 local function build_line(pred, is_sel, total_preds)
+    if type(pred) ~= "table" then return nil end
+    
     local result   = nil
     local chunks   = pred.chunks
     local nw       = pred.nw or ""
@@ -165,23 +268,26 @@ local function build_line(pred, is_sel, total_preds)
 
     local first_done = false
     local function clean_first(s)
-        if not first_done and s and s ~= "" then
-            s = s:gsub("^%s+", "")
-            if s ~= "" then first_done = true end
+        local str = tostring(s or "")
+        if not first_done and str ~= "" then
+            str = str:gsub("^%s+", "")
+            if str ~= "" then first_done = true end
         end
-        return s
+        return str
     end
 
-    if chunks and #chunks > 0 then
+    if type(chunks) == "table" and #chunks > 0 then
         for _, chunk in ipairs(chunks) do
-            local s = clean_first(chunk.text)
-            if s and s ~= "" then
-                if chunk.type == "insert" then
-                    local color = is_sel and C_CORR_SEL or C_UNSELECTED_GRAY
-                    result = append_seg(result, s, color, bold_diff)
-                else -- "equal"
-                    local color = is_sel and C_UNCH_SEL or C_UNSELECTED_GRAY
-                    result = append_seg(result, s, color, false)
+            if type(chunk) == "table" then
+                local s = clean_first(chunk.text)
+                if s and s ~= "" then
+                    if chunk.type == "insert" then
+                        local color = is_sel and C_CORR_SEL or C_UNSELECTED_GRAY
+                        result = append_seg(result, s, color, bold_diff)
+                    else -- "equal"
+                        local color = is_sel and C_UNCH_SEL or C_UNSELECTED_GRAY
+                        result = append_seg(result, s, color, false)
+                    end
                 end
             end
         end
@@ -196,12 +302,19 @@ local function build_line(pred, is_sel, total_preds)
     return result
 end
 
--- ─────────────────────────────────────────────────────────
--- 6. ASSEMBLAGE BLOCS
--- ─────────────────────────────────────────────────────────
 
+
+
+
+-- ==============================
+-- ==============================
+-- ======= 6/ UI Assembly =======
+-- ==============================
+-- ==============================
+
+--- Assembles all lines and bottom hints into styled blocks ready for rendering
 local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod, indent)
-    local n = #raw_preds
+    local n = type(raw_preds) == "table" and #raw_preds or 0
     if n == 0 then return { preds = hs.styledtext.new("") } end
 
     indent = math.max(0, math.min(5, math.floor(tonumber(indent) or 0)))
@@ -214,20 +327,18 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         PREFIX_OTHER = ""
     elseif indent == 0 then
         PREFIX_SEL   = "✨ "
-        PREFIX_OTHER = "  " -- Cas spécial : on ajoute 2 espaces pour aligner sous l'emoji ✨
+        PREFIX_OTHER = "  " -- Special case: add 2 spaces to align under the ✨ emoji
     else
         PREFIX_SEL   = ind_str .. "✨ "
         PREFIX_OTHER = ind_str
     end
 
     local mod_sym = MOD_SYMBOL[shortcut_mod or "ctrl"] or "⌃"
-
     local result = nil
     local gap    = hs.styledtext.new("\n", { font = { name = FONT, size = 3 }, color = C_INVIS })
 
     for i, pred in ipairs(raw_preds) do
         local is_sel = (i == current_index)
-
         local prefix = hs.styledtext.new(is_sel and PREFIX_SEL or PREFIX_OTHER, {
             font  = { name = FONT, size = SIZE_MAIN }, color = is_sel and C_CURSOR or C_BG,
         })
@@ -255,10 +366,11 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         result = result and (result .. gap .. line) or line
     end
 
-    local SP = "      " -- 6 espaces mathématiques
-    
+    local SP = "      " -- 6 mathematical spaces for visual padding
     local hint_st
+    
     if n > 1 then
+        -- UI string kept in French as requested
         hint_st = hs.styledtext.new(
             "⇧G+Tab ◀" .. SP .. "Tab = accepter" .. SP .. "▶ ⇧D+Tab",
             { font = { name = FONT, size = SIZE_HINT }, color = C_HINT, paragraphStyle = { alignment = "center" } }
@@ -268,18 +380,28 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
     end
 
     local info_st = nil
-    if info_bar and info_bar ~= "" then
-        info_bar = info_bar:gsub("%s*·%s*", " — ⏱️ ")
-        info_st = hs.styledtext.new(info_bar, { font = { name = FONT, size = SIZE_INFO }, color = C_INFO_BAR, paragraphStyle = { alignment = "center" } })
+    if info_bar and tostring(info_bar) ~= "" then
+        local safe_info = tostring(info_bar):gsub("%s*·%s*", " — ⏱️ ")
+        info_st = hs.styledtext.new(safe_info, { font = { name = FONT, size = SIZE_INFO }, color = C_INFO_BAR, paragraphStyle = { alignment = "center" } })
     end
 
     return { preds = result, hint_st = hint_st, info_st = info_st, SP = SP }
 end
 
--- ─────────────────────────────────────────────────────────
--- 7. RENDU DYNAMIQUE
--- ─────────────────────────────────────────────────────────
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 7/ Dynamic Rendering =======
+-- ====================================
+-- ====================================
+
+--- Calculates element sizes, updates the canvas payload, and displays it
 local function render(blocks)
+    if not canvas or (type(blocks) ~= "table" and type(blocks) ~= "userdata") then return end
+
     local PAD_X = 14
     local PAD_Y =  7
     
@@ -302,9 +424,9 @@ local function render(blocks)
     local is_combined = false
     local combined_st = nil
 
+    -- Attempt to visually merge Hint and Info texts if horizontal space allows it
     if info_st and hint_st then
         local sep_st = hs.styledtext.new(SP .. "|" .. SP, { font = { name = FONT, size = SIZE_HINT }, color = C_SEP })
-        
         combined_st = hs.styledtext.new("") .. hint_st .. sep_st .. info_st
         combined_st = combined_st:setStyle({ paragraphStyle = { alignment = "center" } }, 1, #combined_st)
         
@@ -317,12 +439,12 @@ local function render(blocks)
     local w = max_w + PAD_X * 2
     local cur_y = PAD_Y
 
-    -- [2] Texte principal
+    -- [2] Main text block rendering
     canvas[2].text  = blocks.preds
     canvas[2].frame = { x = PAD_X, y = cur_y, w = max_w, h = sz_preds.h }
     cur_y = cur_y + sz_preds.h + 8
 
-    -- [3] Ligne Séparatrice à 100% de la largeur
+    -- [3] Full-width separator line rendering
     if hint_st or info_st then
         canvas[3].action    = "fill"
         canvas[3].fillColor = C_SEP
@@ -332,7 +454,7 @@ local function render(blocks)
         canvas[3].action = "skip"
     end
 
-    -- [4] et [5] Textes Hint / Info
+    -- [4] and [5] Hint / Info text blocks rendering
     if is_combined then
         local sz_comb = canvas:minimumTextSize(2, combined_st)
         canvas[4].action = "fill"
@@ -362,10 +484,11 @@ local function render(blocks)
 
     local h = cur_y - 8 + PAD_Y
 
+    -- Dynamic absolute positioning
     local anchor = resolve_anchor()
     local fw     = hs.window.focusedWindow()
     local scr    = nil
-    if fw then pcall(function() scr = fw:screen() end) end
+    if fw and type(fw.screen) == "function" then pcall(function() scr = fw:screen() end) end
     local screen = (scr or hs.screen.mainScreen()):frame()
 
     local px, py
@@ -379,14 +502,17 @@ local function render(blocks)
             if py + h > screen.y + screen.h then py = anchor.y - h - 5 end
         end
     else
+        -- Absolute center-bottom fallback if no context is found
         px = screen.x + (screen.w - w) / 2
         py = screen.y + screen.h - h - 5
     end
 
+    -- Keep coordinates strictly within screen bounds
     local margin = 5
     px = math.max(screen.x + margin, math.min(px, screen.x + screen.w - w  - margin))
     py = math.max(screen.y + margin, math.min(py, screen.y + screen.h - h  - margin))
 
+    -- Final render execution
     local ok, err = pcall(function()
         canvas:frame({ x = px, y = py, w = w, h = h })
         canvas:show()
@@ -395,12 +521,19 @@ local function render(blocks)
     if not ok then hs.printf("[ui/tooltip] render error: %s", tostring(err)) end
 end
 
--- ─────────────────────────────────────────────────────────
--- 8. API PUBLIQUE
--- ─────────────────────────────────────────────────────────
 
+
+
+
+-- =============================
+-- =============================
+-- ======= 8/ Public API =======
+-- =============================
+-- =============================
+
+--- Hides the tooltip and resets all local UI states
 function M.hide()
-    canvas:hide()
+    if canvas and type(canvas.hide) == "function" then canvas:hide() end
     stop_watchers()
     _state.raw_predictions = {}
     _state.current_index   = 1
@@ -408,26 +541,44 @@ function M.hide()
     _state.fixed_width     = nil
 end
 
-function M.set_navigate_callback(fn) _state.on_navigate = fn end
-function M.get_current_index()       return _state.current_index end
-
-function M.navigate(delta)
-    local n = #_state.raw_predictions
-    if n < 2 then return end
-    _state.current_index = ((_state.current_index - 1 + delta) % n) + 1
-    render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent))
-    if _state.on_navigate then pcall(_state.on_navigate, _state.current_index) end
+--- Sets the auto-hide timeout duration for normal hotstrings (called by menu.lua or keymap.lua)
+function M.set_timeout(sec)
+    _state.timeout_sec = math.max(0, tonumber(sec) or 2.5)
 end
 
+--- Assigns a callback executed when the user navigates through predictions
+function M.set_navigate_callback(fn) _state.on_navigate = fn end
+
+--- Retrieves the currently highlighted prediction index
+function M.get_current_index()       return _state.current_index end
+
+--- Navigates through the predictions list safely
+--- @param delta number Direction modifier (+1 or -1)
+function M.navigate(delta)
+    local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+    if n < 2 then return end
+    
+    _state.current_index = ((_state.current_index - 1 + delta) % n) + 1
+    render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent))
+    
+    if type(_state.on_navigate) == "function" then 
+        pcall(_state.on_navigate, _state.current_index) 
+    end
+    reset_idle_timer() -- Restart the inactivity timer on navigation
+end
+
+--- Displays multiple LLM predictions with full UI capabilities
 function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent)
     if not enabled then return end
-    if not predictions or #predictions == 0 then M.hide(); return end
-    current_index = math.max(1, math.min(current_index, #predictions))
+    if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
+    
+    current_index = math.max(1, math.min(tonumber(current_index) or 1, #predictions))
     _state.raw_predictions = predictions
     _state.current_index   = current_index
-    _state.info_bar        = (info_bar and info_bar ~= "") and info_bar or nil
+    _state.info_bar        = (info_bar and tostring(info_bar) ~= "") and tostring(info_bar) or nil
     _state.shortcut_mod    = shortcut_mod or "ctrl"
     _state.indent          = math.max(0, math.min(5, math.floor(tonumber(indent) or 0)))
+    _state.current_is_llm  = true -- Ensure extended timeout is used
 
     local max_width = 0
     for i = 1, #predictions do
@@ -458,13 +609,16 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     render(assemble_blocks(predictions, current_index, _state.info_bar, _state.shortcut_mod, _state.indent))
 end
 
+--- Displays simple tooltip content (Hotstrings or Loading state)
 function M.show(content, is_llm, enabled)
     if not enabled then return end
-    if content == nil or content == "" then M.hide(); return end
+    if content == nil or tostring(content) == "" then M.hide(); return end
+    
     _state.raw_predictions = {}
     _state.current_index   = 1
     _state.info_bar        = nil
     _state.fixed_width     = nil
+    _state.current_is_llm  = (is_llm == true)
     
     local styled
     if type(content) == "userdata" then
@@ -478,8 +632,9 @@ function M.show(content, is_llm, enabled)
     render(styled)
 end
 
+--- Fallback mock interface used for diff styling extraction outside the module
 function M.make_diff_styled(chunks, nw, tc_fallback)
-    local fake = { chunks = chunks, nw = nw or "", has_corrections = true }
+    local fake = { chunks = type(chunks) == "table" and chunks or {}, nw = tostring(nw or ""), has_corrections = true }
     return build_line(fake, true, 1)
 end
 

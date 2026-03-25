@@ -11,7 +11,6 @@
 -- =======================================
 
 local gestures           = require("modules.gestures")
-local scroll             = require("modules.scroll")
 local keymap             = require("modules.keymap")
 local shortcuts          = require("modules.shortcuts")
 local personal_info      = require("modules.personal_info")
@@ -23,7 +22,6 @@ local hotstring_editor   = require("ui.hotstring_editor")
 -- Pre-start modules so they are active before menu.lua reads saved prefs.
 -- menu.lua will honour saved state and stop/start them as needed.
 gestures.start()
-scroll.start()
 shortcuts.start()
 
 -- ========================================
@@ -174,13 +172,13 @@ personal_info.start(base_dir, keymap)
 dynamic_hotstrings.start(keymap)
 dynamic_hotstrings.register_personal_data(
     personal_info.get_info(),
-    global_trigger_char -- Changed: passing the global char instead of personal_info's
+    global_trigger_char -- Changed: passing the global char instead of personal_info’s
 )
 table.insert(hotfiles, "dynamichotstrings")
 
 -- ── Custom hotstrings (personal, git-ignored) ───────────────────────────────
 -- Stored alongside config.json so it is easy to .gitignore independently.
--- The file is created automatically if it doesn't exist yet.
+-- The file is created automatically if it doesn’t exist yet.
 do
     local custom_path = base_dir .. "custom.toml"
     hotstring_editor.init(custom_path, keymap)
@@ -197,10 +195,10 @@ end
 -- ===================================
 
 menu.start(
-    base_dir, hotfiles, gestures, scroll,
+    base_dir, hotfiles, gestures,
     keymap, shortcuts, personal_info, module_sections, script_control
 )
-script_control.start(keymap, shortcuts, gestures, scroll)
+script_control.start(keymap, shortcuts, gestures)
 
 -- ======================================
 -- ======================================

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<h1 id="title">Nouveau profil</h1>
+		<div class="fg">
+			<div class="fg-header"><label>Nom du profil</label></div>
+			<input type="text" id="p-name" autocomplete="off" spellcheck="false" />
+		</div>
+		<div class="fg">
+			<div class="fg-header"><label>Mode de requête</label></div>
+			<select id="p-mode">
+				<option value="parallel">Parallèle</option>
+				<option value="batch">Groupée (batch)</option>
+			</select>
+		</div>
+		<div class="fg" style="flex-grow: 1; display: flex">
+			<div class="fg-header">
+				<label>Prompt système</label>
+				<button
+					class="btn btn-sm btn-s"
+					onclick="insertChipAtCursor('context')"
+					title="Insérer le bloc {context}"
+				>
+					＋ {context}
+				</button>
+			</div>
+			<div class="editor-wrap">
+				<div id="e-out-ph" class="ph-overlay">
+					Voici un texte, continue-le : <span class="tc-ph">{context}</span>
+				</div>
+				<div id="e-out" class="output-editor" contenteditable="true" spellcheck="false"></div>
+			</div>
+			<div class="help">
+				Le bloc {context} sera remplacé par le texte sélectionné par l’utilisateur.
+			</div>
+		</div>
+		<div class="btn-row">
+			<button class="btn btn-s" onclick="doCancel()">Annuler</button>
+			<button class="btn btn-p" onclick="doSave()">Enregistrer</button>
+		</div>
+		<script src="script.js"></script>
+	</body>
+</html>

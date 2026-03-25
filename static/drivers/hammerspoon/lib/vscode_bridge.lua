@@ -14,7 +14,7 @@ M.LINE_HEIGHT  = 19    -- px, fonte 14pt par défaut
 M.CHAR_WIDTH   = 7.65  -- px, Menlo/Consolas 14pt
 M.GUTTER_WIDTH = 62    -- px, numéros de ligne (approximatif)
 
--- ── Fichiers de l'extension (embarqués comme strings Lua) ───────────────────
+-- ── Fichiers de l’extension (embarqués comme strings Lua) ───────────────────
 
 local PACKAGE_JSON = string.format([[{
   "name": "%s",
@@ -28,7 +28,7 @@ local PACKAGE_JSON = string.format([[{
   "contributes": {}
 }]], EXT_ID, EXT_VERSION)
 
--- L'extension :
+-- L’extension :
 --   • écoute onDidChangeTextEditorSelection / VisibleRanges / ActiveEditor
 --   • debounce 40 ms pour ne pas saturer le serveur
 --   • envoie {line, character, visibleStartLine, lineCount, tabSize, active}
@@ -126,7 +126,7 @@ function M.install_extension()
     write_file(pkg_path, PACKAGE_JSON)
     write_file(ext_path, EXTENSION_JS)
     print("[vscode_bridge] Extension installée → " .. EXT_DIR)
-    print("[vscode_bridge] Rechargez VSCode : Cmd+Shift+P > Reload Window")
+    print("[vscode_bridge] Rechargez VSCode : Cmd+Shift+P > Reload Window")
     return true    -- réinstallée, rechargement VSCode nécessaire
 end
 
@@ -173,9 +173,9 @@ function M.is_vscode()
     return app ~= nil and app:bundleID() == "com.microsoft.VSCode"
 end
 
--- ── Frame AX de l'éditeur actif ─────────────────────────────────────────────
--- Renvoie le frame de l'élément AX focalisé (textarea de l'éditeur VSCode).
--- Fiable même sous Electron : on obtient la zone de texte, pas le caret.
+-- ── Frame AX de l’éditeur actif ─────────────────────────────────────────────
+-- Renvoie le frame de l’élément AX focalisé (textarea de l’éditeur VSCode).
+-- Fiable même sous Electron : on obtient la zone de texte, pas le caret.
 
 local function get_editor_ax_frame()
     local ok, frame = pcall(function()
@@ -192,8 +192,8 @@ local function get_editor_ax_frame()
 end
 
 -- ── Estimation de la position pixel ─────────────────────────────────────────
--- Combine données de l'extension (line/character) + frame AX de l'éditeur.
--- Précision : ±1-2 lignes selon le thème / zoom VSCode.
+-- Combine données de l’extension (line/character) + frame AX de l’éditeur.
+-- Précision : ±1-2 lignes selon le thème / zoom VSCode.
 
 function M.estimate_position()
     if not M.is_vscode() then return nil end
@@ -211,7 +211,7 @@ function M.estimate_position()
               + (caret.character * M.CHAR_WIDTH)
     local y = editor_frame.y + (relative_line * M.LINE_HEIGHT)
 
-    -- Garde la bulle dans les limites de l'éditeur
+    -- Garde la bulle dans les limites de l’éditeur
     if y > editor_frame.y + editor_frame.h - M.LINE_HEIGHT then return nil end
     if x > editor_frame.x + editor_frame.w - 20 then
         x = editor_frame.x + editor_frame.w - 20
