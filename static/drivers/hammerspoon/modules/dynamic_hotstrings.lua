@@ -1,7 +1,9 @@
+-- modules/dynamic_hotstrings.lua
+
 -- ===========================================================================
 -- Dynamic hotstrings module.
 --
--- Centralises two kinds of runtime expansions:
+-- Centralizes two kinds of runtime expansions:
 --
 --   1. Interceptor rules (trigger-terminated, computed output):
 --      A buffer-suffix + trigger -> string produced by a resolver function.
@@ -19,19 +21,25 @@
 
 local M = {}
 
--- ==========================================
--- ==========================================
--- ==========================================
--- ========== 1. CONSTANTS & STATE ==========
--- ==========================================
--- ==========================================
--- ==========================================
+local hs = hs
+local ok_utils, km_utils = pcall(require, "lib.keymap_utils")
+if not ok_utils then km_utils = nil end
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 1/ Constants & State =======
+-- ====================================
+-- ====================================
 
 local GROUP_NAME = "dynamichotstrings"
 
 local _km             = nil          -- Reference to the keymap module
 local _trigger        = "\u{2605}"   -- Default trigger character ("★")
-local _replacing      = false        -- Lock flag to prevent recursive intercepts
+local _is_injecting   = false        -- Lock flag to prevent recursive intercepts
 
 -- Interceptor rules: list of { suffix = string, section = string, resolver = function }
 -- suffix   : String that the buffer must end with (before the trigger character arrives)
@@ -43,13 +51,14 @@ local _rules = {}
 local _personal_data = nil
 
 
--- =================================================
--- =================================================
--- =================================================
--- ========== 2. CONFIGURATION MANAGEMENT ==========
--- =================================================
--- =================================================
--- =================================================
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 2/ Configuration Management =======
+-- ===========================================
+-- ===========================================
 
 --- Sets the dynamic trigger character used for expansions.
 --- @param char string The character to use as the trigger instead of the default.
@@ -57,27 +66,28 @@ function M.set_trigger_char(char)
     if type(char) == "string" and char ~= "" then
         _trigger = char
     else
-        print("[dynamic_hotstrings] Warning: Invalid trigger character provided. Keeping '" .. _trigger .. "'.")
+        print("[dynamic_hotstrings] Warning: Invalid trigger character provided. Keeping \"" .. _trigger .. "\".")
     end
 end
 
 
--- ==============================================
--- ==============================================
--- ==============================================
--- ========== 3. KEY INTERCEPTOR ENGINE ==========
--- ==============================================
--- ==============================================
--- ==============================================
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Key Interceptor Engine =======
+-- =========================================
+-- =========================================
 
 --- Intercepts keystrokes to detect suffix + trigger combinations for dynamic resolution.
---- Registered into the keymap's interceptor chain.
+--- Registered into the keymap’s interceptor chain.
 --- @param event userdata The Hammerspoon hs.eventtap.event object.
 --- @param km_buffer string The current typing buffer maintained by the keymap module.
 --- @return string|nil Returns "consume" to swallow the event, or nil to pass it through.
 local function interceptor(event, km_buffer)
-    -- Prevent processing while we are actively injecting text
-    if _replacing or not _km then return nil end
+    -- Prevent processing while we are actively injecting synthetic text
+    if _is_injecting or not _km then return nil end
 
     -- Ignore complex key combinations (Cmd, Ctrl)
     local flags = event:getFlags()
@@ -89,31 +99,37 @@ local function interceptor(event, km_buffer)
 
     -- Check buffer against registered interceptor rules
     for _, rule in ipairs(_rules) do
-        if _km.is_section_enabled(GROUP_NAME, rule.section) then
+        if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, rule.section) then
             local suf = rule.suffix
             
             -- If the buffer ends with the required suffix
             if type(km_buffer) == "string" and #suf > 0 and km_buffer:sub(-(#suf)) == suf then
-                local result = rule.resolver()
                 
-                -- If the resolver successfully produced a replacement string
-                if type(result) == "string" and result ~= "" then
+                -- Safely execute the resolver function
+                local ok, result = pcall(rule.resolver)
+                
+                -- If the resolver successfully produced a valid replacement string
+                if ok and type(result) == "string" and result ~= "" then
                     local n_back = #suf
                     
-                    -- Defer the injection slightly to ensure the trigger keystroke is fully caught
+                    -- Defer the injection slightly to ensure the trigger keystroke is fully consumed by the OS
                     hs.timer.doAfter(0, function()
-                        _replacing = true
+                        _is_injecting = true
                         
                         -- Delete the suffix that triggered the rule
                         for _ = 1, n_back do
                             hs.eventtap.keyStroke({}, "delete", 0)
                         end
                         
-                        -- Inject the dynamic output
-                        hs.eventtap.keyStrokes(result)
+                        -- Inject the dynamic output safely using km_utils if available
+                        if km_utils and type(km_utils.emit_text) == "function" then
+                            km_utils.emit_text(result)
+                        else
+                            hs.eventtap.keyStrokes(result)
+                        end
                         
                         -- Release the lock after a safe delay
-                        hs.timer.doAfter(0.15, function() _replacing = false end)
+                        hs.timer.doAfter(0.15, function() _is_injecting = false end)
                     end)
                     
                     return "consume"
@@ -126,15 +142,16 @@ local function interceptor(event, km_buffer)
 end
 
 
--- ===================================================
--- ===================================================
--- ===================================================
--- ========== 4. DATA-DEPENDENT EXPANSIONS ==========
--- ===================================================
--- ===================================================
--- ===================================================
 
---- Generates and registers all prefix-based hotstrings based on the user's personal data.
+
+
+-- ============================================
+-- ============================================
+-- ======= 4/ Data-Dependent Expansions =======
+-- ============================================
+-- ============================================
+
+--- Generates and registers all prefix-based hotstrings based on the user’s personal data.
 --- This is called during startup and whenever the group is toggled via the UI.
 local function register_prefix_entries()
     if not _km or type(_personal_data) ~= "table" then return end
@@ -142,16 +159,19 @@ local function register_prefix_entries()
     local opts = { is_word = false, auto_expand = true, is_case_sensitive = true }
     
     -- Safely extract variables, falling back to empty strings if missing
-    local phone  = type(_personal_data.PhoneNumber) == "string" and _personal_data.PhoneNumber or ""
-    local fphone = type(_personal_data.PhoneNumberFormatted) == "string" and _personal_data.PhoneNumberFormatted or ""
-    local ssn    = type(_personal_data.SocialSecurityNumber) == "string" and _personal_data.SocialSecurityNumber or ""
+    local phone  = type(_personal_data.PhoneNumber) == "string" and _personal_data.PhoneNumber or tostring(_personal_data.PhoneNumber or "")
+    local fphone = type(_personal_data.PhoneNumberFormatted) == "string" and _personal_data.PhoneNumberFormatted or tostring(_personal_data.PhoneNumberFormatted or "")
+    local ssn    = type(_personal_data.SocialSecurityNumber) == "string" and _personal_data.SocialSecurityNumber or tostring(_personal_data.SocialSecurityNumber or "")
 
-    _km.set_group_context(GROUP_NAME)
+    if _km.set_group_context then _km.set_group_context(GROUP_NAME) end
 
-    -- ========================================
-    -- ======= 4.1 Phone Prefix Entries =======
-    -- ========================================
-    if _km.is_section_enabled(GROUP_NAME, "phoneprefixes") then
+
+
+    -- =====================================
+    -- ===== 4.1) Phone Prefix Entries =====
+    -- =====================================
+
+    if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "phoneprefixes") then
         if #phone >= 2 then
             -- Trigger: First 2 digits + trigger -> full number (e.g. "07★" -> "0706060606")
             _km.add(phone:sub(1, 2) .. _trigger, phone, opts)
@@ -176,10 +196,13 @@ local function register_prefix_entries()
         end
     end
 
-    -- ======================================
-    -- ======= 4.2 SSN Prefix Entries =======
-    -- ======================================
-    if _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
+
+
+    -- ===================================
+    -- ===== 4.2) SSN Prefix Entries =====
+    -- ===================================
+    
+    if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
         if #ssn >= 5 then
             -- Trigger: First 5 digits of SSN -> full SSN
             _km.add(ssn:sub(1, 5), ssn, opts)
@@ -187,18 +210,19 @@ local function register_prefix_entries()
     end
 
     -- Clear the context and sort the mappings so longest triggers evaluate first
-    _km.set_group_context(nil)
-    _km.sort_mappings()
+    if _km.set_group_context then _km.set_group_context(nil) end
+    if _km.sort_mappings then _km.sort_mappings() end
 end
 
 
--- ====================================
--- ====================================
--- ====================================
--- ========== 5. PUBLIC API ==========
--- ====================================
--- ====================================
--- ====================================
+
+
+
+-- =============================
+-- =============================
+-- ======= 5/ Public API =======
+-- =============================
+-- =============================
 
 --- Adds a custom interceptor rule for runtime evaluation.
 --- @param suffix string The string sequence that must immediately precede the trigger character.
@@ -217,12 +241,12 @@ end
 --- @param personal_data table Dictionary containing personal information.
 --- @param trigger_char string|nil The global trigger character to apply.
 function M.register_personal_data(personal_data, trigger_char)
-    _personal_data = personal_data
-    if trigger_char then M.set_trigger_char(trigger_char) end
+    _personal_data = type(personal_data) == "table" and personal_data or {}
+    if trigger_char then M.set_trigger_char(tostring(trigger_char)) end
     register_prefix_entries()
 end
 
---- Initialises the dynamic hotstrings module, wiring it into the keymap engine.
+--- Initializes the dynamic hotstrings module, wiring it into the keymap engine.
 --- @param keymap_module table The active keymap module reference.
 function M.start(keymap_module)
     if type(keymap_module) ~= "table" then
@@ -243,31 +267,40 @@ function M.start(keymap_module)
         { name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement" },
     }
     
-    keymap_module.register_lua_group(
-        GROUP_NAME,
-        "Hotstrings dynamiques",
-        sections
-    )
+    if _km.register_lua_group then
+        _km.register_lua_group(
+            GROUP_NAME,
+            "Hotstrings dynamiques",
+            sections
+        )
+    end
 
     -- Post-load hook: ensures prefix triggers are injected properly 
     -- if the user toggles the feature off and back on via the menu.
-    keymap_module.set_post_load_hook(GROUP_NAME, function()
-        register_prefix_entries()
-    end)
+    if _km.set_post_load_hook then
+        _km.set_post_load_hook(GROUP_NAME, function()
+            register_prefix_entries()
+        end)
+    end
 
-    -- Register our interceptor function into the keymap's event lifecycle.
-    keymap_module.register_interceptor(interceptor)
+    -- Register our interceptor function into the keymap’s event lifecycle.
+    if _km.register_interceptor then
+        _km.register_interceptor(interceptor)
+    end
 
     -- Provide dynamic preview text for the tooltip UI (if supported by keymap)
-    if type(keymap_module.register_preview_provider) == "function" then
-        keymap_module.register_preview_provider(function(buf)
+    if type(_km.register_preview_provider) == "function" then
+        _km.register_preview_provider(function(buf)
             if type(buf) ~= "string" then return nil end
             
             for _, rule in ipairs(_rules) do
-                if _km and _km.is_section_enabled(GROUP_NAME, rule.section) then
+                if _km and _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, rule.section) then
                     local suf = rule.suffix
                     if #suf > 0 and buf:sub(-(#suf)) == suf then
-                        return rule.resolver()
+                        local ok, res = pcall(rule.resolver)
+                        if ok and type(res) == "string" then
+                            return res
+                        end
                     end
                 end
             end

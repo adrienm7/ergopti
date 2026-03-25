@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title>Informations personnelles</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<h1>Informations personnelles</h1>
+
+		<form method="POST" action="/save">
+			{{ROWS}}
+
+			<div class="btns">
+				<button type="button" class="cancel">Annuler</button>
+				<button type="submit" class="save">Enregistrer</button>
+			</div>
+		</form>
+
+		<script src="script.js"></script>
+	</body>
+</html>

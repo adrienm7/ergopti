@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Hotstrings personnels</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<div id="loading">
+			<div class="spinner"></div>
+			<span>Chargement…</span>
+		</div>
+
+		<div id="app" style="display: none">
+			<div id="hdr">
+				<h1>✏︎ Hotstrings personnels</h1>
+				<button id="compact-btn" class="btn btn-sm btn-s" onclick="toggleCompact()"></button>
+				<button class="btn btn-sm btn-p" onclick="showAddSec()">＋ Section</button>
+			</div>
+			<div id="content">
+				<div id="secs-container"></div>
+				<div id="empty" class="empty" style="display: none">
+					Aucun hotstring défini.<br />Cliquez sur <strong>+ Section</strong> pour commencer.<br />
+					<small>☰ glisser pour réordonner — cliquer sur le titre pour renommer</small>
+				</div>
+			</div>
+		</div>
+
+		<div id="bulk-bar">
+			<span id="bulk-cnt" class="bulk-cnt"></span>
+			<div class="bulk-sep"></div>
+			<select
+				id="bulk-sec-sel"
+				class="btn btn-s"
+				style="margin: 0; outline: none; font-weight: normal"
+				onchange="if(this.value!=='') bulkMove()"
+			>
+				<option value="">Déplacer vers…</option>
+			</select>
+			<button
+				class="btn btn-sm"
+				style="background: #ffe5e3; color: var(--danger)"
+				onclick="bulkDel()"
+			>
+				Supprimer
+			</button>
+			<div class="bulk-sep"></div>
+			<button
+				class="btn btn-sm btn-s"
+				style="background: transparent; padding: 4px 8px"
+				onclick="clearBulk()"
+			>
+				Annuler
+			</button>
+		</div>
+
+		<div id="save-toast">Enregistré ✓</div>
+		<div id="ac-popup"></div>
+
+		<div class="overlay" id="msg-modal">
+			<div class="modal">
+				<p id="msg-text"></p>
+				<div class="modal-foot" style="justify-content: flex-end">
+					<button class="btn btn-p" onclick="closeModal('msg-modal')">OK</button>
+				</div>
+			</div>
+		</div>
+		<div class="overlay" id="confirm-modal">
+			<div class="modal">
+				<div id="confirm-text"></div>
+				<div class="modal-foot">
+					<button class="btn btn-s" id="confirm-cancel">Annuler</button>
+					<button class="btn btn-p" id="confirm-ok">OK</button>
+				</div>
+			</div>
+		</div>
+		<div class="overlay" id="sec-modal">
+			<div class="modal">
+				<h2 id="sec-modal-title">Nouvelle section</h2>
+				<div class="fg">
+					<label
+						>Identifiant
+						<span class="hint">(uniquement minuscules, chiffres et underscores)</span></label
+					>
+					<input
+						id="sec-id"
+						type="text"
+						placeholder="ex : mes_abrev"
+						autocomplete="off"
+						spellcheck="false"
+					/>
+					<div class="field-error-msg" id="sec-id-err"></div>
+				</div>
+				<div class="fg">
+					<label>Description <span class="hint">(affichée dans le menu)</span></label>
+					<input id="sec-desc" type="text" placeholder="ex : Mes abréviations" />
+				</div>
+				<div class="modal-foot">
+					<span></span>
+					<div class="foot-btns">
+						<button class="btn btn-s" onclick="closeModal('sec-modal')">Annuler</button>
+						<button class="btn btn-p" onclick="saveSec()">Enregistrer</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="overlay" id="entry-modal">
+			<div class="modal">
+				<h2 id="entry-modal-title">Nouveau hotstring</h2>
+				<div class="fg">
+					<label>Déclencheur <span class="hint" id="trig-hint"></span></label>
+					<div class="trig-row">
+						<div
+							id="e-trig"
+							class="trig-editor"
+							contenteditable="true"
+							spellcheck="false"
+							data-placeholder="ex : btw"
+						></div>
+						<button class="magic-btn" id="magic-btn" onclick="insertMagicKey()"></button>
+					</div>
+					<div class="field-error-msg" id="trig-err"></div>
+				</div>
+				<div class="fg">
+					<label>Remplacement</label>
+					<div class="editor-wrap">
+						<div id="e-out-ph" class="ph-overlay">
+							ex : Bonjour,<span class="tc-ph">Enter</span>J’espère que vous allez bien.<span
+								class="tc-ph"
+								>Enter</span
+							><span class="tc-ph">Up</span><span class="tc-ph">End</span> — curseur après la
+							virgule
+						</div>
+						<div id="e-out" class="output-editor" contenteditable="true" spellcheck="false"></div>
+					</div>
+					<div class="field-error-msg" id="out-err"></div>
+				</div>
+				<details class="cmd-help" id="cmd-help">
+					<summary>Commandes spéciales — cliquer pour insérer</summary>
+					<div class="cmd-block" id="cmd-block"></div>
+				</details>
+				<div class="cbs">
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-word" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								>Mot complet</span
+							>
+						</div>
+						<span class="cb-desc" id="desc-word"></span>
+					</label>
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-auto" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								>Expansion auto</span
+							>
+						</div>
+						<span class="cb-desc" id="desc-auto"></span>
+					</label>
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-case" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								>Sensible à la casse</span
+							>
+						</div>
+						<span class="cb-desc" id="desc-case"></span>
+					</label>
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-final" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								>Résultat final</span
+							>
+						</div>
+						<span class="cb-desc" id="desc-final"></span>
+					</label>
+				</div>
+				<div class="modal-foot">
+					<span class="foot-kbd">
+						<kbd>↩</kbd> = saut de ligne
+						<br />
+						<kbd>⌘</kbd> + <kbd>↩</kbd> = enregistrer
+						<br />
+						<kbd>⇧</kbd> + <kbd>⌘</kbd> + <kbd>↩</kbd> = enregistrer + nouveau hotstring
+					</span>
+					<div class="foot-btns">
+						<button class="btn btn-s" onclick="closeModal('entry-modal')">Annuler</button>
+						<button class="btn btn-p" onclick="saveEntry(false)">Enregistrer</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>
