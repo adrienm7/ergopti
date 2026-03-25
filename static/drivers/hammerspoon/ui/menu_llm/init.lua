@@ -8,9 +8,6 @@
 --   - profiles_manager.lua (Prompt strategies and Editor)
 --   - settings_manager.lua (Numeric configs and Dialogs)
 --   - app_picker.lua       (Application exclusions)
---
--- This modular approach maintains the full feature set of the original 
--- 1400-line file while ensuring high maintainability and robustness.
 -- ===========================================================================
 
 local M = {}
@@ -143,7 +140,33 @@ function M.create(deps)
         return m
     end
 
-
+    local function build_pred_shortcut_menu()
+        local m = {}
+        local options = {
+            { label = "Désactivé", val = "none" },
+            { label = "Ctrl (⌃)", val = "ctrl" },
+            { label = "Option/Alt (⌥)", val = "alt" },
+            { label = "Cmd (⌘)", val = "cmd" },
+            { label = "Shift (⇧)", val = "shift" },
+            { label = "Cmd + Shift (⌘⇧)", val = "cmd+shift" }
+        }
+        
+        for _, opt in ipairs(options) do
+            table.insert(m, {
+                title   = opt.label,
+                checked = (state.llm_pred_shortcut_mod == opt.val),
+                fn      = function()
+                    state.llm_pred_shortcut_mod = opt.val
+                    if keymap and type(keymap.set_llm_pred_shortcut_mod) == "function" then
+                        pcall(keymap.set_llm_pred_shortcut_mod, opt.val)
+                    end
+                    save_prefs()
+                    update_menu()
+                end
+            })
+        end
+        return m
+    end
 
 
 
@@ -188,7 +211,7 @@ function M.create(deps)
         -- --- 3. CONTEXT & EXCLUSIONS ---
         table.insert(main_menu, { title = "— CONTEXTE & EXCLUSIONS —", disabled = true })
 
-        table.insert(main_menu, { title = "Taille du contexte : " .. state.llm_context_length .. " chars", fn = settings_mgr.set_context_length })
+        table.insert(main_menu, { title = "Taille du contexte : " .. state.llm_context_length .. " derniers caractères", fn = settings_mgr.set_context_length })
         
         table.insert(main_menu, {
             title   = "Vider le contexte sur clic/navigation",
@@ -208,7 +231,7 @@ function M.create(deps)
         table.insert(main_menu, { title = "— INTERFACE & RACCOURCIS —", disabled = true })
 
         table.insert(main_menu, {
-            title   = "Afficher la barre d’info (Latence)",
+            title   = "Afficher la barre d’info (modèle et latence)",
             checked = state.llm_show_info_bar,
             fn      = function()
                 state.llm_show_info_bar = not state.llm_show_info_bar
@@ -217,8 +240,19 @@ function M.create(deps)
             end
         })
 
-        local mod_sym = format_mod_string(state.llm_pred_shortcut_mod)
-        table.insert(main_menu, { title = "Raccourcis de sélection : " .. mod_sym .. "1 – " .. mod_sym .. "0", disabled = true })
+        local shortcut_title = "Raccourcis de sélection : "
+        if state.llm_pred_shortcut_mod == "none" then
+            shortcut_title = shortcut_title .. "Désactivé"
+        else
+            local mod_sym = format_mod_string(state.llm_pred_shortcut_mod)
+            shortcut_title = shortcut_title .. mod_sym .. "1 – " .. mod_sym .. "0"
+        end
+
+        table.insert(main_menu, {
+            title    = shortcut_title,
+            disabled = (state.llm_num_predictions < 2),
+            menu     = build_pred_shortcut_menu()
+        })
 
         table.insert(main_menu, { title = "Indentation automatique", menu = settings_mgr.build_indent_menu() })
 
@@ -241,7 +275,7 @@ function M.create(deps)
             hs.timer.doAfter(1, function()
                 pcall(hs.focus)
                 local msg = needs_ollama and "Ollama n’est pas lancé ou installé." or "Le modèle actif n’est pas téléchargé."
-                local choice = hs.dialog.blockAlert("IA non prête", msg .. "\nSouhaitez-vous résoudre ce problème ?", "Oui", "Plus tard")
+                local choice = hs.dialog.blockAlert("IA non prête", msg .. "\nSouhaitez-vous résoudre ce problème ?", "Oui", "Plus tard")
                 if choice == "Oui" then
                     if needs_ollama then pcall(hs.execute, "open /Applications/Ollama.app")
                     else models_mgr.pull_model(state.llm_model, deps) end

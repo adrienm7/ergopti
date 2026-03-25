@@ -163,7 +163,7 @@ function M.new(deps)
     --- Builds the main "Disabled in..." menu item
     function obj.get_menu_item()
         local disabled_count = #(type(deps.state.llm_disabled_apps) == "table" and deps.state.llm_disabled_apps or {})
-        local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application(s)") or " ces applications")
+        local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
         
         return {
             title = label,

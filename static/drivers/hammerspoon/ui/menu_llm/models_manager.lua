@@ -202,7 +202,7 @@ function M.pull_model(target_model, deps)
                 end
                 pcall(deps.save_prefs)
                 if download_window then pcall(download_window.complete, true, target_model) end
-                pcall(notifications.notify, "🟢  MODÈLE INSTALLÉ", target_model .. " est prêt !")
+                pcall(notifications.notify, "🟢  MODÈLE INSTALLÉ", target_model .. " est prêt !")
                 hs.timer.doAfter(2, function() pcall(hs.reload) end)
             else
                 local detail = output:sub(1, 120)
@@ -333,7 +333,7 @@ function M.check_system_and_install(target_model, presets, on_cancel, deps)
         local sep = string.rep("─", 25)
         local ok_c, choice = pcall(hs.dialog.blockAlert,
             "Téléchargement requis",
-            sep .. "\n" .. msg .. "\n" .. sep .. "\n\nVoulez-vous lancer le téléchargement ?",
+            sep .. "\n" .. msg .. "\n" .. sep .. "\n\nVoulez-vous lancer le téléchargement ?",
             "Télécharger", "Annuler", msg:find("⚠️") and "warning" or "informational")
             
         if ok_c and choice == "Télécharger" then

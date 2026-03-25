@@ -447,11 +447,6 @@ function M.init(toml_path, keymap_mod, update_menu_fn)
     _keymap      = keymap_mod
     _update_menu = update_menu_fn
     ensure_file()
-
-    -- Register the window title so the keymap ignores it
-    if type(_keymap) == "table" and type(_keymap.ignore_window_title) == "function" then
-        pcall(_keymap.ignore_window_title, "Hotstrings personnels")
-    end
 end
 
 --- Checks if the editor window is currently open.

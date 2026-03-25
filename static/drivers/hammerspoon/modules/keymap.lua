@@ -31,7 +31,9 @@ if not ok_tt then
         navigate = function() end,
         get_current_index = function() return 1 end,
         make_diff_styled = function() return nil end,
-        set_timeout = function() end
+        set_timeout = function() end,
+        set_navigate_callback = function() end,
+        set_accept_callback = function() end
     }
 end
 
@@ -125,7 +127,7 @@ local llm_arrow_nav_enabled    = false
 local llm_arrow_nav_mods       = {}
 local llm_show_info_bar        = true
 local llm_pred_indent          = 0
-local llm_pred_shortcut_mod    = "ctrl"
+local llm_pred_shortcut_mod    = "alt"
 local llm_sequential_mode      = llm.DEFAULT_LLM_SEQUENTIAL_MODE or false
 
 if tooltip.set_navigate_callback then
@@ -152,7 +154,7 @@ function M.set_llm_arrow_nav_enabled(v)   llm_arrow_nav_enabled  = (v == true) e
 function M.set_llm_arrow_nav_mods(m)      llm_arrow_nav_mods     = type(m) == "table" and m or {} end
 function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
 function M.set_llm_pred_indent(v)         llm_pred_indent        = math.max(0, math.min(5, math.floor(tonumber(v) or 0))) end
-function M.set_llm_pred_shortcut_mod(m)   llm_pred_shortcut_mod  = tostring(m or "ctrl") end
+function M.set_llm_pred_shortcut_mod(m)   llm_pred_shortcut_mod  = tostring(m or "alt") end
 function M.set_llm_sequential_mode(v)     llm_sequential_mode    = (v == true) end
 function M.get_llm_enabled()              return llm_enabled end
 function M.set_llm_show_model_name(v)     llm_show_info_bar      = (v == true) end
@@ -637,6 +639,13 @@ local function apply_prediction(idx)
     return true
 end
 
+if tooltip.set_accept_callback then
+    tooltip.set_accept_callback(function(idx)
+        apply_prediction(idx)
+    end)
+end
+
+
 local function llm_suppressed_for_app()
     if km_utils and type(km_utils.is_ignored_window) == "function" then
         if km_utils.is_ignored_window(_ignored_window_titles, _ignored_window_patterns) then return true end
@@ -665,7 +674,7 @@ local function arrow_mods_match(flags)
 end
 
 local function pred_shortcut_mod_matches(flags)
-    local mod_str = llm_pred_shortcut_mod or "ctrl"
+    local mod_str = llm_pred_shortcut_mod or "alt"
     local req = {}
     for p in mod_str:gmatch("[^+]+") do req[p] = true end
     for _, m in ipairs({"cmd", "ctrl", "alt", "shift"}) do
@@ -1022,7 +1031,13 @@ local function onKeyDown(e)
     local flags   = e:getFlags()
     
     local is_ignored = false
-    if km_utils and type(km_utils.is_ignored_window) == "function" then
+    local frontApp = hs.application.frontmostApplication()
+    
+    -- Global exclusion of all windows owned by Hammerspoon (UIs, console)
+    -- This prevents latency issues when typing inside custom webviews or dialogs.
+    if frontApp and frontApp:name() == "Hammerspoon" then
+        is_ignored = true
+    elseif km_utils and type(km_utils.is_ignored_window) == "function" then
         is_ignored = km_utils.is_ignored_window(_ignored_window_titles, _ignored_window_patterns)
     end
 
