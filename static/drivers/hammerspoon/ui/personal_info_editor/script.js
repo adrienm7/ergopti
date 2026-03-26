@@ -1,20 +1,45 @@
+// ui/personal_info_editor/script.js
+
+// ===========================================================================
+// Personal Info Editor UI Script.
+//
+// Handles the interactions for the personal information editor window.
+// Includes cancellation logic via buttons and keyboard shortcuts.
+// ===========================================================================
+
+// =================================
+// =================================
+// ======= 1/ Core Functions =======
+// =================================
+// =================================
+
+/**
+ * Sends a cancellation request to the local server and securely closes the window.
+ */
+function executeCancellation() {
+	fetch('/cancel')
+		.then(() => window.close())
+		.catch((error) => console.error("Erreur lors de l'annulation :", error));
+}
+
+// ===============================
+// ===============================
+// ======= 2/ Event Wiring =======
+// ===============================
+// ===============================
+
 document.addEventListener('DOMContentLoaded', () => {
-	// Handles closing the window gracefully if the user cancels
-	const cancelBtn = document.querySelector('.cancel');
-	if (cancelBtn) {
-		cancelBtn.addEventListener('click', () => {
-			fetch('/cancel')
-				.then(() => window.close())
-				.catch((err) => console.error('Error cancelling:', err));
-		});
+	const cancelButton = document.querySelector('.cancel');
+
+	// Bind the cancel button click event
+	if (cancelButton) {
+		cancelButton.addEventListener('click', executeCancellation);
 	}
 
-	// Allows pressing Escape to cancel
-	document.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape') {
-			fetch('/cancel')
-				.then(() => window.close())
-				.catch((err) => console.error('Error cancelling:', err));
+	// Bind the Escape key global shortcut
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') {
+			executeCancellation();
 		}
 	});
 });
