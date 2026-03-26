@@ -625,10 +625,10 @@ local function apply_prediction(idx)
     _expected_synthetic_chars = _expected_synthetic_chars .. emitted_str
 
     if deletes == 0 then
-        buffer = buffer .. to_type .. "​"
+        buffer = buffer .. to_type
     else
         local start = utf8.offset(buffer, -deletes)
-        buffer = (start and buffer:sub(1, start - 1) or "") .. to_type .. "​"
+        buffer = (start and buffer:sub(1, start - 1) or "") .. to_type
     end
 
     suppress_rescan_keep_buffer(0.3)
@@ -673,7 +673,7 @@ end
 function M._perform_llm_check()
     if not llm_enabled or llm_suppressed_for_app() then return end
 
-    local clean_buffer = buffer:gsub("​", "")
+    local clean_buffer = buffer
     local words = {}
     for w in clean_buffer:gmatch("%S+%s*") do table.insert(words, w) end
     if #words == 0 then return end
@@ -880,7 +880,7 @@ local function try_auto_expand(m, char_len, is_ignored)
         end,
         function()
             local tstart = utf8.offset(buffer, -text_utils.utf8_len(trigger))
-            buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text .. "​"
+            buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text
         end,
         m.final_result,
         is_ignored
@@ -950,7 +950,7 @@ local function try_terminator_expand(m, chars, char_len, is_ignored)
             end,
             function()
                 local tstart = utf8.offset(buffer, -(char_len + trig_len))
-                buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text .. (consume_term and "" or chars) .. "​"
+                buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text .. (consume_term and "" or chars)
             end,
             m.final_result,
             is_ignored
@@ -973,7 +973,7 @@ local function try_repeat_feature(chars, is_ignored)
     if not last_char_offset then return false end
 
     local last_char = before:sub(last_char_offset)
-    if last_char == "" or last_char:match("^%s$") or last_char == "​" then return false end
+    if last_char == "" or last_char:match("^%s$") then return false end
 
     if not is_ignored and tooltip.hide then tooltip.hide() end
     if is_ignored then 
