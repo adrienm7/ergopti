@@ -269,18 +269,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
             if type(saved.sections_order_overrides) == "table" then state.sections_order_overrides = saved.sections_order_overrides end
             if type(saved.llm_disabled_apps) == "table" then state.llm_disabled_apps = saved.llm_disabled_apps end
             
-            -- Compatibility checks for migrated variables
-            if saved.llm_pred_shortcut_mod ~= nil and saved.llm_val_modifiers == nil then
-                state.llm_val_modifiers = {saved.llm_pred_shortcut_mod}
-            elseif type(saved.llm_val_modifiers) == "table" then
-                state.llm_val_modifiers = saved.llm_val_modifiers
-            end
-            if saved.llm_arrow_nav_mods ~= nil and saved.llm_nav_modifiers == nil then
-                state.llm_nav_modifiers = saved.llm_arrow_nav_mods
-            elseif type(saved.llm_nav_modifiers) == "table" then
-                state.llm_nav_modifiers = saved.llm_nav_modifiers
-            end
-            
             if type(saved.llm_active_profile) == "string" then state.llm_active_profile = saved.llm_active_profile end
             if type(saved.llm_user_profiles) == "table" then state.llm_user_profiles = saved.llm_user_profiles end
 

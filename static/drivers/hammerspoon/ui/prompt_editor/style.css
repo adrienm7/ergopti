@@ -1,3 +1,18 @@
+/* ui/prompt_editor/style.css */
+
+/* =========================================================================== */
+/* Prompt Editor UI Styles.                                                    */
+/* */
+/* Defines the visual appearance of the rich-text prompt editor, including     */
+/* dark mode support, token chips styling, and responsive layout handling.     */
+/* =========================================================================== */
+
+/* ==================================== */
+/* ==================================== */
+/* ======= 1/ Reset & Variables ======= */
+/* ==================================== */
+/* ==================================== */
+
 *,
 *::before,
 *::after {
@@ -5,6 +20,7 @@
 	margin: 0;
 	padding: 0;
 }
+
 :root {
 	--bg: #f2f2f7;
 	--surface: #fff;
@@ -18,6 +34,7 @@
 	--chip-c: #1a4bbf;
 	--chip-bd: rgba(26, 75, 191, 0.22);
 }
+
 @media (prefers-color-scheme: dark) {
 	:root {
 		--bg: #1c1c1e;
@@ -33,6 +50,13 @@
 		--chip-bd: rgba(147, 184, 248, 0.28);
 	}
 }
+
+/* ================================ */
+/* ================================ */
+/* ======= 2/ Base & Layout ======= */
+/* ================================ */
+/* ================================ */
+
 body {
 	background: var(--bg);
 	color: var(--text);
@@ -45,27 +69,38 @@ body {
 	padding: 20px;
 	-webkit-app-region: drag;
 }
+
 h1 {
 	font-size: 15px;
 	font-weight: 600;
 	margin-bottom: 16px;
 }
+
+/* ================================ */
+/* ================================ */
+/* ======= 3/ Form Elements ======= */
+/* ================================ */
+/* ================================ */
+
 .fg {
 	display: flex;
 	flex-direction: column;
 	margin-bottom: 14px;
 }
+
 .fg-header {
 	align-items: center;
 	display: flex;
 	justify-content: space-between;
 	margin-bottom: 5px;
 }
+
 label {
 	color: var(--sub);
 	font-size: 12px;
 	font-weight: 500;
 }
+
 input,
 select {
 	background: var(--surface);
@@ -82,13 +117,19 @@ select {
 	width: 100%;
 	-webkit-app-region: no-drag;
 }
+
 input:focus,
 select:focus {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
 }
 
-/* ── ContentEditable Editor ── */
+/* ========================================= */
+/* ========================================= */
+/* ======= 4/ ContentEditable Editor ======= */
+/* ========================================= */
+/* ========================================= */
+
 .editor-wrap {
 	display: flex;
 	flex-direction: column;
@@ -96,6 +137,7 @@ select:focus {
 	position: relative;
 	-webkit-app-region: no-drag;
 }
+
 .output-editor {
 	background: var(--surface);
 	border: 1.5px solid var(--border);
@@ -115,12 +157,18 @@ select:focus {
 		box-shadow 0.15s;
 	word-break: break-word;
 }
+
 .output-editor:focus {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
 }
 
-/* ── Chips (Pilules) ── */
+/* ================================= */
+/* ================================= */
+/* ======= 5/ Tokens & Chips ======= */
+/* ================================= */
+/* ================================= */
+
 .token-chip {
 	background: var(--chip-bg);
 	border: 1px solid var(--chip-bd);
@@ -137,7 +185,12 @@ select:focus {
 	white-space: nowrap;
 }
 
-/* ── Fake Placeholder ── */
+/* =================================== */
+/* =================================== */
+/* ======= 6/ Fake Placeholder ======= */
+/* =================================== */
+/* =================================== */
+
 .ph-overlay {
 	color: var(--hint);
 	display: none;
@@ -150,6 +203,7 @@ select:focus {
 	top: 11px;
 	user-select: none;
 }
+
 .tc-ph {
 	background: rgba(142, 142, 147, 0.12);
 	border: 1px solid rgba(142, 142, 147, 0.2);
@@ -163,7 +217,12 @@ select:focus {
 	vertical-align: baseline;
 }
 
-/* ── Buttons ── */
+/* ================================= */
+/* ================================= */
+/* ======= 7/ Buttons & Help ======= */
+/* ================================= */
+/* ================================= */
+
 .btn-row {
 	display: flex;
 	gap: 8px;
@@ -172,6 +231,7 @@ select:focus {
 	padding-top: 10px;
 	-webkit-app-region: no-drag;
 }
+
 .btn {
 	border: none;
 	border-radius: 7px;
@@ -181,22 +241,27 @@ select:focus {
 	padding: 7px 14px;
 	transition: filter 0.1s;
 }
+
 .btn:hover {
 	filter: brightness(0.9);
 }
+
 .btn-p {
 	background: var(--accent);
 	color: #fff;
 }
+
 .btn-s {
 	background: var(--surface);
 	border: 1px solid var(--border);
 	color: var(--text);
 }
+
 .btn-sm {
 	font-size: 11px;
 	padding: 3px 8px;
 }
+
 .help {
 	color: var(--hint);
 	font-size: 11px;

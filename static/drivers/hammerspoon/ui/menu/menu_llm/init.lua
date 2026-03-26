@@ -16,10 +16,10 @@ local hs       = hs
 local llm_mod  = require("modules.llm")
 
 -- Sub-modules import
-local Models   = require("ui.menu.menu_llm.models_manager")
-local Profiles = require("ui.menu.menu_llm.profiles_manager")
-local Settings = require("ui.menu.menu_llm.settings_manager")
-local Apps     = require("ui.menu.menu_llm.app_picker")
+local Models    = require("ui.menu.menu_llm.models_manager")
+local Profiles  = require("ui.menu.menu_llm.profiles_manager")
+local Settings  = require("ui.menu.menu_llm.settings_manager")
+local Apps      = require("ui.menu.menu_llm.app_picker")
 
 
 

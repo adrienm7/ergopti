@@ -1,3 +1,18 @@
+/* ui/hotstrings_editor/style.css */
+
+/* =========================================================================== */
+/* Hotstring Editor UI Styles.                                                 */
+/* */
+/* Defines the complete visual layout of the hotstrings manager, including     */
+/* drag and drop cards, dark mode variables, modals, and custom token chips.   */
+/* =========================================================================== */
+
+/* ==================================== */
+/* ==================================== */
+/* ======= 1/ Reset & Variables ======= */
+/* ==================================== */
+/* ==================================== */
+
 *,
 *::before,
 *::after {
@@ -5,6 +20,7 @@
 	margin: 0;
 	padding: 0;
 }
+
 html,
 body {
 	height: 100%;
@@ -59,6 +75,12 @@ body {
 	}
 }
 
+/* ============================= */
+/* ============================= */
+/* ======= 2/ App Layout ======= */
+/* ============================= */
+/* ============================= */
+
 body {
 	background: var(--bg);
 	color: var(--text);
@@ -89,16 +111,24 @@ body {
 #hdr * {
 	-webkit-app-region: no-drag;
 }
+
 #hdr h1 {
 	flex: 1;
 	font-size: 14px;
 	font-weight: 600;
 }
+
 #content {
 	flex: 1;
 	overflow-y: auto;
 	padding: 14px 16px;
 }
+
+/* ================================ */
+/* ================================ */
+/* ======= 3/ Section Cards ======= */
+/* ================================ */
+/* ================================ */
 
 .sec-card {
 	background: var(--surface);
@@ -108,9 +138,11 @@ body {
 	overflow: hidden;
 	transition: box-shadow 0.15s;
 }
+
 .sec-card.drag-over {
 	box-shadow: 0 0 0 2.5px var(--accent);
 }
+
 .sec-card.dragging {
 	opacity: 0.3;
 }
@@ -123,6 +155,7 @@ body {
 	padding: 7px 10px 7px 12px;
 	user-select: none;
 }
+
 .sec-head.open {
 	border-bottom-color: var(--row-sep);
 }
@@ -135,6 +168,7 @@ body {
 	line-height: 1;
 	padding: 2px 4px;
 }
+
 .drag-handle:active {
 	cursor: grabbing;
 }
@@ -146,6 +180,7 @@ body {
 	font-size: 9px;
 	transition: transform 0.18s;
 }
+
 .caret.open {
 	transform: rotate(90deg);
 }
@@ -162,6 +197,7 @@ body {
 	user-select: text;
 	white-space: nowrap;
 }
+
 .sec-title:hover {
 	background: var(--row-hover);
 }
@@ -185,16 +221,24 @@ body {
 		background 0.1s,
 		color 0.1s;
 }
+
 .sec-del:hover {
 	background: #ffe5e3;
 	color: var(--danger);
 }
+
 @media (prefers-color-scheme: dark) {
 	.sec-del:hover {
 		background: #4a1c1a;
 		color: var(--danger);
 	}
 }
+
+/* ============================= */
+/* ============================= */
+/* ======= 4/ Entry Rows ======= */
+/* ============================= */
+/* ============================= */
 
 .entry-row {
 	align-items: stretch;
@@ -203,26 +247,36 @@ body {
 	display: flex;
 	transition: background 0.1s;
 }
+
 .entry-row:last-of-type {
 	border-bottom: none;
 }
+
 .entry-row:hover {
 	background: var(--row-hover);
 }
 
-/* ── Checkboxes ── */
+/* ================================== */
+/* ===== 4.1) Selection Toggles ===== */
+/* ================================== */
+
 .entry-cb-wrap {
 	align-items: center;
 	display: flex;
 	flex-shrink: 0;
 	padding: 6px 0 6px 12px;
 }
+
 .entry-cb {
 	accent-color: var(--accent);
 	cursor: pointer;
 	height: 14px;
 	width: 14px;
 }
+
+/* =============================== */
+/* ===== 4.2) Trigger Column ===== */
+/* =============================== */
 
 .e-trig {
 	align-items: center;
@@ -232,6 +286,7 @@ body {
 	min-width: 90px;
 	padding: 6px 6px 6px 8px;
 }
+
 .trig-lbl {
 	background: var(--tag-bg);
 	border: 1px solid var(--border);
@@ -247,6 +302,7 @@ body {
 	user-select: text;
 	white-space: nowrap;
 }
+
 @media (prefers-color-scheme: dark) {
 	.trig-lbl {
 		background: #2c2c2e;
@@ -260,6 +316,7 @@ body {
 	font-size: 14px;
 	font-weight: 800;
 }
+
 .e-arrow {
 	align-items: center;
 	color: var(--sub);
@@ -269,6 +326,10 @@ body {
 	padding: 0 5px;
 }
 
+/* ============================== */
+/* ===== 4.3) Output Column ===== */
+/* ============================== */
+
 .e-out-cell {
 	align-items: center;
 	display: flex;
@@ -276,15 +337,18 @@ body {
 	min-width: 0;
 	padding: 5px 6px;
 }
+
 .compact .e-out {
 	max-width: 100%;
 	overflow: hidden;
 	white-space: nowrap;
 }
+
 .expanded .e-out {
 	white-space: pre-wrap;
 	word-break: break-word;
 }
+
 .e-out {
 	font-size: 12px;
 	user-select: text;
@@ -303,6 +367,12 @@ body {
 	padding: 0 2px;
 }
 
+/* ================================= */
+/* ================================= */
+/* ======= 5/ Buttons & Tags ======= */
+/* ================================= */
+/* ================================= */
+
 .e-tags {
 	align-items: center;
 	display: flex;
@@ -310,6 +380,7 @@ body {
 	gap: 3px;
 	padding: 0 5px;
 }
+
 .tag {
 	background: var(--tag-bg);
 	border-radius: 4px;
@@ -317,6 +388,7 @@ body {
 	font-size: 10px;
 	padding: 1px 5px;
 }
+
 .tag.on {
 	background: var(--tag-on);
 	color: var(--tag-on-c);
@@ -333,11 +405,11 @@ body {
 	padding: 4px;
 	width: 30px;
 }
+
 .e-del:hover {
 	color: var(--danger);
 }
 
-/* ── Add hotstring button ── */
 .btn-add {
 	align-items: center;
 	background: var(--tag-on);
@@ -355,6 +427,7 @@ body {
 	transition: filter 0.1s;
 	width: calc(100% - 24px);
 }
+
 .btn-add:hover {
 	filter: brightness(0.93);
 }
@@ -366,6 +439,7 @@ body {
 	padding: 52px 16px;
 	text-align: center;
 }
+
 .btn {
 	border: none;
 	border-radius: 7px;
@@ -375,23 +449,32 @@ body {
 	padding: 5px 12px;
 	transition: filter 0.1s;
 }
+
 .btn:hover {
 	filter: brightness(0.9);
 }
+
 .btn-p {
 	background: var(--accent);
 	color: #fff;
 }
+
 .btn-s {
 	background: var(--tag-bg);
 	color: var(--text);
 }
+
 .btn-sm {
 	font-size: 11.5px;
 	padding: 4px 10px;
 }
 
-/* ── Overlays ── */
+/* ==================================== */
+/* ==================================== */
+/* ======= 6/ Modals & Overlays ======= */
+/* ==================================== */
+/* ==================================== */
+
 .overlay {
 	align-items: flex-start;
 	background: rgba(0, 0, 0, 0.42);
@@ -403,13 +486,16 @@ body {
 	position: fixed;
 	z-index: 100;
 }
+
 .overlay.on {
 	display: flex;
 }
+
 #msg-modal,
 #confirm-modal {
 	z-index: 150;
 }
+
 .modal {
 	background: var(--surface);
 	border-radius: 13px;
@@ -419,15 +505,21 @@ body {
 	padding: 20px;
 	width: 560px;
 }
+
 .modal h2 {
 	font-size: 14px;
 	font-weight: 600;
 	margin-bottom: 14px;
 }
 
+/* ================================ */
+/* ===== 6.1) Modal Form Grid ===== */
+/* ================================ */
+
 .fg {
 	margin-bottom: 10px;
 }
+
 .fg > label {
 	align-items: center;
 	color: var(--sub);
@@ -437,11 +529,13 @@ body {
 	justify-content: space-between;
 	margin-bottom: 3px;
 }
+
 .fg .hint {
 	color: var(--hint);
 	font-size: 10px;
 	font-weight: 400;
 }
+
 .fg input[type='text'] {
 	background: var(--surface);
 	border: 1.5px solid var(--border);
@@ -456,10 +550,12 @@ body {
 		box-shadow 0.15s;
 	width: 100%;
 }
+
 .fg input[type='text']:focus {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
 }
+
 @media (prefers-color-scheme: dark) {
 	.fg input[type='text'] {
 		background: #3a3a3c;
@@ -467,12 +563,127 @@ body {
 	}
 }
 
+.cbs {
+	display: grid;
+	gap: 8px 16px;
+	grid-template-columns: 1fr 1fr;
+	margin-bottom: 13px;
+}
+
+.cb-item {
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.cb-row {
+	align-items: center;
+	display: flex;
+	gap: 6px;
+}
+
+.cb-row input {
+	accent-color: var(--accent);
+	cursor: pointer;
+	flex-shrink: 0;
+	height: 14px;
+	width: 14px;
+}
+
+.cb-row input:focus {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.cb-label {
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.cb-desc {
+	color: var(--hint);
+	font-size: 10px;
+	line-height: 1.35;
+	padding-left: 20px;
+}
+
+/* ============================= */
+/* ===== 6.2) Modal Footer ===== */
+/* ============================= */
+
+.modal-foot {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+	margin-top: 15px;
+}
+
+.foot-btns {
+	align-items: center;
+	display: flex;
+	gap: 8px;
+}
+
+.foot-kbd {
+	color: var(--hint);
+	font-size: 10.5px;
+	line-height: 2;
+}
+
+.foot-kbd kbd {
+	background: var(--tag-bg);
+	border: 1px solid var(--border);
+	border-radius: 3px;
+	color: var(--sub);
+	display: inline-block;
+	font-family: 'SF Mono', Menlo, monospace;
+	font-size: 10px;
+	padding: 1px 5px;
+}
+
+#msg-modal .modal,
+#confirm-modal .modal {
+	max-width: 340px;
+}
+
+#msg-modal p,
+#confirm-modal p {
+	color: var(--text);
+	font-size: 13px;
+	line-height: 1.5;
+	margin-bottom: 16px;
+}
+
+.star-badge {
+	background: var(--tag-bg);
+	border-radius: 4px;
+	color: var(--text);
+	display: inline-block;
+	font-family: 'SF Mono', Menlo, monospace;
+	font-size: 11px;
+	font-weight: 500;
+	margin-left: 2px;
+	padding: 1px 3px 1px 5px;
+	vertical-align: baseline;
+}
+
+/* =================================== */
+/* =================================== */
+/* ======= 7/ Editors & Inputs ======= */
+/* =================================== */
+/* =================================== */
+
 .trig-row {
 	align-items: center;
 	display: flex;
 	gap: 6px;
 }
-/* ── Trigger editor ── */
+
+/* ================================ */
+/* ===== 7.1) Trigger Editor ====== */
+/* ================================ */
+
 .trig-editor {
 	background: var(--surface);
 	border: 1.5px solid var(--border);
@@ -493,15 +704,18 @@ body {
 		box-shadow 0.15s;
 	white-space: nowrap;
 }
+
 .trig-editor:focus {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
 }
+
 .trig-editor:empty::before {
 	color: var(--hint);
 	content: attr(data-placeholder);
 	pointer-events: none;
 }
+
 @media (prefers-color-scheme: dark) {
 	.trig-editor {
 		background: #3a3a3c;
@@ -509,7 +723,10 @@ body {
 	}
 }
 
-/* ── Magic key button ── */
+/* ============================== */
+/* ===== 7.2) Magic Button ====== */
+/* ============================== */
+
 .magic-btn {
 	align-items: center;
 	align-self: stretch;
@@ -533,12 +750,16 @@ body {
 	white-space: nowrap;
 	width: 32px;
 }
+
 .magic-btn:hover {
 	border-color: var(--hint);
 	filter: brightness(0.93);
 }
 
-/* ── Output contenteditable ── */
+/* =============================== */
+/* ===== 7.3) Output Editor ====== */
+/* =============================== */
+
 .output-editor {
 	background: var(--surface);
 	border: 1.5px solid var(--border);
@@ -558,10 +779,12 @@ body {
 		box-shadow 0.15s;
 	word-break: break-word;
 }
+
 .output-editor:focus {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
 }
+
 @media (prefers-color-scheme: dark) {
 	.output-editor {
 		background: #3a3a3c;
@@ -569,7 +792,12 @@ body {
 	}
 }
 
-/* ── Field validation errors ── */
+/* ====================================== */
+/* ====================================== */
+/* ======= 8/ Validation & Errors ======= */
+/* ====================================== */
+/* ====================================== */
+
 @keyframes shake {
 	0%,
 	100% {
@@ -584,11 +812,13 @@ body {
 		transform: translateX(4px);
 	}
 }
+
 .field-error {
 	animation: shake 0.28s ease;
 	border-color: var(--danger) !important;
 	box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.18) !important;
 }
+
 .field-error-msg {
 	align-items: center;
 	color: var(--danger);
@@ -597,15 +827,16 @@ body {
 	gap: 4px;
 	margin-top: 4px;
 }
+
 .field-error-msg.on {
 	display: flex;
 }
+
 .field-error-msg::before {
 	content: '⚠';
 	font-size: 11px;
 }
 
-/* ── Warning banner ── */
 .field-warning-msg {
 	align-items: center;
 	background: var(--warning-bg);
@@ -618,18 +849,26 @@ body {
 	margin-top: 4px;
 	padding: 5px 8px;
 }
+
 .field-warning-msg.on {
 	display: flex;
 }
+
 .field-warning-msg::before {
 	content: '⚠️';
 	font-size: 11px;
 }
 
-/* ── Fake Placeholder ── */
+/* ======================================= */
+/* ======================================= */
+/* ======= 9/ Chips & Autocomplete ======= */
+/* ======================================= */
+/* ======================================= */
+
 .editor-wrap {
 	position: relative;
 }
+
 .ph-overlay {
 	color: var(--hint);
 	display: none;
@@ -642,6 +881,7 @@ body {
 	top: 9px;
 	user-select: none;
 }
+
 .tc-ph {
 	background: rgba(142, 142, 147, 0.12);
 	border: 1px solid rgba(142, 142, 147, 0.2);
@@ -656,7 +896,6 @@ body {
 	vertical-align: baseline;
 }
 
-/* ── Chips ── */
 .token-chip {
 	background: var(--chip-bg);
 	border: 1px solid var(--chip-bd);
@@ -673,7 +912,6 @@ body {
 	white-space: nowrap;
 }
 
-/* ── Autocomplete ── */
 #ac-popup {
 	background: var(--surface);
 	border: 1px solid var(--border);
@@ -685,9 +923,11 @@ body {
 	position: fixed;
 	z-index: 999;
 }
+
 #ac-popup.on {
 	display: block;
 }
+
 .ac-item {
 	color: var(--chip-c);
 	cursor: pointer;
@@ -695,19 +935,26 @@ body {
 	font-size: 12px;
 	padding: 5px 12px;
 }
+
 .ac-item.active,
 .ac-item:hover {
 	background: var(--tag-on);
 	color: var(--accent);
 }
 
-/* ── Command grid ── */
+/* ================================ */
+/* ================================ */
+/* ======= 10/ Command Grid ======= */
+/* ================================ */
+/* ================================ */
+
 details.cmd-help {
 	background: var(--tag-bg);
 	border-radius: 7px;
 	margin-bottom: 10px;
 	padding: 7px 10px;
 }
+
 details.cmd-help summary {
 	align-items: center;
 	color: var(--text);
@@ -718,28 +965,34 @@ details.cmd-help summary {
 	gap: 4px;
 	list-style: none;
 }
+
 details.cmd-help summary::-webkit-details-marker {
 	display: none;
 }
+
 details.cmd-help summary::before {
 	content: '›';
 	transition: transform 0.15s;
 }
+
 details.cmd-help[open] summary::before {
 	transform: rotate(90deg);
 }
+
 .cmd-block {
 	display: grid;
 	gap: 5px 6px;
 	grid-template-columns: repeat(4, 1fr);
 	margin-top: 8px;
 }
+
 .cmd-sep {
 	border: none;
 	border-top: 1px solid var(--border);
 	grid-column: 1/-1;
 	margin: 7px 0 3px;
 }
+
 .cmd-grp-lbl {
 	color: var(--hint);
 	font-size: 10px;
@@ -748,6 +1001,7 @@ details.cmd-help[open] summary::before {
 	padding: 2px 0;
 	text-transform: uppercase;
 }
+
 .cmd-ref {
 	align-items: center;
 	background: var(--surface);
@@ -764,10 +1018,12 @@ details.cmd-help[open] summary::before {
 		filter 0.1s;
 	user-select: none;
 }
+
 .cmd-ref:hover {
 	background: var(--chip-bg);
 	filter: brightness(0.93);
 }
+
 .cmd-ref .cmd-sym {
 	font-family:
 		system-ui,
@@ -777,6 +1033,7 @@ details.cmd-help[open] summary::before {
 	font-size: 18px;
 	line-height: 1.1;
 }
+
 .cmd-ref .cmd-lbl {
 	color: var(--hint);
 	font-size: 9px;
@@ -784,96 +1041,46 @@ details.cmd-help[open] summary::before {
 	text-align: center;
 }
 
-/* ── Checkboxes ── */
-.cbs {
-	display: grid;
-	gap: 8px 16px;
-	grid-template-columns: 1fr 1fr;
-	margin-bottom: 13px;
-}
-.cb-item {
-	cursor: pointer;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-}
-.cb-row {
+/* =================================== */
+/* =================================== */
+/* ======= 11/ Bulk Action Bar ======= */
+/* =================================== */
+/* =================================== */
+
+#bulk-bar {
 	align-items: center;
-	display: flex;
-	gap: 6px;
-}
-.cb-row input {
-	accent-color: var(--accent);
-	cursor: pointer;
-	flex-shrink: 0;
-	height: 14px;
-	width: 14px;
-}
-.cb-row input:focus {
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
-}
-.cb-label {
-	font-size: 12px;
-	font-weight: 500;
-}
-.cb-desc {
-	color: var(--hint);
-	font-size: 10px;
-	line-height: 1.35;
-	padding-left: 20px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	bottom: 20px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+	display: none;
+	gap: 12px;
+	left: 50%;
+	padding: 8px 12px;
+	position: fixed;
+	transform: translateX(-50%);
+	z-index: 100;
 }
 
-/* ── Modal footer ── */
-.modal-foot {
-	align-items: center;
-	display: flex;
-	justify-content: space-between;
-	margin-top: 15px;
-}
-.foot-btns {
-	align-items: center;
-	display: flex;
-	gap: 8px;
-}
-.foot-kbd {
-	color: var(--hint);
-	font-size: 10.5px;
-	line-height: 2;
-}
-.foot-kbd kbd {
-	background: var(--tag-bg);
-	border: 1px solid var(--border);
-	border-radius: 3px;
-	color: var(--sub);
-	display: inline-block;
-	font-family: 'SF Mono', Menlo, monospace;
-	font-size: 10px;
-	padding: 1px 5px;
-}
-#msg-modal .modal,
-#confirm-modal .modal {
-	max-width: 340px;
-}
-#msg-modal p,
-#confirm-modal p {
-	color: var(--text);
+.bulk-cnt {
+	color: var(--accent);
 	font-size: 13px;
-	line-height: 1.5;
-	margin-bottom: 16px;
+	font-weight: 600;
+	white-space: nowrap;
 }
-.star-badge {
-	background: var(--tag-bg);
-	border-radius: 4px;
-	color: var(--text);
-	display: inline-block;
-	font-family: 'SF Mono', Menlo, monospace;
-	font-size: 11px;
-	font-weight: 500;
-	margin-left: 2px;
-	padding: 1px 3px 1px 5px;
-	vertical-align: baseline;
+
+.bulk-sep {
+	background: var(--border);
+	height: 18px;
+	width: 1px;
 }
+
+/* ==================================== */
+/* ==================================== */
+/* ======= 12/ Loading & Toasts ======= */
+/* ==================================== */
+/* ==================================== */
 
 #loading {
 	align-items: center;
@@ -885,6 +1092,7 @@ details.cmd-help[open] summary::before {
 	height: 100vh;
 	justify-content: center;
 }
+
 .spinner {
 	animation: spin 0.7s linear infinite;
 	border: 2.5px solid var(--border);
@@ -893,6 +1101,7 @@ details.cmd-help[open] summary::before {
 	height: 24px;
 	width: 24px;
 }
+
 @keyframes spin {
 	to {
 		transform: rotate(360deg);
@@ -914,34 +1123,7 @@ details.cmd-help[open] summary::before {
 	transition: opacity 0.2s;
 	z-index: 200;
 }
+
 #save-toast.show {
 	opacity: 1;
-}
-
-/* ── Bulk Bar ── */
-#bulk-bar {
-	align-items: center;
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-radius: 12px;
-	bottom: 20px;
-	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-	display: none;
-	gap: 12px;
-	left: 50%;
-	padding: 8px 12px;
-	position: fixed;
-	transform: translateX(-50%);
-	z-index: 100;
-}
-.bulk-cnt {
-	color: var(--accent);
-	font-size: 13px;
-	font-weight: 600;
-	white-space: nowrap;
-}
-.bulk-sep {
-	background: var(--border);
-	height: 18px;
-	width: 1px;
 }
