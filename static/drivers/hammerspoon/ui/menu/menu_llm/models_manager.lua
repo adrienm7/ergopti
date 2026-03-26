@@ -1,4 +1,4 @@
--- ui/menu_llm/models_manager.lua
+-- ui/menu/menu_llm/models_manager.lua
 
 -- ===========================================================================
 -- LLM Models Manager Sub-module.

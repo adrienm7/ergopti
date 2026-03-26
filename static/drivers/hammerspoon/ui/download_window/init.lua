@@ -6,13 +6,13 @@
 -- Floating progress window (hs.webview) for tracking LLM model downloads.
 -- Features JS-to-Lua communication via hs.webview.usercontent.
 --
--- Uses lib/ui_builder.lua to inject CSS and JS content directly into the 
+-- Uses ui/ui_builder.lua to inject CSS and JS content directly into the 
 -- HTML template, bypassing path resolution and sandbox issues.
 -- ===========================================================================
 
 local M = {}
 
-local ui_builder = require("lib.ui_builder")
+local ui_builder = require("ui.ui_builder")
 
 local _wv        = nil
 local _on_cancel = nil

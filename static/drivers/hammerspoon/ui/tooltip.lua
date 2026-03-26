@@ -52,6 +52,9 @@ end
 -- ===================================
 -- ===================================
 
+M.TIMEOUT_SEC_DEFAULT     = 2.5
+M.LLM_TIMEOUT_SEC_DEFAULT = 12.0
+
 local _state = {
     raw_predictions = {},
     current_index   = 1,
@@ -62,8 +65,8 @@ local _state = {
     nav_mod_str     = "none",
     indent          = 0,
     fixed_width     = nil,
-    timeout_sec     = 2.5,  -- Default auto-hide timeout for normal hotstrings
-    llm_timeout_sec = 12.0, -- Extended auto-hide timeout for LLM reading
+    timeout_sec     = M.TIMEOUT_SEC_DEFAULT,
+    llm_timeout_sec = M.LLM_TIMEOUT_SEC_DEFAULT,
     current_is_llm  = false,
 }
 
@@ -584,7 +587,7 @@ end
 
 --- Sets the auto-hide timeout duration for normal hotstrings (called by menu.lua or keymap.lua)
 function M.set_timeout(sec)
-    _state.timeout_sec = math.max(0, tonumber(sec) or 2.5)
+    _state.timeout_sec = sec or M.TIMEOUT_SEC_DEFAULT
 end
 
 --- Assigns a callback executed when the user navigates through predictions
@@ -616,13 +619,12 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     if not enabled then return end
     if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
     
-    current_index = math.max(1, math.min(tonumber(current_index) or 1, #predictions))
     _state.raw_predictions = predictions
-    _state.current_index   = current_index
-    _state.info_bar        = (info_bar and tostring(info_bar) ~= "") and tostring(info_bar) or nil
+    _state.current_index   = current_index or 1
+    _state.info_bar        = info_bar
     _state.shortcut_mod    = shortcut_mod or "alt"
     _state.nav_mod_str     = nav_mod_str or "none"
-    _state.indent          = math.floor(tonumber(indent) or 0)
+    _state.indent          = indent or 0
     _state.current_is_llm  = true -- Ensure extended timeout is used
 
     local max_width = 0
@@ -651,7 +653,7 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     end
     _state.fixed_width = max_width
 
-    render(assemble_blocks(predictions, current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str))
+    render(assemble_blocks(predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str))
 end
 
 --- Displays simple tooltip content (Hotstrings or Loading state)

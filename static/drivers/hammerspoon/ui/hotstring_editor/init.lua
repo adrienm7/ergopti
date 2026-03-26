@@ -13,7 +13,7 @@ local M = {}
 local hs          = hs
 local toml_reader = require("lib.toml_reader")
 local toml_writer = require("lib.toml_writer")
-local ui_builder  = require("lib.ui_builder")
+local ui_builder  = require("ui.ui_builder")
 
 
 

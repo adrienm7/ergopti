@@ -7,14 +7,14 @@
 -- custom LLM prompt profiles. Employs a content-editable block to visually
 -- render the "{context}" token as a chip.
 -- 
--- Uses lib/ui_builder.lua to inject CSS and JS content directly into the 
+-- Uses ui/ui_builder.lua to inject CSS and JS content directly into the 
 -- HTML template, bypassing path resolution and sandbox issues.
 -- ===========================================================================
 
 local M = {}
 
 local hs         = hs
-local ui_builder = require("lib.ui_builder")
+local ui_builder = require("ui.ui_builder")
 
 
 
@@ -135,7 +135,7 @@ function M.open(existing, on_save)
         end)
     end)
 
-    -- INJECTION: Generate standalone HTML using the lib/ui_builder library
+    -- INJECTION: Generate standalone HTML using the ui/ui_builder library
     local final_html = ui_builder.build_injected_html(ASSETS_DIR)
     pcall(function() _webview:html(final_html) end)
     pcall(function() _webview:show() end)
