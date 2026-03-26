@@ -664,8 +664,9 @@ def _extract_hotstring_from_line(
     Returns:
             ``(trigger, output, is_word, auto_expand, case_sensitive,
             final_result)`` where *trigger* and *output* are ``None`` when no
-            hotstring was found.  ``final_result`` is derived automatically
-            from the output via :func:`_needs_final_result`.
+            hotstring was found. ``final_result`` is extracted from an explicit
+            ``Map("FinalResult", True/False)`` argument if present, otherwise
+            derived automatically from the output via :func:`_needs_final_result`.
     """
     # Resolve variables and collapse string concatenations upfront.
     line = preprocess_ahk_line(line)
@@ -675,13 +676,6 @@ def _extract_hotstring_from_line(
     # Try from most-specific to most-generic.
     patterns: list[str] = [
         # Standard CreateHotstring / CreateCaseSensitiveHotstrings.
-        # The output / trigger groups handle:
-        #   - ordinary chars           [^"`\\]
-        #   - backslash escapes        \\.
-        #   - AHK2 backtick escapes    `.    (`` `" `` → `"`, ```` `` ```` → `` ` ``)
-        #   - AHK2 in-string "" escape  ""   captured as two chars; the
-        #     process_autohotkey_escapes step keeps them as-is so that two
-        #     literal quote chars reach the SendInput / TOML output.
         (
             r"(?:CreateCaseSensitiveHotstrings|CreateHotstring)\s*\(\s*"
             r'"(?P<opts>[^"]*)",\s*'
@@ -707,13 +701,29 @@ def _extract_hotstring_from_line(
         output = process_autohotkey_escapes(m.group("out"))
         auto_expand = "*" in opts
         is_word = "?" not in opts
+
+        # --- NOUVELLE LOGIQUE POUR FINAL_RESULT ---
+        # On cherche un argument "FinalResult", True|False|1|0 dans la suite de la ligne
+        explicit_fr_match = re.search(
+            r'"FinalResult"\s*,\s*(true|false|1|0)\b',
+            line[m.end() :],
+            re.IGNORECASE,
+        )
+
+        if explicit_fr_match:
+            val = explicit_fr_match.group(1).lower()
+            final_result = val in ("true", "1")
+        else:
+            final_result = _needs_final_result(output)
+        # ------------------------------------------
+
         return (
             trigger,
             output,
             is_word,
             auto_expand,
             case_sensitive,
-            _needs_final_result(output),
+            final_result,
         )
 
     return None, None, False, False, False, False
