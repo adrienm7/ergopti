@@ -1,4 +1,4 @@
--- ui/menu_llm/settings_manager.lua
+-- ui/menu/menu_llm/settings_manager.lua
 
 -- ===========================================================================
 -- LLM Settings Manager Sub-module.

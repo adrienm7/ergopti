@@ -1,4 +1,4 @@
--- ui/menu_llm/profiles_manager.lua
+-- ui/menu/menu_llm/profiles_manager.lua
 
 -- ===========================================================================
 -- LLM Profiles Manager Sub-module.

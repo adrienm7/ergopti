@@ -55,30 +55,42 @@ local M = {}
 -- ====================================
 
 -- LLM prediction defaults
-M.llm_nav_modifiers_default = {}
-M.llm_val_modifiers_default = {"alt"}
+M.LLM_NAV_MODIFIERS_DEFAULT   = {}
+M.LLM_VAL_MODIFIERS_DEFAULT   = {"alt"}
+M.LLM_DEBOUNCE_DEFAULT        = 0.5
+M.LLM_CONTEXT_LENGTH_DEFAULT  = 500
+M.LLM_TEMPERATURE_DEFAULT     = 0.1
+M.LLM_MAX_PREDICT_DEFAULT     = 40
+M.LLM_NUM_PREDICTIONS_DEFAULT = 5
+M.LLM_PRED_INDENT_DEFAULT     = -3
 
-M.DEFAULT_BASE_DELAY_SEC = 0.75
+M.BASE_DELAY_SEC_DEFAULT = 0.75
 
 -- Allowed time gap between two keystrokes (in seconds) depending on the feature
-M.DELAYS = {
+M.DELAYS_DEFAULT = {
     STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (Magickey)
     dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates...
-    autocorrection     = 0.5, -- Spell checking
-    rolls              = 0.25,  -- Rolls (e.g. sx -> sk)
-    sfbsreduction      = 0.25,  -- Comma combos (e.g. ,t -> pt)
-    distancesreduction = 0.25,  -- Dead keys and suffixes
+    autocorrection     = 0.5,  -- Spell checking
+    rolls              = 0.25, -- Rolls (e.g. sx -> sk)
+    sfbsreduction      = 0.25, -- Comma combos (e.g. ,t -> pt)
+    distancesreduction = 0.25, -- Dead keys and suffixes
 }
 
+M.DELAYS = {}
+for k, v in pairs(M.DELAYS_DEFAULT) do M.DELAYS[k] = v end
+
 -- Auto-calculate the timeout to reset the word buffer
-local max_delay = 0
-for _, v in pairs(M.DELAYS) do
-    if type(v) == "number" and v > max_delay then max_delay = v end
+function M._recalc_word_timeout()
+    local max_delay = 0
+    for _, v in pairs(M.DELAYS) do
+        if type(v) == "number" and v > max_delay then max_delay = v end
+    end
+    -- Add a 0.5s margin, and cap it at 5.0 seconds to prevent infinite buffers from invalid configs
+    M.WORD_TIMEOUT_SEC = math.min(5.0, max_delay + 0.5)
+    -- Set tooltip timeout slightly below the word timeout to ensure it hides before the buffer is reset, preventing stale previews
+    if tooltip.set_timeout then tooltip.set_timeout(M.WORD_TIMEOUT_SEC - 0.3) end
 end
--- Add a 0.5s margin, and cap it at 5.0 seconds to prevent infinite buffers from invalid configs
-M.WORD_TIMEOUT_SEC = math.min(5.0, max_delay + 0.5)
--- Set tooltip timeout slightly below the word timeout to ensure it hides before the buffer is reset, preventing stale previews
-if tooltip.set_timeout then tooltip.set_timeout(M.WORD_TIMEOUT_SEC - 0.3) end
+M._recalc_word_timeout()
 
 local NUM_KEYCODES = {
     [18]=1, [19]=2, [20]=3, [21]=4, [23]=5,
@@ -97,7 +109,7 @@ local group_post_load_hooks    = {}
 local _ignored_window_titles   = {}
 local _ignored_window_patterns = {}
 
-local BASE_DELAY_SEC           = M.DEFAULT_BASE_DELAY_SEC
+local BASE_DELAY_SEC           = M.BASE_DELAY_SEC_DEFAULT
 local buffer                   = ""
 local last_key_time            = 0
 local last_key_was_complex     = false
@@ -118,18 +130,20 @@ local _shift_side              = nil
 
 local current_llm_model        = llm.DEFAULT_LLM_MODEL
 local llm_enabled              = llm.DEFAULT_LLM_ENABLED
-local llm_debounce_time        = llm.DEFAULT_LLM_DEBOUNCE
 local preview_enabled          = true
 
-local llm_context_length       = 500
+local llm_debounce_time        = M.LLM_DEBOUNCE_DEFAULT
+local llm_context_length       = M.LLM_CONTEXT_LENGTH_DEFAULT
 local llm_reset_on_nav         = true
-local llm_temperature          = 0.1
-local llm_max_predict          = 40
-local llm_num_predictions      = llm.DEFAULT_LLM_NUM_PREDICTIONS or 3
+local llm_temperature          = M.LLM_TEMPERATURE_DEFAULT
+local llm_max_predict          = M.LLM_MAX_PREDICT_DEFAULT
+local llm_num_predictions      = M.LLM_NUM_PREDICTIONS_DEFAULT
+local llm_pred_indent          = M.LLM_PRED_INDENT_DEFAULT
+local llm_val_modifiers        = M.LLM_VAL_MODIFIERS_DEFAULT
+local llm_nav_modifiers        = M.LLM_NAV_MODIFIERS_DEFAULT
 
 local llm_excluded_apps        = {}
 local llm_show_info_bar        = true
-local llm_pred_indent          = -3
 local llm_sequential_mode      = llm.DEFAULT_LLM_SEQUENTIAL_MODE or false
 
 if tooltip.set_navigate_callback then
@@ -146,15 +160,23 @@ end
 -- ===========================================
 -- ===========================================
 
+local function parse_mods(mod_input, default)
+    if type(mod_input) == "string" then return {mod_input} end
+    if type(mod_input) == "table" then return mod_input end
+    return default
+end
+
 function M.set_llm_model(m)               current_llm_model      = tostring(m) end
-function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
+function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or M.LLM_CONTEXT_LENGTH_DEFAULT) end
 function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) end
-function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
-function M.set_llm_max_predict(p)         llm_max_predict        = math.max(1, tonumber(p) or 40) end
-function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or 3) end
+function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or M.LLM_TEMPERATURE_DEFAULT) end
+function M.set_llm_max_predict(p)         llm_max_predict        = math.max(1, tonumber(p) or M.LLM_MAX_PREDICT_DEFAULT) end
+function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or M.LLM_NUM_PREDICTIONS_DEFAULT) end
 function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
-function M.set_llm_pred_indent(v)         llm_pred_indent        = math.floor(tonumber(v) or 0) end
+function M.set_llm_pred_indent(v)         llm_pred_indent        = math.floor(tonumber(v) or M.LLM_PRED_INDENT_DEFAULT) end
 function M.set_llm_sequential_mode(v)     llm_sequential_mode    = (v == true) end
+function M.set_llm_val_modifiers(mods)    llm_val_modifiers      = parse_mods(mods, M.LLM_VAL_MODIFIERS_DEFAULT) end
+function M.set_llm_nav_modifiers(mods)    llm_nav_modifiers      = parse_mods(mods, M.LLM_NAV_MODIFIERS_DEFAULT) end
 function M.get_llm_enabled()              return llm_enabled end
 function M.set_llm_show_model_name(v)     llm_show_info_bar      = (v == true) end
 
@@ -190,13 +212,21 @@ function M.set_preview_enabled(enabled)
 end
 
 function M.set_llm_debounce(seconds)
-    llm_debounce_time = math.max(0, tonumber(seconds) or 0.5)
+    llm_debounce_time = math.max(0, tonumber(seconds) or M.LLM_DEBOUNCE_DEFAULT)
     if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
     M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
 end
 
 function M.get_base_delay()       return BASE_DELAY_SEC end
-function M.set_base_delay(secs)   BASE_DELAY_SEC = math.max(0, tonumber(secs) or 0) end
+function M.set_base_delay(secs)   BASE_DELAY_SEC = math.max(0, tonumber(secs) or M.BASE_DELAY_SEC_DEFAULT) end
+
+function M.set_delay(key, val)
+    if M.DELAYS_DEFAULT[key] ~= nil then
+        M.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
+        M._recalc_word_timeout()
+    end
+end
+
 function M.pause_processing()     processing_paused = true end
 function M.resume_processing()    processing_paused = false end
 function M.is_processing_paused() return processing_paused end
@@ -683,7 +713,7 @@ function M._perform_llm_check()
 
     if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_enabled) end
 
-    local num_pred = math.max(1, math.floor(tonumber(llm_num_predictions) or 3))
+    local num_pred = llm_num_predictions
 
     _llm_request_id = _llm_request_id + 1
     local my_request_id = _llm_request_id
@@ -712,13 +742,13 @@ function M._perform_llm_check()
                 _predictions_active  = true
                 local info = llm_show_info_bar and build_info_bar(current_llm_model, elapsed_ms) or nil
                 
-                local val_mods = hs.settings.get("llm_val_modifiers") or M.llm_val_modifiers_default
+                local val_mods = llm_val_modifiers
                 local val_mod_str = "none"
                 if llm_num_predictions > 1 and not (#val_mods == 1 and val_mods[1] == "none") then
                     val_mod_str = (#val_mods == 0) and "\226\128\139" or table.concat(val_mods, "+")
                 end
                 
-                local nav_mods = hs.settings.get("llm_nav_modifiers") or M.llm_nav_modifiers_default
+                local nav_mods = llm_nav_modifiers
                 local nav_mod_str = "none"
                 if #nav_mods > 0 and not (#nav_mods == 1 and nav_mods[1] == "none") then
                     nav_mod_str = table.concat(nav_mods, "+")
@@ -1065,14 +1095,14 @@ local function onKeyDown(e)
         end
 
         -- Numeric validation logic
-        local val_mods = split_mods(hs.settings.get("llm_val_modifiers") or M.llm_val_modifiers_default)
+        local val_mods = split_mods(llm_val_modifiers)
         if #_pending_predictions > 1 and llm.check_modifiers(flags, val_mods) then
             local n = NUM_KEYCODES[keyCode]
             if n and n <= #_pending_predictions then return apply_prediction(n) end
         end
 
         -- Arrow navigation logic
-        local nav_mods = split_mods(hs.settings.get("llm_nav_modifiers") or M.llm_nav_modifiers_default)
+        local nav_mods = split_mods(llm_nav_modifiers)
         if #_pending_predictions > 1 and (keyCode >= 123 and keyCode <= 126) and llm.check_modifiers(flags, nav_mods) then
             _enter_validates_pred = true
             local nav_dir = (keyCode == 123 or keyCode == 126) and -1 or 1

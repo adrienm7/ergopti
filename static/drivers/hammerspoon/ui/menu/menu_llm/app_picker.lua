@@ -1,4 +1,4 @@
--- ui/menu_llm/app_picker.lua
+-- ui/menu/menu_llm/app_picker.lua
 
 -- ===========================================================================
 -- LLM App Picker Sub-module.
