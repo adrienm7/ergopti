@@ -1552,6 +1552,15 @@ document.addEventListener('selectionchange', ejectFromChip);
 				hideAc();
 				return;
 			}
+		} else if (e.key === 'Tab') {
+			// Focus on the main validate button in the entry modal
+			e.preventDefault();
+			var entryModal = document.getElementById('entry-modal');
+			if (entryModal) {
+				var btns = entryModal.querySelectorAll('.btn.btn-p');
+				if (btns.length > 0) btns[0].focus();
+			}
+			return;
 		}
 
 		if (e.key === 'Enter' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
