@@ -213,25 +213,29 @@ function M.build_management(ctx)
     local exp_sub = {}
     for _, def in ipairs(defs) do
         if type(def) == "table" then
-            local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
-            exp_sub[#exp_sub + 1] = {
-                title    = ctx.applyTriggerChar(def.label),
-                checked  = (enabled_t and not paused) or nil,
-                disabled = paused or nil,
-                fn       = not paused and (function(k, lbl) return function()
-                    local nv = true
-                    if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
-                        nv = not ctx.keymap.is_terminator_enabled(k)
-                        if type(ctx.keymap.set_terminator_enabled) == "function" then
-                            pcall(ctx.keymap.set_terminator_enabled, k, nv)
+            if def.type == "separator" then
+                exp_sub[#exp_sub + 1] = { title = "-" }
+            elseif def.key then
+                local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
+                exp_sub[#exp_sub + 1] = {
+                    title    = ctx.applyTriggerChar(def.label),
+                    checked  = (enabled_t and not paused) or nil,
+                    disabled = paused or nil,
+                    fn       = not paused and (function(k, lbl) return function()
+                        local nv = true
+                        if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
+                            nv = not ctx.keymap.is_terminator_enabled(k)
+                            if type(ctx.keymap.set_terminator_enabled) == "function" then
+                                pcall(ctx.keymap.set_terminator_enabled, k, nv)
+                            end
                         end
-                    end
-                    state.terminator_states[k] = nv
-                    ctx.save_prefs()
-                    ctx.notify_feature("Expanseur : " .. ctx.applyTriggerChar(lbl), nv)
-                    ctx.updateMenu()
-                end end)(def.key, def.label) or nil,
-            }
+                        state.terminator_states[k] = nv
+                        ctx.save_prefs()
+                        ctx.notify_feature("Expanseur : " .. ctx.applyTriggerChar(lbl), nv)
+                        ctx.updateMenu()
+                    end end)(def.key, def.label) or nil,
+                }
+            end
         end
     end
     table.insert(menu, { title = "Expanseurs", disabled = paused or nil, menu = exp_sub })
@@ -273,15 +277,14 @@ function M.build_management(ctx)
         }
     end
 
-    local def_base = (ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT) or 0.75
-    local def_delays = (ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT) or {
-        STAR_TRIGGER       = 2.0,
-        dynamichotstrings  = 2.0,
-        autocorrection     = 0.5,
-        rolls              = 0.25,
-        sfbsreduction      = 0.25,
-        distancesreduction = 0.25,
-    }
+    local def_base = ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT
+    if not def_base then
+        herror("keymap.BASE_DELAY_SEC_DEFAULT est introuvable")
+    end
+    local def_delays = ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT
+    if not def_delays then
+    	herror("keymap.DELAYS_DEFAULT est introuvable")
+    end
 
     table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
     table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
