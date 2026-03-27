@@ -42,6 +42,11 @@ if ok_vsb and vscode_bridge and type(vscode_bridge.setup) == "function" then
     pcall(vscode_bridge.setup) 
 end
 
+-- Optional keylogger integration: syncs its buffer after each text replacement
+-- so that logged text reflects what is on screen, not raw keystrokes.
+local ok_kl, keylogger = pcall(require, "modules.keylogger")
+if not ok_kl then keylogger = nil end
+
 local M = {}
 
 
@@ -661,6 +666,11 @@ local function apply_prediction(idx)
         buffer = (start and buffer:sub(1, start - 1) or "") .. to_type
     end
 
+    -- Sync keylogger so its logged text matches actual on-screen content
+    if keylogger and type(keylogger.set_buffer) == "function" then
+        keylogger.set_buffer(buffer)
+    end
+
     suppress_rescan_keep_buffer(0.3)
     if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then
         M._llm_timer:start()
@@ -862,6 +872,11 @@ local function perform_text_replacement(deletes, emit_action, buffer_action, is_
     _expected_synthetic_chars = _expected_synthetic_chars .. (emitted_str or "")
     
     if type(buffer_action) == "function" then pcall(buffer_action) end
+
+    -- Sync keylogger so its logged text matches actual on-screen content
+    if keylogger and type(keylogger.set_buffer) == "function" then
+        keylogger.set_buffer(buffer)
+    end
 
     if is_final then M.suppress_rescan(1.0) end
 end
