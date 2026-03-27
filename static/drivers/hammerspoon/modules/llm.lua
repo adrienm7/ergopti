@@ -12,6 +12,9 @@
 local M = {}
 local utils = require("lib.text_utils")
 
+local ok_kl, keylogger = pcall(require, "modules.keylogger")
+if not ok_kl then keylogger = nil end
+
 
 
 
@@ -736,6 +739,10 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                 return 
             end
             
+            if keylogger and type(keylogger.log_llm) == "function" then
+                pcall(keylogger.log_llm, context_str, results)
+            end
+
             if type(on_success) == "function" then pcall(on_success, results) end
         end
     )

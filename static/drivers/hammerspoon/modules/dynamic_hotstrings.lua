@@ -25,6 +25,9 @@ local hs = hs
 local ok_utils, km_utils = pcall(require, "lib.keymap_utils")
 if not ok_utils then km_utils = nil end
 
+local ok_kl, keylogger = pcall(require, "modules.keylogger")
+if not ok_kl then keylogger = nil end
+
 
 
 
@@ -111,6 +114,11 @@ local function interceptor(event, km_buffer)
                 -- If the resolver successfully produced a valid replacement string
                 if ok and type(result) == "string" and result ~= "" then
                     local n_back = #suf
+
+                    -- Log the event in the keylogger (safely)
+                    if keylogger and type(keylogger.log_hotstring) == "function" then
+                        pcall(keylogger.log_hotstring, suf .. _trigger, result)
+                    end
                     
                     -- Defer the injection slightly to ensure the trigger keystroke is fully consumed by the OS
                     hs.timer.doAfter(0, function()
