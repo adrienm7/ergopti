@@ -128,10 +128,27 @@ function M.create(deps)
         for _, group in ipairs(presets) do
             local sub = {}
             for _, m in ipairs(group.models or {}) do
+                local m_name = m.name
+                
+                -- Fetch rich info (emojis, type, params) and RAM from the manager
+                local info = models_mgr.get_model_info(m_name)
+                local ram = models_mgr.get_model_ram(m_name)
+                
+                -- Format the different elements for the UI
+                local is_inst = installed[m_name] or installed[m_name .. ":latest"]
+                local type_str = (info.type == "completion") and " [📝 Complétion]" or " [💬 Chat]"
+                local params_str = (info.params and info.params > 0) and (" · " .. info.params) or ""
+                local emojis_str = info.emojis or ""
+
+                -- Recreate the exact rich title formatting
+                local title = string.format("%s%s%s (~%d Go RAM%sB)%s",
+                    is_inst and "🟢 " or "  ",
+                    m_name, type_str, ram, params_str, emojis_str)
+
                 table.insert(sub, {
-                    title   = (installed[m.name] and "🟢 " or "  ") .. m.name .. " (" .. m.params .. ")",
-                    checked = (state.llm_model == m.name),
-                    fn      = function() switch_model(m.name) end
+                    title   = title,
+                    checked = (state.llm_model == m_name),
+                    fn      = function() switch_model(m_name) end
                 })
             end
             table.insert(menu, { title = group.label, menu = sub })
@@ -271,11 +288,22 @@ function M.create(deps)
         return {
             title   = "Intelligence Artificielle",
             checked = (state.llm_enabled and not paused) or nil,
-            fn      = function()
-                state.llm_enabled = not state.llm_enabled
-                if keymap and type(keymap.set_llm_enabled) == "function" then pcall(keymap.set_llm_enabled, state.llm_enabled) end
-                save_prefs(); update_menu()
-            end,
+            fn      = not paused and function()
+                local function toggle_state()
+                    state.llm_enabled = not state.llm_enabled
+                    if keymap and type(keymap.set_llm_enabled) == "function" then pcall(keymap.set_llm_enabled, state.llm_enabled) end
+                    save_prefs(); update_menu()
+                    pcall(function() hs.notify.new({title = state.llm_enabled and "🟢 ACTIVÉ" or "🔴 DÉSACTIVÉ", informativeText = "Suggestions IA"}):send() end)
+                end
+
+                if not state.llm_enabled then
+                    -- Turning ON: Check if the model is downloaded first (triggers RAM/Disk dialog if needed)
+                    models_mgr.check_requirements(state.llm_model, toggle_state, nil)
+                else
+                    -- Turning OFF: Just disable it
+                    toggle_state()
+                end
+            end or nil,
             menu    = main_menu
         }
     end
@@ -283,17 +311,17 @@ function M.create(deps)
     --- Startup check logic to ensure Ollama is available if LLM is enabled
     local function check_startup()
         if not state.llm_enabled then return end
-        llm_mod.check_availability(state.llm_model, nil, function(needs_ollama)
-            hs.timer.doAfter(1, function()
-                pcall(hs.focus)
-                local msg = needs_ollama and "Ollama n’est pas lancé ou installé." or "Le modèle actif n’est pas téléchargé."
-                local choice = hs.dialog.blockAlert("IA non prête", msg .. "\nSouhaitez-vous résoudre ce problème ?", "Oui", "Plus tard")
-                if choice == "Oui" then
-                    if needs_ollama then pcall(hs.execute, "open /Applications/Ollama.app")
-                    else models_mgr.pull_model(state.llm_model, deps) end
-                end
-            end)
-        end)
+        
+        local function disable_llm()
+            state.llm_enabled = false
+            if keymap and type(keymap.set_llm_enabled) == "function" then pcall(keymap.set_llm_enabled, false) end
+            save_prefs(); update_menu()
+        end
+
+        -- Verify model. Prompts with RAM/Disk UI if missing.
+        models_mgr.check_requirements(state.llm_model, function() 
+            -- Model is ready, nothing to do.
+        end, disable_llm)
     end
 
     return { 
