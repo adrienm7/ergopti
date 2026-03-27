@@ -412,8 +412,8 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         local left_hint  = "⇧G + Tab"
         local right_hint = "⇧D + Tab"
         if nav_mod_str ~= "none" then
-            left_hint  = left_hint  .. " ou " .. (nav_mod_str .. " + " or "") .. "↑/←"
-            right_hint = right_hint .. " ou " .. (nav_mod_str .. " + " or "") .. "↓/→"
+            left_hint  = left_hint  .. " ou " .. ((nav_mod_str ~= "" and nav_mod_str ~= "none") and (nav_mod_str .. " + ") or "") .. "↑/←"
+            right_hint = right_hint .. " ou " .. ((nav_mod_str ~= "" and nav_mod_str ~= "none") and (nav_mod_str .. " + ") or "") .. "↓/→"
         end
         hint_st = hs.styledtext.new(
             left_hint .. SP .. " ◀" .. SP .. "Tab = accepter" .. SP .. "▶ " .. SP .. right_hint,

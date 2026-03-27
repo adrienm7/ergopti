@@ -51,7 +51,7 @@ local config_file    = base_dir .. "config.json"
 
 -- Restore section-enabled states and global trigger char from config.json
 -- BEFORE any TOML is parsed.
-local global_trigger_char = "★"
+local magic_key = "★"
 
 do
     local fh = io.open(config_file, "r")
@@ -62,7 +62,7 @@ do
             
             -- 1. Read the global trigger character
             if type(cfg.trigger_char) == "string" then
-                global_trigger_char = cfg.trigger_char
+                magic_key = cfg.trigger_char
             end
 
             -- 2. Restore section states
@@ -82,8 +82,12 @@ end
 
 -- Pass the loaded trigger char to keymap before loading files
 if keymap.set_trigger_char then
-    keymap.set_trigger_char(global_trigger_char)
+    keymap.set_trigger_char(magic_key)
 end
+
+
+
+
 
 -- =================================================
 -- =================================================
@@ -172,7 +176,7 @@ personal_info.start(base_dir, keymap)
 dynamic_hotstrings.start(keymap)
 dynamic_hotstrings.register_personal_data(
     personal_info.get_info(),
-    global_trigger_char -- Changed: passing the global char instead of personal_info’s
+    magic_key -- Changed: passing the global char instead of personal_info’s
 )
 table.insert(hotfiles, "dynamichotstrings")
 

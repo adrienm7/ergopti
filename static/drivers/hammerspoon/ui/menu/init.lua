@@ -644,9 +644,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 
 		if ok_hot and menu_hotstrings then
 			for _, it in ipairs(menu_hotstrings.build_groups(ctx)) do table.insert(items, it) end
-			table.insert(items, menu_hotstrings.build_management(ctx))
-
 			table.insert(items, { title = "-" })
+			table.insert(items, menu_hotstrings.build_management(ctx))
 			local personnel_item = menu_hotstrings.build_personal(ctx)
 			if personnel_item then table.insert(items, personnel_item) end
 			table.insert(items, menu_hotstrings.build_custom(ctx))

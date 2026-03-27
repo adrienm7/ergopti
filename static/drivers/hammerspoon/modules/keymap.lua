@@ -108,7 +108,7 @@ local mappings                 = {}
 local mappings_lookup          = {}
 local _interceptors            = {}
 local _preview_providers       = {}
-local current_trigger_char     = "★"
+local magic_key                = "★"
 local group_post_load_hooks    = {}
 
 local _ignored_window_titles   = {}
@@ -457,20 +457,37 @@ end
 
 -- UI Labels remain in French for user display
 local TERMINATOR_DEFS = {
-    { key = "space",        chars  = { " " },        label = "Espace"                },
-    { key = "tab",          chars  = { "\t" },       label = "Tabulation"            },
-    { key = "enter",        chars  = { "\r", "\n" }, label = "Entrée"                },
-    { key = "period",       chars  = { "." },        label = "Point (.)"             },
-    { key = "comma",        chars  = { "," },        label = "Virgule (,)"           },
-    { key = "parenright",   chars  = { ")" },        label = "Parenthèse fermante )" },
-    { key = "bracketright", chars  = { "]" },        label = "Crochet fermant ]"     },
-    { key = "nbsp",         prefix = " ",            label = "Espace insécable"      },
-    { key = "nnbsp",        prefix = " ",            label = "Espace fine insécable" },
-    { key = "star",         chars  = { current_trigger_char }, label = "Touche " .. current_trigger_char, consume = true },
+    { key = "space",                chars  = { " " },             label = "␣ : Espace",                       default_enabled = true },
+    { key = "nbsp",                 chars  = { "\u{00A0}" },      label = "⍽ : Espace insécable",             default_enabled = true },
+    { key = "nnbsp",                chars  = { "\u{202F}" },      label = "⍽ : Espace fine insécable",        default_enabled = true },
+    { type = "separator" },
+    { key = "tab",                  chars  = { "\t" },            label = "⇥ : Tabulation",                   default_enabled = false },
+    { key = "enter",                chars  = { "\r", "\n" },      label = "⏎ : Entrée",                       default_enabled = false },
+    { type = "separator" },
+    { key = "comma",                chars  = { "," },             label = ", : Virgule",                      default_enabled = true },
+    { key = "period",               chars  = { "." },             label = ". : Point",                        default_enabled = false },
+    { key = "exclam",               chars  = { "!" },             label = "! : Point d’exclamation",          default_enabled = false },
+    { key = "question",             chars  = { "?" },             label = "? : Point d’interrogation",        default_enabled = false },
+    { key = "colon",                chars  = { ":" },             label = ": : Deux-points",                  default_enabled = false },
+    { type = "separator" },
+    { key = "apostrophe_straight",  chars  = { "'" },             label = "' : Apostrophe droite",            default_enabled = false },
+    { key = "apostrophe_typo",      chars  = { "’" },             label = "’ : Apostrophe typographique",     default_enabled = false },
+    { key = "quote",                chars  = { '"' },             label = '" : Guillemet double',             default_enabled = false },
+    { key = "parenright",           chars  = { ")" },             label = ") : Parenthèse fermante",          default_enabled = false },
+    { key = "bracketright",         chars  = { "]" },             label = "] : Crochet fermant",              default_enabled = false },
+    { key = "star",                 chars  = { magic_key },       label = (magic_key .. " : Touche magique"), default_enabled = true, consume = true },
 }
 
 local _terminator_enabled = {}
-for _, def in ipairs(TERMINATOR_DEFS) do _terminator_enabled[def.key] = true end
+for _, def in ipairs(TERMINATOR_DEFS) do
+    if def.key then
+        if def.default_enabled ~= nil then
+            _terminator_enabled[def.key] = def.default_enabled
+        else
+            _terminator_enabled[def.key] = true
+        end
+    end
+end
 
 local function is_terminator(chars)
     for _, def in ipairs(TERMINATOR_DEFS) do
@@ -508,13 +525,7 @@ function M.get_terminator_defs()           return TERMINATOR_DEFS               
 
 function M.set_trigger_char(char)
     if type(char) ~= "string" or char == "" then return end
-    current_trigger_char = char
-    for _, def in ipairs(TERMINATOR_DEFS) do
-        if def.key == "star" then 
-            def.chars = { char }
-            def.label = "Touche " .. char 
-        end
-    end
+    magic_key = char
 end
 
 
@@ -530,8 +541,8 @@ end
 function M.add(trigger, replacement, opts)
     if type(trigger) ~= "string" or type(replacement) ~= "string" then return end
     
-    if current_trigger_char ~= "★" then
-        trigger = trigger:gsub("★", current_trigger_char)
+    if magic_key ~= "★" then
+        trigger = trigger:gsub("★", magic_key)
     end
     
     opts = type(opts) == "table" and opts or {}
@@ -812,7 +823,7 @@ local function update_preview(buf)
         for _, m in ipairs(mappings) do
             local group_active = not m.group or not groups[m.group] or groups[m.group].enabled
             if group_active then
-                if m.trigger == last_word .. current_trigger_char then
+                if m.trigger == last_word .. magic_key then
                     local clean = km_utils and type(km_utils.tokens_from_repl) == "function" 
                         and km_utils.plain_text(km_utils.tokens_from_repl(m.repl)) or m.repl
                     if clean ~= last_word then match_repl = m.repl; break end
@@ -1007,7 +1018,7 @@ local function try_terminator_expand(m, chars, char_len, is_ignored)
 end
 
 local function try_repeat_feature(chars, is_ignored)
-    if not M.is_repeat_feature_enabled() or chars ~= current_trigger_char then return false end
+    if not M.is_repeat_feature_enabled() or chars ~= magic_key then return false end
 
     local char_len = text_utils.utf8_len(chars)
     local buf_len  = text_utils.utf8_len(buffer)
@@ -1229,7 +1240,7 @@ local function onKeyDown(e)
                 local specific_delay = BASE_DELAY_SEC
                 
                 -- If the trigger ends with ★ (regardless of its source file)
-                if m.trigger:sub(-#current_trigger_char) == current_trigger_char then
+                if m.trigger:sub(-#magic_key) == magic_key then
                     specific_delay = M.DELAYS.STAR_TRIGGER
                 -- Otherwise, if a custom rule is defined for this file/group name
                 elseif m.group and M.DELAYS[m.group] then
