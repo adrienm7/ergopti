@@ -1,4 +1,4 @@
-; Last modified on 2026-03-27 at 02:19 (UTC+1)
+; Last modified on 2026-03-27 at 09:28 (UTC+1)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -5335,12 +5335,10 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "tiktok", "TikTok")
     CreateHotstring("", "tls", "TLS")
     CreateHotstring("", "ttc", "TTC")
-    CreateHotstring("", "ttm", "TTM")
     CreateHotstring("", "ui", "UI")
     CreateHotstring("", "uno", "UNO")
     CreateHotstring("", "url", "URL")
     CreateHotstring("", "ux", "UX")
-    CreateHotstring("", "vpn", "VPN")
     CreateHotstring("", "vscode", "VSCode")
     CreateHotstring("", "wikipedia", "Wikipedia")
     CreateHotstring("", "wikipédia", "Wikipédia")
@@ -5568,7 +5566,6 @@ if Features["Autocorrection"]["Accents"].Enabled {
     ; === F ===
     CreateCaseSensitiveHotstrings("*", "fache", "fâche")
     CreateCaseSensitiveHotstrings("*", "faché", "fâché")
-    CreateCaseSensitiveHotstrings("", "famé", "fâmé")
     CreateCaseSensitiveHotstrings("*", "fantom", "fantôm")
     CreateCaseSensitiveHotstrings("*", "fenetre", "fenêtre")
     CreateCaseSensitiveHotstrings("*", "felure", "fêlure")
@@ -5692,7 +5689,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "oeil", "œil")
     CreateCaseSensitiveHotstrings("*", "oesophage", "œsophage")
     CreateCaseSensitiveHotstrings("*", "oeuf", "œuf")
-    CreateCaseSensitiveHotstrings("*?", "oeuvre", "œuvre")
+    CreateCaseSensitiveHotstrings("*", "oeuvre", "œuvre")
     CreateCaseSensitiveHotstrings("*?", "oiaque", "oïaque") ; Suffixes like paran-oïaque
     CreateCaseSensitiveHotstrings("*?", "froide", "froide") ; Fixes this particular word to not get froïde
     CreateCaseSensitiveHotstrings("*?", "oide", "oïde") ; Suffixes like ov-oïde
@@ -5710,7 +5707,6 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "patés", "pâtés")
     CreateCaseSensitiveHotstrings("", "pate", "pâte")
     CreateCaseSensitiveHotstrings("", "pates", "pâtes")
-    CreateCaseSensitiveHotstrings("", "pati", "pâti")
     CreateCaseSensitiveHotstrings("*", "patir", "pâtir")
     CreateCaseSensitiveHotstrings("*", "patiss", "pâtiss")
     CreateCaseSensitiveHotstrings("*", "patur", "pâtur")
@@ -6450,7 +6446,7 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "param" . ScriptInformation["MagicKey"], "paramètre")
     CreateCaseSensitiveHotstrings("*", "params" . ScriptInformation["MagicKey"], "paramètres")
     CreateCaseSensitiveHotstrings("*", "pè" . ScriptInformation["MagicKey"], "problème")
-    CreateCaseSensitiveHotstrings("*", "pb" . ScriptInformation["MagicKey"], "problème")
+    CreateCaseSensitiveHotstrings("*", "pb" . ScriptInformation["MagicKey"], "problem")
     CreateCaseSensitiveHotstrings("*", "pcq" . ScriptInformation["MagicKey"], "parce que")
     CreateCaseSensitiveHotstrings("*", "pck" . ScriptInformation["MagicKey"], "parce que")
     CreateCaseSensitiveHotstrings("*", "pckil" . ScriptInformation["MagicKey"], "parce qu’il")
@@ -6598,7 +6594,6 @@ if Features["MagicKey"]["TextExpansion"].Enabled {
     CreateCaseSensitiveHotstrings("*", "trav" . ScriptInformation["MagicKey"], "travail")
     CreateCaseSensitiveHotstrings("*", "trkl" . ScriptInformation["MagicKey"], "tranquille")
     CreateCaseSensitiveHotstrings("*", "tt" . ScriptInformation["MagicKey"], "télétravail")
-    CreateCaseSensitiveHotstrings("*", "ttm" . ScriptInformation["MagicKey"], "time to market")
     CreateCaseSensitiveHotstrings("*", "tv" . ScriptInformation["MagicKey"], "télévision")
     CreateCaseSensitiveHotstrings("*", "ty" . ScriptInformation["MagicKey"], "thank you")
     CreateCaseSensitiveHotstrings("*", "typo" . ScriptInformation["MagicKey"], "typographie")

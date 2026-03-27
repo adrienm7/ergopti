@@ -487,6 +487,7 @@ function M.build_custom(ctx)
         if sc_is_default(sc) then
             return "Ctrl + " .. state.trigger_char .. " (défaut)"
         end
+
         local mods_str = table.concat(sc.mods or {}, "+")
         return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
                 or (sc.key or "?"):upper()
@@ -600,7 +601,17 @@ function M.build_custom(ctx)
             end,
         },
         {
-            title    = "   ↳ Réinitialiser (défaut : Ctrl+" .. state.trigger_char .. ")",
+            title    = (function()
+                local def = def_sc
+                local mods = def.mods or {}
+                local mods_cap = {}
+                for i, m in ipairs(mods) do
+                    mods_cap[i] = m:sub(1,1):upper() .. m:sub(2)
+                end
+                local mods_str = table.concat(mods_cap, "+")
+                local key_str = def.key or "?"
+                return "   ↳ Réinitialiser (défaut : " .. (mods_str ~= "" and (mods_str .. " + ") or "") .. key_str:upper() .. ")"
+            end)(),
             disabled = already_def or nil,
             fn       = not already_def and function()
                 apply_shortcut(def_sc.mods, def_sc.key)
@@ -611,7 +622,7 @@ function M.build_custom(ctx)
             menu  = cat_menu,
         },
         {
-            title   = "Fermer l’UI après ajout d’une hotstring avec le raccourci",
+            title   = "Fermer l’UI après ajout d’un hotstring par le raccourci",
             checked = state.custom_close_on_add or nil,
             fn      = function()
                 state.custom_close_on_add = not state.custom_close_on_add
