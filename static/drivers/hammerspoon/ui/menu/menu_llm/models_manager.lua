@@ -63,13 +63,15 @@ end
 -- =======================================
 -- =======================================
 
---- Extracts type and parameter count from a model name or JSON definition
+--- Extracts type, parameter count, and emojis from a model name or JSON definition
 --- @param model_name string Name of the model
 --- @param presets table The list of provider presets
---- @return table { type: string, params: number }
+--- @return table { type: string, params: number, emojis: string, tags: table }
 local function get_model_info(model_name, presets)
     local m_type = "chat"
     local p_count = 0
+    local m_tags = {}
+    local found = false
 
     if type(presets) == "table" then
         for _, group in ipairs(presets) do
@@ -81,20 +83,55 @@ local function get_model_info(model_name, presets)
                             local num = m.params:match("([%d%.]+)")
                             if num then p_count = tonumber(num) or 0 end
                         end
-                        return { type = m_type, params = p_count }
+                        if type(m.tags) == "table" then m_tags = m.tags end
+                        found = true
+                        break
                     end
                 end
             end
+            if found then break end
         end
     end
 
-    if model_name:match("%-base$") or model_name:match("coder") then
-        m_type = "completion"
+    if not found then
+        if model_name:match("%-base$") or model_name:match("coder") then
+            m_type = "completion"
+        end
+        local num = model_name:match("([%d%.]+)b")
+        if num then p_count = tonumber(num) or 0 end
     end
-    local num = model_name:match("([%d%.]+)b")
-    if num then p_count = tonumber(num) or 0 end
 
-    return { type = m_type, params = p_count }
+    -- === Detection and generation of emojis ===
+    local is_thinking = model_name:lower():find("%-r1") or model_name:lower():find("thinking") or model_name:lower():find("reasoning")
+    local seen_emojis = {}
+    
+    if is_thinking then seen_emojis["🧠💭"] = true end
+
+    for _, t in ipairs(m_tags) do
+        local em = ({best="⭐",reasoning="🧠",math="🧠",code="💻",
+                     completion="💻",fast="⚡",tiny="⚡",
+                     ["ultra-tiny"]="⚡",edge="⚡",
+                     multilingual="🌐",chinese="🌐",korean="🌐",
+                     multimodal="🖼️",["high-quality"]="🏆",quality="🏆"})[t]
+        
+        if em == "🧠" and seen_emojis["🧠💭"] then em = nil end
+        if em then seen_emojis[em] = true end
+    end
+
+    local tag_list = {}
+    for em, _ in pairs(seen_emojis) do table.insert(tag_list, em) end
+
+    local EMOJI_ORDER = { ["🏆"]=1, ["⚡"]=2, ["🧠💭"]=3, ["🧠"]=4, ["💻"]=5, ["🌐"]=6, ["🖼️"]=7, ["⭐"]=8 }
+    table.sort(tag_list, function(a, b)
+        local oa = EMOJI_ORDER[a] or 99
+        local ob = EMOJI_ORDER[b] or 99
+        if oa == ob then return a < b end
+        return oa < ob
+    end)
+
+    local tag_str = #tag_list > 0 and (" " .. table.concat(tag_list, "")) or ""
+
+    return { type = m_type, params = p_count, emojis = tag_str, tags = m_tags }
 end
 
 --- Ensures the RAM requirements cache is populated from presets
@@ -207,7 +244,7 @@ function M.pull_model(target_model, deps)
             else
                 local detail = output:sub(1, 120)
                 if download_window then pcall(download_window.complete, false, target_model) end
-                pcall(notifications.notify, "❌ Échec téléchargement", target_model .. " : " .. detail)
+                pcall(notifications.notify, "❌ Échec téléchargement", target_model .. " : " .. detail)
             end
         end,
         function(_, stdout, stderr)
@@ -257,7 +294,7 @@ end
 --- @param target_model string The model to pull after installation
 --- @param deps table Global dependencies
 function M.install_ollama_then_pull(target_model, deps)
-    pcall(notifications.notify, "Étape 1/2 : Installation", "Téléchargement de l’application Ollama…")
+    pcall(notifications.notify, "Étape 1/2 : Installation", "Téléchargement de l’application Ollama…")
     
     local ok, task = pcall(hs.task.new, "/bin/bash", function(code)
         deps.active_tasks["install"] = nil
@@ -297,30 +334,30 @@ function M.check_system_and_install(target_model, presets, on_cancel, deps)
     local ok_mem, mem_str = pcall(hs.execute, "sysctl -n hw.memsize")
     local sys_ram_gb = math.ceil((tonumber(mem_str) or 0) / (1024^3))
     
-    local ok_df, df_str = pcall(hs.execute, "df -g / | awk \"NR==2 {print $4}\"")
+    local ok_df, df_str = pcall(hs.execute, "df -g / | awk 'NR==2 {print $4}'")
     local free_disk_gb = tonumber(df_str) or 0
 
     local warnings, is_critical = {}, false
     
     if sys_ram_gb > 0 and sys_ram_gb < ram_req then
-        table.insert(warnings, string.format("⚠️ RAM : %d Go disponible (requis ~%d Go) — risque de lenteur", sys_ram_gb, ram_req))
+        table.insert(warnings, string.format("⚠️ RAM : %d Go disponible (requis ~%d Go) — risque de lenteur", sys_ram_gb, ram_req))
     else
-        table.insert(warnings, string.format("🟢 RAM : %d Go disponible (requis ~%d Go)", sys_ram_gb, ram_req))
+        table.insert(warnings, string.format("🟢 RAM : %d Go disponible (requis ~%d Go)", sys_ram_gb, ram_req))
     end
     
     if free_disk_gb > 0 then
         local rem = free_disk_gb - disk_req
         if rem < 2 then
             is_critical = true
-            table.insert(warnings, string.format("❌ Disque : %d Go disponible (requis ~%d Go) — espace insuffisant", free_disk_gb, disk_req))
+            table.insert(warnings, string.format("❌ Disque : %d Go disponible (requis ~%d Go) — espace insuffisant", free_disk_gb, disk_req))
         elseif rem < 15 then
-            table.insert(warnings, string.format("⚠️ Disque : %d Go disponible (requis ~%d Go) — espace limité", free_disk_gb, disk_req))
+            table.insert(warnings, string.format("⚠️ Disque : %d Go disponible (requis ~%d Go) — espace limité", free_disk_gb, disk_req))
         else
-            table.insert(warnings, string.format("🟢 Disque : %d Go disponible (requis ~%d Go)", free_disk_gb, disk_req))
+            table.insert(warnings, string.format("🟢 Disque : %d Go disponible (requis ~%d Go)", free_disk_gb, disk_req))
         end
     end
 
-    local msg = "Modèle : " .. target_model .. "\n\n" .. table.concat(warnings, "\n")
+    local msg = "Modèle : " .. target_model .. "\n\n" .. table.concat(warnings, "\n")
     
     hs.timer.doAfter(0.1, function()
         pcall(hs.focus)
@@ -333,7 +370,7 @@ function M.check_system_and_install(target_model, presets, on_cancel, deps)
         local sep = string.rep("─", 25)
         local ok_c, choice = pcall(hs.dialog.blockAlert,
             "Téléchargement requis",
-            sep .. "\n" .. msg .. "\n" .. sep .. "\n\nVoulez-vous lancer le téléchargement ?",
+            sep .. "\n" .. msg .. "\n" .. sep .. "\n\nCe modèle n’est pas encore installé.\nVoulez-vous lancer le téléchargement ?\nLa progression sera visible dans une fenêtre dédiée.",
             "Télécharger", "Annuler", msg:find("⚠️") and "warning" or "informational")
             
         if ok_c and choice == "Télécharger" then
@@ -382,6 +419,7 @@ function M.new(deps)
     function obj.get_presets() return presets end
     function obj.get_model_info(name) return get_model_info(name, presets) end
     function obj.get_model_ram(name) return get_model_ram(name, presets) end
+    function obj.get_model_emojis(name) return get_model_info(name, presets).emojis end
     
     function obj.get_installed_models()
         local installed = {}
@@ -399,14 +437,15 @@ function M.new(deps)
     --- Main validation entry point called by the menu UI
     --- @param target_model string The model name to check
     --- @param on_success function The callback to execute if the model is ready or already exists
-    function obj.check_requirements(target_model, on_success)
+    --- @param on_cancel function|nil Callback if the user aborts the download or system is insufficient
+    function obj.check_requirements(target_model, on_success, on_cancel)
         local installed = obj.get_installed_models()
         -- If already installed, proceed immediately
         if installed[target_model] or installed[target_model .. ":latest"] then
             if type(on_success) == "function" then on_success() end
         else
             -- Run the full system check and prompt for download
-            M.check_system_and_install(target_model, presets, nil, deps)
+            M.check_system_and_install(target_model, presets, on_cancel, deps)
         end
     end
 
