@@ -51,8 +51,8 @@ function parseToNodes(text) {
 		var tokenName = match[1].toLowerCase();
 		if (tokenName === 'enter') {
 			nodes.push(document.createElement('br'));
-		} else if (tokenName === 'context') {
-			nodes.push(makeChip('context'));
+		} else if (tokenName === 'context' || tokenName === 'n') {
+			nodes.push(makeChip(tokenName));
 		} else {
 			nodes.push(document.createTextNode(match[0]));
 		}
@@ -85,7 +85,7 @@ function serializeEditor(element) {
 	}
 
 	var serializedString = '';
-	nodes.forEach((node) => {
+	nodes.forEach(function (node) {
 		if (node.nodeType === 3) {
 			serializedString += node.textContent;
 		} else if (node.nodeType === 1 && node.classList.contains('token-chip')) {
@@ -204,7 +204,7 @@ function tryConvertToken(editorElement) {
 
 	var offset = range.startOffset;
 	var beforeContent = node.textContent.slice(0, offset);
-	var match = beforeContent.match(/\{context\}$/i);
+	var match = beforeContent.match(/\{(context|n)\}$/i);
 	if (!match) return;
 
 	var matchStart = offset - match[0].length;
@@ -213,7 +213,8 @@ function tryConvertToken(editorElement) {
 	replaceRange.setEnd(node, offset);
 	replaceRange.deleteContents();
 
-	var chip = makeChip('context');
+	var tokenName = match[1].toLowerCase();
+	var chip = makeChip(tokenName);
 	var anchorRange = selection.getRangeAt(0);
 	anchorRange.insertNode(chip);
 
@@ -228,7 +229,130 @@ function tryConvertToken(editorElement) {
 
 // ====================================
 // ====================================
-// ======= 2/ Events Wiring ===========
+// ======= 2/ Autocomplete Engine =====
+// ====================================
+// ====================================
+
+var acItems = [];
+var acIdx = 0;
+var TOKEN_NAMES = ['context', 'n'];
+
+/**
+ * Retrieves the context under the cursor to determine if autocomplete should trigger.
+ * @returns {Object|null} Context including the partial match and node references.
+ */
+function getAcCtx() {
+	var sel = window.getSelection();
+	if (!sel || !sel.rangeCount) return null;
+	var r = sel.getRangeAt(0);
+	if (!r.collapsed) return null;
+	var n = r.startContainer;
+	if (n.nodeType !== 3) return null;
+	var text = n.textContent.slice(0, r.startOffset);
+	var m = text.match(/\{(\w*)$/);
+	if (!m) return null;
+	return { partial: m[1].toLowerCase(), start: r.startOffset - m[0].length, node: n };
+}
+
+/**
+ * Displays the autocomplete popup with the matching options.
+ * @param {string[]} matches - An array of matching token names.
+ */
+function showAc(matches) {
+	var popup = document.getElementById('ac-popup');
+	acItems = matches;
+	acIdx = 0;
+	popup.innerHTML = '';
+	var sel = window.getSelection();
+	if (!sel || !sel.rangeCount) {
+		hideAc();
+		return;
+	}
+	var rect = sel.getRangeAt(0).getBoundingClientRect();
+	matches.forEach(function (name, i) {
+		var d = document.createElement('div');
+		d.className = 'ac-item' + (i === 0 ? ' active' : '');
+		d.textContent = name;
+		d.addEventListener('mousedown', function (e) {
+			e.preventDefault();
+			applyAc(name);
+		});
+		popup.appendChild(d);
+	});
+	popup.style.left = rect.left + 'px';
+	popup.style.top = rect.bottom + 4 + 'px';
+	popup.classList.add('on');
+}
+
+/**
+ * Hides the autocomplete popup and resets the matches.
+ */
+function hideAc() {
+	var popup = document.getElementById('ac-popup');
+	if (popup) popup.classList.remove('on');
+	acItems = [];
+}
+
+/**
+ * Updates the visual selection highlight within the autocomplete dropdown.
+ */
+function updateAcSel() {
+	document.querySelectorAll('.ac-item').forEach(function (el, i) {
+		el.classList.toggle('active', i === acIdx);
+	});
+}
+
+/**
+ * Applies the selected token from the autocomplete list.
+ * @param {string} name - The token name to insert.
+ */
+function applyAc(name) {
+	hideAc();
+	var ctx = getAcCtx();
+	if (!ctx) {
+		insertChipAtCursor(name);
+		return;
+	}
+	var r = document.createRange();
+	r.setStart(ctx.node, ctx.start);
+	r.setEnd(ctx.node, ctx.start + ctx.partial.length + 1);
+	r.deleteContents();
+
+	var chip = makeChip(name);
+	var sel = window.getSelection();
+	var anch = sel.getRangeAt(0);
+	anch.insertNode(chip);
+
+	var nr = document.createRange();
+	nr.setStartAfter(chip);
+	nr.collapse(true);
+	sel.removeAllRanges();
+	sel.addRange(nr);
+	checkPlaceholder();
+}
+
+/**
+ * Validates the current typing context against the list of available tokens.
+ */
+function checkAc() {
+	var ctx = getAcCtx();
+	if (!ctx) {
+		hideAc();
+		return;
+	}
+	var matches = TOKEN_NAMES.filter(function (n) {
+		return n.toLowerCase().indexOf(ctx.partial) === 0;
+	});
+	if (matches.length === 0) {
+		hideAc();
+		return;
+	}
+	showAc(matches);
+}
+
+// ====================================
+// ====================================
+// ======= 3/ Events Wiring ===========
 // ====================================
 // ====================================
 
@@ -237,15 +361,57 @@ var editorElement = document.getElementById('e-out');
 // Trigger dynamic token evaluation on text input
 editorElement.addEventListener('input', function () {
 	tryConvertToken(editorElement);
+	checkAc();
 	checkPlaceholder();
 });
 
 editorElement.addEventListener('keyup', function (e) {
+	if (
+		acItems.length > 0 &&
+		['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape', 'Enter'].indexOf(e.key) >=
+			0
+	) {
+		return;
+	}
 	if (e.key === '}') tryConvertToken(editorElement);
+	checkAc();
 	checkPlaceholder();
 });
 
+editorElement.addEventListener('blur', hideAc);
+
 editorElement.addEventListener('keydown', function (e) {
+	// Handling Autocomplete navigation
+	if (acItems.length > 0) {
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			applyAc(acItems[acIdx]);
+			return;
+		}
+		if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+			e.preventDefault();
+			acIdx = (acIdx + 1) % acItems.length;
+			updateAcSel();
+			return;
+		}
+		if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+			e.preventDefault();
+			acIdx = (acIdx - 1 + acItems.length) % acItems.length;
+			updateAcSel();
+			return;
+		}
+		if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) {
+			e.preventDefault();
+			applyAc(acItems[acIdx]);
+			return;
+		}
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			hideAc();
+			return;
+		}
+	}
+
 	// Save on Cmd+Enter / Ctrl+Enter
 	if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
 		e.preventDefault();
@@ -345,9 +511,15 @@ document.addEventListener('selectionchange', function () {
 	}
 });
 
+// Hide Autocomplete popup when clicking outside
+document.addEventListener('click', function (e) {
+	var popup = document.getElementById('ac-popup');
+	if (popup && !popup.contains(e.target)) hideAc();
+});
+
 // ====================================
 // ====================================
-// ======= 3/ Main UI API =============
+// ======= 4/ Main UI API =============
 // ====================================
 // ====================================
 
@@ -385,9 +557,9 @@ function doCancel() {
  * Serializes the editor and sends the updated configuration back to Hammerspoon.
  */
 function doSave() {
-	const promptName = document.getElementById('p-name').value.trim();
-	const promptMode = document.getElementById('p-mode').value;
-	const promptContent = serializeEditor(editorElement).trim();
+	var promptName = document.getElementById('p-name').value.trim();
+	var promptMode = document.getElementById('p-mode').value;
+	var promptContent = serializeEditor(editorElement).trim();
 
 	// UI text remains in French as requested
 	if (!promptName || !promptContent) {

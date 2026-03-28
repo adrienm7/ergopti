@@ -163,8 +163,8 @@ local function start_watchers()
             end
         end
         
-        -- Ignore raw modifier presses (Shift, Ctrl, Alt, Cmd) to prevent premature dismissal
-        if kc == 54 or kc == 55 or kc == 56 or kc == 58 or kc == 59 or kc == 60 then
+        -- Ignore raw modifier presses (Shift, Ctrl, Alt, Cmd) and common hyper/layer keys (F13-F20) to prevent premature dismissal
+        if kc == 54 or kc == 55 or kc == 56 or kc == 58 or kc == 59 or kc == 60 or kc == 105 or kc == 107 or kc == 113 or kc == 106 or kc == 64 or kc == 79 or kc == 80 or kc == 90 then
             return false
         end
         

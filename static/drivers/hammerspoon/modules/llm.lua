@@ -3,10 +3,10 @@
 -- ===========================================================================
 -- LLM Prediction Engine Module.
 --
--- Manages the communication with the local Ollama API to provide AI-assisted
--- text completions. Includes robust text parsing, prompt profiling, and a
--- custom token/character hybrid diffing algorithm to smoothly merge the AI’s
--- output with the user’s existing typing buffer.
+-- Manages communication with the local Ollama API.
+-- Uses explicit structured output (TAIL_CORRECTED / NEXT_WORDS) to reliably
+-- determine deletions and insertions, paired with a Wagner-Fischer diffing
+-- engine for visual precision.
 -- ===========================================================================
 
 local M = {}
@@ -29,7 +29,7 @@ M.DEFAULT_LLM_ENABLED         = false
 M.DEFAULT_LLM_MODEL           = "llama3.1"
 M.DEFAULT_LLM_DEBOUNCE        = 0.5
 M.DEFAULT_LLM_NUM_PREDICTIONS = 3
-M.DEFAULT_LLM_SEQUENTIAL_MODE = false  -- Kept for backward-compatibility
+M.DEFAULT_LLM_SEQUENTIAL_MODE = false
 
 
 
@@ -37,480 +37,195 @@ M.DEFAULT_LLM_SEQUENTIAL_MODE = false  -- Kept for backward-compatibility
 
 -- =======================================
 -- =======================================
--- ======= 2/ Built-in Profiles ==========
+-- ======= 2/ Built-in Profiles ========
 -- =======================================
 -- =======================================
 
--- System prompts are kept in French as they dictate instructions to the AI.
-local SIMPLE_PROMPT_SINGLE = [[Tu es un assistant de frappe au clavier.
-Voici le texte que je suis en train de taper : {context}
+local RAW_PROMPT_SINGLE = [[{context}]]
+
+local BASIC_PROMPT_SINGLE = [[Tu es un assistant de frappe au clavier intelligent et ultra-concis.
+Voici le texte saisi : {context}
 
 Prédis UNIQUEMENT la suite directe (1 à 5 mots).
 RÈGLES ABSOLUES :
-- NE RÉPÈTE PAS le texte déjà écrit. Donne uniquement la suite.
-- N’écris jamais de points de suspension (...).
-- Ne fais aucun commentaire, pas de guillemets.]]
+- NE RÉPÈTE JAMAIS le contexte.
+- NE FAIS AUCUN COMMENTAIRE. Pas de "Voici la suite", pas de salutations.
+- N’utilise AUCUN guillemet. Donne juste les mots suivants nus.]]
 
-local function SIMPLE_PROMPT_BATCH(n)
-    return [[Tu es un assistant de frappe au clavier.
-Voici le texte que je suis en train de taper : {context}
+local ADVANCED_PROMPT_SINGLE = [[Tu es un moteur strict de correction et de complétion de texte.
+RÈGLES CRITIQUES :
+1. Tu reçois un PREFIX (le contexte complet) et un TAIL (les ~5 à 7 derniers mots).
+2. Format : Deux lignes commençant par "TAIL_CORRECTED:" et "NEXT_WORDS:".
+3. TAIL_CORRECTED : Corrige l’orthographe, la grammaire et les accents UNIQUEMENT dans le TAIL. Ne modifie pas le sens. S’il n’y a pas de faute, recopie le TAIL EXACTEMENT à l’identique sans rien changer.
+4. NEXT_WORDS : Prédis 1 à 5 mots pour continuer la phrase de façon logique. Laisse vide si la phrase est terminée.
 
-Tu dois proposer EXACTEMENT ]] .. tostring(n) .. [[ suites directes possibles (de 1 à 5 mots).
-RÈGLES ABSOLUES :
-- NE RÉPÈTE PAS le texte déjà écrit. Donne uniquement la suite.
-- N’écris jamais de points de suspension (...).
-- Sépare chaque proposition par une ligne "---".
-Exemple :
-suite une
----
-suite deux
----
-suite trois]]
+EXEMPLES :
+
+Exemple 1 (Correction Grammaticale) :
+PREFIX: "Il est aller à Paris"
+TAIL: "est aller à Paris"
+TAIL_CORRECTED: est allé à Paris
+NEXT_WORDS: 
+
+Exemple 2 (Correction + Prédiction) :
+PREFIX: "Je vous envoit ce mail pour vous dir"
+TAIL: "envoit ce mail pour vous dir"
+TAIL_CORRECTED: envoie ce mail pour vous dire
+NEXT_WORDS: que tout est prêt.
+
+Exemple 3 (Aucune Correction + Courte Prédiction) :
+PREFIX: "Salut, comment ça"
+TAIL: "Salut, comment ça"
+TAIL_CORRECTED: Salut, comment ça
+NEXT_WORDS: va ?
+
+Exemple 4 (Aucune Correction + Longue Prédiction) :
+PREFIX: "Je pense qu’il est important de"
+TAIL: "qu’il est important de"
+TAIL_CORRECTED: qu’il est important de
+NEXT_WORDS: prendre une décision rapidement.
+
+Exemple 5 (Code) :
+PREFIX: "def calculate_total(price, tax):"
+TAIL: "def calculate_total(price, tax):"
+TAIL_CORRECTED: def calculate_total(price, tax):
+NEXT_WORDS: return price * (1 + tax)
+]]
+
+--- Generates a batch prompt for multiple predictions.
+--- @param n number The number of predictions required.
+--- @return string The formatted prompt string.
+local function BATCH_ADVANCED_PROMPT(n)
+	return ADVANCED_PROMPT_SINGLE .. "\n\n" ..
+[[=========================================
+RÈGLE SPÉCIALE BATCH : Tu DOIS OBLIGATOIREMENT générer EXACTEMENT ]] .. tostring(n) .. [[ suites logiques différentes.
+Ne t’arrête SURTOUT PAS avant d’avoir donné les ]] .. tostring(n) .. [[ propositions.
+Sépare chaque proposition par `===`.
+
+Format strict à respecter scrupuleusement :
+TAIL_CORRECTED: <tail>
+NEXT_WORDS: <prédiction 1>
+===
+TAIL_CORRECTED: <tail>
+NEXT_WORDS: <prédiction 2>
+===
+(Continue ainsi jusqu’à la proposition ]] .. tostring(n) .. [[)
+===]]
 end
 
-local ADVANCED_PROMPT_SINGLE = [[Tu es un assistant strict d’autocomplétion. NE FAIS AUCUN COMMENTAIRE.
-Voici le texte saisi jusqu’à présent : {context}
-
-Réponds UNIQUEMENT sous ce format exact :
-TAIL_CORRECTED: <réécris le dernier mot/fragment si mal orthographié, sinon recopie-le>
-NEXT_WORDS: <suite prédite (1 à 5 mots), ou vide>
-
-RÈGLE : NEXT_WORDS ne doit JAMAIS répéter le contexte, juste la suite. Ne mets pas de points de suspension.]]
-
-local function ADVANCED_PROMPT_BATCH(n)
-    return [[Tu es un assistant strict d’autocomplétion. NE FAIS AUCUN COMMENTAIRE.
-Voici le texte saisi jusqu’à présent : {context}
-
-Tu dois produire EXACTEMENT ]] .. tostring(n) .. [[ continuations DIFFÉRENTES.
-FORMAT STRICTEMENT REQUIS (répété ]] .. tostring(n) .. [[ fois, séparé par une ligne "---"):
-TAIL_CORRECTED: <réécris le dernier mot/fragment si mal orthographié, sinon recopie-le>
-NEXT_WORDS: <suite prédite différente à chaque fois>
----
-
-RÈGLE : NEXT_WORDS ne doit JAMAIS répéter le contexte, juste la suite. Ne mets pas de points de suspension (...).]]
-end
-
--- Raw prompt for basic completion models (Base/Coder)
-local BASE_PROMPT_SINGLE = [[{context}]]
-
--- UI labels and descriptions are kept in French for the menu display.
 M.BUILTIN_PROFILES = {
-    {
-        id            = "parallel_simple",
-        label         = "Parallèle (Simple) — N req. de 1 prédiction",
-        description   = "Prédiction directe, très rapide, pour tous modèles",
-        batch         = false,
-        system_single = SIMPLE_PROMPT_SINGLE,
-        system_multi  = nil,
-    },
-    {
-        id            = "parallel_advanced",
-        label         = "Parallèle (Avancé) — N req. de 1 prédiction",
-        description   = "Correction + Prédiction, modèles performants",
-        batch         = false,
-        system_single = ADVANCED_PROMPT_SINGLE,
-        system_multi  = nil,
-    },
-    {
-        id            = "base_completion",
-        label         = "Complétion Pure (Base) — 1 prédiction",
-        description   = "Idéal pour modèles de complétion pure. Aucun prompt système.",
-        batch         = false,
-        system_single = BASE_PROMPT_SINGLE,
-        system_multi  = nil,
-    },
-    {
-        id            = "batch_simple",
-        label         = "Batch (Simple) — 1 req. de N prédictions",
-        description   = "Plusieurs suggestions en 1 seul appel",
-        batch         = true,
-        system_single = SIMPLE_PROMPT_SINGLE,
-        system_multi  = SIMPLE_PROMPT_BATCH,
-    },
-    {
-        id            = "batch_advanced",
-        label         = "Batch (Avancé) — 1 req. de N prédictions",
-        description   = "Correction + N suggestions en 1 appel",
-        batch         = true,
-        system_single = ADVANCED_PROMPT_SINGLE,
-        system_multi  = ADVANCED_PROMPT_BATCH,
-    },
+	{
+		id            = "raw",
+		label         = "Raw — Aucun prompt, juste le contexte",
+		batch         = false,
+		system_single = RAW_PROMPT_SINGLE,
+		system_multi  = nil,
+	},
+	{
+		id            = "basic",
+		label         = "Basique — Prédiction simple",
+		batch         = false,
+		system_single = BASIC_PROMPT_SINGLE,
+		system_multi  = nil,
+	},
+	{
+		id            = "advanced",
+		label         = "Avancé — Correction + Prédiction",
+		batch         = false,
+		system_single = ADVANCED_PROMPT_SINGLE,
+		system_multi  = nil,
+	},
+	{
+		id            = "batch_advanced",
+		label         = "●●●● Batch Avancé — 1 req. avancée avec {n} prédiction{s}",
+		batch         = true,
+		system_single = ADVANCED_PROMPT_SINGLE,
+		system_multi  = BATCH_ADVANCED_PROMPT,
+	},
 }
 
--- Active profile ID (can be overridden from menu)
-M.active_profile_id = "parallel_simple"
-
--- User custom profiles (loaded from config.json by menu.lua)
+M.active_profile_id = "basic"
 M.user_profiles = {}
 
---- Retrieves all available profiles (built-in + user-defined)
---- @return table A list of profile definitions
+--- Combines built-in profiles and user profiles into a single table.
+--- @return table An array containing all available profiles.
 local function get_all_profiles()
-    local all = {}
-    for _, p in ipairs(M.BUILTIN_PROFILES) do table.insert(all, p) end
-    if type(M.user_profiles) == "table" then
-        for _, p in ipairs(M.user_profiles) do table.insert(all, p) end
-    end
-    return all
+	local all = {}
+	for _, p in ipairs(M.BUILTIN_PROFILES) do table.insert(all, p) end
+	if type(M.user_profiles) == "table" then
+		for _, p in ipairs(M.user_profiles) do table.insert(all, p) end
+	end
+	return all
 end
 
---- Retrieves the active profile safely, handling legacy migrations
---- @return table The active profile definition
+--- Retrieves the currently active profile object, falling back to basic if invalid.
+--- @return table The active profile object.
 function M.get_active_profile()
-    local id = tostring(M.active_profile_id)
-    
-    -- Auto-migration from legacy profiles
-    if id == "parallel" then id = "parallel_simple" end
-    if id == "batch" then id = "batch_simple" end
-    
-    for _, p in ipairs(get_all_profiles()) do
-        if type(p) == "table" and p.id == id then return p end
-    end
-    return M.BUILTIN_PROFILES[1]  -- Fallback: parallel_simple
+	local id = tostring(M.active_profile_id)
+	
+	-- Auto-migrate legacy profiles to maintain compatibility
+	if id == "parallel" or id == "parallel_simple" then id = "basic" end
+	if id == "batch" or id == "batch_simple" then id = "batch_advanced" end
+	if id == "parallel_advanced" then id = "advanced" end
+	if id == "base_completion" then id = "raw" end
+	
+	for _, p in ipairs(get_all_profiles()) do
+		if type(p) == "table" and p.id == id then return p end
+	end
+	return M.BUILTIN_PROFILES[2]  -- Fallback: basic
 end
 
---- Safely sets the active profile
---- @param id string The profile ID
+--- Updates the active profile ID and synchronizes sequential mode settings.
+--- @param id string The ID of the profile to activate.
 function M.set_active_profile(id)
-    if type(id) == "string" then
-        M.active_profile_id = id
-        local p = M.get_active_profile()
-        M.DEFAULT_LLM_SEQUENTIAL_MODE = (p and not p.batch) or false
-    end
+	if type(id) == "string" then
+		M.active_profile_id = id
+		local p = M.get_active_profile()
+		M.DEFAULT_LLM_SEQUENTIAL_MODE = (p and not p.batch) or false
+	end
 end
 
 
 
 
 
--- ===================================
--- ===================================
--- ======= 3/ Model Heuristics =======
--- ===================================
--- ===================================
+-- =======================================
+-- =======================================
+-- ======= 3/ Model Heuristics ===========
+-- =======================================
+-- =======================================
 
---- Detects if a model is considered "small" based on common naming conventions
---- @param name string The model name
---- @return boolean True if small
-local function is_small_model(name)
-    if type(name) ~= "string" then return false end
-    name = name:lower()
-    
-    if name:match("0%.[0-9]+b") or name:match(":0%.[0-9]") or name:match("^0%.[0-9]") then return true end
-    for _, tag in ipairs({"%-tiny", ":tiny", "%-mini", ":mini", "%-nano", ":nano", "%-small", ":small"}) do
-        if name:match(tag) then return true end
-    end
-    return false
-end
-M.is_small_model = is_small_model
-
---- Detects if a model is a reasoning/thinking model based on naming conventions
---- @param name string The model name
---- @return boolean True if it is a thinking model
+--- Determines if a model is categorized as a "thinking" model based on its name.
+--- @param name string The model name to evaluate.
+--- @return boolean True if it is a thinking model, false otherwise.
 local function is_thinking_model(name)
-    if type(name) ~= "string" then return false end
-    name = name:lower()
-    
-    if name:match("qwen3")        then return true end
-    if name:match("deepseek%-r")  then return true end
-    if name:match("deepseek_r")   then return true end
-    if name:match("%-r1")         then return true end
-    if name:match(":r1")          then return true end
-    if name:match("%-think")      then return true end
-    if name:match(":think")       then return true end
-    if name:match("gpt%-oss")     then return true end
-    return false
+	if type(name) ~= "string" then return false end
+	name = name:lower()
+	if name:match("qwen3") or name:match("deepseek") or name:match("%-r1") or name:match(":r1") or name:match("think") then return true end
+	return false
 end
 M.is_thinking_model = is_thinking_model
 
---- Checks availability of the selected model locally via Ollama API
---- @param model_name string The target model name
---- @param on_available function Callback if model is found
---- @param on_missing function Callback if model is missing or server is down
+--- Asynchronously checks if a specific model is available in the local Ollama instance.
+--- @param model_name string The name of the model to check.
+--- @param on_available function Callback executed if the model is found.
+--- @param on_missing function Callback executed if the model is missing or API is unreachable.
 function M.check_availability(model_name, on_available, on_missing)
-    if type(model_name) ~= "string" then return end
-    
-    hs.http.asyncGet("http://127.0.0.1:11434/api/tags", {}, function(status, body)
-        if status ~= 200 then 
-            if type(on_missing) == "function" then pcall(on_missing, true) end
-            return 
-        end
-        
-        local ok, tags = pcall(hs.json.decode, body)
-        if ok and type(tags) == "table" and type(tags.models) == "table" then
-            local found = false
-            for _, m in ipairs(tags.models) do
-                if type(m.name) == "string" and m.name:find(model_name, 1, true) then 
-                    found = true
-                    break 
-                end
-            end
-            
-            if found then
-                if type(on_available) == "function" then pcall(on_available) end
-            else
-                if type(on_missing) == "function" then pcall(on_missing, false) end
-            end
-        else
-            if type(on_missing) == "function" then pcall(on_missing, false) end
-        end
-    end)
-end
-
-
-
-
-
--- ========================================
--- ========================================
--- ======= 4/ Diff & Parsing Engine =======
--- ========================================
--- ========================================
-
---- Determines if two characters are fundamentally equivalent for diffing
---- @param c1 string The first char
---- @param c2 string The second char
---- @return boolean True if they match
-local function chars_match(c1, c2)
-    if c1 == c2 then return true end
-    -- Treat all standard and non-breaking spaces equally
-    local function is_sp(c) return c == " " or c == "\194\160" or c == "\226\128\175" end
-    return is_sp(c1) and is_sp(c2)
-end
-
---- Splits a string into word and symbol tokens
---- @param text string The input string
---- @return table An array of string tokens
-local function tokenize(text)
-    local tokens, cur, is_w = {}, "", nil
-    if type(text) ~= "string" then return tokens end
-    
-    for c in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-        local w = c:match("[%w\128-\255]") ~= nil
-        if is_w == nil then 
-            is_w = w
-            cur = c
-        elseif is_w == w then 
-            cur = cur .. c
-        else 
-            table.insert(tokens, cur)
-            is_w = w
-            cur = c 
-        end
-    end
-    if cur ~= "" then table.insert(tokens, cur) end
-    
-    return tokens
-end
-
---- Performs a fine-grained character-level diff between two segments
---- @param t1_str string Original segment
---- @param t2_str string Target segment
---- @return table, number Diff chunks and a similarity ratio
-local function char_diff(t1_str, t2_str)
-    local t1, t2 = {}, {}
-    if type(t1_str) ~= "string" then t1_str = "" end
-    if type(t2_str) ~= "string" then t2_str = "" end
-    
-    for c in t1_str:gmatch("[%z\1-\127\194-\244][\128-\191]*") do table.insert(t1, c) end
-    for c in t2_str:gmatch("[%z\1-\127\194-\244][\128-\191]*") do table.insert(t2, c) end
-
-    local dp = {}
-    for i = 0, #t1 do dp[i] = {[0] = 0} end
-    for j = 0, #t2 do dp[0][j] = 0 end
-    
-    for i = 1, #t1 do 
-        for j = 1, #t2 do
-            dp[i][j] = chars_match(t1[i], t2[j]) and dp[i-1][j-1] + 1
-                       or math.max(dp[i-1][j], dp[i][j-1])
-        end 
-    end
-
-    local diffs, i, j = {}, #t1, #t2
-    while i > 0 or j > 0 do
-        if i > 0 and j > 0 and chars_match(t1[i], t2[j]) then
-            table.insert(diffs, 1, {type="equal",  text=t2[j]})
-            i, j = i - 1, j - 1
-        elseif j > 0 and (i == 0 or dp[i][j-1] >= dp[i-1][j]) then
-            table.insert(diffs, 1, {type="insert", text=t2[j]})
-            j = j - 1
-        else
-            i = i - 1
-        end
-    end
-
-    -- Compress contiguous differences
-    local merged = {}
-    for _, d in ipairs(diffs) do
-        if #merged > 0 and merged[#merged].type == d.type then
-            merged[#merged].text = merged[#merged].text .. d.text
-        else 
-            table.insert(merged, {type=d.type, text=d.text}) 
-        end
-    end
-
-    local max_len = math.max(#t1, #t2)
-    local ratio = max_len > 0 and (dp[#t1][#t2] / max_len) or 0
-    
-    return merged, ratio
-end
-
---- Processes the raw string output of the model to produce a safe edit operation
---- @param full_context string The context string supplied to the model
---- @param tail_text string The user’s active typing segment
---- @param tc_raw string The model’s "TAIL_CORRECTED" response
---- @param nw_raw string The model’s "NEXT_WORDS" response
---- @return table|nil The edit plan, or nil if invalid
-local function process_prediction(full_context, tail_text, tc_raw, nw_raw)
-    if type(full_context) ~= "string" then full_context = "" end
-    if type(tail_text) ~= "string" then tail_text = "" end
-    if type(tc_raw) ~= "string" or type(nw_raw) ~= "string" then return nil end
-
-    local tc = tc_raw:gsub("^\"", ""):gsub("\"$", ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
-    local nw = nw_raw:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
-
-    -- Remove overlaps (hallucinations where the model repeats context inside next_words)
-    local function strip_overlap(context, next_w)
-        if not context or not next_w or context == "" or next_w == "" then return next_w end
-        local c_low = context:lower()
-        local n_low = next_w:lower()
-        local max_len = math.min(#c_low, 150)
-        local start_idx = #c_low - max_len + 1
-        
-        for i = start_idx, #c_low do
-            local suffix = c_low:sub(i)
-            if n_low:sub(1, #suffix) == suffix then
-                return next_w:sub(#suffix + 1)
-            end
-        end
-        return next_w
-    end
-
-    nw = strip_overlap(full_context, nw)
-    nw = nw:gsub("^%s+", "")
-
-    if tc == "" and nw == "" then return nil end
-
-    local tail_trailing = tail_text:match("(%s+)$")
-    if tail_trailing and not tc:match("%s$") then tc = tc .. tail_trailing end
-
-    local last_char  = utils.utf8_sub(tc, -1)
-    local first_char = utils.utf8_sub(nw, 1, 1)
-    if not (last_char:match("[%s''%-]") or first_char:match("[%s.,;)%}%%%]]") or nw == "") then
-        nw = " " .. nw
-    end
-
-    local tok1, tok2 = tokenize(tail_text), tokenize(tc)
-    local dp = {}
-    for i = 0, #tok1 do dp[i] = {[0]=0} end
-    for j = 0, #tok2 do dp[0][j] = 0 end
-    
-    for i = 1, #tok1 do 
-        for j = 1, #tok2 do
-            dp[i][j] = chars_match(tok1[i], tok2[j]) and dp[i-1][j-1] + 1
-                       or math.max(dp[i-1][j], dp[i][j-1])
-        end 
-    end
-
-    local diffs, i, j = {}, #tok1, #tok2
-    while i > 0 or j > 0 do
-        if i > 0 and j > 0 and chars_match(tok1[i], tok2[j]) then
-            table.insert(diffs, 1, {type="equal",  text=tok2[j]})
-            i, j = i - 1, j - 1
-        elseif j > 0 and (i == 0 or dp[i][j-1] >= dp[i-1][j]) then
-            table.insert(diffs, 1, {type="insert", text=tok2[j]})
-            j = j - 1
-        else
-            table.insert(diffs, 1, {type="delete", text=tok1[i]})
-            i = i - 1
-        end
-    end
-
-    while #diffs > 0 and diffs[1].type == "equal" do table.remove(diffs, 1) end
-
-    local compressed, cur_del, cur_ins = {}, "", ""
-    for _, d in ipairs(diffs) do
-        if d.type == "equal" then
-            if cur_del ~= "" or cur_ins ~= "" then
-                table.insert(compressed, {type="replace", del=cur_del, ins=cur_ins})
-                cur_del, cur_ins = "", ""
-            end
-            table.insert(compressed, {type="equal", text=d.text})
-        elseif d.type == "delete" then 
-            cur_del = cur_del .. d.text
-        elseif d.type == "insert" then 
-            cur_ins = cur_ins .. d.text
-        end
-    end
-    if cur_del ~= "" or cur_ins ~= "" then
-        table.insert(compressed, {type="replace", del=cur_del, ins=cur_ins})
-    end
-
-    local final_chunks, spilled_nw = {}, ""
-    for idx, blk in ipairs(compressed) do
-        if blk.type == "equal" then
-            table.insert(final_chunks, {type="equal", text=blk.text})
-        else
-            if blk.del == "" and idx == #compressed then
-                nw = blk.ins .. nw
-            else
-                local c_diffs, ratio = char_diff(blk.del, blk.ins)
-                local is_single_word = not (blk.del:find("[%s\194\160\226\128\175]")
-                                         or blk.ins:find("[%s\194\160\226\128\175]"))
-                
-                if is_single_word or ratio >= 0.5 then
-                    for _, cd in ipairs(c_diffs) do table.insert(final_chunks, cd) end
-                elseif blk.ins ~= "" then
-                    table.insert(final_chunks, {type="insert", text=blk.ins})
-                end
-            end
-        end
-    end
-
-    local merged = {}
-    for _, ch in ipairs(final_chunks) do
-        if #merged > 0 and merged[#merged].type == ch.type then
-            merged[#merged].text = merged[#merged].text .. ch.text
-        else 
-            table.insert(merged, {type=ch.type, text=ch.text}) 
-        end
-    end
-
-    while #merged > 0 do
-        if merged[1].type == "equal" then 
-            table.remove(merged, 1)
-        elseif merged[1].type == "insert" and merged[1].text:match("^[%s\194\160\226\128\175]+$") then
-            table.remove(merged, 1)
-        else 
-            break 
-        end
-    end
-
-    if #merged > 0 and merged[#merged].type == "insert" then
-        local text = merged[#merged].text
-        local sp   = text:find("[%s\194\160\226\128\175]")
-        if sp == 1 then
-            spilled_nw = text
-            table.remove(merged, #merged)
-        elseif sp then
-            merged[#merged].text = text:sub(1, sp-1)
-            spilled_nw = text:sub(sp)
-        end
-    end
-
-    local has_corrections = false
-    for _, ch in ipairs(merged) do
-        if ch.type == "insert" then has_corrections = true; break end
-    end
-
-    local common_len = utils.get_common_prefix_utf8(tail_text, tc)
-    return {
-        deletes         = utils.utf8_len(tail_text) - common_len,
-        to_type         = utils.utf8_sub(tc, common_len+1) .. nw,
-        nw              = spilled_nw .. nw,
-        chunks          = merged,
-        has_corrections = has_corrections,
-    }
+	if type(model_name) ~= "string" then return end
+	hs.http.asyncGet("http://127.0.0.1:11434/api/tags", {}, function(status, body)
+		if status ~= 200 then if type(on_missing) == "function" then pcall(on_missing, true) end return end
+		local ok, tags = pcall(hs.json.decode, body)
+		if ok and type(tags) == "table" and type(tags.models) == "table" then
+			local found = false
+			for _, m in ipairs(tags.models) do
+				if type(m.name) == "string" and m.name:find(model_name, 1, true) then found = true break end
+			end
+			if found then if type(on_available) == "function" then pcall(on_available) end
+			else if type(on_missing) == "function" then pcall(on_missing, false) end end
+		else
+			if type(on_missing) == "function" then pcall(on_missing, false) end
+		end
+	end)
 end
 
 
@@ -519,419 +234,594 @@ end
 
 -- =======================================
 -- =======================================
--- ======= 5/ Robust Text Parsers ========
+-- ======= 4/ Robust Parsing Engine ======
 -- =======================================
 -- =======================================
 
---- Strips markdown formatting to process raw text properly
---- @param text string The raw output
---- @return string Cleaned text
+--- Strips conversational filler and markdown from the model’s raw text.
+--- @param text string The raw output from the LLM.
+--- @return string The cleaned text.
 local function clean_model_output(text)
-    if type(text) ~= "string" then return "" end
-    text = text:gsub("%*%*", "")
-    text = text:gsub("`", "")
-    return text
+	if type(text) ~= "string" then return "" end
+	
+	-- Unescape HTML entities and encoded unicode to avoid garbled text
+	text = utils.unescape_text(text)
+	
+	-- Strip markdown to prevent hallucinated formatting
+	text = text:gsub("%*%*", ""):gsub("`", ""):gsub("\"", "")
+	
+	-- Strip chatty intros to extract only the prediction
+	text = text:gsub("^Voici la suite%s*:?%s*", "")
+	text = text:gsub("^Je propose%s*:?%s*", "")
+	
+	-- Robust normalization for explicit tags (forces case-insensitivity manually)
+	text = text:gsub("%[[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%]", "TAIL_CORRECTED:")
+	text = text:gsub("%[[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%]", "NEXT_WORDS:")
+	text = text:gsub("[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%s*:", "TAIL_CORRECTED:")
+	text = text:gsub("[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%s*:", "NEXT_WORDS:")
+	
+	return text
 end
 
---- Attempts to extract the TAIL_CORRECTED value from the LLM output
---- @param text string The raw LLM string
---- @param default_tail string The fallback string if no match is found
---- @return string The extracted context
-local function extract_tc(text, default_tail)
-    text = clean_model_output(text)
-    
-    local tc = text:match("[Tt][Aa][Ii][Ll][_%s]?[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%s*:%s*([^\n\r]+)")
-        or text:match("[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%s*:%s*([^\n\r]+)")
-        or text:match("[Tt][Aa][Ii][Ll]%s*:%s*([^\n\r]+)")
-        or text:match("TAIL_CORRIG.E%s*:%s*([^\n\r]+)")
-        or text:match("[Ll][Ii][Nn][Ee]%s*1%s*:%s*([^\n\r]+)")
-        or text:match("[Ll]1%s*:%s*([^\n\r]+)")
-    
-    if tc then return tc end
-    
-    -- Fallback to the original tail (for simple / base modes)
-    return type(default_tail) == "string" and default_tail or ""
-end
-
---- Attempts to extract the NEXT_WORDS value from the LLM output
---- @param text string The raw LLM string
---- @return string The extracted prediction
-local function extract_nw(text)
-    text = clean_model_output(text)
-    
-    local nw = text:match("[Nn][Ee][Xx][Tt][_%s]?[Ww][Oo][Rr][Dd][Ss]%s*:%s*([^\n\r]*)")
-        or text:match("[Nn][Ee][Xx][Tt]%s*:%s*([^\n\r]*)")
-        or text:match("[Cc][Oo][Nn][Tt][Ii][Nn][Uu][Aa][Tt][Ii][Oo][Nn]%s*:%s*([^\n\r]*)")
-        or text:match("MOTS_SUIVANTS%s*:%s*([^\n\r]*)")
-        or text:match("[Ll][Ii][Nn][Ee]%s*2%s*:%s*([^\n\r]*)")
-        or text:match("[Ll]2%s*:%s*([^\n\r]*)")
-    
-    if nw then 
-        -- Clean up stray ellipsis
-        nw = nw:gsub("^%.%.%.%s*", ""):gsub("%s*%.%.%.$", "")
-        return nw == "..." and "" or nw
-    end
-    
-    -- Fallback if the format wasn’t explicitly matched
-    if not text:match("TAIL_CORRECTED") and not text:match("TAIL_CORRIG") then
-        local raw_nw = text:gsub("^%s+", ""):gsub("%s+$", "")
-        raw_nw = raw_nw:gsub("^%.%.%.%s*", ""):gsub("%s*%.%.%.$", "")
-        if raw_nw == "..." then return "" end
-        return raw_nw
-    end
-    
-    return ""
-end
-
---- Splits a batch response into its respective prediction blocks
---- @param raw string The full LLM output
---- @return table An array of blocks
+--- Splits batch output into individual prediction blocks based on separators.
+--- @param raw string The concatenated batch output.
+--- @return table An array of string blocks.
 local function split_blocks(raw)
-    if type(raw) ~= "string" then return {} end
-    local text   = raw:gsub("\r\n", "\n"):gsub("\r", "\n")
-    local blocks, current = {}, {}
-    
-    for line in (text .. "\n---\n"):gmatch("([^\n]*)\n") do
-        if line:match("^%s*%-%-%-+%s*$") then
-            if #current > 0 then 
-                table.insert(blocks, table.concat(current, "\n"))
-                current = {} 
-            end
-        else 
-            table.insert(current, line) 
-        end
-    end
-    return blocks
+	local blocks = {}
+	for block in (raw .. "==="):gmatch("(.-)===") do
+		local clean = block:gsub("^%s+", ""):gsub("%s+$", "")
+		if clean ~= "" then table.insert(blocks, clean) end
+	end
+	if #blocks == 0 then table.insert(blocks, raw) end
+	return blocks
 end
 
---- Strips <think> tags generated by reasoning models
---- @param text string The raw output
---- @return string The output without thinking steps
+--- Removes XML-like thinking tags from the model’s response to isolate the final answer.
+--- @param text string The raw response containing potential thinking blocks.
+--- @return string The response without thinking tags.
 local function strip_thinking(text)
-    if type(text) ~= "string" then return "" end
-    text = text:gsub("<think>.-</think>%s*", "")
-    text = text:gsub("</think>%s*", "")
-    return text
+	if type(text) ~= "string" then return "" end
+	text = text:gsub("<think>.-</think>%s*", "")
+	text = text:gsub("</think>%s*", "")
+	return text
+end
+
+--- Parses explicit prompt tags to determine insertions and deletions securely.
+--- @param full_text string The full user context provided to the LLM.
+--- @param tail_text string The current end of the user’s input.
+--- @param block string The raw block of text generated by the model.
+--- @return table|nil A table containing prediction data or nil if invalid.
+local function process_prediction(full_text, tail_text, block)
+	block = clean_model_output(block)
+	
+	local is_advanced = block:find("TAIL_CORRECTED") or block:find("NEXT_WORDS")
+	
+	if is_advanced then
+		-- Surgical extraction
+		local tc = block:match("TAIL_CORRECTED%s*:%s*(.-)[\r\n]+") or block:match("TAIL_CORRECTED%s*:%s*(.-)$") or ""
+		local nw = block:match("NEXT_WORDS%s*:%s*(.-)[\r\n]+") or block:match("NEXT_WORDS%s*:%s*(.-)$") or ""
+
+		local function trim(s)
+			return s:match("^%s*(.-)%s*$") or ""
+		end
+
+		-- Aggressive cleanup of hallucinated residual quotes and brackets
+		tc = trim(tc:gsub("%s*%]$", ""):gsub('^"', ""):gsub('"$', ""))
+		nw = trim(nw:gsub("%s*%]$", ""):gsub('^"', ""):gsub('"$', ""))
+
+		-- Élimination stricte des points de suspension, espaces et ponctuations parasites aux extrémités
+		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+
+		-- Fix lazy LLMs in batch mode that forget TAIL_CORRECTED
+		if tc == "" and nw ~= "" then
+			tc = trim((tail_text or ""):gsub('^"', ""):gsub('"$', ""))
+		end
+
+		if tc == "" and nw == "" then return nil end
+
+		-- Sliding window alignment logic: We find where the LLM’s correction seamlessly aligns with the user’s full context
+		local normalized_full = (full_text or ""):gsub("'", "’")
+		local tc_norm = tc:gsub("'", "’")
+		
+		-- Restore trailing spaces (including unicode non-breaking spaces) entered by the user
+		local tail_trailing_space = normalized_full:match("([%s\194\160\226\128\175]+)$")
+		if tail_trailing_space and not tc_norm:match("[%s\194\160\226\128\175]$") then
+			tc_norm = tc_norm .. tail_trailing_space
+		end
+		
+		-- Search in the last 300 characters to ensure speed while accounting for verbose hallucinations
+		local search_start = math.max(1, #normalized_full - 300)
+		local best_c_len = -1
+		local best_suffix = ""
+		
+		for i = search_start, #normalized_full do
+			local b = normalized_full:byte(i)
+			-- Ensure alignment search only starts on valid UTF-8 character boundaries
+			if b < 0x80 or b >= 0xC0 then
+				local suffix = normalized_full:sub(i)
+				local c_len = utils.get_common_prefix_utf8(suffix, tc_norm)
+				if c_len > best_c_len then
+					best_c_len = c_len
+					best_suffix = suffix
+				end
+			end
+		end
+		
+		-- Fallback: If alignment failed (LLM hallucinated a completely disconnected word), default to strictly substituting the tail
+		if best_c_len < 2 and #tc_norm > 5 then
+			best_suffix = (tail_text or ""):gsub("'", "’")
+			best_c_len = utils.get_common_prefix_utf8(best_suffix, tc_norm)
+		end
+
+		-- Smart spacing check between corrected context and prediction
+		local last_char = utils.utf8_sub(tc_norm, -1)
+		local first_char = utils.utf8_sub(nw, 1, 1)
+		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
+		
+		local display_nw = nw
+		if needs_space then 
+			nw = " " .. nw 
+			display_nw = " " .. display_nw
+		end
+
+		-- Critical security: cancel if AI did not copy a reasonable amount of the tail
+		local tail_len = utils.utf8_len(tail_text)
+		local tc_len = utils.utf8_len(tc)
+		if best_c_len < tail_len * 0.4 and tc_len < tail_len * 0.4 then return nil end
+
+		-- The exact mathematical calculation of deletes ensuring zero UI artifacts
+		local deletes = utils.utf8_len(best_suffix) - best_c_len
+		local to_type = utils.utf8_sub(tc_norm, best_c_len + 1) .. nw
+
+		-- Rejet ultime : si la chaîne à taper ne contient plus rien après avoir retiré espaces et points
+		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+
+		local has_corr = (deletes > 0 or utils.utf8_sub(tc_norm, best_c_len + 1) ~= "")
+
+		-- Generates clean diff chunks for the visual interface
+		local chunks = utils.diff_strings(best_suffix, tc_norm)
+
+		return { 
+			deletes = deletes, 
+			to_type = to_type, 
+			nw = display_nw, 
+			has_corrections = has_corr, 
+			chunks = chunks 
+		}
+		
+	else
+		-- Basic / Raw Mode: Grab only the first line to truncate chatty paragraphs
+		local nw = block:gsub("^%s+", ""):gsub("%s+$", "")
+		nw = nw:match("([^\n\r]+)") or nw
+		
+		-- Strip any residual tag just in case it completely failed parsing
+		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
+		
+		-- Élimination stricte des points de suspension, espaces et ponctuations parasites aux extrémités
+		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		
+		-- Robust overlap mitigation using word-by-word comparison for basic models
+		local full_words = {}
+		for w in (full_text or ""):gmatch("%S+") do table.insert(full_words, w) end
+		
+		local nw_words = {}
+		for w in nw:gmatch("%S+") do table.insert(nw_words, w) end
+		
+		local start_idx = math.max(1, #full_words - 20)
+		for i = start_idx, #full_words do
+			local buf_suffix_count = #full_words - i + 1
+			if buf_suffix_count <= #nw_words then
+				local match = true
+				for j = 1, buf_suffix_count do
+					local bw = full_words[i + j - 1]:lower():gsub("[%p%c]", "")
+					local pw = nw_words[j]:lower():gsub("[%p%c]", "")
+					if bw ~= pw or bw == "" then
+						match = false
+						break
+					end
+				end
+				
+				if match then
+					local remaining = {}
+					for j = buf_suffix_count + 1, #nw_words do
+						table.insert(remaining, nw_words[j])
+					end
+					nw = table.concat(remaining, " ")
+					break
+				end
+			end
+		end
+		
+		nw = nw:gsub("%s*%]$", ""):gsub("%s+$", "")
+		local to_type = nw
+		local deletes = 0
+		
+		-- Smart spacing taking UTF-8 apostrophes and raw bytes into account for basic mode
+		if to_type ~= "" and tail_text ~= "" then
+			local t_last = utils.utf8_sub(tail_text, -1)
+			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
+			local is_apos  = t_last:match("['’]")
+			local type_start = utils.utf8_sub(to_type, 1, 1)
+			
+			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
+				to_type = " " .. to_type
+				nw = " " .. nw
+			end
+		end
+
+		-- Rejet ultime : si la chaîne à taper ne contient plus rien après avoir retiré espaces et points
+		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+		return { deletes = deletes, to_type = to_type, nw = nw, has_corrections = false, chunks = {} }
+	end
 end
 
 
 
 
 
--- ===================================
--- ===================================
--- ======= 6/ API Communication ======
--- ===================================
--- ===================================
+-- =======================================
+-- =======================================
+-- ======= 5/ API Communication ==========
+-- =======================================
+-- =======================================
 
---- Constructs the payload options targeting the Ollama API
---- @param temperature number The AI creativity metric
---- @param num_predict_tokens number Max token output
---- @param model_name string Model identifier
---- @return table The configuration object
-local function build_options(temperature, num_predict_tokens, model_name)
-    local opts = {
-        temperature = tonumber(temperature) or 0.1,
-        num_predict = tonumber(num_predict_tokens) or 40,
-        stop        = { "\n\n\n\n" },
-    }
-    
-    if is_thinking_model(model_name) then
-        opts.think           = false
-        opts.thinking_budget = 0
-        -- We do not restrict tokens on reasoning models to give them space to process
-        opts.num_predict = math.max(opts.num_predict, 400)
-    end
-    
-    return opts
+--- Builds the options payload for the Ollama API.
+--- @param temperature number The creativity parameter.
+--- @param num_predict_tokens number Max tokens to predict.
+--- @param model_name string Name of the target model.
+--- @param is_batch boolean Whether this request is a batch prompt expecting multiple outputs.
+--- @return table The options configuration table.
+local function build_options(temperature, num_predict_tokens, model_name, is_batch)
+	local opts = {
+		temperature = tonumber(temperature) or 0.1,
+		num_predict = tonumber(num_predict_tokens),
+		-- Enforce strict stop tokens to prevent runaway generations
+		stop        = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
+	}
+	
+	if not is_batch then
+		table.insert(opts.stop, "\n\n")
+		table.insert(opts.stop, "===")
+	end
+	
+	if is_thinking_model(model_name) then
+		opts.think           = false
+		opts.thinking_budget = 0
+		opts.num_predict = math.max(opts.num_predict, 400)
+	end
+	
+	return opts
 end
 
---- Resolves the appropriate system prompt template based on profile
---- @param profile table Active profile definition
---- @param n number Number of predictions requested
---- @param model_name string Target model
---- @return string The raw prompt template
-local function resolve_system_prompt(profile, n, model_name)
-    if type(profile) ~= "table" then return SIMPLE_PROMPT_SINGLE end
-    
-    if type(profile.raw_prompt) == "string" then
-        return profile.raw_prompt
-    end
-    
-    if n == 1 then
-        if type(profile.system_single) == "string" then return profile.system_single end
-    else
-        if type(profile.system_multi) == "function" then return profile.system_multi(n) end
-        if type(profile.system_multi) == "string"   then return profile.system_multi    end
-    end
-    
-    return n == 1 and SIMPLE_PROMPT_SINGLE or SIMPLE_PROMPT_BATCH(n)
+--- Resolves the appropriate system prompt logic based on the current profile.
+--- @param profile table The active profile data.
+--- @param n number The number of predictions expected.
+--- @return string The resolved system prompt.
+local function resolve_system_prompt(profile, n)
+	if type(profile) ~= "table" then return BASIC_PROMPT_SINGLE end
+	
+	-- Support for custom profiles built from the Prompt Editor
+	if type(profile.raw_prompt) == "string" and profile.raw_prompt ~= "" then
+		return profile.raw_prompt
+	end
+
+	if n == 1 then
+		return type(profile.system_single) == "string" and profile.system_single or BASIC_PROMPT_SINGLE
+	else
+		if type(profile.system_multi) == "function" then return profile.system_multi(n) end
+		if type(profile.system_multi) == "string"   then return profile.system_multi    end
+	end
+	return BASIC_PROMPT_SINGLE
 end
 
---- Executes the HTTP POST request to Ollama and triggers the parsing callbacks
+--- Posts data to the local LLM and parses the response.
+--- @param model_name string The LLM model name.
+--- @param system_prompt string The resolved instructions.
+--- @param full_text string The complete preceding document text.
+--- @param tail_text string The immediate trailing text.
+--- @param temperature number Model temperature.
+--- @param num_predict_tokens number Token limits.
+--- @param num_predictions number Total predictions to process from batch.
+--- @param is_batch boolean Flag to determine batch parsing strategy.
+--- @param on_success function Callback triggering on successful parse.
+--- @param on_fail function Callback triggering on failure.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
-                               temperature, num_predict_tokens, num_predictions,
-                               on_success, on_fail)
-    
-    local context_str = (type(full_text) == "string" and full_text or "") .. (type(tail_text) == "string" and tail_text or "")
-    local messages = {}
+							   temperature, num_predict_tokens, num_predictions, is_batch,
+							   on_success, on_fail)
+	
+	local messages = {}
 
-    -- Check if it’s a raw prompt encapsulating context directly
-    if type(system_prompt) == "string" and system_prompt:find("{context}", 1, true) then
-        local final_prompt = system_prompt:gsub("%{context%}", function() return context_str end)
-        table.insert(messages, { role = "user", content = final_prompt })
-    else
-        table.insert(messages, { role = "system", content = system_prompt })
-        table.insert(messages, { role = "user",   content = context_str })
-    end
+	local final_sys = system_prompt
+	if type(final_sys) == "string" then
+		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+	end
 
-    local payload = {
-        model    = tostring(model_name),
-        messages = messages,
-        stream   = false,
-        options  = build_options(temperature, num_predict_tokens, model_name),
-    }
+	local user_prompt = ""
+	-- Surgical formatting into PREFIX and TAIL if the System Prompt mentions them
+	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
+		user_prompt = string.format('PREFIX: "%s"\nTAIL: "%s"', full_text or "", tail_text or "")
+	else
+		-- Fix context duplication: full_text inherently contains tail_text.
+		local context_str = type(full_text) == "string" and full_text or ""
+		
+		-- Resolve string substitutions for raw or base contexts
+		if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
+			final_sys = final_sys:gsub("%{context%}", function() return context_str end)
+			user_prompt = final_sys
+			final_sys = nil
+		else
+			user_prompt = context_str
+		end
+	end
 
-    local ok, encoded = pcall(hs.json.encode, payload)
-    if not ok or not encoded then 
-        if type(on_fail) == "function" then pcall(on_fail) end
-        return 
-    end
+	if final_sys and final_sys ~= "" then
+		table.insert(messages, { role = "system", content = final_sys })
+	end
+	table.insert(messages, { role = "user", content = user_prompt })
 
-    hs.http.asyncPost(
-        "http://127.0.0.1:11434/api/chat",
-        encoded,
-        { ["Content-Type"] = "application/json" },
-        function(status, body, _)
-            if status ~= 200 then 
-                if type(on_fail) == "function" then pcall(on_fail) end
-                return 
-            end
-            
-            local ok_dec, resp = pcall(hs.json.decode, body)
-            if not ok_dec or type(resp) ~= "table" or type(resp.message) ~= "table" or type(resp.message.content) ~= "string" then
-                if type(on_fail) == "function" then pcall(on_fail) end
-                return
-            end
+	local payload = {
+		model    = tostring(model_name),
+		messages = messages,
+		stream   = false,
+		options  = build_options(temperature, num_predict_tokens, model_name, is_batch),
+	}
 
-            local raw     = strip_thinking(resp.message.content)
-            local results = {}
+	local ok, encoded = pcall(hs.json.encode, payload)
+	if not ok or not encoded then if type(on_fail) == "function" then pcall(on_fail) end return end
 
-            if num_predictions == 1 then
-                local pred = process_prediction(context_str, tail_text, extract_tc(raw, tail_text), extract_nw(raw))
-                if pred then table.insert(results, pred) end
-            else
-                for _, block in ipairs(split_blocks(raw)) do
-                    if #results >= num_predictions then break end
-                    local pred = process_prediction(context_str, tail_text, extract_tc(block, tail_text), extract_nw(block))
-                    if pred then table.insert(results, pred) end
-                end
-                
-                -- Fallback if the model completely failed the batch formatting instructions
-                if #results == 0 then
-                    local pred = process_prediction(context_str, tail_text, extract_tc(raw, tail_text), extract_nw(raw))
-                    if pred then table.insert(results, pred) end
-                end
-            end
+	hs.http.asyncPost("http://127.0.0.1:11434/api/chat", encoded, { ["Content-Type"] = "application/json" },
+		function(status, body, _)
+			if status ~= 200 then if type(on_fail) == "function" then pcall(on_fail) end return end
+			
+			local ok_dec, resp = pcall(hs.json.decode, body)
+			if not ok_dec or type(resp) ~= "table" or type(resp.message) ~= "table" or type(resp.message.content) ~= "string" then
+				if type(on_fail) == "function" then pcall(on_fail) end
+				return
+			end
 
-            if #results == 0 then 
-                if type(on_fail) == "function" then pcall(on_fail) end
-                return 
-            end
-            
-            if keylogger and type(keylogger.log_llm) == "function" then
-                pcall(keylogger.log_llm, context_str, results)
-            end
+			local raw     = strip_thinking(resp.message.content)
+			local results = {}
 
-            if type(on_success) == "function" then pcall(on_success, results) end
-        end
-    )
+			if not is_batch then
+				local pred = process_prediction(full_text, tail_text, raw)
+				if pred then table.insert(results, pred) end
+			else
+				for _, block in ipairs(split_blocks(raw)) do
+					if #results >= num_predictions then break end
+					local pred = process_prediction(full_text, tail_text, block)
+					if pred then 
+						-- Déduplication à la volée pour éviter 5 propositions identiques
+						local dup = false
+						for _, ex in ipairs(results) do
+							if ex.to_type == pred.to_type then dup = true; break end
+						end
+						if not dup then table.insert(results, pred) end
+					end
+				end
+			end
+
+			if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
+			if keylogger and type(keylogger.log_llm) == "function" then pcall(keylogger.log_llm, full_text, results) end
+			if type(on_success) == "function" then pcall(on_success, results) end
+		end
+	)
 end
 
 
 
 
 
--- ===================================
--- ===================================
--- ======= 7/ Fetch Strategies =======
--- ===================================
--- ===================================
+-- =======================================
+-- =======================================
+-- ======= 6/ Fetch Strategies ===========
+-- =======================================
+-- =======================================
 
-
-
--- =========================================
--- ===== 7.1) Batch Mode (1 Request) =======
--- =========================================
-
+--- Dispatches a single API request asking for N clustered predictions.
+--- @param full_text string Preceding text.
+--- @param tail_text string Immediate preceding text.
+--- @param model_name string Target LLM.
+--- @param temperature number Base temperature.
+--- @param max_predict number Max tokens per prediction.
+--- @param num_predictions number Quantity to predict.
+--- @param profile table Selected active profile.
+--- @param on_success function Success callback.
+--- @param on_fail function Failure callback.
 local function fetch_batch(full_text, tail_text, model_name, temperature,
-                             max_predict, num_predictions, profile,
-                             on_success, on_fail)
-                             
-    local effective_temp = tonumber(temperature) or 0.1
-    local system_prompt  = resolve_system_prompt(profile, num_predictions, model_name)
-    local tokens         = (tonumber(max_predict) or 40) * num_predictions + 20
+							 max_predict, num_predictions, profile,
+							 on_success, on_fail)
+							 
+	local effective_temp = tonumber(temperature) or 0.1
+	local system_prompt  = resolve_system_prompt(profile, num_predictions)
+	-- Augmentation forte de la limite de tokens pour permettre 5 blocs entiers
+	local tokens         = tonumber(max_predict) * num_predictions + 150
+	local is_batch       = profile.batch
 
-    local t0 = hs.timer.secondsSinceEpoch()
-    post_and_parse(model_name, system_prompt, full_text, tail_text,
-                   effective_temp, tokens, num_predictions,
-                   function(results)
-                       local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
-                       if type(on_success) == "function" then pcall(on_success, results, ms) end
-                   end,
-                   on_fail)
+	local t0 = hs.timer.secondsSinceEpoch()
+	post_and_parse(model_name, system_prompt, full_text, tail_text,
+				   effective_temp, tokens, num_predictions, is_batch,
+				   function(results)
+					   local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+					   if type(on_success) == "function" then pcall(on_success, results, ms) end
+				   end,
+				   on_fail)
 end
 
-
-
--- ==============================================
--- ===== 7.2) Parallel Mode (N Requests) ========
--- ==============================================
-
+--- Dispatches multiple parallel API requests incrementing the temperature to aggregate predictions.
+--- @param full_text string Preceding text.
+--- @param tail_text string Immediate preceding text.
+--- @param model_name string Target LLM.
+--- @param temperature number Base starting temperature.
+--- @param max_predict number Max tokens per prediction.
+--- @param num_predictions number Total individual requests to fire.
+--- @param profile table Selected active profile.
+--- @param on_success function Success callback.
+--- @param on_fail function Failure callback.
 local function fetch_parallel(full_text, tail_text, model_name, temperature,
-                                max_predict, num_predictions, profile,
-                                on_success, on_fail)
+								max_predict, num_predictions, profile,
+								on_success, on_fail)
+								
+	local system_prompt = resolve_system_prompt(profile, 1)
+	local t0            = hs.timer.secondsSinceEpoch()
+	local results       = {}
+	local done_count    = 0
+	local finished      = false
+	local base_temp     = tonumber(temperature) or 0.1
+
+	--- Closes the async loop once all requests return or error out.
+	local function finish()
+		if finished then return end
+		finished = true
+		if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
+		local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+		if type(on_success) == "function" then pcall(on_success, results, ms) end
+	end
+
+	for i = 1, num_predictions do
+		post_and_parse(model_name, system_prompt, full_text, tail_text,
+					   base_temp, tonumber(max_predict) + 10, 1, false,
+					   function(preds)
+						   if finished then return end
+						   if type(preds) == "table" and type(preds[1]) == "table" then
+							   -- Deduplicate answers returned by parallel requests
+							   local dup = false
+							   for _, ex in ipairs(results) do
+								   if ex.to_type == preds[1].to_type then dup = true; break end
+							   end
+							   if not dup then table.insert(results, preds[1]) end
+						   end
+						   done_count = done_count + 1
+						   if done_count >= num_predictions then finish() end
+					   end,
+					   function()
+						   if finished then return end
+						   done_count = done_count + 1
+						   if done_count >= num_predictions then finish() end
+					   end)
+	end
+end
+
+--- Dispatches multiple sequential API requests to avoid parallel connection dropping.
+--- @param full_text string Preceding text.
+--- @param tail_text string Immediate preceding text.
+--- @param model_name string Target LLM.
+--- @param temperature number Base starting temperature.
+--- @param max_predict number Max tokens per prediction.
+--- @param num_predictions number Total individual requests to fire.
+--- @param profile table Selected active profile.
+--- @param on_success function Success callback.
+--- @param on_fail function Failure callback.
+local function fetch_sequential(full_text, tail_text, model_name, temperature,
+                                  max_predict, num_predictions, profile,
+                                  on_success, on_fail)
                                 
-    local system_prompt = resolve_system_prompt(profile, 1, model_name)
+    local system_prompt = resolve_system_prompt(profile, 1)
     local t0            = hs.timer.secondsSinceEpoch()
     local results       = {}
-    local done_count    = 0
-    local finished      = false
-    
     local base_temp     = tonumber(temperature) or 0.1
+    local current_req   = 1
 
-    local function finish()
-        if finished then return end
-        finished = true
-        
-        if #results == 0 then 
-            if type(on_fail) == "function" then pcall(on_fail) end
-            return 
+    local function do_next()
+        if current_req > num_predictions then
+            if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
+            local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+            if type(on_success) == "function" then pcall(on_success, results, ms) end
+            return
         end
-        
-        local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
-        if type(on_success) == "function" then pcall(on_success, results, ms) end
-    end
 
-    local temp_steps = {}
-    for i = 1, num_predictions do
-        temp_steps[i] = (i == 1) and base_temp
-                        or math.min(1.0, base_temp + (i - 1) * 0.15)
-    end
-
-    for i = 1, num_predictions do
         post_and_parse(model_name, system_prompt, full_text, tail_text,
-                       temp_steps[i], (tonumber(max_predict) or 40) + 10, 1,
+                       base_temp, tonumber(max_predict) + 10, 1, false,
                        function(preds)
-                           if finished then return end
                            if type(preds) == "table" and type(preds[1]) == "table" then
+                               -- Deduplicate answers returned by sequential requests
                                local dup = false
                                for _, ex in ipairs(results) do
                                    if ex.to_type == preds[1].to_type then dup = true; break end
                                end
                                if not dup then table.insert(results, preds[1]) end
                            end
-                           
-                           done_count = done_count + 1
-                           if done_count >= num_predictions then finish() end
+                           current_req = current_req + 1
+                           do_next()
                        end,
                        function()
-                           if finished then return end
-                           done_count = done_count + 1
-                           if done_count >= num_predictions then finish() end
+                           current_req = current_req + 1
+                           do_next()
                        end)
     end
+
+    do_next()
 end
 
 
 
 
 
--- =============================
--- =============================
--- ======= 8/ Public API =======
--- =============================
--- =============================
+-- =======================================
+-- =======================================
+-- ======= 7/ Public API =================
+-- =======================================
+-- =======================================
 
---- Entry point to dispatch an LLM prediction request
---- Automatically checks disabled app rules before firing
+--- Initiates a new LLM prediction request, selecting the optimal fetch strategy based on profile state.
+--- @param full_text string The complete tracked context string.
+--- @param tail_text string The most recent segment of the context.
+--- @param model_name string Name of the targeted local model.
+--- @param temperature number Base sampling temperature.
+--- @param max_predict number Maximum allowed output tokens.
+--- @param num_predictions number Request quantity for prediction arrays.
+--- @param on_success function Function to execute when successfully parsed payload returns.
+--- @param on_fail function Function to execute on timeout, error, or empty output.
+--- @param sequential_mode boolean Flag to enforce sequential API requests instead of parallel.
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
-                                  max_predict, num_predictions,
-                                  on_success, on_fail,
-                                  _legacy_sequential_mode)
+								  max_predict, num_predictions, on_success, on_fail, sequential_mode)
 
-    local ok_front, front = pcall(hs.application.frontmostApplication)
-    if ok_front and front then
-        local config_path = hs.configdir and (hs.configdir .. "/config.json")
-        local disabled = nil
-        
-        if config_path then
-            local ok_fh, fh = pcall(io.open, config_path, "r")
-            if ok_fh and fh then
-                local content = fh:read("*a")
-                pcall(function() fh:close() end)
-                
-                local ok_cfg, cfg = pcall(hs.json.decode, content)
-                if ok_cfg and type(cfg) == "table" and type(cfg.llm_disabled_apps) == "table" then
-                    disabled = cfg.llm_disabled_apps
-                end
-            end
+	-- Prevent firing requests if the active application is blacklisted by user settings
+	local ok_front, front = pcall(hs.application.frontmostApplication)
+	if ok_front and front then
+		local disabled = hs.settings.get("llm_disabled_apps")
+		if type(disabled) == "table" then
+			local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
+			local path = type(front.path) == "function" and front:path() or ""
+			for _, app in ipairs(disabled) do
+				if type(app) == "table" and ((app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path)) then
+					if type(on_fail) == "function" then pcall(on_fail) end
+					return
+				end
+			end
+		end
+	end
+
+	num_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
+	local profile = M.get_active_profile()
+
+	if type(profile) == "table" and (not profile.batch) and num_predictions > 1 then
+        if sequential_mode then
+            fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
+        else
+            fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
         end
-        
-        if not disabled then 
-            disabled = hs.settings.get("llm_disabled_apps") 
-        end
-        
-        if type(disabled) == "table" then
-            local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
-            local path = type(front.path) == "function" and front:path() or ""
-            
-            for _, app in ipairs(disabled) do
-                if type(app) == "table" then
-                    if (app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path) then
-                        if type(on_fail) == "function" then pcall(on_fail) end
-                        return
-                    end
-                end
-            end
-        end
-    end
-
-    num_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
-
-    local profile = M.get_active_profile()
-
-    if type(profile) == "table" and (not profile.batch) and num_predictions > 1 then
-        fetch_parallel(full_text, tail_text, model_name, temperature,
-                       max_predict, num_predictions, profile, on_success, on_fail)
-    else
-        fetch_batch(full_text, tail_text, model_name, temperature,
-                    max_predict, num_predictions, profile, on_success, on_fail)
-    end
+	else
+		fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
+	end
 end
 
---- Utility to correctly match current keyboard modifiers from an event
---- @param eventFlags table The flags from event:getFlags()
---- @param targetMods table The configured modifiers array (e.g. {"alt"} or {"none"})
---- @return boolean True if it perfectly matches
+--- Validates keystroke event modifiers against an expected explicit modifier set.
+--- @param eventFlags table The flags object emitted by the keystroke event.
+--- @param targetMods table A list of expected modifier keys (e.g., {"cmd", "shift"}).
+--- @return boolean True if the flags exactly match the target criteria, false otherwise.
 function M.check_modifiers(eventFlags, targetMods)
-    if type(targetMods) ~= "table" then return false end
-    if #targetMods == 1 and targetMods[1] == "none" then return false end
-    
-    -- We create a strict map of target modifiers to evaluate ONLY these 4 keys
-    -- This allows us to ignore the "fn" or "numericpad" flags often sent by macOS with arrow keys
-    local target_map = { cmd = false, alt = false, shift = false, ctrl = false }
-    for _, mod in ipairs(targetMods) do
-        if target_map[mod] ~= nil then target_map[mod] = true end
-    end
-    
-    -- We verify strictly that the event state matches the desired state for each modifier
-    if (eventFlags.cmd or false)   ~= target_map.cmd   then return false end
-    if (eventFlags.alt or false)   ~= target_map.alt   then return false end
-    if (eventFlags.shift or false) ~= target_map.shift then return false end
-    if (eventFlags.ctrl or false)  ~= target_map.ctrl  then return false end
-    
-    return true
+	if type(targetMods) ~= "table" then return false end
+	if #targetMods == 1 and targetMods[1] == "none" then return false end
+	
+	local target_map = { cmd = false, alt = false, shift = false, ctrl = false }
+	for _, mod in ipairs(targetMods) do if target_map[mod] ~= nil then target_map[mod] = true end end
+	
+	if (eventFlags.cmd or false)   ~= target_map.cmd   then return false end
+	if (eventFlags.alt or false)   ~= target_map.alt   then return false end
+	if (eventFlags.shift or false) ~= target_map.shift then return false end
+	if (eventFlags.ctrl or false)  ~= target_map.ctrl  then return false end
+	
+	return true
 end
 
 return M
