@@ -1,12 +1,9 @@
 -- ui/menu/init.lua
 
--- ===========================================================================
--- Menu UI Module.
---
--- Orchestrates the macOS Menu Bar icon (System Tray). Acts as the central 
--- hub tying together settings for hotstrings, gestures, shortcuts, etc.
--- UI components have been extracted into dedicated menu_* modules.
--- ===========================================================================
+--- Menu UI Module
+--- Orchestrates the macOS Menu Bar icon (System Tray)
+--- Acts as the central hub tying together settings for hotstrings, gestures, shortcuts, etc
+--- UI components have been extracted into dedicated menu_* modules
 
 local M = {}
 
@@ -25,41 +22,85 @@ local ok_kl, menu_keylogger       = pcall(require, "ui.menu.menu_keylogger")
 
 M._active_tasks = {}
 
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 1/ Helper Functions =======
+-- ===================================
+-- ===================================
+
+--- Extracts the group name from a file path or name
+--- @param file string The file name or path
+--- @return string The extracted group name
 local function get_group_name(file)
 	if type(file) ~= "string" then return "" end
 	return file:match("^(.*)%.lua$") or file:match("^(.*)%.toml$") or file
 end
 
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 2/ Core Lifecycle =======
+-- =================================
+-- =================================
+
 --- Initializes the menu bar app, loads configurations, and binds modules
+--- @param base_dir string Base directory for configuration
+--- @param hotfiles table List of hotstring files
+--- @param gestures table Gestures module reference
+--- @param keymap table Keymap module reference
+--- @param shortcuts table Shortcuts module reference
+--- @param personal_info table Personal info module reference
+--- @param module_sections table Extra module sections definitions
+--- @param script_control table Script control module reference
+--- @return table|nil myMenu The created menubar object
+--- @return table|nil configWatcher The file watcher object
 function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info, module_sections, script_control)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	
 	local ok, myMenu = pcall(hs.menubar.new)
 	if not ok or not myMenu then
-		print("[menu] Failed to create hs.menubar object.")
+		print("[menu] Failed to create hs.menubar object")
 		return nil, nil
 	end
 
 	local updateMenu
 
+
+
+	-- =================================
+	-- ===== 2.1) Internal Helpers =====
+	-- =================================
+
+	--- Updates the menubar icon based on the script state
+	--- @param custom_text string Optional text to display next to the icon
 	local function update_icon(custom_text)
 		local paused    = script_control and type(script_control.is_paused) == "function" and script_control.is_paused() or false
 		local logo_file = paused and "logo_black.png" or "logo_white.png"
 		local ok_img, ico = pcall(hs.image.imageFromPath, base_dir .. "images/" .. logo_file)
 		
-		myMenu:setTitle(custom_text and (" " .. tostring(custom_text)) or "")
+		pcall(function() myMenu:setTitle(custom_text and (" " .. tostring(custom_text)) or "") end)
 		
 		if ok_img and ico then
 			pcall(function() if type(ico.setSize) == "function" then ico:setSize({ w = 18, h = 18 }) end end)
-			myMenu:setIcon(ico, false)
+			pcall(function() myMenu:setIcon(ico, false) end)
 		elseif not custom_text then
-			myMenu:setTitle("🔧")
+			pcall(function() myMenu:setTitle("🔧") end)
 		end
 	end
-	update_icon()
+	
+	pcall(update_icon)
 
 	local _suppress_watcher_until = 0
 
+	--- Triggers a safe reload of the Hammerspoon configuration
+	--- @param source string The trigger source to determine the notification message
 	local function do_reload(source)
 		local msg = source == "watcher"
 			and "Fichiers modifiés — Rechargement…"
@@ -68,6 +109,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
 
+	--- Displays a notification when a feature is toggled
+	--- @param label string The feature name
+	--- @param is_enabled boolean The new state
 	local function notify_feature(label, is_enabled)
 		pcall(function()
 			hs.notify.new({
@@ -110,6 +154,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		llm_disabled_apps        = {},
 		llm_active_profile       = "standard",
 		llm_user_profiles        = {},
+		llm_trigger_shortcut     = false,
 		custom_editor_shortcut   = nil,
 		custom_default_section   = nil,
 		custom_close_on_add      = false,
@@ -117,6 +162,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		keylogger_disabled_apps  = {},
 	}
 
+	--- Replaces the default trigger character in strings if a custom one is set
+	--- @param text string The original text
+	--- @return string The modified text
 	local function applyTriggerChar(text)
 		if type(text) ~= "string" then return text end
 		local safe_repl = tostring(state.trigger_char):gsub("%%", "%%%%")
@@ -128,8 +176,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		if name ~= "" then state.hotstrings[name] = true end
 	end
 
+
+
+	-- =========================================
+	-- ===== 2.2) Preferences & State Sync =====
+	-- =========================================
+
 	local prefs_file = base_dir .. "config.json"
 
+	--- Loads user preferences from the JSON configuration file
+	--- @return table The loaded preferences
 	local function load_prefs()
 		local ok, fh = pcall(io.open, prefs_file, "r")
 		if not ok or not fh then return {} end
@@ -141,6 +197,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		return (dec_ok and type(tbl) == "table") and tbl or {}
 	end
 
+	--- Saves the current state to the JSON configuration file
 	local function save_prefs()
 		_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 1.0
 
@@ -197,6 +254,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 			llm_disabled_apps        = state.llm_disabled_apps,
 			llm_active_profile       = state.llm_active_profile or "standard",
 			llm_user_profiles        = state.llm_user_profiles  or {},
+			llm_trigger_shortcut     = state.llm_trigger_shortcut or false,
 			custom_editor_shortcut   = state.custom_editor_shortcut or false,
 			custom_default_section   = state.custom_default_section or false,
 			custom_close_on_add      = state.custom_close_on_add,
@@ -227,7 +285,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		end
 	end
 
-	-- Initial load
+	-- Initial load logic
 	do
 		local saved         = load_prefs()
 		local config_absent = (next(saved) == nil)
@@ -276,6 +334,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 			
 			if type(saved.llm_active_profile) == "string" then state.llm_active_profile = saved.llm_active_profile end
 			if type(saved.llm_user_profiles) == "table" then state.llm_user_profiles = saved.llm_user_profiles end
+
+			if type(saved.llm_trigger_shortcut) == "table" then
+				state.llm_trigger_shortcut = saved.llm_trigger_shortcut
+			elseif saved.llm_trigger_shortcut == false then
+				state.llm_trigger_shortcut = false
+			end
 
 			if type(saved.custom_editor_shortcut) == "table" then
 				state.custom_editor_shortcut = saved.custom_editor_shortcut
@@ -440,9 +504,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 				pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
 			end
 			if state.keylogger_enabled then
-				pcall(Keylogger.start, script_control)
+				if type(Keylogger.start) == "function" then pcall(Keylogger.start, script_control) end
 			else
-				pcall(Keylogger.stop)
+				if type(Keylogger.stop) == "function" then pcall(Keylogger.stop) end
 			end
 		end
 
@@ -472,7 +536,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 
 	-- Setup LLM handler safely
 	local llm_handler = nil
-	if ok_llm and menu_llm and type(menu_llm.create) == "function" then
+	if ok_llm and type(menu_llm) == "table" and type(menu_llm.create) == "function" then
 		local ok_h, res = pcall(menu_llm.create, {
 			state          = state,
 			active_tasks   = M._active_tasks,
@@ -485,7 +549,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		if ok_h then llm_handler = res end
 	end
 	
-	if llm_handler and type(llm_handler.check_startup) == "function" then
+	if type(llm_handler) == "table" and type(llm_handler.check_startup) == "function" then
 		pcall(llm_handler.check_startup)
 	end
 
@@ -540,9 +604,38 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 					end
 				end)
 			end,
+			trigger_prediction = function()
+				if keymap and type(keymap.trigger_prediction) == "function" then
+					pcall(keymap.trigger_prediction)
+				end
+			end,
+			add_hotstring = function()
+				if hotstring_editor and type(hotstring_editor.open) == "function" then
+					pcall(hotstring_editor.open, "shortcut")
+				end
+			end,
+			open_config = function()
+				hs.timer.doAfter(0, function()
+					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					pcall(hs.execute, "open \"" .. base_dir .. "config.json\"")
+				end)
+			end,
+			open_logs = function()
+				hs.timer.doAfter(0, function()
+					pcall(hs.execute, "open \"" .. base_dir .. "logs\"")
+				end)
+			end,
 		})
 	end
 
+
+
+	-- ===================================
+	-- ===== 2.3) Menu Construction ======
+	-- ===================================
+
+	--- Globally enables or disables all main features
+	--- @param enabled boolean The target state
 	local function set_all_enabled(enabled)
 		state.keymap = enabled; state.gestures = enabled
 		state.shortcuts = enabled
@@ -606,102 +699,115 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 
 		save_prefs()
 		notify_feature(enabled
-			and "Toutes les fonctionnalités ont été activées."
-			or  "Toutes les fonctionnalités ont été désactivées.", enabled)
+			and "Toutes les fonctionnalités ont été activées"
+			or  "Toutes les fonctionnalités ont été désactivées", enabled)
 		updateMenu()
 	end
 
 	updateMenu = function()
-		-- Context generated dynamically at each update for accurate paused state
-		local ctx = {
-			state            = state,
-			paused           = script_control and type(script_control.is_paused) == "function" and script_control.is_paused() or false,
-			save_prefs       = save_prefs,
-			updateMenu       = updateMenu,
-			notify_feature   = notify_feature,
-			do_reload        = do_reload,
-			applyTriggerChar = applyTriggerChar,
-			get_group_name   = get_group_name,
-			keymap           = keymap,
-			hotfiles         = hotfiles,
-			module_sections  = module_sections,
-			hotstring_editor = hotstring_editor,
-			personal_info    = personal_info,
-			gestures         = gestures,
-			shortcuts        = shortcuts,
-			script_control   = script_control,
-		}
+		local function generate_menu()
+			-- Context generated dynamically at each update for accurate paused state
+			local ctx = {
+				state            = state,
+				paused           = script_control and type(script_control.is_paused) == "function" and script_control.is_paused() or false,
+				save_prefs       = save_prefs,
+				updateMenu       = updateMenu,
+				notify_feature   = notify_feature,
+				do_reload        = do_reload,
+				applyTriggerChar = applyTriggerChar,
+				get_group_name   = get_group_name,
+				keymap           = keymap,
+				hotfiles         = hotfiles,
+				module_sections  = module_sections,
+				hotstring_editor = hotstring_editor,
+				personal_info    = personal_info,
+				gestures         = gestures,
+				shortcuts        = shortcuts,
+				script_control   = script_control,
+			}
 
-		local items = {}
-		table.insert(items, {
-			title = hs.styledtext.new("Ergopti+", {
-				font           = { name = "Helvetica-Bold", size = 16 },
-				paragraphStyle = { alignment = "center" },
-			}),
-			fn = function() end,
-		})
-		table.insert(items, { title = "-" })
-
-		if ok_hot and menu_hotstrings then
-			for _, it in ipairs(menu_hotstrings.build_groups(ctx)) do table.insert(items, it) end
+			local items = {}
+			table.insert(items, {
+				title = hs.styledtext.new("Ergopti+", {
+					font           = { name = "Helvetica-Bold", size = 16 },
+					paragraphStyle = { alignment = "center" },
+				}),
+				fn = function() end,
+			})
 			table.insert(items, { title = "-" })
-			table.insert(items, menu_hotstrings.build_management(ctx))
-			local personnel_item = menu_hotstrings.build_personal(ctx)
-			if personnel_item then table.insert(items, personnel_item) end
-			table.insert(items, menu_hotstrings.build_custom(ctx))
+
+			if ok_hot and type(menu_hotstrings) == "table" then
+				if type(menu_hotstrings.build_groups) == "function" then
+					for _, it in ipairs(menu_hotstrings.build_groups(ctx)) do table.insert(items, it) end
+				end
+				table.insert(items, { title = "-" })
+				if type(menu_hotstrings.build_management) == "function" then
+					table.insert(items, menu_hotstrings.build_management(ctx))
+				end
+				if type(menu_hotstrings.build_personal) == "function" then
+					local personnel_item = menu_hotstrings.build_personal(ctx)
+					if personnel_item then table.insert(items, personnel_item) end
+				end
+				if type(menu_hotstrings.build_custom) == "function" then
+					table.insert(items, menu_hotstrings.build_custom(ctx))
+				end
+			end
+
+			table.insert(items, { title = "-" })
+			if type(llm_handler) == "table" and type(llm_handler.build_item) == "function" then
+				local ok_b, llm_item = pcall(llm_handler.build_item)
+				if ok_b and llm_item then table.insert(items, llm_item) end
+			end
+			
+			-- Ajout du Keylogger sous l'IA
+			if ok_kl and type(menu_keylogger) == "table" and type(menu_keylogger.build) == "function" then
+				local kl_item = menu_keylogger.build(ctx)
+				if kl_item then table.insert(items, kl_item) end
+			end
+
+			table.insert(items, { title = "-" })
+			if ok_gest and type(menu_gestures) == "table" and type(menu_gestures.build) == "function" then
+				local g_item = menu_gestures.build(ctx)
+				if g_item then table.insert(items, g_item) end
+			end
+			
+			if ok_short and type(menu_shortcuts) == "table" and type(menu_shortcuts.build) == "function" then
+				local r_item = menu_shortcuts.build(ctx)
+				if r_item then table.insert(items, r_item) end
+			end
+
+			if ok_script and type(menu_script_ctrl) == "table" and type(menu_script_ctrl.build) == "function" then
+				local sc = menu_script_ctrl.build(ctx)
+				if sc then table.insert(items, sc) end
+			end
+
+			table.insert(items, { title = "-" })
+			table.insert(items, { title = "☑ Activer toutes les fonctionnalités",
+				fn = function() set_all_enabled(true)  end })
+			table.insert(items, { title = "☐ Désactiver toutes les fonctionnalités",
+				fn = function() set_all_enabled(false) end })
+			table.insert(items, { title = "-" })
+			table.insert(items, { title = "Ouvrir init.lua",
+				fn = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end })
+			table.insert(items, { title = "Console Hammerspoon",
+				fn = function() pcall(hs.openConsole) end })
+			table.insert(items, { title = "Préférences",
+				fn = function() pcall(hs.openPreferences) end })
+			table.insert(items, { title = "Recharger",
+				fn = function() do_reload("menu") end })
+			table.insert(items, { title = "Quitter Hammerspoon",
+				fn = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end })
+
+			return items
 		end
 
-		table.insert(items, { title = "-" })
-		if llm_handler and type(llm_handler.build_item) == "function" then
-			local ok_b, llm_item = pcall(llm_handler.build_item)
-			if ok_b and llm_item then table.insert(items, llm_item) end
-		end
-		
-		-- Ajout du Keylogger sous l'IA
-		if ok_kl and menu_keylogger then
-			local kl_item = menu_keylogger.build(ctx)
-			if kl_item then table.insert(items, kl_item) end
-		end
-
-		table.insert(items, { title = "-" })
-		if ok_gest and menu_gestures then
-			local g_item = menu_gestures.build(ctx)
-			if g_item then table.insert(items, g_item) end
-		end
-		
-		if ok_short and menu_shortcuts then
-			local r_item = menu_shortcuts.build(ctx)
-			if r_item then table.insert(items, r_item) end
-		end
-
-		if ok_script and menu_script_ctrl then
-			local sc = menu_script_ctrl.build(ctx)
-			if sc then table.insert(items, sc) end
-		end
-
-		table.insert(items, { title = "-" })
-		table.insert(items, { title = "☑ Activer toutes les fonctionnalités",
-			fn = function() set_all_enabled(true)  end })
-		table.insert(items, { title = "☐ Désactiver toutes les fonctionnalités",
-			fn = function() set_all_enabled(false) end })
-		table.insert(items, { title = "-" })
-		table.insert(items, { title = "Ouvrir init.lua",
-			fn = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end })
-		table.insert(items, { title = "Console",
-			fn = function() pcall(hs.openConsole) end })
-		table.insert(items, { title = "Préférences",
-			fn = function() pcall(hs.openPreferences) end })
-		table.insert(items, { title = "Recharger",
-			fn = function() do_reload("menu") end })
-		table.insert(items, { title = "Quitter",
-			fn = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end })
-
-		pcall(function() myMenu:setMenu({}) end)
-		hs.timer.doAfter(0.02, function() pcall(function() myMenu:setMenu(items) end) end)
+		pcall(function() myMenu:setMenu(generate_menu) end)
 	end
 
 	updateMenu()
 
+	--- Watcher callback to detect configuration file modifications
+	--- @param files table The modified files list
 	local function reloadConfig(files)
 		if hs.timer.secondsSinceEpoch() < _suppress_watcher_until then return end
 		if type(files) == "table" then
@@ -726,7 +832,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 	M._menu    = myMenu
 	M._watcher = configWatcher
 
-	pcall(notifications.notify, "Script prêt ! 🚀")
+	pcall(notifications.notify, "Script prêt ! 🚀")
 	return myMenu, configWatcher
 end
 

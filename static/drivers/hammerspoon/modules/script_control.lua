@@ -28,14 +28,24 @@ local notifications = require("lib.notifications")
 
 -- Available actions and their display labels (used by the menu UI)
 local ACTION_LABELS = {
-    none      = "Désactivé",
-    pause     = "Pause / Reprendre",
-    reload    = "Recharger le script",
-    open_init = "Ouvrir init.lua",
-    open_ahk  = "Ouvrir le script AHK",
+    none               = "Désactivé",
+    pause              = "Pause / Reprendre",
+    reload             = "Recharger",
+    open_init          = "Ouvrir init.lua",
+    open_ahk           = "Ouvrir le fichier AHK",
+    trigger_prediction = "Déclencher une prédiction IA",
+    add_hotstring      = "Ajouter un hotstring",
+    open_config        = "Ouvrir config.json",
+    open_logs          = "Ouvrir le dossier de logs",
+    open_console       = "Console Hammerspoon",
+    quit_hammerspoon   = "Quitter Hammerspoon",
 }
 
-local ACTIONS_ORDER = { "none", "pause", "reload", "open_init", "open_ahk" }
+local ACTIONS_ORDER = { 
+    "none", "pause", "reload", "open_init", "open_ahk",
+    "trigger_prediction", "add_hotstring", "open_config",
+    "open_logs", "open_console", "quit_hammerspoon"
+}
 
 local KEYCODE_RETURN    = 36
 local KEYCODE_BACKSPACE = 51
@@ -168,6 +178,30 @@ local function dispatch_action(action)
         
     elseif action == "open_ahk" then
         if type(_extras.open_ahk) == "function" then pcall(_extras.open_ahk) end
+        return true
+        
+    elseif action == "trigger_prediction" then
+        if type(_extras.trigger_prediction) == "function" then pcall(_extras.trigger_prediction) end
+        return true
+        
+    elseif action == "add_hotstring" then
+        if type(_extras.add_hotstring) == "function" then pcall(_extras.add_hotstring) end
+        return true
+        
+    elseif action == "open_config" then
+        if type(_extras.open_config) == "function" then pcall(_extras.open_config) end
+        return true
+        
+    elseif action == "open_logs" then
+        if type(_extras.open_logs) == "function" then pcall(_extras.open_logs) end
+        return true
+        
+    elseif action == "open_console" then
+        pcall(hs.openConsole)
+        return true
+        
+    elseif action == "quit_hammerspoon" then
+        hs.timer.doAfter(0.1, function() os.exit(0) end)
         return true
     end
     
