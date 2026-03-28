@@ -16,6 +16,7 @@ Copilot is authorized to create, edit, and delete any file type in any directory
 - **Code is English, UI is French.**
 - ALL variables, function names, class names, parameters, internal comments, and docstrings **MUST be written in English**.
 - ONLY user-facing text (HTML content, UI labels, `hs.dialog.alert`, `alert()`, `print()` intended for the user) must be written in **French**.
+- **Typography & Quotes (CRITICAL):** You MUST use the typographic apostrophe (`’`) in all comments and text displayed to the user. Always prefer double quotes (`"`) over single quotes (`'`) for strings. Double quotes are our standard; the goal is to have as few standard single quotes (`'`) as possible in the codebase.
 
 ## 2. Architecture & Spacing (CRITICAL)
 
