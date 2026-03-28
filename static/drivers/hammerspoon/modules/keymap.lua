@@ -201,8 +201,19 @@ function M.ignore_window_pattern(pattern)
 	if type(pattern) == "string" then table.insert(_ignored_window_patterns, pattern) end 
 end
 
-function M.set_llm_excluded_apps(apps)
+function M.set_llm_disabled_apps(apps)
 	llm_excluded_apps = type(apps) == "table" and apps or {}
+end
+
+--- Timer safe wrappers
+local function start_llm_timer(delay)
+	if llm_enabled and llm_debounce_time >= 0 and M._llm_timer and type(M._llm_timer.start) == "function" then
+		if delay then M._llm_timer:start(delay) else M._llm_timer:start() end
+	end
+end
+
+local function stop_llm_timer()
+	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
 end
 
 --- Toggles the LLM prediction state safely
@@ -215,9 +226,7 @@ function M.set_llm_enabled(enabled)
 		_predictions_active   = false
 		_enter_validates_pred = false
 		_llm_request_id       = _llm_request_id + 1
-		if M._llm_timer and type(M._llm_timer.running) == "function" and M._llm_timer:running() then 
-			M._llm_timer:stop() 
-		end
+		stop_llm_timer()
 	end
 end
 
@@ -229,9 +238,11 @@ end
 --- Updates the debounce timer for the LLM request
 --- @param seconds number The debounce delay in seconds
 function M.set_llm_debounce(seconds)
-	llm_debounce_time = math.max(0, tonumber(seconds) or M.LLM_DEBOUNCE_DEFAULT)
-	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
-	M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
+	llm_debounce_time = tonumber(seconds) or M.LLM_DEBOUNCE_DEFAULT
+	stop_llm_timer()
+	if llm_debounce_time >= 0 then
+		M._llm_timer = hs.timer.delayed.new(llm_debounce_time, function() M._perform_llm_check(false) end)
+	end
 end
 
 function M.get_base_delay()       return BASE_DELAY_SEC end
@@ -664,9 +675,7 @@ local function reset_predictions()
 	_llm_request_id       = _llm_request_id + 1
 	
 	if tooltip.hide then tooltip.hide() end
-	if M._llm_timer and type(M._llm_timer.stop) == "function" then
-		M._llm_timer:stop()
-	end
+	stop_llm_timer()
 end
 
 --- Validates and applies the selected LLM prediction with robust fail-safes
@@ -772,9 +781,7 @@ local function apply_prediction(idx)
 	end
 
 	suppress_rescan_keep_buffer(0.3)
-	if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then
-		M._llm_timer:start()
-	end
+	start_llm_timer()
 	return true
 end
 
@@ -810,9 +817,15 @@ local function llm_suppressed_for_app()
 	local frontApp = hs.application.frontmostApplication()
 	if not frontApp then return false end
 	
-	local appName = frontApp:name() or ""
-	for _, excluded in ipairs(llm_excluded_apps) do
-		if excluded == appName then return true end
+	local bid  = type(frontApp.bundleID) == "function" and frontApp:bundleID() or ""
+	local path = type(frontApp.path) == "function" and frontApp:path() or ""
+	
+	for _, app in ipairs(llm_excluded_apps) do
+		if type(app) == "table" then
+			if (app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path) then
+				return true
+			end
+		end
 	end
 	return false
 end
@@ -832,8 +845,11 @@ local function build_info_bar(model_name, elapsed_ms)
 end
 
 --- Core routine to evaluate buffer state and dispatch API calls if suitable
-function M._perform_llm_check()
-	if not llm_enabled or llm_suppressed_for_app() then return end
+--- @param force boolean Bypasses app exclusions and debounce timeouts (for manual triggers)
+function M._perform_llm_check(force)
+	if not llm_enabled then return end
+	if not force and llm_suppressed_for_app() then return end
+	if not force and llm_debounce_time < 0 then return end
 
 	local clean_buffer = buffer
 	local words = {}
@@ -915,19 +931,23 @@ function M._perform_llm_check()
 				if _llm_request_id ~= my_request_id then return end
 				reset_predictions()
 			end,
-			llm_sequential_mode
+			llm_sequential_mode, force
 		)
 	end
 end
 
-M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
+M._llm_timer = hs.timer.delayed.new(llm_debounce_time, function() M._perform_llm_check(false) end)
+
+--- Exposes a manual trigger allowing system-wide shortcuts to launch predictions
+function M.trigger_prediction()
+	if not llm_enabled then return end
+	M._perform_llm_check(true)
+end
 
 --- Synchronizes state and invalidates previews when typing alters context
 --- @param buf string The current buffer context
 local function update_preview(buf)
-	if M._llm_timer and type(M._llm_timer.running) == "function" and M._llm_timer:running() then 
-		M._llm_timer:stop() 
-	end
+	stop_llm_timer()
 	reset_predictions()
 
 	if not buf or #buf == 0 then 
@@ -938,9 +958,7 @@ local function update_preview(buf)
 	local last_word = buf:match("([^%s]+)$")
 	if not last_word then 
 		if tooltip.hide then tooltip.hide() end
-		if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then 
-			M._llm_timer:start() 
-		end
+		start_llm_timer()
 		return 
 	end
 
@@ -985,14 +1003,10 @@ local function update_preview(buf)
 		local display_text = km_utils and type(km_utils.tokens_from_repl) == "function" 
 			and km_utils.plain_text(km_utils.tokens_from_repl(match_repl)) or match_repl
 		if tooltip.show then tooltip.show(display_text, false, preview_enabled) end
-		if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then 
-			M._llm_timer:start(math.max(0.1, M.WORD_TIMEOUT_SEC - 0.3))
-		end
+		start_llm_timer(math.max(0.1, M.WORD_TIMEOUT_SEC - 0.3))
 	else
 		if tooltip.hide then tooltip.hide() end
-		if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then 
-			M._llm_timer:start() 
-		end
+		start_llm_timer()
 	end
 end
 
@@ -1032,9 +1046,7 @@ local function perform_text_replacement(deletes, emit_action, buffer_action, is_
 	if is_final then M.suppress_rescan(1.0) end
 
 	-- Triggers an AI prediction as soon as the hotstring is expanded
-	if not is_ignored and llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then
-		M._llm_timer:start()
-	end
+	if not is_ignored then start_llm_timer() end
 end
 
 --- Attempts to resolve and execute an auto-expanding hotstring sequence
@@ -1203,9 +1215,7 @@ local function try_repeat_feature(chars, is_ignored)
 	local tstart = utf8.offset(buffer, -char_len)
 	buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. last_char
 	
-	if not is_ignored and llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then
-		M._llm_timer:start()
-	end
+	if not is_ignored then start_llm_timer() end
 	
 	return true
 end

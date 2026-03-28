@@ -7,19 +7,18 @@
 --   - models_manager.lua   (Ollama, metadata, and installs)
 --   - profiles_manager.lua (Prompt strategies and Editor)
 --   - settings_manager.lua (Numeric configs and Dialogs)
---   - app_picker.lua       (Application exclusions)
 -- ===========================================================================
 
 local M = {}
 
-local hs       = hs
-local llm_mod  = require("modules.llm")
+local hs           = hs
+local llm_mod      = require("modules.llm")
 
 -- Sub-modules import
-local Models   = require("ui.menu.menu_llm.models_manager")
-local Profiles = require("ui.menu.menu_llm.profiles_manager")
-local Settings = require("ui.menu.menu_llm.settings_manager")
-local Apps     = require("ui.menu.menu_llm.app_picker")
+local Models       = require("ui.menu.menu_llm.models_manager")
+local Profiles     = require("ui.menu.menu_llm.profiles_manager")
+local Settings     = require("ui.menu.menu_llm.settings_manager")
+local AppPickerLib = require("lib.app_picker")
 
 
 
@@ -79,7 +78,6 @@ function M.create(deps)
 	local models_mgr   = Models.new(deps)
 	local profiles_mgr = Profiles.new(deps, models_mgr)
 	local settings_mgr = Settings.new(deps)
-	local apps_mgr     = Apps.new(deps)
 
 	local state        = deps.state
 	local keymap       = deps.keymap
@@ -242,6 +240,23 @@ function M.create(deps)
 	-- ===================================
 	-- ===================================
 
+	local _llm_trigger_hk = nil
+
+	--- Binds the global hotkey to manually trigger LLM prediction
+	local function apply_llm_shortcut(mods, key)
+		if _llm_trigger_hk then pcall(function() _llm_trigger_hk:delete() end); _llm_trigger_hk = nil end
+		if mods and key then
+			state.llm_trigger_shortcut = { mods = mods, key = key }
+			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+				if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end
+			end)
+			if ok and hk then _llm_trigger_hk = hk; hk:enable() end
+		else
+			state.llm_trigger_shortcut = false
+		end
+		save_prefs(); update_menu()
+	end
+
 	--- Core builder for the entire Artificial Intelligence menu tree
 	--- @return table The root menu item structure
 	local function build_item()
@@ -288,7 +303,8 @@ function M.create(deps)
 		-- --- PROFILES SUBMENU CONSTRUCTION ---
 		table.insert(main_menu, profiles_mgr.get_menu_item())
 		
-		table.insert(main_menu, { title = "Temps d’attente avant suggestion : " .. math.floor(state.llm_debounce * 1000) .. " ms…", fn = settings_mgr.set_debounce })
+		local debounce_display = (tonumber(state.llm_debounce) and state.llm_debounce < 0) and "Jamais" or (math.floor(state.llm_debounce * 1000) .. " ms…")
+		table.insert(main_menu, { title = "Temps d’attente avant suggestion : " .. debounce_display, fn = settings_mgr.set_debounce })
 		if state.llm_debounce ~= keymap.LLM_DEBOUNCE_DEFAULT then
 			table.insert(main_menu, { title = "   ↳ Réinitialiser (défaut : " .. math.floor(keymap.LLM_DEBOUNCE_DEFAULT * 1000) .. " ms)", fn = settings_mgr.reset_debounce })
 		end
@@ -330,11 +346,29 @@ function M.create(deps)
 			end
 		})
 
-		table.insert(main_menu, apps_mgr.get_menu_item())
+		-- Directly build the AppPicker exclusion menu item here
+		local disabled_count = #(type(state.llm_disabled_apps) == "table" and state.llm_disabled_apps or {})
+		local disabled_label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
+
+		table.insert(main_menu, {
+			title = disabled_label,
+			menu  = AppPickerLib.build_menu(
+				state.llm_disabled_apps,
+				function(new_list)
+					state.llm_disabled_apps = new_list
+					if keymap and type(keymap.set_llm_disabled_apps) == "function" then
+						pcall(keymap.set_llm_disabled_apps, new_list)
+					end
+					pcall(save_prefs)
+					pcall(update_menu)
+				end,
+				"Exclure de la génération IA automatique…"
+			)
+		})
 
 		table.insert(main_menu, { title = "-" })
 
-		-- --- 4. INTERFACE & SHORTCUTS ---
+		-- --- 4. INTERFACE & RACCOURCIS ---
 		table.insert(main_menu, { title = "— INTERFACE & RACCOURCIS —", disabled = true })
 
 		table.insert(main_menu, {
@@ -387,8 +421,48 @@ function M.create(deps)
 
 		table.insert(main_menu, { title = "Indentation de la suggestion sélectionnée", menu = settings_mgr.build_indent_menu() })
 
+		local sc_label = "Aucun"
+		if type(state.llm_trigger_shortcut) == "table" then
+			local mods_cap = {}
+			for _, m in ipairs(state.llm_trigger_shortcut.mods or {}) do
+				table.insert(mods_cap, m:sub(1,1):upper() .. m:sub(2))
+			end
+			local mods_str = table.concat(mods_cap, "+")
+			sc_label = (mods_str ~= "" and (mods_str .. " + ") or "") .. string.upper(state.llm_trigger_shortcut.key or "")
+		end
+
+		table.insert(main_menu, {
+			title = "Raccourci pour générer manuellement : " .. sc_label,
+			fn = function()
+				local current_str = ""
+				if type(state.llm_trigger_shortcut) == "table" then
+					current_str = table.concat(state.llm_trigger_shortcut.mods or {}, "+") .. "+" .. (state.llm_trigger_shortcut.key or "")
+				end
+				local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+					"Raccourci génération IA",
+					"Format : mods+touche  (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+					current_str, "OK", "Annuler"
+				)
+				if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
+				raw = raw:match("^%s*(.-)%s*$"):lower()
+				if raw == "" then apply_llm_shortcut(nil, nil); return end
+				local parts = {}
+				for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
+				if #parts < 1 then return end
+				local key  = parts[#parts]
+				local mods = {}
+				for i = 1, #parts - 1 do
+					local m = parts[i]
+					if m == "option" then m = "alt" end
+					table.insert(mods, m)
+				end
+				if #mods == 0 then mods = {"ctrl"} end
+				apply_llm_shortcut(mods, key)
+			end
+		})
+
 		return {
-			title   = "Intelligence Artificielle",
+			title   = "Intelligence Artificielle ✨",
 			checked = (state.llm_enabled and not paused) or nil,
 			fn      = not paused and function()
 				local function toggle_state()
@@ -412,6 +486,10 @@ function M.create(deps)
 
 	--- Startup check logic to ensure Ollama is available if LLM is enabled
 	local function check_startup()
+		if type(state.llm_trigger_shortcut) == "table" then
+			apply_llm_shortcut(state.llm_trigger_shortcut.mods, state.llm_trigger_shortcut.key)
+		end
+
 		if not state.llm_enabled then return end
 		
 		local function disable_llm()

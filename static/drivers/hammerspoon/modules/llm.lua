@@ -772,20 +772,23 @@ end
 --- @param on_success function Function to execute when successfully parsed payload returns.
 --- @param on_fail function Function to execute on timeout, error, or empty output.
 --- @param sequential_mode boolean Flag to enforce sequential API requests instead of parallel.
+--- @param force boolean If true, bypasses application exclusions.
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
-								  max_predict, num_predictions, on_success, on_fail, sequential_mode)
+								  max_predict, num_predictions, on_success, on_fail, sequential_mode, force)
 
 	-- Prevent firing requests if the active application is blacklisted by user settings
-	local ok_front, front = pcall(hs.application.frontmostApplication)
-	if ok_front and front then
-		local disabled = hs.settings.get("llm_disabled_apps")
-		if type(disabled) == "table" then
-			local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
-			local path = type(front.path) == "function" and front:path() or ""
-			for _, app in ipairs(disabled) do
-				if type(app) == "table" and ((app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path)) then
-					if type(on_fail) == "function" then pcall(on_fail) end
-					return
+	if not force then
+		local ok_front, front = pcall(hs.application.frontmostApplication)
+		if ok_front and front then
+			local disabled = hs.settings.get("llm_disabled_apps")
+			if type(disabled) == "table" then
+				local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
+				local path = type(front.path) == "function" and front:path() or ""
+				for _, app in ipairs(disabled) do
+					if type(app) == "table" and ((app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path)) then
+						if type(on_fail) == "function" then pcall(on_fail) end
+						return
+					end
 				end
 			end
 		end

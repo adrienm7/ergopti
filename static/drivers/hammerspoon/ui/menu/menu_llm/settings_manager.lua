@@ -105,11 +105,38 @@ function M.new(deps)
 
 	--- Sets the idle delay before triggering the LLM
 	function obj.set_debounce()
-		generic_numeric_prompt(deps, 
-			"Temps d’attente", 
-			"Délai de pause requis lors de la frappe (en ms) avant de solliciter l’IA :", 
-			"llm_debounce", 1000, "set_llm_debounce", keymap.LLM_DEBOUNCE_DEFAULT
-		)
+		local state = deps.state
+		pcall(hs.focus)
+
+		local current_val = tonumber(state.llm_debounce)
+		if current_val == nil then current_val = keymap.LLM_DEBOUNCE_DEFAULT end
+		local display_val = current_val < 0 and "Jamais" or math.floor(current_val * 1000)
+		local display_def = math.floor(keymap.LLM_DEBOUNCE_DEFAULT * 1000)
+
+		local full_msg = "Délai de pause requis lors de la frappe (en ms) avant de solliciter l’IA :\n\n(Laissez vide pour réinitialiser : " .. display_def .. " ms)\n(Tapez 'Jamais' ou -1 pour désactiver l'auto-génération)"
+
+		local ok_p, btn, raw = pcall(hs.dialog.textPrompt, "Temps d’attente", full_msg, tostring(display_val), "OK", "Annuler")
+
+		if ok_p and btn == "OK" then
+			local new_val
+			if raw:match("^%s*$") then
+				new_val = keymap.LLM_DEBOUNCE_DEFAULT
+			elseif raw:lower():match("jamais") then
+				new_val = -1
+			else
+				new_val = tonumber(raw)
+				if new_val and new_val >= 0 then new_val = new_val / 1000 end
+			end
+			
+			if new_val then
+				state.llm_debounce = new_val
+				if deps.keymap and type(deps.keymap.set_llm_debounce) == "function" then
+					pcall(deps.keymap.set_llm_debounce, new_val)
+				end
+				pcall(deps.save_prefs)
+				pcall(deps.update_menu)
+			end
+		end
 	end
 	function obj.reset_debounce() reset_to_default(deps, "llm_debounce", keymap.LLM_DEBOUNCE_DEFAULT, "set_llm_debounce") end
 
