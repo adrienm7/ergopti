@@ -86,8 +86,7 @@ function M.open(existing, on_save)
                 if type(on_save) == "function" then
                     pcall(on_save, {
                         id          = id,
-                        label       = type(body.name) == "string" and body.name or "Profil Sans Nom",
-                        description = "Profil personnalisé",
+                        label       = type(body.name) == "string" and body.name or "Profil personnalisé",
                         batch       = (body.batch == true),
                         raw_prompt  = type(body.prompt) == "string" and body.prompt or "",
                     })

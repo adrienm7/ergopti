@@ -13,20 +13,29 @@
 		<div class="fg">
 			<div class="fg-header"><label>Mode de requête</label></div>
 			<select id="p-mode">
-				<option value="parallel">Parallèle</option>
-				<option value="batch">Groupée (batch)</option>
+				<option value="parallel" selected>Standard — prédictions en parallèle</option>
+				<option value="batch">Groupé — prédictions par lot (grands modèles)</option>
 			</select>
 		</div>
 		<div class="fg" style="flex-grow: 1; display: flex">
 			<div class="fg-header">
 				<label>Prompt système</label>
-				<button
-					class="btn btn-sm btn-s"
-					onclick="insertChipAtCursor('context')"
-					title="Insérer le bloc {context}"
-				>
-					＋ {context}
-				</button>
+				<div>
+					<button
+						class="btn btn-sm btn-s"
+						onclick="insertChipAtCursor('context')"
+						title="Insérer le bloc {context}"
+					>
+						＋ {context}
+					</button>
+					<button
+						class="btn btn-sm btn-s"
+						onclick="insertChipAtCursor('n')"
+						title="Insérer le bloc {n}"
+					>
+						＋ {n}
+					</button>
+				</div>
 			</div>
 			<div class="editor-wrap">
 				<div id="e-out-ph" class="ph-overlay">
@@ -35,13 +44,19 @@
 				<div id="e-out" class="output-editor" contenteditable="true" spellcheck="false"></div>
 			</div>
 			<div class="help">
-				Le bloc {context} sera remplacé par le texte sélectionné par l’utilisateur.
+				Le bloc {context} sera remplacé par le texte sélectionné par l’utilisateur. Le bloc {n} sera
+				remplacé par le nombre de prédictions (ex: 3).
+				<br /><br />
+				<strong>Formatage (Batch) :</strong> Demandez explicitement au modèle de séparer chaque
+				suggestion par le délimiteur "---". (ex : "Propose {n} suites, séparées par ---").
 			</div>
 		</div>
 		<div class="btn-row">
 			<button class="btn btn-s" onclick="doCancel()">Annuler</button>
 			<button class="btn btn-p" onclick="doSave()">Enregistrer</button>
 		</div>
+
+		<div id="ac-popup"></div>
 		<script src="script.js"></script>
 	</body>
 </html>
