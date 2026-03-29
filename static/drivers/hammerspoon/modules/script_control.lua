@@ -28,24 +28,24 @@ local notifications = require("lib.notifications")
 
 -- Available actions and their display labels (used by the menu UI)
 local ACTION_LABELS = {
-    none               = "Désactivé",
-    pause              = "Pause / Reprendre",
-    reload             = "Recharger",
-    open_init          = "Ouvrir init.lua",
-    open_ahk           = "Ouvrir le fichier AHK",
-    trigger_prediction = "Déclencher une prédiction IA",
     add_hotstring      = "Ajouter un hotstring",
-    show_metrics       = "Afficher les métriques",
+    none               = "Désactivé",
+    open_ahk           = "Ouvrir le fichier AHK",
     open_config        = "Ouvrir config.json",
-    open_logs          = "Ouvrir le dossier de logs",
     open_console       = "Console Hammerspoon",
+    open_init          = "Ouvrir init.lua",
+    open_logs          = "Ouvrir le dossier de logs",
+    pause              = "Pause / Reprendre",
     quit_hammerspoon   = "Quitter Hammerspoon",
+    reload             = "Recharger",
+    show_metrics       = "Afficher les métriques",
+    trigger_prediction = "Déclencher une prédiction IA",
 }
 
 local ACTIONS_ORDER = { 
-    "none", "pause", "reload", "open_init", "open_ahk",
-    "trigger_prediction", "add_hotstring", "show_metrics", "open_config",
-    "open_logs", "open_console", "quit_hammerspoon"
+    "none", "pause", "reload", "open_console", "quit_hammerspoon",
+    "open_init", "open_ahk", "open_config", "open_logs",
+    "add_hotstring", "trigger_prediction",  "show_metrics", 
 }
 
 local KEYCODE_RETURN    = 36
