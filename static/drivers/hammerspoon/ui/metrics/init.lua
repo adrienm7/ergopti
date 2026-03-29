@@ -1,106 +1,216 @@
--- ui/metrics/init.lua
+--- ui/metrics/init.lua
 
--- ===========================================================================
--- Keylogger Metrics UI Module.
---
--- Spawns a Webview to process and display detailed typing statistics
--- (Characters, Bigrams, Trigrams, Words, WPM evolution) using Chart.js.
--- ===========================================================================
+--- ==============================================================================
+--- MODULE: Metrics Dashboard UI
+--- DESCRIPTION:
+--- Injects and manages the HTML/JS webview to display typing metrics.
+---
+--- FEATURES & RATIONALE:
+--- 1. Decoupled Architecture: Connects raw local logs to an isolated Webview.
+--- 2. Singleton Preservation: Pressing the shortcut multiple times brings the existing window to the front without reloading the heavy JS DOM, creating a new window only if it is completely closed.
+--- 3. Space Teleportation & Focus: Leverages the UI builder to natively teleport the window to the active macOS space and grant it focus, while allowing other apps to overlap it when clicked.
+--- ==============================================================================
 
 local M = {}
-
 local hs = hs
-M._wv    = nil
+local fs = require("hs.fs")
+local json = require("hs.json")
+local ui_builder = require("ui.ui_builder")
+
+M._wv       = nil
+M._timer    = nil
+M._last_req = nil
 
 
 
 
 
--- =============================
--- =============================
--- ======= 1/ Public API =======
--- =============================
--- =============================
+-- =================================
+-- =================================
+-- ======= 1/ Data Retrieval =======
+-- =================================
+-- =================================
 
---- Opens the metrics dashboard and injects the log data.
---- @param log_dir string The directory containing the daily .log files
-function M.show(log_dir)
-	if not log_dir then return end
-
-	local base_dir = hs.configdir .. "/ui/metrics/"
-	
-	-- Create Webview if it doesn't exist, maximizing the screen bounds with a slight padding
-	if not M._wv then
-		local screen_frame = hs.screen.mainScreen():frame()
-		M._wv = hs.webview.new({
-			x = screen_frame.x + 50,
-			y = screen_frame.y + 50,
-			w = screen_frame.w - 100,
-			h = screen_frame.h - 100
-		})
-		M._wv:windowTitle("Métriques de frappe")
-		M._wv:level(hs.drawing.windowLevels.normal)
-		M._wv:windowStyle(1|2|4|8)
-		M._wv:allowTextEntry(true) -- Required to allow typing inside HTML input elements
-		
-		M._wv:windowCallback(function(action)
-			if action == "closing" then M._wv = nil end
-		end)
-	end
-
-	-- Read local UI files
-	local function read_file(path)
-		local f = io.open(path, "r")
-		if not f then return "" end
-		local content = f:read("*a")
-		f:close()
-		return content
-	end
-
-	local html = read_file(base_dir .. "index.html")
-	local css  = read_file(base_dir .. "style.css")
-	local js   = read_file(base_dir .. "script.js")
-
-	-- Inject CSS and JS safely without triggering Lua's '%' pattern matching
-	local function inject_safely(source, tag, content)
-		local start_idx, end_idx = source:find(tag, 1, true)
-		if start_idx then
-			return source:sub(1, start_idx - 1) .. content .. source:sub(end_idx + 1)
+--- Extracts the app icon safely from macOS.
+--- @param app_name string The name of the application.
+--- @return string Base64 encoded string of the icon.
+local function get_app_icon(app_name)
+	local app = hs.application.find(app_name)
+	if app and type(app.bundleID) == "function" then
+		local ok, img = pcall(hs.image.imageFromAppBundle, app:bundleID())
+		if ok and img then 
+			img:setSize({ w = 32, h = 32 })
+			return img:encodeAsURLString() 
 		end
-		return source
+	end
+	return nil
+end
+
+--- Lazily loads compressed daily index files on demand for the JavaScript UI.
+--- @param log_dir string Path to logs.
+--- @param start_date string Minimum date boundary.
+--- @param end_date string Maximum date boundary.
+--- @param selected_apps table Array of requested applications.
+--- @return table The fully merged big dictionary for the UI.
+local function fetch_range(log_dir, start_date, end_date, selected_apps)
+	local merged = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {} }
+	local app_set = {}
+	
+	if selected_apps and type(selected_apps) == "table" then
+		for _, app in ipairs(selected_apps) do app_set[app] = true end
 	end
 
-	html = inject_safely(html, "</head>", "<style>\n" .. css .. "\n</style>\n</head>")
-	html = inject_safely(html, "</head>", "<script>\n" .. js .. "\n</script>\n</head>")
+	for f in fs.dir(log_dir) do
+		local y, m, d = f:match("^(%d%d%d%d)_(%d%d)_(%d%d)%.idx")
+		if y and m and d then
+			local date_str = string.format("%s-%s-%s", y, m, d)
+			local is_in_range = true
+			if start_date and start_date ~= "" and date_str < start_date then is_in_range = false end
+			if end_date and end_date ~= "" and date_str > end_date then is_in_range = false end
 
-	M._wv:html(html)
-	M._wv:show()
-	M._wv:bringToFront()
-	hs.focus()
-
-	-- Gather and format log data
-	local all_lines = {}
-	local attrs = hs.fs.attributes(log_dir)
-	if attrs then
-		for f in hs.fs.dir(log_dir) do
-			if f:match("%.log$") then
-				local file = io.open(log_dir .. "/" .. f, "r")
-				if file then
-					for line in file:lines() do
-						line = line:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("'", "\\'")
-						table.insert(all_lines, '"' .. line .. '"')
+			if is_in_range then
+				local content = ""
+				local full_path = log_dir .. "/" .. f
+				
+				if f:match("%.gz$") then
+					local p = io.popen(string.format("gzip -c -d %q 2>/dev/null", full_path), "r")
+					if p then 
+						content = p:read("*a")
+						p:close() 
 					end
-					file:close()
+				else
+					local file = io.open(full_path, "r")
+					if file then 
+						content = file:read("*a")
+						file:close() 
+					end
+				end
+
+				if content and content ~= "" then
+					local ok, day_data = pcall(json.decode, content)
+					if ok and type(day_data) == "table" then
+						for appName, appData in pairs(day_data) do
+							if app_set[appName] then
+								for k_type, k_dict in pairs(appData) do
+									if merged[k_type] and type(k_dict) == "table" then
+										for k_seq, k_stats in pairs(k_dict) do
+											local t = merged[k_type][k_seq]
+											if not t then
+												t = { c = 0, t = 0, hs = 0, llm = 0, o = 0, e = 0 }
+												merged[k_type][k_seq] = t
+											end
+											t.c = t.c + (k_stats.c or 0)
+											t.t = t.t + (k_stats.t or 0)
+											t.hs = t.hs + (k_stats.hs or 0)
+											t.llm = t.llm + (k_stats.llm or 0)
+											t.o = t.o + (k_stats.o or 0)
+											t.e = t.e + (k_stats.e or 0)
+										end
+									end
+								end
+							end
+						end
+					end
 				end
 			end
 		end
 	end
+	
+	return merged
+end
 
-	-- Inject data asynchronously to avoid blocking Hammerspoon.
-	local js_inject = "window.log_lines = [" .. table.concat(all_lines, ",") .. "]; window.process_logs();"
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 2/ UI Injection =======
+-- ===============================
+-- ===============================
+
+--- Injects the instant manifest and polls for lazy loading requests.
+--- @param log_dir string Path to the logging directory.
+function M.show(log_dir)
+	if not fs.attributes(log_dir, "mode") == "directory" then return end
+	
+	-- Early return: Reuse the webview if it is already open to strictly preserve state.
+	if M._wv then
+		ui_builder.force_focus(M._wv)
+		return
+	end
+	
+	local manifest_path = log_dir .. "/manifest.json"
+	local manifest = {}
+	local f = io.open(manifest_path, "r")
+	
+	if f then
+		local content = f:read("*a")
+		f:close()
+		pcall(function() manifest = json.decode(content) or {} end)
+	end
+
+	local app_icons = {}
+	for _, day_data in pairs(manifest) do
+		for app_name, _ in pairs(day_data) do
+			if app_name ~= "Unknown" and not app_icons[app_name] then
+				app_icons[app_name] = get_app_icon(app_name)
+			end
+		end
+	end
+
+	local sf = hs.screen.mainScreen():frame()
+	local frame = { x = sf.x + 50, y = sf.y + 50, w = sf.w - 100, h = sf.h - 100 }
+
+	-- Request the webview creation/focus from the centralized UI builder
+	M._wv = ui_builder.show_webview({
+		frame       = frame,
+		title       = "Métriques de frappe",
+		style_masks = 15,
+		assets_dir  = hs.configdir .. "/ui/metrics/",
+		on_close    = function()
+			M._wv = nil
+			if M._timer then 
+				M._timer:stop()
+				M._timer = nil 
+			end
+		end
+	})
+
+	-- Load manifest safely into the browser
 	hs.timer.doAfter(0.5, function()
-		if M._wv then M._wv:evaluateJavaScript(js_inject) end
+		if M._wv then 
+			local js = string.format("window.metrics_manifest = %s; window.app_icons = %s; if(window.process_manifest) window.process_manifest();", json.encode(manifest), json.encode(app_icons))
+			pcall(function() M._wv:evaluateJavaScript(js) end)
+		end
 	end)
+
+	if M._timer then M._timer:stop() end
+	
+	-- Data polling loop
+	M._timer = hs.timer.new(0.3, function()
+		if not M._wv then 
+			M._timer:stop()
+			M._timer = nil
+			return 
+		end
+		
+		pcall(function()
+			M._wv:evaluateJavaScript("window._lua_request", function(req)
+				if req and type(req) == "string" and req ~= "" and req ~= "null" then
+					pcall(function() M._wv:evaluateJavaScript("window._lua_request = null;") end)
+					local ok, query = pcall(json.decode, req)
+					if ok and query then
+						local raw_data = fetch_range(log_dir, query.start_date, query.end_date, query.apps)
+						local js_cmd = string.format("window.receive_range_data(%s)", json.encode(raw_data))
+						pcall(function() M._wv:evaluateJavaScript(js_cmd) end)
+					end
+				end
+			end)
+		end)
+	end)
+	
+	M._timer:start()
 end
 
 return M

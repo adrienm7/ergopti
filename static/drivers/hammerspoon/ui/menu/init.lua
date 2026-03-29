@@ -155,11 +155,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		llm_active_profile       = "standard",
 		llm_user_profiles        = {},
 		llm_trigger_shortcut     = false,
+		metrics_shortcut         = false,
 		custom_editor_shortcut   = nil,
 		custom_default_section   = nil,
 		custom_close_on_add      = false,
 		keylogger_enabled        = false,
 		keylogger_disabled_apps  = {},
+		keylogger_encrypt        = false,
+		keylogger_password       = "ErgoptiPlusAutoKey_v1",
+		keylogger_menubar_wpm    = false,
+		keylogger_float_wpm      = false,
+		keylogger_float_graph    = false,
 	}
 
 	--- Replaces the default trigger character in strings if a custom one is set
@@ -255,11 +261,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 			llm_active_profile       = state.llm_active_profile or "standard",
 			llm_user_profiles        = state.llm_user_profiles  or {},
 			llm_trigger_shortcut     = state.llm_trigger_shortcut or false,
+			metrics_shortcut         = state.metrics_shortcut or false,
 			custom_editor_shortcut   = state.custom_editor_shortcut or false,
 			custom_default_section   = state.custom_default_section or false,
 			custom_close_on_add      = state.custom_close_on_add,
 			keylogger_enabled        = state.keylogger_enabled,
 			keylogger_disabled_apps  = state.keylogger_disabled_apps,
+			keylogger_encrypt        = state.keylogger_encrypt,
+			keylogger_password       = state.keylogger_password,
+			keylogger_menubar_wpm    = state.keylogger_menubar_wpm,
+			keylogger_float_wpm      = state.keylogger_float_wpm,
+			keylogger_float_graph    = state.keylogger_float_graph,
 		}
 
 		if shortcuts and type(shortcuts.list_shortcuts) == "function" then
@@ -283,6 +295,25 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 				pcall(function() fh:close() end) 
 			end
 		end
+	end
+
+	local _metrics_hk = nil
+	local function apply_metrics_shortcut(mods, key)
+		if _metrics_hk then pcall(function() _metrics_hk:delete() end); _metrics_hk = nil end
+		if mods and key then
+			state.metrics_shortcut = { mods = mods, key = key }
+			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+				local ok_kl_mod, Keylogger = pcall(require, "modules.keylogger")
+				if ok_kl_mod and Keylogger and type(Keylogger.show_metrics) == "function" then
+					pcall(Keylogger.show_metrics)
+				end
+			end)
+			if ok and hk then _metrics_hk = hk; hk:enable() end
+		else
+			state.metrics_shortcut = false
+		end
+		save_prefs()
+		if type(updateMenu) == "function" then updateMenu() end
 	end
 
 	-- Initial load logic
@@ -341,6 +372,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 				state.llm_trigger_shortcut = false
 			end
 
+			if type(saved.metrics_shortcut) == "table" then
+				state.metrics_shortcut = saved.metrics_shortcut
+			elseif saved.metrics_shortcut == false then
+				state.metrics_shortcut = false
+			end
+
 			if type(saved.custom_editor_shortcut) == "table" then
 				state.custom_editor_shortcut = saved.custom_editor_shortcut
 			elseif saved.custom_editor_shortcut == false then
@@ -356,6 +393,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 			if saved.custom_close_on_add ~= nil then state.custom_close_on_add = saved.custom_close_on_add end
 
 			if saved.keylogger_enabled ~= nil then state.keylogger_enabled = saved.keylogger_enabled end
+			if saved.keylogger_encrypt ~= nil then state.keylogger_encrypt = saved.keylogger_encrypt end
+			if type(saved.keylogger_password) == "string" and saved.keylogger_password ~= "" then state.keylogger_password = saved.keylogger_password end
+			if saved.keylogger_menubar_wpm ~= nil then state.keylogger_menubar_wpm = saved.keylogger_menubar_wpm end
+			if saved.keylogger_float_wpm ~= nil then state.keylogger_float_wpm = saved.keylogger_float_wpm end
+			if saved.keylogger_float_graph ~= nil then state.keylogger_float_graph = saved.keylogger_float_graph end
+
 			if type(saved.keylogger_disabled_apps) == "table" then state.keylogger_disabled_apps = saved.keylogger_disabled_apps end
 
 			if type(saved.section_states) == "table" then
@@ -464,6 +507,32 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 			end
 		end
 
+		if type(state.metrics_shortcut) == "table" then
+			apply_metrics_shortcut(state.metrics_shortcut.mods, state.metrics_shortcut.key)
+		end
+
+		-- Sync Keylogger Engine Options BEFORE starting
+		local ok_kl_mod, Keylogger = pcall(require, "modules.keylogger")
+		if ok_kl_mod and Keylogger then
+			if type(Keylogger.set_options) == "function" then
+				pcall(Keylogger.set_options, {
+					encrypt     = state.keylogger_encrypt,
+					password    = state.keylogger_password or "ErgoptiPlusAutoKey_v1",
+					menubar     = state.keylogger_menubar_wpm,
+					float       = state.keylogger_float_wpm,
+					float_graph = state.keylogger_float_graph,
+				})
+			end
+			if type(Keylogger.set_disabled_apps) == "function" then
+				pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
+			end
+			if state.keylogger_enabled then
+				if type(Keylogger.start) == "function" then pcall(Keylogger.start, script_control) end
+			else
+				if type(Keylogger.stop) == "function" then pcall(Keylogger.stop) end
+			end
+		end
+
 		-- Start engines according to states
 		if keymap then
 			if state.keymap then 
@@ -494,19 +563,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 				if type(personal_info.enable) == "function" then pcall(personal_info.enable) end 
 			else 
 				if type(personal_info.disable) == "function" then pcall(personal_info.disable) end 
-			end
-		end
-
-		-- Sync Keylogger Engine
-		local ok_kl_mod, Keylogger = pcall(require, "modules.keylogger")
-		if ok_kl_mod and Keylogger then
-			if type(Keylogger.set_disabled_apps) == "function" then
-				pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
-			end
-			if state.keylogger_enabled then
-				if type(Keylogger.start) == "function" then pcall(Keylogger.start, script_control) end
-			else
-				if type(Keylogger.stop) == "function" then pcall(Keylogger.stop) end
 			end
 		end
 
@@ -614,6 +670,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 					pcall(hotstring_editor.open, "shortcut")
 				end
 			end,
+			show_metrics = function()
+				local ok_kl_mod, Keylogger = pcall(require, "modules.keylogger")
+				if ok_kl_mod and Keylogger and type(Keylogger.show_metrics) == "function" then
+					pcall(Keylogger.show_metrics)
+				end
+			end,
 			open_config = function()
 				hs.timer.doAfter(0, function()
 					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
@@ -701,29 +763,30 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 		notify_feature(enabled
 			and "Toutes les fonctionnalités ont été activées"
 			or  "Toutes les fonctionnalités ont été désactivées", enabled)
-		updateMenu()
+		if type(updateMenu) == "function" then updateMenu() end
 	end
 
 	updateMenu = function()
 		local function generate_menu()
 			-- Context generated dynamically at each update for accurate paused state
 			local ctx = {
-				state            = state,
-				paused           = script_control and type(script_control.is_paused) == "function" and script_control.is_paused() or false,
-				save_prefs       = save_prefs,
-				updateMenu       = updateMenu,
-				notify_feature   = notify_feature,
-				do_reload        = do_reload,
-				applyTriggerChar = applyTriggerChar,
-				get_group_name   = get_group_name,
-				keymap           = keymap,
-				hotfiles         = hotfiles,
-				module_sections  = module_sections,
-				hotstring_editor = hotstring_editor,
-				personal_info    = personal_info,
-				gestures         = gestures,
-				shortcuts        = shortcuts,
-				script_control   = script_control,
+				state                  = state,
+				paused                 = script_control and type(script_control.is_paused) == "function" and script_control.is_paused() or false,
+				save_prefs             = save_prefs,
+				updateMenu             = updateMenu,
+				notify_feature         = notify_feature,
+				do_reload              = do_reload,
+				applyTriggerChar       = applyTriggerChar,
+				get_group_name         = get_group_name,
+				keymap                 = keymap,
+				hotfiles               = hotfiles,
+				module_sections        = module_sections,
+				hotstring_editor       = hotstring_editor,
+				personal_info          = personal_info,
+				gestures               = gestures,
+				shortcuts              = shortcuts,
+				script_control         = script_control,
+				apply_metrics_shortcut = apply_metrics_shortcut,
 			}
 
 			local items = {}
