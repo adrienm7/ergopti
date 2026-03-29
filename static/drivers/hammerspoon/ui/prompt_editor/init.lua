@@ -58,7 +58,7 @@ function M.open(existing, on_save)
 	end
 
 	local default_name   = type(existing) == "table" and type(existing.label) == "string" and existing.label or ""
-	local default_batch  = (existing == nil) or (type(existing) == "table" and existing.batch ~= false)
+	local default_batch  = type(existing) == "table" and existing.batch == true
 	local default_prompt = type(existing) == "table" and type(existing.raw_prompt) == "string" and existing.raw_prompt or "Voici un texte, continue-le : {context}"
 	local title_str      = existing and "Modifier le profil" or "Nouveau profil"
 
