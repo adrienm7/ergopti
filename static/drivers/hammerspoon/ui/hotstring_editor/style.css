@@ -44,6 +44,7 @@ body {
 	--tag-on-c: #007aff;
 	--chip-bg: #ddeeff;
 	--chip-c: #1a4bbf;
+	--cmd-hover-bg: #f1f1f1;
 	--chip-bd: rgba(26, 75, 191, 0.22);
 	--row-hover: #f5f8ff;
 	--warning: #ff9500;
@@ -53,11 +54,11 @@ body {
 @media (prefers-color-scheme: dark) {
 	:root {
 		--bg: #1c1c1e;
-		--surface: #2c2c2e;
+		--surface: #242424;
 		--border: #3a3a3c;
 		--text: #fff;
 		--sub: rgba(235, 235, 245, 0.6);
-		--hint: #636366;
+		--hint: #a2a2a2;
 		--accent: #0a84ff;
 		--accent2: #bf5af2;
 		--danger: #ff453a;
@@ -66,8 +67,8 @@ body {
 		--tag-bg: #3a3a3c;
 		--tag-on: #0a3a6e;
 		--tag-on-c: #64b5f6;
-		--chip-bg: #183060;
-		--chip-c: #93b8f8;
+		--chip-bg: #5e5f60;
+		--cmd-hover-bg: #131313;
 		--chip-bd: rgba(147, 184, 248, 0.28);
 		--row-hover: #333335;
 		--warning: #ff9f0a;
@@ -1020,8 +1021,7 @@ details.cmd-help[open] summary::before {
 }
 
 .cmd-ref:hover {
-	background: var(--chip-bg);
-	filter: brightness(0.93);
+	background-color: var(--cmd-hover-bg);
 }
 
 .cmd-ref .cmd-sym {
