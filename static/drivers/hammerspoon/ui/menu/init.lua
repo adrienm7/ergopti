@@ -850,15 +850,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, shortcuts, personal_info,
 			table.insert(items, { title = "☐ Désactiver toutes les fonctionnalités",
 				fn = function() set_all_enabled(false) end })
 			table.insert(items, { title = "-" })
+			table.insert(items, { title = "Console",
+				fn = function() pcall(hs.openConsole) end })
 			table.insert(items, { title = "Ouvrir init.lua",
 				fn = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end })
-			table.insert(items, { title = "Console Hammerspoon",
-				fn = function() pcall(hs.openConsole) end })
 			table.insert(items, { title = "Préférences",
 				fn = function() pcall(hs.openPreferences) end })
 			table.insert(items, { title = "Recharger",
 				fn = function() do_reload("menu") end })
-			table.insert(items, { title = "Quitter Hammerspoon",
+			table.insert(items, { title = "Quitter",
 				fn = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end })
 
 			return items
