@@ -11,14 +11,14 @@ Copilot is authorized to create, edit, and delete any file type in any directory
 
 # Global Project Rules
 
-## 1. Language Enforcement (CRITICAL)
+## 1. Language Enforcement
 
 - **Code is English, UI is French.**
 - ALL variables, function names, class names, parameters, internal comments, and docstrings **MUST be written in English**.
 - ONLY user-facing text (HTML content, UI labels, `hs.dialog.alert`, `alert()`, `print()` intended for the user) must be written in **French**.
-- **Typography & Quotes (CRITICAL):** You MUST use the typographic apostrophe (`’`) in all comments and text displayed to the user. Always prefer double quotes (`"`) over single quotes (`'`) for strings. Double quotes are our standard; the goal is to have as few standard single quotes (`'`) as possible in the codebase.
+- **Typography & Quotes:** You MUST use the typographic apostrophe (`’`) in all comments and text displayed to the user. Always prefer double quotes (`"`) over single quotes (`'`) for strings. Double quotes are our standard; the goal is to have as few standard single quotes (`'`) as possible in the codebase.
 
-## 2. Architecture & Spacing (CRITICAL)
+## 2. Architecture & Spacing
 
 - **Indentation:** Always use **tabs** for indentation (no spaces).
 - **Sections:** Major functional sections MUST be preceded by **EXACTLY 5 blank lines**.
@@ -49,8 +49,13 @@ more_code_here()
 
 ## 3. Documentation
 
-- Every function, method, and class must be documented using the standard docstring format of the respective language (`JSDoc` for JS, `EmmyLua` for Lua, `Google Style` for Python).
-- Comments should explain _why_ something is done, not _what_ is done.
+- **File Path Header:** The VERY FIRST line of every file MUST be a comment containing its relative path (excluding any leading `hammerspoon/` or `/hammerspoon/`). **Important:** For Lua (`.lua`) files, you MUST use exactly three dashes for this line (e.g., `--- ui/menu/init.lua`). For other languages, use their standard single-line comment syntax.
+- **Module Headers:** Immediately following the file path line, there MUST be a comprehensive module-level docstring. This header must explain the module's name, its detailed description, its core features, and the overarching "why" behind its existence.
+- **Function/Class Docs:** Every function, method, and class must be documented using the standard docstring format of the respective language (`JSDoc` for JS, `EmmyLua` for Lua, `Google Style` for Python).
+- **Punctuation Rules:**
+  - **Docstrings** (formal documentation) **MUST ALWAYS end with a period (`.`)**. They are formal sentences and start with a capital letter.
+  - **Inline comments** (quick developer notes like `//`, `--`, `#`) **MUST NEVER end with a period** but need to start with a capital letter. They are not formal sentences but should still be clear and well-written.
+- **Context:** Comments should explain _why_ something is done, not _what_ is done.
 
 # Language-Specific Guidelines
 
@@ -62,6 +67,20 @@ more_code_here()
 **Example:**
 
 ```javascript
+// ui/modal_engine.js
+
+/**
+ * ==============================================================================
+ * MODULE: UI Modal Engine
+ * DESCRIPTION:
+ * Manages the lifecycle and DOM interactions of all application modals.
+ *
+ * FEATURES & RATIONALE:
+ * 1. Centralized State: Prevents z-index conflicts by managing a global state.
+ * 2. Safe Injection: Ensures DOM elements exist before applying CSS classes.
+ * ==============================================================================
+ */
+
 let globalData = null;
 
 // ===================================
@@ -75,8 +94,9 @@ let globalData = null;
  * @param {string} modalId - The DOM ID of the modal container.
  */
 function openModal(modalId) {
+	// Apply the class only if element is found
 	document.getElementById(modalId).classList.add('on');
-	console.log('Fenêtre modale ouverte avec succès.'); // French for UI/Logs
+	console.log('Fenêtre modale ouverte avec succès.');
 }
 
 // ===================================
@@ -102,6 +122,18 @@ function showAlertModal(message) {
 **Example:**
 
 ```lua
+--- modules/keylogger_core.lua
+
+--- ==============================================================================
+--- MODULE: Keylogger Core
+--- DESCRIPTION:
+--- Daemon responsible for intercepting and aggregating human keystrokes.
+---
+--- FEATURES & RATIONALE:
+--- 1. Precision Profiling: Captures millisecond delays for N-gram analysis.
+--- 2. OS Safety: Wrapped in pcalls to prevent keyboard lockups on error.
+--- ==============================================================================
+
 local M = {}
 local hs = hs
 
@@ -118,15 +150,16 @@ local hs = hs
 --- Safely starts the keylogger engine and binds the event tap.
 --- @param script_control table The module reference to check pause state.
 function M.start(script_control)
-	local ok, err = pcall(function()
-		-- Implementation logic here
-	end)
+  -- Wrap in pcall to avoid locking the OS keyboard
+  local ok, err = pcall(function()
+    -- Implementation logic here
+  end)
 
-	if not ok then
-		hs.dialog.alert("Erreur", "Le lancement a échoué.")
-	else
-		print("[keylogger] Système activé.")
-	end
+  if not ok then
+    hs.dialog.alert("Erreur", "Le lancement a échoué.")
+  else
+    print("[keylogger] Système activé.")
+  end
 end
 ```
 
@@ -140,6 +173,20 @@ end
 **Example:**
 
 ```python
+# utils/driver_config.py
+
+"""
+==============================================================================
+MODULE: Driver Config Parser
+DESCRIPTION:
+Handles the ingestion and parsing of low-level keyboard driver configurations.
+
+FEATURES & RATIONALE:
+1. Failsafe Parsing: Returns None instead of crashing on missing files.
+2. Strict Typing: Ensures downstream modules receive predictable dictionaries.
+==============================================================================
+"""
+
 import os
 from typing import Optional
 
@@ -154,19 +201,20 @@ from typing import Optional
 # ==================================
 
 def parse_driver_config(file_path: str) -> Optional[dict]:
-	"""Parses a configuration file for the keyboard drivers.
+  """Parses a configuration file for the keyboard drivers.
 
-	Args:
-		file_path: The absolute path to the configuration file.
+  Args:
+    file_path: The absolute path to the configuration file.
 
-	Returns:
-		A dictionary containing the parsed configuration, or None if it fails.
-	"""
-	if not os.path.exists(file_path):
-		print("Erreur : Le fichier de configuration est introuvable.")
-		return None
-	# Logic goes here
-	return {}
+  Returns:
+    A dictionary containing the parsed configuration, or None if it fails.
+  """
+  # Ensure file exists to prevent IO exceptions
+  if not os.path.exists(file_path):
+    print("Erreur : Le fichier de configuration est introuvable.")
+    return None
+
+  return {}
 ```
 
 ## AutoHotkey (`.ahk`)
@@ -177,6 +225,14 @@ def parse_driver_config(file_path: str) -> Optional[dict]:
 **Example:**
 
 ```autohotkey
+; ui/tray_menu.ahk
+
+; ==============================================================================
+; MODULE: Tray Menu Integration
+; DESCRIPTION:
+; Manages the Windows system tray icon and right-click context menu.
+; ==============================================================================
+
 global IsPaused := False
 
 
@@ -190,7 +246,6 @@ global IsPaused := False
 ; ==================================
 
 SetupTrayMenu() {
-	Menu, Tray, Tip, Ergopti+ est actif
-	; Logic goes here
+  ; Logic goes here
 }
 ```
