@@ -226,7 +226,9 @@ function M.set_llm_enabled(enabled)
 		_predictions_active   = false
 		_enter_validates_pred = false
 		_llm_request_id       = _llm_request_id + 1
-		stop_llm_timer()
+		if M._llm_timer and type(M._llm_timer.running) == "function" and M._llm_timer:running() then 
+			M._llm_timer:stop() 
+		end
 	end
 end
 
@@ -238,15 +240,14 @@ end
 --- Updates the debounce timer for the LLM request
 --- @param seconds number The debounce delay in seconds
 function M.set_llm_debounce(seconds)
-	llm_debounce_time = tonumber(seconds) or M.LLM_DEBOUNCE_DEFAULT
-	stop_llm_timer()
-	if llm_debounce_time >= 0 then
-		M._llm_timer = hs.timer.delayed.new(llm_debounce_time, function() M._perform_llm_check(false) end)
-	end
+	llm_debounce_time = math.max(0, tonumber(seconds) or M.LLM_DEBOUNCE_DEFAULT)
+	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
+	M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
 end
 
 function M.get_base_delay()       return BASE_DELAY_SEC end
 function M.set_base_delay(secs)   BASE_DELAY_SEC = math.max(0, tonumber(secs) or M.BASE_DELAY_SEC_DEFAULT) end
+function M.get_shift_side()       return _shift_side    end
 
 function M.set_delay(key, val)
 	if M.DELAYS_DEFAULT[key] ~= nil then
@@ -675,7 +676,9 @@ local function reset_predictions()
 	_llm_request_id       = _llm_request_id + 1
 	
 	if tooltip.hide then tooltip.hide() end
-	stop_llm_timer()
+	if M._llm_timer and type(M._llm_timer.stop) == "function" then
+		M._llm_timer:stop()
+	end
 end
 
 --- Validates and applies the selected LLM prediction with robust fail-safes
@@ -760,6 +763,11 @@ local function apply_prediction(idx)
 	
 	-- Queueing generated characters to prevent buffer duplication
 	_expected_synthetic_chars = _expected_synthetic_chars .. emitted_str
+	
+	-- Notifying the Keylogger that this sequence is LLM generated
+	if keylogger and type(keylogger.notify_synthetic) == "function" and emitted_str ~= "" then
+		keylogger.notify_synthetic(emitted_str, "llm")
+	end
 
 	if deletes == 0 then
 		buffer = buffer .. to_type
@@ -781,7 +789,9 @@ local function apply_prediction(idx)
 	end
 
 	suppress_rescan_keep_buffer(0.3)
-	start_llm_timer()
+	if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then
+		M._llm_timer:start()
+	end
 	return true
 end
 
@@ -845,11 +855,8 @@ local function build_info_bar(model_name, elapsed_ms)
 end
 
 --- Core routine to evaluate buffer state and dispatch API calls if suitable
---- @param force boolean Bypasses app exclusions and debounce timeouts (for manual triggers)
-function M._perform_llm_check(force)
-	if not llm_enabled then return end
-	if not force and llm_suppressed_for_app() then return end
-	if not force and llm_debounce_time < 0 then return end
+function M._perform_llm_check()
+	if not llm_enabled or llm_suppressed_for_app() then return end
 
 	local clean_buffer = buffer
 	local words = {}
@@ -931,23 +938,19 @@ function M._perform_llm_check(force)
 				if _llm_request_id ~= my_request_id then return end
 				reset_predictions()
 			end,
-			llm_sequential_mode, force
+			llm_sequential_mode
 		)
 	end
 end
 
-M._llm_timer = hs.timer.delayed.new(llm_debounce_time, function() M._perform_llm_check(false) end)
-
---- Exposes a manual trigger allowing system-wide shortcuts to launch predictions
-function M.trigger_prediction()
-	if not llm_enabled then return end
-	M._perform_llm_check(true)
-end
+M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
 
 --- Synchronizes state and invalidates previews when typing alters context
 --- @param buf string The current buffer context
 local function update_preview(buf)
-	stop_llm_timer()
+	if M._llm_timer and type(M._llm_timer.running) == "function" and M._llm_timer:running() then 
+		M._llm_timer:stop() 
+	end
 	reset_predictions()
 
 	if not buf or #buf == 0 then 
@@ -958,7 +961,9 @@ local function update_preview(buf)
 	local last_word = buf:match("([^%s]+)$")
 	if not last_word then 
 		if tooltip.hide then tooltip.hide() end
-		start_llm_timer()
+		if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then 
+			M._llm_timer:start() 
+		end
 		return 
 	end
 
@@ -1003,10 +1008,14 @@ local function update_preview(buf)
 		local display_text = km_utils and type(km_utils.tokens_from_repl) == "function" 
 			and km_utils.plain_text(km_utils.tokens_from_repl(match_repl)) or match_repl
 		if tooltip.show then tooltip.show(display_text, false, preview_enabled) end
-		start_llm_timer(math.max(0.1, M.WORD_TIMEOUT_SEC - 0.3))
+		if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then 
+			M._llm_timer:start(math.max(0.1, M.WORD_TIMEOUT_SEC - 0.3))
+		end
 	else
 		if tooltip.hide then tooltip.hide() end
-		start_llm_timer()
+		if llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then 
+			M._llm_timer:start() 
+		end
 	end
 end
 
@@ -1026,7 +1035,8 @@ end
 --- @param buffer_action function Routine syncing the internal tracker logic
 --- @param is_final boolean Whether to pause predictions temporarily post execution
 --- @param is_ignored boolean Disables tooltip and AI reactions
-local function perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored)
+--- @param source_type string Specifies the module triggering the generation
+local function perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type)
 	_expected_synthetic_deletes = _expected_synthetic_deletes + deletes
 	if not is_ignored and tooltip.hide then tooltip.hide() end
 	
@@ -1035,6 +1045,11 @@ local function perform_text_replacement(deletes, emit_action, buffer_action, is_
 	if not ok then emitted_str = "" end
 	
 	_expected_synthetic_chars = _expected_synthetic_chars .. (emitted_str or "")
+	
+	-- Notifying the Keylogger of the exact provenance of the sequence
+	if keylogger and type(keylogger.notify_synthetic) == "function" and emitted_str ~= "" then
+		keylogger.notify_synthetic(emitted_str, source_type or "hotstring")
+	end
 	
 	if type(buffer_action) == "function" then pcall(buffer_action) end
 
@@ -1046,7 +1061,9 @@ local function perform_text_replacement(deletes, emit_action, buffer_action, is_
 	if is_final then M.suppress_rescan(1.0) end
 
 	-- Triggers an AI prediction as soon as the hotstring is expanded
-	if not is_ignored then start_llm_timer() end
+	if not is_ignored and llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then
+		M._llm_timer:start()
+	end
 end
 
 --- Attempts to resolve and execute an auto-expanding hotstring sequence
@@ -1101,7 +1118,8 @@ local function try_auto_expand(m, char_len, is_ignored)
 			buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text
 		end,
 		m.final_result,
-		is_ignored
+		is_ignored,
+		"hotstring"
 	)
 	return true
 end
@@ -1177,7 +1195,8 @@ local function try_terminator_expand(m, chars, char_len, is_ignored)
 				buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. repl_text .. (consume_term and "" or chars)
 			end,
 			m.final_result,
-			is_ignored
+			is_ignored,
+			"hotstring"
 		)
 	end
 
@@ -1210,12 +1229,18 @@ local function try_repeat_feature(chars, is_ignored)
 	end
 	
 	_expected_synthetic_chars = _expected_synthetic_chars .. last_char
+	
+	if keylogger and type(keylogger.notify_synthetic) == "function" then
+		keylogger.notify_synthetic(last_char, "hotstring")
+	end
 	keyStrokes(last_char)
 
 	local tstart = utf8.offset(buffer, -char_len)
 	buffer = (tstart and buffer:sub(1, tstart - 1) or "") .. last_char
 	
-	if not is_ignored then start_llm_timer() end
+	if not is_ignored and llm_enabled and M._llm_timer and type(M._llm_timer.start) == "function" then
+		M._llm_timer:start()
+	end
 	
 	return true
 end

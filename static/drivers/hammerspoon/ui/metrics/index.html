@@ -10,116 +10,152 @@
 		<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
 	</head>
 	<body>
-		<div class="header">
-			<h1>📊 Métriques de frappe</h1>
-		</div>
-
-		<div class="filters-bar">
-			<div>
-				<label>Du : </label><input type="date" id="date_start" onchange="apply_filters()" />
-			</div>
-			<div><label>Au : </label><input type="date" id="date_end" onchange="apply_filters()" /></div>
-			<div>
-				<label style="margin-left: 15px">Ignorer les pauses > </label>
-				<select id="max_delay" onchange="apply_filters()">
-					<option value="99999999">Illimité</option>
-					<option value="300000">5 min</option>
-					<option value="60000">1 min</option>
-					<option value="30000">30 s</option>
-					<option value="20000">20 s</option>
-					<option value="10000">10 s</option>
-					<option value="5000" selected>5 s</option>
-					<option value="3000">3 s</option>
-					<option value="1000">1 s</option>
-				</select>
+		<div class="top-fixed-bar">
+			<div class="header">
+				<h1>📊 Métriques de frappe</h1>
 			</div>
 
-			<div class="checkbox-group" style="margin-left: 15px">
-				<input type="checkbox" id="hide_spaces" onchange="apply_filters()" />
-				<label for="hide_spaces">Masquer espaces</label>
-			</div>
-			<div class="checkbox-group">
-				<input type="checkbox" id="hide_synth" onchange="apply_filters()" />
-				<label for="hide_synth">Masquer 100% Auto</label>
-			</div>
+			<div class="filters-bar">
+				<div>
+					<label>Du : </label><input type="date" id="date_start" onchange="apply_filters()" />
+				</div>
+				<div>
+					<label>Au : </label><input type="date" id="date_end" onchange="apply_filters()" />
+				</div>
 
-			<button class="tab-btn" style="margin-left: auto" onclick="reset_filters()">
-				Réinitialiser
-			</button>
-		</div>
+				<div class="checkbox-group" style="margin-left: 15px">
+					<button class="tab-btn" id="app_filter_btn" onclick="open_app_modal()">
+						Apps (Toutes)
+					</button>
+				</div>
 
-		<div class="stats-grid">
-			<div class="stat-card" id="global_stats">Calcul en cours...</div>
-			<div class="stat-card" id="sentence_stats">Calcul en cours...</div>
-		</div>
+				<div class="checkbox-group" style="margin-left: 15px">
+					<input type="checkbox" id="hide_spaces" onchange="apply_filters()" />
+					<label for="hide_spaces">Masquer espaces</label>
+				</div>
+				<div class="checkbox-group">
+					<input type="checkbox" id="hide_hs" onchange="apply_filters()" />
+					<label for="hide_hs">Masquer Hotstrings</label>
+				</div>
+				<div class="checkbox-group">
+					<input type="checkbox" id="hide_llm" onchange="apply_filters()" />
+					<label for="hide_llm">Masquer IA</label>
+				</div>
+				<div class="checkbox-group">
+					<input type="checkbox" id="case_sensitive" onchange="apply_filters()" />
+					<label for="case_sensitive">Sensible à la casse</label>
+				</div>
 
-		<div class="chart-container">
-			<div style="flex-grow: 1; position: relative; height: 100%">
-				<canvas id="wpm_chart"></canvas>
-			</div>
-			<div class="chart-help">
-				Scrollez (Molette) pour zoomer sur une période, glissez pour vous déplacer.
+				<button class="tab-btn" style="margin-left: auto" onclick="reset_filters()">
+					Réinitialiser
+				</button>
 			</div>
 		</div>
 
-		<div class="tabs">
-			<button class="tab-btn active" onclick="switch_tab('chars')">Caractères</button>
-			<button class="tab-btn" onclick="switch_tab('bigrams')">Bigrammes</button>
-			<button class="tab-btn" onclick="switch_tab('trigrams')">Trigrammes</button>
-			<button class="tab-btn" onclick="switch_tab('quadrigrams')">Quadrigrammes</button>
-			<button class="tab-btn" onclick="switch_tab('pentagrams')">Pentagrammes</button>
-			<button class="tab-btn" onclick="switch_tab('hexagrams')">Hexagrammes</button>
-			<button class="tab-btn" onclick="switch_tab('heptagrams')">Heptagrammes</button>
-			<button class="tab-btn" onclick="switch_tab('words')">Mots</button>
+		<div class="main-content">
+			<div class="stats-grid">
+				<div class="stat-card" id="sentence_stats">Calcul en cours...</div>
+				<div class="stat-card" id="global_stats">Calcul en cours...</div>
+			</div>
+
+			<div class="chart-container">
+				<div style="flex-grow: 1; position: relative; height: 100%">
+					<canvas id="wpm_chart"></canvas>
+				</div>
+				<div class="chart-help">
+					Scrollez (Molette) pour zoomer sur une période, glissez pour vous déplacer.
+				</div>
+			</div>
+
+			<div class="tabs">
+				<button class="tab-btn active" onclick="switch_tab('c')">Caractères</button>
+				<button class="tab-btn" onclick="switch_tab('bg')">Bigrammes</button>
+				<button class="tab-btn" onclick="switch_tab('tg')">Trigrammes</button>
+				<button class="tab-btn" onclick="switch_tab('qg')">Quadrigrammes</button>
+				<button class="tab-btn" onclick="switch_tab('pg')">Pentagrammes</button>
+				<button class="tab-btn" onclick="switch_tab('hx')">Hexagrammes</button>
+				<button class="tab-btn" onclick="switch_tab('hp')">Heptagrammes</button>
+				<button class="tab-btn" onclick="switch_tab('w')">Mots</button>
+			</div>
+
+			<div class="table-controls">
+				<input
+					type="text"
+					id="search_input"
+					placeholder="Rechercher une séquence..."
+					onkeyup="handle_search()"
+				/>
+			</div>
+
+			<div class="table-container">
+				<table id="metrics_table">
+					<thead>
+						<tr>
+							<th onclick="handle_sort('key')">Séquence ↕</th>
+							<th onclick="handle_sort('count')">
+								Occurrences ↕<br />
+								<span
+									id="total_occurrences"
+									style="font-size: 0.85em; font-weight: normal; color: var(--text-muted)"
+								></span>
+							</th>
+							<th onclick="handle_sort('freq')">Fréq relative ↕</th>
+							<th onclick="handle_sort('avg')">Vitesse Moy. (ms) ↕</th>
+							<th onclick="handle_sort('wpm')">
+								Équiv. MPM
+								<div class="tooltip" onclick="event.stopPropagation()">
+									ℹ️<span class="tooltiptext"
+										>Mots Par Minute : Vitesse estimée si vous tapiez ce fragment en boucle (1 mot =
+										5 touches). Ne prend en compte QUE vos vraies frappes.</span
+									>
+								</div>
+								↕
+							</th>
+							<th onclick="handle_sort('acc')">
+								Précision
+								<div class="tooltip" onclick="event.stopPropagation()">
+									ℹ️<span class="tooltiptext"
+										>Précision : Pourcentage de fois où cette séquence a été tapée du premier coup
+										sans utiliser la touche Effacer (Backspace).</span
+									>
+								</div>
+								↕
+							</th>
+						</tr>
+					</thead>
+					<tbody id="metrics_table_body">
+						<tr>
+							<td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px">
+								Chargement de l’interface...
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
 		</div>
 
-		<div class="table-controls">
-			<input
-				type="text"
-				id="search_input"
-				placeholder="Rechercher une séquence..."
-				onkeyup="handle_search()"
-			/>
-		</div>
-
-		<div class="table-container">
-			<table id="metrics_table">
-				<thead>
-					<tr>
-						<th onclick="handle_sort('key')">Séquence ↕</th>
-						<th onclick="handle_sort('count')">
-							Occurrences ↕<br />
-							<span
-								id="total_occurrences"
-								style="font-size: 0.85em; font-weight: normal; color: #aaa"
-							></span>
-						</th>
-						<th onclick="handle_sort('freq')">Fréq relative ↕</th>
-						<th onclick="handle_sort('avg')">Vitesse Moy. (ms) ↕</th>
-						<th onclick="handle_sort('wpm')">
-							Équiv. MPM
-							<div class="tooltip" onclick="event.stopPropagation()">
-								ℹ️<span class="tooltiptext"
-									>Mots Par Minute : Vitesse estimée si vous tapiez ce fragment en boucle (1 mot = 5
-									touches). Ne prend en compte QUE vos vraies frappes.</span
-								>
-							</div>
-							↕
-						</th>
-						<th onclick="handle_sort('acc')">
-							Précision
-							<div class="tooltip" onclick="event.stopPropagation()">
-								ℹ️<span class="tooltiptext"
-									>Précision : Pourcentage de fois où cette séquence a été tapée du premier coup
-									sans utiliser la touche Effacer (Backspace).</span
-								>
-							</div>
-							↕
-						</th>
-					</tr>
-				</thead>
-				<tbody id="metrics_table_body"></tbody>
-			</table>
+		<div id="app_modal" class="modal" style="display: none">
+			<div class="modal-content">
+				<h2>Sélectionner les applications</h2>
+				<div class="app-modal-controls">
+					<button class="tab-btn" onclick="select_all_apps()">Tout cocher</button>
+					<button class="tab-btn" onclick="deselect_all_apps()">Tout décocher</button>
+				</div>
+				<input
+					type="text"
+					id="app_search"
+					placeholder="Rechercher une application..."
+					onkeyup="render_app_list()"
+				/>
+				<div id="app_list" class="app-list"></div>
+				<button
+					class="tab-btn"
+					style="width: 100%; margin-top: 15px; font-weight: bold"
+					onclick="close_app_modal()"
+				>
+					Fermer et Appliquer
+				</button>
+			</div>
 		</div>
 	</body>
 </html>

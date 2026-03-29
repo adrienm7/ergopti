@@ -35,6 +35,7 @@ local ACTION_LABELS = {
     open_ahk           = "Ouvrir le fichier AHK",
     trigger_prediction = "Déclencher une prédiction IA",
     add_hotstring      = "Ajouter un hotstring",
+    show_metrics       = "Afficher les métriques",
     open_config        = "Ouvrir config.json",
     open_logs          = "Ouvrir le dossier de logs",
     open_console       = "Console Hammerspoon",
@@ -43,7 +44,7 @@ local ACTION_LABELS = {
 
 local ACTIONS_ORDER = { 
     "none", "pause", "reload", "open_init", "open_ahk",
-    "trigger_prediction", "add_hotstring", "open_config",
+    "trigger_prediction", "add_hotstring", "show_metrics", "open_config",
     "open_logs", "open_console", "quit_hammerspoon"
 }
 
@@ -188,6 +189,10 @@ local function dispatch_action(action)
         if type(_extras.add_hotstring) == "function" then pcall(_extras.add_hotstring) end
         return true
         
+    elseif action == "show_metrics" then
+        if type(_extras.show_metrics) == "function" then pcall(_extras.show_metrics) end
+        return true
+
     elseif action == "open_config" then
         if type(_extras.open_config) == "function" then pcall(_extras.open_config) end
         return true
