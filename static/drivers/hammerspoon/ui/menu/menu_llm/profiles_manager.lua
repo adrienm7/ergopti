@@ -1,12 +1,12 @@
--- ui/menu/menu_llm/profiles_manager.lua
+--- ui/menu/menu_llm/profiles_manager.lua
 
--- ===========================================================================
--- LLM Profiles Manager Sub-module.
---
--- Logic for handling prompt strategies. Manages built-in and user-defined 
--- profiles, handles compatibility warnings for reasoning models, and 
--- integrates with the Prompt Editor UI for CRUD operations.
--- ===========================================================================
+--- ===========================================================================
+--- MODULE: LLM Profiles Manager
+--- DESCRIPTION:
+--- Logic for handling prompt strategies. Manages built-in and user-defined 
+--- profiles, handles compatibility warnings for reasoning models, and 
+--- integrates with the Prompt Editor UI for CRUD operations.
+--- ===========================================================================
 
 local M = {}
 
@@ -50,7 +50,7 @@ end
 --- @return table List of all profile definitions
 local function get_all_profiles(state)
 	local all = {}
-	for _, p in ipairs(llm_mod.BUILTIN_PROFILES) do table.insert(all, p) end
+	for _, p in ipairs(llm_mod.BUILTIN_PROFILES or {}) do table.insert(all, p) end
 	local user_p = (type(state) == "table" and type(state.llm_user_profiles) == "table") and state.llm_user_profiles or {}
 	for _, p in ipairs(user_p) do table.insert(all, p) end
 	return all
@@ -95,9 +95,9 @@ local function build_profile_menu(deps, models_mgr)
 		disabled = paused or nil,
 		fn       = not paused and function()
 			local model_name = state.llm_model
-			if not model_name or not models_mgr then return end
+			if type(model_name) ~= "string" or model_name == "" or not models_mgr then return end
 			
-			local info = models_mgr.get_model_info(model_name)
+			local info = models_mgr.get_model_info(model_name) or {}
 			local rec_profile = "basic"
 
 			if info.type == "completion" then
@@ -121,11 +121,12 @@ local function build_profile_menu(deps, models_mgr)
 
 	-- Native profiles section
 	table.insert(menu, { title = "— PROFILS PAR DÉFAUT —", disabled = true })
-	for _, profile in ipairs(llm_mod.BUILTIN_PROFILES) do
+	for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
 		local pid = profile.id
 		
-		-- Thinking models often fail with parallel strategies; add a visual warning
-		local is_thinking = llm_mod.is_thinking_model(state.llm_model)
+		local info = models_mgr and models_mgr.get_model_info(state.llm_model) or {}
+		local is_thinking = info.emojis and info.emojis:find("🧠💭")
+		
 		local extra = ""
 		if (pid == "basic" or pid == "advanced") and is_thinking then
 			extra = "  ⚠️ Non recommandé (Thinking)"
@@ -272,7 +273,9 @@ function M.new(deps, models_mgr)
 	--- Returns the main menu entry for Strategy selection
 	function obj.get_menu_item()
 		local label = active_profile_label(deps.state)
-		local is_thinking = llm_mod.is_thinking_model(deps.state.llm_model)
+		
+		local info = models_mgr and models_mgr.get_model_info(deps.state.llm_model) or {}
+		local is_thinking = info.emojis and info.emojis:find("🧠💭")
 		local warning = (is_thinking and (deps.state.llm_active_profile == "basic" or deps.state.llm_active_profile == "advanced")) and "  ⚠️" or ""
 
 		return {

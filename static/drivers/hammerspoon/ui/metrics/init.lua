@@ -132,9 +132,9 @@ end
 --- Injects the instant manifest and polls for lazy loading requests.
 --- @param log_dir string Path to the logging directory.
 function M.show(log_dir)
-	if not fs.attributes(log_dir, "mode") == "directory" then return end
+	if fs.attributes(log_dir, "mode") ~= "directory" then return end
 	
-	-- Early return: Reuse the webview if it is already open to strictly preserve state.
+	-- Early return: Reuse the webview if it is already open to strictly preserve state
 	if M._wv then
 		ui_builder.force_focus(M._wv)
 		return
