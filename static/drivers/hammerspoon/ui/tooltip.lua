@@ -1,17 +1,11 @@
--- ui/tooltip.lua
+--- ui/tooltip.lua
 
--- ===========================================================================
--- Tooltip UI Module.
---
--- Handles the rendering and lifecycle of the on-screen tooltip used for
--- both standard hotstring previews and LLM predictions.
---
--- Features:
---   - Zero-lag rendering using a pre-allocated hs.canvas.
---   - Smart positioning (context-aware anchor resolution via Accessibility API).
---   - Auto-hide mechanics based on inactivity timers and mouse/keyboard events.
---   - Diff-styled text rendering to highlight insertions cleanly.
--- ===========================================================================
+--- ==============================================================================
+--- MODULE: Tooltip UI
+--- DESCRIPTION:
+--- Handles the rendering and lifecycle of the on-screen tooltip used for
+--- both standard hotstring previews and LLM predictions.
+--- ==============================================================================
 
 local M = {}
 
@@ -62,6 +56,7 @@ local _state = {
     on_accept       = nil,
     info_bar        = nil,
     shortcut_mod    = "alt",
+    nav_mods        = {},
     nav_mod_str     = "none",
     indent          = 0,
     fixed_width     = nil,
@@ -104,7 +99,23 @@ local function stop_watchers()
     end
 end
 
---- Starts listening for events that should naturally dismiss the tooltip
+--- Validates modifier flags securely against expected target mods
+local function check_modifiers(flags, targetMods)
+    if type(targetMods) ~= "table" then return false end
+    if #targetMods == 1 and targetMods[1] == "none" then return false end
+    
+    local target_map = { cmd = false, alt = false, shift = false, ctrl = false }
+    for _, mod in ipairs(targetMods) do if target_map[mod] ~= nil then target_map[mod] = true end end
+    
+    if (flags.cmd or false)   ~= target_map.cmd   then return false end
+    if (flags.alt or false)   ~= target_map.alt   then return false end
+    if (flags.shift or false) ~= target_map.shift then return false end
+    if (flags.ctrl or false)  ~= target_map.ctrl  then return false end
+    
+    return true
+end
+
+--- Starts listening for events that should naturally dismiss or interact with the tooltip
 local function start_watchers()
     stop_watchers()
     reset_idle_timer()
@@ -119,15 +130,40 @@ local function start_watchers()
     w_mouse:start()
     table.insert(_watchers, w_mouse)
 
-    -- Hide tooltip on standard keypresses
+    -- Handle explicit key overrides
     local w_key = hs.eventtap.new({evTypes.keyDown}, function(e)
         local kc = e:getKeyCode()
-        
-        -- Ignored keys (Tab & Enter are handled directly by keymap.lua to accept predictions)
-        if kc == 48 or kc == 36 then return false end 
-        if kc >= 123 and kc <= 126 then return false end -- Ignore Arrow keys
-        
         local flags = e:getFlags()
+        
+        -- Priority interception: STRICTLY consume TAB when LLM predictions are active
+        if kc == 48 and _state.current_is_llm then
+            if flags.shift then
+                local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+                if n > 1 then
+                    M.navigate(-1)
+                    return true
+                end
+            else
+                if type(_state.on_accept) == "function" then
+                    _state.on_accept(_state.current_index)
+                end
+                return true
+            end
+        end
+        
+        -- Priority interception: Arrow keys for secure navigation
+        if _state.current_is_llm and kc >= 123 and kc <= 126 then
+            local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+            if n > 1 and check_modifiers(flags, _state.nav_mods) then
+                local nav_dir = (kc == 123 or kc == 126) and -1 or 1
+                M.navigate(nav_dir)
+                return true
+            end
+        end
+        
+        -- Ignored keys (Enter is handled directly by keymap.lua to accept predictions)
+        if kc == 48 or kc == 36 then return false end 
+        
         local mod = _state.shortcut_mod or "alt"
         
         -- Priority interception: Selection shortcuts (1-0)
@@ -317,11 +353,14 @@ local function build_line(pred, is_sel, total_preds)
         return str
     end
 
+    local last_char = ""
+
     if type(chunks) == "table" and #chunks > 0 then
         for _, chunk in ipairs(chunks) do
             if type(chunk) == "table" then
                 local s = clean_first(chunk.text)
                 if s and s ~= "" then
+                    last_char = s:sub(-1)
                     if chunk.type == "insert" then
                         local color = is_sel and C_CORR_SEL or C_UNSELECTED_GRAY
                         result = append_seg(result, s, color, bold_diff)
@@ -336,6 +375,10 @@ local function build_line(pred, is_sel, total_preds)
 
     local s_nw = clean_first(nw)
     if s_nw and s_nw ~= "" then
+        -- FIX: Automatically insert a space if the previous text (gray) and the new text (orange) are glued together
+        if last_char ~= "" and not last_char:match("%s") and not s_nw:match("^%s") then
+            s_nw = " " .. s_nw
+        end
         local color = is_sel and C_NW_SEL or C_UNSELECTED_GRAY
         result = append_seg(result, s_nw, color, bold_diff)
     end
@@ -615,7 +658,7 @@ function M.navigate(delta)
 end
 
 --- Displays multiple LLM predictions with full UI capabilities
-function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mod_str)
+function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mods)
     if not enabled then return end
     if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
     
@@ -623,9 +666,18 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     _state.current_index   = current_index or 1
     _state.info_bar        = info_bar
     _state.shortcut_mod    = shortcut_mod or "alt"
-    _state.nav_mod_str     = nav_mod_str or "none"
+    _state.nav_mods        = type(nav_mods) == "table" and nav_mods or {}
     _state.indent          = indent or 0
     _state.current_is_llm  = true -- Ensure extended timeout is used
+    
+    local nav_mod_str = "none"
+    if #_state.nav_mods > 0 and not (#_state.nav_mods == 1 and _state.nav_mods[1] == "none") then
+        nav_mod_str = table.concat(_state.nav_mods, "+")
+        nav_mod_str = nav_mod_str:gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
+    elseif #_state.nav_mods == 0 then
+        nav_mod_str = ""
+    end
+    _state.nav_mod_str = nav_mod_str
 
     local max_width = 0
     for i = 1, #predictions do

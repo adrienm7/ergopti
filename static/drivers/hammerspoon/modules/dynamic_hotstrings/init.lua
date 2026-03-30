@@ -1,0 +1,68 @@
+--- modules/dynamic_hotstrings/init.lua
+
+--- ==============================================================================
+--- MODULE: Dynamic Hotstrings Core
+--- DESCRIPTION:
+--- Orchestrates dynamic expansions by coupling the Personal Info engine (which
+--- acts on @ tags) and the Rules Engine (which acts on dynamic suffixes like
+--- 'dt' and generates real-time prefixes).
+---
+--- FEATURES & RATIONALE:
+--- 1. Shared Data Pipeline: Extracts personal info automatically and passes it
+---    to the rules engine for phone and SSN auto-completion without requiring
+---    the main init.lua to manage the logic.
+--- ==============================================================================
+
+local M = {}
+
+local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
+local RulesEngine  = require("modules.dynamic_hotstrings.rules_engine")
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 1/ Default State ==========
+-- ===================================
+-- ===================================
+
+M.DEFAULT_STATE = {
+    personal_info                   = true,
+    dynamichotstrings_enabled       = true,
+    dynamichotstrings_date          = true,
+    dynamichotstrings_phoneprefixes = true,
+    dynamichotstrings_ssnprefixes   = true,
+}
+
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 2/ Base API & Forwarding =======
+-- ========================================
+-- ========================================
+
+--- Initializes both dynamic expansion engines and securely shares data between them.
+--- @param base_dir string Base configuration directory.
+--- @param keymap_module table The active keymap module reference.
+function M.start(base_dir, keymap_module)
+    -- Start the personal info tracker
+    PersonalInfo.start(base_dir, keymap_module)
+    
+    -- Pass the securely loaded data from PersonalInfo to the Rules Engine
+    RulesEngine.inject_data(PersonalInfo.get_info(), PersonalInfo.get_trigger_char())
+    
+    -- Start the dynamic rules engine
+    RulesEngine.start(keymap_module)
+end
+
+-- Proxy Personal Info UI and state controls for the menu
+M.open_editor = PersonalInfo.open_editor
+M.enable      = PersonalInfo.enable
+M.disable     = PersonalInfo.disable
+
+return M

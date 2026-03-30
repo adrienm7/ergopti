@@ -10,7 +10,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Singleton Preservation: By combining this module with early returns in UI modules, pressing a shortcut multiple times will not destroy an already open window. It simply brings the existing window to the front, preserving any text the user has already started typing, or creates a new window only if none exists.
 --- 2. Active Space Teleportation: If a user opens the UI in Space 1, moves to Space 2, and triggers the shortcut again, the script momentarily hides and shows the window. This natively teleports the existing window to the active space without erasing its DOM state.
---- 3. Smart Focus Management: Brings the window to the front and gives it system focus, but deliberately uses the 'normal' window level. This ensures it appears on top when triggered, but clicking on another application gracefully pushes the UI to the background.
+--- 3. Smart Focus Management: Brings the window to the front and gives it system focus, but deliberately uses the "normal" window level. This ensures it appears on top when triggered, but clicking on another application gracefully pushes the UI to the background.
 --- 4. DRY Architecture: Removes repetitive window creation and configuration boilerplate across all UI modules.
 --- ==============================================================================
 
@@ -107,7 +107,7 @@ function M.force_focus(wv)
 	if not wv then return end
 	
 	-- Hiding and showing the window natively teleports it to the active macOS space
-	-- without changing its "behavior" property, which would destroy the webview state.
+	-- without changing its behavior property, which would destroy the webview state
 	pcall(function() wv:hide() end)
 	pcall(function() wv:show() end)
 	
@@ -139,7 +139,14 @@ end
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
 
-	local wv = hs.webview.new(opts.frame, { developerExtrasEnabled = false }, opts.usercontent)
+	-- Prevent LuaSkin crash by not passing explicit nil for the third argument
+	local wv
+	if opts.usercontent then
+		wv = hs.webview.new(opts.frame, { developerExtrasEnabled = false }, opts.usercontent)
+	else
+		wv = hs.webview.new(opts.frame, { developerExtrasEnabled = false })
+	end
+	
 	if not wv then return nil end
 
 	-- Apply core UI properties

@@ -1,12 +1,11 @@
--- ui/menu/menu_llm/models_manager.lua
+--- ui/menu/menu_llm/models_manager.lua
 
--- ===========================================================================
--- LLM Models Manager Sub-module.
---
--- Logic for detecting Ollama, checking system requirements (RAM & Disk),
--- parsing model metadata, and managing the full installation pipeline
--- (pulling models or installing Ollama itself).
--- ===========================================================================
+--- ===========================================================================
+--- MODULE: LLM Models Manager
+--- DESCRIPTION:
+--- Logic for detecting Ollama, checking system requirements (RAM & Disk),
+--- parsing model metadata, and managing the full installation pipeline.
+--- ===========================================================================
 
 local M = {}
 
@@ -68,6 +67,9 @@ end
 --- @param presets table The list of provider presets
 --- @return table { type: string, params: number, emojis: string, tags: table }
 local function get_model_info(model_name, presets)
+    -- Sécurité : forcer en chaîne de caractères pour éviter les crashs sur les variables non définies
+    model_name = type(model_name) == "string" and model_name or ""
+
     local m_type = "chat"
     local p_count = 0
     local m_tags = {}
@@ -93,7 +95,7 @@ local function get_model_info(model_name, presets)
         end
     end
 
-    if not found then
+    if not found and model_name ~= "" then
         if model_name:match("%-base$") or model_name:match("coder") then
             m_type = "completion"
         end
@@ -159,7 +161,7 @@ end
 --- @param presets table The list of provider presets
 --- @return number Estimated GB of RAM required
 local function get_model_ram(model_name, presets)
-    if type(model_name) ~= "string" then return 8 end
+    if type(model_name) ~= "string" or model_name == "" then return 8 end
     
     ensure_ram_cache(presets)
     if _model_ram_cache and _model_ram_cache[model_name] then

@@ -1,15 +1,16 @@
--- modules/script_control.lua
+--- modules/shortcuts/script_control.lua
 
--- ===========================================================================
--- Script Control Module.
---
--- Manages global shortcuts for the Ergopti+ script lifecycle:
---   AltGr (Right Option) + Return    : Toggle pause / resume all modules
---   AltGr (Right Option) + Backspace : Reload the Hammerspoon configuration
---
--- Interacts safely with keymap, shortcuts, and gestures modules to ensure
--- no deadlocks occur when the script is logically "paused".
--- ===========================================================================
+--- ==============================================================================
+--- MODULE: Script Control
+--- DESCRIPTION:
+--- Manages global shortcuts for the Ergopti+ script lifecycle:
+---  AltGr (Right Option) + Return    : Toggle pause / resume all modules
+---  AltGr (Right Option) + Backspace : Reload the Hammerspoon configuration
+---
+--- FEATURES & RATIONALE:
+--- 1. Safe Interactivity: Interacts safely with keymap, shortcuts, and gestures modules.
+--- 2. OS Safety: Ensures no deadlocks occur when the script is logically paused.
+--- ==============================================================================
 
 local M = {}
 
@@ -71,10 +72,10 @@ local _gestures        = nil
 -- =====================================
 -- =====================================
 
---- Returns true when the event has exclusively the right Option key held down
+--- Returns true when the event has exclusively the right Option key held down.
 --- (no left Option, no Cmd, no Ctrl, no Shift).
---- @param e userdata The hs.eventtap.event object
---- @return boolean True if only right Alt is pressed
+--- @param e userdata The hs.eventtap.event object.
+--- @return boolean True if only right Alt is pressed.
 local function is_right_alt_only(e)
     if type(e) ~= "userdata" or type(e.getFlags) ~= "function" then return false end
     
@@ -96,7 +97,7 @@ local function is_right_alt_only(e)
     local right_mask = masks.deviceRightAlternate or 0
     local left_mask  = masks.deviceLeftAlternate  or 0
     
-    -- If masks are totally unavailable we cannot distinguish sides; accept any alt.
+    -- If masks are totally unavailable we cannot distinguish sides; accept any alt
     if right_mask == 0 then return true end
     
     return (raw & right_mask) ~= 0 and (raw & left_mask) == 0
@@ -112,11 +113,11 @@ end
 -- ==============================
 -- ==============================
 
---- Suspends all registered modules gracefully
+--- Suspends all registered modules gracefully.
 local function pause_all()
     -- Use pause_processing() instead of stop() so the keymap eventtap stays
     -- alive. This guarantees that script_control’s own shortcuts remain
-    -- reachable even while the script appears "paused".
+    -- reachable even while the script appears paused.
     if _keymap and type(_keymap.pause_processing) == "function" then 
         pcall(function() _keymap.pause_processing() end) 
     end
@@ -130,7 +131,7 @@ local function pause_all()
     end
 end
 
---- Resumes all registered modules gracefully
+--- Resumes all registered modules gracefully.
 local function resume_all()
     if _keymap and type(_keymap.resume_processing) == "function" then 
         pcall(function() _keymap.resume_processing() end) 
@@ -145,9 +146,9 @@ local function resume_all()
     end
 end
 
---- Dispatches a configured action
---- @param action string The action identifier
---- @return boolean True if the event should be consumed
+--- Dispatches a configured action.
+--- @param action string The action identifier.
+--- @return boolean True if the event should be consumed.
 local function dispatch_action(action)
     if type(action) ~= "string" or action == "none" then return false end
     
@@ -213,9 +214,9 @@ local function dispatch_action(action)
     return false
 end
 
---- Handles the low-level keystroke event
---- @param e userdata The hs.eventtap.event object
---- @return boolean True to consume the keystroke, false otherwise
+--- Handles the low-level keystroke event.
+--- @param e userdata The hs.eventtap.event object.
+--- @return boolean True to consume the keystroke, false otherwise.
 local function handle_key(e)
     if not is_right_alt_only(e) then return false end
     
@@ -271,14 +272,14 @@ function M.stop()
 end
 
 --- Returns whether the script is currently paused.
---- @return boolean True if paused
+--- @return boolean True if paused.
 function M.is_paused()
     return _is_paused
 end
 
 --- Sets the action triggered by a specific key slot.
---- @param keyname string "return_key" or "backspace"
---- @param action string One of "none", "pause", "reload", "open_init", "open_ahk"
+--- @param keyname string "return_key" or "backspace".
+--- @param action string One of "none", "pause", "reload", "open_init", "open_ahk".
 function M.set_shortcut_action(keyname, action)
     if type(keyname) == "string" and type(action) == "string" then
         _key_actions[keyname] = action
@@ -286,7 +287,7 @@ function M.set_shortcut_action(keyname, action)
 end
 
 --- Registers a callback invoked whenever the pause state changes.
---- @param cb function Called with (is_paused: boolean)
+--- @param cb function Called with (is_paused: boolean).
 function M.set_on_pause_change(cb)
     if type(cb) == "function" then
         _on_pause_change = cb
@@ -294,7 +295,7 @@ function M.set_on_pause_change(cb)
 end
 
 --- Provides handlers for actions that require external context (like paths).
---- @param tbl table May contain open_init() and open_ahk() functions
+--- @param tbl table May contain open_init() and open_ahk() functions.
 function M.set_extras(tbl)
     _extras = type(tbl) == "table" and tbl or {}
 end

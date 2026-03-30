@@ -1,11 +1,52 @@
--- ui/menu/menu_hotstrings.lua
+--- ui/menu/menu_hotstrings.lua
+
+--- ==============================================================================
+--- MODULE: Menu Hotstrings
+--- DESCRIPTION:
+--- Builds the hotstrings and personal info sub-menus for the tray menu.
+--- ==============================================================================
 
 local M = {}
 local hs = hs
 
+local dh_mod = require("modules.dynamic_hotstrings")
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 1/ Default State ==========
+-- ===================================
+-- ===================================
+
+M.DEFAULT_STATE = {
+	preview_enabled          = true,
+	custom_close_on_add      = false,
+	custom_default_section   = nil,
+	custom_editor_shortcut   = nil,
+	sections_order_overrides = {},
+	terminator_states        = {},
+	hotstrings               = {},
+	delays                   = {},
+	personal_info            = dh_mod.DEFAULT_STATE.personal_info,
+	dynamichotstrings_enabled = dh_mod.DEFAULT_STATE.dynamichotstrings_enabled,
+}
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 2/ Menu Construction ======
+-- ===================================
+-- ===================================
+
 --- Formats a number with spaces as thousands separators.
---- @param n number|string The number to format
---- @return string The formatted number
+--- @param n number|string The number to format.
+--- @return string The formatted number.
 local function fmt_count(n)
 	local num = tonumber(n) or 0
 	local s = tostring(math.floor(num + 0.5))
@@ -18,8 +59,8 @@ local function fmt_count(n)
 end
 
 --- Checks if a hotstring group is enabled.
---- @param ctx table Context
---- @param name string Group name
+--- @param ctx table Context.
+--- @param name string Group name.
 --- @return boolean
 local function groupEnabled(ctx, name)
 	return (ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" and ctx.keymap.is_group_enabled(name))
@@ -27,8 +68,8 @@ local function groupEnabled(ctx, name)
 end
 
 --- Gets the display label for a group.
---- @param ctx table Context
---- @param name string Group name
+--- @param ctx table Context.
+--- @param name string Group name.
 --- @return string
 local function groupLabel(ctx, name)
 	local meta = ctx.keymap and type(ctx.keymap.get_meta_description) == "function" and ctx.keymap.get_meta_description(name)
@@ -37,8 +78,8 @@ local function groupLabel(ctx, name)
 end
 
 --- Generates a function to toggle a hotstring group.
---- @param ctx table Context
---- @param name string Group name
+--- @param ctx table Context.
+--- @param name string Group name.
 --- @return function
 local function toggleGroupFn(ctx, name)
 	return function()
@@ -46,7 +87,7 @@ local function toggleGroupFn(ctx, name)
 		if ctx.state.hotstrings[name] then
 			if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, name) end
 			if not ctx.state.keymap then 
-				ctx.state.keymap = true; 
+				ctx.state.keymap = true
 				if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
 			end
 		else
@@ -59,10 +100,10 @@ local function toggleGroupFn(ctx, name)
 end
 
 --- Generates a function to toggle a specific section.
---- @param ctx table Context
---- @param group_name string Group name
---- @param sec_name string Section name
---- @param sec_label string Section display label
+--- @param ctx table Context.
+--- @param group_name string Group name.
+--- @param sec_name string Section name.
+--- @param sec_label string Section display label.
 --- @return function
 local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	return function()
@@ -70,7 +111,7 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 		if will_enable then
 			if ctx.keymap and type(ctx.keymap.enable_section) == "function" then pcall(ctx.keymap.enable_section, group_name, sec_name) end
 			if not ctx.state.keymap then 
-				ctx.state.keymap = true; 
+				ctx.state.keymap = true
 				if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
 			end
 		else
@@ -83,8 +124,8 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 end
 
 --- Builds menu items for personal information.
---- @param ctx table Context
---- @param description string Description of the item
+--- @param ctx table Context.
+--- @param description string Description of the item.
 --- @return table|nil
 local function buildPersonalInfoItems(ctx, description)
 	if not ctx.personal_info then return nil end
@@ -113,7 +154,7 @@ local function buildPersonalInfoItems(ctx, description)
 end
 
 --- Builds the main hotstring groups menu.
---- @param ctx table Context
+--- @param ctx table Context.
 --- @return table
 function M.build_groups(ctx)
 	local top_names = {}
@@ -217,7 +258,7 @@ function M.build_groups(ctx)
 end
 
 --- Builds the management sub-menu.
---- @param ctx table Context
+--- @param ctx table Context.
 --- @return table
 function M.build_management(ctx)
 	local state  = ctx.state
@@ -316,11 +357,11 @@ function M.build_management(ctx)
 
 	local def_base = ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT
 	if not def_base then
-		herror("keymap.BASE_DELAY_SEC_DEFAULT est introuvable")
+		print("[menu_hotstrings] keymap.BASE_DELAY_SEC_DEFAULT is missing.")
 	end
 	local def_delays = ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT
 	if not def_delays then
-		herror("keymap.DELAYS_DEFAULT est introuvable")
+		print("[menu_hotstrings] keymap.DELAYS_DEFAULT is missing.")
 	end
 
 	table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
@@ -378,7 +419,7 @@ function M.build_management(ctx)
 end
 
 --- Builds the personal hotstrings section.
---- @param ctx table Context
+--- @param ctx table Context.
 --- @return table|nil
 function M.build_personal(ctx)
 	local state  = ctx.state
@@ -479,7 +520,7 @@ function M.build_personal(ctx)
 end
 
 --- Builds the custom user hotstrings menu.
---- @param ctx table Context
+--- @param ctx table Context.
 --- @return table
 function M.build_custom(ctx)
 	local state  = ctx.state
@@ -724,7 +765,7 @@ function M.build_custom(ctx)
 			if will_enable then
 				if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "custom") end
 				if not state.keymap then 
-					state.keymap = true; 
+					state.keymap = true
 					if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
 				end
 			else
