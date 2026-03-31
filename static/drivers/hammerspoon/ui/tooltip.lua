@@ -737,4 +737,9 @@ function M.make_diff_styled(chunks, nw, tc_fallback)
     return build_line(fake, true, 1)
 end
 
+--- Checks if the tooltip is currently displaying active predictions
+function M.is_visible()
+    return type(_state.raw_predictions) == "table" and #_state.raw_predictions > 0
+end
+
 return M

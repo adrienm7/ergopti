@@ -8,10 +8,9 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pure Canvas: Uses hs.canvas for high-performance, low-overhead rendering
----    without the need for an embedded webview (no HTML/CSS/JS required).
---- 2. Autonomous Polling: Manages its own lifecycle and history array by
----    requesting data from the core engine.
---- 3. Dynamic Scaling: Sizes itself relative to the exact macOS dock height.
+---    without the need for an embedded webview.
+--- 2. Autonomous Polling: Manages its own lifecycle and history array.
+--- 3. Dynamic Styling: Visual feedback changes color based on the typing source.
 --- ==============================================================================
 
 local M = {}
@@ -29,17 +28,23 @@ local keylogger = require("modules.keylogger")
 -- ================================
 
 local CONFIG = {
-	width_graph      = 180,
-	width_simple     = 110,
-	height_simple    = 36,
-	graph_margin     = 5,
-	bg_color         = { white = 0, alpha = 0.8 },
-	bg_radius        = 8,
-	graph_fill_color = { hex = "#007aff", alpha = 0.3 },
-	graph_line_color = { hex = "#007aff", alpha = 0.8 },
-	graph_line_width = 2,
-	text_color       = { white = 1, alpha = 1 },
-	text_size        = 14
+	source_color_duration = 3.0,
+	
+	use_fixed_scale       = true,
+	fixed_scale_max       = 120,
+	
+	bg_color              = { white = 0, alpha = 0.8 },
+	border_color          = { white = 1, alpha = 0.4 },
+	border_width          = 1,
+	text_color            = { white = 1, alpha = 1 },
+	text_size             = 14, -- Taille de la police modifiable ici
+	
+	color_manual          = { hex = "#007aff", alpha = 0.8 },
+	color_hotstring       = { hex = "#ff3b30", alpha = 0.8 },
+	color_llm             = { hex = "#af52de", alpha = 0.8 },
+	
+	graph_fill_alpha      = 0.2,
+	graph_line_width      = 2
 }
 
 
@@ -71,38 +76,56 @@ local _show_graph  = false
 local function update_widget()
 	local stats = keylogger.get_live_stats()
 	local display_wpm = stats.wpm or 0
+	local source = stats.source or "none"
+	local source_time = stats.source_time or 0
+	local now = hs.timer.absoluteTime() / 1000000000
+	
+	local active_source = "none"
+	if source ~= "none" and (now - source_time) <= CONFIG.source_color_duration then
+		active_source = source
+	end
+	
+	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local tooltip_visible = false
+	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
+		tooltip_visible = tooltip.is_visible()
+	end
+	
 	local wpm_str = string.format("%d MPM", display_wpm)
 	
-	table.insert(_wpm_history, display_wpm)
+	table.insert(_wpm_history, { v = display_wpm, s = active_source })
 	if #_wpm_history > 60 then table.remove(_wpm_history, 1) end
 	
-	if display_wpm > 0 then
+	-- Garde le widget visible pendant la frappe, si un tooltip IA est affiché, ou si une IA vient d'être injectée
+	if display_wpm > 0 or tooltip_visible or (active_source ~= "none") then
 		local screen = hs.screen.mainScreen()
 		local full_frame = screen:fullFrame()
 		local work_frame = screen:frame()
 		
-		-- Isolate the bottom dock height precisely
 		local dock_height = (full_frame.y + full_frame.h) - (work_frame.y + work_frame.h)
 		if dock_height < 20 then dock_height = 60 end
 		
 		local canvas_width, canvas_height, target_x, target_y
+		local graph_margin = 5
+		local graph_padding = 8
 		
 		if _show_graph then
-			canvas_height = dock_height - CONFIG.graph_margin
-			canvas_width  = CONFIG.width_graph
-			target_x = full_frame.x + full_frame.w - canvas_width - CONFIG.graph_margin
-			target_y = full_frame.y + full_frame.h - canvas_height - CONFIG.graph_margin
+			canvas_height = dock_height - graph_margin
+			canvas_width  = canvas_height * 3
+			target_x = full_frame.x + full_frame.w - canvas_width - graph_margin
+			target_y = full_frame.y + full_frame.h - canvas_height - graph_margin
 		else
-			canvas_height = CONFIG.height_simple
-			canvas_width  = CONFIG.width_simple
+			canvas_height = dock_height * 0.6
+			canvas_width  = canvas_height * 3
 			
-			-- Center vertically within the exact dock area
 			target_y = full_frame.y + full_frame.h - (dock_height / 2) - (canvas_height / 2)
 			
-			-- Set right margin equal to bottom margin to ensure perfect visual balance
 			local margin_bottom = full_frame.y + full_frame.h - (target_y + canvas_height)
 			target_x = full_frame.x + full_frame.w - canvas_width - margin_bottom
 		end
+		
+		local bg_radius = 10 -- Standard macOS window radius
+		local text_size = CONFIG.text_size
 		
 		if not _canvas then
 			_canvas = hs.canvas.new({ x = target_x, y = target_y, w = canvas_width, h = canvas_height })
@@ -113,36 +136,44 @@ local function update_widget()
 		end
 		
 		local elements = {}
-		table.insert(elements, { type = "rectangle", action = "fill", fillColor = CONFIG.bg_color, roundedRectRadii = { xRadius = CONFIG.bg_radius, yRadius = CONFIG.bg_radius } })
+		table.insert(elements, { type = "rectangle", action = "fill", fillColor = CONFIG.bg_color, roundedRectRadii = { xRadius = bg_radius, yRadius = bg_radius } })
+		table.insert(elements, { type = "rectangle", action = "stroke", strokeColor = CONFIG.border_color, strokeWidth = CONFIG.border_width, roundedRectRadii = { xRadius = bg_radius, yRadius = bg_radius } })
 		
 		if _show_graph then
-			local max_val = 10
-			for _, v in ipairs(_wpm_history) do if v > max_val then max_val = v end end
+			local max_val = CONFIG.use_fixed_scale and CONFIG.fixed_scale_max or 10
+			if not CONFIG.use_fixed_scale then
+				for _, d in ipairs(_wpm_history) do if d.v > max_val then max_val = d.v end end
+			end
 			
-			local graph_w = canvas_width - 10
-			local graph_h = canvas_height - 30 
+			local graph_w = canvas_width - (graph_padding * 2)
+			local graph_h = canvas_height - (text_size * 2) 
+			local step = graph_w / math.max(1, #_wpm_history - 1)
+			
+			-- La couleur ne change QUE si active_source correspond à une injection effective (et non pas juste l'apparition du tooltip)
+			local current_color = CONFIG.color_manual
+			if active_source == "hotstring" then current_color = CONFIG.color_hotstring
+			elseif active_source == "llm" then current_color = CONFIG.color_llm end
+			
+			local fill_color = { hex = current_color.hex, alpha = CONFIG.graph_fill_alpha }
 			
 			local path = {}
-			table.insert(path, { x = 5, y = canvas_height - 5 })
-			local step = graph_w / math.max(1, #_wpm_history - 1)
-			for i, v in ipairs(_wpm_history) do 
-				table.insert(path, { x = 5 + (i - 1) * step, y = canvas_height - 5 - ((v / max_val) * graph_h) }) 
+			table.insert(path, { x = graph_padding, y = canvas_height - graph_padding })
+			for i, d in ipairs(_wpm_history) do 
+				table.insert(path, { x = graph_padding + (i - 1) * step, y = canvas_height - graph_padding - ((d.v / max_val) * graph_h) }) 
 			end
-			table.insert(path, { x = canvas_width - 5, y = canvas_height - 5 })
-			table.insert(elements, { type = "segments", coordinates = path, action = "fill", fillColor = CONFIG.graph_fill_color })
+			table.insert(path, { x = canvas_width - graph_padding, y = canvas_height - graph_padding })
+			table.insert(elements, { type = "segments", coordinates = path, action = "fill", fillColor = fill_color })
 			
 			local line_path = {}
-			for i, v in ipairs(_wpm_history) do 
-				table.insert(line_path, { x = 5 + (i - 1) * step, y = canvas_height - 5 - ((v / max_val) * graph_h) }) 
+			for i, d in ipairs(_wpm_history) do 
+				table.insert(line_path, { x = graph_padding + (i - 1) * step, y = canvas_height - graph_padding - ((d.v / max_val) * graph_h) }) 
 			end
-			table.insert(elements, { type = "segments", coordinates = line_path, action = "stroke", strokeColor = CONFIG.graph_line_color, strokeWidth = CONFIG.graph_line_width })
+			table.insert(elements, { type = "segments", coordinates = line_path, action = "stroke", strokeColor = current_color, strokeWidth = CONFIG.graph_line_width })
 			
-			-- Draw text at the top of the graph widget
-			table.insert(elements, { type = "text", text = wpm_str, textColor = CONFIG.text_color, textSize = CONFIG.text_size, textAlignment = "center", frame = { x = 0, y = 5, w = canvas_width, h = 20 } })
+			table.insert(elements, { type = "text", text = wpm_str, textColor = CONFIG.text_color, textSize = text_size, textAlignment = "center", frame = { x = 0, y = 5, w = canvas_width, h = text_size + 6 } })
 		else
-			-- Center the text mathematically within the simple box
-			local text_y = (canvas_height - 20) / 2
-			table.insert(elements, { type = "text", text = wpm_str, textColor = CONFIG.text_color, textSize = CONFIG.text_size, textAlignment = "center", frame = { x = 0, y = text_y, w = canvas_width, h = 20 } })
+			local text_y = (canvas_height - text_size - 6) / 2
+			table.insert(elements, { type = "text", text = wpm_str, textColor = CONFIG.text_color, textSize = text_size, textAlignment = "center", frame = { x = 0, y = text_y, w = canvas_width, h = text_size + 6 } })
 		end
 		
 		_canvas:replaceElements(elements)
@@ -166,7 +197,7 @@ end
 --- @param show_graph boolean Whether to draw the history curve.
 function M.start(show_graph)
 	_show_graph = show_graph or false
-	if not _timer then _timer = hs.timer.new(1.0, update_widget) end
+	if not _timer then _timer = hs.timer.new(0.2, update_widget) end
 	_timer:start()
 	update_widget()
 end

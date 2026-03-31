@@ -240,15 +240,18 @@ shortcuts.start_script_control(keymap, shortcuts, gestures)
 -- ==================================
 -- ==================================
 
+-- Global variables to prevent the Garbage Collector from destroying the watchers
+_G.script_watchers = {}
+
 do
 	local reload_timer = nil
 
-	local function schedule_reload()
+	local function schedule_reload(msg)
 		if reload_timer then reload_timer:stop() end
 		reload_timer = hs.timer.doAfter(0.5, function()
 			hs.notify.new({
 				title           = "Hammerspoon",
-				informativeText = "Hotstrings modifiés — rechargement…",
+				informativeText = msg or "Fichiers modifiés — rechargement…",
 			}):send()
 			hs.reload()
 		end)
@@ -260,16 +263,30 @@ do
 	-- ===== 7.1) Directory-Level Watcher =======
 	-- ==========================================
 
-	-- Catches file creation, deletion, and renames
+	-- Catches file creation, deletion, and renames in the hotstrings directory
 	local dir_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
 		for _, p in ipairs(paths) do
 			if p:match("%.toml$") or p:match("_index%.json$")
 				or p:match("%.local_ahk_path$") then
-				schedule_reload(); return
+				schedule_reload("Hotstrings modifiés — rechargement…")
+				return
 			end
 		end
 	end)
 	dir_watcher:start()
+	table.insert(_G.script_watchers, dir_watcher)
+
+	-- Catches modifications on Lua and UI scripts (HTML, JS, CSS) for auto-reload
+	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
+		for _, p in ipairs(paths) do
+			if p:match("%.lua$") or p:match("%.html$") or p:match("%.css$") or p:match("%.js$") then
+				schedule_reload("Interface ou script modifié — rechargement…")
+				return
+			end
+		end
+	end)
+	project_watcher:start()
+	table.insert(_G.script_watchers, project_watcher)
 
 
 
@@ -280,8 +297,11 @@ do
 	-- Safety net for in-place edits that directory watchers may miss
 	for fname in hs.fs.dir(hotstrings_dir) do
 		if fname:match("%.toml$") or fname:match("_index%.json$") then
-			local w = hs.pathwatcher.new(hotstrings_dir .. fname, schedule_reload)
+			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function()
+				schedule_reload("Hotstrings modifiés — rechargement…")
+			end)
 			w:start()
+			table.insert(_G.script_watchers, w)
 		end
 	end
 end
