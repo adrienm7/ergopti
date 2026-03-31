@@ -416,6 +416,8 @@ function M.create(deps)
             end
         })
 
+        table.insert(main_menu, { title = "Indentation de la suggestion sélectionnée", menu = settings_mgr.build_indent_menu() })
+
         -- Retrieve configurations and synchronize them with keymap.lua
         local nav_mods = hs.settings.get("llm_nav_modifiers")
         if nav_mods == nil then nav_mods = llm_mod.DEFAULT_STATE.llm_nav_modifiers end
@@ -453,8 +455,6 @@ function M.create(deps)
             disabled = (num_preds_safe < 2),
             menu     = settings_mgr.build_val_modifier_menu()
         })
-
-        table.insert(main_menu, { title = "Indentation de la suggestion sélectionnée", menu = settings_mgr.build_indent_menu() })
 
         local sc_label = "Aucun"
         if type(state.llm_trigger_shortcut) == "table" then

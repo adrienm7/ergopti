@@ -446,7 +446,7 @@ function M.build_personal(ctx)
 		end
 	end
 
-	local base_label = groupLabel(ctx, name)
+	local base_label = "Hotstrings AHK" -- Libellé ajusté comme demandé
 	local item = {
 		title   = has_count and (base_label .. " (" .. fmt_count(total) .. ")") or base_label,
 		checked = (enabled and not paused) or nil,
