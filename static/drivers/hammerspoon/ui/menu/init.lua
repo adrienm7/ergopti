@@ -90,7 +90,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function update_icon(custom_text)
 		local shortcuts = core_mods.shortcuts_mod
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
+		
 		local logo_file = paused and "logo_black.png" or "logo_white.png"
+		
 		local ok_img, ico = pcall(hs.image.imageFromPath, base_dir .. "images/" .. logo_file)
 		
 		pcall(function() myMenu:setTitle(custom_text and (" " .. tostring(custom_text)) or "") end)
@@ -127,9 +129,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 
 
-	-- =========================================
-	-- ===== 1.2) Module Synchronization =======
-	-- =========================================
+	-- =======================================
+	-- ===== 1.2) Module Synchronization =====
+	-- =======================================
 
 	local _metrics_hk = nil
 	local function apply_metrics_shortcut(mods, key)
@@ -306,10 +308,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					for _, sec in ipairs(secs) do
 						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
 							if enabled then
-                                pcall(keymap.enable_section, name, sec.name)
-                            else
-                                pcall(keymap.disable_section, name, sec.name)
-                            end
+								pcall(keymap.enable_section, name, sec.name)
+							else
+								pcall(keymap.disable_section, name, sec.name)
+							end
 						end
 					end
 				end
@@ -352,9 +354,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 
 
-	-- ===================================
-	-- ===== 1.3) Final Orchestration ====
-	-- ===================================
+	-- ====================================
+	-- ===== 1.3) Final Orchestration =====
+	-- ====================================
 
 	pcall(update_icon)
 
@@ -435,7 +437,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			show_metrics = function() if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end end,
 			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "config.json\"") end) end,
 			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
-        })
+		})
 	end
 
 	updateMenu = function()
@@ -493,6 +495,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	M._menu    = myMenu
 	M._watcher = configWatcher
+	
+	M._theme_watcher = hs.distributednotifications.new(function(name)
+		if name == "AppleInterfaceThemeChangedNotification" then
+			if type(update_icon) == "function" then update_icon() end
+			if type(updateMenu) == "function" then updateMenu() end
+		end
+	end, "AppleInterfaceThemeChangedNotification")
+	M._theme_watcher:start()
 
 	pcall(notifications.notify, "Script prêt ! 🚀")
 	return myMenu, configWatcher

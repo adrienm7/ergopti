@@ -8,67 +8,223 @@
 		<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 		<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
 		<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
 		<div class="top-fixed-bar">
 			<div class="header">
-				<h1>📊 Métriques de frappe</h1>
+				<h1>Métriques de frappe</h1>
 			</div>
 
 			<div class="filters-bar">
-				<div>
-					<label>Du : </label><input type="date" id="date_start" onchange="apply_filters()" />
-				</div>
-				<div>
-					<label>Au : </label><input type="date" id="date_end" onchange="apply_filters()" />
+				<div class="filter-group-dates" style="display: flex; gap: 15px">
+					<div>
+						<label>Du : </label
+						><input type="date" id="date_start" onchange="apply_date_app_filters()" />
+					</div>
+					<div>
+						<label>Au : </label
+						><input type="date" id="date_end" onchange="apply_date_app_filters()" />
+					</div>
 				</div>
 
-				<div class="checkbox-group" style="margin-left: 15px">
-					<button class="tab-btn" id="app_filter_btn" onclick="open_app_modal()">
+				<div class="filter-group-buttons" style="display: flex; gap: 8px; margin: 0 auto">
+					<button class="filter-btn active" id="app_filter_btn" onclick="open_app_modal()">
 						Apps (Toutes)
+					</button>
+					<button
+						class="filter-btn active"
+						id="btn_show_manual"
+						onclick="toggle_filter('btn_show_manual')"
+					>
+						Frappes brutes
+					</button>
+					<button class="filter-btn active" id="btn_show_hs" onclick="toggle_filter('btn_show_hs')">
+						Hotstrings
+					</button>
+					<button
+						class="filter-btn active"
+						id="btn_show_llm"
+						onclick="toggle_filter('btn_show_llm')"
+					>
+						IA
+					</button>
+					<button
+						class="filter-btn active"
+						id="btn_show_spaces"
+						onclick="toggle_filter('btn_show_spaces')"
+					>
+						Espaces
+					</button>
+					<button
+						class="filter-btn"
+						id="btn_case_sensitive"
+						onclick="toggle_filter('btn_case_sensitive')"
+					>
+						Sensible à la casse
 					</button>
 				</div>
 
-				<div class="checkbox-group" style="margin-left: 15px">
-					<input type="checkbox" id="hide_spaces" onchange="apply_filters()" />
-					<label for="hide_spaces">Masquer espaces</label>
-				</div>
-				<div class="checkbox-group">
-					<input type="checkbox" id="hide_hs" onchange="apply_filters()" />
-					<label for="hide_hs">Masquer Hotstrings</label>
-				</div>
-				<div class="checkbox-group">
-					<input type="checkbox" id="hide_llm" onchange="apply_filters()" />
-					<label for="hide_llm">Masquer IA</label>
-				</div>
-				<div class="checkbox-group">
-					<input type="checkbox" id="case_sensitive" onchange="apply_filters()" />
-					<label for="case_sensitive">Sensible à la casse</label>
-				</div>
-
-				<button class="tab-btn" style="margin-left: auto" onclick="reset_filters()">
-					Réinitialiser
-				</button>
+				<button class="filter-btn filter-reset" onclick="reset_filters()">Réinitialiser</button>
 			</div>
 		</div>
 
 		<div class="main-content">
-			<div class="stats-grid">
-				<div class="stat-card" id="sentence_stats">Calcul en cours...</div>
-				<div class="stat-card" id="global_stats">Calcul en cours...</div>
+			<div class="stats-grid" id="main_stats_grid">
+				<div class="stat-card card-hs" id="hs_card">
+					<h2>Hotstrings <span id="hs_trend"></span></h2>
+					<div class="stat-value" id="hs_val">0 <span class="stat-unit">activations</span></div>
+
+					<div class="stat-details" id="hs_loading">Calcul en cours...</div>
+					<div class="stat-details-split" id="hs_details" style="display: none">
+						<div class="split-col">
+							<div class="split-label">Ajout net</div>
+							<div class="split-val"><strong id="hs_net_val">0</strong> touches</div>
+						</div>
+						<div class="split-col">
+							<div class="split-label">Acceptés</div>
+							<div class="split-val">
+								<strong id="hs_acc_pct">0%</strong>
+								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="sparkline-container"><canvas id="hs_sparkline"></canvas></div>
+				</div>
+
+				<div class="stat-card card-llm" id="llm_card">
+					<h2>Intelligence artificielle <span id="llm_trend"></span></h2>
+					<div class="stat-value" id="llm_val">0 <span class="stat-unit">activations</span></div>
+
+					<div class="stat-details" id="llm_loading">Calcul en cours...</div>
+					<div class="stat-details-split" id="llm_details" style="display: none">
+						<div class="split-col">
+							<div class="split-label">Ajout net</div>
+							<div class="split-val"><strong id="llm_net_val">0</strong> touches</div>
+						</div>
+						<div class="split-col">
+							<div class="split-label">Acceptés</div>
+							<div class="split-val">
+								<strong id="llm_acc_pct">0%</strong>
+								<span class="split-sub" id="llm_acc_raw">(0/0)</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="sparkline-container"><canvas id="llm_sparkline"></canvas></div>
+				</div>
+
+				<div class="stat-card card-global" id="global_card">
+					<h2>Vitesse moyenne <span id="wpm_trend"></span></h2>
+					<div class="stat-value" id="wpm_val" style="margin: 5px 0">0</div>
+					<div class="stat-details" id="global_details">
+						<div>
+							<strong>0</strong>
+							<span class="stat-unit" style="font-size: 0.9em">touches tapées</span>
+						</div>
+					</div>
+				</div>
 			</div>
 
-			<div class="chart-container">
-				<div style="flex-grow: 1; position: relative; height: 100%">
-					<canvas id="wpm_chart"></canvas>
+			<div style="display: flex; gap: 20px; margin-bottom: 20px">
+				<div
+					class="chart-container"
+					style="
+						flex: 1;
+						height: 220px;
+						background: var(--precision-bg);
+						border-color: var(--precision-border);
+					"
+				>
+					<h3
+						style="
+							margin: 0;
+							font-size: 14px;
+							color: var(--kpi-precision-color);
+							margin-bottom: 5px;
+						"
+					>
+						Précision horaire (%)
+					</h3>
+					<div style="flex-grow: 1; position: relative; height: 100%">
+						<canvas id="precision_chart"></canvas>
+					</div>
 				</div>
-				<div class="chart-help">
-					Scrollez (Molette) pour zoomer sur une période, glissez pour vous déplacer.
+
+				<div
+					class="chart-container"
+					style="
+						flex: 1;
+						height: 220px;
+						background: var(--global-bg);
+						border-color: var(--global-border);
+					"
+				>
+					<div
+						style="
+							display: flex;
+							justify-content: space-between;
+							align-items: center;
+							margin-bottom: 5px;
+						"
+					>
+						<div style="display: flex; align-items: baseline; gap: 10px">
+							<h3 style="margin: 0; font-size: 14px; color: var(--kpi-wpm-color)">Vitesse (MPM)</h3>
+							<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
+						</div>
+						<button
+							class="tab-btn"
+							style="padding: 2px 8px; font-size: 11px"
+							onclick="reset_chart_zoom('wpm')"
+						>
+							Restaurer zoom
+						</button>
+					</div>
+					<div style="flex-grow: 1; position: relative; height: 100%">
+						<canvas id="wpm_chart"></canvas>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="chart-container"
+				style="
+					height: 240px;
+					margin-bottom: 20px;
+					background: var(--delegation-bg);
+					border-color: var(--delegation-border);
+				"
+			>
+				<div
+					style="
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
+						margin-bottom: 5px;
+					"
+				>
+					<div style="display: flex; align-items: baseline; gap: 10px">
+						<h3 style="margin: 0; font-size: 14px; color: var(--kpi-delegation-color)">
+							Origine des frappes
+						</h3>
+						<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
+					</div>
+					<button
+						class="tab-btn"
+						style="padding: 2px 8px; font-size: 11px"
+						onclick="reset_chart_zoom('delegation')"
+					>
+						Restaurer zoom
+					</button>
+				</div>
+				<div style="flex-grow: 1; position: relative; height: 100%">
+					<canvas id="delegation_chart"></canvas>
 				</div>
 			</div>
 
 			<div class="tabs">
-				<button class="tab-btn active" onclick="switch_tab('c')">Caractères</button>
+				<button class="tab-btn active" onclick="switch_tab('c')">Touches</button>
 				<button class="tab-btn" onclick="switch_tab('bg')">Bigrammes</button>
 				<button class="tab-btn" onclick="switch_tab('tg')">Trigrammes</button>
 				<button class="tab-btn" onclick="switch_tab('qg')">Quadrigrammes</button>
@@ -104,7 +260,23 @@
 							<th onclick="handle_sort('wpm')">
 								Équiv. MPM
 								<div class="tooltip" onclick="event.stopPropagation()">
-									ℹ️<span class="tooltiptext"
+									<svg
+										class="info-icon"
+										xmlns="http://www.w3.org/2000/svg"
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<circle cx="12" cy="12" r="10"></circle>
+										<line x1="12" y1="16" x2="12" y2="12"></line>
+										<line x1="12" y1="8" x2="12.01" y2="8"></line>
+									</svg>
+									<span class="tooltiptext"
 										>Mots Par Minute : Vitesse estimée si vous tapiez ce fragment en boucle (1 mot =
 										5 touches). Ne prend en compte QUE vos vraies frappes.</span
 									>
@@ -114,7 +286,23 @@
 							<th onclick="handle_sort('acc')">
 								Précision
 								<div class="tooltip" onclick="event.stopPropagation()">
-									ℹ️<span class="tooltiptext"
+									<svg
+										class="info-icon"
+										xmlns="http://www.w3.org/2000/svg"
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<circle cx="12" cy="12" r="10"></circle>
+										<line x1="12" y1="16" x2="12" y2="12"></line>
+										<line x1="12" y1="8" x2="12.01" y2="8"></line>
+									</svg>
+									<span class="tooltiptext"
 										>Précision : Pourcentage de fois où cette séquence a été tapée du premier coup
 										sans utiliser la touche Effacer (Backspace).</span
 									>
@@ -157,5 +345,7 @@
 				</button>
 			</div>
 		</div>
+
+		<script src="script.js"></script>
 	</body>
 </html>

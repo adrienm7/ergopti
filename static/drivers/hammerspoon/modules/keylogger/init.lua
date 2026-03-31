@@ -9,8 +9,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Precision Profiling: Captures the exact millisecond delay between keys.
 --- 2. Zero-Lag Architecture: Lazy loads metrics UI using daily fragments.
---- 3. Enterprise-Grade Security: Robust hardware ID detection for corporate Macs.
---- 4. Semantic Context: Captures field role, layout, app, window title, and active URL.
+--- 3. Accurate Synthetic Tracking: Synchronizes backspaces and text for net metrics.
 --- ==============================================================================
 
 local M = {}
@@ -71,6 +70,8 @@ local CoreState = {
 	session_last_active    = 0,
 	
 	recent_typing          = {},
+	last_source_type       = "none",
+	last_source_time       = 0,
 	
 	session_app_name       = "Unknown",
 	session_win_title      = "Unknown",
@@ -157,9 +158,14 @@ local function handle_key(event_obj)
 		local evt_type = event_obj:getType()
 		local now = hs.timer.absoluteTime() / 1000000
 
-		if evt_type == hs.eventtap.event.types.leftMouseDown or evt_type == hs.eventtap.event.types.leftMouseDragged then
-			LogManager.flush_buffer()
-			return
+		if evt_type == hs.eventtap.event.types.leftMouseDown or 
+		   evt_type == hs.eventtap.event.types.rightMouseDown or 
+		   evt_type == hs.eventtap.event.types.scrollWheel or 
+		   evt_type == hs.eventtap.event.types.mouseMoved then
+			if #CoreState.buffer_events > 0 then
+				LogManager.flush_buffer()
+			end
+			return false
 		end
 		
 		if evt_type == hs.eventtap.event.types.keyUp then
@@ -180,6 +186,12 @@ local function handle_key(event_obj)
 
 		local flags = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
+		
+		-- F1-F12 keys, Escape, Modifiers etc. flush the buffer to ensure continuous tracking across window switches
+		if keycode >= 96 and keycode <= 122 then
+			LogManager.flush_buffer()
+			return false
+		end
 		
 		if flags.cmd and keycode == 0 then LogManager.flush_buffer(); return end
 		if flags.shift and (keycode >= 123 and keycode <= 126) then LogManager.flush_buffer(); return end
@@ -247,20 +259,27 @@ local function handle_key(event_obj)
 		local is_dead_key = false
 		local is_composed = false
 
-		if #CoreState.synth_queue > 0 then
-			local next_synth = CoreState.synth_queue[1]
-			if raw_chars == next_synth.char then
-				is_synth = true; synth_type = next_synth.type; table.remove(CoreState.synth_queue, 1)
-			elseif delay < 3 then
-				is_synth = true; synth_type = next_synth.type
+		if keycode == 51 then
+			if #CoreState.synth_queue > 0 and CoreState.synth_queue[1].char == "[BS]" then
+				is_synth = true
+				synth_type = CoreState.synth_queue[1].type
+				table.remove(CoreState.synth_queue, 1)
+			end
+		else
+			if #CoreState.synth_queue > 0 then
+				local next_synth = CoreState.synth_queue[1]
+				if raw_chars == next_synth.char then
+					is_synth = true; synth_type = next_synth.type; table.remove(CoreState.synth_queue, 1)
+				elseif delay < 3 then
+					is_synth = true; synth_type = next_synth.type
+				end
 			end
 		end
 
+		table.insert(CoreState.recent_typing, now)
+		CoreState.session_last_active = now
+		
 		if not is_synth then
-			table.insert(CoreState.recent_typing, now)
-			CoreState.session_last_active = now
-			
-			-- Dead key and composed characters tracking
 			if keycode ~= 51 and keycode ~= 48 and keycode ~= 36 and keycode ~= 53 then
 				local raw = event_obj:getCharacters(false) or ""
 				local cooked = event_obj:getCharacters(true) or ""
@@ -344,12 +363,25 @@ function M.set_buffer(text) CoreState.buffer_text = type(text) == "string" and t
 --- Queues synthetic characters to be marked distinctly in logs.
 --- @param text string The synthetic text.
 --- @param source_type string Origin identifier.
-function M.notify_synthetic(text, source_type)
-	if not text or text == "" then return end
-	for _, code in utf8.codes(text) do table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type }) end
+--- @param deletes number Quantity of backspaces issued before the text.
+function M.notify_synthetic(text, source_type, deletes)
+	if deletes and deletes > 0 then
+		for i = 1, deletes do
+			table.insert(CoreState.synth_queue, { char = "[BS]", type = source_type })
+		end
+	end
+
+	if text and text ~= "" then
+		for _, code in utf8.codes(text) do
+			table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type })
+		end
+	end
+	
+	CoreState.last_source_type = source_type
+	CoreState.last_source_time = hs.timer.absoluteTime() / 1000000000
 end
 
---- Extracts the rolling array to compute current Words-Per-Minute.
+--- Extracts the rolling array to compute current Words-Per-Minute immediately.
 --- @return table Dictionary with `wpm` integer property.
 function M.get_live_stats()
 	local now = hs.timer.absoluteTime() / 1000000
@@ -357,11 +389,20 @@ function M.get_live_stats()
 		table.remove(CoreState.recent_typing, 1)
 	end
 	
-	local live_wpm = #CoreState.recent_typing * 0.8
 	local is_idle = (CoreState.session_last_active == 0) or ((now - CoreState.session_last_active) > 5000)
-	local display_wpm = is_idle and 0 or math.floor(live_wpm + 0.5)
+	local display_wpm = 0
 	
-	return { wpm = display_wpm }
+	if not is_idle and #CoreState.recent_typing > 1 then
+		local duration_ms = now - CoreState.recent_typing[1]
+		if duration_ms < 2000 then duration_ms = 2000 end
+		display_wpm = math.floor(((#CoreState.recent_typing / 5) / (duration_ms / 60000)) + 0.5)
+	end
+	
+	return { 
+		wpm = display_wpm, 
+		source = CoreState.last_source_type, 
+		source_time = CoreState.last_source_time 
+	}
 end
 
 --- Cleans up sessions if typing is abandoned for a while.
@@ -407,7 +448,11 @@ function M.start(script_control)
 		ContextTracker.update_private_status()
 
 		if not _tap then 
-			_tap = hs.eventtap.new({ hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp, hs.eventtap.event.types.leftMouseDown, hs.eventtap.event.types.leftMouseDragged }, handle_key) 
+			_tap = hs.eventtap.new({ 
+				hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp, 
+				hs.eventtap.event.types.leftMouseDown, hs.eventtap.event.types.rightMouseDown,
+				hs.eventtap.event.types.scrollWheel, hs.eventtap.event.types.mouseMoved
+			}, handle_key) 
 		end
 		_tap:start()
 
@@ -442,7 +487,7 @@ end
 function M.log_hotstring(trigger, replacement)
 	if not CoreState.is_enabled then return end
 	LogManager.flush_buffer()
-	LogManager.append_log({ type = "hotstring", trigger = trigger, replacement = replacement, tag = "<hotstring>" .. replacement .. "</hotstring>" })
+	LogManager.append_log({ type = "hotstring", app = CoreState.session_app_name, trigger = trigger, replacement = replacement, tag = "<hotstring>" .. replacement .. "</hotstring>" })
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 
@@ -454,8 +499,21 @@ function M.log_llm(context, results)
 	LogManager.flush_buffer()
 	local preds = {}
 	for _, r in ipairs(results or {}) do table.insert(preds, r.to_type) end
-	LogManager.append_log({ type = "llm_generation", context = context, predictions = preds, tag = "<llm_generated>" .. (preds[1] or "") .. "</llm_generated>" })
+	LogManager.append_log({ type = "llm_generation", app = CoreState.session_app_name, context = context, predictions = preds, tag = "<llm_generated>" .. (preds[1] or "") .. "</llm_generated>" })
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+end
+
+--- Logs that a Hotstring was proposed to the user but not necessarily executed.
+function M.log_hotstring_suggested()
+	if not CoreState.is_enabled then return end
+	LogManager.append_log({ type = "hotstring_suggested", app = CoreState.session_app_name })
+	LogManager.increment_manifest_stat(CoreState.session_app_name, "hs_suggested")
+end
+
+--- Logs that an LLM string was proposed to the user.
+function M.log_llm_suggested()
+	if not CoreState.is_enabled then return end
+	LogManager.increment_manifest_stat(CoreState.session_app_name, "llm_suggested")
 end
 
 --- Triggers the massive HTML interface metrics canvas.

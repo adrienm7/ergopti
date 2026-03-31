@@ -7,8 +7,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Decoupled Architecture: Connects raw local logs to an isolated Webview.
---- 2. Singleton Preservation: Pressing the shortcut multiple times brings the existing window to the front without reloading the heavy JS DOM, creating a new window only if it is completely closed.
---- 3. Space Teleportation & Focus: Leverages the UI builder to natively teleport the window to the active macOS space and grant it focus, while allowing other apps to overlap it when clicked.
+--- 2. Singleton Preservation: Reuses instances without reloading the DOM.
+--- 3. Format Resiliency: Understands both optimized index schema and legacy formats.
 --- ==============================================================================
 
 local M = {}
@@ -25,11 +25,11 @@ M._last_req = nil
 
 
 
--- =================================
--- =================================
+-- =====================================
+-- =====================================
 -- ======= 1/ Data Retrieval =======
--- =================================
--- =================================
+-- =====================================
+-- =====================================
 
 --- Extracts the app icon safely from macOS.
 --- @param app_name string The name of the application.
@@ -99,12 +99,23 @@ local function fetch_range(log_dir, start_date, end_date, selected_apps)
 												t = { c = 0, t = 0, hs = 0, llm = 0, o = 0, e = 0 }
 												merged[k_type][k_seq] = t
 											end
-											t.c = t.c + (k_stats.c or 0)
-											t.t = t.t + (k_stats.t or 0)
-											t.hs = t.hs + (k_stats.hs or 0)
-											t.llm = t.llm + (k_stats.llm or 0)
-											t.o = t.o + (k_stats.o or 0)
-											t.e = t.e + (k_stats.e or 0)
+											
+											-- Accommodate varying schemas (array/legacy dict/omitted zeroes)
+											if k_stats[1] or k_stats[2] or k_stats[3] then
+												t.c = t.c + (k_stats[1] or 0)
+												t.t = t.t + (k_stats[2] or 0)
+												t.e = t.e + (k_stats[3] or 0)
+												t.hs = t.hs + (k_stats[4] or 0)
+												t.llm = t.llm + (k_stats[5] or 0)
+												t.o = t.o + (k_stats[6] or 0)
+											else
+												t.c = t.c + (k_stats.c or 0)
+												t.t = t.t + (k_stats.t or 0)
+												t.hs = t.hs + (k_stats.hs or 0)
+												t.llm = t.llm + (k_stats.llm or 0)
+												t.o = t.o + (k_stats.o or 0)
+												t.e = t.e + (k_stats.e or 0)
+											end
 										end
 									end
 								end
@@ -123,11 +134,11 @@ end
 
 
 
--- ===============================
--- ===============================
+-- =====================================
+-- =====================================
 -- ======= 2/ UI Injection =======
--- ===============================
--- ===============================
+-- =====================================
+-- =====================================
 
 --- Injects the instant manifest and polls for lazy loading requests.
 --- @param log_dir string Path to the logging directory.
