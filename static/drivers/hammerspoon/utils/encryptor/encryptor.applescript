@@ -4,16 +4,12 @@
 -- MODULE: Encryptor AppleScript Payload
 -- DESCRIPTION:
 -- The core logic for the Encryptor application.
--- Handles GUI, CLI, and Droplet
--- modes to encrypt or decrypt keylogger files securely.
+-- Handles GUI, CLI, and Droplet modes to encrypt or decrypt keylogger files.
 --
 -- FEATURES & RATIONALE:
--- 1. Tri-Mode Operation: Runs via double-click (GUI), drag-and-drop (Droplet),
---    or command line (CLI) for seamless Hammerspoon integration.
--- 2. Hardware-Bound: Fetches the Mac serial number dynamically to act as the
---    default encryption key.
--- 3. Double-Click Native: Seamlessly opens and decrypts `.enc` files upon
---    double-click without asking redundant prompts.
+-- 1. Tri-Mode Operation: Runs via GUI, Droplet, or CLI for Hammerspoon.
+-- 2. Hardware-Bound: Fetches the Mac serial number for the encryption key.
+-- 3. Unicode Safe: Uses character IDs to prevent encoding issues (???).
 -- ==============================================================================
 
 
@@ -83,12 +79,15 @@ on processFiles(theFiles, macSerial, isSilent)
 	set errorCount to 0
 	set totalCount to count of theFiles
 	
+	-- Character IDs for UI
+	set iconCheck to (character id 9989) -- ?
+	set iconCross to (character id 10060) -- ?
+	
 	-- Communicate start status to Hammerspoon IPC
 	do shell script "echo \"0\n\" & totalCount & \"\n0\n0\nprocessing\" > /tmp/.ergopti_encryptor_status"
 	
 	set i to 1
 	repeat with f in theFiles
-		-- Normalize path handling for both CLI strings and GUI aliases
 		if class of f is text then
 			set filePath to f
 		else
@@ -121,17 +120,14 @@ on processFiles(theFiles, macSerial, isSilent)
 			set errorCount to errorCount + 1
 		end try
 		
-		-- Update IPC status for progress bar
 		do shell script "echo \"" & i & "\n\" & totalCount & \"\n\" & successCount & \"\n\" & errorCount & \"\nprocessing\" > /tmp/.ergopti_encryptor_status"
 		set i to i + 1
 	end repeat
 	
-	-- Mark as finished
 	do shell script "echo \"" & totalCount & "\n\" & totalCount & \"\n\" & successCount & \"\n\" & errorCount & \"\ndone\" > /tmp/.ergopti_encryptor_status"
 	
-	-- Display a native alert if not launched quietly from Hammerspoon
 	if not isSilent then
-		display alert "OpŽration terminŽe" message "Fichiers traitŽs avec succs : " & successCount & return & "Erreurs : " & errorCount
+		display alert "OpŽration terminŽe" message iconCheck & " Fichiers traitŽs avec succs : " & successCount & return & iconCross & " Erreurs : " & errorCount
 	end if
 end processFiles
 
@@ -146,13 +142,11 @@ end processFiles
 -- ===============================
 
 on run argv
-	-- Safe check to avoid "canÕt get class of argv" error when launched natively via GUI
 	set hasArgs to false
 	try
 		if class of argv is list then set hasArgs to true
 	end try
 
-	-- Handle CLI execution triggered by Hammerspoon or Terminal
 	if hasArgs and (count of argv) > 0 then
 		set macSerial to getLocalSerial()
 		set fileList to {}
@@ -175,9 +169,13 @@ on run argv
 		end if
 	end if
 
-	-- GUI Mode: Interactive user execution
+	-- Character IDs for GUI
+	set iconShield to (character id 128737) -- ???
+	set iconLight to (character id 128161) -- ??
+	set iconKey to (character id 128273) -- ??
+
 	set localSerial to getLocalSerial()
-	set infoMsg to "??? Utilitaire de SŽcuritŽ Encryptor" & return & return & "Cet outil permet de chiffrer ou dŽchiffrer vos fichiers de logs de faon sŽcurisŽe." & return & return & "?? ASTUCE : Vous pouvez directement glisser-dŽposer vos fichiers ou double-cliquer sur un fichier .enc pour le dŽchiffrer instantanŽment !" & return & return & "ClŽ de sŽcuritŽ (laissez la valeur par dŽfaut pour utiliser ce Mac) :"
+	set infoMsg to iconShield & " Utilitaire de SŽcuritŽ Encryptor" & return & return & "Cet outil permet de chiffrer ou dŽchiffrer vos fichiers de logs de faon sŽcurisŽe." & return & return & iconLight & "ASTUCE : Vous pouvez directement glisser-dŽposer vos fichiers ou double-cliquer sur un fichier .enc pour le dŽchiffrer instantanŽment !" & return & return & iconKey & " ClŽ de sŽcuritŽ (laissez la valeur par dŽfaut pour utiliser ce Mac) :"
 	
 	try
 		set dialogResult to display dialog infoMsg default answer localSerial buttons {"Quitter", "Choisir des fichiers..."} default button 2 with title "Encryptor"
@@ -200,11 +198,9 @@ end run
 -- =================================
 
 on open theFiles
-	-- Droplet Mode: Files dragged directly onto the App icon or double-clicked (.enc)
 	set isSilent to false
 	set macSerial to getLocalSerial()
 	
-	-- Check for silent IPC flag passed by Hammerspoon
 	try
 		set cliArgs to do shell script "cat /tmp/.ergopti_encryptor_cli 2>/dev/null"
 		if cliArgs is not "" then
