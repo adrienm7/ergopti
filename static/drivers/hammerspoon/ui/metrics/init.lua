@@ -53,7 +53,7 @@ end
 --- @param selected_apps table Array of requested applications.
 --- @return table The fully merged big dictionary for the UI.
 local function fetch_range(log_dir, start_date, end_date, selected_apps)
-	local merged = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {} }
+	local merged = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
 	local app_set = {}
 	
 	if selected_apps and type(selected_apps) == "table" then
@@ -90,7 +90,8 @@ local function fetch_range(log_dir, start_date, end_date, selected_apps)
 					local ok, day_data = pcall(json.decode, content)
 					if ok and type(day_data) == "table" then
 						for appName, appData in pairs(day_data) do
-							if app_set[appName] then
+							local has_shortcuts = type(appData) == "table" and type(appData.sc) == "table" and next(appData.sc) ~= nil
+							if appName == "Unknown" or app_set[appName] or has_shortcuts then
 								for k_type, k_dict in pairs(appData) do
 									if merged[k_type] and type(k_dict) == "table" then
 										for k_seq, k_stats in pairs(k_dict) do
@@ -148,6 +149,9 @@ function M.show(log_dir)
 	-- Early return: Reuse the webview if it is already open to strictly preserve state
 	if M._wv then
 		ui_builder.force_focus(M._wv)
+		pcall(function()
+			M._wv:evaluateJavaScript("if(window.apply_date_app_filters) window.apply_date_app_filters();")
+		end)
 		return
 	end
 	

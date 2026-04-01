@@ -19,11 +19,12 @@ window._lua_request = null;
 
 const app_state = {
 	raw_data_cache: null,
-	data: { c: {}, bg: {}, tg: {}, qg: {}, pg: {}, hx: {}, hp: {}, w: {} },
+	data: { c: {}, bg: {}, tg: {}, qg: {}, pg: {}, hx: {}, hp: {}, w: {}, sc: {} },
 	time_series: {},
 	hourly_series: {},
 	available_apps: [],
 	selected_apps: new Set(),
+	did_apply_initial_reset: false,
 	current_tab: 'c',
 	sort_col: 'count',
 	sort_asc: false,
@@ -37,6 +38,7 @@ let wpm_chart_instance = null;
 let precision_chart_instance = null;
 let hs_sparkline_instance = null;
 let llm_sparkline_instance = null;
+let auto_refresh_bound = false;
 
 const info_svg =
 	'<svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
@@ -121,6 +123,75 @@ function format_display_key(str) {
 }
 
 /**
+ * Formats shortcuts with visual chips for modifiers and primary key.
+ */
+function format_shortcut_key(str) {
+	if (!str) return '';
+
+	const modifierSet = new Set(['cmd', 'ctrl', 'alt', 'shift', 'fn']);
+	const prettyMap = {
+		cmd: '⌘',
+		ctrl: '⌃',
+		alt: '⌥',
+		shift: '⇧',
+		fn: 'fn',
+		left: '←',
+		right: '→',
+		up: '↑',
+		down: '↓',
+		enter: '⏎',
+		tab: '⇥',
+		backspace: '⌫',
+		escape: '⎋',
+		space: '␣',
+		delete: '⌦',
+		home: '⇱',
+		end: '⇲',
+		pageup: '⇞',
+		pagedown: '⇟'
+	};
+	const parts = String(str)
+		.split('+')
+		.map((part) => part.trim())
+		.filter((part) => part.length > 0);
+
+	if (parts.length === 0) return '';
+
+	return parts
+		.map((part, index) => {
+			const lowerPart = part.toLowerCase();
+			const cls = modifierSet.has(lowerPart)
+				? 'shortcut-chip shortcut-mod'
+				: 'shortcut-chip shortcut-key';
+			let label = prettyMap[lowerPart] || part;
+			if (!prettyMap[lowerPart] && part.length === 1) label = part.toUpperCase();
+			const plus = index < parts.length - 1 ? '<span class="shortcut-plus">+</span>' : '';
+			return `<span class="${cls}">${escape_html(label)}</span>${plus}`;
+		})
+		.join('');
+}
+
+/**
+ * Keeps the dashboard in sync without aggressive polling.
+ * Refreshes only when the window/tab becomes active again.
+ */
+function ensure_live_refresh() {
+	if (auto_refresh_bound) return;
+	auto_refresh_bound = true;
+
+	const refreshIfIdle = () => {
+		if (app_state.loading_data) return;
+		request_range_data(false);
+	};
+
+	document.addEventListener('visibilitychange', () => {
+		if (!document.hidden) refreshIfIdle();
+	});
+
+	window.addEventListener('focus', refreshIfIdle);
+}
+
+/**
  * Procedurally generates an app color.
  */
 function get_app_color(appName) {
@@ -173,8 +244,18 @@ function get_trend_svg(valid_points) {
 /**
  * Merges raw dictionary entries applying current UI filters.
  */
-function merge_dict(target, source, case_sensitive, show_spaces, show_hs, show_llm, show_manual) {
+function merge_dict(
+	target,
+	source,
+	case_sensitive,
+	show_spaces,
+	show_hs,
+	show_llm,
+	show_manual,
+	tabName
+) {
 	if (!source || typeof source !== 'object') return;
+	const isShortcutsTab = tabName === 'sc';
 
 	Object.keys(source).forEach((k) => {
 		let display_k = case_sensitive ? k : k.toLowerCase();
@@ -193,9 +274,11 @@ function merge_dict(target, source, case_sensitive, show_spaces, show_hs, show_l
 
 		let manual_count = Math.max(0, real_count - hs_count - llm_count - (item.o || 0));
 
-		if (!show_manual) real_count -= manual_count;
-		if (!show_hs) real_count -= hs_count;
-		if (!show_llm) real_count -= llm_count;
+		if (!isShortcutsTab) {
+			if (!show_manual) real_count -= manual_count;
+			if (!show_hs) real_count -= hs_count;
+			if (!show_llm) real_count -= llm_count;
+		}
 		if (real_count <= 0) return;
 
 		if (!target[display_k]) {
@@ -222,20 +305,33 @@ function merge_dict(target, source, case_sensitive, show_spaces, show_hs, show_l
  * Main boot function processing the fast manifest.
  */
 function process_manifest() {
-	if (app_state.available_apps.length === 0 && Object.keys(window.metrics_manifest).length > 0) {
+	if (Object.keys(window.metrics_manifest).length > 0) {
 		const appSet = new Set();
-
 		Object.keys(window.metrics_manifest).forEach((date) => {
 			Object.keys(window.metrics_manifest[date]).forEach((appName) => {
-				if (appName !== 'Unknown') {
-					appSet.add(appName);
-				}
+				if (appName !== 'Unknown') appSet.add(appName);
 			});
 		});
 
+		const previousApps = new Set(app_state.available_apps);
+		const hadAllSelected =
+			app_state.available_apps.length > 0 &&
+			app_state.selected_apps.size === app_state.available_apps.length;
+
 		app_state.available_apps = Array.from(appSet).sort((a, b) => a.localeCompare(b));
-		if (app_state.selected_apps.size === 0) {
+
+		if (app_state.selected_apps.size === 0 || hadAllSelected) {
+			app_state.selected_apps.clear();
 			app_state.available_apps.forEach((app) => app_state.selected_apps.add(app));
+		} else {
+			// Keep existing custom selection, and prune apps that disappeared
+			const nextSelection = new Set();
+			app_state.available_apps.forEach((app) => {
+				if (app_state.selected_apps.has(app) || !previousApps.has(app)) {
+					nextSelection.add(app);
+				}
+			});
+			app_state.selected_apps = nextSelection;
 		}
 
 		const start_input = document.getElementById('date_start');
@@ -251,9 +347,17 @@ function process_manifest() {
 		}
 	}
 
+	if (!app_state.did_apply_initial_reset) {
+		app_state.did_apply_initial_reset = true;
+		ensure_live_refresh();
+		reset_filters();
+		return;
+	}
+
 	update_app_btn_text();
 	compute_manifest_metrics();
 	request_range_data();
+	ensure_live_refresh();
 }
 
 /**
@@ -264,7 +368,7 @@ function compute_manifest_metrics() {
 	app_state.hourly_series = {};
 
 	for (let i = 0; i < 24; i++) {
-		app_state.hourly_series[i.toString().padStart(2, '0')] = { c: 0, e: 0 };
+		app_state.hourly_series[i.toString().padStart(2, '0')] = { c: 0, e: 0, es: 0 };
 	}
 
 	let global_hs_triggers = 0;
@@ -311,8 +415,11 @@ function compute_manifest_metrics() {
 			if (app.hourly) {
 				Object.keys(app.hourly).forEach((hour) => {
 					if (app_state.hourly_series[hour]) {
-						app_state.hourly_series[hour].c += app.hourly[hour].c || 0;
-						app_state.hourly_series[hour].e += app.hourly[hour].e || 0;
+						const hourData = app.hourly[hour] || {};
+						const manualErrors = typeof hourData.em === 'number' ? hourData.em : hourData.e || 0;
+						app_state.hourly_series[hour].c += hourData.c || 0;
+						app_state.hourly_series[hour].e += manualErrors;
+						app_state.hourly_series[hour].es += hourData.es || 0;
 					}
 				});
 			}
@@ -347,11 +454,15 @@ function compute_manifest_metrics() {
 		wpm_points = [];
 	let hs_chars_total = 0,
 		llm_chars_total = 0;
+	let global_chars_total = 0,
+		global_time_total = 0;
 
 	sorted_keys.forEach((k) => {
 		const d = app_state.time_series[k];
 		hs_chars_total += d.hs_chars;
 		llm_chars_total += d.llm_chars;
+		global_chars_total += d.chars || 0;
+		global_time_total += d.time_ms || 0;
 
 		if (d.chars > 0) {
 			hs_points.push({ x: new Date(k + 'T12:00:00'), y: (d.hs_chars / d.chars) * 100 });
@@ -401,6 +512,31 @@ function compute_manifest_metrics() {
 		wpm_points.map((p) => p.y).filter((y) => y > 0)
 	);
 
+	// Populate the global speed KPI instantly from manifest aggregates,
+	// then let detailed table-level computation refine it once raw data arrives.
+	const manifest_cpm = global_time_total > 0 ? global_chars_total / (global_time_total / 60000) : 0;
+	const manifest_wpm = manifest_cpm / 5;
+	const wpm_val_elem = document.getElementById('wpm_val');
+	if (wpm_val_elem) {
+		wpm_val_elem.innerHTML = `
+			<div style="display:flex; flex-direction:column; justify-content:center;">
+				<div style="display:flex; align-items:center; gap:6px;">
+					<span>${format_number(manifest_wpm.toFixed(1))} <span class="stat-unit">MPM</span></span>
+					<span class="tooltip stat-inline-tooltip">${info_svg}<span class="tooltiptext">MPM : Mots par minute, avec la convention standard 1 mot = 5 touches</span></span>
+				</div>
+				<div style="display:flex; align-items:center; gap:6px; font-size: 0.65em; margin-top: 5px;">
+					<span>${format_number(manifest_cpm.toFixed(0))} <span class="stat-unit">CPM</span></span>
+					<span class="tooltip stat-inline-tooltip">${info_svg}<span class="tooltiptext">CPM : Caractères par minute, total de touches tapées par minute</span></span>
+				</div>
+			</div>
+		`;
+	}
+
+	const global_details_elem = document.getElementById('global_details');
+	if (global_details_elem) {
+		global_details_elem.innerHTML = `<div style="margin-top:5px;"><strong style="color:var(--kpi-wpm-color); font-size: 1.1em;">${format_number(global_chars_total)}</strong> <span class="stat-unit" style="font-size: 0.9em;">touches tapées</span></div>`;
+	}
+
 	render_charts();
 }
 
@@ -410,7 +546,7 @@ function compute_manifest_metrics() {
 function apply_local_filters() {
 	if (!app_state.raw_data_cache) return;
 
-	app_state.data = { c: {}, bg: {}, tg: {}, qg: {}, pg: {}, hx: {}, hp: {}, w: {} };
+	app_state.data = { c: {}, bg: {}, tg: {}, qg: {}, pg: {}, hx: {}, hp: {}, w: {}, sc: {} };
 
 	const show_hs = document.getElementById('btn_show_hs').classList.contains('active');
 	const show_llm = document.getElementById('btn_show_llm').classList.contains('active');
@@ -426,7 +562,8 @@ function apply_local_filters() {
 			show_spaces,
 			show_hs,
 			show_llm,
-			show_manual
+			show_manual,
+			tab
 		);
 	});
 
@@ -436,7 +573,7 @@ function apply_local_filters() {
 /**
  * Queries Hammerspoon Lua thread for range data.
  */
-function request_range_data() {
+function request_range_data(show_loader = true) {
 	if (app_state.loading_data) return;
 	app_state.loading_data = true;
 
@@ -446,8 +583,10 @@ function request_range_data() {
 		apps: Array.from(app_state.selected_apps)
 	};
 
-	document.getElementById('metrics_table_body').innerHTML =
-		'<tr><td colspan="6" style="text-align:center; padding: 30px;"><div class="loader-spinner"></div> Lecture des fichiers en cours...</td></tr>';
+	if (show_loader) {
+		document.getElementById('metrics_table_body').innerHTML =
+			'<tr><td colspan="6" style="text-align:center; padding: 30px;"><div class="loader-spinner"></div> Lecture des fichiers en cours...</td></tr>';
+	}
 
 	setTimeout(() => {
 		window._lua_request = JSON.stringify(req);
@@ -925,7 +1064,12 @@ function render_current_tab() {
 				? Array.from(norm_k).length
 				: { hp: 7, hx: 6, pg: 5, qg: 4, tg: 3, bg: 2 }[app_state.current_tab] || 1;
 
-		if (app_state.current_tab !== 'w' && Array.from(norm_k).length !== seq_len) return;
+		if (
+			app_state.current_tab !== 'w' &&
+			app_state.current_tab !== 'sc' &&
+			Array.from(norm_k).length !== seq_len
+		)
+			return;
 
 		const item = source_dict[k];
 		const manual_count = Math.max(
@@ -941,7 +1085,8 @@ function render_current_tab() {
 			synth_llm: item.synth_llm,
 			synth_other: item.synth_other,
 			avg: isNaN(avg) ? 0 : avg,
-			wpm: !isNaN(avg) && avg > 0 ? seq_len / 5 / (avg / 60000) : 0,
+			wpm:
+				app_state.current_tab !== 'sc' && !isNaN(avg) && avg > 0 ? seq_len / 5 / (avg / 60000) : 0,
 			acc: item.count > 0 ? ((item.count - item.errors) / item.count) * 100 : 0
 		});
 	});
@@ -972,8 +1117,14 @@ function render_current_tab() {
 	if (wpm_val_elem) {
 		wpm_val_elem.innerHTML = `
 			<div style="display:flex; flex-direction:column; justify-content:center;">
-				<div>${format_number(wpm_filtered.toFixed(1))} <span class="stat-unit">MPM</span></div>
-				<div style="font-size: 0.65em; margin-top: 5px;">${format_number(cpm_filtered.toFixed(0))} <span class="stat-unit">CPM</span></div>
+				<div style="display:flex; align-items:center; gap:6px;">
+					<span>${format_number(wpm_filtered.toFixed(1))} <span class="stat-unit">MPM</span></span>
+					<span class="tooltip stat-inline-tooltip">${info_svg}<span class="tooltiptext">MPM : Mots par minute, avec la convention standard 1 mot = 5 touches</span></span>
+				</div>
+				<div style="display:flex; align-items:center; gap:6px; font-size: 0.65em; margin-top: 5px;">
+					<span>${format_number(cpm_filtered.toFixed(0))} <span class="stat-unit">CPM</span></span>
+					<span class="tooltip stat-inline-tooltip">${info_svg}<span class="tooltiptext">CPM : Caractères par minute, total de touches tapées par minute</span></span>
+				</div>
 			</div>
 		`;
 	}
@@ -1014,6 +1165,11 @@ function render_table() {
 	let html = arr
 		.slice(0, 1000)
 		.map((item) => {
+			const keyHtml =
+				app_state.current_tab === 'sc'
+					? `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`
+					: `<span class="mono-space">${format_display_key(item.key)}</span>`;
+
 			let synth = [];
 			if (item.synth_hs > 0) synth.push(`${format_number(item.synth_hs)} HS`);
 			if (item.synth_llm > 0) synth.push(`${format_number(item.synth_llm)} IA`);
@@ -1030,7 +1186,7 @@ function render_table() {
 			let acc_color = item.acc >= 95 ? '#34c759' : item.acc < 80 ? '#ff3b30' : '#ffcc00';
 
 			return `<tr>
-			<td><span class="mono-space">${format_display_key(item.key)}</span></td>
+			<td>${keyHtml}</td>
 			<td>${format_number(item.count)}${synth_str}</td>
 			<td>${format_number(item.freq.toFixed(2))} %</td>
 			<td>${avg_str}</td>
