@@ -103,28 +103,28 @@ end
 M.BUILTIN_PROFILES = {
     {
         id            = "raw",
-        label         = "Raw — Aucun prompt, juste le contexte",
+        label         = "○○○ Raw — Aucun prompt, juste le contexte",
         batch         = false,
         system_single = RAW_PROMPT_SINGLE,
         system_multi  = nil,
     },
     {
         id            = "basic",
-        label         = "Basique — Prédiction simple",
+        label         = "●○○ Basique — Prédiction simple",
         batch         = false,
         system_single = BASIC_PROMPT_SINGLE,
         system_multi  = nil,
     },
     {
         id            = "advanced",
-        label         = "Avancé — Correction + Prédiction",
+        label         = "●●○ Avancé — Correction + Prédiction",
         batch         = false,
         system_single = ADVANCED_PROMPT_SINGLE,
         system_multi  = nil,
     },
     {
         id            = "batch_advanced",
-        label         = "●●●● Batch Avancé — 1 req. avancée avec {n} prédiction{s}",
+        label         = "●●● Batch Avancé — 1 req. avancée avec {n} prédiction{s}",
         batch         = true,
         system_single = ADVANCED_PROMPT_SINGLE,
         system_multi  = BATCH_ADVANCED_PROMPT,

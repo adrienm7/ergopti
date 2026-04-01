@@ -17,6 +17,7 @@ local shortcuts          = require("modules.shortcuts")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
+local mlx_deps_checker   = require("lib.mlx_deps_checker")
 
 
 
@@ -32,6 +33,13 @@ local hotstring_editor   = require("ui.hotstring_editor")
 -- Menu.lua will honor saved state and stop/start them as needed
 gestures.start()
 shortcuts.start()
+
+
+
+
+-- Background check: verify Python MLX dependencies are installed
+-- This runs asynchronously once per session, non-blocking
+mlx_deps_checker.check_and_install_deps()
 
 
 

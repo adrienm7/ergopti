@@ -44,8 +44,7 @@ _ucc:setCallback(function(msg)
 		if type(_on_cancel) == "function" then pcall(_on_cancel) end
 		
 	elseif msg.body == "terminal" then
-		local model = type(M._current_model) == "string" and M._current_model or ""
-		local cmd   = "ollama pull " .. model
+		local cmd   = M._terminal_cmd or ("ollama pull " .. (M._current_model or ""))
 		local apple_script = string.format(
 			"osascript -e 'tell application \"Terminal\" to do script \"%s\"' -e 'tell application \"Terminal\" to activate'",
 			cmd:gsub("\"", "\\\"")
@@ -125,10 +124,12 @@ end
 --- Shows the download window for a given model.
 --- @param model_name string The name of the model being downloaded.
 --- @param on_cancel function Callback invoked if the user cancels.
-function M.show(model_name, on_cancel)
+--- @param terminal_cmd string Optional override for the terminal fallback command.
+function M.show(model_name, on_cancel, terminal_cmd)
 	M.hide() -- Ensure any old download window is strictly cleared
 	
 	M._current_model = type(model_name) == "string" and model_name or "inconnu"
+	M._terminal_cmd  = type(terminal_cmd) == "string" and terminal_cmd or ("ollama pull " .. M._current_model)
 	_on_cancel = type(on_cancel) == "function" and on_cancel or nil
 	_start_ts  = hs.timer.secondsSinceEpoch()
 	_ready     = false

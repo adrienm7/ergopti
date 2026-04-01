@@ -63,7 +63,11 @@ function M.generate(ctx, menu_mods, actions)
 	
 	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_item) == "function" then
 		local ok_b, llm_item = pcall(ctx.llm_handler.build_item)
-		if ok_b and llm_item then table.insert(items, llm_item) end
+		if ok_b and llm_item then
+			table.insert(items, llm_item)
+		elseif not ok_b then
+			print("[builder] ERREUR build_item IA : " .. tostring(llm_item))
+		end
 	end
 	
 	if type(menu_mods.keylogger) == "table" and type(menu_mods.keylogger.build) == "function" then

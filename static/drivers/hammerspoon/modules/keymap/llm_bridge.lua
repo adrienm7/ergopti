@@ -69,7 +69,6 @@ local llm_debounce_time        = 0.5
 local llm_context_length       = 500
 local llm_reset_on_nav         = true
 local llm_temperature          = 0.1
-local llm_max_predict          = 40
 local llm_max_words            = 10
 local llm_num_predictions      = 3
 local llm_pred_indent          = -3
@@ -104,7 +103,6 @@ function M.set_llm_model(m)               current_llm_model      = tostring(m) e
 function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
 function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) end
 function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
-function M.set_llm_max_predict(p)         llm_max_predict        = math.max(1, tonumber(p) or 40) end
 function M.set_llm_max_words(w)           llm_max_words          = math.max(0, tonumber(w) or 10) end
 function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or 3) end
 function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
@@ -346,13 +344,15 @@ end
 --- Generates the string for the information bar tooltip.
 --- @param model_name string Model identifier.
 --- @param elapsed_ms number Milliseconds taken for generation.
+--- @param is_mlx boolean Whether MLX backend is active.
 --- @return string Formatted string.
-local function build_info_bar(model_name, elapsed_ms)
+local function build_info_bar(model_name, elapsed_ms, is_mlx)
 	if not model_name or model_name == "" then return nil end
 	if elapsed_ms and elapsed_ms > 0 then
 		local secs = elapsed_ms / 1000
 		local time_str = secs < 10 and string.format("%.1fs", secs) or string.format("%ds", math.floor(secs + 0.5))
-		return model_name .. " · " .. time_str
+		local time_block = "⏱️ " .. time_str .. (is_mlx and " (MLX 🚀)" or "")
+		return model_name .. " — " .. time_block
 	end
 	return model_name
 end
@@ -379,7 +379,7 @@ function M._perform_llm_check()
 	if type(core_llm.fetch_llm_prediction) == "function" then
 		core_llm.fetch_llm_prediction(
 			clean_buffer, tail,
-			current_llm_model, llm_temperature, llm_max_predict, num_pred,
+			current_llm_model, llm_temperature, 80, num_pred,
 			function(predictions, elapsed_ms)
 				if _llm_request_id ~= my_request_id then return end
 				
@@ -410,7 +410,9 @@ function M._perform_llm_check()
 					end
 				end
 
-				if #valid_preds == 0 then M.reset_predictions(); return end
+				if #valid_preds == 0 then
+					M.reset_predictions(); return
+				end
 				
 				-- Notify keylogger that we suggested a prediction
 				if keylogger and type(keylogger.log_llm_suggested) == "function" then
@@ -419,7 +421,8 @@ function M._perform_llm_check()
 				
 				_pending_predictions = valid_preds
 				_predictions_active  = true
-				local info = llm_show_info_bar and build_info_bar(current_llm_model, elapsed_ms) or nil
+				local using_mlx = type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() or false
+				local info = llm_show_info_bar and build_info_bar(current_llm_model, elapsed_ms, using_mlx) or nil
 				
 				local val_mods = llm_val_modifiers
 				local val_mod_str = "none"
