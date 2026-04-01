@@ -375,8 +375,9 @@ local function onKeyDownRaw(e)
                 elseif m.group and CoreState.DELAYS[m.group] then
                     specific_delay = CoreState.DELAYS[m.group]
                 end
-                
-                local allowed_delay = specific_delay * complex_mult
+
+                local allow_complex_delay = not (m.group == "autocorrection")
+                local allowed_delay = allow_complex_delay and (specific_delay * complex_mult) or specific_delay
 
                 -- B. Check if the time gap (dt) with the previous key is valid
                 if dt <= allowed_delay then

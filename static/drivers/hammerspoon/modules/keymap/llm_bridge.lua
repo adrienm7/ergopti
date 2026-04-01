@@ -18,6 +18,7 @@ local keyStrokes = hs.eventtap.keyStrokes
 local keyStroke  = hs.eventtap.keyStroke
 
 local km_utils   = require("modules.keymap.utils")
+local text_utils = require("lib.text_utils")
 local core_llm   = require("modules.llm")
 local Logger     = require("lib.logger")
 
@@ -547,6 +548,26 @@ M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
 function M.update_preview(buf)
 	M.stop_timer()
 
+	local function buffer_ends_with_trigger(buffer, trigger, is_word)
+		if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
+		if #buffer < #trigger then return false end
+		if buffer:sub(-#trigger) ~= trigger then return false end
+		if is_word ~= true then return true end
+
+		local start_idx = #buffer - #trigger + 1
+		if start_idx <= 1 then return true end
+
+		local before = buffer:sub(1, start_idx - 1)
+		local prev_offset = utf8.offset(before, -1)
+		local prev_char = prev_offset and before:sub(prev_offset) or ""
+
+		if prev_char == "@" then return false end
+		if text_utils and type(text_utils.is_letter_char) == "function" and text_utils.is_letter_char(prev_char) then
+			return false
+		end
+		return true
+	end
+
 	-- Essentiel: ne pas conserver la mémoire des suggestions inexploitées
 	if not buf or #buf == 0 then 
 		M.reset_predictions()
@@ -561,6 +582,7 @@ function M.update_preview(buf)
 	end
 
 	local match_repl    = nil
+	local matched_input = nil
 	-- "star" = hotstring terminant par ★, "autocorrect" = déclenché par espace, "provider" = dynamique
 	local match_type    = nil
 	for _, provider in ipairs(_state.preview_providers) do
@@ -572,15 +594,29 @@ function M.update_preview(buf)
 		for _, m in ipairs(_state.mappings) do
 			local group_active = not m.group or not _state.groups[m.group] or _state.groups[m.group].enabled
 			if group_active then
-				if m.trigger == last_word .. _state.magic_key then
+				local magic_len = #_state.magic_key
+				local has_magic_suffix = magic_len > 0 and m.trigger:sub(-magic_len) == _state.magic_key
+				local star_base = has_magic_suffix and m.trigger:sub(1, #m.trigger - magic_len) or nil
+
+				if star_base and star_base ~= "" and buffer_ends_with_trigger(buf, star_base, m.is_word) then
 					local clean = km_utils and type(km_utils.tokens_from_repl) == "function" 
 						and km_utils.plain_text(km_utils.tokens_from_repl(m.repl)) or m.repl
-					if clean ~= last_word then match_repl = m.repl; match_type = "star"; break end
-				elseif m.trigger == last_word then
+					if clean ~= star_base then
+						match_repl = m.repl
+						match_type = "star"
+						matched_input = star_base
+						break
+					end
+				elseif buffer_ends_with_trigger(buf, m.trigger, m.is_word) then
 					if not (m.is_word == false and m.auto == true) then
 						local clean = km_utils and type(km_utils.tokens_from_repl) == "function" 
 							and km_utils.plain_text(km_utils.tokens_from_repl(m.repl)) or m.repl
-						if clean ~= last_word then match_repl = m.repl; match_type = "autocorrect"; break end
+						if clean ~= m.trigger then
+							match_repl = m.repl
+							match_type = "autocorrect"
+							matched_input = m.trigger
+							break
+						end
 					end
 				end
 			end
@@ -591,10 +627,11 @@ function M.update_preview(buf)
 	if match_repl and _state.is_repeat_feature_enabled() then
 		local clean = km_utils and type(km_utils.tokens_from_repl) == "function" 
 			and km_utils.plain_text(km_utils.tokens_from_repl(match_repl)) or match_repl
-		local last_char_offset = utf8.offset(last_word, -1)
+		local input_for_repeat = matched_input or last_word
+		local last_char_offset = utf8.offset(input_for_repeat, -1)
 		if last_char_offset then
-			local last_char = last_word:sub(last_char_offset)
-			if clean == last_word .. last_char then is_fallback_repetition = true end
+			local last_char = input_for_repeat:sub(last_char_offset)
+			if clean == input_for_repeat .. last_char then is_fallback_repetition = true end
 		end
 	end
 
@@ -617,8 +654,8 @@ function M.update_preview(buf)
 		else
 			hs_delay = _state.WORD_TIMEOUT_SEC or 2.5
 		end
-		-- Le tooltip disparaît légèrement avant l'expiration du hotstring pour éviter les confusions
-		if tooltip.set_timeout then tooltip.set_timeout(math.max(0.15, hs_delay - 0.15)) end
+		-- Le tooltip doit rester visible exactement pendant la fenêtre de déclenchement
+		if tooltip.set_timeout then tooltip.set_timeout(math.max(0.05, hs_delay)) end
 
 		if tooltip.show then tooltip.show(display_text, false, hs_enabled, hs_color) end
 
@@ -628,8 +665,9 @@ function M.update_preview(buf)
 		end
 		
 		-- Enregistre qu'une suggestion vient de s'afficher à l'écran si ce n'est pas déjà le cas
-		if _last_suggested_hs ~= last_word then
-			_last_suggested_hs = last_word
+		local suggested_key = matched_input or last_word
+		if _last_suggested_hs ~= suggested_key then
+			_last_suggested_hs = suggested_key
 			if keylogger and type(keylogger.log_hotstring_suggested) == "function" then
 				pcall(keylogger.log_hotstring_suggested)
 			end

@@ -67,6 +67,11 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		keylogger.set_buffer(_state.buffer)
 	end
 
+	if not is_ignored and _llm and type(_llm.update_preview) == "function" then
+		-- Re-evaluate previews on the freshly expanded buffer to support chained autocorrections
+		_llm.update_preview(_state.buffer)
+	end
+
 	if is_final then _state.suppress_rescan(1.0) end
 
 	if not is_ignored and _llm.get_llm_enabled() then

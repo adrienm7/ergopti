@@ -296,6 +296,11 @@ function M.build_management(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
 	local menu   = {}
+	local bubble_item = nil
+	local exp_item = nil
+	local delays_item = nil
+	local magic_item = nil
+	local magic_reset_item = nil
 
 	-- Valeurs par défaut des couleurs (cohérentes avec llm_bridge et DEFAULT_STATE)
 	local c_star        = M.DEFAULT_STATE.preview_star_color
@@ -310,24 +315,19 @@ function M.build_management(ctx)
 		"set_preview_star_enabled",
 		"Bulle ★"))
 
-	table.insert(bubble_sub, { title = "-" })
-
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		"Bulle Autocorrection (espace)",
 		"preview_autocorrect_enabled",
 		"set_preview_autocorrect_enabled",
 		"Bulle Autocorrection"))
 
-	table.insert(bubble_sub, { title = "-" })
-
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulle Intelligence artificielle",
+		"Bulle Intelligence Artificielle",
 		"preview_ai_enabled",
 		"set_preview_ai_enabled",
 		"Bulle IA"))
 
-	table.insert(menu, { title = "Bulles de prévisualisation", disabled = paused or nil, menu = bubble_sub })
-	table.insert(menu, { title = "-" })
+	bubble_item = { title = "Bulles de prévisualisation", disabled = paused or nil, menu = bubble_sub }
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
@@ -473,7 +473,7 @@ function M.build_management(ctx)
 		end or nil,
 	}
 
-	table.insert(menu, { title = "Expanseurs de mots", disabled = paused or nil, menu = exp_sub })
+	exp_item = { title = "Expanseurs de mots", disabled = paused or nil, menu = exp_sub }
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
@@ -531,10 +531,9 @@ function M.build_management(ctx)
 	table.insert(delay_menu, { title = "-" })
 	table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
 
-	table.insert(menu, { title = "Délais d’expansion", disabled = paused or nil, menu = delay_menu })
-	table.insert(menu, { title = "-" })
+	delays_item = { title = "Délais d’expansion", disabled = paused or nil, menu = delay_menu }
 
-	table.insert(menu, {
+	magic_item = {
 		title    = "Touche magique : " .. state.trigger_char,
 		disabled = paused or nil,
 		fn       = not paused and function()
@@ -558,10 +557,10 @@ function M.build_management(ctx)
 				end
 			end
 		end or nil,
-	})
+	}
 	
 	if state.trigger_char ~= "★" then
-		table.insert(menu, {
+		magic_reset_item = {
 			title    = "   ↳ Réinitialiser (défaut : ★)",
 			disabled = paused or nil,
 			fn       = not paused and function()
@@ -569,8 +568,15 @@ function M.build_management(ctx)
 				if ctx.keymap and type(ctx.keymap.set_trigger_char) == "function" then pcall(ctx.keymap.set_trigger_char, "★") end
 				ctx.save_prefs(); ctx.do_reload("menu")
 			end or nil,
-		})
+		}
 	end
+
+	if magic_item then table.insert(menu, magic_item) end
+	if magic_reset_item then table.insert(menu, magic_reset_item) end
+	if exp_item then table.insert(menu, exp_item) end
+	if delays_item then table.insert(menu, delays_item) end
+	table.insert(menu, { title = "-" })
+	if bubble_item then table.insert(menu, bubble_item) end
 
 	return { title = "Paramètres Hotstrings", menu = menu }
 end
