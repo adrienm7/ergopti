@@ -30,6 +30,7 @@ M.DEFAULT_STATE = {
 	custom_editor_shortcut        = nil,
 	sections_order_overrides      = {},
 	terminator_states             = {},
+	custom_terminators            = {},
 	hotstrings                    = {},
 	delays                        = {},
 	personal_info                 = dh_mod.DEFAULT_STATE.personal_info,
@@ -328,18 +329,21 @@ function M.build_management(ctx)
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
+
+	-- Built-in terminators (non-custom), with consume indicator
 	for _, def in ipairs(defs) do
-		if type(def) == "table" then
+		if type(def) == "table" and not def.custom then
 			if def.type == "separator" then
 				exp_sub[#exp_sub + 1] = { title = "-" }
 			elseif def.key then
 				local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
-				
+
 				local lbl = def.label or ""
 				lbl = lbl:gsub("Guillemets fermants", "Guillemet fermant")
 				lbl = lbl:gsub("tiret bas", "underscore")
 				lbl = lbl:gsub("Tiret bas", "Underscore")
-				
+				if def.consume then lbl = lbl .. " (consommé)" end
+
 				exp_sub[#exp_sub + 1] = {
 					title    = ctx.applyTriggerChar(lbl),
 					checked  = (enabled_t and not paused) or nil,
@@ -361,6 +365,110 @@ function M.build_management(ctx)
 			end
 		end
 	end
+
+	-- Custom terminators + add button, grouped together at the bottom
+	exp_sub[#exp_sub + 1] = { title = "-" }
+
+	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
+		local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(ct.key) or false
+		local consume_sfx = ct.consume and " (consommé)" or ""
+		local ct_lbl = ct.char .. " : Personnalisé" .. consume_sfx
+
+		local ct_sub = {
+			{
+				title    = "Supprimer cet expanseur…",
+				disabled = paused or nil,
+				fn       = not paused and (function(k) return function()
+					local res = hs.dialog.blockAlert(
+						"Supprimer l'expanseur",
+						"Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
+						"Supprimer", "Annuler"
+					)
+					if res ~= "Supprimer" then return end
+					if ctx.keymap and type(ctx.keymap.remove_custom_terminator) == "function" then
+						pcall(ctx.keymap.remove_custom_terminator, k)
+					end
+					if type(state.custom_terminators) == "table" then
+						for i, ct_e in ipairs(state.custom_terminators) do
+							if ct_e.key == k then table.remove(state.custom_terminators, i); break end
+						end
+					end
+					if type(state.terminator_states) == "table" then state.terminator_states[k] = nil end
+					ctx.save_prefs()
+					ctx.updateMenu()
+				end end)(ct.key) or nil,
+			},
+		}
+
+		exp_sub[#exp_sub + 1] = {
+			title    = ct_lbl,
+			checked  = (enabled_t and not paused) or nil,
+			menu     = ct_sub,
+			disabled = paused or nil,
+		}
+	end
+
+	exp_sub[#exp_sub + 1] = {
+		title    = "+ Ajouter un expanseur personnalisé…",
+		disabled = paused or nil,
+		fn       = not paused and function()
+			-- 1. Ask for the trigger character (loop until exactly one character is entered)
+			local char
+			while true do
+				local ok_p, btn, char_raw = pcall(hs.dialog.textPrompt,
+					"Nouvel expanseur de mots",
+					"Saisissez le caractère déclencheur (un seul caractère) :",
+					"", "OK", "Annuler"
+				)
+				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
+				-- Extract first UTF-8 character and check nothing follows
+				local first = char_raw:match("^[%z\1-\127\194-\244][\128-\191]*")
+				if first and first ~= "" and first == char_raw then
+					char = first
+					break
+				end
+				hs.dialog.blockAlert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
+			end
+
+			-- 2. Ask consume behaviour (default: non consommé)
+			local consume_res = hs.dialog.blockAlert(
+				"Comportement du déclencheur",
+				"Voulez-vous que le caractère soit consommé (non tapé) lors de l'expansion ?",
+				"Non — taper le caractère", "Oui — consommer", "Annuler"
+			)
+			if consume_res == "Annuler" then return end
+			local consume = (consume_res == "Oui — consommer")
+
+			-- 3. Generate a unique key
+			local existing_keys = {}
+			if ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" then
+				for _, d in ipairs(ctx.keymap.get_terminator_defs()) do
+					if d.key then existing_keys[d.key] = true end
+				end
+			end
+			local idx = 1
+			local key = "custom_" .. idx
+			while existing_keys[key] do idx = idx + 1; key = "custom_" .. idx end
+
+			local label = char .. " : Personnalisé" .. (consume and " (consommé)" or "")
+
+			-- 4. Register in the live engine
+			if ctx.keymap and type(ctx.keymap.add_custom_terminator) == "function" then
+				pcall(ctx.keymap.add_custom_terminator, key, char, label, consume)
+			end
+			if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
+				pcall(ctx.keymap.set_terminator_enabled, key, true)
+			end
+
+			-- 5. Persist in state
+			if type(state.custom_terminators) ~= "table" then state.custom_terminators = {} end
+			table.insert(state.custom_terminators, { key = key, char = char, label = label, consume = consume })
+			state.terminator_states[key] = true
+			ctx.save_prefs()
+			ctx.updateMenu()
+		end or nil,
+	}
+
 	table.insert(menu, { title = "Expanseurs de mots", disabled = paused or nil, menu = exp_sub })
 
 	local delay_menu = {}

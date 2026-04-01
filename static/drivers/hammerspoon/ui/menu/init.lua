@@ -187,6 +187,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 
+		-- Re-register custom terminators created by the user (persisted in state)
+		if keymap and type(keymap.add_custom_terminator) == "function" then
+			for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
+				if type(ct) == "table" and ct.key and ct.char then
+					pcall(keymap.add_custom_terminator, ct.key, ct.char, ct.label or ct.char, ct.consume or false)
+					local enabled_ct = (type(state.terminator_states) == "table" and state.terminator_states[ct.key])
+					if enabled_ct ~= nil and type(keymap.set_terminator_enabled) == "function" then
+						pcall(keymap.set_terminator_enabled, ct.key, enabled_ct)
+					end
+				end
+			end
+		end
+
 		-- Sync delays
 		if type(state.expansion_delay) == "number" then
 			if keymap and type(keymap.set_base_delay) == "function" then pcall(keymap.set_base_delay, state.expansion_delay) end

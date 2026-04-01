@@ -47,9 +47,9 @@ M.TERMINATOR_DEFS = {
     { key = "colon",                chars  = { ":" },             label = ": : Deux-points",                 default_enabled = false },
     { type = "separator" },
     { key = "parenright",           chars  = { ")" },             label = ") : Parenthèse fermante",         default_enabled = false },
-    { key = "bracketright",         chars  = { "]" },             label = "] : Crochet fermant",             default_enabled = false },
     { key = "braceright",           chars  = { "}" },             label = "} : Accolade fermante",           default_enabled = false },
-    { key = "anglebracketright",    chars  = { ">" },             label = "> : Guillemets fermants",         default_enabled = false },
+    { key = "bracketright",         chars  = { "]" },             label = "] : Crochet fermant",             default_enabled = false },
+    { key = "anglebracketright",    chars  = { ">" },             label = "> : Guillemet fermant",         default_enabled = false },
     { type = "separator" },
     { key = "apostrophe_typo",      chars  = { "’" },             label = "’ : Apostrophe typographique",    default_enabled = false },
     { key = "apostrophe_straight",  chars  = { "'" },             label = "' : Apostrophe droite",           default_enabled = false },
@@ -130,6 +130,44 @@ end
 function M.set_terminator_enabled(key, en) _terminator_enabled[key] = (en ~= false) end
 function M.is_terminator_enabled(key)      return _terminator_enabled[key] ~= false  end
 function M.get_terminator_defs()           return M.TERMINATOR_DEFS                  end
+
+--- Adds a user-created terminator to the live definitions table.
+--- @param key string  Unique identifier (e.g. "custom_1").
+--- @param char string The trigger character.
+--- @param label string Human-readable label shown in the menu.
+--- @param consume boolean Whether the character is consumed on expansion.
+function M.add_custom_terminator(key, char, label, consume)
+	-- Update in place if the key already exists (idempotent on reload)
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key == key then
+			def.chars   = { char }
+			def.label   = label
+			def.consume = consume or false
+			return
+		end
+	end
+	table.insert(M.TERMINATOR_DEFS, {
+		key             = key,
+		chars           = { char },
+		label           = label,
+		consume         = consume or false,
+		default_enabled = true,
+		custom          = true,
+	})
+	_terminator_enabled[key] = true
+end
+
+--- Removes a user-created terminator from the live definitions table.
+--- @param key string The unique identifier of the terminator to remove.
+function M.remove_custom_terminator(key)
+	for i, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key == key and def.custom then
+			table.remove(M.TERMINATOR_DEFS, i)
+			break
+		end
+	end
+	_terminator_enabled[key] = nil
+end
 
 
 
