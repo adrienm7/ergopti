@@ -7,7 +7,9 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
+local hs     = hs
+local Logger = require("lib.logger")
+local LOG    = "menu_hotstrings"
 
 local dh_mod = require("modules.dynamic_hotstrings")
 
@@ -512,11 +514,11 @@ function M.build_management(ctx)
 
 	local def_base = ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT
 	if not def_base then
-		print("[menu_hotstrings] keymap.BASE_DELAY_SEC_DEFAULT is missing.")
+		Logger.warn(LOG, "keymap.BASE_DELAY_SEC_DEFAULT manquant — délai de base indéfini")
 	end
 	local def_delays = ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT
 	if not def_delays then
-		print("[menu_hotstrings] keymap.DELAYS_DEFAULT is missing.")
+		Logger.warn(LOG, "keymap.DELAYS_DEFAULT manquant — délais individuels indéfinis")
 	end
 
 	table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))

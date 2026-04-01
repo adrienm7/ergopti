@@ -19,6 +19,9 @@ local keyStroke  = hs.eventtap.keyStroke
 
 local km_utils   = require("modules.keymap.utils")
 local core_llm   = require("modules.llm")
+local Logger     = require("lib.logger")
+
+local LOG = "llm_bridge"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -276,7 +279,7 @@ function M.apply_prediction(idx)
 			end
 		end
 	else
-		print("Erreur solveur : " .. tostring(res_deletes))
+		Logger.error(LOG, "Solveur d'expansion: %s", tostring(res_deletes))
 		deletes = original_deletes
 		to_type = original_to_type
 	end
@@ -417,38 +420,38 @@ end
 --- Core routine to evaluate buffer state and dispatch API calls if suitable.
 function M._perform_llm_check(force_trigger, profile_name)
 	force_trigger = force_trigger == true
-	print(string.format("[LLM Check] force_trigger=%s, profile_name=%s", tostring(force_trigger), tostring(profile_name)))
-	print(string.format("[LLM Check] llm_enabled=%s", tostring(llm_enabled)))
-	if not llm_enabled then 
-		print("[LLM Check] ✗ LLM désactivé")
-		return 
+	Logger.debug(LOG, "_perform_llm_check: force_trigger=%s, profile_name=%s", tostring(force_trigger), tostring(profile_name))
+	Logger.debug(LOG, "llm_enabled=%s", tostring(llm_enabled))
+	if not llm_enabled then
+		Logger.debug(LOG, "LLM désactivé — abandon")
+		return
 	end
 	
 	local is_suppressed = llm_suppressed_for_app()
-	print(string.format("[LLM Check] llm_suppressed_for_app()=%s", tostring(is_suppressed)))
-	if is_suppressed then 
-		print("[LLM Check] ✗ LLM supprimé pour cette app")
-		return 
+	Logger.debug(LOG, "llm_suppressed_for_app()=%s", tostring(is_suppressed))
+	if is_suppressed then
+		Logger.debug(LOG, "LLM supprimé pour cette app — abandon")
+		return
 	end
 
 	local clean_buffer = _state.buffer
-	print(string.format("[LLM Check] Buffer: '%s' (length=%d)", clean_buffer, #clean_buffer))
+	Logger.debug(LOG, "Buffer: '%s' (length=%d)", clean_buffer, #clean_buffer)
 	
 	local words = {}
 	for w in clean_buffer:gmatch("%S+%s*") do table.insert(words, w) end
-	print(string.format("[LLM Check] Mots trouvés: %d", #words))
+	Logger.debug(LOG, "Mots dans le buffer: %d", #words)
 	
-	if #words == 0 and not force_trigger then 
-		print("[LLM Check] ✗ Buffer vide (0 mots) et pas un trigger manuel")
-		return 
+	if #words == 0 and not force_trigger then
+		Logger.debug(LOG, "Buffer vide sans trigger manuel — abandon")
+		return
 	end
 	
 	local tail = table.concat(words, "", math.max(1, #words - 4))
-	print(string.format("[LLM Check] Tail: '%s' (length=%d)", tail, #tail))
+	Logger.debug(LOG, "Tail: '%s' (length=%d)", tail, #tail)
 	
-	if (not tail or #tail < 2) and not force_trigger then 
-		print("[LLM Check] ✗ Tail trop court et pas un trigger manuel")
-		return 
+	if (not tail or #tail < 2) and not force_trigger then
+		Logger.debug(LOG, "Tail trop court sans trigger manuel — abandon")
+		return
 	end
 
 	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, preview_ai_color) end

@@ -16,12 +16,14 @@ local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
+local Logger     = require("lib.logger")
 
 local Registry  = require("modules.keymap.registry")
 local Expander  = require("modules.keymap.expander")
 local LLMBridge = require("modules.keymap.llm_bridge")
 
 local M = {}
+local LOG = "keymap"
 
 
 
@@ -410,7 +412,7 @@ end
 local function onKeyDown(e)
     local ok, result = pcall(onKeyDownRaw, e)
     if not ok then
-        print("Erreur d’interception clavier : " .. tostring(result))
+        Logger.error(LOG, "Interception clavier: %s", tostring(result))
         return false
     end
     return result
@@ -443,7 +445,7 @@ shift_tap = eventtap.new(
             end
             return false
         end)
-        if not ok then print("Erreur majuscule : " .. tostring(result)) return false end
+        if not ok then Logger.error(LOG, "Gestion majuscule: %s", tostring(result)) return false end
         return result
     end
 )
@@ -461,7 +463,7 @@ mouse_tap = eventtap.new(
             LLMBridge.reset_predictions()
             return false
         end)
-        if not ok then print("Erreur souris : " .. tostring(result)) return false end
+        if not ok then Logger.error(LOG, "Gestion souris: %s", tostring(result)) return false end
         return result
     end
 )

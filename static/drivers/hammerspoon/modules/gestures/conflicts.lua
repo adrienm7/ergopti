@@ -9,6 +9,9 @@
 
 local M = {}
 
+local Logger = require("lib.logger")
+local LOG    = "gestures.conflicts"
+
 
 
 
@@ -127,7 +130,7 @@ end
 function M.apply_all_overrides(active_actions)
     for _, grp in ipairs(MACOS_GESTURE_GROUPS) do
         if group_has_active_slot(grp, active_actions) then
-            print(string.format("[gestures] Conflict active: \"%s\" — user must disable in System Settings", grp.description))
+            Logger.warn(LOG, "Conflit actif: \"%s\" — désactiver dans Réglages Système", grp.description)
         end
     end
 end

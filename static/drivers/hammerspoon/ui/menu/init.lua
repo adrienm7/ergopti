@@ -16,10 +16,12 @@ local M = {}
 local hs               = hs
 local notifications    = require("lib.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
+local Logger           = require("lib.logger")
 
 local Preferences = require("ui.menu.preferences")
 local Builder     = require("ui.menu.builder")
 
+local LOG = "menu"
 local load_errors = {}
 
 --- Safely loads a module and logs any loading failure.
@@ -31,9 +33,10 @@ local function safe_require(module_id, label)
 	if not ok then
 		local err_msg = tostring(mod_or_err)
 		load_errors[module_id] = err_msg
-		print("[menu] Échec chargement " .. tostring(label) .. " (" .. tostring(module_id) .. "): " .. err_msg)
+		Logger.error(LOG, "Échec chargement '%s' (%s): %s", tostring(label), tostring(module_id), err_msg)
 		return nil
 	end
+	Logger.debug(LOG, "Module '%s' chargé (%s)", tostring(label), tostring(module_id))
 	return mod_or_err
 end
 
@@ -83,9 +86,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local ok, myMenu = pcall(hs.menubar.new)
 	if not ok or not myMenu then
-		print("[menu] Failed to create hs.menubar object")
+		Logger.error(LOG, "Impossible de créer l'objet hs.menubar")
 		return nil, nil
 	end
+	Logger.info(LOG, "Menubar créé avec succès")
 
 	local updateMenu
 	local _suppress_watcher_until = 0
@@ -436,8 +440,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		})
 		if ok_h then
 			llm_handler = res
+			Logger.info(LOG, "Handler LLM créé avec succès")
 		else
-			print("[menu] create() failed for ui.menu.menu_llm: " .. tostring(res))
+			Logger.error(LOG, "create() échoué pour ui.menu.menu_llm: %s", tostring(res))
 		end
 	end
 	

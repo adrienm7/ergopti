@@ -23,6 +23,9 @@
 -- ===========================================================================
 
 local M = {}
+local hs     = hs
+local Logger = require("lib.logger")
+local LOG    = "toml_reader"
 
 
 
@@ -252,7 +255,7 @@ function M.parse(path)
 
     local ok, f = pcall(io.open, path, "r")
     if not ok or not f then
-        print("[toml_reader] cannot open: " .. tostring(path))
+        Logger.warn(LOG, "Impossible d'ouvrir: %s", tostring(path))
         return empty_result
     end
 
@@ -342,7 +345,7 @@ function M.parse(path)
     end)
 
     if not read_ok then
-        print("[toml_reader] Error reading lines: " .. tostring(read_err))
+        Logger.error(LOG, "Erreur lecture fichier: %s", tostring(read_err))
     end
 
     pcall(function() f:close() end)

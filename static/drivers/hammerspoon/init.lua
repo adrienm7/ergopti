@@ -11,6 +11,34 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
+-- ====================================
+-- ====================================
+-- ======= 0/ Logger Setup ===========
+-- ====================================
+-- ====================================
+
+-- Must run BEFORE any require() to suppress "Enabled hotkey ⌃X" spam at startup
+-- hs.hotkey hardcodes its logger level to "debug" via hs.logger.new("hotkey","debug"),
+-- so defaultLogLevel/setGlobalLogLevel have no effect. We intercept hs.logger.new()
+-- to force "warning" for known noisy internal modules before they are loaded.
+-- Uncomment the guard below to restore full hs.* logging when debugging Hammerspoon internals:
+-- local _suppress_hs_loggers = false
+do
+	local _orig_new = hs.logger.new
+	hs.logger.new = function(id, level, ...)
+		if id == "hotkey" or id == "window.filter" then level = "warning" end
+		return _orig_new(id, level, ...)
+	end
+end
+
+local Logger             = require("lib.logger")
+local LOG                = "init"
+
+-- Set our logger level. Uncomment one to enable:
+-- Logger.set_level("DEBUG")  -- Show all logs (DEBUG, INFO, WARNING, ERROR)
+-- Logger.set_level("INFO")   -- Show INFO, WARNING, ERROR only
+-- Default: WARNING (production mode)
+
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
 local shortcuts          = require("modules.shortcuts")
@@ -31,8 +59,11 @@ local mlx_deps_checker   = require("lib.mlx_deps_checker")
 
 -- Pre-start modules so they are active before menu.lua reads saved prefs
 -- Menu.lua will honor saved state and stop/start them as needed
+Logger.debug(LOG, "Démarrage gestures...")
 gestures.start()
+Logger.debug(LOG, "Démarrage shortcuts...")
 shortcuts.start()
+Logger.info(LOG, "Modules principaux initialisés")
 
 
 
@@ -185,9 +216,12 @@ for _, fname in ipairs(remaining) do table.insert(toml_fnames, fname) end
 local hotfiles = {}
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
+	Logger.debug(LOG, "Chargement TOML: %s", name)
 	keymap.load_toml(name, hotstrings_dir .. fname)
 	table.insert(hotfiles, name)
 end
+
+Logger.info(LOG, "Fichiers hotstrings TOML chargés: %d fichiers", #toml_fnames)
 
 
 
@@ -202,8 +236,11 @@ end
 keymap.sort_mappings()
 
 -- Start the dynamic hotstrings module which handles personal info internally
+Logger.debug(LOG, "Démarrage module hotstrings dynamiques...")
 dynamic_hotstrings.start(base_dir, keymap)
 table.insert(hotfiles, "dynamichotstrings")
+
+Logger.debug(LOG, "Initialisation hotstrings personnalisés...")
 
 
 
@@ -230,13 +267,17 @@ end
 -- ==============================
 -- ==============================
 
+Logger.debug(LOG, "Démarrage interface utilisateur (menu)...")
 menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections
 )
 
 -- Script control is now managed through the shortcuts module
+Logger.debug(LOG, "Démarrage script control...")
 shortcuts.start_script_control(keymap, shortcuts, gestures)
+
+Logger.info(LOG, "Interface utilisateur initialisée")
 
 
 
@@ -285,6 +326,7 @@ do
 	table.insert(_G.script_watchers, dir_watcher)
 
 	-- Catches modifications on Lua and UI scripts (HTML, JS, CSS) for auto-reload
+	Logger.debug(LOG, "Configuration file watcher...")
 	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
 		for _, p in ipairs(paths) do
 			if p:match("%.lua$") or p:match("%.html$") or p:match("%.css$") or p:match("%.js$") then
@@ -325,5 +367,14 @@ end
 -- =====================================
 
 hs.shutdownCallback = function()
+	Logger.info(LOG, "Arrêt système — restauration des overrides")
 	gestures.restore_all_overrides()
+	Logger.info(LOG, "Hammerspoon arrêté")
 end
+
+
+
+
+Logger.info(LOG, "════════════════════════════════════════════════════════════")
+Logger.info(LOG, "✅ Démarrage Hammerspoon RÉUSSI")
+Logger.info(LOG, "════════════════════════════════════════════════════════════")
