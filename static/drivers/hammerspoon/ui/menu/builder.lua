@@ -96,6 +96,7 @@ function M.generate(ctx, menu_mods, actions)
 	table.insert(items, { title = "-" })
 	table.insert(items, { title = "☑ Activer toutes les fonctionnalités", fn = actions.enable_all })
 	table.insert(items, { title = "☐ Désactiver toutes les fonctionnalités", fn = actions.disable_all })
+	table.insert(items, { title = "↺ Réinitialiser les valeurs par défaut", fn = actions.reset_defaults })
 	
 	table.insert(items, { title = "-" })
 	table.insert(items, { title = "Console", fn = actions.open_console })
