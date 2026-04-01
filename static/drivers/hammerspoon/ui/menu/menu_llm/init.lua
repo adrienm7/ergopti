@@ -4,6 +4,7 @@ local M = {}
 
 local hs           = hs
 local llm_mod      = require("modules.llm")
+local shortcut_ui  = require("ui.menu.shortcut_utils")
 local Models       = require("ui.menu.menu_llm.models_manager")
 local Profiles     = require("ui.menu.menu_llm.profiles_manager")
 local Settings     = require("ui.menu.menu_llm.settings_manager")
@@ -33,6 +34,7 @@ M.DEFAULT_STATE = {
     llm_user_models       = {},
     llm_disabled_apps     = {},
     llm_user_profiles     = {},
+    llm_profile_shortcuts = {},
     llm_trigger_shortcut  = false,
     llm_after_hotstring   = false,
 }
@@ -207,19 +209,122 @@ function M.create(deps)
     end
 
     local _llm_trigger_hk = nil
+    local _llm_profile_hks = {}
+
+    local function bind_hotkey(mods, key, callback)
+        print(string.format("[LLM Hotkey] Tentative de bind: mods=%s, key=%s", 
+            type(mods) == "table" and table.concat(mods, "+") or tostring(mods), 
+            key or "nil"))
+        local ok, hk = pcall(hs.hotkey.new, mods, key, callback)
+        if ok and hk then
+            hk:enable()
+            print(string.format("[LLM Hotkey] ✓ Succès: hotkey créé et activé"))
+            return hk
+        else
+            print(string.format("[LLM Hotkey] ✗ Erreur: ok=%s, hk=%s", tostring(ok), tostring(hk)))
+            return nil
+        end
+    end
+
+    local function trigger_prediction_with_profile(profile_id)
+        if type(profile_id) ~= "string" or profile_id == "" then 
+            print(string.format("[LLM Profile Trigger] Erreur: profile_id invalide: %s", tostring(profile_id)))
+            return 
+        end
+        if not keymap or type(keymap.trigger_prediction) ~= "function" then 
+            print("[LLM Profile Trigger] Erreur: keymap ou trigger_prediction non disponible")
+            return 
+        end
+
+        print(string.format("[LLM Profile Trigger] Déclenchement prédiction avec profil '%s'", profile_id))
+        
+        -- Réinitialiser les prédictions en cours
+        if type(keymap.reset_predictions) == "function" then
+            pcall(keymap.reset_predictions)
+            print("[LLM Profile Trigger] Prédictions en cours annulées")
+        end
+        
+        local previous_profile = state.llm_active_profile or "basic"
+        print(string.format("[LLM Profile Trigger] Ancien profil: %s → Nouveau: %s", previous_profile, profile_id))
+        
+        -- Récupérer le label du profil pour l'afficher dans la barre d'info
+        local profile_label = profile_id
+        for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
+            if type(profile) == "table" and profile.id == profile_id and type(profile.label) == "string" then
+                profile_label = profile.label
+                break
+            end
+        end
+        if profile_label == profile_id then
+            for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
+                if type(profile) == "table" and profile.id == profile_id and type(profile.label) == "string" then
+                    profile_label = profile.label
+                    break
+                end
+            end
+        end
+        
+        llm_mod.set_active_profile(profile_id)
+        pcall(keymap.trigger_prediction, true, profile_label)  -- true = force trigger, profile_label = nom du profil
+        llm_mod.set_active_profile(previous_profile)
+        
+        print(string.format("[LLM Profile Trigger] Restauré au profil: %s", previous_profile))
+    end
+
     local function apply_llm_shortcut(mods, key)
         if _llm_trigger_hk then pcall(function() _llm_trigger_hk:delete() end); _llm_trigger_hk = nil end
-        if mods and key then
-            state.llm_trigger_shortcut = { mods = mods, key = key }
-            local ok, hk = pcall(hs.hotkey.new, mods, key, function()
-                if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end
+
+        local normalized = shortcut_ui.normalize_shortcut(mods, key, {"ctrl"})
+        if normalized then
+            state.llm_trigger_shortcut = { mods = normalized.mods, key = normalized.key }
+            _llm_trigger_hk = bind_hotkey(normalized.mods, normalized.key, function()
+                if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction, true) end
             end)
-            if ok and hk then _llm_trigger_hk = hk; hk:enable() end
         else
             state.llm_trigger_shortcut = false
         end
+
         save_prefs(); update_menu()
     end
+
+    local function apply_llm_profile_shortcut(profile_id, mods, key, opts)
+        if type(profile_id) ~= "string" or profile_id == "" then return end
+        if _llm_profile_hks[profile_id] then
+            pcall(function() _llm_profile_hks[profile_id]:delete() end)
+            _llm_profile_hks[profile_id] = nil
+        end
+
+        if type(state.llm_profile_shortcuts) ~= "table" then state.llm_profile_shortcuts = {} end
+
+        local normalized = shortcut_ui.normalize_shortcut(mods, key, {"ctrl"})
+        print(string.format("[LLM Profile Shortcut] apply_llm_profile_shortcut('%s', mods=%s, key=%s) → normalized=%s", 
+            profile_id, 
+            type(mods) == "table" and table.concat(mods, "+") or tostring(mods),
+            key or "nil",
+            normalized and (table.concat(normalized.mods, "+") .. "+" .. normalized.key) or "nil"
+        ))
+        
+        if normalized then
+            state.llm_profile_shortcuts[profile_id] = { mods = normalized.mods, key = normalized.key }
+            local hk = bind_hotkey(normalized.mods, normalized.key, function()
+                print(string.format("[LLM Profile Shortcut] Triggered: profile '%s'", profile_id))
+                trigger_prediction_with_profile(profile_id)
+            end)
+            _llm_profile_hks[profile_id] = hk
+            print(string.format("[LLM Profile Shortcut] Hotkey bound successfully: %s", hk and "YES" or "FAILED"))
+        else
+            state.llm_profile_shortcuts[profile_id] = nil
+            print(string.format("[LLM Profile Shortcut] Raccourci désactivé pour '%s'", profile_id))
+        end
+
+        if not (type(opts) == "table" and opts.silent == true) then
+            save_prefs(); update_menu()
+        end
+    end
+
+    deps.apply_llm_profile_shortcut = apply_llm_profile_shortcut
+
+    profiles_mgr = Profiles.new(deps, models_mgr)
 
     local check_startup
 
@@ -408,37 +513,19 @@ function M.create(deps)
 
         table.insert(main_menu, { title = "Indentation de la suggestion sélectionnée", disabled = is_disabled or nil, menu = settings_mgr.build_indent_menu() })
 
-        local sc_label = "Aucun"
-        if type(state.llm_trigger_shortcut) == "table" then
-            local mods_cap = {}
-            for _, m in ipairs(state.llm_trigger_shortcut.mods or {}) do table.insert(mods_cap, m:sub(1,1):upper() .. m:sub(2)) end
-            local mods_str = table.concat(mods_cap, "+")
-            sc_label = (mods_str ~= "" and (mods_str .. " + ") or "") .. string.upper(state.llm_trigger_shortcut.key or "")
-        end
+        local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, "Aucun")
 
         table.insert(main_menu, {
             title    = "Raccourci pour générer manuellement : " .. sc_label,
             disabled = is_disabled or nil,
             fn       = function()
-                local current_str = ""
-                if type(state.llm_trigger_shortcut) == "table" then
-                    current_str = table.concat(state.llm_trigger_shortcut.mods or {}, "+") .. "+" .. (state.llm_trigger_shortcut.key or "")
-                end
-                local ok_p, btn, raw = pcall(hs.dialog.textPrompt, "Raccourci génération IA", "Format : mods+touche  (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver", current_str, "OK", "Annuler")
-                if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
-                raw = raw:match("^%s*(.-)%s*$"):lower()
-                if raw == "" then apply_llm_shortcut(nil, nil); return end
-                local parts = {}
-                for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
-                if #parts < 1 then return end
-                local key  = parts[#parts]; local mods = {}
-                for i = 1, #parts - 1 do
-                    local m = parts[i]
-                    if m == "option" then m = "alt" end
-                    table.insert(mods, m)
-                end
-                if #mods == 0 then mods = {"ctrl"} end
-                apply_llm_shortcut(mods, key)
+                shortcut_ui.prompt_shortcut({
+                    title = "Raccourci génération IA",
+                    message = "Format : mods+touche  (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+                    current_shortcut = state.llm_trigger_shortcut,
+                    default_mods = {"ctrl"},
+                    on_apply = apply_llm_shortcut,
+                })
             end
         })
 
@@ -471,6 +558,37 @@ function M.create(deps)
     check_startup = function()
         if type(state.llm_trigger_shortcut) == "table" then
             apply_llm_shortcut(state.llm_trigger_shortcut.mods, state.llm_trigger_shortcut.key)
+        end
+
+        local valid_profile_ids = {}
+        for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
+            if type(profile) == "table" and type(profile.id) == "string" then
+                valid_profile_ids[profile.id] = true
+            end
+        end
+        for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
+            if type(profile) == "table" and type(profile.id) == "string" then
+                valid_profile_ids[profile.id] = true
+            end
+        end
+
+        local profile_shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
+        local sc_count = 0
+        for _ in pairs(profile_shortcuts) do sc_count = sc_count + 1 end
+        print("[LLM Startup] Raccourcis de profils trouvés : " .. tostring(sc_count) .. " entrées")
+        
+        for profile_id, sc in pairs(profile_shortcuts) do
+            local mods_str = (type(sc) == "table" and type(sc.mods) == "table") and table.concat(sc.mods, "+") or "nil"
+            local key_str = (type(sc) == "table" and type(sc.key) == "string") and sc.key or "nil"
+            print(string.format("[LLM Startup] Profil '%s' : mods=%s, key=%s", profile_id, mods_str, key_str))
+            
+            if valid_profile_ids[profile_id] and type(sc) == "table" then
+                print(string.format("[LLM Startup] → Binding raccourci pour '%s'", profile_id))
+                apply_llm_profile_shortcut(profile_id, sc.mods, sc.key, { silent = true })
+            else
+                print(string.format("[LLM Startup] → Suppression raccourci pour '%s' (profil invalide)", profile_id))
+                apply_llm_profile_shortcut(profile_id, nil, nil, { silent = true })
+            end
         end
 
         if not state.llm_enabled then return end

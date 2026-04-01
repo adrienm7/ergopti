@@ -45,7 +45,11 @@ function M.generate(ctx, menu_mods, actions)
 		
 		if type(menu_mods.hotstrings.build_management) == "function" then
 			local ok, mgmt = pcall(menu_mods.hotstrings.build_management, ctx)
-			if ok and mgmt then table.insert(items, mgmt) end
+			if ok and mgmt then
+				table.insert(items, mgmt)
+			elseif not ok then
+				print("[builder] ERREUR build_management: " .. tostring(mgmt))
+			end
 		end
 		
 		if type(menu_mods.hotstrings.build_personal) == "function" then

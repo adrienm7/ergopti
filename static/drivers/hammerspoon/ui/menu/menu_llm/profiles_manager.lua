@@ -12,6 +12,7 @@ local M = {}
 
 local notifications = require("lib.notifications")
 local llm_mod       = require("modules.llm")
+local shortcut_ui   = require("ui.menu.shortcut_utils")
 
 local ok_pe, prompt_editor = pcall(require, "ui.prompt_editor")
 if not ok_pe then prompt_editor = nil end
@@ -156,6 +157,7 @@ local function build_profile_menu(deps, models_mgr)
 		for i, profile in ipairs(user_profiles) do
 			local pid = profile.id
 			local display_label = format_dynamic_label(profile.label or ("Profil personnalisé " .. i), state.llm_num_predictions)
+			local profile_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil
 			local item = {
 				title    = display_label,
 				checked  = (state.llm_active_profile == pid) or nil,
@@ -174,6 +176,23 @@ local function build_profile_menu(deps, models_mgr)
 						sync_profiles(state)
 						pcall(deps.save_prefs)
 						pcall(deps.update_menu)
+					end or nil,
+				},
+				{
+					title    = "Raccourci : " .. shortcut_ui.shortcut_to_label(profile_shortcut, "Aucun"),
+					disabled = paused or nil,
+					fn       = not paused and function()
+						shortcut_ui.prompt_shortcut({
+							title = "Raccourci du profil",
+							message = "Format : mods+touche  (ex : cmd+shift+b)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+							current_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil,
+							default_mods = {"ctrl"},
+							on_apply = function(mods, key)
+								if type(deps.apply_llm_profile_shortcut) == "function" then
+									deps.apply_llm_profile_shortcut(pid, mods, key)
+								end
+							end,
+						})
 					end or nil,
 				},
 				{ title = "-" },
@@ -210,6 +229,9 @@ local function build_profile_menu(deps, models_mgr)
 							"Supprimer", "Annuler", "critical")
 							
 						if ok_c and choice == "Supprimer" then
+							if type(deps.apply_llm_profile_shortcut) == "function" then
+								deps.apply_llm_profile_shortcut(pid, nil, nil, { silent = true })
+							end
 							local kept = {}
 							for _, p in ipairs(state.llm_user_profiles) do
 								if type(p) == "table" and p.id ~= pid then table.insert(kept, p) end
