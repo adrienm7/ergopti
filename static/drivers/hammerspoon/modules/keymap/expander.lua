@@ -95,10 +95,12 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	
 	if m.is_word and text_utils.utf8_len(_state.buffer) > text_utils.utf8_len(trigger)
 		and not trigger:match("^[ \194\160\226\128\175]") then
-		local tstart  = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
-		local before  = tstart and _state.buffer:sub(1, tstart - 1) or ""
-		local last_ch = utf8.offset(before, -1)
-		if text_utils.is_letter_char(last_ch and before:sub(last_ch) or "") then
+		local tstart   = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
+		local before   = tstart and _state.buffer:sub(1, tstart - 1) or ""
+		local last_ch  = utf8.offset(before, -1)
+		local prev_char = last_ch and before:sub(last_ch) or ""
+		-- @ is intentional (personal_info prefix) — treat as word continuation
+		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
 			return false
 		end
 	end
@@ -160,9 +162,11 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	if segment ~= trigger then return false end
 
 	if m.is_word and not trigger:match("^[ \194\160\226\128\175]") then
-		local before  = buf_start and _state.buffer:sub(1, buf_start - 1) or ""
-		local last_ch = utf8.offset(before, -1)
-		if text_utils.is_letter_char(last_ch and before:sub(last_ch) or "") then
+		local before    = buf_start and _state.buffer:sub(1, buf_start - 1) or ""
+		local last_ch   = utf8.offset(before, -1)
+		local prev_char = last_ch and before:sub(last_ch) or ""
+		-- @ is intentional (personal_info prefix) — treat as word continuation
+		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
 			return false
 		end
 	end
