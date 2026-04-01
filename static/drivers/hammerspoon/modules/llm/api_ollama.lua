@@ -1,7 +1,7 @@
---- modules/llm/api.lua
+--- modules/llm/api_ollama.lua
 
 --- ==============================================================================
---- MODULE: LLM API Controller
+--- MODULE: LLM API Controller (Ollama)
 --- DESCRIPTION:
 --- Manages communication with the local Ollama API.
 --- ==============================================================================

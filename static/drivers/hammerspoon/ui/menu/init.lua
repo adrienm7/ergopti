@@ -20,21 +20,38 @@ local hotstring_editor = require("ui.hotstring_editor")
 local Preferences = require("ui.menu.preferences")
 local Builder     = require("ui.menu.builder")
 
+local load_errors = {}
+
+--- Safely loads a module and logs any loading failure.
+--- @param module_id string Lua module path.
+--- @param label string Human label used in logs.
+--- @return table|nil Loaded module or nil on failure.
+local function safe_require(module_id, label)
+	local ok, mod_or_err = pcall(require, module_id)
+	if not ok then
+		local err_msg = tostring(mod_or_err)
+		load_errors[module_id] = err_msg
+		print("[menu] Échec chargement " .. tostring(label) .. " (" .. tostring(module_id) .. "): " .. err_msg)
+		return nil
+	end
+	return mod_or_err
+end
+
 -- Load isolated sub-menu builders safely
 local menu_mods = {
-	gestures   = pcall(require, "ui.menu.menu_gestures") and require("ui.menu.menu_gestures") or nil,
-	shortcuts  = pcall(require, "ui.menu.menu_shortcuts") and require("ui.menu.menu_shortcuts") or nil,
-	hotstrings = pcall(require, "ui.menu.menu_hotstrings") and require("ui.menu.menu_hotstrings") or nil,
-	llm        = pcall(require, "ui.menu.menu_llm") and require("ui.menu.menu_llm") or nil,
-	keylogger  = pcall(require, "ui.menu.menu_keylogger") and require("ui.menu.menu_keylogger") or nil,
+	gestures   = safe_require("ui.menu.menu_gestures", "menu gestes"),
+	shortcuts  = safe_require("ui.menu.menu_shortcuts", "menu raccourcis"),
+	hotstrings = safe_require("ui.menu.menu_hotstrings", "menu hotstrings"),
+	llm        = safe_require("ui.menu.menu_llm", "menu IA"),
+	keylogger  = safe_require("ui.menu.menu_keylogger", "menu métriques"),
 }
 
 -- Load core modules
 local core_mods = {
-	llm           = pcall(require, "modules.llm") and require("modules.llm") or nil,
-	keylogger     = pcall(require, "modules.keylogger") and require("modules.keylogger") or nil,
-	shortcuts_mod = pcall(require, "modules.shortcuts") and require("modules.shortcuts") or nil,
-	dyn_hot_mod   = pcall(require, "modules.dynamic_hotstrings") and require("modules.dynamic_hotstrings") or nil,
+	llm           = safe_require("modules.llm", "moteur IA"),
+	keylogger     = safe_require("modules.keylogger", "moteur métriques"),
+	shortcuts_mod = safe_require("modules.shortcuts", "moteur raccourcis"),
+	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "moteur hotstrings dynamiques"),
 }
 
 M._active_tasks = {}
@@ -200,7 +217,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				{ fn = "set_llm_context_length",  val = state.llm_context_length },
 				{ fn = "set_llm_reset_on_nav",    val = state.llm_reset_on_nav },
 				{ fn = "set_llm_temperature",     val = state.llm_temperature },
-				{ fn = "set_llm_max_predict",     val = state.llm_max_predict },
 				{ fn = "set_llm_num_predictions", val = state.llm_num_predictions },
 				{ fn = "set_llm_arrow_nav_enabled", val = state.llm_arrow_nav_enabled },
 				{ fn = "set_llm_nav_modifiers",   val = state.llm_nav_modifiers },
@@ -395,7 +411,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			keymap         = keymap,
 			script_control = core_mods.shortcuts_mod,
 		})
-		if ok_h then llm_handler = res end
+		if ok_h then
+			llm_handler = res
+		else
+			print("[menu] create() failed for ui.menu.menu_llm: " .. tostring(res))
+		end
 	end
 	
 	if type(llm_handler) == "table" and type(llm_handler.check_startup) == "function" then pcall(llm_handler.check_startup) end

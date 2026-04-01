@@ -1,0 +1,105 @@
+Last login: Wed Apr  1 00:36:56 on ttys000
+/tmp/hs_mlx_dl_2356.sh
+❯ /tmp/hs_mlx_dl_2356.sh
+Démarrage du téléchargement de mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit...
+
+--- ERREUR HUGGINGFACE ---
+Traceback (most recent call last):
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+        pool_request.request
+    )
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpcore/_sync/connection.py", line 101, in handle_request
+    raise exc
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpcore/_sync/connection.py", line 78, in handle_request
+    stream = self._connect(request)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpcore/_sync/connection.py", line 156, in _connect
+    stream = stream.start_tls(**kwargs)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpcore/_backends/sync.py", line 154, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1032)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/huggingface_hub/_snapshot_download.py", line 240, in snapshot_download
+    repo_info = api.repo_info(repo_id=repo_id, repo_type=repo_type, revision=revision)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/huggingface_hub/hf_api.py", line 2978, in repo_info
+    return method(
+        repo_id,
+    ...<4 lines>...
+        files_metadata=files_metadata,
+    )
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/huggingface_hub/hf_api.py", line 2771, in model_info
+    r = get_session().get(path, headers=headers, timeout=timeout, params=params)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_client.py", line 1053, in get
+    return self.request(
+           ~~~~~~~~~~~~^
+        "GET",
+        ^^^^^^
+    ...<7 lines>...
+        extensions=extensions,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+        request,
+    ...<2 lines>...
+        history=[],
+    )
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+        request,
+        follow_redirects=follow_redirects,
+        history=history,
+    )
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_transports/default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1032)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+    snapshot_download('mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit', max_workers=4)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/Users/b519hs/Library/Python/3.13/lib/python/site-packages/huggingface_hub/_snapshot_download.py", line 324, in snapshot_download
+    raise LocalEntryNotFoundError(
+    ...<3 lines>...
+    ) from api_call_error
+huggingface_hub.errors.LocalEntryNotFoundError: An error happened while trying to locate the files on the Hub and we cannot find the appropriate snapshot folder for the specified revision on the local disk. Please check your internet connection and try again.
+
+╭─     ~ ────────────────────────────────────────────── 1 ✘  00:43:10   
+╰─ 

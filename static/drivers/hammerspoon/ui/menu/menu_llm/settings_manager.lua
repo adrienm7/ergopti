@@ -140,16 +140,6 @@ function M.new(deps)
     end
     function obj.reset_debounce() reset_to_default(deps, "llm_debounce", llm_mod.DEFAULT_STATE.llm_debounce, "set_llm_debounce") end
 
-    --- Sets the maximum number of tokens generated per prediction
-    function obj.set_max_predict()
-        generic_numeric_prompt(deps, 
-            "Tokens max", 
-            "Nombre maximum de tokens à générer par suggestion :", 
-            "llm_max_predict", nil, "set_llm_max_predict", llm_mod.DEFAULT_STATE.llm_max_predict
-        )
-    end
-    function obj.reset_max_predict() reset_to_default(deps, "llm_max_predict", llm_mod.DEFAULT_STATE.llm_max_predict, "set_llm_max_predict") end
-
     --- Sets the maximum number of words kept per prediction
     function obj.set_max_words()
         local def_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and llm_mod.DEFAULT_STATE.llm_max_words or "Illimité"

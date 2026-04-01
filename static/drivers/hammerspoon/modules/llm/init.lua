@@ -3,15 +3,18 @@
 --- ==============================================================================
 --- MODULE: LLM Prediction Engine Core
 --- DESCRIPTION:
---- Coordinates communication with the local Ollama API through decoupled API, 
+--- Coordinates communication with the local Ollama/MLX API through decoupled API, 
 --- Profiles, and Parsing engines.
 --- ==============================================================================
 
 local M = {}
 
 local hs = hs
-local Profiles = require("modules.llm.profiles")
-local Api      = require("modules.llm.api")
+local Profiles  = require("modules.llm.profiles")
+local ApiOllama = require("modules.llm.api_ollama")
+local ApiMlx    = require("modules.llm.api_mlx")
+
+M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 
 
 
@@ -25,13 +28,13 @@ local Api      = require("modules.llm.api")
 
 M.DEFAULT_STATE = {
     llm_enabled           = false,
+    llm_use_mlx           = false,
     llm_model             = "llama3.2",
     llm_debounce          = 0.5,
     llm_num_predictions   = 3,
     llm_sequential_mode   = false,
     llm_context_length    = 500,
     llm_temperature       = 0.1,
-    llm_max_predict       = 40,
     llm_arrow_nav_enabled = false,
     llm_nav_modifiers     = {},
     llm_show_info_bar     = false,
@@ -43,6 +46,7 @@ M.DEFAULT_STATE = {
 local CoreState = {
     active_profile_id = M.DEFAULT_STATE.llm_active_profile,
     user_profiles     = {},
+    use_mlx           = M.DEFAULT_STATE.llm_use_mlx,
 }
 
 
@@ -69,6 +73,17 @@ function M.set_active_profile(id)
     end
 end
 
+--- Sets whether to route queries to MLX or Ollama
+function M.set_use_mlx(enabled)
+    CoreState.use_mlx = enabled == true
+end
+
+--- Returns whether MLX is currently enabled as inference backend.
+--- @return boolean True when MLX backend is active.
+function M.is_using_mlx()
+    return CoreState.use_mlx == true
+end
+
 --- Exposes built-in profiles and user profiles.
 --- @return table An array containing all available profiles.
 function M.get_all_profiles()
@@ -80,6 +95,11 @@ function M.set_user_profiles(profiles_table)
     if type(profiles_table) == "table" then
         CoreState.user_profiles = profiles_table
     end
+end
+
+--- Returns the active API engine
+local function get_api()
+    return CoreState.use_mlx and ApiMlx or ApiOllama
 end
 
 --- Initiates a new LLM prediction request, selecting the optimal fetch strategy based on profile state.
@@ -116,15 +136,16 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 
     num_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
     local profile = M.get_active_profile()
+    local api = get_api()
 
     if type(profile) == "table" and (not profile.batch) and num_predictions > 1 then
         if sequential_mode then
-            Api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
+            api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
         else
-            Api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
+            api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
         end
     else
-        Api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
+        api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail)
     end
 end
 
@@ -148,7 +169,7 @@ function M.check_modifiers(eventFlags, targetMods)
 end
 
 -- Proxy Model Heuristics Methods
-M.is_thinking_model  = Api.is_thinking_model
-M.check_availability = Api.check_availability
+M.is_thinking_model  = ApiOllama.is_thinking_model
+M.check_availability = function(...) get_api().check_availability(...) end
 
 return M

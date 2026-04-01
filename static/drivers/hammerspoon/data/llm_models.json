@@ -8,121 +8,253 @@
 					"name": "qwen2.5:0.5b",
 					"type": "chat",
 					"disk_gb": 0.4,
-					"ram_gb": 2.0,
+					"ram_gb": 2,
 					"params": "0.5B",
-					"tags": ["fast", "tiny", "text"]
+					"tags": [
+						"fast",
+						"tiny",
+						"text"
+					],
+					"mlx_repo": "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+					"download_gb": 0.2
 				},
 				{
 					"name": "qwen2.5:1.5b",
 					"type": "chat",
-					"disk_gb": 1.0,
-					"ram_gb": 3.0,
+					"disk_gb": 1,
+					"ram_gb": 3,
 					"params": "1.5B",
-					"tags": ["fast", "text"]
+					"tags": [
+						"fast",
+						"text"
+					],
+					"mlx_repo": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+					"download_gb": 0.6
 				},
 				{
 					"name": "qwen2.5:7b",
 					"type": "chat",
 					"disk_gb": 4.7,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "7B",
-					"tags": ["balanced", "text", "code"]
+					"tags": [
+						"balanced",
+						"text",
+						"code"
+					],
+					"mlx_repo": "mlx-community/Qwen2.5-7B-Instruct-4bit",
+					"download_gb": 2.6
 				},
 				{
 					"name": "qwen2.5:14b",
 					"type": "chat",
-					"disk_gb": 9.0,
-					"ram_gb": 16.0,
+					"disk_gb": 9,
+					"ram_gb": 16,
 					"params": "14B",
-					"tags": ["quality", "text", "code"]
+					"tags": [
+						"quality",
+						"text",
+						"code"
+					],
+					"mlx_repo": "mlx-community/Qwen2.5-14B-Instruct-4bit",
+					"download_gb": 5
 				},
 				{
 					"name": "qwen2.5-coder:7b",
 					"type": "chat",
 					"disk_gb": 4.7,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "7B",
-					"tags": ["code", "completion"]
+					"tags": [
+						"code",
+						"completion"
+					],
+					"mlx_repo": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+					"download_gb": 2.6
 				},
 				{
 					"name": "qwen2.5-coder:1.5b-base",
 					"type": "completion",
-					"disk_gb": 1.0,
-					"ram_gb": 3.0,
+					"disk_gb": 1,
+					"ram_gb": 3,
 					"params": "1.5B",
-					"tags": ["fast", "tiny", "completion"]
+					"tags": [
+						"fast",
+						"tiny",
+						"completion"
+					],
+					"download_gb": 0.9
 				},
 				{
 					"name": "qwen2.5-coder:7b-base",
 					"type": "completion",
 					"disk_gb": 4.7,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "7B",
-					"tags": ["balanced", "completion"]
+					"tags": [
+						"balanced",
+						"completion"
+					],
+					"download_gb": 4.2
 				},
 				{
 					"name": "qwen3:0.6b",
 					"type": "chat",
 					"disk_gb": 0.5,
-					"ram_gb": 2.0,
+					"ram_gb": 2,
 					"params": "0.6B",
-					"tags": ["fast", "tiny"]
+					"tags": [
+						"fast",
+						"tiny"
+					],
+					"download_gb": 0.5
 				},
 				{
 					"name": "qwen3:1.7b",
 					"type": "chat",
 					"disk_gb": 1.1,
-					"ram_gb": 3.0,
+					"ram_gb": 3,
 					"params": "1.7B",
-					"tags": ["fast", "text"]
+					"tags": [
+						"fast",
+						"text"
+					],
+					"download_gb": 1
 				},
 				{
 					"name": "qwen3:4b",
 					"type": "chat",
 					"disk_gb": 2.6,
-					"ram_gb": 5.0,
+					"ram_gb": 5,
 					"params": "4B",
-					"tags": ["balanced", "text"]
+					"tags": [
+						"balanced",
+						"text"
+					],
+					"download_gb": 2.3
 				},
 				{
 					"name": "qwen3:8b",
 					"type": "chat",
 					"disk_gb": 4.9,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "8B",
-					"tags": ["balanced", "reasoning"]
+					"tags": [
+						"balanced",
+						"reasoning"
+					],
+					"download_gb": 4.4
 				},
 				{
 					"name": "qwen3:14b",
 					"type": "chat",
-					"disk_gb": 9.0,
-					"ram_gb": 16.0,
+					"disk_gb": 9,
+					"ram_gb": 16,
 					"params": "14B",
-					"tags": ["quality", "reasoning"]
+					"tags": [
+						"quality",
+						"reasoning"
+					],
+					"download_gb": 8.1
 				},
 				{
 					"name": "qwen3.5:7b",
 					"type": "chat",
 					"disk_gb": 4.8,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "7B",
-					"tags": ["balanced", "multilingual"]
+					"tags": [
+						"balanced",
+						"multilingual"
+					],
+					"download_gb": 4.3
 				},
 				{
 					"name": "qwen3.5:14b",
 					"type": "chat",
 					"disk_gb": 9.2,
-					"ram_gb": 16.0,
+					"ram_gb": 16,
 					"params": "14B",
-					"tags": ["quality", "multilingual"]
+					"tags": [
+						"quality",
+						"multilingual"
+					],
+					"download_gb": 8.3
 				},
 				{
 					"name": "qwen3.5:32b",
 					"type": "chat",
-					"disk_gb": 20.0,
-					"ram_gb": 32.0,
+					"disk_gb": 20,
+					"ram_gb": 32,
 					"params": "32B",
-					"tags": ["high-quality", "multilingual"]
+					"tags": [
+						"high-quality",
+						"multilingual"
+					],
+					"download_gb": 18
+				},
+				{
+					"name": "qwen2.5:3b",
+					"type": "chat",
+					"disk_gb": 2.1,
+					"download_gb": 1.2,
+					"ram_gb": 5,
+					"params": "3B",
+					"tags": [
+						"fast",
+						"text"
+					],
+					"mlx_repo": "mlx-community/Qwen2.5-3B-Instruct-4bit"
+				},
+				{
+					"name": "qwen2.5:32b",
+					"type": "chat",
+					"disk_gb": 20,
+					"download_gb": 11,
+					"ram_gb": 32,
+					"params": "32B",
+					"tags": [
+						"high-quality",
+						"text",
+						"code"
+					],
+					"mlx_repo": "mlx-community/Qwen2.5-32B-Instruct-4bit"
+				},
+				{
+					"name": "qwen2.5-coder:3b",
+					"type": "chat",
+					"disk_gb": 2.1,
+					"download_gb": 1.9,
+					"ram_gb": 5,
+					"params": "3B",
+					"tags": [
+						"code",
+						"fast"
+					]
+				},
+				{
+					"name": "qwen2.5-coder:14b",
+					"type": "chat",
+					"disk_gb": 9,
+					"download_gb": 8.1,
+					"ram_gb": 16,
+					"params": "14B",
+					"tags": [
+						"code",
+						"quality"
+					]
+				},
+				{
+					"name": "qwen2.5-coder:32b",
+					"type": "chat",
+					"disk_gb": 20,
+					"download_gb": 18,
+					"ram_gb": 32,
+					"params": "32B",
+					"tags": [
+						"code",
+						"high-quality"
+					]
 				}
 			]
 		},
@@ -134,9 +266,13 @@
 					"name": "starcoder2:3b",
 					"type": "completion",
 					"disk_gb": 1.7,
-					"ram_gb": 4.0,
+					"ram_gb": 4,
 					"params": "3B",
-					"tags": ["fast", "completion"]
+					"tags": [
+						"fast",
+						"completion"
+					],
+					"download_gb": 1.5
 				}
 			]
 		},
@@ -148,9 +284,14 @@
 					"name": "command-r:35b",
 					"type": "chat",
 					"disk_gb": 20.4,
-					"ram_gb": 32.0,
+					"ram_gb": 32,
 					"params": "35B",
-					"tags": ["rag", "tools", "chat"]
+					"tags": [
+						"rag",
+						"tools",
+						"chat"
+					],
+					"download_gb": 18.4
 				}
 			]
 		},
@@ -162,65 +303,114 @@
 					"name": "deepseek-coder:1.3b-base",
 					"type": "completion",
 					"disk_gb": 0.8,
-					"ram_gb": 2.0,
+					"ram_gb": 2,
 					"params": "1.3B",
-					"tags": ["tiny", "completion"]
+					"tags": [
+						"tiny",
+						"completion"
+					],
+					"download_gb": 0.7
 				},
 				{
 					"name": "deepseek-r1:1.5b",
 					"type": "chat",
 					"disk_gb": 1.1,
-					"ram_gb": 3.0,
+					"ram_gb": 3,
 					"params": "1.5B",
-					"tags": ["reasoning", "math", "fast"]
+					"tags": [
+						"reasoning",
+						"math",
+						"fast"
+					],
+					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit",
+					"download_gb": 0.6
 				},
 				{
 					"name": "deepseek-r1:7b",
 					"type": "chat",
 					"disk_gb": 4.7,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "7B",
-					"tags": ["reasoning", "math"]
+					"tags": [
+						"reasoning",
+						"math"
+					],
+					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit",
+					"download_gb": 2.6
 				},
 				{
 					"name": "deepseek-r1:8b",
 					"type": "chat",
 					"disk_gb": 4.9,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "8B",
-					"tags": ["reasoning", "math"]
+					"tags": [
+						"reasoning",
+						"math"
+					],
+					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Llama-8B-4bit",
+					"download_gb": 2.7
 				},
 				{
 					"name": "deepseek-r1:14b",
 					"type": "chat",
-					"disk_gb": 9.0,
-					"ram_gb": 16.0,
+					"disk_gb": 9,
+					"ram_gb": 16,
 					"params": "14B",
-					"tags": ["reasoning", "quality"]
+					"tags": [
+						"reasoning",
+						"quality"
+					],
+					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Qwen-14B-4bit",
+					"download_gb": 5
 				},
 				{
 					"name": "deepseek-r1:32b",
 					"type": "chat",
-					"disk_gb": 20.0,
-					"ram_gb": 32.0,
+					"disk_gb": 20,
+					"ram_gb": 32,
 					"params": "32B",
-					"tags": ["high-quality", "reasoning"]
+					"tags": [
+						"high-quality",
+						"reasoning"
+					],
+					"download_gb": 18
 				},
 				{
 					"name": "deepseek-coder-v2:16b",
 					"type": "chat",
 					"disk_gb": 8.9,
-					"ram_gb": 16.0,
+					"ram_gb": 16,
 					"params": "16B",
-					"tags": ["code", "completion"]
+					"tags": [
+						"code",
+						"completion"
+					],
+					"download_gb": 8
 				},
 				{
 					"name": "deepseek-v3:32b",
 					"type": "chat",
-					"disk_gb": 20.0,
-					"ram_gb": 32.0,
+					"disk_gb": 20,
+					"ram_gb": 32,
 					"params": "32B",
-					"tags": ["chat", "quality"]
+					"tags": [
+						"chat",
+						"quality"
+					],
+					"download_gb": 18
+				},
+				{
+					"name": "deepseek-r1:70b",
+					"type": "chat",
+					"disk_gb": 43,
+					"download_gb": 38.7,
+					"ram_gb": 64,
+					"params": "70B",
+					"tags": [
+						"reasoning",
+						"high-quality"
+					]
 				}
 			]
 		},
@@ -232,57 +422,85 @@
 					"name": "gemma2:2b",
 					"type": "chat",
 					"disk_gb": 1.6,
-					"ram_gb": 4.0,
+					"ram_gb": 4,
 					"params": "2B",
-					"tags": ["fast", "efficient"]
+					"tags": [
+						"fast",
+						"efficient"
+					],
+					"download_gb": 1.4
 				},
 				{
 					"name": "gemma2:9b",
 					"type": "chat",
 					"disk_gb": 5.5,
-					"ram_gb": 10.0,
+					"ram_gb": 10,
 					"params": "9B",
-					"tags": ["balanced", "text"]
+					"tags": [
+						"balanced",
+						"text"
+					],
+					"download_gb": 5
 				},
 				{
 					"name": "gemma2:27b",
 					"type": "chat",
-					"disk_gb": 16.0,
-					"ram_gb": 24.0,
+					"disk_gb": 16,
+					"ram_gb": 24,
 					"params": "27B",
-					"tags": ["quality", "text"]
+					"tags": [
+						"quality",
+						"text"
+					],
+					"download_gb": 14.4
 				},
 				{
 					"name": "gemma3:1b",
 					"type": "chat",
 					"disk_gb": 0.8,
-					"ram_gb": 2.0,
+					"ram_gb": 2,
 					"params": "1B",
-					"tags": ["tiny", "fast"]
+					"tags": [
+						"tiny",
+						"fast"
+					],
+					"download_gb": 0.7
 				},
 				{
 					"name": "gemma3:4b",
 					"type": "chat",
 					"disk_gb": 2.5,
-					"ram_gb": 5.0,
+					"ram_gb": 5,
 					"params": "4B",
-					"tags": ["balanced", "multimodal"]
+					"tags": [
+						"balanced",
+						"multimodal"
+					],
+					"download_gb": 2.3
 				},
 				{
 					"name": "gemma3:12b",
 					"type": "chat",
 					"disk_gb": 7.6,
-					"ram_gb": 12.0,
+					"ram_gb": 12,
 					"params": "12B",
-					"tags": ["quality", "multimodal"]
+					"tags": [
+						"quality",
+						"multimodal"
+					],
+					"download_gb": 6.8
 				},
 				{
 					"name": "gemma3:27b",
 					"type": "chat",
-					"disk_gb": 17.0,
-					"ram_gb": 24.0,
+					"disk_gb": 17,
+					"ram_gb": 24,
 					"params": "27B",
-					"tags": ["high-quality", "multimodal"]
+					"tags": [
+						"high-quality",
+						"multimodal"
+					],
+					"download_gb": 15.3
 				}
 			]
 		},
@@ -294,25 +512,38 @@
 					"name": "granite-code:8b",
 					"type": "chat",
 					"disk_gb": 4.6,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "8B",
-					"tags": ["code", "enterprise"]
+					"tags": [
+						"code",
+						"enterprise"
+					],
+					"download_gb": 4.1
 				},
 				{
 					"name": "granite3.3:2b",
 					"type": "chat",
 					"disk_gb": 1.6,
-					"ram_gb": 4.0,
+					"ram_gb": 4,
 					"params": "2B",
-					"tags": ["fast", "code"]
+					"tags": [
+						"fast",
+						"code"
+					],
+					"download_gb": 1.4
 				},
 				{
 					"name": "granite3.3:8b",
 					"type": "chat",
 					"disk_gb": 4.9,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "8B",
-					"tags": ["code", "tools", "enterprise"]
+					"tags": [
+						"code",
+						"tools",
+						"enterprise"
+					],
+					"download_gb": 4.4
 				}
 			]
 		},
@@ -324,41 +555,87 @@
 					"name": "llama3.2:1b",
 					"type": "chat",
 					"disk_gb": 1.3,
-					"ram_gb": 3.0,
+					"ram_gb": 3,
 					"params": "1B",
-					"tags": ["tiny", "fast"]
+					"tags": [
+						"tiny",
+						"fast"
+					],
+					"mlx_repo": "mlx-community/Llama-3.2-1B-Instruct-4bit",
+					"download_gb": 0.7
 				},
 				{
 					"name": "llama3.2:3b",
 					"type": "chat",
-					"disk_gb": 2.0,
-					"ram_gb": 4.0,
+					"disk_gb": 2,
+					"ram_gb": 4,
 					"params": "3B",
-					"tags": ["fast", "text"]
+					"tags": [
+						"fast",
+						"text"
+					],
+					"mlx_repo": "mlx-community/Llama-3.2-3B-Instruct-4bit",
+					"download_gb": 1.1
 				},
 				{
 					"name": "llama3.1:8b",
 					"type": "chat",
 					"disk_gb": 4.7,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "8B",
-					"tags": ["balanced", "tools"]
+					"tags": [
+						"balanced",
+						"tools"
+					],
+					"mlx_repo": "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",
+					"download_gb": 2.6
 				},
 				{
 					"name": "llama3.1:70b",
 					"type": "chat",
-					"disk_gb": 40.0,
-					"ram_gb": 64.0,
+					"disk_gb": 40,
+					"ram_gb": 64,
 					"params": "70B",
-					"tags": ["high-quality"]
+					"tags": [
+						"high-quality"
+					],
+					"download_gb": 36
 				},
 				{
 					"name": "llama3.3:70b",
 					"type": "chat",
-					"disk_gb": 43.0,
-					"ram_gb": 64.0,
+					"disk_gb": 43,
+					"ram_gb": 64,
 					"params": "70B",
-					"tags": ["high-quality", "tools"]
+					"tags": [
+						"high-quality",
+						"tools"
+					],
+					"download_gb": 38.7
+				},
+				{
+					"name": "llama3.2:11b-vision",
+					"type": "chat",
+					"disk_gb": 6.7,
+					"download_gb": 6,
+					"ram_gb": 12,
+					"params": "11B",
+					"tags": [
+						"multimodal",
+						"quality"
+					]
+				},
+				{
+					"name": "llama3.2:90b-vision",
+					"type": "chat",
+					"disk_gb": 55,
+					"download_gb": 49.5,
+					"ram_gb": 80,
+					"params": "90B",
+					"tags": [
+						"multimodal",
+						"high-quality"
+					]
 				}
 			]
 		},
@@ -370,25 +647,51 @@
 					"name": "phi3:3.8b",
 					"type": "chat",
 					"disk_gb": 2.3,
-					"ram_gb": 5.0,
+					"ram_gb": 5,
 					"params": "3.8B",
-					"tags": ["fast", "efficient"]
+					"tags": [
+						"fast",
+						"efficient"
+					],
+					"download_gb": 2.1
 				},
 				{
 					"name": "phi3:14b",
 					"type": "chat",
 					"disk_gb": 7.9,
-					"ram_gb": 12.0,
+					"ram_gb": 12,
 					"params": "14B",
-					"tags": ["quality", "text"]
+					"tags": [
+						"quality",
+						"text"
+					],
+					"download_gb": 7.1
 				},
 				{
 					"name": "phi4:14b",
 					"type": "chat",
-					"disk_gb": 9.0,
-					"ram_gb": 16.0,
+					"disk_gb": 9,
+					"ram_gb": 16,
 					"params": "14B",
-					"tags": ["quality", "math", "reasoning"]
+					"tags": [
+						"quality",
+						"math",
+						"reasoning"
+					],
+					"mlx_repo": "mlx-community/phi-4-4bit",
+					"download_gb": 5
+				},
+				{
+					"name": "phi4-mini:3.8b",
+					"type": "chat",
+					"disk_gb": 2.4,
+					"download_gb": 2.2,
+					"ram_gb": 5,
+					"params": "3.8B",
+					"tags": [
+						"fast",
+						"reasoning"
+					]
 				}
 			]
 		},
@@ -399,42 +702,87 @@
 				{
 					"name": "codestral:22b",
 					"type": "chat",
-					"disk_gb": 13.0,
-					"ram_gb": 20.0,
+					"disk_gb": 13,
+					"ram_gb": 20,
 					"params": "22B",
-					"tags": ["code", "completion"]
+					"tags": [
+						"code",
+						"completion"
+					],
+					"download_gb": 11.7
 				},
 				{
 					"name": "mistral:7b",
 					"type": "chat",
 					"disk_gb": 4.1,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "7B",
-					"tags": ["balanced", "fast"]
+					"tags": [
+						"balanced",
+						"fast"
+					],
+					"mlx_repo": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
+					"download_gb": 2.3
 				},
 				{
 					"name": "mistral-nemo:12b",
 					"type": "chat",
 					"disk_gb": 7.1,
-					"ram_gb": 12.0,
+					"ram_gb": 12,
 					"params": "12B",
-					"tags": ["balanced", "multilingual"]
+					"tags": [
+						"balanced",
+						"multilingual"
+					],
+					"download_gb": 6.4
 				},
 				{
 					"name": "mistral-small:24b",
 					"type": "chat",
 					"disk_gb": 14.1,
-					"ram_gb": 24.0,
+					"ram_gb": 24,
 					"params": "24B",
-					"tags": ["quality", "tools"]
+					"tags": [
+						"quality",
+						"tools"
+					],
+					"download_gb": 12.7
 				},
 				{
 					"name": "mixtral:8x7b",
 					"type": "chat",
-					"disk_gb": 26.0,
-					"ram_gb": 32.0,
+					"disk_gb": 26,
+					"ram_gb": 32,
 					"params": "47B MoE",
-					"tags": ["quality", "moe"]
+					"tags": [
+						"quality",
+						"moe"
+					],
+					"download_gb": 23.4
+				},
+				{
+					"name": "ministral:3b",
+					"type": "chat",
+					"disk_gb": 2,
+					"download_gb": 1.8,
+					"ram_gb": 5,
+					"params": "3B",
+					"tags": [
+						"fast",
+						"multilingual"
+					]
+				},
+				{
+					"name": "ministral:8b",
+					"type": "chat",
+					"disk_gb": 4.7,
+					"download_gb": 4.2,
+					"ram_gb": 8,
+					"params": "8B",
+					"tags": [
+						"balanced",
+						"multilingual"
+					]
 				}
 			]
 		},
@@ -446,17 +794,25 @@
 					"name": "nemotron-mini:4b",
 					"type": "chat",
 					"disk_gb": 2.7,
-					"ram_gb": 5.0,
+					"ram_gb": 5,
 					"params": "4B",
-					"tags": ["fast", "chat"]
+					"tags": [
+						"fast",
+						"chat"
+					],
+					"download_gb": 2.4
 				},
 				{
 					"name": "nemotron:70b",
 					"type": "chat",
-					"disk_gb": 42.0,
-					"ram_gb": 64.0,
+					"disk_gb": 42,
+					"ram_gb": 64,
 					"params": "70B",
-					"tags": ["high-quality", "chat"]
+					"tags": [
+						"high-quality",
+						"chat"
+					],
+					"download_gb": 37.8
 				}
 			]
 		},
@@ -467,10 +823,14 @@
 				{
 					"name": "gpt-oss:20b",
 					"type": "chat",
-					"disk_gb": 12.0,
-					"ram_gb": 20.0,
+					"disk_gb": 12,
+					"ram_gb": 20,
 					"params": "20B",
-					"tags": ["quality", "reasoning"]
+					"tags": [
+						"quality",
+						"reasoning"
+					],
+					"download_gb": 10.8
 				}
 			]
 		},
@@ -482,17 +842,25 @@
 					"name": "internlm2:7b",
 					"type": "chat",
 					"disk_gb": 4.5,
-					"ram_gb": 8.0,
+					"ram_gb": 8,
 					"params": "7B",
-					"tags": ["chat", "tools"]
+					"tags": [
+						"chat",
+						"tools"
+					],
+					"download_gb": 4.1
 				},
 				{
 					"name": "internlm2:20b",
 					"type": "chat",
 					"disk_gb": 11.5,
-					"ram_gb": 16.0,
+					"ram_gb": 16,
 					"params": "20B",
-					"tags": ["quality", "tools"]
+					"tags": [
+						"quality",
+						"tools"
+					],
+					"download_gb": 10.4
 				}
 			]
 		},
@@ -504,17 +872,40 @@
 					"name": "smollm2:135m",
 					"type": "chat",
 					"disk_gb": 0.1,
-					"ram_gb": 1.0,
+					"ram_gb": 1,
 					"params": "135M",
-					"tags": ["ultra-tiny", "edge"]
+					"tags": [
+						"ultra-tiny",
+						"edge"
+					],
+					"mlx_repo": "mlx-community/SmolLM2-135M-Instruct-4bit",
+					"download_gb": 0.1
 				},
 				{
 					"name": "smollm2:1.7b",
 					"type": "completion",
-					"disk_gb": 1.0,
-					"ram_gb": 3.0,
+					"disk_gb": 1,
+					"ram_gb": 3,
 					"params": "1.7B",
-					"tags": ["tiny", "completion"]
+					"tags": [
+						"tiny",
+						"completion"
+					],
+					"mlx_repo": "mlx-community/SmolLM2-1.7B-Instruct-4bit",
+					"download_gb": 0.6
+				},
+				{
+					"name": "smollm2:360m",
+					"type": "chat",
+					"disk_gb": 0.3,
+					"download_gb": 0.2,
+					"ram_gb": 1.5,
+					"params": "360M",
+					"tags": [
+						"ultra-tiny",
+						"edge"
+					],
+					"mlx_repo": "mlx-community/SmolLM2-360M-Instruct-4bit"
 				}
 			]
 		},
@@ -526,9 +917,13 @@
 					"name": "solar:10.7b",
 					"type": "chat",
 					"disk_gb": 6.1,
-					"ram_gb": 10.0,
+					"ram_gb": 10,
 					"params": "10.7B",
-					"tags": ["balanced", "korean"]
+					"tags": [
+						"balanced",
+						"korean"
+					],
+					"download_gb": 5.5
 				}
 			]
 		},
@@ -540,9 +935,14 @@
 					"name": "glm4:9b",
 					"type": "chat",
 					"disk_gb": 5.5,
-					"ram_gb": 10.0,
+					"ram_gb": 10,
 					"params": "9B",
-					"tags": ["chat", "tools", "chinese"]
+					"tags": [
+						"chat",
+						"tools",
+						"chinese"
+					],
+					"download_gb": 5
 				}
 			]
 		},
@@ -554,17 +954,25 @@
 					"name": "yi:6b",
 					"type": "chat",
 					"disk_gb": 3.5,
-					"ram_gb": 6.0,
+					"ram_gb": 6,
 					"params": "6B",
-					"tags": ["balanced", "chinese"]
+					"tags": [
+						"balanced",
+						"chinese"
+					],
+					"download_gb": 3.2
 				},
 				{
 					"name": "yi:34b",
 					"type": "chat",
 					"disk_gb": 19.5,
-					"ram_gb": 32.0,
+					"ram_gb": 32,
 					"params": "34B",
-					"tags": ["quality", "chinese"]
+					"tags": [
+						"quality",
+						"chinese"
+					],
+					"download_gb": 17.6
 				}
 			]
 		}
