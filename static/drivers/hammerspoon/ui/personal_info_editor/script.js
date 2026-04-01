@@ -29,6 +29,10 @@ function executeCancellation() {
 // ===============================
 
 document.addEventListener('DOMContentLoaded', () => {
+	// Focus the first input field immediately on open
+	const firstInput = document.querySelector('input');
+	if (firstInput) firstInput.focus();
+
 	const cancelButton = document.querySelector('.cancel');
 
 	// Bind the cancel button click event
