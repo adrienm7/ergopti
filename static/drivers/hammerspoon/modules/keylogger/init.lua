@@ -16,9 +16,11 @@ local M = {}
 
 local hs   = hs
 local utf8 = utf8
+local Logger = require("lib.logger")
 
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
+local LOG = "keylogger"
 
 
 
@@ -332,7 +334,7 @@ local function handle_key(event_obj)
 		if ev_entry then CoreState.pending_keyup[keycode] = { down_time = now, event = ev_entry } end
 	end)
 	
-	if not ok then print("[keylogger] Évitement d’un verrouillage clavier : " .. tostring(err)) end
+	if not ok then Logger.warn(LOG, "Évitement verrouillage clavier: %s", tostring(err)) end
 	return false
 end
 

@@ -9,7 +9,9 @@
 
 local M = {}
 
-local hs = hs
+local hs     = hs
+local Logger = require("lib.logger")
+local LOG    = "mlx_deps"
 
 function M.check_and_install_deps()
 	-- Dynamically find the script path from the current Hammerspoon config location
@@ -29,16 +31,16 @@ function M.check_and_install_deps()
 	end
 	
 	if not script_path then
-		print("[MLX-DEPS] Warning: ensure-mlx-deps.sh script not found")
+		Logger.warn(LOG, "Script ensure-mlx-deps.sh introuvable")
 		return
 	end
 	
 	-- Run asynchronously in background; failures are non-critical
 	hs.task.new("/bin/bash", function(exitCode, stdOut, stdErr)
 		if exitCode == 0 then
-			print("[MLX-DEPS] ✅ All dependencies verified")
+			Logger.info(LOG, "✅ All dependencies verified")
 		else
-			print("[MLX-DEPS] Warning: check failed (non-critical)")
+			Logger.warn(LOG, "Dépendances non vérifiées (non critique)")
 		end
 	end, { script_path }):start()
 end

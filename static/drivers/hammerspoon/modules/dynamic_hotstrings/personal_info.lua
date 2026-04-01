@@ -16,6 +16,8 @@ local M = {}
 local hs       = hs
 local eventtap = hs.eventtap
 local timer    = hs.timer
+local Logger   = require("lib.logger")
+local LOG      = "personal_info"
 
 local ok_editor, ui_editor = pcall(require, "ui.personal_info_editor")
 if not ok_editor then ui_editor = nil end
@@ -102,7 +104,7 @@ local function load_config(base_dir)
         return raw["personal_info_config"]
     end
     
-    print("[personal_info] No personal_info_config in config.json — using defaults")
+    Logger.info(LOG, "personal_info_config absent dans config.json — utilisation des valeurs par défaut")
     return DEFAULT_CONFIG
 end
 
@@ -134,7 +136,7 @@ function M.save_info(new_info)
     end
     
     _info = raw["personal_info_config"]["info"]
-    print("[personal_info] Config saved")
+    Logger.debug(LOG, "Config infos personnelles sauvegardée")
 end
 
 
@@ -316,7 +318,7 @@ function M.open_editor()
     if ui_editor and type(ui_editor.open) == "function" then
         ui_editor.open(_info, M.save_info)
     else
-        print("[personal_info] Error: UI editor module is not available")
+        Logger.error(LOG, "Module UI éditeur non disponible")
     end
 end
 
@@ -328,7 +330,7 @@ function M.start(base_dir, keymap_module)
 
     local config = load_config(_base_dir)
     if type(config) ~= "table" then
-        print("[personal_info] Module disabled (config missing or invalid)")
+        Logger.warn(LOG, "Module désactivé (config manquante ou invalide)")
         return
     end
 

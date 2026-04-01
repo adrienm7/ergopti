@@ -16,6 +16,8 @@ local M = {}
 
 local hs = hs
 local notifications = require("lib.notifications")
+local Logger        = require("lib.logger")
+local LOG           = "gestures"
 
 local ok_td, touchdevice = pcall(require, "hs._asm.undocumented.touchdevice")
 if not ok_td then touchdevice = nil end
@@ -191,7 +193,7 @@ function M.is_enabled()  return CoreState.enabled end
 --- Initializes and binds multi-touch listeners.
 function M.start()
     if not touchdevice then
-        print("[gestures] Warning: touchdevice module not available.")
+        Logger.warn(LOG, "Module touchdevice non disponible — gestes désactivés")
         return
     end
     

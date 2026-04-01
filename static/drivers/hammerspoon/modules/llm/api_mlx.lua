@@ -7,9 +7,11 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
-local Parser = require("modules.llm.parser")
+local hs       = hs
+local Logger   = require("lib.logger")
+local Parser   = require("modules.llm.parser")
 local Profiles = require("modules.llm.profiles")
+local LOG      = "llm.api_mlx"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -92,7 +94,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     hs.http.asyncPost("http://127.0.0.1:8080/v1/chat/completions", encoded, { ["Content-Type"] = "application/json" },
         function(status, body, _)
             if status ~= 200 then
-                print("MLX chat/completions HTTP " .. tostring(status) .. " :: " .. tostring((body or ""):sub(1, 260)))
+                Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
                 if type(on_fail) == "function" then pcall(on_fail) end
                 return
             end

@@ -19,6 +19,8 @@ local hs          = hs
 local toml_reader = require("lib.toml_reader")
 local toml_writer = require("lib.toml_writer")
 local ui_builder  = require("ui.ui_builder")
+local Logger      = require("lib.logger")
+local LOG         = "hotstring_editor"
 
 
 
@@ -329,7 +331,7 @@ function M.open(open_mode)
 	-- Initialize the User Content bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsEditor")
 	if not ok_uc or not uc then
-		print("[hotstring_editor] Error creating usercontent bridge.")
+		Logger.error(LOG, "Impossible de créer le pont webview usercontent")
 		return
 	end
 	
