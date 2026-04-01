@@ -36,7 +36,7 @@ local ACTION_DEFINITIONS = {
 	{ id = "quit_hammerspoon",   label = "Quitter Hammerspoon" },
 	{ id = "open_init",          label = "Ouvrir init.lua" },
 	{ id = "open_ahk",           label = "Ouvrir le fichier AHK" },
-	{ id = "open_personal_toml", label = "Ouvrir le fichier personal.toml" },
+    { id = "open_personal_toml", label = "Ouvrir le fichier custom.toml" },
 	{ id = "open_config",        label = "Ouvrir config.json" },
 	{ id = "open_logs",          label = "Ouvrir le dossier de logs" },
 	{ id = "add_hotstring",      label = "Ajouter un hotstring" },

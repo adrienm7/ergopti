@@ -482,16 +482,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			open_personal_toml = function()
 				hs.timer.doAfter(0, function()
-					local personal_path = base_dir .. "personal.toml"
 					local custom_path = base_dir .. "custom.toml"
-					local file_path = personal_path
-					local fh = io.open(personal_path, "r")
-					if fh then
-						fh:close()
-					else
-						file_path = custom_path
-					end
-					pcall(hs.execute, "open \"" .. file_path .. "\"")
+					pcall(hs.execute, "open \"" .. custom_path .. "\"")
 				end)
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
