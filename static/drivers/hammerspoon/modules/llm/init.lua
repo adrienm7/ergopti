@@ -35,6 +35,7 @@ M.DEFAULT_STATE = {
     llm_sequential_mode   = false,
     llm_context_length    = 500,
     llm_temperature       = 0.1,
+    llm_max_words         = 5,
     llm_arrow_nav_enabled = false,
     llm_nav_modifiers     = {},
     llm_show_info_bar     = false,

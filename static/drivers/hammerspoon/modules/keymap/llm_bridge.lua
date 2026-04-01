@@ -63,13 +63,26 @@ local _last_suggested_hs       = nil
 
 local current_llm_model        = core_llm.DEFAULT_LLM_MODEL or "llama3.2"
 local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED or false
-local preview_enabled          = true
+local preview_star_enabled        = true
+local preview_autocorrect_enabled = true
+local preview_ai_enabled          = true
+
+-- Hardcoded tint colors (hue only, applied over a fixed dark base in apply_tint)
+local C_TINT_STAR_DEFAULT        = { red = 1.00, green = 0.00, blue = 0.00, alpha = 1.0 }
+local C_TINT_AUTOCORRECT_DEFAULT = { red = 0.00, green = 0.80, blue = 0.00, alpha = 1.0 }
+-- IA uses nil = neutral dark gray (no tint)
+
+local preview_star_color        = C_TINT_STAR_DEFAULT
+local preview_autocorrect_color = C_TINT_AUTOCORRECT_DEFAULT
+local preview_ai_color          = nil
+
+local llm_after_hotstring_enabled = false
 
 local llm_debounce_time        = 0.5
 local llm_context_length       = 500
 local llm_reset_on_nav         = true
 local llm_temperature          = 0.1
-local llm_max_words            = 10
+local llm_max_words            = 5
 local llm_num_predictions      = 3
 local llm_pred_indent          = -3
 local llm_val_modifiers        = {"alt"}
@@ -103,7 +116,7 @@ function M.set_llm_model(m)               current_llm_model      = tostring(m) e
 function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
 function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) end
 function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
-function M.set_llm_max_words(w)           llm_max_words          = math.max(0, tonumber(w) or 10) end
+function M.set_llm_max_words(w)           llm_max_words          = math.max(0, tonumber(w) or 5) end
 function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or 3) end
 function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
 function M.set_llm_pred_indent(v)         llm_pred_indent        = math.floor(tonumber(v) or -3) end
@@ -132,9 +145,43 @@ function M.set_llm_enabled(enabled)
 	end
 end
 
+function M.set_preview_star_enabled(v)
+	preview_star_enabled = (v == true)
+	if not preview_star_enabled and tooltip.hide then tooltip.hide() end
+end
+
+function M.set_preview_autocorrect_enabled(v)
+	preview_autocorrect_enabled = (v == true)
+	if not preview_autocorrect_enabled and tooltip.hide then tooltip.hide() end
+end
+
+function M.set_preview_ai_enabled(v)
+	preview_ai_enabled = (v == true)
+	if not preview_ai_enabled and tooltip.hide then tooltip.hide() end
+end
+
+function M.set_preview_star_color(c)
+	preview_star_color = (type(c) == "table") and c or C_TINT_STAR_DEFAULT
+end
+
+function M.set_preview_autocorrect_color(c)
+	preview_autocorrect_color = (type(c) == "table") and c or C_TINT_AUTOCORRECT_DEFAULT
+end
+
+function M.set_preview_ai_color(_)
+	-- Couleur IA fixe (gris neutre) — non personnalisable
+end
+
+function M.set_llm_after_hotstring(v)
+	llm_after_hotstring_enabled = (v == true)
+end
+
+--- Backward-compatible setter : enables or disables all hotstring tooltips at once.
+--- @param enabled boolean Whether to enable the tooltips.
 function M.set_preview_enabled(enabled)
-	preview_enabled = (enabled == true)
-	if not preview_enabled and tooltip.hide then tooltip.hide() end
+	preview_star_enabled        = (enabled == true)
+	preview_autocorrect_enabled = (enabled == true)
+	if not enabled and tooltip.hide then tooltip.hide() end
 end
 
 --- Updates the debounce timer for the LLM request.
@@ -369,7 +416,7 @@ function M._perform_llm_check()
 	local tail = table.concat(words, "", math.max(1, #words - 4))
 	if not tail or #tail < 2 then return end
 
-	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_enabled) end
+	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, preview_ai_color) end
 
 	local num_pred = llm_num_predictions
 
@@ -431,7 +478,7 @@ function M._perform_llm_check()
 				end
 
 				if tooltip.show_predictions then
-					tooltip.show_predictions(valid_preds, 1, preview_enabled, info, val_mod_str, llm_pred_indent, llm_nav_modifiers)
+					tooltip.show_predictions(valid_preds, 1, preview_ai_enabled, info, val_mod_str, llm_pred_indent, llm_nav_modifiers, preview_ai_color)
 				end
 			end,
 			function()
@@ -463,10 +510,12 @@ function M.update_preview(buf)
 		return 
 	end
 
-	local match_repl = nil
+	local match_repl    = nil
+	-- "star" = hotstring terminant par ★, "autocorrect" = déclenché par espace, "provider" = dynamique
+	local match_type    = nil
 	for _, provider in ipairs(_state.preview_providers) do
 		local ok, res = pcall(provider, buf)
-		if ok and res then match_repl = res; break end
+		if ok and res then match_repl = res; match_type = "provider"; break end
 	end
 	
 	if not match_repl then
@@ -476,12 +525,12 @@ function M.update_preview(buf)
 				if m.trigger == last_word .. _state.magic_key then
 					local clean = km_utils and type(km_utils.tokens_from_repl) == "function" 
 						and km_utils.plain_text(km_utils.tokens_from_repl(m.repl)) or m.repl
-					if clean ~= last_word then match_repl = m.repl; break end
+					if clean ~= last_word then match_repl = m.repl; match_type = "star"; break end
 				elseif m.trigger == last_word then
 					if not (m.is_word == false and m.auto == true) then
 						local clean = km_utils and type(km_utils.tokens_from_repl) == "function" 
 							and km_utils.plain_text(km_utils.tokens_from_repl(m.repl)) or m.repl
-						if clean ~= last_word then match_repl = m.repl; break end
+						if clean ~= last_word then match_repl = m.repl; match_type = "autocorrect"; break end
 					end
 				end
 			end
@@ -503,8 +552,30 @@ function M.update_preview(buf)
 		_llm_request_id = _llm_request_id + 1
 		local display_text = km_utils and type(km_utils.tokens_from_repl) == "function" 
 			and km_utils.plain_text(km_utils.tokens_from_repl(match_repl)) or match_repl
-		if tooltip.show then tooltip.show(display_text, false, preview_enabled) end
-		M.start_timer(math.max(0.1, _state.WORD_TIMEOUT_SEC - 0.3))
+
+		-- Sélectionne le drapeau et la couleur en fonction du type de hotstring correspondant
+		local is_star    = (match_type == "star")
+		local hs_enabled = is_star and preview_star_enabled or preview_autocorrect_enabled
+		local hs_color   = is_star and preview_star_color   or preview_autocorrect_color
+
+		-- Synchronise la durée du tooltip avec la fenêtre de déclenchement réelle du hotstring
+		local hs_delay
+		if match_type == "star" then
+			hs_delay = type(_state.DELAYS) == "table" and (_state.DELAYS.STAR_TRIGGER or 2.0) or 2.0
+		elseif match_type == "autocorrect" then
+			hs_delay = type(_state.DELAYS) == "table" and (_state.DELAYS.autocorrection or 0.5) or 0.5
+		else
+			hs_delay = _state.WORD_TIMEOUT_SEC or 2.5
+		end
+		-- Le tooltip disparaît légèrement avant l'expiration du hotstring pour éviter les confusions
+		if tooltip.set_timeout then tooltip.set_timeout(math.max(0.15, hs_delay - 0.15)) end
+
+		if tooltip.show then tooltip.show(display_text, false, hs_enabled, hs_color) end
+
+		-- Lance le timer IA seulement si l'option "IA après hotstring" est activée
+		if llm_after_hotstring_enabled then
+			M.start_timer(math.max(0.1, _state.WORD_TIMEOUT_SEC - 0.3))
+		end
 		
 		-- Enregistre qu'une suggestion vient de s'afficher à l'écran si ce n'est pas déjà le cas
 		if _last_suggested_hs ~= last_word then

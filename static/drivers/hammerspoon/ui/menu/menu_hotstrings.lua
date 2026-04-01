@@ -22,16 +22,18 @@ local dh_mod = require("modules.dynamic_hotstrings")
 -- ===================================
 
 M.DEFAULT_STATE = {
-	preview_enabled          = true,
-	custom_close_on_add      = false,
-	custom_default_section   = nil,
-	custom_editor_shortcut   = nil,
-	sections_order_overrides = {},
-	terminator_states        = {},
-	hotstrings               = {},
-	delays                   = {},
-	personal_info            = dh_mod.DEFAULT_STATE.personal_info,
-	dynamichotstrings_enabled = dh_mod.DEFAULT_STATE.dynamichotstrings_enabled,
+	preview_star_enabled          = true,
+	preview_autocorrect_enabled   = true,
+	preview_ai_enabled            = true,
+	custom_close_on_add           = false,
+	custom_default_section        = nil,
+	custom_editor_shortcut        = nil,
+	sections_order_overrides      = {},
+	terminator_states             = {},
+	hotstrings                    = {},
+	delays                        = {},
+	personal_info                 = dh_mod.DEFAULT_STATE.personal_info,
+	dynamichotstrings_enabled     = dh_mod.DEFAULT_STATE.dynamichotstrings_enabled,
 }
 
 
@@ -257,6 +259,33 @@ function M.build_groups(ctx)
 	return items
 end
 
+--- Builds a toggle item for one preview bubble type.
+--- @param ctx table Context.
+--- @param label string Display label for the toggle item.
+--- @param enabled_key string State key for the enabled flag.
+--- @param set_enabled_fn string Keymap setter name for the enabled flag.
+--- @param notify_label string Label used in the notification.
+--- @return table The toggle menu item.
+local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_label)
+	local state  = ctx.state
+	local paused = ctx.paused
+
+	return {
+		title    = label,
+		checked  = (state[enabled_key] and not paused) or nil,
+		disabled = paused or nil,
+		fn       = not paused and function()
+			state[enabled_key] = not state[enabled_key]
+			if ctx.keymap and type(ctx.keymap[set_enabled_fn]) == "function" then
+				pcall(ctx.keymap[set_enabled_fn], state[enabled_key])
+			end
+			ctx.save_prefs()
+			ctx.notify_feature(notify_label, state[enabled_key])
+			ctx.updateMenu()
+		end or nil,
+	}
+end
+
 --- Builds the management sub-menu.
 --- @param ctx table Context.
 --- @return table
@@ -265,20 +294,36 @@ function M.build_management(ctx)
 	local paused = ctx.paused
 	local menu   = {}
 
-	table.insert(menu, {
-		title    = "Afficher la prévisualisation (Bulle)",
-		checked  = (state.preview_enabled and not paused) or nil,
-		disabled = paused or nil,
-		fn       = not paused and function()
-			state.preview_enabled = not state.preview_enabled
-			if ctx.keymap and type(ctx.keymap.set_preview_enabled) == "function" then
-				pcall(ctx.keymap.set_preview_enabled, state.preview_enabled)
-			end
-			ctx.save_prefs()
-			ctx.notify_feature("Prévisualisation", state.preview_enabled)
-			ctx.updateMenu()
-		end or nil,
-	})
+	-- Valeurs par défaut des couleurs (cohérentes avec llm_bridge et DEFAULT_STATE)
+	local c_star        = M.DEFAULT_STATE.preview_star_color
+	local c_autocorrect = M.DEFAULT_STATE.preview_autocorrect_color
+	local c_ai          = M.DEFAULT_STATE.preview_ai_color
+
+	local bubble_sub = {}
+
+	table.insert(bubble_sub, buildBubbleItem(ctx,
+		"Bulle ★ (touche magique)",
+		"preview_star_enabled",
+		"set_preview_star_enabled",
+		"Bulle ★"))
+
+	table.insert(bubble_sub, { title = "-" })
+
+	table.insert(bubble_sub, buildBubbleItem(ctx,
+		"Bulle Autocorrection (espace)",
+		"preview_autocorrect_enabled",
+		"set_preview_autocorrect_enabled",
+		"Bulle Autocorrection"))
+
+	table.insert(bubble_sub, { title = "-" })
+
+	table.insert(bubble_sub, buildBubbleItem(ctx,
+		"Bulle Intelligence artificielle",
+		"preview_ai_enabled",
+		"set_preview_ai_enabled",
+		"Bulle IA"))
+
+	table.insert(menu, { title = "Bulles de prévisualisation", disabled = paused or nil, menu = bubble_sub })
 	table.insert(menu, { title = "-" })
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}

@@ -22,17 +22,18 @@ if not ok_bridge then vscode_bridge = nil end
 -- ===============================
 -- ===============================
 
--- Pre-allocate the 5 static elements to ensure zero lag during rendering
+-- Pre-allocate the 6 static elements to ensure zero lag during rendering
 local canvas = hs.canvas.new({ x = 0, y = 0, w = 0, h = 0 })
 if canvas then
     canvas:level(hs.canvas.windowLevels.cursor)
     canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
     canvas:appendElements(
-        { type = "rectangle", action = "fill", fillColor = { white = 0.10, alpha = 0.97 }, roundedRectRadii = { xRadius = 7, yRadius = 7 } },
-        { type = "text" },      -- [2] Predictions (Main text block)
-        { type = "rectangle" }, -- [3] Full-width separator line
-        { type = "text" },      -- [4] Hint / Shortcut OR Combined (Hint + Info)
-        { type = "text" }       -- [5] Info Bar (Time/Model) if not combined
+        { type = "rectangle", action = "fill",        fillColor  = { white = 0.10, alpha = 0.97 }, roundedRectRadii = { xRadius = 7, yRadius = 7 } }, -- [1] Background
+        { type = "rectangle", action = "strokeAndFill", fillColor = { white = 0, alpha = 0 }, strokeColor = { white = 1, alpha = 0.13 }, strokeWidth = 1, roundedRectRadii = { xRadius = 7, yRadius = 7 } }, -- [2] Border
+        { type = "text" },      -- [3] Predictions (Main text block)
+        { type = "rectangle" }, -- [4] Full-width separator line
+        { type = "text" },      -- [5] Hint / Shortcut OR Combined (Hint + Info)
+        { type = "text" }       -- [6] Info Bar (Time/Model) if not combined
     )
 end
 
@@ -63,6 +64,7 @@ local _state = {
     timeout_sec     = M.TIMEOUT_SEC_DEFAULT,
     llm_timeout_sec = M.LLM_TIMEOUT_SEC_DEFAULT,
     current_is_llm  = false,
+    bg_color        = nil,
 }
 
 local _watchers = {}
@@ -314,6 +316,60 @@ local C_INVIS    = { white = 0.00, alpha = 0.00 }
 
 local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧", ["cmd+shift"] = "⌘⇧" }
 
+--- Extracts the hue from an RGB color and rebuilds a dark, barely-saturated background
+--- using only that hue — lightness and saturation are fixed regardless of the input color.
+--- @param tint table|nil RGBA tint color whose hue is used, or nil for neutral dark.
+--- @return table RGBA resulting background color.
+local function apply_tint(tint)
+    if not tint or type(tint) ~= "table" then return C_BG end
+
+    local r = math.max(0, math.min(1, tint.red   or 0))
+    local g = math.max(0, math.min(1, tint.green or 0))
+    local b = math.max(0, math.min(1, tint.blue  or 0))
+
+    -- Extract hue from RGB
+    local max_c = math.max(r, g, b)
+    local min_c = math.min(r, g, b)
+    local delta = max_c - min_c
+
+    local hue = 0
+    if delta > 0.0001 then
+        if max_c == r then
+            hue = ((g - b) / delta) % 6
+        elseif max_c == g then
+            hue = (b - r) / delta + 2
+        else
+            hue = (r - g) / delta + 4
+        end
+        hue = hue / 6
+    end
+
+    -- Fixed dark lightness and very low saturation — only the hue changes
+    local L = 0.10
+    local S = 0.40
+
+    -- HSL → RGB
+    local c  = (1 - math.abs(2 * L - 1)) * S
+    local x  = c * (1 - math.abs((hue * 6) % 2 - 1))
+    local m  = L - c / 2
+    local h6 = hue * 6
+    local nr, ng, nb
+    if     h6 < 1 then nr, ng, nb = c, x, 0
+    elseif h6 < 2 then nr, ng, nb = x, c, 0
+    elseif h6 < 3 then nr, ng, nb = 0, c, x
+    elseif h6 < 4 then nr, ng, nb = 0, x, c
+    elseif h6 < 5 then nr, ng, nb = x, 0, c
+    else            nr, ng, nb = c, 0, x
+    end
+
+    return {
+        red   = math.max(0, math.min(1, nr + m)),
+        green = math.max(0, math.min(1, ng + m)),
+        blue  = math.max(0, math.min(1, nb + m)),
+        alpha = 0.97,
+    }
+end
+
 
 
 
@@ -494,18 +550,18 @@ local function render(blocks)
     
     local sz_preds = {w=0, h=0}
     if type(blocks) == "userdata" then
-        sz_preds = canvas:minimumTextSize(2, blocks)
+        sz_preds = canvas:minimumTextSize(3, blocks)
         blocks = { preds = blocks }
     else
-        sz_preds = canvas:minimumTextSize(2, blocks.preds)
+        sz_preds = canvas:minimumTextSize(3, blocks.preds)
     end
 
     local hint_st = blocks.hint_st
     local info_st = blocks.info_st
     local SP = blocks.SP or "      "
 
-    local sz_hint = hint_st and canvas:minimumTextSize(2, hint_st) or {w=0, h=0}
-    local sz_info = info_st and canvas:minimumTextSize(2, info_st) or {w=0, h=0}
+    local sz_hint = hint_st and canvas:minimumTextSize(3, hint_st) or {w=0, h=0}
+    local sz_info = info_st and canvas:minimumTextSize(3, info_st) or {w=0, h=0}
 
     local max_w = _state.fixed_width or sz_preds.w
     local is_combined = false
@@ -517,55 +573,60 @@ local function render(blocks)
         combined_st = hs.styledtext.new("") .. hint_st .. sep_st .. info_st
         combined_st = combined_st:setStyle({ paragraphStyle = { alignment = "center" } }, 1, #combined_st)
         
-        local sz_comb = canvas:minimumTextSize(2, combined_st)
+        local sz_comb = canvas:minimumTextSize(3, combined_st)
         if sz_comb.w <= max_w then
             is_combined = true
         end
     end
 
+    -- [1] Apply tinted dark background according to the active tooltip type
+    canvas[1].fillColor = apply_tint(_state.bg_color)
+
+    -- [2] Border: always covers the full canvas size (updated after size is known)
+
     local w = max_w + PAD_X * 2
     local cur_y = PAD_Y
 
-    -- [2] Main text block rendering
-    canvas[2].text  = blocks.preds
-    canvas[2].frame = { x = PAD_X, y = cur_y, w = max_w, h = sz_preds.h }
+    -- [3] Main text block rendering
+    canvas[3].text  = blocks.preds
+    canvas[3].frame = { x = PAD_X, y = cur_y, w = max_w, h = sz_preds.h }
     cur_y = cur_y + sz_preds.h + 8
 
-    -- [3] Full-width separator line rendering
+    -- [4] Full-width separator line rendering
     if hint_st or info_st then
-        canvas[3].action    = "fill"
-        canvas[3].fillColor = C_SEP
-        canvas[3].frame     = { x = 0, y = cur_y, w = w, h = 1 }
+        canvas[4].action    = "fill"
+        canvas[4].fillColor = C_SEP
+        canvas[4].frame     = { x = 0, y = cur_y, w = w, h = 1 }
         cur_y = cur_y + 8
     else
-        canvas[3].action = "skip"
+        canvas[4].action = "skip"
     end
 
-    -- [4] and [5] Hint / Info text blocks rendering
+    -- [5] and [6] Hint / Info text blocks rendering
     if is_combined then
-        local sz_comb = canvas:minimumTextSize(2, combined_st)
-        canvas[4].action = "fill"
-        canvas[4].text   = combined_st
-        canvas[4].frame  = { x = 0, y = cur_y, w = w, h = sz_comb.h }
+        local sz_comb = canvas:minimumTextSize(3, combined_st)
+        canvas[5].action = "fill"
+        canvas[5].text   = combined_st
+        canvas[5].frame  = { x = 0, y = cur_y, w = w, h = sz_comb.h }
         cur_y = cur_y + sz_comb.h + 8
-        canvas[5].action = "skip"
+        canvas[6].action = "skip"
     else
         if hint_st then
-            canvas[4].action = "fill"
-            canvas[4].text   = hint_st
-            canvas[4].frame  = { x = 0, y = cur_y, w = w, h = sz_hint.h }
+            canvas[5].action = "fill"
+            canvas[5].text   = hint_st
+            canvas[5].frame  = { x = 0, y = cur_y, w = w, h = sz_hint.h }
             cur_y = cur_y + sz_hint.h + (info_st and 4 or 8)
         else
-            canvas[4].action = "skip"
+            canvas[5].action = "skip"
         end
 
         if info_st then
-            canvas[5].action = "fill"
-            canvas[5].text   = info_st
-            canvas[5].frame  = { x = 0, y = cur_y, w = w, h = sz_info.h }
+            canvas[6].action = "fill"
+            canvas[6].text   = info_st
+            canvas[6].frame  = { x = 0, y = cur_y, w = w, h = sz_info.h }
             cur_y = cur_y + sz_info.h + 8
         else
-            canvas[5].action = "skip"
+            canvas[6].action = "skip"
         end
     end
 
@@ -602,6 +663,8 @@ local function render(blocks)
     -- Final render execution
     local ok, err = pcall(function()
         canvas:frame({ x = px, y = py, w = w, h = h })
+        -- [2] Border frame is set after w/h are computed
+        canvas[2].frame = { x = 0, y = 0, w = w, h = h }
         canvas:show()
         start_watchers()
     end)
@@ -626,6 +689,7 @@ function M.hide()
     _state.current_index   = 1
     _state.info_bar        = nil
     _state.fixed_width     = nil
+    _state.bg_color        = nil
 end
 
 --- Sets the auto-hide timeout duration for normal hotstrings (called by menu.lua or keymap.lua)
@@ -658,7 +722,7 @@ function M.navigate(delta)
 end
 
 --- Displays multiple LLM predictions with full UI capabilities
-function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mods)
+function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mods, bg_color)
     if not enabled then return end
     if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
     
@@ -669,6 +733,7 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     _state.nav_mods        = type(nav_mods) == "table" and nav_mods or {}
     _state.indent          = indent or 0
     _state.current_is_llm  = true -- Ensure extended timeout is used
+    _state.bg_color        = type(bg_color) == "table" and bg_color or nil
     
     local nav_mod_str = "none"
     if #_state.nav_mods > 0 and not (#_state.nav_mods == 1 and _state.nav_mods[1] == "none") then
@@ -682,17 +747,17 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     local max_width = 0
     for i = 1, #predictions do
         local b = assemble_blocks(predictions, i, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str)
-        local w_preds = canvas:minimumTextSize(2, b.preds).w
+        local w_preds = canvas:minimumTextSize(3, b.preds).w
         
-        local sz_hint = b.hint_st and canvas:minimumTextSize(2, b.hint_st) or {w=0}
-        local sz_info = b.info_st and canvas:minimumTextSize(2, b.info_st) or {w=0}
+        local sz_hint = b.hint_st and canvas:minimumTextSize(3, b.hint_st) or {w=0}
+        local sz_info = b.info_st and canvas:minimumTextSize(3, b.info_st) or {w=0}
         
         local w_final = w_preds
         if b.info_st and b.hint_st then
             local SP = b.SP or "      "
             local sep_st = hs.styledtext.new(SP .. "|" .. SP, { font = { name = FONT, size = SIZE_HINT } })
             local combined_st = hs.styledtext.new("") .. b.hint_st .. sep_st .. b.info_st
-            local sz_comb = canvas:minimumTextSize(2, combined_st)
+            local sz_comb = canvas:minimumTextSize(3, combined_st)
             
             if sz_comb.w > w_preds then
                 w_final = math.max(w_preds, sz_hint.w, sz_info.w)
@@ -709,7 +774,7 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
 end
 
 --- Displays simple tooltip content (Hotstrings or Loading state)
-function M.show(content, is_llm, enabled)
+function M.show(content, is_llm, enabled, bg_color)
     if not enabled then return end
     if content == nil or tostring(content) == "" then M.hide(); return end
     
@@ -718,6 +783,7 @@ function M.show(content, is_llm, enabled)
     _state.info_bar        = nil
     _state.fixed_width     = nil
     _state.current_is_llm  = (is_llm == true)
+    _state.bg_color        = type(bg_color) == "table" and bg_color or nil
     
     local styled
     if type(content) == "userdata" then

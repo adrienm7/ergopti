@@ -142,25 +142,21 @@ function M.new(deps)
 
     --- Sets the maximum number of words kept per prediction
     function obj.set_max_words()
-        local def_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and llm_mod.DEFAULT_STATE.llm_max_words or "Illimité"
-        
         local state = deps.state
         pcall(hs.focus)
 
         local current_val = tonumber(state.llm_max_words)
         local display_val = (current_val and current_val > 0) and tostring(current_val) or "0"
 
-        local full_msg = "Nombre maximum de mots à conserver (0 = illimité) :\n\n(Laissez vide pour réinitialiser : " .. def_disp .. ")"
+        local full_msg = "Nombre maximum de mots à conserver par suggestion (0 = illimité) :"
 
         local ok_p, btn, raw = pcall(hs.dialog.textPrompt, "Mots max par suggestion", full_msg, display_val, "OK", "Annuler")
 
         if ok_p and btn == "OK" then
-            local new_val
-            if raw:match("^%s*$") then
-                new_val = llm_mod.DEFAULT_STATE.llm_max_words or 0
-            else
-                new_val = tonumber(raw) or 0
-            end
+            -- N'accepte que des chiffres entiers positifs ou zéro
+            local digits = raw:match("^%s*(%d+)%s*$")
+            if not digits then return end
+            local new_val = tonumber(digits) or 0
             
             state.llm_max_words = new_val
             if deps.keymap and type(deps.keymap.set_llm_max_words) == "function" then
@@ -170,7 +166,7 @@ function M.new(deps)
             pcall(deps.update_menu)
         end
     end
-    function obj.reset_max_words() reset_to_default(deps, "llm_max_words", llm_mod.DEFAULT_STATE.llm_max_words or 0, "set_llm_max_words") end
+    function obj.reset_max_words() reset_to_default(deps, "llm_max_words", llm_mod.DEFAULT_STATE.llm_max_words or 5, "set_llm_max_words") end
 
     --- Sets the AI temperature (creativity vs stability)
     function obj.set_temperature()
