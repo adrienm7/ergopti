@@ -34,6 +34,7 @@ M.DEFAULT_STATE = {
     llm_disabled_apps     = {},
     llm_user_profiles     = {},
     llm_trigger_shortcut  = false,
+    llm_after_hotstring   = false,
 }
 
 local function format_mod_string(m_str)
@@ -303,12 +304,25 @@ function M.create(deps)
         end
         
         local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce or 0.5
-        local debounce_display = (debounce_val < 0) and "Jamais" or (math.floor(debounce_val * 1000) .. " ms…")
+        local debounce_display = (debounce_val <= 0) and "Jamais" or (math.floor(debounce_val * 1000) .. " ms…")
         
         table.insert(main_menu, { title = "Temps d’attente avant suggestion : " .. debounce_display, disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
         if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
             table.insert(main_menu, { title = "   ↳ Réinitialiser (défaut : " .. math.floor((llm_mod.DEFAULT_STATE.llm_debounce or 0.5) * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
         end
+
+        table.insert(main_menu, {
+            title    = "Prédiction IA après expiration des bulles hotstrings",
+            checked  = state.llm_after_hotstring,
+            disabled = is_disabled or nil,
+            fn       = not is_disabled and function()
+                state.llm_after_hotstring = not state.llm_after_hotstring
+                if keymap and type(keymap.set_llm_after_hotstring) == "function" then
+                    pcall(keymap.set_llm_after_hotstring, state.llm_after_hotstring)
+                end
+                save_prefs(); update_menu()
+            end or nil,
+        })
 
         local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or "Illimité"
         table.insert(main_menu, { title = "Mots max par suggestion : " .. max_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_max_words })

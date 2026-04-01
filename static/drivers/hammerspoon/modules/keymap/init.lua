@@ -39,7 +39,7 @@ M.LLM_VAL_MODIFIERS_DEFAULT   = {"alt"}
 M.LLM_DEBOUNCE_DEFAULT        = 0.5
 M.LLM_CONTEXT_LENGTH_DEFAULT  = 500
 M.LLM_TEMPERATURE_DEFAULT     = 0.1
-M.LLM_MAX_WORDS_DEFAULT       = 10
+M.LLM_MAX_WORDS_DEFAULT       = 5
 M.LLM_NUM_PREDICTIONS_DEFAULT = 5
 M.LLM_PRED_INDENT_DEFAULT     = -3
 M.BASE_DELAY_SEC_DEFAULT      = 0.75
@@ -207,14 +207,18 @@ M.set_llm_show_info_bar   = LLMBridge.set_llm_show_info_bar
 M.set_llm_pred_indent     = LLMBridge.set_llm_pred_indent
 M.set_llm_sequential_mode = LLMBridge.set_llm_sequential_mode
 M.set_llm_val_modifiers   = LLMBridge.set_llm_val_modifiers
-M.set_llm_nav_modifiers   = LLMBridge.set_llm_nav_modifiers
-M.get_llm_enabled         = LLMBridge.get_llm_enabled
-M.set_llm_show_model_name = LLMBridge.set_llm_show_model_name
-M.set_llm_disabled_apps   = LLMBridge.set_llm_disabled_apps
-M.set_llm_enabled         = LLMBridge.set_llm_enabled
-M.set_preview_enabled     = LLMBridge.set_preview_enabled
-M.set_llm_debounce        = LLMBridge.set_llm_debounce
-M.trigger_prediction      = LLMBridge._perform_llm_check
+M.set_llm_nav_modifiers         = LLMBridge.set_llm_nav_modifiers
+M.get_llm_enabled               = LLMBridge.get_llm_enabled
+M.set_llm_show_model_name       = LLMBridge.set_llm_show_model_name
+M.set_llm_disabled_apps         = LLMBridge.set_llm_disabled_apps
+M.set_llm_enabled               = LLMBridge.set_llm_enabled
+M.set_preview_enabled           = LLMBridge.set_preview_enabled
+M.set_preview_star_enabled      = LLMBridge.set_preview_star_enabled
+M.set_preview_autocorrect_enabled = LLMBridge.set_preview_autocorrect_enabled
+M.set_preview_ai_enabled        = LLMBridge.set_preview_ai_enabled
+M.set_llm_after_hotstring       = LLMBridge.set_llm_after_hotstring
+M.set_llm_debounce              = LLMBridge.set_llm_debounce
+M.trigger_prediction            = LLMBridge._perform_llm_check
 
 
 
