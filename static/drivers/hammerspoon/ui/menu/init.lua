@@ -480,6 +480,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					if app_name ~= "" then pcall(hs.execute, string.format("open -a \"%s\" \"%s\"", app_name, path)) else pcall(hs.execute, string.format("open -t \"%s\"", path)) end
 				end)
 			end,
+			open_personal_toml = function()
+				hs.timer.doAfter(0, function()
+					local personal_path = base_dir .. "personal.toml"
+					local custom_path = base_dir .. "custom.toml"
+					local file_path = personal_path
+					local fh = io.open(personal_path, "r")
+					if fh then
+						fh:close()
+					else
+						file_path = custom_path
+					end
+					pcall(hs.execute, "open \"" .. file_path .. "\"")
+				end)
+			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
 			add_hotstring = function() if hotstring_editor and type(hotstring_editor.open) == "function" then pcall(hotstring_editor.open, "shortcut") end end,
 			show_metrics = function() if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end end,
