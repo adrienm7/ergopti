@@ -230,12 +230,22 @@ local function handle_key(e)
     local ok, code = pcall(function() return e:getKeyCode() end)
     if not ok or type(code) ~= "number" then return false end
     
-    if code == KEYCODE_RETURN then 
-        return dispatch_action(_key_actions.return_key) 
+    if code == KEYCODE_RETURN then
+        local ok_kl, kl = pcall(require, "modules.keylogger")
+        if ok_kl and kl and type(kl.log_shortcut) == "function" then
+            local app = hs.application.frontmostApplication()
+            pcall(kl.log_shortcut, "Alt+Enter", app and app:title() or "Unknown")
+        end
+        return dispatch_action(_key_actions.return_key)
     end
-    
-    if code == KEYCODE_BACKSPACE then 
-        return dispatch_action(_key_actions.backspace)  
+
+    if code == KEYCODE_BACKSPACE then
+        local ok_kl, kl = pcall(require, "modules.keylogger")
+        if ok_kl and kl and type(kl.log_shortcut) == "function" then
+            local app = hs.application.frontmostApplication()
+            pcall(kl.log_shortcut, "Alt+Backspace", app and app:title() or "Unknown")
+        end
+        return dispatch_action(_key_actions.backspace)
     end
     
     return false

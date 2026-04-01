@@ -32,6 +32,50 @@ local hotkey_labels = {}
 
 local started       = false
 
+-- Ordered list used to build canonical shortcut labels
+local MOD_ORDER  = { "cmd", "ctrl", "alt", "shift", "fn" }
+local MOD_LABELS = { cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn = "Fn" }
+
+--- Builds a canonical shortcut label from a mods table and a key string.
+--- @param mods table Array of modifier strings (e.g. {"ctrl", "shift"}).
+--- @param key string The primary key character or name.
+--- @return string Canonical label (e.g. "Ctrl+Shift+S").
+local function make_label(mods, key)
+	local parts = {}
+	for _, m in ipairs(MOD_ORDER) do
+		for _, bound_m in ipairs(mods) do
+			if bound_m == m then table.insert(parts, MOD_LABELS[m] or m); break end
+		end
+	end
+	local k = (#key == 1) and key:upper() or (key:sub(1, 1):upper() .. key:sub(2))
+	table.insert(parts, k)
+	return table.concat(parts, "+")
+end
+
+--- Wraps hs.hotkey.bind to log the shortcut immediately before executing the action.
+--- Uses a direct lazy-require of the keylogger so no external wiring is needed.
+--- @param mods table Modifier array.
+--- @param key string Primary key.
+--- @param fn function Action callback.
+--- @return table The hotkey object.
+local function bind_log(mods, key, fn)
+	local label = make_label(mods, key)
+	return hs.hotkey.bind(mods, key, function()
+		local ok_kl, kl = pcall(require, "modules.keylogger")
+		if ok_kl and kl and type(kl.log_shortcut) == "function" then
+            local app = hs.application.frontmostApplication()
+            local app_name = app and app:title() or nil
+            if not app_name or app_name == "" then
+                local win = hs.window.focusedWindow()
+                local win_app = win and win:application()
+                app_name = win_app and win_app:title() or "Unknown"
+            end
+            pcall(kl.log_shortcut, label, app_name)
+		end
+		fn()
+	end)
+end
+
 
 
 
@@ -50,17 +94,17 @@ end
 
 hotkey_labels.ctrl_h = "Capture interactive vers le presse-papiers"
 hotkey_defs.ctrl_h = function()
-    return hs.hotkey.bind({"ctrl"}, "h", helpers.interactive_screenshot)
+    return bind_log({"ctrl"}, "h", helpers.interactive_screenshot)
 end
 
 hotkey_labels.ctrl_m = "Anti-veille"
 hotkey_defs.ctrl_m = function()
-    return hs.hotkey.bind({"ctrl"}, "m", helpers.toggle_awake)
+    return bind_log({"ctrl"}, "m", helpers.toggle_awake)
 end
 
 hotkey_labels.ctrl_x = "Copier la couleur hex du pixel sous le curseur"
 hotkey_defs.ctrl_x = function()
-    return hs.hotkey.bind({"ctrl"}, "x", helpers.copy_pixel_color)
+    return bind_log({"ctrl"}, "x", helpers.copy_pixel_color)
 end
 
 hotkey_labels.layer_scroll = "Volume"
@@ -76,60 +120,60 @@ end
 
 hotkey_labels.cmd_shift_v = "Coller sans mise en forme"
 hotkey_defs.cmd_shift_v = function()
-    return hs.hotkey.bind({"cmd","shift"}, "v", helpers.paste_as_plain_text)
+    return bind_log({"cmd","shift"}, "v", helpers.paste_as_plain_text)
 end
 
 hotkey_labels.ctrl_a = "Sélectionner la ligne"
 hotkey_defs.ctrl_a = function()
-    return hs.hotkey.bind({"ctrl"}, "a", helpers.select_line)
+    return bind_log({"ctrl"}, "a", helpers.select_line)
 end
 
 hotkey_labels.ctrl_o = "Entourer la ligne de parenthèses"
 hotkey_defs.ctrl_o = function()
-    return hs.hotkey.bind({"ctrl"}, "o", helpers.surround_with_parens)
+    return bind_log({"ctrl"}, "o", helpers.surround_with_parens)
 end
 
 hotkey_labels.ctrl_t = "Toggle Casse De Titre / minuscules"
 hotkey_defs.ctrl_t = function()
-    return hs.hotkey.bind({"ctrl"}, "t", helpers.toggle_titlecase)
+    return bind_log({"ctrl"}, "t", helpers.toggle_titlecase)
 end
 
 hotkey_labels.ctrl_u = "Toggle MAJUSCULES / minuscules"
 hotkey_defs.ctrl_u = function()
-    return hs.hotkey.bind({"ctrl"}, "u", helpers.toggle_uppercase)
+    return bind_log({"ctrl"}, "u", helpers.toggle_uppercase)
 end
 
 hotkey_labels.ctrl_w = "Sélectionner le mot courant"
 hotkey_defs.ctrl_w = function()
-    return hs.hotkey.bind({"ctrl"}, "w", helpers.select_word)
+    return bind_log({"ctrl"}, "w", helpers.select_word)
 end
 
 -- App Navigation
 hotkey_labels.ctrl_d = "Ouvrir Téléchargements"
 hotkey_defs.ctrl_d = function()
-    return hs.hotkey.bind({"ctrl"}, "d", helpers.open_downloads)
+    return bind_log({"ctrl"}, "d", helpers.open_downloads)
 end
 
 hotkey_labels.ctrl_e = "Ouvrir Finder"
 hotkey_defs.ctrl_e = function()
-    return hs.hotkey.bind({"ctrl"}, "e", helpers.open_finder)
+    return bind_log({"ctrl"}, "e", helpers.open_finder)
 end
 
 hotkey_labels.ctrl_g = "Ouvrir ChatGPT (URL définie dans le menu)"
 hotkey_defs.ctrl_g = function()
-    return hs.hotkey.bind({"ctrl"}, "g", function()
+    return bind_log({"ctrl"}, "g", function()
         helpers.open_chatgpt(M.DEFAULT_CHATGPT_URL)
     end)
 end
 
 hotkey_labels.ctrl_i = "Ouvrir Réglages"
 hotkey_defs.ctrl_i = function()
-    return hs.hotkey.bind({"ctrl"}, "i", helpers.open_settings)
+    return bind_log({"ctrl"}, "i", helpers.open_settings)
 end
 
 hotkey_labels.ctrl_s = "Ouvrir / Copier chemin"
 hotkey_defs.ctrl_s = function()
-    return hs.hotkey.bind({"ctrl"}, "s", helpers.copy_or_open_path)
+    return bind_log({"ctrl"}, "s", helpers.copy_or_open_path)
 end
 
 

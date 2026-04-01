@@ -720,6 +720,24 @@ function M.bind_cmd_star()
         if flags.alt then table.insert(mods, "alt") end
         if flags.ctrl then table.insert(mods, "ctrl") end
 
+        -- Log the real Cmd+S (with preserved modifiers) immediately via direct keylogger call
+        local ok_kl, kl = pcall(require, "modules.keylogger")
+        if ok_kl and kl and type(kl.log_shortcut) == "function" then
+            local parts = {}
+            local order = { "cmd", "ctrl", "alt", "shift" }
+            local labels = { cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift" }
+            for _, m in ipairs(order) do if flags[m] then table.insert(parts, labels[m]) end end
+            table.insert(parts, "S")
+            local app = hs.application.frontmostApplication()
+            local app_name = app and app:title() or nil
+            if not app_name or app_name == "" then
+                local win = hs.window.focusedWindow()
+                local win_app = win and win:application()
+                app_name = win_app and win_app:title() or "Unknown"
+            end
+            pcall(kl.log_shortcut, table.concat(parts, "+"), app_name)
+        end
+
         if #mods > 0 then
             eventtap.keyStroke(mods, "s")
         end

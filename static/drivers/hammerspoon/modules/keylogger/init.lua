@@ -132,6 +132,89 @@ local _app_watcher        = nil
 local _win_filter         = nil
 local _current_day        = os.date("%Y_%m_%d")
 
+local MODIFIER_KEYCODES = {
+	[54] = true,
+	[55] = true,
+	[56] = true,
+	[57] = true,
+	[58] = true,
+	[59] = true,
+	[60] = true,
+	[61] = true,
+	[62] = true,
+	[63] = true,
+}
+
+local MODIFIER_ORDER = { "cmd", "ctrl", "alt", "shift", "fn" }
+local MODIFIER_LABELS = { cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn = "Fn" }
+local KEY_LABELS = {
+	[36] = "Enter",
+	[48] = "Tab",
+	[49] = "Space",
+	[51] = "Backspace",
+	[53] = "Escape",
+	[123] = "Left",
+	[124] = "Right",
+	[125] = "Down",
+	[126] = "Up",
+}
+local _keycode_to_name = nil
+
+local function get_keycode_name_map()
+	if _keycode_to_name then return _keycode_to_name end
+
+	_keycode_to_name = {}
+	for name, code in pairs(hs.keycodes.map or {}) do
+		if type(name) == "string" and type(code) == "number" and not _keycode_to_name[code] then
+			_keycode_to_name[code] = name
+		end
+	end
+
+	return _keycode_to_name
+end
+
+local function normalize_key_name(name)
+	if type(name) ~= "string" or name == "" then return nil end
+	if #name == 1 then return string.upper(name) end
+	return name:sub(1, 1):upper() .. name:sub(2)
+end
+
+local function is_shortcut_candidate(flags, keycode)
+	if MODIFIER_KEYCODES[keycode] then return false end
+
+	local has_cmd = flags.cmd or false
+	local has_ctrl = flags.ctrl or false
+	local has_alt = flags.alt or false
+	local has_fn = flags.fn or false
+
+	if not (has_cmd or has_ctrl or has_alt or has_fn) then return false end
+
+	-- Option alone, or Shift+Option, are symbol layers and should not be counted as shortcuts
+	if has_alt and not (has_cmd or has_ctrl or has_fn) then return false end
+
+	return true
+end
+
+local function build_shortcut_key(event_obj, flags, keycode)
+	local parts = {}
+	for _, mod in ipairs(MODIFIER_ORDER) do
+		if flags[mod] then table.insert(parts, MODIFIER_LABELS[mod]) end
+	end
+
+	local key_label = KEY_LABELS[keycode]
+	if not key_label then
+		local chars = event_obj:getCharacters(true) or event_obj:getCharacters(false) or ""
+		if chars ~= "" and not chars:match("[%z\1-\31\127]") then
+			key_label = normalize_key_name(chars)
+		else
+			key_label = normalize_key_name(get_keycode_name_map()[keycode]) or ("Keycode " .. tostring(keycode))
+		end
+	end
+
+	table.insert(parts, key_label)
+	return table.concat(parts, "+")
+end
+
 
 
 
@@ -188,16 +271,25 @@ local function handle_key(event_obj)
 
 		local flags = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
-		
+
+		-- Shortcut detection runs FIRST — before any early-exit that would silently
+		-- drop candidates like Cmd+A (keycode 0). Shortcuts bypass the typing buffer
+		-- entirely and are persisted immediately via a dedicated log entry.
+		if is_shortcut_candidate(flags, keycode) then
+			LogManager.flush_buffer()
+			local app_sc = hs.application.frontmostApplication()
+			LogManager.log_shortcut(build_shortcut_key(event_obj, flags, keycode), app_sc and app_sc:title() or "Unknown")
+			return false
+		end
+
 		-- F1-F12 keys, Escape, Modifiers etc. flush the buffer to ensure continuous tracking across window switches
 		if keycode >= 96 and keycode <= 122 then
 			LogManager.flush_buffer()
 			return false
 		end
-		
+
 		if flags.cmd and keycode == 0 then LogManager.flush_buffer(); return end
 		if flags.shift and (keycode >= 123 and keycode <= 126) then LogManager.flush_buffer(); return end
-		if flags.cmd or flags.ctrl then return end
 
 		local chars = event_obj:getCharacters(true)
 		if keycode ~= 51 and keycode ~= 48 and keycode ~= 36 and keycode ~= 53 then
@@ -332,6 +424,13 @@ local function handle_key(event_obj)
 		end
 
 		if ev_entry then CoreState.pending_keyup[keycode] = { down_time = now, event = ev_entry } end
+
+		-- Metrics webview requires near-real-time updates: flush each key so the
+		-- table reflects typed characters immediately (including search field typing).
+		local title = CoreState.session_win_title or ""
+		if CoreState.session_app_name == "Hammerspoon" and (title:find("Métriques", 1, true) or title:find("Metrics", 1, true)) then
+			LogManager.flush_buffer()
+		end
 	end)
 	
 	if not ok then Logger.warn(LOG, "Évitement verrouillage clavier: %s", tostring(err)) end
@@ -503,6 +602,13 @@ function M.log_llm(context, results)
 	for _, r in ipairs(results or {}) do table.insert(preds, r.to_type) end
 	LogManager.append_log({ type = "llm_generation", app = CoreState.session_app_name, context = context, predictions = preds, tag = "<llm_generated>" .. (preds[1] or "") .. "</llm_generated>" })
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+end
+
+--- Persists a shortcut trigger immediately (used by modules.shortcuts bindings).
+--- @param shortcut_key string Canonical label (e.g. "Ctrl+S").
+--- @param app_name string Frontmost application name.
+function M.log_shortcut(shortcut_key, app_name)
+	LogManager.log_shortcut(shortcut_key, app_name or CoreState.session_app_name)
 end
 
 --- Logs that a Hotstring was proposed to the user but not necessarily executed.

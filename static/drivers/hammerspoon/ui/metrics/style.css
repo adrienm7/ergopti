@@ -502,6 +502,42 @@ tr:hover td {
 	padding: 3px 6px;
 }
 
+.shortcut-seq {
+	align-items: center;
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.shortcut-chip {
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1;
+	padding: 4px 7px;
+	white-space: nowrap;
+}
+
+.shortcut-mod {
+	background: color-mix(in srgb, var(--accent) 14%, var(--panel-bg));
+	border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+	color: var(--accent);
+	text-transform: uppercase;
+}
+
+.shortcut-key {
+	background: var(--mono-bg);
+	border-color: color-mix(in srgb, var(--mono-color) 25%, var(--border));
+	color: var(--mono-color);
+	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.shortcut-plus {
+	color: var(--text-muted);
+	font-weight: 700;
+}
+
 /* Custom Space Badges */
 .space-reg {
 	color: var(--text-muted);
@@ -578,6 +614,15 @@ th .tooltip .tooltiptext {
 .tooltip:hover .tooltiptext {
 	opacity: 1;
 	visibility: visible;
+}
+
+.stat-inline-tooltip .info-icon {
+	margin-right: 0;
+	opacity: 0.8;
+}
+
+.stat-inline-tooltip {
+	color: var(--kpi-wpm-color);
 }
 
 /* ================================ */

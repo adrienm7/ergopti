@@ -93,9 +93,10 @@ function M.aggregate_events(events, app_name, date_str)
 	
 	local a = _state.today_idx[app_name]
 	if type(a) ~= "table" then
-		a = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {} }
+		a = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
 		_state.today_idx[app_name] = a
 	end
+	a.sc = type(a.sc) == "table" and a.sc or {}
 
 	local m_day = _state.manifest[date_str]
 	if type(m_day) ~= "table" then m_day = {}; _state.manifest[date_str] = m_day end
@@ -108,7 +109,9 @@ function M.aggregate_events(events, app_name, date_str)
 	
 	local current_hour = tostring(os.date("%H"))
 	m_app.hourly = type(m_app.hourly) == "table" and m_app.hourly or {}
-	if type(m_app.hourly[current_hour]) ~= "table" then m_app.hourly[current_hour] = { c = 0, e = 0 } end
+	if type(m_app.hourly[current_hour]) ~= "table" then m_app.hourly[current_hour] = { c = 0, e = 0, em = 0, es = 0 } end
+	m_app.hourly[current_hour].em = m_app.hourly[current_hour].em or 0
+	m_app.hourly[current_hour].es = m_app.hourly[current_hour].es or 0
 
 	local p1, p2, p3, p4, p5, p6 = nil, nil, nil, nil, nil, nil
 	local cur_word = ""
@@ -121,9 +124,14 @@ function M.aggregate_events(events, app_name, date_str)
 		local char = ev[1]
 		local delay = ev[2] or 0
 		local meta = ev[3] or {}
+		local shortcut_key = meta.sc
 		local is_bs = (char == "[BS]")
 		local stype = meta.st or "none"
 		local is_synth = meta.s or false
+
+		if type(shortcut_key) == "string" and shortcut_key ~= "" then
+			add_metric(a.sc, shortcut_key, delay, false, "none")
+		else
 
 		if is_synth and stype ~= "none" and stype ~= prev_stype then
 			if stype == "hotstring" then m_app.hs_triggers = (m_app.hs_triggers or 0) + 1 end
@@ -150,7 +158,13 @@ function M.aggregate_events(events, app_name, date_str)
 				if l.hp then add_metric(a.hp, l.hp, 0, true) end
 			end
 			word_err = true
-			m_app.hourly[current_hour].e = (m_app.hourly[current_hour].e or 0) + 1
+			if is_synth then
+				m_app.hourly[current_hour].es = (m_app.hourly[current_hour].es or 0) + 1
+			else
+				-- Keep `e` aligned with manual backspaces so precision reflects human typing only
+				m_app.hourly[current_hour].e = (m_app.hourly[current_hour].e or 0) + 1
+				m_app.hourly[current_hour].em = (m_app.hourly[current_hour].em or 0) + 1
+			end
 			
 			local h_obj = {}
 			add_metric(a.c, "[BS]", delay, false, stype); h_obj.c = "[BS]"
@@ -216,6 +230,7 @@ function M.aggregate_events(events, app_name, date_str)
 			table.insert(hist, h_obj)
 			p6 = p5; p5 = p4; p4 = p3; p3 = p2; p2 = p1; p1 = k_c
 		end
+		end
 	end
 end
 
@@ -240,6 +255,30 @@ function M.increment_manifest_stat(app_name, stat_key)
 	if type(m_app) ~= "table" then m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {} }; m_day[app_name or "Unknown"] = m_app end
 	
 	m_app[stat_key] = (m_app[stat_key] or 0) + 1
+	debounced_save()
+end
+
+--- Records a single keyboard shortcut immediately into the index and the log file.
+--- Bypasses the typing buffer entirely so shortcuts are persisted on the spot.
+--- @param shortcut_key string The formatted shortcut string (e.g. "Cmd+C").
+--- @param app_name string The frontmost application name at time of press.
+function M.log_shortcut(shortcut_key, app_name)
+	if type(shortcut_key) ~= "string" or shortcut_key == "" then return end
+	app_name = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown"
+
+	local a = _state.today_idx[app_name]
+	if type(a) ~= "table" then
+		a = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
+		_state.today_idx[app_name] = a
+	end
+	a.sc = type(a.sc) == "table" and a.sc or {}
+
+	local sc_item = a.sc[shortcut_key]
+	if type(sc_item) ~= "table" then sc_item = {}; a.sc[shortcut_key] = sc_item end
+	sc_item.c = (sc_item.c or 0) + 1
+
+	M.append_log({ type = "shortcut", key = shortcut_key, app = app_name })
+	M.save_today_index()
 	debounced_save()
 end
 
@@ -361,6 +400,18 @@ function M.rebuild_index_if_needed()
 							if ok and entry then
 								if entry.type == "typing" and entry.events then
 									M.aggregate_events(entry.events, entry.app or "Unknown", date_str)
+									changed = true
+								elseif entry.type == "shortcut" and type(entry.key) == "string" and entry.key ~= "" then
+									local sc_app = entry.app or "Unknown"
+									local s_a = _state.today_idx[sc_app]
+									if type(s_a) ~= "table" then
+										s_a = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
+										_state.today_idx[sc_app] = s_a
+									end
+									s_a.sc = type(s_a.sc) == "table" and s_a.sc or {}
+									local sc_item = s_a.sc[entry.key]
+									if type(sc_item) ~= "table" then sc_item = {}; s_a.sc[entry.key] = sc_item end
+									sc_item.c = (sc_item.c or 0) + 1
 									changed = true
 								elseif entry.type == "hotstring_suggested" then
 									local m_day = _state.manifest[date_str]
