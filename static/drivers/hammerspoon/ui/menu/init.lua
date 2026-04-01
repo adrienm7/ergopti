@@ -371,6 +371,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if type(updateMenu) == "function" then updateMenu() end
 	end
 
+	local function reset_all_defaults()
+		-- Delete config.json so that the next startup uses the default module settings
+		pcall(os.remove, base_dir .. "config.json")
+		pcall(notifications.notify, "↺ Valeurs par défaut réinitialisées — Rechargement…")
+		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
+	end
+
 
 
 	-- ====================================
@@ -486,8 +493,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		}
 
 		local actions = {
-			enable_all   = function() set_all_enabled(true) end,
-			disable_all  = function() set_all_enabled(false) end,
+			enable_all      = function() set_all_enabled(true) end,
+			disable_all     = function() set_all_enabled(false) end,
+			reset_defaults  = function() reset_all_defaults() end,
 			open_console = function() pcall(hs.openConsole) end,
 			open_init    = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
 			open_prefs   = function() pcall(hs.openPreferences) end,
