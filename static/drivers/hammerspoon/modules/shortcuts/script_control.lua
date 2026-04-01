@@ -27,27 +27,30 @@ local notifications = require("lib.notifications")
 -- ====================================
 -- ====================================
 
--- Available actions and their display labels (used by the menu UI)
-local ACTION_LABELS = {
-    add_hotstring      = "Ajouter un hotstring",
-    none               = "Désactivé",
-    open_ahk           = "Ouvrir le fichier AHK",
-    open_config        = "Ouvrir config.json",
-    open_console       = "Console Hammerspoon",
-    open_init          = "Ouvrir init.lua",
-    open_logs          = "Ouvrir le dossier de logs",
-    pause              = "Pause / Reprendre",
-    quit_hammerspoon   = "Quitter Hammerspoon",
-    reload             = "Recharger",
-    show_metrics       = "Afficher les métriques",
-    trigger_prediction = "Déclencher une prédiction IA",
+-- Ordered action definitions used by the menu UI
+local ACTION_DEFINITIONS = {
+	{ id = "none",               label = "Désactivé" },
+	{ id = "pause",              label = "Pause / Reprendre" },
+	{ id = "reload",             label = "Recharger" },
+	{ id = "open_console",       label = "Console Hammerspoon" },
+	{ id = "quit_hammerspoon",   label = "Quitter Hammerspoon" },
+	{ id = "open_init",          label = "Ouvrir init.lua" },
+	{ id = "open_ahk",           label = "Ouvrir le fichier AHK" },
+	{ id = "open_personal_toml", label = "Ouvrir le fichier personal.toml" },
+	{ id = "open_config",        label = "Ouvrir config.json" },
+	{ id = "open_logs",          label = "Ouvrir le dossier de logs" },
+	{ id = "add_hotstring",      label = "Ajouter un hotstring" },
+	{ id = "trigger_prediction", label = "Déclencher une prédiction IA" },
+	{ id = "show_metrics",       label = "Afficher les métriques" },
 }
 
-local ACTIONS_ORDER = { 
-    "none", "pause", "reload", "open_console", "quit_hammerspoon",
-    "open_init", "open_ahk", "open_config", "open_logs",
-    "add_hotstring", "trigger_prediction",  "show_metrics", 
-}
+local ACTION_LABELS = {}
+local ACTIONS_ORDER = {}
+
+for _, definition in ipairs(ACTION_DEFINITIONS) do
+	ACTION_LABELS[definition.id] = definition.label
+	table.insert(ACTIONS_ORDER, definition.id)
+end
 
 local KEYCODE_RETURN    = 36
 local KEYCODE_BACKSPACE = 51
@@ -181,6 +184,10 @@ local function dispatch_action(action)
     elseif action == "open_ahk" then
         if type(_extras.open_ahk) == "function" then pcall(_extras.open_ahk) end
         return true
+
+    elseif action == "open_personal_toml" then
+        if type(_extras.open_personal_toml) == "function" then pcall(_extras.open_personal_toml) end
+        return true
         
     elseif action == "trigger_prediction" then
         if type(_extras.trigger_prediction) == "function" then pcall(_extras.trigger_prediction) end
@@ -279,7 +286,7 @@ end
 
 --- Sets the action triggered by a specific key slot.
 --- @param keyname string "return_key" or "backspace".
---- @param action string One of "none", "pause", "reload", "open_init", "open_ahk".
+--- @param action string One configured action id (for example "pause" or "open_personal_toml").
 function M.set_shortcut_action(keyname, action)
     if type(keyname) == "string" and type(action) == "string" then
         _key_actions[keyname] = action
@@ -295,7 +302,7 @@ function M.set_on_pause_change(cb)
 end
 
 --- Provides handlers for actions that require external context (like paths).
---- @param tbl table May contain open_init() and open_ahk() functions.
+--- @param tbl table May contain handlers such as open_init(), open_ahk(), and open_personal_toml().
 function M.set_extras(tbl)
     _extras = type(tbl) == "table" and tbl or {}
 end
