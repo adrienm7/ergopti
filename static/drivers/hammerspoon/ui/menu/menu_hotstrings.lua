@@ -370,6 +370,7 @@ function M.build_management(ctx)
 	exp_sub[#exp_sub + 1] = { title = "-" }
 
 	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
+		if type(ct) ~= "table" or type(ct.char) ~= "string" or ct.char == "" then goto continue_ct end
 		local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(ct.key) or false
 		local consume_sfx = ct.consume and " (consommé)" or ""
 		local ct_lbl = ct.char .. " : Personnalisé" .. consume_sfx
@@ -406,6 +407,7 @@ function M.build_management(ctx)
 			menu     = ct_sub,
 			disabled = paused or nil,
 		}
+		::continue_ct::
 	end
 
 	exp_sub[#exp_sub + 1] = {

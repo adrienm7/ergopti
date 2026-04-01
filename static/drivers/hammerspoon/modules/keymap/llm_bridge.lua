@@ -392,29 +392,64 @@ end
 --- @param model_name string Model identifier.
 --- @param elapsed_ms number Milliseconds taken for generation.
 --- @param is_mlx boolean Whether MLX backend is active.
+--- @param profile_name string|nil Profile/prompt name for display.
 --- @return string Formatted string.
-local function build_info_bar(model_name, elapsed_ms, is_mlx)
+local function build_info_bar(model_name, elapsed_ms, is_mlx, profile_name)
 	if not model_name or model_name == "" then return nil end
+	
+	local parts = {}
+	table.insert(parts, model_name)
+	
+	if profile_name and profile_name ~= "" then
+		table.insert(parts, profile_name)
+	end
+	
 	if elapsed_ms and elapsed_ms > 0 then
 		local secs = elapsed_ms / 1000
 		local time_str = secs < 10 and string.format("%.1fs", secs) or string.format("%ds", math.floor(secs + 0.5))
 		local time_block = "⏱️ " .. time_str .. (is_mlx and " (MLX 🚀)" or "")
-		return model_name .. " — " .. time_block
+		table.insert(parts, time_block)
+		return table.concat(parts, " — ")
 	end
-	return model_name
+	return table.concat(parts, " — ")
 end
 
 --- Core routine to evaluate buffer state and dispatch API calls if suitable.
-function M._perform_llm_check()
-	if not llm_enabled or llm_suppressed_for_app() then return end
+function M._perform_llm_check(force_trigger, profile_name)
+	force_trigger = force_trigger == true
+	print(string.format("[LLM Check] force_trigger=%s, profile_name=%s", tostring(force_trigger), tostring(profile_name)))
+	print(string.format("[LLM Check] llm_enabled=%s", tostring(llm_enabled)))
+	if not llm_enabled then 
+		print("[LLM Check] ✗ LLM désactivé")
+		return 
+	end
+	
+	local is_suppressed = llm_suppressed_for_app()
+	print(string.format("[LLM Check] llm_suppressed_for_app()=%s", tostring(is_suppressed)))
+	if is_suppressed then 
+		print("[LLM Check] ✗ LLM supprimé pour cette app")
+		return 
+	end
 
 	local clean_buffer = _state.buffer
+	print(string.format("[LLM Check] Buffer: '%s' (length=%d)", clean_buffer, #clean_buffer))
+	
 	local words = {}
 	for w in clean_buffer:gmatch("%S+%s*") do table.insert(words, w) end
-	if #words == 0 then return end
+	print(string.format("[LLM Check] Mots trouvés: %d", #words))
+	
+	if #words == 0 and not force_trigger then 
+		print("[LLM Check] ✗ Buffer vide (0 mots) et pas un trigger manuel")
+		return 
+	end
 	
 	local tail = table.concat(words, "", math.max(1, #words - 4))
-	if not tail or #tail < 2 then return end
+	print(string.format("[LLM Check] Tail: '%s' (length=%d)", tail, #tail))
+	
+	if (not tail or #tail < 2) and not force_trigger then 
+		print("[LLM Check] ✗ Tail trop court et pas un trigger manuel")
+		return 
+	end
 
 	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, preview_ai_color) end
 
@@ -469,7 +504,18 @@ function M._perform_llm_check()
 				_pending_predictions = valid_preds
 				_predictions_active  = true
 				local using_mlx = type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() or false
-				local info = llm_show_info_bar and build_info_bar(current_llm_model, elapsed_ms, using_mlx) or nil
+				
+				local display_profile_name = profile_name
+				if not display_profile_name then
+					if type(core_llm.get_active_profile) == "function" then
+						local profile = core_llm.get_active_profile()
+						if type(profile) == "table" and type(profile.label) == "string" then
+							display_profile_name = profile.label
+						end
+					end
+				end
+				
+				local info = llm_show_info_bar and build_info_bar(current_llm_model, elapsed_ms, using_mlx, display_profile_name) or nil
 				
 				local val_mods = llm_val_modifiers
 				local val_mod_str = "none"
@@ -485,7 +531,8 @@ function M._perform_llm_check()
 				if _llm_request_id ~= my_request_id then return end
 				M.reset_predictions()
 			end,
-			llm_sequential_mode
+			llm_sequential_mode,
+			force_trigger
 		)
 	end
 end
