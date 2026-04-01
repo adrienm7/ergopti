@@ -192,9 +192,11 @@ M.register_lua_group    = Registry.register_lua_group
 M.enable_group          = Registry.enable_group
 M.sort_mappings         = Registry.sort_mappings
 
-M.set_terminator_enabled = Registry.set_terminator_enabled
-M.is_terminator_enabled  = Registry.is_terminator_enabled
-M.get_terminator_defs    = Registry.get_terminator_defs
+M.set_terminator_enabled    = Registry.set_terminator_enabled
+M.is_terminator_enabled     = Registry.is_terminator_enabled
+M.get_terminator_defs       = Registry.get_terminator_defs
+M.add_custom_terminator     = Registry.add_custom_terminator
+M.remove_custom_terminator  = Registry.remove_custom_terminator
 
 -- Proxy LLM Bridge Methods
 M.set_llm_model           = LLMBridge.set_llm_model

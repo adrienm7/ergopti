@@ -265,7 +265,8 @@ function M.build(ctx)
     local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
     
     table.insert(menu, {
-        title = label,
+        title    = label,
+        disabled = not state.keylogger_enabled,
         menu  = AppPickerLib.build_menu(
             state.keylogger_disabled_apps,
             function(new_list)
@@ -290,8 +291,9 @@ function M.build(ctx)
     -- =================================
 
     table.insert(menu, {
-        title = "Chiffrer les logs sur le disque (Sécurité)",
-        checked = state.keylogger_encrypt,
+        title    = "Chiffrer les logs sur le disque (Sécurité)",
+        checked  = state.keylogger_encrypt,
+        disabled = not state.keylogger_enabled,
         fn = function()
             local log_manager = require("modules.keylogger.log_manager")
             local log_dir = hs.configdir .. "/logs"
@@ -378,7 +380,7 @@ function M.build(ctx)
         checked = state.keylogger_enabled,
         fn      = function()
             if not state.keylogger_enabled then
-                local warnMsg = "ATTENTION : Vous êtes sur le point d’activer le keylogger.\n\nIl enregistre vos frappes au clavier à la milliseconde près.\nCes logs sont stockés dans le dossier Hammerspoon.\n\nBien que les champs de mots de passe soient ignorés automatiquement, il est recommandé de mettre le script en PAUSE lors de la saisie de données ultra-sensibles."
+                local warnMsg = "ATTENTION : Vous êtes sur le point d’activer le keylogger.\n\nIl enregistre vos frappes au clavier à la milliseconde près.\nCes logs sont stockés dans le dossier Hammerspoon.\n\nBien que les champs de mots de passe soient ignorés automatiquement, il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles."
                 local res = hs.dialog.blockAlert("Avertissement de Sécurité", warnMsg, "Activer", "Annuler", "warning")
                 if res ~= "Activer" then return end
             end
