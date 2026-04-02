@@ -16,6 +16,8 @@
 local M = {}
 local hs = hs
 local keylogger = require("modules.keylogger")
+local WPMShared = require("ui.wpm.shared")
+local ColorUtils = require("lib.color_utils")
 
 
 
@@ -28,7 +30,7 @@ local keylogger = require("modules.keylogger")
 -- ================================
 
 local CONFIG = {
-	source_color_duration = 3.0,
+	source_color_duration = 1.0,
 	
 	use_fixed_scale       = true,
 	fixed_scale_max       = 120,
@@ -37,11 +39,10 @@ local CONFIG = {
 	border_color          = { white = 1, alpha = 0.4 },
 	border_width          = 1,
 	text_color            = { white = 1, alpha = 1 },
-	text_size             = 14, -- Taille de la police modifiable ici
-	
-	color_manual          = { hex = "#007aff", alpha = 0.8 },
-	color_hotstring       = { hex = "#ff3b30", alpha = 0.8 },
-	color_llm             = { hex = "#af52de", alpha = 0.8 },
+	text_size             = 14, -- Adjustable font size
+	compact_padding_x     = 16,
+	compact_padding_y     = 8,
+	compact_color_mix     = 0.8,
 	
 	graph_fill_alpha      = 0.2,
 	graph_line_width      = 2
@@ -61,6 +62,7 @@ local _canvas      = nil
 local _timer       = nil
 local _wpm_history = {}
 local _show_graph  = false
+local _use_source_colors = true
 
 
 
@@ -76,14 +78,8 @@ local _show_graph  = false
 local function update_widget()
 	local stats = keylogger.get_live_stats()
 	local display_wpm = stats.wpm or 0
-	local source = stats.source or "none"
-	local source_time = stats.source_time or 0
 	local now = hs.timer.absoluteTime() / 1000000000
-	
-	local active_source = "none"
-	if source ~= "none" and (now - source_time) <= CONFIG.source_color_duration then
-		active_source = source
-	end
+	local active_source = WPMShared.get_active_source(stats, CONFIG.source_color_duration, now)
 	
 	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
 	local tooltip_visible = false
@@ -96,7 +92,7 @@ local function update_widget()
 	table.insert(_wpm_history, { v = display_wpm, s = active_source })
 	if #_wpm_history > 60 then table.remove(_wpm_history, 1) end
 	
-	-- Garde le widget visible pendant la frappe, si un tooltip IA est affiché, ou si une IA vient d'être injectée
+	-- Keep the widget visible while typing, while tooltip is visible, or right after injection
 	if display_wpm > 0 or tooltip_visible or (active_source ~= "none") then
 		local screen = hs.screen.mainScreen()
 		local full_frame = screen:fullFrame()
@@ -107,19 +103,22 @@ local function update_widget()
 		
 		local canvas_width, canvas_height, target_x, target_y
 		local graph_margin = 5
-		local graph_padding = 8
+		local graph_padding = 5
 		
 		if _show_graph then
-			canvas_height = dock_height - graph_margin
+			canvas_height = dock_height - graph_margin - 5
 			canvas_width  = canvas_height * 3
 			target_x = full_frame.x + full_frame.w - canvas_width - graph_margin
 			target_y = full_frame.y + full_frame.h - canvas_height - graph_margin
 		else
-			canvas_height = dock_height * 0.6
-			canvas_width  = canvas_height * 3
+			-- Compact mode uses measured text size plus padding
+			local text_measure = hs.drawing.getTextDrawingSize(wpm_str, { size = CONFIG.text_size, font = ".AppleSystemUIFont" })
+			local text_width = (text_measure and text_measure.w) or math.floor(#wpm_str * CONFIG.text_size * 0.62)
+			local text_height = (text_measure and text_measure.h) or (CONFIG.text_size + 6)
+			canvas_width  = math.floor(text_width + (CONFIG.compact_padding_x * 2))
+			canvas_height = math.floor(text_height + (CONFIG.compact_padding_y * 2))
 			
 			target_y = full_frame.y + full_frame.h - (dock_height / 2) - (canvas_height / 2)
-			
 			local margin_bottom = full_frame.y + full_frame.h - (target_y + canvas_height)
 			target_x = full_frame.x + full_frame.w - canvas_width - margin_bottom
 		end
@@ -149,10 +148,10 @@ local function update_widget()
 			local graph_h = canvas_height - (text_size * 2) 
 			local step = graph_w / math.max(1, #_wpm_history - 1)
 			
-			-- La couleur ne change QUE si active_source correspond à une injection effective (et non pas juste l'apparition du tooltip)
-			local current_color = CONFIG.color_manual
-			if active_source == "hotstring" then current_color = CONFIG.color_hotstring
-			elseif active_source == "llm" then current_color = CONFIG.color_llm end
+			-- Color switches only when an effective injected source is active
+			local current_color = _use_source_colors
+				and WPMShared.get_source_color(active_source, 0.8)
+				or WPMShared.get_source_color("manual", 0.8)
 			
 			local fill_color = { hex = current_color.hex, alpha = CONFIG.graph_fill_alpha }
 			
@@ -172,8 +171,15 @@ local function update_widget()
 			
 			table.insert(elements, { type = "text", text = wpm_str, textColor = CONFIG.text_color, textSize = text_size, textAlignment = "center", frame = { x = 0, y = 5, w = canvas_width, h = text_size + 6 } })
 		else
-			local text_y = (canvas_height - text_size - 6) / 2
-			table.insert(elements, { type = "text", text = wpm_str, textColor = CONFIG.text_color, textSize = text_size, textAlignment = "center", frame = { x = 0, y = text_y, w = canvas_width, h = text_size + 6 } })
+			local text_measure = hs.drawing.getTextDrawingSize(wpm_str, { size = text_size, font = ".AppleSystemUIFont" })
+			local text_height = (text_measure and text_measure.h) or (text_size + 6)
+			local text_y = (canvas_height - text_height) / 2
+			local compact_text_color = CONFIG.text_color
+			if _use_source_colors and active_source ~= "none" then
+				local source_color = WPMShared.get_source_color(active_source, 1.0)
+				compact_text_color = ColorUtils.mix_hex_with_white(source_color and source_color.hex, CONFIG.compact_color_mix, 1.0)
+			end
+			table.insert(elements, { type = "text", text = wpm_str, textColor = compact_text_color, textSize = text_size, textAlignment = "center", frame = { x = 0, y = text_y, w = canvas_width, h = text_height } })
 		end
 		
 		_canvas:replaceElements(elements)
@@ -206,6 +212,12 @@ end
 function M.stop()
 	if _timer then _timer:stop(); _timer = nil end
 	if _canvas then _canvas:delete(); _canvas = nil end
+end
+
+--- Enables or disables source-based widget coloring.
+--- @param enabled boolean Whether source colors should be active.
+function M.set_use_source_colors(enabled)
+	_use_source_colors = enabled ~= false
 end
 
 return M

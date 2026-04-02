@@ -37,8 +37,10 @@ M.DEFAULT_STATE = {
 	keylogger_disabled_apps = {},
 	keylogger_encrypt       = false,
 	keylogger_menubar_wpm   = false,
+	keylogger_menubar_colors = true,
 	keylogger_float_wpm     = false,
 	keylogger_float_graph   = false,
+	keylogger_float_colors  = true,
 }
 
 
@@ -73,6 +75,7 @@ local CoreState = {
 	
 	recent_typing          = {},
 	last_source_type       = "none",
+	last_source_variant    = "none",
 	last_source_time       = 0,
 	
 	session_app_name       = "Unknown",
@@ -370,7 +373,10 @@ local function handle_key(event_obj)
 			end
 		end
 
-		table.insert(CoreState.recent_typing, now)
+		-- Only count real (non-synthetic) non-BS chars: they represent effective net output
+		if not is_synth and keycode ~= 51 then
+			table.insert(CoreState.recent_typing, now)
+		end
 		CoreState.session_last_active = now
 		
 		if not is_synth then
@@ -398,6 +404,8 @@ local function handle_key(event_obj)
 		local ev_entry = nil
 
 		if keycode == 51 then
+			-- A real BS erases a char previously counted as effective output
+			if not is_synth and #CoreState.recent_typing > 0 then table.remove(CoreState.recent_typing) end
 			local deleted_char = ""
 			if not is_synth and #CoreState.buffer_text > 0 then
 				local last_char_pos = utf8.offset(CoreState.buffer_text, -1)
@@ -465,10 +473,15 @@ function M.set_buffer(text) CoreState.buffer_text = type(text) == "string" and t
 --- @param text string The synthetic text.
 --- @param source_type string Origin identifier.
 --- @param deletes number Quantity of backspaces issued before the text.
-function M.notify_synthetic(text, source_type, deletes)
+--- @param source_variant string|nil Optional source variant for UI coloring.
+function M.notify_synthetic(text, source_type, deletes, source_variant)
 	if deletes and deletes > 0 then
 		for i = 1, deletes do
 			table.insert(CoreState.synth_queue, { char = "[BS]", type = source_type })
+		end
+		-- Debit the trigger chars that were previously counted as effective output
+		for i = 1, deletes do
+			if #CoreState.recent_typing > 0 then table.remove(CoreState.recent_typing) end
 		end
 	end
 
@@ -476,9 +489,16 @@ function M.notify_synthetic(text, source_type, deletes)
 		for _, code in utf8.codes(text) do
 			table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type })
 		end
+		-- Credit the output chars to the effective MPM counter
+		local now_ms = hs.timer.absoluteTime() / 1000000
+		local out_len = utf8.len(text) or 0
+		for i = 1, out_len do
+			table.insert(CoreState.recent_typing, now_ms)
+		end
 	end
 	
 	CoreState.last_source_type = source_type
+	CoreState.last_source_variant = type(source_variant) == "string" and source_variant or source_type
 	CoreState.last_source_time = hs.timer.absoluteTime() / 1000000000
 end
 
@@ -502,6 +522,7 @@ function M.get_live_stats()
 	return { 
 		wpm = display_wpm, 
 		source = CoreState.last_source_type, 
+		source_variant = CoreState.last_source_variant,
 		source_time = CoreState.last_source_time 
 	}
 end

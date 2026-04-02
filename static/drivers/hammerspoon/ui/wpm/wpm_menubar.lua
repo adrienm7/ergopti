@@ -15,9 +15,11 @@
 local M = {}
 local hs = hs
 local keylogger = require("modules.keylogger")
+local WPMShared = require("ui.wpm.shared")
 
 local _menubar = nil
 local _timer   = nil
+local _use_source_colors = true
 
 
 
@@ -33,14 +35,8 @@ local _timer   = nil
 local function update_menubar()
 	local stats = keylogger.get_live_stats()
 	local display_wpm = stats.wpm or 0
-	local source = stats.source or "none"
-	local source_time = stats.source_time or 0
 	local now = hs.timer.absoluteTime() / 1000000000
-	
-	local active_source = "none"
-	if source ~= "none" and (now - source_time) <= 3.0 then
-		active_source = source
-	end
+	local active_source = WPMShared.get_active_source(stats, 3.0, now)
 	
 	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
 	local tooltip_visible = false
@@ -51,10 +47,9 @@ local function update_menubar()
 	if display_wpm > 0 or tooltip_visible or (active_source ~= "none") then
 		if not _menubar then _menubar = hs.menubar.new() end
 		
-		-- Ajout d'un fond coloré translucide pour garantir la lisibilité du texte blanc en Menubar
+		-- Add a translucent background to preserve readability in the menubar
 		local bg_color = nil
-		if active_source == "hotstring" then bg_color = { hex = "#ff3b30", alpha = 0.5 }
-		elseif active_source == "llm" then bg_color = { hex = "#af52de", alpha = 0.5 } end
+		if _use_source_colors and active_source ~= "none" then bg_color = WPMShared.get_source_color(active_source, 0.5) end
 		
 		local attrs = { 
 			font = { name = ".AppleSystemUIFont", size = 13 }, 
@@ -62,7 +57,7 @@ local function update_menubar()
 		}
 		if bg_color then attrs.backgroundColor = bg_color end
 		
-		local styled_title = hs.styledtext.new(display_wpm .. " MPM ", attrs)
+		local styled_title = hs.styledtext.new(WPMShared.format_mpm_label(display_wpm, true), attrs)
 		_menubar:setTitle(styled_title)
 	else
 		if _menubar then _menubar:delete(); _menubar = nil end
@@ -90,6 +85,12 @@ end
 function M.stop()
 	if _timer then _timer:stop(); _timer = nil end
 	if _menubar then _menubar:delete(); _menubar = nil end
+end
+
+--- Enables or disables source-based menubar coloring.
+--- @param enabled boolean Whether source colors should be active.
+function M.set_use_source_colors(enabled)
+	_use_source_colors = enabled ~= false
 end
 
 return M
