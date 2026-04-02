@@ -30,7 +30,8 @@ const app_state = {
 	sort_asc: false,
 	search_query: '',
 	rendered_list: [],
-	loading_data: false
+	loading_data: false,
+	manifest_dates_sorted: []
 };
 
 let delegation_chart_instance = null;
@@ -235,6 +236,31 @@ function get_trend_svg(valid_points) {
 	return '<svg class="trend-svg stable" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>';
 }
 
+/**
+ * Returns the default range: first logged day to today.
+ */
+function get_default_date_range() {
+	const sorted_dates =
+		app_state.manifest_dates_sorted.length > 0
+			? app_state.manifest_dates_sorted
+			: Object.keys(window.metrics_manifest).sort();
+	const today = new Date().toISOString().split('T')[0];
+	const first_logged_date = sorted_dates.length > 0 ? sorted_dates[0] : today;
+	return { start: first_logged_date, end: today };
+}
+
+/**
+ * Applies default date inputs safely.
+ */
+function apply_default_date_range() {
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
+	if (!start_input || !end_input) return;
+	const range = get_default_date_range();
+	start_input.value = range.start;
+	end_input.value = range.end;
+}
+
 // =====================================
 // =====================================
 // ======= 2/ Data Pipeline =======
@@ -268,16 +294,24 @@ function merge_dict(
 		}
 
 		let item = source[k];
-		let real_count = item.c || 0;
+		let total_count = item.c || 0;
 		let hs_count = item.hs || 0;
 		let llm_count = item.llm || 0;
+		let other_synth_count = item.o || 0;
 
-		let manual_count = Math.max(0, real_count - hs_count - llm_count - (item.o || 0));
+		let manual_count = Math.max(0, total_count - hs_count - llm_count - other_synth_count);
+		let filtered_hs_count = hs_count;
+		let filtered_llm_count = llm_count;
+		let real_count = total_count;
 
 		if (!isShortcutsTab) {
-			if (!show_manual) real_count -= manual_count;
-			if (!show_hs) real_count -= hs_count;
-			if (!show_llm) real_count -= llm_count;
+			filtered_hs_count = show_hs ? hs_count : 0;
+			filtered_llm_count = show_llm ? llm_count : 0;
+			real_count =
+				(show_manual ? manual_count : 0) +
+				filtered_hs_count +
+				filtered_llm_count +
+				other_synth_count;
 		}
 		if (real_count <= 0) return;
 
@@ -295,8 +329,8 @@ function merge_dict(
 		target[display_k].count += real_count;
 		target[display_k].time += item.t || 0;
 		target[display_k].errors += item.e || 0;
-		target[display_k].synth_hs += hs_count;
-		target[display_k].synth_llm += llm_count;
+		target[display_k].synth_hs += filtered_hs_count;
+		target[display_k].synth_llm += filtered_llm_count;
 		target[display_k].synth_other += item.o || 0;
 	});
 }
@@ -306,8 +340,9 @@ function merge_dict(
  */
 function process_manifest() {
 	if (Object.keys(window.metrics_manifest).length > 0) {
+		app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
 		const appSet = new Set();
-		Object.keys(window.metrics_manifest).forEach((date) => {
+		app_state.manifest_dates_sorted.forEach((date) => {
 			Object.keys(window.metrics_manifest[date]).forEach((appName) => {
 				if (appName !== 'Unknown') appSet.add(appName);
 			});
@@ -335,15 +370,9 @@ function process_manifest() {
 		}
 
 		const start_input = document.getElementById('date_start');
-		if (start_input && !start_input.value) {
-			const one_month_ago = new Date();
-			one_month_ago.setMonth(one_month_ago.getMonth() - 1);
-			start_input.value = one_month_ago.toISOString().split('T')[0];
-		}
-
 		const end_input = document.getElementById('date_end');
-		if (end_input && !end_input.value) {
-			end_input.value = new Date().toISOString().split('T')[0];
+		if (start_input && end_input && (!start_input.value || !end_input.value)) {
+			apply_default_date_range();
 		}
 	}
 
@@ -351,6 +380,8 @@ function process_manifest() {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
 		reset_filters();
+		// Explicitly request data on first load instead of relying on filter chain
+		request_range_data();
 		return;
 	}
 
@@ -382,7 +413,12 @@ function compute_manifest_metrics() {
 	const show_llm = document.getElementById('btn_show_llm').classList.contains('active');
 	const show_manual = document.getElementById('btn_show_manual').classList.contains('active');
 
-	Object.keys(window.metrics_manifest).forEach((dateStr) => {
+	const manifest_dates =
+		app_state.manifest_dates_sorted.length > 0
+			? app_state.manifest_dates_sorted
+			: Object.keys(window.metrics_manifest).sort();
+
+	manifest_dates.forEach((dateStr) => {
 		if (start_val && dateStr < start_val) return;
 		if (end_val && dateStr > end_val) return;
 
@@ -391,26 +427,42 @@ function compute_manifest_metrics() {
 
 			const app = window.metrics_manifest[dateStr][appName];
 			if (!app_state.time_series[dateStr]) {
-				app_state.time_series[dateStr] = { chars: 0, time_ms: 0, hs_chars: 0, llm_chars: 0 };
+				app_state.time_series[dateStr] = {
+					chars: 0,
+					time_ms: 0,
+					hs_chars: 0,
+					llm_chars: 0,
+					daily_chars: 0,
+					daily_manual_errors: 0
+				};
 			}
 
-			let effective_chars = app.chars || 0;
-			let manual_chars = Math.max(0, effective_chars - (app.hs_chars || 0) - (app.llm_chars || 0));
+			const total_chars = app.chars || 0;
+			const hs_chars_raw = app.hs_chars || 0;
+			const llm_chars_raw = app.llm_chars || 0;
+			const manual_chars_raw = Math.max(0, total_chars - hs_chars_raw - llm_chars_raw);
 
-			if (!show_manual) effective_chars -= manual_chars;
-			if (!show_hs) effective_chars -= app.hs_chars || 0;
-			if (!show_llm) effective_chars -= app.llm_chars || 0;
-			effective_chars = Math.max(0, effective_chars);
+			const filtered_hs_chars = show_hs ? hs_chars_raw : 0;
+			const filtered_llm_chars = show_llm ? llm_chars_raw : 0;
+			const filtered_manual_chars = show_manual ? manual_chars_raw : 0;
+			const effective_chars = Math.max(
+				0,
+				filtered_manual_chars + filtered_hs_chars + filtered_llm_chars
+			);
 
-			global_hs_triggers += app.hs_triggers || 0;
-			global_llm_triggers += app.llm_triggers || 0;
-			global_hs_suggested += Math.max(app.hs_suggested || 0, app.hs_triggers || 0);
-			global_llm_suggested += Math.max(app.llm_suggested || 0, app.llm_triggers || 0);
+			if (show_hs) {
+				global_hs_triggers += app.hs_triggers || 0;
+				global_hs_suggested += Math.max(app.hs_suggested || 0, app.hs_triggers || 0);
+			}
+			if (show_llm) {
+				global_llm_triggers += app.llm_triggers || 0;
+				global_llm_suggested += Math.max(app.llm_suggested || 0, app.llm_triggers || 0);
+			}
 
 			app_state.time_series[dateStr].chars += effective_chars;
 			app_state.time_series[dateStr].time_ms += app.time || 0;
-			app_state.time_series[dateStr].hs_chars += app.hs_chars || 0;
-			app_state.time_series[dateStr].llm_chars += app.llm_chars || 0;
+			app_state.time_series[dateStr].hs_chars += filtered_hs_chars;
+			app_state.time_series[dateStr].llm_chars += filtered_llm_chars;
 
 			if (app.hourly) {
 				Object.keys(app.hourly).forEach((hour) => {
@@ -421,6 +473,11 @@ function compute_manifest_metrics() {
 						app_state.hourly_series[hour].e += manualErrors;
 						app_state.hourly_series[hour].es += hourData.es || 0;
 					}
+					// Accumulate daily accuracy stats
+					const hourData = app.hourly[hour] || {};
+					const manualErrors = typeof hourData.em === 'number' ? hourData.em : hourData.e || 0;
+					app_state.time_series[dateStr].daily_chars += hourData.c || 0;
+					app_state.time_series[dateStr].daily_manual_errors += manualErrors;
 				});
 			}
 		});
@@ -430,23 +487,10 @@ function compute_manifest_metrics() {
 	const hsCard = document.getElementById('hs_card');
 	const llmCard = document.getElementById('llm_card');
 
-	let grid_frs = [];
-	if (show_hs) {
-		hsCard.style.display = 'flex';
-		grid_frs.push('2fr');
-	} else {
-		hsCard.style.display = 'none';
-	}
-
-	if (show_llm) {
-		llmCard.style.display = 'flex';
-		grid_frs.push('2fr');
-	} else {
-		llmCard.style.display = 'none';
-	}
-
-	grid_frs.push('1fr');
-	grid.style.gridTemplateColumns = grid_frs.join(' ');
+	// Keep cards visible to preserve stable layout; filters affect values, not visibility
+	hsCard.style.display = 'flex';
+	llmCard.style.display = 'flex';
+	grid.style.gridTemplateColumns = '2fr 2fr 1fr';
 
 	const sorted_keys = Object.keys(app_state.time_series).sort();
 	const hs_points = [],
@@ -619,8 +663,7 @@ function apply_date_app_filters() {
 }
 
 function reset_filters() {
-	document.getElementById('date_start').value = '';
-	document.getElementById('date_end').value = '';
+	apply_default_date_range();
 
 	['btn_show_manual', 'btn_show_hs', 'btn_show_llm', 'btn_show_spaces'].forEach((id) => {
 		document.getElementById(id).classList.add('active');
@@ -884,35 +927,29 @@ function render_charts() {
 	}
 
 	if (precision_chart_instance) precision_chart_instance.destroy();
-	const p_data = [],
-		p_labels = [];
-	let min_p = 100,
-		max_p = 0;
-	Object.keys(app_state.hourly_series)
-		.sort()
-		.forEach((h) => {
-			const d = app_state.hourly_series[h];
-			if (d.c > 0) {
-				let p = ((d.c - d.e) / d.c) * 100;
-				p_data.push(p);
-				p_labels.push(`${h}h`);
-				if (p < min_p) min_p = p;
-				if (p > max_p) max_p = p;
-			}
-		});
+	const precision_pts = [];
+	sorted_keys.forEach((k) => {
+		const d = app_state.time_series[k];
+		const accuracy =
+			d.daily_chars > 0 ? ((d.daily_chars - d.daily_manual_errors) / d.daily_chars) * 100 : 0;
+		const date_obj = new Date(k + 'T12:00:00');
+		precision_pts.push({ x: date_obj, y: accuracy });
+	});
 
 	const precision_elem = document.getElementById('precision_chart');
 	if (precision_elem) {
 		precision_chart_instance = new Chart(precision_elem.getContext('2d'), {
-			type: 'bar',
+			type: 'line',
 			data: {
-				labels: p_labels,
 				datasets: [
 					{
 						label: 'Précision (%)',
-						data: p_data,
-						backgroundColor: `rgb(${rgbPrec})`,
-						borderRadius: 4
+						data: precision_pts,
+						borderColor: `rgb(${rgbPrec})`,
+						backgroundColor: `rgba(${rgbPrec}, 0.2)`,
+						fill: true,
+						tension: 0.3,
+						pointRadius: 3
 					}
 				]
 			},
@@ -921,19 +958,30 @@ function render_charts() {
 				maintainAspectRatio: false,
 				plugins: {
 					legend: { display: false },
+					zoom: {
+						pan: { enabled: false },
+						zoom: {
+							wheel: { enabled: true, modifierKey: 'ctrl' },
+							pinch: { enabled: true },
+							mode: 'x'
+						}
+					},
 					tooltip: {
 						callbacks: {
-							title: function (context) {
-								return `${context[0].label}`;
-							},
+							title: tooltipTitleCallback,
 							label: (ctx) => `Précision : ${format_number(Math.round(ctx.parsed.y))} %`
 						}
 					}
 				},
 				scales: {
-					x: { grid: { display: false } },
+					x: {
+						type: 'time',
+						time: { unit: 'day', displayFormats: { day: 'd MMM' } },
+						grid: { color: 'rgba(128,128,128,0.2)' }
+					},
 					y: {
-						min: Math.max(0, Math.floor(min_p - 2)),
+						beginAtZero: false,
+						min: 0,
 						max: 100,
 						ticks: { callback: (v) => v + '%' },
 						grid: { color: 'rgba(128, 128, 128, 0.1)' }
@@ -944,26 +992,36 @@ function render_charts() {
 	}
 
 	// Always redraw sparklines with the dynamic CSS colors
-	const show_hs = document.getElementById('btn_show_hs').classList.contains('active');
-	const show_llm = document.getElementById('btn_show_llm').classList.contains('active');
-	if (show_hs) {
-		render_sparkline(
-			'hs_sparkline',
-			hs_sparkline_instance,
-			hs_sp_pts,
-			`rgb(${rgbHS})`,
-			(i) => (hs_sparkline_instance = i)
-		);
+	// Ensure precision chart container is always visible regardless of filter state
+	if (precision_elem) {
+		const precisionChartContainer = precision_elem.closest('.chart-container');
+		if (precisionChartContainer) {
+			precisionChartContainer.style.display = 'flex';
+			precisionChartContainer.style.visibility = 'visible';
+			precisionChartContainer.style.flex = '1';
+		}
+		// Ensure parent flex wrapper is also visible
+		const parentWrapper = precisionChartContainer?.parentElement;
+		if (parentWrapper) {
+			parentWrapper.style.display = 'flex';
+			parentWrapper.style.visibility = 'visible';
+		}
 	}
-	if (show_llm) {
-		render_sparkline(
-			'llm_sparkline',
-			llm_sparkline_instance,
-			llm_sp_pts,
-			`rgb(${rgbIA})`,
-			(i) => (llm_sparkline_instance = i)
-		);
-	}
+
+	render_sparkline(
+		'hs_sparkline',
+		hs_sparkline_instance,
+		hs_sp_pts,
+		`rgb(${rgbHS})`,
+		(i) => (hs_sparkline_instance = i)
+	);
+	render_sparkline(
+		'llm_sparkline',
+		llm_sparkline_instance,
+		llm_sp_pts,
+		`rgb(${rgbIA})`,
+		(i) => (llm_sparkline_instance = i)
+	);
 }
 
 function render_sparkline(ctxId, chartRef, dataPoints, colorHex, updateRefFn) {
