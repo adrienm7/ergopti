@@ -220,6 +220,7 @@ M.set_preview_enabled           = LLMBridge.set_preview_enabled
 M.set_preview_star_enabled      = LLMBridge.set_preview_star_enabled
 M.set_preview_autocorrect_enabled = LLMBridge.set_preview_autocorrect_enabled
 M.set_preview_ai_enabled        = LLMBridge.set_preview_ai_enabled
+M.set_preview_colored_tooltips  = LLMBridge.set_preview_colored_tooltips
 M.set_llm_after_hotstring       = LLMBridge.set_llm_after_hotstring
 M.set_llm_debounce              = LLMBridge.set_llm_debounce
 M.trigger_prediction            = LLMBridge._perform_llm_check

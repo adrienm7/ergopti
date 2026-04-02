@@ -27,6 +27,7 @@ M.DEFAULT_STATE = {
 	preview_star_enabled          = true,
 	preview_autocorrect_enabled   = true,
 	preview_ai_enabled            = true,
+	preview_colored_tooltips      = true,
 	custom_close_on_add           = false,
 	custom_default_section        = nil,
 	custom_editor_shortcut        = nil,
@@ -326,6 +327,14 @@ function M.build_management(ctx)
 		"preview_ai_enabled",
 		"set_preview_ai_enabled",
 		"Bulle IA"))
+
+	table.insert(bubble_sub, { title = "-" })
+
+	table.insert(bubble_sub, buildBubbleItem(ctx,
+		"Bulles colorées par catégorie",
+		"preview_colored_tooltips",
+		"set_preview_colored_tooltips",
+		"Bulles colorées"))
 
 	bubble_item = { title = "Bulles de prévisualisation", disabled = paused or nil, menu = bubble_sub }
 
