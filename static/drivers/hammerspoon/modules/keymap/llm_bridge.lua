@@ -400,6 +400,20 @@ local function llm_suppressed_for_app()
 	return false
 end
 
+--- Returns the prompt title part before the first em dash for compact display.
+--- @param prompt_title string|nil Prompt title to shorten.
+--- @return string|nil Short prompt title.
+local function trim_prompt_title(prompt_title)
+	if type(prompt_title) ~= "string" then return nil end
+	local clean = prompt_title:gsub("^%s+", ""):gsub("%s+$", "")
+	if clean == "" then return nil end
+	local head = clean:match("^(.-)%s*—")
+	if type(head) == "string" and head ~= "" then
+		return head:gsub("%s+$", "")
+	end
+	return clean
+end
+
 --- Generates the string for the information bar tooltip.
 --- @param model_name string Model identifier.
 --- @param elapsed_ms number Milliseconds taken for generation.
@@ -412,8 +426,9 @@ local function build_info_bar(model_name, elapsed_ms, is_mlx, profile_name)
 	local parts = {}
 	table.insert(parts, model_name)
 	
-	if profile_name and profile_name ~= "" then
-		table.insert(parts, profile_name)
+	local profile_short = trim_prompt_title(profile_name)
+	if profile_short then
+		table.insert(parts, profile_short)
 	end
 	
 	if elapsed_ms and elapsed_ms > 0 then

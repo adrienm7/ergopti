@@ -41,8 +41,10 @@ M.DEFAULT_STATE = {
     keylogger_disabled_apps = kl_mod.DEFAULT_STATE.keylogger_disabled_apps,
     keylogger_encrypt       = kl_mod.DEFAULT_STATE.keylogger_encrypt,
     keylogger_menubar_wpm   = kl_mod.DEFAULT_STATE.keylogger_menubar_wpm,
+    keylogger_menubar_colors = kl_mod.DEFAULT_STATE.keylogger_menubar_colors,
     keylogger_float_wpm     = kl_mod.DEFAULT_STATE.keylogger_float_wpm,
     keylogger_float_graph   = kl_mod.DEFAULT_STATE.keylogger_float_graph,
+    keylogger_float_colors  = kl_mod.DEFAULT_STATE.keylogger_float_colors,
     metrics_shortcut        = false,
 }
 
@@ -155,10 +157,18 @@ function M.build(ctx)
             Keylogger.start(script_control)
             
             if state.keylogger_menubar_wpm then 
-                require("ui.wpm.wpm_menubar").start() 
+                local WpmMenubar = require("ui.wpm.wpm_menubar")
+                if type(WpmMenubar.set_use_source_colors) == "function" then
+                    WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+                end
+                WpmMenubar.start()
             end
             if state.keylogger_float_wpm then 
-                require("ui.wpm.wpm_widget").start(state.keylogger_float_graph) 
+                local WpmWidget = require("ui.wpm.wpm_widget")
+                if type(WpmWidget.set_use_source_colors) == "function" then
+                    WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+                end
+                WpmWidget.start(state.keylogger_float_graph)
             end
         end
     end
@@ -228,7 +238,26 @@ function M.build(ctx)
             state.keylogger_menubar_wpm = not state.keylogger_menubar_wpm
             save_prefs()
             local WpmMenubar = require("ui.wpm.wpm_menubar")
+            if type(WpmMenubar.set_use_source_colors) == "function" then
+                WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+            end
             if state.keylogger_menubar_wpm then WpmMenubar.start() else WpmMenubar.stop() end
+            updateMenu()
+        end
+    })
+
+    table.insert(menu, {
+        title = "↳ Couleurs selon la source",
+        checked = state.keylogger_menubar_colors,
+        disabled = not state.keylogger_enabled or not state.keylogger_menubar_wpm,
+        fn = function()
+            state.keylogger_menubar_colors = not state.keylogger_menubar_colors
+            save_prefs()
+            local WpmMenubar = require("ui.wpm.wpm_menubar")
+            if type(WpmMenubar.set_use_source_colors) == "function" then
+                WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+            end
+            if state.keylogger_menubar_wpm then WpmMenubar.start() end
             updateMenu()
         end
     })
@@ -241,7 +270,26 @@ function M.build(ctx)
             state.keylogger_float_wpm = not state.keylogger_float_wpm
             save_prefs()
             local WpmWidget = require("ui.wpm.wpm_widget")
+            if type(WpmWidget.set_use_source_colors) == "function" then
+                WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+            end
             if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) else WpmWidget.stop() end
+            updateMenu()
+        end
+    })
+
+    table.insert(menu, {
+        title = "↳ Couleurs selon la source",
+        checked = state.keylogger_float_colors,
+        disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
+        fn = function()
+            state.keylogger_float_colors = not state.keylogger_float_colors
+            save_prefs()
+            local WpmWidget = require("ui.wpm.wpm_widget")
+            if type(WpmWidget.set_use_source_colors) == "function" then
+                WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+            end
+            if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) end
             updateMenu()
         end
     })
@@ -254,6 +302,9 @@ function M.build(ctx)
             state.keylogger_float_graph = not state.keylogger_float_graph
             save_prefs()
             local WpmWidget = require("ui.wpm.wpm_widget")
+            if type(WpmWidget.set_use_source_colors) == "function" then
+                WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+            end
             if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) end
             updateMenu()
         end
@@ -401,6 +452,13 @@ function M.build(ctx)
                 
                 Keylogger.start(script_control)
                 
+                if type(WpmMenubar.set_use_source_colors) == "function" then
+                    WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+                end
+                if type(WpmWidget.set_use_source_colors) == "function" then
+                    WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+                end
+
                 if state.keylogger_menubar_wpm then WpmMenubar.start() end
                 if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) end
             else

@@ -47,7 +47,8 @@ local _llm      = nil
 --- @param is_final boolean Whether to pause predictions temporarily post execution.
 --- @param is_ignored boolean Disables tooltip and AI reactions.
 --- @param source_type string Specifies the module triggering the generation.
-function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type)
+--- @param source_variant string|nil Optional subtype used by UI widgets.
+function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant)
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
 	if not is_ignored and tooltip.hide then tooltip.hide() end
 	
@@ -58,7 +59,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. (emitted_str or "")
 	
 	if keylogger and type(keylogger.notify_synthetic) == "function" then
-		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes)
+		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes, source_variant)
 	end
 	
 	if type(buffer_action) == "function" then pcall(buffer_action) end
@@ -144,7 +145,8 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		end,
 		m.final_result,
 		is_ignored,
-		"hotstring"
+		"hotstring",
+		(m.group == "autocorrection") and "autocorrection" or nil
 	)
 	return true
 end
@@ -228,7 +230,8 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			end,
 			m.final_result,
 			is_ignored,
-			"hotstring"
+			"hotstring",
+			(m.group == "autocorrection") and "autocorrection" or nil
 		)
 	end
 
