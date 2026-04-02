@@ -20,6 +20,9 @@ local ui_builder = require("ui.ui_builder")
 M._wv       = nil
 M._timer    = nil
 M._last_req = nil
+M._app_icon_cache = {}
+M._day_file_cache = {}
+M._range_cache = {}
 
 
 
@@ -30,6 +33,56 @@ M._last_req = nil
 -- ======= 1/ Data Retrieval =======
 -- =====================================
 -- =====================================
+
+local MAX_ICON_LOOKUPS_PER_OPEN = 24
+
+--- Builds a deterministic key for selected apps in cache signatures.
+--- @param selected_apps table Array of requested applications.
+--- @return string Deterministic signature.
+local function make_apps_signature(selected_apps)
+	if type(selected_apps) ~= "table" or #selected_apps == 0 then return "*" end
+	local apps = {}
+	for _, app in ipairs(selected_apps) do
+		if type(app) == "string" and app ~= "" then table.insert(apps, app) end
+	end
+	table.sort(apps)
+	return table.concat(apps, "|")
+end
+
+--- Reads and decodes one daily index file using an in-memory cache keyed by file mtime.
+--- @param full_path string Absolute file path.
+--- @return table|nil Decoded day dictionary.
+local function read_day_index_cached(full_path)
+	local mtime = fs.attributes(full_path, "modification") or 0
+	local cached = M._day_file_cache[full_path]
+	if cached and cached.mtime == mtime then
+		return cached.data
+	end
+
+	local content = ""
+	if full_path:match("%.gz$") then
+		local p = io.popen(string.format("gzip -c -d %q 2>/dev/null", full_path), "r")
+		if p then
+			content = p:read("*a")
+			p:close()
+		end
+	else
+		local file = io.open(full_path, "r")
+		if file then
+			content = file:read("*a")
+			file:close()
+		end
+	end
+
+	local decoded = nil
+	if content and content ~= "" then
+		local ok, day_data = pcall(json.decode, content)
+		if ok and type(day_data) == "table" then decoded = day_data end
+	end
+
+	M._day_file_cache[full_path] = { mtime = mtime, data = decoded }
+	return decoded
+end
 
 --- Extracts the app icon safely from macOS.
 --- @param app_name string The name of the application.
@@ -53,6 +106,18 @@ end
 --- @param selected_apps table Array of requested applications.
 --- @return table The fully merged big dictionary for the UI.
 local function fetch_range(log_dir, start_date, end_date, selected_apps)
+	local manifest_mtime = fs.attributes(log_dir .. "/manifest.json", "modification") or 0
+	local range_key = table.concat({
+		log_dir,
+		start_date or "",
+		end_date or "",
+		make_apps_signature(selected_apps),
+		tostring(manifest_mtime)
+	}, "::")
+
+	local cached_range = M._range_cache[range_key]
+	if cached_range then return cached_range end
+
 	local merged = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
 	local app_set = {}
 	
@@ -69,54 +134,36 @@ local function fetch_range(log_dir, start_date, end_date, selected_apps)
 			if end_date and end_date ~= "" and date_str > end_date then is_in_range = false end
 
 			if is_in_range then
-				local content = ""
 				local full_path = log_dir .. "/" .. f
-				
-				if f:match("%.gz$") then
-					local p = io.popen(string.format("gzip -c -d %q 2>/dev/null", full_path), "r")
-					if p then 
-						content = p:read("*a")
-						p:close() 
-					end
-				else
-					local file = io.open(full_path, "r")
-					if file then 
-						content = file:read("*a")
-						file:close() 
-					end
-				end
+				local day_data = read_day_index_cached(full_path)
+				if type(day_data) == "table" then
+					for appName, appData in pairs(day_data) do
+						local has_shortcuts = type(appData) == "table" and type(appData.sc) == "table" and next(appData.sc) ~= nil
+						if appName == "Unknown" or app_set[appName] or has_shortcuts then
+							for k_type, k_dict in pairs(appData) do
+								if merged[k_type] and type(k_dict) == "table" then
+									for k_seq, k_stats in pairs(k_dict) do
+										local t = merged[k_type][k_seq]
+										if not t then
+											t = { c = 0, t = 0, hs = 0, llm = 0, o = 0, e = 0 }
+											merged[k_type][k_seq] = t
+										end
 
-				if content and content ~= "" then
-					local ok, day_data = pcall(json.decode, content)
-					if ok and type(day_data) == "table" then
-						for appName, appData in pairs(day_data) do
-							local has_shortcuts = type(appData) == "table" and type(appData.sc) == "table" and next(appData.sc) ~= nil
-							if appName == "Unknown" or app_set[appName] or has_shortcuts then
-								for k_type, k_dict in pairs(appData) do
-									if merged[k_type] and type(k_dict) == "table" then
-										for k_seq, k_stats in pairs(k_dict) do
-											local t = merged[k_type][k_seq]
-											if not t then
-												t = { c = 0, t = 0, hs = 0, llm = 0, o = 0, e = 0 }
-												merged[k_type][k_seq] = t
-											end
-											
-											-- Accommodate varying schemas (array/legacy dict/omitted zeroes)
-											if k_stats[1] or k_stats[2] or k_stats[3] then
-												t.c = t.c + (k_stats[1] or 0)
-												t.t = t.t + (k_stats[2] or 0)
-												t.e = t.e + (k_stats[3] or 0)
-												t.hs = t.hs + (k_stats[4] or 0)
-												t.llm = t.llm + (k_stats[5] or 0)
-												t.o = t.o + (k_stats[6] or 0)
-											else
-												t.c = t.c + (k_stats.c or 0)
-												t.t = t.t + (k_stats.t or 0)
-												t.hs = t.hs + (k_stats.hs or 0)
-												t.llm = t.llm + (k_stats.llm or 0)
-												t.o = t.o + (k_stats.o or 0)
-												t.e = t.e + (k_stats.e or 0)
-											end
+										-- Accommodate varying schemas (array/legacy dict/omitted zeroes)
+										if k_stats[1] or k_stats[2] or k_stats[3] then
+											t.c = t.c + (k_stats[1] or 0)
+											t.t = t.t + (k_stats[2] or 0)
+											t.e = t.e + (k_stats[3] or 0)
+											t.hs = t.hs + (k_stats[4] or 0)
+											t.llm = t.llm + (k_stats[5] or 0)
+											t.o = t.o + (k_stats[6] or 0)
+										else
+											t.c = t.c + (k_stats.c or 0)
+											t.t = t.t + (k_stats.t or 0)
+											t.hs = t.hs + (k_stats.hs or 0)
+											t.llm = t.llm + (k_stats.llm or 0)
+											t.o = t.o + (k_stats.o or 0)
+											t.e = t.e + (k_stats.e or 0)
 										end
 									end
 								end
@@ -127,7 +174,8 @@ local function fetch_range(log_dir, start_date, end_date, selected_apps)
 			end
 		end
 	end
-	
+
+	M._range_cache[range_key] = merged
 	return merged
 end
 
@@ -166,10 +214,21 @@ function M.show(log_dir)
 	end
 
 	local app_icons = {}
+	local icon_lookups = 0
 	for _, day_data in pairs(manifest) do
 		for app_name, _ in pairs(day_data) do
-			if app_name ~= "Unknown" and not app_icons[app_name] then
-				app_icons[app_name] = get_app_icon(app_name)
+			if app_name ~= "Unknown" and app_icons[app_name] == nil then
+				local cached_icon = M._app_icon_cache[app_name]
+				if cached_icon ~= nil then
+					app_icons[app_name] = cached_icon or nil
+				elseif icon_lookups < MAX_ICON_LOOKUPS_PER_OPEN then
+					local icon = get_app_icon(app_name)
+					M._app_icon_cache[app_name] = icon or false
+					app_icons[app_name] = icon
+					icon_lookups = icon_lookups + 1
+				else
+					app_icons[app_name] = nil
+				end
 			end
 		end
 	end
