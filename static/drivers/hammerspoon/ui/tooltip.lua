@@ -49,6 +49,7 @@ end
 
 M.TIMEOUT_SEC_DEFAULT     = 2.5
 M.LLM_TIMEOUT_SEC_DEFAULT = 12.0
+M.HOTSTRING_TIMEOUT_MARGIN_SEC = 0.1
 
 local _state = {
     raw_predictions = {},
@@ -694,7 +695,8 @@ end
 
 --- Sets the auto-hide timeout duration for normal hotstrings (called by menu.lua or keymap.lua)
 function M.set_timeout(sec)
-    _state.timeout_sec = sec or M.TIMEOUT_SEC_DEFAULT
+    local base_timeout = tonumber(sec) or M.TIMEOUT_SEC_DEFAULT
+    _state.timeout_sec = math.max(0.05, base_timeout - M.HOTSTRING_TIMEOUT_MARGIN_SEC)
 end
 
 --- Assigns a callback executed when the user navigates through predictions

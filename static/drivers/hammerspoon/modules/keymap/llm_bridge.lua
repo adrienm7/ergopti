@@ -70,10 +70,13 @@ local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED or false
 local preview_star_enabled        = true
 local preview_autocorrect_enabled = true
 local preview_ai_enabled          = true
+local preview_colored_tooltips    = true
 
 -- Hardcoded tint colors (hue only, applied over a fixed dark base in apply_tint)
 local C_TINT_STAR_DEFAULT        = { red = 1.00, green = 0.00, blue = 0.00, alpha = 1.0 }
 local C_TINT_AUTOCORRECT_DEFAULT = { red = 0.00, green = 0.80, blue = 0.00, alpha = 1.0 }
+local C_TINT_PERSONAL_DEFAULT     = { red = 0.20, green = 0.55, blue = 1.00, alpha = 1.0 }
+local C_TINT_AI_LOADING           = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 }
 -- IA uses nil = neutral dark gray (no tint)
 
 local preview_star_color        = C_TINT_STAR_DEFAULT
@@ -162,6 +165,11 @@ end
 function M.set_preview_ai_enabled(v)
 	preview_ai_enabled = (v == true)
 	if not preview_ai_enabled and tooltip.hide then tooltip.hide() end
+end
+
+function M.set_preview_colored_tooltips(v)
+	preview_colored_tooltips = (v == true)
+	if tooltip.hide then tooltip.hide() end
 end
 
 function M.set_preview_star_color(c)
@@ -455,7 +463,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 		return
 	end
 
-	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, preview_ai_color) end
+	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, C_TINT_AI_LOADING) end
 
 	local num_pred = llm_num_predictions
 
@@ -585,6 +593,7 @@ function M.update_preview(buf)
 	local matched_input = nil
 	-- "star" = hotstring terminant par ★, "autocorrect" = déclenché par espace, "provider" = dynamique
 	local match_type    = nil
+	local match_group   = nil
 	for _, provider in ipairs(_state.preview_providers) do
 		local ok, res = pcall(provider, buf)
 		if ok and res then match_repl = res; match_type = "provider"; break end
@@ -604,6 +613,7 @@ function M.update_preview(buf)
 					if clean ~= star_base then
 						match_repl = m.repl
 						match_type = "star"
+						match_group = m.group
 						matched_input = star_base
 						break
 					end
@@ -614,6 +624,7 @@ function M.update_preview(buf)
 						if clean ~= m.trigger then
 							match_repl = m.repl
 							match_type = "autocorrect"
+							match_group = m.group
 							matched_input = m.trigger
 							break
 						end
@@ -643,7 +654,14 @@ function M.update_preview(buf)
 		-- Sélectionne le drapeau et la couleur en fonction du type de hotstring correspondant
 		local is_star    = (match_type == "star")
 		local hs_enabled = is_star and preview_star_enabled or preview_autocorrect_enabled
-		local hs_color   = is_star and preview_star_color   or preview_autocorrect_color
+		local hs_color = nil
+		if preview_colored_tooltips then
+			if match_group == "personal" or match_group == "custom" then
+				hs_color = C_TINT_PERSONAL_DEFAULT
+			else
+				hs_color = is_star and preview_star_color or preview_autocorrect_color
+			end
+		end
 
 		-- Synchronise la durée du tooltip avec la fenêtre de déclenchement réelle du hotstring
 		local hs_delay
@@ -654,7 +672,7 @@ function M.update_preview(buf)
 		else
 			hs_delay = _state.WORD_TIMEOUT_SEC or 2.5
 		end
-		-- Le tooltip doit rester visible exactement pendant la fenêtre de déclenchement
+		-- Le tooltip doit rester visible pendant la fenêtre de déclenchement (avec la marge appliquée dans tooltip.lua)
 		if tooltip.set_timeout then tooltip.set_timeout(math.max(0.05, hs_delay)) end
 
 		if tooltip.show then tooltip.show(display_text, false, hs_enabled, hs_color) end

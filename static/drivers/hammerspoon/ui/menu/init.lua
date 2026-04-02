@@ -229,6 +229,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				{ fn = "set_preview_star_enabled",        val = state.preview_star_enabled },
 				{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
 				{ fn = "set_preview_ai_enabled",          val = state.preview_ai_enabled },
+				{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
 				{ fn = "set_llm_after_hotstring",         val = state.llm_after_hotstring },
 				{ fn = "set_llm_enabled",         val = state.llm_enabled },
 				{ fn = "set_llm_debounce",        val = state.llm_debounce },
