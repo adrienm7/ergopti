@@ -1,4 +1,4 @@
-; Last modified on 2026-04-02 at 14:41 (UTC+2)
+; Last modified on 2026-04-03 at 15:35 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -99,7 +99,7 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := Map()) {
     HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
         "TimeActivationSeconds", OptionTimeActivationSeconds)
 
-    FlagsPortion := ":" Flags "B0:"
+    FlagsPortion := ":" Flags "B0O:" ; O is to omit the ending character from the abbreviation
     Hotstring(
         FlagsPortion Abbreviation,
         (*) => HotstringHandler(
@@ -128,11 +128,6 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
     ; This is to make it work everywhere, like in URL bar or in the code inspector inside navigators
     ; Otherwise, typing hc to get wh gives hwh for example when trying to type "white"
     NumberOfCharactersToDelete := StrLen(Abbreviation)
-    if (EndChar != "") {
-        ; Delete ending character too if present, to then add it again
-        ; Tab is now safely included here, relying on the modern editors' smart backspace
-        NumberOfCharactersToDelete := NumberOfCharactersToDelete + 1
-    }
 
     if WinActive("ahk_class Notepad") {
         ; In Windows 11 Notepad, hotstrings don’t work properly, this is a Windows bug, not AutoHotkey one
@@ -175,7 +170,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
 
     HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
         "TimeActivationSeconds", OptionTimeActivationSeconds)
-    FlagsPortion := ":" Flags "CB0:"
+    FlagsPortion := ":" Flags "B0O:" ; O is to omit the ending character from the abbreviation
 
     UppercasedSymbols := Map(
         ",", [" ;", " :"], ; Order matters, the nbsp abbreviations need to trigger first the engine, otherwise the nbsp won’t be deleted
