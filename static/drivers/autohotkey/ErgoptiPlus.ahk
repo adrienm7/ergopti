@@ -1,4 +1,4 @@
-; Last modified on 2026-04-03 at 15:35 (UTC+2)
+; Last modified on 2026-04-03 at 15:45 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -170,7 +170,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
 
     HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
         "TimeActivationSeconds", OptionTimeActivationSeconds)
-    FlagsPortion := ":" Flags "B0O:" ; O is to omit the ending character from the abbreviation
+    FlagsPortion := ":" Flags "CB0O:" ; O is to omit the ending character from the abbreviation
 
     UppercasedSymbols := Map(
         ",", [" ;", " :"], ; Order matters, the nbsp abbreviations need to trigger first the engine, otherwise the nbsp won’t be deleted
