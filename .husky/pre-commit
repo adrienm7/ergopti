@@ -12,6 +12,7 @@ node scripts/update-ahk-date.js
 
 # --- DÉBUT DE LA MODIFICATION ---
 FILE="static/drivers/autohotkey/ErgoptiPlus.ahk"
+EXE_FILE="static/drivers/autohotkey/ErgoptiPlus.exe"
 
 # On récupère HEAD, on enlève la ligne 1, on supprime les \r (Windows), on hash
 HASH_HEAD=$(git show HEAD:"$FILE" 2>/dev/null | tail -n +2 | tr -d '\r' | git hash-object --stdin)
@@ -28,6 +29,56 @@ else
   git add "$FILE"
 fi
 # --- FIN DE LA MODIFICATION ---
+
+# Compile EXE locally on Windows only when AHK is staged
+if git diff --cached --name-only -- "$FILE" | grep -q .; then
+  if [ "${OS:-}" = "Windows_NT" ] || uname | grep -Eiq "mingw|msys|cygwin"; then
+    if command -v powershell.exe >/dev/null 2>&1; then
+      echo "AHK staged on Windows: compiling ErgoptiPlus.exe"
+      if powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
+        $ErrorActionPreference = "Stop"
+
+        $inPath = Join-Path (Get-Location) "static/drivers/autohotkey/ErgoptiPlus.ahk"
+        $outPath = Join-Path (Get-Location) "static/drivers/autohotkey/ErgoptiPlus.exe"
+        $iconPath = Join-Path (Get-Location) "static/favicon.ico"
+
+        $compilerCandidates = @(
+          "$env:ProgramFiles\AutoHotkey\Compiler\Ahk2Exe.exe",
+          "$env:ProgramFiles\AutoHotkey\Ahk2Exe.exe",
+          "$env:LOCALAPPDATA\Programs\AutoHotkey\Compiler\Ahk2Exe.exe"
+        )
+        $runtimeCandidates = @(
+          "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe",
+          "$env:ProgramFiles\AutoHotkey\AutoHotkey64.exe",
+          "$env:LOCALAPPDATA\Programs\AutoHotkey\v2\AutoHotkey64.exe"
+        )
+
+        $ahk2exe = $compilerCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+        $runtime = $runtimeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+        if (-not $ahk2exe) {
+          throw "Ahk2Exe.exe introuvable sur cette machine"
+        }
+        if (-not $runtime) {
+          throw "AutoHotkey64.exe introuvable sur cette machine"
+        }
+
+        & $ahk2exe /in $inPath /out $outPath /base $runtime /icon $iconPath
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+      '; then
+        git add "$EXE_FILE"
+      else
+        echo "Warning: local EXE compilation failed, CI fallback will handle it"
+      fi
+    else
+      echo "Warning: powershell.exe not found, CI fallback will handle EXE compilation"
+    fi
+  else
+    echo "Non-Windows environment detected: EXE compilation skipped (CI fallback enabled)"
+  fi
+fi
 
 # Regenerate TOML hotstrings from the (now cleaned) AHK file
 uv run python static/drivers/hotstrings/0_generate_hotstrings.py
