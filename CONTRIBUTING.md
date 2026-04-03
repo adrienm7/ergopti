@@ -160,14 +160,15 @@ When `.local_ahk_path` is present, the script reads from your private file direc
 
 Managed by [Husky](https://typicode.github.io/husky/). The hook runs in order:
 
-| Step | Script                                     | Description                                      |
-| ---- | ------------------------------------------ | ------------------------------------------------ |
-| 1    | `npm run sync-ahk`                         | Copy private AHK → public (no-op if no override) |
-| 2    | `npm run clean-ahk`                        | Strip section 2 from public AHK                  |
-| 3    | `node scripts/update-ahk-date.js`          | Update the "Last modified" date                  |
-| 4    | `git add static/drivers/autohotkey/*.ahk`  | Stage the cleaned file                           |
-| 5    | `uv run python … 0_generate_hotstrings.py` | Regenerate TOML hotstrings from the cleaned AHK  |
-| 6    | `git add static/drivers/hotstrings/*.toml` | Stage the regenerated TOML files                 |
+| Step | Script                                     | Description                                           |
+| ---- | ------------------------------------------ | ----------------------------------------------------- |
+| 1    | `npm run sync-ahk`                         | Copy private AHK → public (no-op if no override)      |
+| 2    | `npm run clean-ahk`                        | Strip section 2 from public AHK                       |
+| 3    | `node scripts/update-ahk-date.js`          | Update the "Last modified" date                       |
+| 4    | `git add static/drivers/autohotkey/*.ahk`  | Stage the cleaned file                                |
+| 5    | Windows only: local Ahk2Exe compile        | If AHK is staged, compile and stage `ErgoptiPlus.exe` |
+| 6    | `uv run python … 0_generate_hotstrings.py` | Regenerate TOML hotstrings from the cleaned AHK       |
+| 7    | `git add static/drivers/hotstrings/*.toml` | Stage the regenerated TOML files                      |
 
 ```
 

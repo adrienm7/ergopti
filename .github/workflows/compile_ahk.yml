@@ -13,17 +13,22 @@ permissions:
     contents: write
     pull-requests: write
 
+concurrency:
+    group: compile-ahk-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     compile:
+        if: ${{ github.actor != 'github-actions[bot]' }}
         runs-on: windows-latest
 
         steps:
             - name: Checkout repository
-              run: |
-                  git clone --depth 1 --branch "$env:GITHUB_REF_NAME" `
-                    "https://x-access-token:${{ secrets.PAT_ERGOPTI }}@github.com/${{ github.repository }}.git" `
-                    "${{ github.workspace }}"
-              shell: pwsh
+              uses: actions/checkout@v4
+              with:
+                  token: ${{ secrets.PAT_ERGOPTI }}
+                  ref: ${{ github.ref_name }}
+                  fetch-depth: 0
 
             - name: Download AutoHotkey v2 runtime and Ahk2Exe
               run: |
@@ -53,6 +58,7 @@ jobs:
 
             - name: Commit compiled EXE and auto-merge PR
               run: |
+                  set -euo pipefail
                   git config user.name  "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
                   git add static/drivers/autohotkey/ErgoptiPlus.exe
@@ -60,9 +66,9 @@ jobs:
                     echo "No changes to commit"
                     exit 0
                   fi
-                  $datetime = Get-Date -Format 'yyyy-MM-dd HH:mm'
+                  datetime="$(date '+%Y-%m-%d %H:%M')"
                   git commit -m "ci: recompile ErgoptiPlus.exe [$datetime]"
-                  git checkout -b ci/recompile-exe
+                  git checkout -B ci/recompile-exe
                   git push origin ci/recompile-exe --force
                   EXISTING_PR=$(gh pr list --head ci/recompile-exe --base "$GITHUB_REF_NAME" --json number --jq '.[0].number')
                   if [ -n "$EXISTING_PR" ]; then
