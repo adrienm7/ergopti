@@ -32,6 +32,6 @@
 		"prettier-plugin-css-order": "^2.1.2",
 		"prettier-plugin-svelte": "^3.4.0",
 		"svelte": "^5.53.7",
-		"vite": "^7.2.2"
+		"vite": "^7.3.2"
 	}
 }
