@@ -5,19 +5,17 @@
 --- DESCRIPTION:
 --- Centralized, level-aware logging system for the entire Hammerspoon runtime.
 --- Provides consistent formatting and filtering so only relevant messages are
---- printed to the Hammerspoon console.
+--- printed to the console.
 ---
 --- FEATURES & RATIONALE:
---- 1. Level Filtering: Only messages at or above the current level are printed,
----    avoiding console noise in production while keeping full detail in debug mode.
+--- 1. Level Filtering: Avoids console noise in production while keeping detail.
 --- 2. Module Tagging: Every call receives a module name tag for quick triage.
---- 3. Lazy Formatting: String.format is only called when the message passes the
----    level filter, avoiding unnecessary string allocations at runtime.
+--- 3. Lazy Formatting: Avoids unnecessary string allocations at runtime.
 --- ==============================================================================
 
 local M = {}
-
 local hs = hs
+
 
 
 
@@ -43,21 +41,21 @@ local LEVEL_LABELS = {
 	[4] = "ERROR",
 }
 
---- Current active level — only messages at or above this level are printed.
---- Default: WARNING, so INFO and DEBUG are silenced in production.
+--- Current active level — only messages at or above this level are printed
 M.current_level = M.LEVELS.WARNING
 
 
 
 
--- =====================================
--- =====================================
--- ======= 2/ Public Configuration =====
--- =====================================
--- =====================================
+
+-- =======================================
+-- =======================================
+-- ======= 2/ Public Configuration =======
+-- =======================================
+-- =======================================
 
 --- Sets the active log level.
---- @param level number|string Level constant (M.LEVELS.X) or name string ("DEBUG", "INFO"…).
+--- @param level number|string Level constant or name string.
 function M.set_level(level)
 	if type(level) == "number" then
 		M.current_level = level
@@ -76,17 +74,18 @@ end
 
 
 
--- ====================================
--- ====================================
--- ======= 3/ Core Logging API ========
--- ====================================
--- ====================================
+
+-- ===================================
+-- ===================================
+-- ======= 3/ Core Logging API =======
+-- ===================================
+-- ===================================
 
 --- Internal dispatcher — formats and prints a log entry.
---- @param level number    Numeric severity level.
+--- @param level number Numeric severity level.
 --- @param module_name string Short identifier of the calling module.
---- @param msg string      Message or format string.
---- @param ... any         Optional arguments for string.format.
+--- @param msg string Message or format string.
+--- @param ... any Optional arguments for string formatting.
 local function _log(level, module_name, msg, ...)
 	if level < M.current_level then return end
 
@@ -103,7 +102,7 @@ local function _log(level, module_name, msg, ...)
 	print(string.format("[%s] [%s] %s", label, tostring(module_name), text))
 end
 
---- Logs a DEBUG message (only printed when level is set to DEBUG).
+--- Logs a DEBUG message.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
@@ -115,13 +114,13 @@ function M.debug(module_name, msg, ...)   _log(M.LEVELS.DEBUG,   module_name, ms
 --- @param ... any Optional format arguments.
 function M.info(module_name, msg, ...)    _log(M.LEVELS.INFO,    module_name, msg, ...) end
 
---- Logs a WARNING message (default minimum visible level).
+--- Logs a WARNING message.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.warn(module_name, msg, ...)    _log(M.LEVELS.WARNING, module_name, msg, ...) end
 
---- Logs an ERROR message (always visible).
+--- Logs an ERROR message.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
@@ -130,17 +129,17 @@ function M.error(module_name, msg, ...)   _log(M.LEVELS.ERROR,   module_name, ms
 
 
 
--- ===================================
--- ===================================
--- ======= 4/ Utility Helpers =========
--- ===================================
--- ===================================
+
+-- ==================================
+-- ==================================
+-- ======= 4/ Utility Helpers =======
+-- ==================================
+-- ==================================
 
 --- Wraps pcall and logs any error at the ERROR level.
---- Returns the same values as pcall.
 --- @param module_name string Short module identifier used in the error log.
---- @param fn function  Function to call.
---- @param ... any      Arguments forwarded to fn.
+--- @param fn function Function to call.
+--- @param ... any Arguments forwarded to the function.
 --- @return boolean ok
 --- @return any result_or_error
 function M.pcall(module_name, fn, ...)
@@ -151,17 +150,16 @@ function M.pcall(module_name, fn, ...)
 	return table.unpack(results, 1, results.n)
 end
 
---- Wraps a builder pcall pattern: runs fn(ctx) and logs on failure.
---- Returns the result on success, nil on failure.
+--- Wraps a builder pcall pattern.
 --- @param module_name string Short module identifier.
 --- @param label string Human-readable label of the component being built.
 --- @param fn function Builder function to call.
---- @param ctx table Context argument forwarded to fn.
+--- @param ctx table Context argument forwarded to the function.
 --- @return any|nil
 function M.build(module_name, label, fn, ctx)
 	local ok, result = pcall(fn, ctx)
 	if not ok then
-		_log(M.LEVELS.ERROR, module_name, "Erreur construction '%s': %s", label, tostring(result))
+		_log(M.LEVELS.ERROR, module_name, "Erreur de construction de \"%s\" : %s", label, tostring(result))
 		return nil
 	end
 	return result

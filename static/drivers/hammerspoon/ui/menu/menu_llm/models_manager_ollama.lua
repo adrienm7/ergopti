@@ -11,7 +11,12 @@
 --- ==============================================================================
 
 local M = {}
+
+local hs            = hs
 local notifications = require("lib.notifications")
+local Logger        = require("lib.logger")
+
+local LOG = "menu_llm.ollama"
 
 local ok_dw, download_window = pcall(require, "ui.download_window")
 if not ok_dw then download_window = nil end
@@ -45,12 +50,17 @@ end
 
 
 
--- ===================================
--- ===================================
--- ======= 2/ Manager Factory ========
--- ===================================
--- ===================================
+-- ==================================
+-- ==================================
+-- ======= 2/ Manager Factory =======
+-- ==================================
+-- ==================================
 
+--- Instantiates the Ollama models manager.
+--- @param deps table Module dependencies.
+--- @param presets table Global models presets.
+--- @param ram_getter function Resolves RAM requirements.
+--- @return table The Ollama manager instance.
 function M.new(deps, presets, ram_getter)
 	local obj = {}
 	obj._ollama_upgrade_attempted = {}
@@ -458,8 +468,13 @@ function M.new(deps, presets, ram_getter)
 		)
 	end
 
+	--- Verifies if the target model is installed, triggering the download prompt otherwise.
+	--- @param target_model string The model to check.
+	--- @param on_success function Callback executed when ready.
+	--- @param on_cancel function Callback executed when cancelled.
 	function obj.check_requirements(target_model, on_success, on_cancel)
 		if not target_model or target_model == "" then return end
+		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
 		local installed = obj.get_installed_models()
 		local repo = get_ollama_repo(target_model)
 		-- Resolve the actual Ollama name (repo may differ from display name, e.g. "gemma-4-E2B-it" vs "gemma4:e2b")
@@ -489,17 +504,24 @@ function M.new(deps, presets, ram_getter)
 		end
 	end
 
+	--- Deletes a downloaded model from Ollama.
+	--- @param model_name string The model to delete.
 	function obj.delete_model(model_name)
 		if not model_name or model_name == "" then return end
+		Logger.debug(LOG, string.format("Deleting Ollama model %s…", model_name))
 		local bin = get_ollama_path() or "/usr/local/bin/ollama"
 		local ok, output = pcall(hs.execute, bin .. " rm " .. model_name .. " 2>&1")
+		
 		if ok then
 			pcall(notifications.notify, "🗑️ Supprimé (Ollama)", "Modèle supprimé: " .. model_name)
 			if deps.update_menu then pcall(deps.update_menu) end
+			Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
 		else
-			pcall(notifications.notify, "❌ Échec de la suppression Ollama", "Modèle: " .. model_name .. "\n" .. tostring(output))
+			pcall(notifications.notify, "❌ Échec suppression Ollama", model_name .. "\n" .. tostring(output))
+			Logger.error(LOG, string.format("Failed to delete Ollama model %s: %s", model_name, tostring(output)))
 		end
 	end
+
 	return obj
 end
 

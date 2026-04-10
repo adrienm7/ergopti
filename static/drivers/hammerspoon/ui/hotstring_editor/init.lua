@@ -242,7 +242,7 @@ end
 -- ===============================
 
 --- Handles incoming messages/actions from the JS frontend.
---- @param msg table The message payload containing 'action' and 'data'.
+--- @param msg table The message payload containing "action" and "data".
 local function handle_message(msg)
 	if type(msg) ~= "table" then return end
 	local action, data = msg.action, msg.data
@@ -317,8 +317,8 @@ end
 function M.open(open_mode)
 	_pending_mode = type(open_mode) == "string" and open_mode or "menu"
 
-	-- Early return: Reuse the webview if it is already open to strictly preserve user input and focus.
-	-- This completely bypasses any Javascript evaluation or reloading, keeping the text intact!
+	-- Early return: Reuse the webview if it is already open to strictly preserve user input and focus
+	-- This completely bypasses any Javascript evaluation or reloading keeping the text intact
 	if _webview then
 		ui_builder.force_focus(_webview)
 		return
@@ -327,7 +327,7 @@ function M.open(open_mode)
 	-- Initialize the User Content bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsEditor")
 	if not ok_uc or not uc then
-		Logger.error(LOG, "Impossible de créer le pont webview usercontent")
+		Logger.error(LOG, "Failed to create webview usercontent bridge.")
 		return
 	end
 	
