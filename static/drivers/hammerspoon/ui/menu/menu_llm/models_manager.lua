@@ -13,8 +13,13 @@
 --- ==============================================================================
 
 local M = {}
+
+local hs        = hs
 local OllamaMgr = require("ui.menu.menu_llm.models_manager_ollama")
 local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
+local Logger    = require("lib.logger")
+
+local LOG = "menu_llm.models"
 
 local _model_ram_cache = nil
 
@@ -67,11 +72,11 @@ end
 
 
 
--- ==========================================
--- ==========================================
--- ======= 1/ Logic & Cache Helpers =======
--- ==========================================
--- ==========================================
+-- ============================================
+-- ============================================
+-- ======= 1/ Logic And Cache Utilities =======
+-- ============================================
+-- ============================================
 
 --- Extracts model metadata (type, parameters, tags) based on its name and presets.
 --- @param model_name string The name of the model.
@@ -280,7 +285,7 @@ function M.new(deps)
 		end
 	end
 
-	-- Injecting a cross-engine hardware check for dynamic scaling.
+	-- Shared system check logic injected into dependencies for engines to use
 	deps.shared_system_check = function(target_model, engine_name, repo_info, do_download, on_cancel)
 		local is_mlx   = engine_name:lower():find("mlx") ~= nil
 		local ram_req  = get_model_ram_logic(target_model, presets, is_mlx)
@@ -433,6 +438,7 @@ function M.new(deps)
 		if deps.active_tasks and deps.active_tasks["mlx_server"] then
 			pcall(function() deps.active_tasks["mlx_server"]:terminate() end)
 			deps.active_tasks["mlx_server"] = nil
+			Logger.info(LOG, "MLX server stopped safely.")
 		end
 	end
 

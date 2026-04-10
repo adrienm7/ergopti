@@ -14,8 +14,12 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
+
+local hs         = hs
 local ui_builder = require("ui.ui_builder")
+local Logger     = require("lib.logger")
+
+local LOG = "prompt_editor"
 
 
 
@@ -53,6 +57,7 @@ local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
 function M.open(existing, on_save)
 	-- Early return: Reuse the webview if it is already open to strictly preserve user input and focus.
 	if _webview then 
+		Logger.debug(LOG, "Prompt Editor already open, bringing to front…")
 		ui_builder.force_focus(_webview)
 		return
 	end
@@ -65,7 +70,7 @@ function M.open(existing, on_save)
 	-- Setup the usercontent bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
 	if not ok_uc or not uc then
-		print("[prompt_editor] Error creating usercontent bridge.")
+		Logger.error(LOG, "Error creating usercontent bridge.")
 		return
 	end
 	
@@ -122,6 +127,7 @@ function M.open(existing, on_save)
 			_usercontent = nil
 		end
 	})
+	Logger.info(LOG, "Prompt editor opened successfully.")
 end
 
 --- Closes and destroys the Prompt Editor window.
@@ -131,6 +137,7 @@ function M.close()
 	end
 	_webview     = nil 
 	_usercontent = nil
+	Logger.info(LOG, "Prompt editor closed.")
 end
 
 return M

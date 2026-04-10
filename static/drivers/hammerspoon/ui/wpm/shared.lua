@@ -34,6 +34,7 @@ local SOURCE_COLOR_HEX = {
 
 
 
+
 -- ======================================
 -- ======================================
 -- ======= 2/ Source Normalization ======
@@ -63,6 +64,7 @@ function M.get_active_source(stats, source_color_duration, now_sec)
 
 	return "none"
 end
+
 
 
 

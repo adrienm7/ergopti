@@ -22,7 +22,7 @@ local text_utils = require("lib.text_utils")
 local core_llm   = require("modules.llm")
 local Logger     = require("lib.logger")
 
-local LOG = "llm_bridge"
+local LOG = "keymap.llm_bridge"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -85,9 +85,8 @@ local preview_colored_tooltips    = true
 -- Hardcoded tint colors (hue only, applied over a fixed dark base in apply_tint)
 local C_TINT_STAR_DEFAULT        = { red = 1.00, green = 0.00, blue = 0.00, alpha = 1.0 }
 local C_TINT_AUTOCORRECT_DEFAULT = { red = 0.00, green = 0.80, blue = 0.00, alpha = 1.0 }
-local C_TINT_PERSONAL_DEFAULT     = { red = 0.20, green = 0.55, blue = 1.00, alpha = 1.0 }
-local C_TINT_AI_LOADING           = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 }
--- IA uses nil = neutral dark gray (no tint)
+local C_TINT_PERSONAL_DEFAULT    = { red = 0.20, green = 0.55, blue = 1.00, alpha = 1.0 }
+local C_TINT_AI_LOADING          = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 }
 
 local preview_star_color        = C_TINT_STAR_DEFAULT
 local preview_autocorrect_color = C_TINT_AUTOCORRECT_DEFAULT
@@ -207,14 +206,14 @@ function M.set_preview_autocorrect_color(c)
 end
 
 function M.set_preview_ai_color(_)
-	-- Couleur IA fixe (gris neutre) — non personnalisable
+	-- Fixed AI color (neutral gray) — non customizable
 end
 
 function M.set_llm_after_hotstring(v)
 	llm_after_hotstring_enabled = (v == true)
 end
 
---- Backward-compatible setter : enables or disables all hotstring tooltips at once.
+--- Backward-compatible setter: enables or disables all hotstring tooltips at once.
 --- @param enabled boolean Whether to enable the tooltips.
 function M.set_preview_enabled(enabled)
 	preview_star_enabled        = (enabled == true)
@@ -244,11 +243,11 @@ end
 
 
 
--- =====================================
--- =====================================
--- ======= 3/ Engine & Validation ======
--- =====================================
--- =====================================
+-- ======================================
+-- ======================================
+-- ======= 3/ Engine & Validation =======
+-- ======================================
+-- ======================================
 
 --- Safely resets the prediction engine state and invalidates any pending API request.
 function M.reset_predictions()
@@ -316,7 +315,7 @@ function M.apply_prediction(idx)
 			end
 		end
 	else
-		Logger.error(LOG, "Solveur d'expansion: %s", tostring(res_deletes))
+		Logger.error(LOG, string.format("Expansion solver error: %s.", tostring(res_deletes)))
 		deletes = original_deletes
 		to_type = original_to_type
 	end
@@ -390,11 +389,11 @@ end
 
 
 
--- =========================================
--- =========================================
--- ======= 4/ Execution Constraints ========
--- =========================================
--- =========================================
+-- ========================================
+-- ========================================
+-- ======= 4/ Execution Constraints =======
+-- ========================================
+-- ========================================
 
 --- Truncates text output based on word count limitations.
 --- @param text string The raw output to limit.
@@ -521,39 +520,43 @@ local function build_info_bar(model_name, elapsed_ms, is_mlx, profile_name)
 end
 
 --- Core routine to evaluate buffer state and dispatch API calls if suitable.
+--- @param force_trigger boolean Ignore contextual bounds and fetch directly.
+--- @param profile_name string Evaluated override profile string.
 function M._perform_llm_check(force_trigger, profile_name)
 	force_trigger = force_trigger == true
-	Logger.debug(LOG, "_perform_llm_check: force_trigger=%s, profile_name=%s", tostring(force_trigger), tostring(profile_name))
-	Logger.debug(LOG, "llm_enabled=%s", tostring(llm_enabled))
+	Logger.debug(LOG, string.format("_perform_llm_check: force_trigger=%s, profile_name=%s", tostring(force_trigger), tostring(profile_name)))
+	Logger.debug(LOG, string.format("llm_enabled=%s", tostring(llm_enabled)))
+	
 	if not llm_enabled then
-		Logger.debug(LOG, "LLM désactivé — abandon")
+		Logger.info(LOG, "LLM disabled — aborting.")
 		return
 	end
 	
 	local is_suppressed = llm_suppressed_for_app()
-	Logger.debug(LOG, "llm_suppressed_for_app()=%s", tostring(is_suppressed))
+	Logger.debug(LOG, string.format("llm_suppressed_for_app()=%s", tostring(is_suppressed)))
+	
 	if is_suppressed then
-		Logger.debug(LOG, "LLM supprimé pour cette app — abandon")
+		Logger.info(LOG, "LLM suppressed for this app — aborting.")
 		return
 	end
 
 	local clean_buffer = _state.buffer
-	Logger.debug(LOG, "Buffer: '%s' (length=%d)", clean_buffer, #clean_buffer)
+	Logger.debug(LOG, string.format("Buffer: '%s' (length=%d)", clean_buffer, #clean_buffer))
 	
 	local words = {}
 	for w in clean_buffer:gmatch("%S+%s*") do table.insert(words, w) end
-	Logger.debug(LOG, "Mots dans le buffer: %d", #words)
+	Logger.debug(LOG, string.format("Words in buffer: %d.", #words))
 	
 	if #words == 0 and not force_trigger then
-		Logger.debug(LOG, "Buffer vide sans trigger manuel — abandon")
+		Logger.info(LOG, "Empty buffer without manual trigger — aborting.")
 		return
 	end
 	
 	local tail = table.concat(words, "", math.max(1, #words - 4))
-	Logger.debug(LOG, "Tail: '%s' (length=%d)", tail, #tail)
+	Logger.debug(LOG, string.format("Tail: '%s' (length=%d)", tail, #tail))
 	
 	if (not tail or #tail < 2) and not force_trigger then
-		Logger.debug(LOG, "Tail trop court sans trigger manuel — abandon")
+		Logger.info(LOG, "Tail too short without manual trigger — aborting.")
 		return
 	end
 
@@ -564,7 +567,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 	end
 	_last_llm_input_signature = llm_input_signature
 
-	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, C_TINT_AI_LOADING) end
+	if tooltip.show then tooltip.show("⏳ Génération en cours…", true, preview_ai_enabled, C_TINT_AI_LOADING) end
 
 	local num_pred = llm_num_predictions
 	local req_temperature = llm_temperature
@@ -837,7 +840,7 @@ function M.update_preview(buf)
 		return true
 	end
 
-	-- Essentiel: ne pas conserver la mémoire des suggestions inexploitées
+	-- Essential: do not keep memory of unused suggestions
 	if not buf or #buf == 0 then 
 		_last_llm_input_signature = nil
 		M.reset_predictions()
@@ -853,7 +856,6 @@ function M.update_preview(buf)
 
 	local match_repl    = nil
 	local matched_input = nil
-	-- "star" = hotstring terminant par ★, "autocorrect" = déclenché par espace, "provider" = dynamique
 	local match_type    = nil
 	local match_group   = nil
 	for _, provider in ipairs(_state.preview_providers) do
@@ -913,7 +915,6 @@ function M.update_preview(buf)
 		local display_text = km_utils and type(km_utils.tokens_from_repl) == "function" 
 			and km_utils.plain_text(km_utils.tokens_from_repl(match_repl)) or match_repl
 
-		-- Sélectionne le drapeau et la couleur en fonction du type de hotstring correspondant
 		local is_star    = (match_type == "star")
 		local hs_enabled = is_star and preview_star_enabled or preview_autocorrect_enabled
 		local hs_color = nil
@@ -925,7 +926,6 @@ function M.update_preview(buf)
 			end
 		end
 
-		-- Synchronise la durée du tooltip avec la fenêtre de déclenchement réelle du hotstring
 		local hs_delay
 		if match_type == "star" then
 			hs_delay = type(_state.DELAYS) == "table" and (_state.DELAYS.STAR_TRIGGER or 2.0) or 2.0
@@ -934,17 +934,15 @@ function M.update_preview(buf)
 		else
 			hs_delay = _state.WORD_TIMEOUT_SEC or 2.5
 		end
-		-- Le tooltip doit rester visible pendant la fenêtre de déclenchement (avec la marge appliquée dans tooltip.lua)
+
 		if tooltip.set_timeout then tooltip.set_timeout(math.max(0.05, hs_delay)) end
 
 		if tooltip.show then tooltip.show(display_text, false, hs_enabled, hs_color) end
 
-		-- Lance le timer IA seulement si l'option "IA après hotstring" est activée
 		if llm_after_hotstring_enabled then
 			M.start_timer(math.max(0.1, _state.WORD_TIMEOUT_SEC - 0.3))
 		end
 		
-		-- Enregistre qu'une suggestion vient de s'afficher à l'écran si ce n'est pas déjà le cas
 		local suggested_key = matched_input or last_word
 		if _last_suggested_hs ~= suggested_key then
 			_last_suggested_hs = suggested_key
@@ -1014,6 +1012,7 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 end
 
 --- Validates if LLM reset must happen upon escape keystroke.
+--- @return boolean Indicates if the keystroke event was consumed.
 function M.check_escape_reset()
 	if _predictions_active then M.reset_predictions(); return true end
 	if llm_reset_on_nav then _state.buffer = "" end
@@ -1041,6 +1040,7 @@ end
 --- @param core_state table The shared state object.
 function M.init(core_state)
 	_state = core_state
+	Logger.info(LOG, "Keymap LLM bridge initialized successfully.")
 end
 
 return M

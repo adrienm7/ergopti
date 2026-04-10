@@ -18,11 +18,11 @@ local dh_mod = require("modules.dynamic_hotstrings")
 
 
 
--- ===================================
--- ===================================
--- ======= 1/ Default State ==========
--- ===================================
--- ===================================
+-- ================================
+-- ================================
+-- ======= 1/ Default State =======
+-- ================================
+-- ================================
 
 M.DEFAULT_STATE = {
 	preview_star_enabled          = true,
@@ -45,11 +45,11 @@ M.DEFAULT_STATE = {
 
 
 
--- ===================================
--- ===================================
--- ======= 2/ Menu Construction ======
--- ===================================
--- ===================================
+-- ====================================
+-- ====================================
+-- ======= 2/ Menu Construction =======
+-- ====================================
+-- ====================================
 
 --- Formats a number with spaces as thousands separators.
 --- @param n number|string The number to format.
@@ -304,7 +304,6 @@ function M.build_management(ctx)
 	local magic_item = nil
 	local magic_reset_item = nil
 
-	-- Valeurs par défaut des couleurs (cohérentes avec llm_bridge et DEFAULT_STATE)
 	local c_star        = M.DEFAULT_STATE.preview_star_color
 	local c_autocorrect = M.DEFAULT_STATE.preview_autocorrect_color
 	local c_ai          = M.DEFAULT_STATE.preview_ai_color
@@ -342,7 +341,6 @@ function M.build_management(ctx)
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
 
-	-- Built-in terminators (non-custom), with consume indicator
 	for _, def in ipairs(defs) do
 		if type(def) == "table" and not def.custom then
 			if def.type == "separator" then
@@ -378,7 +376,6 @@ function M.build_management(ctx)
 		end
 	end
 
-	-- Custom terminators + add button, grouped together at the bottom
 	exp_sub[#exp_sub + 1] = { title = "-" }
 
 	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
@@ -393,7 +390,7 @@ function M.build_management(ctx)
 				disabled = paused or nil,
 				fn       = not paused and (function(k) return function()
 					local res = hs.dialog.blockAlert(
-						"Supprimer l'expanseur",
+						"Supprimer l’expanseur",
 						"Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
 						"Supprimer", "Annuler"
 					)
@@ -426,7 +423,6 @@ function M.build_management(ctx)
 		title    = "+ Ajouter un expanseur personnalisé…",
 		disabled = paused or nil,
 		fn       = not paused and function()
-			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
 				local ok_p, btn, char_raw = pcall(hs.dialog.textPrompt,
@@ -435,8 +431,7 @@ function M.build_management(ctx)
 					"", "OK", "Annuler"
 				)
 				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
-				-- Extract first UTF-8 character and check nothing follows
-				local first = char_raw:match("^[%z\1-\127\194-\244][\128-\191]*")
+				local first = char_raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
 				if first and first ~= "" and first == char_raw then
 					char = first
 					break
@@ -444,16 +439,14 @@ function M.build_management(ctx)
 				hs.dialog.blockAlert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
 			end
 
-			-- 2. Ask consume behaviour (default: non consommé)
 			local consume_res = hs.dialog.blockAlert(
 				"Comportement du déclencheur",
-				"Voulez-vous que le caractère soit consommé (non tapé) lors de l'expansion ?",
+				"Voulez-vous que le caractère soit consommé (non tapé) lors de l’expansion ?",
 				"Non — taper le caractère", "Oui — consommer", "Annuler"
 			)
 			if consume_res == "Annuler" then return end
 			local consume = (consume_res == "Oui — consommer")
 
-			-- 3. Generate a unique key
 			local existing_keys = {}
 			if ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" then
 				for _, d in ipairs(ctx.keymap.get_terminator_defs()) do
@@ -466,7 +459,6 @@ function M.build_management(ctx)
 
 			local label = char .. " : Personnalisé" .. (consume and " (consommé)" or "")
 
-			-- 4. Register in the live engine
 			if ctx.keymap and type(ctx.keymap.add_custom_terminator) == "function" then
 				pcall(ctx.keymap.add_custom_terminator, key, char, label, consume)
 			end
@@ -474,7 +466,6 @@ function M.build_management(ctx)
 				pcall(ctx.keymap.set_terminator_enabled, key, true)
 			end
 
-			-- 5. Persist in state
 			if type(state.custom_terminators) ~= "table" then state.custom_terminators = {} end
 			table.insert(state.custom_terminators, { key = key, char = char, label = label, consume = consume })
 			state.terminator_states[key] = true
@@ -524,11 +515,11 @@ function M.build_management(ctx)
 
 	local def_base = ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT
 	if not def_base then
-		Logger.warn(LOG, "keymap.BASE_DELAY_SEC_DEFAULT manquant — délai de base indéfini")
+		Logger.warn(LOG, "keymap.BASE_DELAY_SEC_DEFAULT missing — base delay undefined.")
 	end
 	local def_delays = ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT
 	if not def_delays then
-		Logger.warn(LOG, "keymap.DELAYS_DEFAULT manquant — délais individuels indéfinis")
+		Logger.warn(LOG, "keymap.DELAYS_DEFAULT missing — individual delays undefined.")
 	end
 
 	table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
@@ -619,7 +610,7 @@ function M.build_personal(ctx)
 		end
 	end
 
-	local base_label = "Hotstrings AHK" -- Libellé ajusté comme demandé
+	local base_label = "Hotstrings AHK"
 	local item = {
 		title   = has_count and (base_label .. " (" .. fmt_count(total) .. ")") or base_label,
 		checked = (enabled and not paused) or nil,

@@ -1,13 +1,12 @@
--- lib/text_utils.lua
+--- lib/text_utils.lua
 
--- ===========================================================================
--- Text Utilities Module.
---
--- Provides robust UTF-8 string manipulation, advanced surgical diffing
--- for AI text prediction, and complex case-conversion logic for hotstrings.
--- Designed to fail safely (using pcall and type checks) even with 
--- malformed strings or invalid byte sequences.
--- ===========================================================================
+--- ==============================================================================
+--- MODULE: Text Utilities
+--- DESCRIPTION:
+--- Provides robust UTF-8 string manipulation, advanced surgical diffing
+--- for AI text prediction, and complex case-conversion logic for hotstrings.
+--- Designed to fail safely (using pcall and type checks) even with malformed strings.
+--- ==============================================================================
 
 local M = {}
 
@@ -21,14 +20,13 @@ local M = {}
 -- =======================================
 -- =======================================
 
---- Safely splits a UTF-8 string into a table of individual characters
---- @param s string The input string
---- @return table An array of UTF-8 characters
+--- Safely splits a UTF-8 string into a table of individual characters.
+--- @param s string The input string.
+--- @return table An array of UTF-8 characters.
 function M.utf8_chars(s)
 	local chars = {}
 	if type(s) ~= "string" then return chars end
 	
-	-- Wrap in pcall because utf8.codes throws an error on invalid byte sequences
 	pcall(function()
 		for _, c in utf8.codes(s) do
 			table.insert(chars, utf8.char(c))
@@ -38,14 +36,13 @@ function M.utf8_chars(s)
 	return chars
 end
 
---- Calculates the length of a common prefix between two UTF-8 strings
---- @param s1 string First string
---- @param s2 string Second string
---- @return number The length of the common prefix in characters
+--- Calculates the length of a common prefix between two UTF-8 strings.
+--- @param s1 string First string.
+--- @param s2 string Second string.
+--- @return number The length of the common prefix in characters.
 function M.get_common_prefix_utf8(s1, s2)
 	if type(s1) ~= "string" or type(s2) ~= "string" then return 0 end
 	
-	-- Normalize apostrophes to typographic ones for accurate comparison
 	local c1 = M.utf8_chars(s1:gsub("'", "’"))
 	local c2 = M.utf8_chars(s2:gsub("'", "’"))
 	
@@ -57,11 +54,11 @@ function M.get_common_prefix_utf8(s1, s2)
 	return i - 1
 end
 
---- Safely extracts a substring using UTF-8 character indexing
---- @param s string The input string
---- @param i number The starting index (supports negative indexing)
---- @param j number|nil The ending index (supports negative indexing)
---- @return string The extracted substring
+--- Safely extracts a substring using UTF-8 character indexing.
+--- @param s string The input string.
+--- @param i number The starting index.
+--- @param j number|nil The ending index.
+--- @return string The extracted substring.
 function M.utf8_sub(s, i, j)
 	if type(s) ~= "string" then return "" end
 	
@@ -71,11 +68,9 @@ function M.utf8_sub(s, i, j)
 	local start_idx = tonumber(i) or 1
 	local end_idx   = tonumber(j) or n
 	
-	-- Handle negative indices
 	if start_idx < 0 then start_idx = n + start_idx + 1 end
 	if end_idx < 0 then end_idx = n + end_idx + 1 end
 	
-	-- Clamp to bounds
 	start_idx = math.max(1, math.min(start_idx, n))
 	end_idx   = math.max(1, math.min(end_idx, n))
 	
@@ -89,21 +84,20 @@ function M.utf8_sub(s, i, j)
 	return table.concat(res)
 end
 
---- Safely measures the length of a UTF-8 string
---- @param s string The input string
---- @return number The length in characters (or bytes if malformed)
+--- Safely measures the length of a UTF-8 string.
+--- @param s string The input string.
+--- @return number The length in characters.
 function M.utf8_len(s) 
 	if type(s) ~= "string" then return 0 end
 	
-	-- utf8.len returns nil on invalid UTF-8 sequences, fallback to raw length
 	local ok, len = pcall(utf8.len, s)
 	return (ok and len) and len or #s 
 end
 
---- Checks if a string ends with a specific UTF-8 suffix
---- @param s string The target string
---- @param suffix string The suffix to check for
---- @return boolean True if the string ends with the suffix
+--- Checks if a string ends with a specific UTF-8 suffix.
+--- @param s string The target string.
+--- @param suffix string The suffix to check for.
+--- @return boolean True if the string ends with the suffix.
 function M.utf8_ends_with(s, suffix)
 	if type(s) ~= "string" or type(suffix) ~= "string" then return false end
 	if s == "" or suffix == "" then return false end
@@ -114,9 +108,9 @@ function M.utf8_ends_with(s, suffix)
 	return (ok and start_idx) and (s:sub(start_idx) == suffix) or false
 end
 
---- Checks if a string contains characters requiring more than 2 bytes
---- @param s string The input string
---- @return boolean True if high unicode characters are found (e.g. emojis)
+--- Checks if a string contains characters requiring more than 2 bytes.
+--- @param s string The input string.
+--- @return boolean True if high unicode characters are found.
 function M.contains_high_unicode(s)
 	if type(s) ~= "string" then return false end
 	
@@ -133,13 +127,12 @@ function M.contains_high_unicode(s)
 	return found
 end
 
---- Safely decodes unicode escape sequences and HTML entities commonly hallucinated by LLMs
---- @param s string The input string
---- @return string The decoded string
+--- Safely decodes unicode escape sequences and HTML entities.
+--- @param s string The input string.
+--- @return string The decoded string.
 function M.unescape_text(s)
 	if type(s) ~= "string" then return "" end
 
-	-- 1. Decode Unicode escapes: \uXXXX
 	s = s:gsub("\\u(%x%x%x%x)", function(hex)
 		local code = tonumber(hex, 16)
 		if code then
@@ -149,14 +142,12 @@ function M.unescape_text(s)
 		return "\\u" .. hex
 	end)
 
-	-- 2. Decode standard backslash escapes
 	s = s:gsub("\\'", "'")
 	s = s:gsub('\\"', '"')
 	s = s:gsub("\\n", "\n")
 	s = s:gsub("\\t", "\t")
 	s = s:gsub("\\/", "/")
 	
-	-- 3. Decode common HTML entities (especially French and typographic ones)
 	local entities = {
 		["&amp;"] = "&", ["&lt;"] = "<", ["&gt;"] = ">",
 		["&quot;"] = '"', ["&apos;"] = "'", ["&#39;"] = "'",
@@ -190,18 +181,16 @@ end
 -- =======================================
 -- =======================================
 
---- Computes a Wagner-Fischer edit distance diff to display UI text prediction overlays
---- @param old_str string The original user text
---- @param new_str string The predicted text
---- @return table An array of styled text chunks
+--- Computes a Wagner-Fischer edit distance diff to display UI text prediction overlays.
+--- @param old_str string The original user text.
+--- @param new_str string The predicted text.
+--- @return table An array of styled text chunks.
 function M.diff_strings(old_str, new_str)
 	if type(old_str) ~= "string" or type(new_str) ~= "string" then return {} end
 
-	-- Normalize apostrophes to typographic ones to avoid "fake" differences in the UI
 	local t1 = M.utf8_chars(old_str:gsub("'", "’"))
 	local t2 = M.utf8_chars(new_str:gsub("'", "’"))
 	
-	-- Find common prefix
 	local p = 0
 	while p < #t1 and p < #t2 and t1[p+1] == t2[p+1] do
 		p = p + 1
@@ -210,17 +199,14 @@ function M.diff_strings(old_str, new_str)
 	local out = {}
 	for i = 1, p do table.insert(out, {char=t1[i], color="grey"}) end
 	
-	-- If string 1 is fully contained in string 2
 	if p == #t1 then
 		for i = p + 1, #t2 do table.insert(out, {char=t2[i], color="orange"}) end
 	else
-		-- Extract remaining differing segments
 		local rem_t1, rem_t2 = {}, {}
 		for i = p + 1, #t1 do table.insert(rem_t1, t1[i]) end
 		for i = p + 1, #t2 do table.insert(rem_t2, t2[i]) end
 		local len1, len2 = #rem_t1, #rem_t2
 		
-		-- Wagner-Fischer matrix initialization
 		local m = {}
 		for i = 0, len1 do
 			m[i] = {}
@@ -231,7 +217,6 @@ function M.diff_strings(old_str, new_str)
 			end
 		end
 
-		-- Compute distances
 		for i = 1, len1 do
 			for j = 1, len2 do
 				if rem_t1[i] == rem_t2[j] then
@@ -242,7 +227,6 @@ function M.diff_strings(old_str, new_str)
 			end
 		end
 
-		-- Backtrack to find operations
 		local i, j = len1, len2
 		local rev_ops = {}
 		while i > 0 or j > 0 do
@@ -261,7 +245,6 @@ function M.diff_strings(old_str, new_str)
 			end
 		end
 
-		-- Apply colors based on operations
 		for k = #rev_ops, 1, -1 do
 			local op = rev_ops[k]
 			if op.type == "eq" then
@@ -271,7 +254,6 @@ function M.diff_strings(old_str, new_str)
 			elseif op.type == "ins" then
 				table.insert(out, {char=op.char, color=op.is_tail and "orange" or "green"})
 			elseif op.type == "del" then
-				-- Convert preceding grey characters to green if they are adjacent to a deletion
 				if #out > 0 and out[#out].color == "grey" and not op.char:match("%s") then
 					out[#out].color = "green"
 				end
@@ -279,7 +261,6 @@ function M.diff_strings(old_str, new_str)
 		end
 	end
 
-	-- UI Cleaning: Find the first differing character to trim irrelevant context
 	local first_diff_idx = 0
 	for idx, item in ipairs(out) do
 		if item.color ~= "grey" then
@@ -290,8 +271,6 @@ function M.diff_strings(old_str, new_str)
 
 	if first_diff_idx > 0 then
 		local start_idx = first_diff_idx
-		
-		-- Backtrack ONLY to the start of the current word so the first displayed word contains the diff
 		while start_idx > 1 do
 			local prev_char = out[start_idx - 1].char
 			if prev_char:match("[%s'’]") then break end
@@ -305,7 +284,6 @@ function M.diff_strings(old_str, new_str)
 		out = {} 
 	end
 
-	-- Compile contiguous characters of the same color into chunks
 	local chunks, cur_color, cur_str = {}, nil, ""
 	for _, item in ipairs(out) do
 		if item.color ~= cur_color then
@@ -338,7 +316,6 @@ end
 -- =========================================
 -- =========================================
 
--- Capitalization logic restricted strictly to letters to avoid emoji/symbol conflicts.
 M.UPPER_LETTERS = {
 	["à"]="À", ["â"]="Â", ["ä"]="Ä", ["é"]="É", ["è"]="È", ["ê"]="Ê", ["ë"]="Ë",
 	["î"]="Î", ["ï"]="Ï", ["ô"]="Ô", ["ö"]="Ö", ["ù"]="Ù", ["û"]="Û", ["ü"]="Ü",
@@ -351,7 +328,6 @@ for k, v in pairs(M.UPPER_LETTERS) do M.LOWER_LETTERS[v] = k end
 M.UPPER_TRIGGERS = {}
 for k, v in pairs(M.UPPER_LETTERS) do M.UPPER_TRIGGERS[k] = v end
 
--- Ergopti-specific French punctuation layer triggers mappings
 M.UPPER_TRIGGERS["'"] = " ?" 
 M.UPPER_TRIGGERS[","] = {" :", " ;"} 
 M.UPPER_TRIGGERS["."] = " :" 
@@ -366,9 +342,9 @@ M.UPPER_TRIGGERS["."] = " :"
 -- ===========================================
 -- ===========================================
 
---- Checks if a character is considered a valid letter (handles French accents)
---- @param c string The character to test
---- @return boolean True if it’s a letter
+--- Checks if a character is considered a valid letter.
+--- @param c string The character to test.
+--- @return boolean True if it is a letter.
 function M.is_letter_char(c)
 	if type(c) ~= "string" or c == "" then return false end
 	if c:match("[%w]") then return true end
@@ -376,9 +352,9 @@ function M.is_letter_char(c)
 	return string.upper(c) ~= string.lower(c)
 end
 
---- Safely converts a trigger string to lowercase
---- @param s string The string to convert
---- @return string The lowercase string
+--- Safely converts a trigger string to lowercase.
+--- @param s string The string to convert.
+--- @return string The lowercase string.
 function M.trig_lower(s)
 	if type(s) ~= "string" then return "" end
 	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
@@ -386,9 +362,9 @@ function M.trig_lower(s)
 	end))
 end
 
---- Generates all possible uppercase variants of a trigger (handles multiple punctuation maps)
---- @param s string The string to convert
---- @return table An array of possible uppercase variants
+--- Generates all possible uppercase variants of a trigger.
+--- @param s string The string to convert.
+--- @return table An array of possible uppercase variants.
 function M.trig_upper(s)
 	local results = {""}
 	if type(s) ~= "string" then return results end
@@ -417,9 +393,9 @@ function M.trig_upper(s)
 	return results
 end
 
---- Generates all possible Title Case variants of a trigger
---- @param s string The string to convert
---- @return table An array of possible Title Case variants
+--- Generates all possible Title Case variants of a trigger.
+--- @param s string The string to convert.
+--- @return table An array of possible Title Case variants.
 function M.trig_title(s)
 	if type(s) ~= "string" then return {""} end
 	
@@ -437,9 +413,9 @@ function M.trig_title(s)
 	return results
 end
 
---- Safely converts a replacement string to uppercase
---- @param s string The string to convert
---- @return string The uppercase string
+--- Safely converts a replacement string to uppercase.
+--- @param s string The string to convert.
+--- @return string The uppercase string.
 function M.repl_upper(s)
 	if type(s) ~= "string" then return "" end
 	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
@@ -447,9 +423,9 @@ function M.repl_upper(s)
 	end))
 end
 
---- Safely converts a replacement string to Title Case
---- @param s string The string to convert
---- @return string The Title Case string
+--- Safely converts a replacement string to Title Case.
+--- @param s string The string to convert.
+--- @return string The Title Case string.
 function M.repl_title(s)
 	if type(s) ~= "string" then return "" end
 	
