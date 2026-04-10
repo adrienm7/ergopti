@@ -1,0 +1,158 @@
+/* ui/token_prompt/style.css */
+
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	align-items: center;
+	background: #242426;
+	color: #e8e8ea;
+	display: flex;
+	font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+	justify-content: center;
+	min-height: 100vh;
+	padding: 20px;
+}
+
+#container {
+	background: #2a2a2c;
+	border-radius: 12px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+	max-width: 500px;
+	padding: 28px;
+	width: 100%;
+}
+
+h2 {
+	color: #fff;
+	font-size: 16px;
+	font-weight: 600;
+	margin-bottom: 16px;
+	text-align: center;
+}
+
+#instruction {
+	background: rgba(100, 100, 100, 0.15);
+	border-left: 3px solid #5eb1ff;
+	border-radius: 4px;
+	color: #ccc;
+	font-size: 13px;
+	line-height: 1.5;
+	margin-bottom: 14px;
+	padding: 10px 12px;
+}
+
+#link-section {
+	color: #888;
+	font-size: 12px;
+	margin-bottom: 18px;
+	text-align: center;
+}
+
+#link-section a {
+	color: #5eb1ff;
+	font-weight: 500;
+	text-decoration: none;
+}
+
+#link-section a:hover {
+	color: #a8d8ff;
+	text-decoration: underline;
+}
+
+#token-input-wrapper {
+	background: rgba(0, 0, 0, 0.2);
+	border: 1px solid rgba(94, 177, 255, 0.1);
+	border-radius: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 20px;
+	padding: 12px;
+	transition: all 0.2s ease;
+}
+
+#token-input-wrapper:has(#token-input:focus) {
+	background: rgba(94, 177, 255, 0.05);
+	border-color: rgba(94, 177, 255, 0.3);
+}
+
+label {
+	color: #aaa;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+}
+
+#token-input {
+	background: #2a2a2c;
+	border: 2px solid #555;
+	border-radius: 6px;
+	box-sizing: border-box;
+	color: #e8e8ea;
+	cursor: text;
+	font-family: 'SF Mono', monospace;
+	font-size: 13px;
+	padding: 10px 12px;
+	transition: all 0.2s ease;
+	width: 100%;
+}
+
+#token-input::placeholder {
+	color: #888;
+}
+
+#token-input:focus {
+	background: #343436;
+	border-color: #5eb1ff;
+	box-shadow:
+		0 0 0 3px rgba(94, 177, 255, 0.3),
+		inset 0 0 2px rgba(94, 177, 255, 0.2);
+	color: #fff;
+	outline: none;
+}
+
+#button-group {
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+}
+
+button {
+	border: 1px solid;
+	border-radius: 8px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	padding: 8px 16px;
+	transition: all 0.2s;
+}
+
+#btn-cancel {
+	background: rgba(100, 100, 100, 0.15);
+	border-color: rgba(150, 150, 150, 0.35);
+	color: #aaa;
+}
+
+#btn-cancel:hover {
+	background: rgba(100, 100, 100, 0.28);
+	color: #ccc;
+}
+
+#btn-validate {
+	background: rgba(48, 209, 88, 0.12);
+	border-color: rgba(48, 209, 88, 0.45);
+	color: #30d158;
+}
+
+#btn-validate:hover {
+	background: rgba(48, 209, 88, 0.22);
+}
+
+#btn-validate:active {
+	transform: scale(0.98);
+}

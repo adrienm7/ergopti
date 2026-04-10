@@ -555,19 +555,22 @@ function M.start(script_control)
 	_script_control = script_control
 	if not CoreState.is_enabled then
 		CoreState.is_enabled = true
-		LogManager.rebuild_index_if_needed()
-		LogManager.ensure_dir_and_rotate()
 		CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 
 		if not _app_watcher then _app_watcher = hs.application.watcher.new(ContextTracker.app_watcher_cb) end
 		_app_watcher:start()
 
-		if not _win_filter then
-			local target_browsers = { "Safari", "Google Chrome", "Firefox", "Microsoft Edge", "Brave Browser", "Arc", "Opera", "Vivaldi" }
-			_win_filter = hs.window.filter.new(target_browsers)
-			_win_filter:subscribe({ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged }, ContextTracker.update_private_status)
-		end
-		ContextTracker.update_private_status()
+		-- Defer window.filter init: hs.window.filter.new() enumerates all windows
+		-- synchronously via AX, taking ~10s at startup. Running after the event loop
+		-- starts makes it non-blocking
+		hs.timer.doAfter(0, function()
+			if not _win_filter then
+				local target_browsers = { "Safari", "Google Chrome", "Firefox", "Microsoft Edge", "Brave Browser", "Arc", "Opera", "Vivaldi" }
+				_win_filter = hs.window.filter.new(target_browsers)
+				_win_filter:subscribe({ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged }, ContextTracker.update_private_status)
+			end
+			ContextTracker.update_private_status()
+		end)
 
 		if not _tap then 
 			_tap = hs.eventtap.new({ 
@@ -583,9 +586,21 @@ function M.start(script_control)
 
 		if not _maintenance_timer then _maintenance_timer = hs.timer.new(1.0, perform_maintenance) end
 		_maintenance_timer:start()
-		
-		local current_app = hs.application.frontmostApplication()
-		if current_app then ContextTracker.update_ax_observer(current_app:pid()) end
+
+		-- Defer AX observer init: hs.axuielement.applicationElement() enumerates the full
+		-- accessibility tree of the frontmost app synchronously, blocking ~9s at startup
+		hs.timer.doAfter(0, function()
+			local current_app = hs.application.frontmostApplication()
+			if current_app then pcall(ContextTracker.update_ax_observer, current_app:pid()) end
+		end)
+
+		-- Defer heavy log maintenance: rebuild_index_if_needed() decompresses and parses
+		-- all un-indexed log files (io.popen gzip per file), and ensure_dir_and_rotate()
+		-- gzip-compresses old logs — both block the main thread for several seconds
+		hs.timer.doAfter(2, function()
+			pcall(LogManager.ensure_dir_and_rotate)
+			pcall(LogManager.rebuild_index_if_needed)
+		end)
 	end
 end
 

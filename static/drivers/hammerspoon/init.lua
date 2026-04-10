@@ -35,9 +35,29 @@ local Logger             = require("lib.logger")
 local LOG                = "init"
 
 -- Set our logger level. Uncomment one to enable:
--- Logger.set_level("DEBUG")  -- Show all logs (DEBUG, INFO, WARNING, ERROR)
+Logger.set_level("DEBUG")  -- Show all logs (DEBUG, INFO, WARNING, ERROR)
 -- Logger.set_level("INFO")   -- Show INFO, WARNING, ERROR only
 -- Default: WARNING (production mode)
+
+-- Global user-notification logging bridge.
+-- Any module using hs.notify.new() will now be traced in Logger.info.
+do
+	if hs.notify and type(hs.notify.new) == "function" and hs.notify.__ergopti_info_wrapped ~= true then
+		local _orig_notify_new = hs.notify.new
+		hs.notify.new = function(opts, ...)
+			if type(opts) == "table" then
+				local t = tostring(opts.title or "")
+				local b = tostring(opts.informativeText or "")
+				if t ~= "" or b ~= "" then
+					local payload = (t ~= "" and t or "(sans titre)") .. (b ~= "" and (" | " .. b) or "")
+					Logger.info("notify", "Notification utilisateur: %s", payload)
+				end
+			end
+			return _orig_notify_new(opts, ...)
+		end
+		hs.notify.__ergopti_info_wrapped = true
+	end
+end
 
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
@@ -46,6 +66,7 @@ local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
 local mlx_deps_checker   = require("lib.mlx_deps_checker")
+local notifications      = require("lib.notifications")
 
 
 
@@ -298,10 +319,7 @@ do
 	local function schedule_reload(msg)
 		if reload_timer then reload_timer:stop() end
 		reload_timer = hs.timer.doAfter(0.5, function()
-			hs.notify.new({
-				title           = "Hammerspoon",
-				informativeText = msg or "Fichiers modifiés — rechargement…",
-			}):send()
+			pcall(notifications.notify, "Hammerspoon", msg or "Fichiers modifiés — rechargement…")
 			hs.reload()
 		end)
 	end
@@ -329,6 +347,10 @@ do
 	Logger.debug(LOG, "Configuration file watcher...")
 	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
 		for _, p in ipairs(paths) do
+			-- Ignore temporary files (tokens, etc.)
+			if p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_") then
+				return
+			end
 			if p:match("%.lua$") or p:match("%.html$") or p:match("%.css$") or p:match("%.js$") then
 				schedule_reload("Interface ou script modifié — rechargement…")
 				return
@@ -368,7 +390,11 @@ end
 
 hs.shutdownCallback = function()
 	Logger.info(LOG, "Arrêt système — restauration des overrides")
-	gestures.restore_all_overrides()
+	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
+		pcall(gestures.restore_all_overrides)
+	else
+		Logger.warn(LOG, "restore_all_overrides indisponible — arrêt sans restauration")
+	end
 	Logger.info(LOG, "Hammerspoon arrêté")
 end
 

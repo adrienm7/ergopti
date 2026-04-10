@@ -230,8 +230,8 @@ function M.new(deps)
             {title = "⌘ Cmd", mods = {"cmd"}},
             {title = "⌥ Option", mods = {"alt"}}, 
             {title = "⌃ Ctrl", mods = {"ctrl"}},
-            {title = "⌘⇧ Cmd + Shift", mods = {"cmd", "shift"}},
-            {title = "⌥⇧ Option + Shift", mods = {"alt", "shift"}}
+            {title = "⇧⌘ Shift + Cmd", mods = {"shift", "cmd"}},
+            {title = "⇧⌥ Shift + Option", mods = {"shift", "alt"}}
         }
         
         local menu = {}

@@ -26,6 +26,22 @@ local VALID_MODS = {
 	shift = true,
 }
 
+local MOD_ORDER = {
+	shift = 1,
+	cmd = 2,
+	alt = 3,
+	ctrl = 4,
+}
+
+local function sort_modifiers(mods)
+	table.sort(mods, function(a, b)
+		local oa = MOD_ORDER[a] or 99
+		local ob = MOD_ORDER[b] or 99
+		if oa == ob then return a < b end
+		return oa < ob
+	end)
+end
+
 
 
 
@@ -68,6 +84,7 @@ function M.normalize_shortcut(mods, key, default_mods)
 	end
 
 	if #out_mods == 0 then return nil end
+	sort_modifiers(out_mods)
 	return { mods = out_mods, key = clean_key:lower() }
 end
 
@@ -110,13 +127,16 @@ end
 --- @return string Display label.
 function M.shortcut_to_label(sc, none_label)
 	if type(sc) ~= "table" then return none_label or "Aucun" end
+	local ordered_mods = {}
+	for _, m in ipairs(sc.mods or {}) do table.insert(ordered_mods, m) end
+	sort_modifiers(ordered_mods)
 
 	local mods_cap = {}
-	for _, m in ipairs(sc.mods or {}) do
+	for _, m in ipairs(ordered_mods) do
 		table.insert(mods_cap, m:sub(1, 1):upper() .. m:sub(2))
 	end
 
-	local mods_str = table.concat(mods_cap, "+")
+	local mods_str = table.concat(mods_cap, " + ")
 	local key_str = string.upper(sc.key or "")
 	if key_str == "" then return none_label or "Aucun" end
 	return (mods_str ~= "" and (mods_str .. " + ") or "") .. key_str

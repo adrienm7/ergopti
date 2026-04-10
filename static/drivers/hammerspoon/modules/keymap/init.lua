@@ -202,6 +202,7 @@ M.remove_custom_terminator  = Registry.remove_custom_terminator
 
 -- Proxy LLM Bridge Methods
 M.set_llm_model           = LLMBridge.set_llm_model
+M.set_llm_display_model_name = LLMBridge.set_llm_display_model_name
 M.set_llm_context_length  = LLMBridge.set_llm_context_length
 M.set_llm_reset_on_nav    = LLMBridge.set_llm_reset_on_nav
 M.set_llm_temperature     = LLMBridge.set_llm_temperature

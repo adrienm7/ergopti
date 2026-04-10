@@ -1,980 +1,3881 @@
-{
-	"providers": [
-		{
-			"id": "alibaba",
-			"label": "Alibaba Cloud (Qwen)",
-			"models": [
-				{
-					"name": "qwen2.5:0.5b",
-					"type": "chat",
-					"disk_gb": 0.4,
-					"ram_gb": 2,
-					"params": "0.5B",
-					"tags": [
-						"fast",
-						"tiny",
-						"text"
-					],
-					"mlx_repo": "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
-					"download_gb": 0.2
-				},
-				{
-					"name": "qwen2.5:1.5b",
-					"type": "chat",
-					"disk_gb": 1,
-					"ram_gb": 3,
-					"params": "1.5B",
-					"tags": [
-						"fast",
-						"text"
-					],
-					"mlx_repo": "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
-					"download_gb": 0.6
-				},
-				{
-					"name": "qwen2.5:7b",
-					"type": "chat",
-					"disk_gb": 4.7,
-					"ram_gb": 8,
-					"params": "7B",
-					"tags": [
-						"balanced",
-						"text",
-						"code"
-					],
-					"mlx_repo": "mlx-community/Qwen2.5-7B-Instruct-4bit",
-					"download_gb": 2.6
-				},
-				{
-					"name": "qwen2.5:14b",
-					"type": "chat",
-					"disk_gb": 9,
-					"ram_gb": 16,
-					"params": "14B",
-					"tags": [
-						"quality",
-						"text",
-						"code"
-					],
-					"mlx_repo": "mlx-community/Qwen2.5-14B-Instruct-4bit",
-					"download_gb": 5
-				},
-				{
-					"name": "qwen2.5-coder:7b",
-					"type": "chat",
-					"disk_gb": 4.7,
-					"ram_gb": 8,
-					"params": "7B",
-					"tags": [
-						"code",
-						"completion"
-					],
-					"mlx_repo": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
-					"download_gb": 2.6
-				},
-				{
-					"name": "qwen2.5-coder:1.5b-base",
-					"type": "completion",
-					"disk_gb": 1,
-					"ram_gb": 3,
-					"params": "1.5B",
-					"tags": [
-						"fast",
-						"tiny",
-						"completion"
-					],
-					"download_gb": 0.9
-				},
-				{
-					"name": "qwen2.5-coder:7b-base",
-					"type": "completion",
-					"disk_gb": 4.7,
-					"ram_gb": 8,
-					"params": "7B",
-					"tags": [
-						"balanced",
-						"completion"
-					],
-					"download_gb": 4.2
-				},
-				{
-					"name": "qwen3:0.6b",
-					"type": "chat",
-					"disk_gb": 0.5,
-					"ram_gb": 2,
-					"params": "0.6B",
-					"tags": [
-						"fast",
-						"tiny"
-					],
-					"download_gb": 0.5
-				},
-				{
-					"name": "qwen3:1.7b",
-					"type": "chat",
-					"disk_gb": 1.1,
-					"ram_gb": 3,
-					"params": "1.7B",
-					"tags": [
-						"fast",
-						"text"
-					],
-					"download_gb": 1
-				},
-				{
-					"name": "qwen3:4b",
-					"type": "chat",
-					"disk_gb": 2.6,
-					"ram_gb": 5,
-					"params": "4B",
-					"tags": [
-						"balanced",
-						"text"
-					],
-					"download_gb": 2.3
-				},
-				{
-					"name": "qwen3:8b",
-					"type": "chat",
-					"disk_gb": 4.9,
-					"ram_gb": 8,
-					"params": "8B",
-					"tags": [
-						"balanced",
-						"reasoning"
-					],
-					"download_gb": 4.4
-				},
-				{
-					"name": "qwen3:14b",
-					"type": "chat",
-					"disk_gb": 9,
-					"ram_gb": 16,
-					"params": "14B",
-					"tags": [
-						"quality",
-						"reasoning"
-					],
-					"download_gb": 8.1
-				},
-				{
-					"name": "qwen3.5:7b",
-					"type": "chat",
-					"disk_gb": 4.8,
-					"ram_gb": 8,
-					"params": "7B",
-					"tags": [
-						"balanced",
-						"multilingual"
-					],
-					"download_gb": 4.3
-				},
-				{
-					"name": "qwen3.5:14b",
-					"type": "chat",
-					"disk_gb": 9.2,
-					"ram_gb": 16,
-					"params": "14B",
-					"tags": [
-						"quality",
-						"multilingual"
-					],
-					"download_gb": 8.3
-				},
-				{
-					"name": "qwen3.5:32b",
-					"type": "chat",
-					"disk_gb": 20,
-					"ram_gb": 32,
-					"params": "32B",
-					"tags": [
-						"high-quality",
-						"multilingual"
-					],
-					"download_gb": 18
-				},
-				{
-					"name": "qwen2.5:3b",
-					"type": "chat",
-					"disk_gb": 2.1,
-					"download_gb": 1.2,
-					"ram_gb": 5,
-					"params": "3B",
-					"tags": [
-						"fast",
-						"text"
-					],
-					"mlx_repo": "mlx-community/Qwen2.5-3B-Instruct-4bit"
-				},
-				{
-					"name": "qwen2.5:32b",
-					"type": "chat",
-					"disk_gb": 20,
-					"download_gb": 11,
-					"ram_gb": 32,
-					"params": "32B",
-					"tags": [
-						"high-quality",
-						"text",
-						"code"
-					],
-					"mlx_repo": "mlx-community/Qwen2.5-32B-Instruct-4bit"
-				},
-				{
-					"name": "qwen2.5-coder:3b",
-					"type": "chat",
-					"disk_gb": 2.1,
-					"download_gb": 1.9,
-					"ram_gb": 5,
-					"params": "3B",
-					"tags": [
-						"code",
-						"fast"
-					]
-				},
-				{
-					"name": "qwen2.5-coder:14b",
-					"type": "chat",
-					"disk_gb": 9,
-					"download_gb": 8.1,
-					"ram_gb": 16,
-					"params": "14B",
-					"tags": [
-						"code",
-						"quality"
-					]
-				},
-				{
-					"name": "qwen2.5-coder:32b",
-					"type": "chat",
-					"disk_gb": 20,
-					"download_gb": 18,
-					"ram_gb": 32,
-					"params": "32B",
-					"tags": [
-						"code",
-						"high-quality"
-					]
-				}
-			]
-		},
-		{
-			"id": "bigcode",
-			"label": "BigCode",
-			"models": [
-				{
-					"name": "starcoder2:3b",
-					"type": "completion",
-					"disk_gb": 1.7,
-					"ram_gb": 4,
-					"params": "3B",
-					"tags": [
-						"fast",
-						"completion"
-					],
-					"download_gb": 1.5
-				}
-			]
-		},
-		{
-			"id": "cohere",
-			"label": "Cohere",
-			"models": [
-				{
-					"name": "command-r:35b",
-					"type": "chat",
-					"disk_gb": 20.4,
-					"ram_gb": 32,
-					"params": "35B",
-					"tags": [
-						"rag",
-						"tools",
-						"chat"
-					],
-					"download_gb": 18.4
-				}
-			]
-		},
-		{
-			"id": "deepseek",
-			"label": "DeepSeek",
-			"models": [
-				{
-					"name": "deepseek-coder:1.3b-base",
-					"type": "completion",
-					"disk_gb": 0.8,
-					"ram_gb": 2,
-					"params": "1.3B",
-					"tags": [
-						"tiny",
-						"completion"
-					],
-					"download_gb": 0.7
-				},
-				{
-					"name": "deepseek-r1:1.5b",
-					"type": "chat",
-					"disk_gb": 1.1,
-					"ram_gb": 3,
-					"params": "1.5B",
-					"tags": [
-						"reasoning",
-						"math",
-						"fast"
-					],
-					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit",
-					"download_gb": 0.6
-				},
-				{
-					"name": "deepseek-r1:7b",
-					"type": "chat",
-					"disk_gb": 4.7,
-					"ram_gb": 8,
-					"params": "7B",
-					"tags": [
-						"reasoning",
-						"math"
-					],
-					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit",
-					"download_gb": 2.6
-				},
-				{
-					"name": "deepseek-r1:8b",
-					"type": "chat",
-					"disk_gb": 4.9,
-					"ram_gb": 8,
-					"params": "8B",
-					"tags": [
-						"reasoning",
-						"math"
-					],
-					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Llama-8B-4bit",
-					"download_gb": 2.7
-				},
-				{
-					"name": "deepseek-r1:14b",
-					"type": "chat",
-					"disk_gb": 9,
-					"ram_gb": 16,
-					"params": "14B",
-					"tags": [
-						"reasoning",
-						"quality"
-					],
-					"mlx_repo": "mlx-community/DeepSeek-R1-Distill-Qwen-14B-4bit",
-					"download_gb": 5
-				},
-				{
-					"name": "deepseek-r1:32b",
-					"type": "chat",
-					"disk_gb": 20,
-					"ram_gb": 32,
-					"params": "32B",
-					"tags": [
-						"high-quality",
-						"reasoning"
-					],
-					"download_gb": 18
-				},
-				{
-					"name": "deepseek-coder-v2:16b",
-					"type": "chat",
-					"disk_gb": 8.9,
-					"ram_gb": 16,
-					"params": "16B",
-					"tags": [
-						"code",
-						"completion"
-					],
-					"download_gb": 8
-				},
-				{
-					"name": "deepseek-v3:32b",
-					"type": "chat",
-					"disk_gb": 20,
-					"ram_gb": 32,
-					"params": "32B",
-					"tags": [
-						"chat",
-						"quality"
-					],
-					"download_gb": 18
-				},
-				{
-					"name": "deepseek-r1:70b",
-					"type": "chat",
-					"disk_gb": 43,
-					"download_gb": 38.7,
-					"ram_gb": 64,
-					"params": "70B",
-					"tags": [
-						"reasoning",
-						"high-quality"
-					]
-				}
-			]
-		},
-		{
-			"id": "google",
-			"label": "Google DeepMind (Gemma)",
-			"models": [
-				{
-					"name": "gemma2:2b",
-					"type": "chat",
-					"disk_gb": 1.6,
-					"ram_gb": 4,
-					"params": "2B",
-					"tags": [
-						"fast",
-						"efficient"
-					],
-					"download_gb": 1.4
-				},
-				{
-					"name": "gemma2:9b",
-					"type": "chat",
-					"disk_gb": 5.5,
-					"ram_gb": 10,
-					"params": "9B",
-					"tags": [
-						"balanced",
-						"text"
-					],
-					"download_gb": 5
-				},
-				{
-					"name": "gemma2:27b",
-					"type": "chat",
-					"disk_gb": 16,
-					"ram_gb": 24,
-					"params": "27B",
-					"tags": [
-						"quality",
-						"text"
-					],
-					"download_gb": 14.4
-				},
-				{
-					"name": "gemma3:1b",
-					"type": "chat",
-					"disk_gb": 0.8,
-					"ram_gb": 2,
-					"params": "1B",
-					"tags": [
-						"tiny",
-						"fast"
-					],
-					"download_gb": 0.7
-				},
-				{
-					"name": "gemma3:4b",
-					"type": "chat",
-					"disk_gb": 2.5,
-					"ram_gb": 5,
-					"params": "4B",
-					"tags": [
-						"balanced",
-						"multimodal"
-					],
-					"download_gb": 2.3
-				},
-				{
-					"name": "gemma3:12b",
-					"type": "chat",
-					"disk_gb": 7.6,
-					"ram_gb": 12,
-					"params": "12B",
-					"tags": [
-						"quality",
-						"multimodal"
-					],
-					"download_gb": 6.8
-				},
-				{
-					"name": "gemma3:27b",
-					"type": "chat",
-					"disk_gb": 17,
-					"ram_gb": 24,
-					"params": "27B",
-					"tags": [
-						"high-quality",
-						"multimodal"
-					],
-					"download_gb": 15.3
-				}
-			]
-		},
-		{
-			"id": "ibm",
-			"label": "IBM (Granite)",
-			"models": [
-				{
-					"name": "granite-code:8b",
-					"type": "chat",
-					"disk_gb": 4.6,
-					"ram_gb": 8,
-					"params": "8B",
-					"tags": [
-						"code",
-						"enterprise"
-					],
-					"download_gb": 4.1
-				},
-				{
-					"name": "granite3.3:2b",
-					"type": "chat",
-					"disk_gb": 1.6,
-					"ram_gb": 4,
-					"params": "2B",
-					"tags": [
-						"fast",
-						"code"
-					],
-					"download_gb": 1.4
-				},
-				{
-					"name": "granite3.3:8b",
-					"type": "chat",
-					"disk_gb": 4.9,
-					"ram_gb": 8,
-					"params": "8B",
-					"tags": [
-						"code",
-						"tools",
-						"enterprise"
-					],
-					"download_gb": 4.4
-				}
-			]
-		},
-		{
-			"id": "meta",
-			"label": "Meta (Llama)",
-			"models": [
-				{
-					"name": "llama3.2:1b",
-					"type": "chat",
-					"disk_gb": 1.3,
-					"ram_gb": 3,
-					"params": "1B",
-					"tags": [
-						"tiny",
-						"fast"
-					],
-					"mlx_repo": "mlx-community/Llama-3.2-1B-Instruct-4bit",
-					"download_gb": 0.7
-				},
-				{
-					"name": "llama3.2:3b",
-					"type": "chat",
-					"disk_gb": 2,
-					"ram_gb": 4,
-					"params": "3B",
-					"tags": [
-						"fast",
-						"text"
-					],
-					"mlx_repo": "mlx-community/Llama-3.2-3B-Instruct-4bit",
-					"download_gb": 1.1
-				},
-				{
-					"name": "llama3.1:8b",
-					"type": "chat",
-					"disk_gb": 4.7,
-					"ram_gb": 8,
-					"params": "8B",
-					"tags": [
-						"balanced",
-						"tools"
-					],
-					"mlx_repo": "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",
-					"download_gb": 2.6
-				},
-				{
-					"name": "llama3.1:70b",
-					"type": "chat",
-					"disk_gb": 40,
-					"ram_gb": 64,
-					"params": "70B",
-					"tags": [
-						"high-quality"
-					],
-					"download_gb": 36
-				},
-				{
-					"name": "llama3.3:70b",
-					"type": "chat",
-					"disk_gb": 43,
-					"ram_gb": 64,
-					"params": "70B",
-					"tags": [
-						"high-quality",
-						"tools"
-					],
-					"download_gb": 38.7
-				},
-				{
-					"name": "llama3.2:11b-vision",
-					"type": "chat",
-					"disk_gb": 6.7,
-					"download_gb": 6,
-					"ram_gb": 12,
-					"params": "11B",
-					"tags": [
-						"multimodal",
-						"quality"
-					]
-				},
-				{
-					"name": "llama3.2:90b-vision",
-					"type": "chat",
-					"disk_gb": 55,
-					"download_gb": 49.5,
-					"ram_gb": 80,
-					"params": "90B",
-					"tags": [
-						"multimodal",
-						"high-quality"
-					]
-				}
-			]
-		},
-		{
-			"id": "microsoft",
-			"label": "Microsoft (Phi)",
-			"models": [
-				{
-					"name": "phi3:3.8b",
-					"type": "chat",
-					"disk_gb": 2.3,
-					"ram_gb": 5,
-					"params": "3.8B",
-					"tags": [
-						"fast",
-						"efficient"
-					],
-					"download_gb": 2.1
-				},
-				{
-					"name": "phi3:14b",
-					"type": "chat",
-					"disk_gb": 7.9,
-					"ram_gb": 12,
-					"params": "14B",
-					"tags": [
-						"quality",
-						"text"
-					],
-					"download_gb": 7.1
-				},
-				{
-					"name": "phi4:14b",
-					"type": "chat",
-					"disk_gb": 9,
-					"ram_gb": 16,
-					"params": "14B",
-					"tags": [
-						"quality",
-						"math",
-						"reasoning"
-					],
-					"mlx_repo": "mlx-community/phi-4-4bit",
-					"download_gb": 5
-				},
-				{
-					"name": "phi4-mini:3.8b",
-					"type": "chat",
-					"disk_gb": 2.4,
-					"download_gb": 2.2,
-					"ram_gb": 5,
-					"params": "3.8B",
-					"tags": [
-						"fast",
-						"reasoning"
-					]
-				}
-			]
-		},
-		{
-			"id": "mistral",
-			"label": "Mistral AI",
-			"models": [
-				{
-					"name": "codestral:22b",
-					"type": "chat",
-					"disk_gb": 13,
-					"ram_gb": 20,
-					"params": "22B",
-					"tags": [
-						"code",
-						"completion"
-					],
-					"download_gb": 11.7
-				},
-				{
-					"name": "mistral:7b",
-					"type": "chat",
-					"disk_gb": 4.1,
-					"ram_gb": 8,
-					"params": "7B",
-					"tags": [
-						"balanced",
-						"fast"
-					],
-					"mlx_repo": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-					"download_gb": 2.3
-				},
-				{
-					"name": "mistral-nemo:12b",
-					"type": "chat",
-					"disk_gb": 7.1,
-					"ram_gb": 12,
-					"params": "12B",
-					"tags": [
-						"balanced",
-						"multilingual"
-					],
-					"download_gb": 6.4
-				},
-				{
-					"name": "mistral-small:24b",
-					"type": "chat",
-					"disk_gb": 14.1,
-					"ram_gb": 24,
-					"params": "24B",
-					"tags": [
-						"quality",
-						"tools"
-					],
-					"download_gb": 12.7
-				},
-				{
-					"name": "mixtral:8x7b",
-					"type": "chat",
-					"disk_gb": 26,
-					"ram_gb": 32,
-					"params": "47B MoE",
-					"tags": [
-						"quality",
-						"moe"
-					],
-					"download_gb": 23.4
-				},
-				{
-					"name": "ministral:3b",
-					"type": "chat",
-					"disk_gb": 2,
-					"download_gb": 1.8,
-					"ram_gb": 5,
-					"params": "3B",
-					"tags": [
-						"fast",
-						"multilingual"
-					]
-				},
-				{
-					"name": "ministral:8b",
-					"type": "chat",
-					"disk_gb": 4.7,
-					"download_gb": 4.2,
-					"ram_gb": 8,
-					"params": "8B",
-					"tags": [
-						"balanced",
-						"multilingual"
-					]
-				}
-			]
-		},
-		{
-			"id": "nvidia",
-			"label": "NVIDIA (Nemotron)",
-			"models": [
-				{
-					"name": "nemotron-mini:4b",
-					"type": "chat",
-					"disk_gb": 2.7,
-					"ram_gb": 5,
-					"params": "4B",
-					"tags": [
-						"fast",
-						"chat"
-					],
-					"download_gb": 2.4
-				},
-				{
-					"name": "nemotron:70b",
-					"type": "chat",
-					"disk_gb": 42,
-					"ram_gb": 64,
-					"params": "70B",
-					"tags": [
-						"high-quality",
-						"chat"
-					],
-					"download_gb": 37.8
-				}
-			]
-		},
-		{
-			"id": "openai",
-			"label": "OpenAI",
-			"models": [
-				{
-					"name": "gpt-oss:20b",
-					"type": "chat",
-					"disk_gb": 12,
-					"ram_gb": 20,
-					"params": "20B",
-					"tags": [
-						"quality",
-						"reasoning"
-					],
-					"download_gb": 10.8
-				}
-			]
-		},
-		{
-			"id": "shanghaiailab",
-			"label": "Shanghai AI Lab (InternLM)",
-			"models": [
-				{
-					"name": "internlm2:7b",
-					"type": "chat",
-					"disk_gb": 4.5,
-					"ram_gb": 8,
-					"params": "7B",
-					"tags": [
-						"chat",
-						"tools"
-					],
-					"download_gb": 4.1
-				},
-				{
-					"name": "internlm2:20b",
-					"type": "chat",
-					"disk_gb": 11.5,
-					"ram_gb": 16,
-					"params": "20B",
-					"tags": [
-						"quality",
-						"tools"
-					],
-					"download_gb": 10.4
-				}
-			]
-		},
-		{
-			"id": "smollm",
-			"label": "SmolLM (HuggingFace)",
-			"models": [
-				{
-					"name": "smollm2:135m",
-					"type": "chat",
-					"disk_gb": 0.1,
-					"ram_gb": 1,
-					"params": "135M",
-					"tags": [
-						"ultra-tiny",
-						"edge"
-					],
-					"mlx_repo": "mlx-community/SmolLM2-135M-Instruct-4bit",
-					"download_gb": 0.1
-				},
-				{
-					"name": "smollm2:1.7b",
-					"type": "completion",
-					"disk_gb": 1,
-					"ram_gb": 3,
-					"params": "1.7B",
-					"tags": [
-						"tiny",
-						"completion"
-					],
-					"mlx_repo": "mlx-community/SmolLM2-1.7B-Instruct-4bit",
-					"download_gb": 0.6
-				},
-				{
-					"name": "smollm2:360m",
-					"type": "chat",
-					"disk_gb": 0.3,
-					"download_gb": 0.2,
-					"ram_gb": 1.5,
-					"params": "360M",
-					"tags": [
-						"ultra-tiny",
-						"edge"
-					],
-					"mlx_repo": "mlx-community/SmolLM2-360M-Instruct-4bit"
-				}
-			]
-		},
-		{
-			"id": "upstage",
-			"label": "Upstage (Solar)",
-			"models": [
-				{
-					"name": "solar:10.7b",
-					"type": "chat",
-					"disk_gb": 6.1,
-					"ram_gb": 10,
-					"params": "10.7B",
-					"tags": [
-						"balanced",
-						"korean"
-					],
-					"download_gb": 5.5
-				}
-			]
-		},
-		{
-			"id": "zhipu",
-			"label": "Zhipu AI (GLM)",
-			"models": [
-				{
-					"name": "glm4:9b",
-					"type": "chat",
-					"disk_gb": 5.5,
-					"ram_gb": 10,
-					"params": "9B",
-					"tags": [
-						"chat",
-						"tools",
-						"chinese"
-					],
-					"download_gb": 5
-				}
-			]
-		},
-		{
-			"id": "01ai",
-			"label": "01.AI (Yi)",
-			"models": [
-				{
-					"name": "yi:6b",
-					"type": "chat",
-					"disk_gb": 3.5,
-					"ram_gb": 6,
-					"params": "6B",
-					"tags": [
-						"balanced",
-						"chinese"
-					],
-					"download_gb": 3.2
-				},
-				{
-					"name": "yi:34b",
-					"type": "chat",
-					"disk_gb": 19.5,
-					"ram_gb": 32,
-					"params": "34B",
-					"tags": [
-						"quality",
-						"chinese"
-					],
-					"download_gb": 17.6
-				}
-			]
-		}
-	]
-}
+[
+    {
+        "label": "Alibaba Cloud (Qwen)",
+        "families": [
+            {
+                "label": "Qwen3-Coder",
+                "models": [
+                    {
+                        "name": "Qwen3-Coder-30B-A3B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2025-12-03",
+                        "parameters": {
+                            "total": "30.5B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 16.02,
+                                "disk_gb": 16.02,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 19.82,
+                                "disk_gb": 19.82,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+                            "ollama": "https://ollama.com/library/qwen3-coder:30b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Qwen3-Coder-Next",
+                "models": [
+                    {
+                        "name": "Qwen3-Coder-Next-Base",
+                        "type": "completion",
+                        "last_updated": "2026-02-03",
+                        "parameters": {
+                            "total": "79.7B",
+                            "active": "79.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 51.81,
+                                "disk_gb": 51.81,
+                                "ram_gb": 64
+                            },
+                            "ollama": {
+                                "download_gb": 51.81,
+                                "disk_gb": 51.81,
+                                "ram_gb": 64
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3-Coder-Next-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Qwen3-Coder-Next",
+                        "type": "chat",
+                        "last_updated": "2026-02-03",
+                        "parameters": {
+                            "total": "79.7B",
+                            "active": "79.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 41.78,
+                                "disk_gb": 41.78,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "download_gb": 51.81,
+                                "disk_gb": 51.81,
+                                "ram_gb": 64
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3-Coder-Next",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3-Coder-Next-4bit",
+                            "ollama": "https://ollama.com/library/qwen3-coder-next:q4_K_M"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Qwen 3.5",
+                "models": [
+                    {
+                        "name": "Qwen3.5-0.8B-Base",
+                        "type": "completion",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "0.0B",
+                            "active": "0.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-0.8B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-0.8B",
+                        "type": "chat",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "0.0B",
+                            "active": "0.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.61,
+                                "disk_gb": 0.61,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-0.8B",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-MLX-4bit",
+                            "ollama": "https://ollama.com/library/qwen3.5:0.8b"
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-2B-Base",
+                        "type": "completion",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "0.0B",
+                            "active": "0.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-2B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-2B",
+                        "type": "chat",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "0.0B",
+                            "active": "0.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 1.63,
+                                "disk_gb": 1.63,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-2B",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3.5-2B-4bit",
+                            "ollama": "https://ollama.com/library/qwen3.5:2b"
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-4B-Base",
+                        "type": "completion",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "4.7B",
+                            "active": "4.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 3.06,
+                                "disk_gb": 3.06,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 3.06,
+                                "disk_gb": 3.06,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-4B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-4B",
+                        "type": "chat",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "4.7B",
+                            "active": "4.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 2.85,
+                                "disk_gb": 2.85,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 3.06,
+                                "disk_gb": 3.06,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-4B",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3.5-4B-MLX-4bit",
+                            "ollama": "https://ollama.com/library/qwen3.5:4b"
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-9B-Base",
+                        "type": "completion",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "9.7B",
+                            "active": "9.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 6.3,
+                                "disk_gb": 6.3,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 6.3,
+                                "disk_gb": 6.3,
+                                "ram_gb": 12
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-9B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-9B",
+                        "type": "chat",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "9.7B",
+                            "active": "9.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 5.57,
+                                "disk_gb": 5.57,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 6.3,
+                                "disk_gb": 6.3,
+                                "ram_gb": 12
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-9B",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3.5-9B-MLX-4bit",
+                            "ollama": "https://ollama.com/library/qwen3.5:9b"
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-27B",
+                        "type": "chat",
+                        "last_updated": "2026-02-25",
+                        "parameters": {
+                            "total": "27.8B",
+                            "active": "27.8B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 14.98,
+                                "disk_gb": 14.98,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 18.07,
+                                "disk_gb": 18.07,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-27B",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3.5-27B-4bit",
+                            "ollama": "https://ollama.com/library/qwen3.5:27b"
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-35B-A3B-Base",
+                        "type": "completion",
+                        "last_updated": "2026-03-02",
+                        "parameters": {
+                            "total": "36.0B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 23.4,
+                                "disk_gb": 23.4,
+                                "ram_gb": 32
+                            },
+                            "ollama": {
+                                "download_gb": 23.4,
+                                "disk_gb": 23.4,
+                                "ram_gb": 32
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Qwen3.5-35B-A3B",
+                        "type": "chat",
+                        "last_updated": "2026-02-27",
+                        "parameters": {
+                            "total": "36.0B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 19.02,
+                                "disk_gb": 19.02,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 23.4,
+                                "disk_gb": 23.4,
+                                "ram_gb": 32
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3.5-35B-A3B-4bit",
+                            "ollama": "https://ollama.com/library/qwen3.5:35b"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "BigCode (StarCoder)",
+        "families": [
+            {
+                "label": "StarCoder2",
+                "models": [
+                    {
+                        "name": "starcoder2-3b",
+                        "type": "chat",
+                        "last_updated": "2024-03-04",
+                        "parameters": {
+                            "total": "3.0B",
+                            "active": "3.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 1.79,
+                                "disk_gb": 1.79,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 1.95,
+                                "disk_gb": 1.95,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/bigcode/starcoder2-3b",
+                            "mlx": "https://huggingface.co/mlx-community/starcoder2-3b-4bit",
+                            "ollama": "https://ollama.com/library/starcoder2:3b"
+                        }
+                    },
+                    {
+                        "name": "starcoder2-7b",
+                        "type": "chat",
+                        "last_updated": "2024-06-11",
+                        "parameters": {
+                            "total": "7.2B",
+                            "active": "7.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.07,
+                                "disk_gb": 4.07,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 4.68,
+                                "disk_gb": 4.68,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/bigcode/starcoder2-7b",
+                            "mlx": "https://huggingface.co/mlx-community/starcoder2-7b-4bit",
+                            "ollama": "https://ollama.com/library/starcoder2:7b"
+                        }
+                    },
+                    {
+                        "name": "starcoder2-15b",
+                        "type": "chat",
+                        "last_updated": "2024-06-05",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 12.83,
+                                "disk_gb": 12.83,
+                                "ram_gb": 16
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/bigcode/starcoder2-15b",
+                            "mlx": "https://huggingface.co/mlx-community/starcoder2-15b-4bit",
+                            "ollama": "https://ollama.com/library/starcoder2:15b"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "DeepSeek",
+        "families": [
+            {
+                "label": "DeepSeek V2",
+                "models": [
+                    {
+                        "name": "DeepSeek-V2-Lite-Chat",
+                        "type": "chat",
+                        "last_updated": "2024-06-25",
+                        "parameters": {
+                            "total": "15.7B",
+                            "active": "2.4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 8.24,
+                                "disk_gb": 8.24,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 10.21,
+                                "disk_gb": 10.21,
+                                "ram_gb": 16
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+                            "mlx": "https://huggingface.co/mlx-community/DeepSeek-V2-Lite-Chat-4bit-mlx",
+                            "ollama": "https://ollama.com/library/deepseek-v2:16b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "DeepSeek V2.5",
+                "models": [
+                    {
+                        "name": "DeepSeek-V2.5-1210",
+                        "type": "chat",
+                        "last_updated": "2024-12-11",
+                        "parameters": {
+                            "total": "235.7B",
+                            "active": "235.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 123.57,
+                                "disk_gb": 123.57,
+                                "ram_gb": 128
+                            },
+                            "ollama": {
+                                "download_gb": 153.2,
+                                "disk_gb": 153.2,
+                                "ram_gb": 192
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/deepseek-ai/DeepSeek-V2.5-1210",
+                            "mlx": "https://huggingface.co/mlx-community/DeepSeek-V2.5-1210-4bit",
+                            "ollama": "https://ollama.com/milkey/deepseek-v2.5-1210:IQ1_S"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Google (Gemma)",
+        "families": [
+            {
+                "label": "Gemma 4",
+                "models": [
+                    {
+                        "name": "gemma-4-E2B",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "5.1B",
+                            "active": "2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.0,
+                                "disk_gb": 4.0,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 3.31,
+                                "disk_gb": 3.31,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-E2B",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-e2b-mxfp4",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "gemma-4-E2B-it",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "5.1B",
+                            "active": "2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.0,
+                                "disk_gb": 4.0,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 3.31,
+                                "disk_gb": 3.31,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-E2B-it",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-e2b-it-mxfp4",
+                            "ollama": "https://ollama.com/library/gemma4:e2b"
+                        }
+                    },
+                    {
+                        "name": "gemma-4-E4B",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "8.0B",
+                            "active": "4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.89,
+                                "disk_gb": 4.89,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 5.2,
+                                "disk_gb": 5.2,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-E4B",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-e4b-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "gemma-4-E4B-it",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "8.0B",
+                            "active": "4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 6.31,
+                                "disk_gb": 6.31,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 5.2,
+                                "disk_gb": 5.2,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-E4B-it",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-e4b-it-mxfp4",
+                            "ollama": "https://ollama.com/library/gemma4:e4b"
+                        }
+                    },
+                    {
+                        "name": "gemma-4-26B-A4B",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "25.8B",
+                            "active": "4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 13.85,
+                                "disk_gb": 13.85,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 16.77,
+                                "disk_gb": 16.77,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-26B-A4B",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-26b-a4b-mxfp4",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "gemma-4-26B-A4B-it",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "25.8B",
+                            "active": "4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 13.85,
+                                "disk_gb": 13.85,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 16.77,
+                                "disk_gb": 16.77,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-26B-A4B-it",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-mxfp4",
+                            "ollama": "https://ollama.com/library/gemma4:26b"
+                        }
+                    },
+                    {
+                        "name": "gemma-4-31B",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "31.3B",
+                            "active": "31.3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 16.28,
+                                "disk_gb": 16.28,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 20.35,
+                                "disk_gb": 20.35,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-31B",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-31b-mxfp4",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "gemma-4-31B-it",
+                        "type": "chat",
+                        "last_updated": "2026-04-02",
+                        "parameters": {
+                            "total": "31.3B",
+                            "active": "31.3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 16.28,
+                                "disk_gb": 16.28,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 20.35,
+                                "disk_gb": 20.35,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/google/gemma-4-31B-it",
+                            "mlx": "https://huggingface.co/mlx-community/gemma-4-31b-it-mxfp4",
+                            "ollama": "https://ollama.com/library/gemma4:31b"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "HuggingFace (SmolLM)",
+        "families": [
+            {
+                "label": "SmolLM3",
+                "models": [
+                    {
+                        "name": "SmolLM3-3B-Base",
+                        "type": "completion",
+                        "last_updated": "2025-08-14",
+                        "parameters": {
+                            "total": "3.1B",
+                            "active": "3.1B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 2.02,
+                                "disk_gb": 2.02,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.02,
+                                "disk_gb": 2.02,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/HuggingFaceTB/SmolLM3-3B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "SmolLM3-3B",
+                        "type": "chat",
+                        "last_updated": "2025-09-10",
+                        "parameters": {
+                            "total": "3.1B",
+                            "active": "3.1B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 1.63,
+                                "disk_gb": 1.63,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.02,
+                                "disk_gb": 2.02,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/HuggingFaceTB/SmolLM3-3B",
+                            "mlx": "https://huggingface.co/mlx-community/SmolLM3-3B-4bit",
+                            "ollama": "https://ollama.com/alibayram/smollm3:latest"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "IBM (Granite)",
+        "families": [
+            {
+                "label": "Granite 4.0 Nano Language Models",
+                "models": [
+                    {
+                        "name": "granite-4.0-350m-base",
+                        "type": "completion",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "0.4B",
+                            "active": "0.4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.26,
+                                "disk_gb": 0.26,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.26,
+                                "disk_gb": 0.26,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-350m-base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-350m-base",
+                        "type": "completion",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "0.3B",
+                            "active": "0.3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.2,
+                                "disk_gb": 0.2,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.2,
+                                "disk_gb": 0.2,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-350m-base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-350m",
+                        "type": "chat",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "0.4B",
+                            "active": "0.4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.26,
+                                "disk_gb": 0.26,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.26,
+                                "disk_gb": 0.26,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-350m",
+                            "mlx": "",
+                            "ollama": "https://ollama.com/library/granite4:350m"
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-350m",
+                        "type": "chat",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-350m",
+                            "mlx": "",
+                            "ollama": "https://ollama.com/library/granite4:350m-h"
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-1b-base",
+                        "type": "completion",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "1.6B",
+                            "active": "1.6B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 1.04,
+                                "disk_gb": 1.04,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 1.04,
+                                "disk_gb": 1.04,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-1b-base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-1b-base",
+                        "type": "completion",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "1.5B",
+                            "active": "1.5B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.98,
+                                "disk_gb": 0.98,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-1b-base",
+                            "mlx": "https://huggingface.co/mlx-community/granite-4.0-h-1b-base-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-1b",
+                        "type": "chat",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-1b",
+                            "mlx": "",
+                            "ollama": "https://ollama.com/library/granite4:1b"
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-1b",
+                        "type": "chat",
+                        "last_updated": "2025-10-23",
+                        "parameters": {
+                            "total": "1.5B",
+                            "active": "1.5B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.98,
+                                "disk_gb": 0.98,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-1b",
+                            "mlx": "https://huggingface.co/mlx-community/granite-4.0-h-1b-4bit",
+                            "ollama": "https://ollama.com/library/granite4:1b-h"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Granite 4.0 Language Models",
+                "models": [
+                    {
+                        "name": "granite-4.0-micro-base",
+                        "type": "completion",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "3.4B",
+                            "active": "3.4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 2.21,
+                                "disk_gb": 2.21,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.21,
+                                "disk_gb": 2.21,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-micro-base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-micro-base",
+                        "type": "completion",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "3.2B",
+                            "active": "3.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 2.08,
+                                "disk_gb": 2.08,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.08,
+                                "disk_gb": 2.08,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-micro-base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-micro",
+                        "type": "chat",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 3.38,
+                                "disk_gb": 3.38,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-micro",
+                            "mlx": "https://huggingface.co/mlx-community/granite-4.0-micro-8bit",
+                            "ollama": "https://ollama.com/library/granite4:micro"
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-micro",
+                        "type": "chat",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "3.2B",
+                            "active": "3.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 3.17,
+                                "disk_gb": 3.17,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.08,
+                                "disk_gb": 2.08,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-micro",
+                            "mlx": "https://huggingface.co/mlx-community/granite-4.0-h-micro-8bit",
+                            "ollama": "https://ollama.com/library/granite4:micro-h"
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-tiny-base",
+                        "type": "completion",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "6.9B",
+                            "active": "6.9B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.49,
+                                "disk_gb": 4.49,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 4.49,
+                                "disk_gb": 4.49,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-tiny-base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-tiny-base-preview",
+                        "type": "chat",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "6.7B",
+                            "active": "6.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.36,
+                                "disk_gb": 4.36,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 4.36,
+                                "disk_gb": 4.36,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-tiny-base-preview",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-tiny-preview",
+                        "type": "chat",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 3.5,
+                                "disk_gb": 3.5,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-tiny-preview",
+                            "mlx": "https://huggingface.co/mlx-community/granite-4.0-tiny-preview-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-tiny",
+                        "type": "chat",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "6.9B",
+                            "active": "6.9B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 6.88,
+                                "disk_gb": 6.88,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 4.49,
+                                "disk_gb": 4.49,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-tiny",
+                            "mlx": "https://huggingface.co/mlx-community/granite-4.0-h-tiny-8bit",
+                            "ollama": "https://ollama.com/library/granite4:tiny-h"
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-small-base",
+                        "type": "completion",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "32.2B",
+                            "active": "32.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 20.93,
+                                "disk_gb": 20.93,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 20.93,
+                                "disk_gb": 20.93,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-small-base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "granite-4.0-h-small",
+                        "type": "chat",
+                        "last_updated": "2025-11-03",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 16.89,
+                                "disk_gb": 16.89,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/ibm-granite/granite-4.0-h-small",
+                            "mlx": "https://huggingface.co/mlx-community/granite-4.0-h-small-4bit",
+                            "ollama": "https://ollama.com/library/granite4:small-h"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "LiquidAI (LFM)",
+        "families": [
+            {
+                "label": "LFM2.5",
+                "models": [
+                    {
+                        "name": "LFM2.5-350M",
+                        "type": "chat",
+                        "last_updated": "2026-04-01",
+                        "parameters": {
+                            "total": "0.4B",
+                            "active": "0.4B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.38,
+                                "disk_gb": 0.38,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.26,
+                                "disk_gb": 0.26,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/LiquidAI/LFM2.5-350M",
+                            "mlx": "https://huggingface.co/LiquidAI/LFM2.5-350M-MLX-8bit",
+                            "ollama": "https://ollama.com/LiquidAI/lfm2.5-350m"
+                        }
+                    },
+                    {
+                        "name": "LFM2.5-1.2B-Base",
+                        "type": "completion",
+                        "last_updated": "2026-03-30",
+                        "parameters": {
+                            "total": "1.2B",
+                            "active": "1.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "LFM2.5-1.2B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2026-03-30",
+                        "parameters": {
+                            "total": "1.2B",
+                            "active": "1.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 1.16,
+                                "disk_gb": 1.16,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct",
+                            "mlx": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit",
+                            "ollama": "https://ollama.com/LiquidAI/lfm2.5-1.2b-instruct:latest"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Meta (Llama)",
+        "families": [
+            {
+                "label": "Llama 3.1",
+                "models": [
+                    {
+                        "name": "Llama-3.1-8B",
+                        "type": "chat",
+                        "last_updated": "2024-10-16",
+                        "parameters": {
+                            "total": "8.0B",
+                            "active": "8.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.22,
+                                "disk_gb": 4.22,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 5.2,
+                                "disk_gb": 5.2,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.1-8B",
+                            "mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-8B-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Llama-3.1-8B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2024-09-25",
+                        "parameters": {
+                            "total": "8.0B",
+                            "active": "8.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.22,
+                                "disk_gb": 4.22,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 5.2,
+                                "disk_gb": 5.2,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",
+                            "ollama": "https://ollama.com/library/llama3.1:8b"
+                        }
+                    },
+                    {
+                        "name": "Llama-3.1-70B",
+                        "type": "chat",
+                        "last_updated": "2024-09-25",
+                        "parameters": {
+                            "total": "70.6B",
+                            "active": "70.6B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 36.97,
+                                "disk_gb": 36.97,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "download_gb": 45.89,
+                                "disk_gb": 45.89,
+                                "ram_gb": 64
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.1-70B",
+                            "mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-70B-4bit",
+                            "ollama": "https://ollama.com/library/llama3.1:70b"
+                        }
+                    },
+                    {
+                        "name": "Llama-3.1-70B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2024-12-15",
+                        "parameters": {
+                            "total": "70.6B",
+                            "active": "70.6B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 36.97,
+                                "disk_gb": 36.97,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "download_gb": 45.89,
+                                "disk_gb": 45.89,
+                                "ram_gb": 64
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-70B-Instruct-4bit",
+                            "ollama": ""
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Llama 3.2",
+                "models": [
+                    {
+                        "name": "Llama-3.2-1B",
+                        "type": "chat",
+                        "last_updated": "2024-10-24",
+                        "parameters": {
+                            "total": "1.2B",
+                            "active": "1.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.2-1B",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Llama-3.2-1B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2024-10-24",
+                        "parameters": {
+                            "total": "1.2B",
+                            "active": "1.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.66,
+                                "disk_gb": 0.66,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.78,
+                                "disk_gb": 0.78,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit",
+                            "ollama": "https://ollama.com/library/llama3.2:1b"
+                        }
+                    },
+                    {
+                        "name": "Llama-3.2-3B",
+                        "type": "chat",
+                        "last_updated": "2024-10-24",
+                        "parameters": {
+                            "total": "3.2B",
+                            "active": "3.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 3.19,
+                                "disk_gb": 3.19,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.08,
+                                "disk_gb": 2.08,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.2-3B",
+                            "mlx": "https://huggingface.co/mlx-community/Llama-3.2-3B-8bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Llama-3.2-3B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2024-10-24",
+                        "parameters": {
+                            "total": "3.2B",
+                            "active": "3.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 1.7,
+                                "disk_gb": 1.7,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.08,
+                                "disk_gb": 2.08,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Llama-3.2-3B-Instruct-4bit",
+                            "ollama": "https://ollama.com/library/llama3.2:3b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Llama 3.3",
+                "models": [
+                    {
+                        "name": "Llama-3.3-70B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2024-12-21",
+                        "parameters": {
+                            "total": "70.6B",
+                            "active": "70.6B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 28.77,
+                                "disk_gb": 28.77,
+                                "ram_gb": 32
+                            },
+                            "ollama": {
+                                "download_gb": 45.89,
+                                "disk_gb": 45.89,
+                                "ram_gb": 64
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Llama-3.3-70B-Instruct-3bit",
+                            "ollama": "https://ollama.com/library/llama3.3:70b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Llama 4",
+                "models": [
+                    {
+                        "name": "Llama-4-Scout-17B-16E",
+                        "type": "chat",
+                        "last_updated": "2025-04-09",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 56.48,
+                                "disk_gb": 56.48,
+                                "ram_gb": 64
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E",
+                            "mlx": "https://huggingface.co/mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Llama-4-Scout-17B-16E-Instruct",
+                        "type": "chat",
+                        "last_updated": "2025-05-22",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 56.94,
+                                "disk_gb": 56.94,
+                                "ram_gb": 64
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Llama-4-Scout-17B-16E-Instruct-4bit",
+                            "ollama": "https://ollama.com/library/llama4:16x17b"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Microsoft",
+        "families": [
+            {
+                "label": "Phi-4",
+                "models": [
+                    {
+                        "name": "Phi-4-mini-instruct",
+                        "type": "chat",
+                        "last_updated": "2025-12-10",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 2.03,
+                                "disk_gb": 2.03,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit",
+                            "ollama": "https://ollama.com/library/phi4-mini:3.8b"
+                        }
+                    },
+                    {
+                        "name": "phi-4",
+                        "type": "chat",
+                        "last_updated": "2025-11-24",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 7.69,
+                                "disk_gb": 7.69,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/microsoft/phi-4",
+                            "mlx": "https://huggingface.co/mlx-community/phi-4-4bit",
+                            "ollama": "https://ollama.com/library/phi4:14b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "NextCoder",
+                "models": [
+                    {
+                        "name": "NextCoder-7B",
+                        "type": "chat",
+                        "last_updated": "2025-06-12",
+                        "parameters": {
+                            "total": "7.6B",
+                            "active": "7.6B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.45,
+                                "disk_gb": 4.45,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 4.94,
+                                "disk_gb": 4.94,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/microsoft/NextCoder-7B",
+                            "mlx": "https://huggingface.co/jedisct1/NextCoder-7B-q4-mlx",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "NextCoder-14B",
+                        "type": "chat",
+                        "last_updated": "2025-06-12",
+                        "parameters": {
+                            "total": "14.8B",
+                            "active": "14.8B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 7.75,
+                                "disk_gb": 7.75,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 9.62,
+                                "disk_gb": 9.62,
+                                "ram_gb": 16
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/microsoft/NextCoder-14B",
+                            "mlx": "https://huggingface.co/jedisct1/NextCoder-14B-q4-mlx",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "NextCoder-32B",
+                        "type": "chat",
+                        "last_updated": "2025-06-12",
+                        "parameters": {
+                            "total": "32.8B",
+                            "active": "32.8B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 19.09,
+                                "disk_gb": 19.09,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 21.32,
+                                "disk_gb": 21.32,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/microsoft/NextCoder-32B",
+                            "mlx": "https://huggingface.co/jedisct1/NextCoder-32B-q4-mlx",
+                            "ollama": ""
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Mistral AI",
+        "families": [
+            {
+                "label": "Mistral",
+                "models": [
+                    {
+                        "name": "Mistral-7B-Instruct-v0.3",
+                        "type": "chat",
+                        "last_updated": "2025-12-03",
+                        "parameters": {
+                            "total": "7.2B",
+                            "active": "7.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 3.8,
+                                "disk_gb": 3.8,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 4.68,
+                                "disk_gb": 4.68,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+                            "mlx": "https://huggingface.co/mlx-community/Mistral-7B-Instruct-v0.3-4bit",
+                            "ollama": "https://ollama.com/library/mistral:7b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Ministral",
+                "models": [
+                    {
+                        "name": "Ministral-3-3B-Base-2512",
+                        "type": "chat",
+                        "last_updated": "2026-01-15",
+                        "parameters": {
+                            "total": "3.8B",
+                            "active": "3.8B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 2.47,
+                                "disk_gb": 2.47,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.47,
+                                "disk_gb": 2.47,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Ministral-3-3B-Base-2512",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Ministral-3-3B-Instruct-2512",
+                        "type": "chat",
+                        "last_updated": "2026-01-15",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 6.4,
+                                "disk_gb": 6.4,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512",
+                            "mlx": "https://huggingface.co/mlx-community/Ministral-3-3B-Instruct-2512",
+                            "ollama": "https://ollama.com/library/ministral-3:3b"
+                        }
+                    },
+                    {
+                        "name": "Ministral-3-8B-Base-2512",
+                        "type": "chat",
+                        "last_updated": "2026-01-15",
+                        "parameters": {
+                            "total": "8.9B",
+                            "active": "8.9B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 5.79,
+                                "disk_gb": 5.79,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 5.79,
+                                "disk_gb": 5.79,
+                                "ram_gb": 12
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Ministral-3-8B-Base-2512",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Ministral-3-8B-Instruct-2512",
+                        "type": "chat",
+                        "last_updated": "2026-01-15",
+                        "parameters": {
+                            "total": "1.5B",
+                            "active": "1.5B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 5.24,
+                                "disk_gb": 5.24,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 0.98,
+                                "disk_gb": 0.98,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512",
+                            "mlx": "https://huggingface.co/mlx-community/Ministral-3-8B-Instruct-2512-4bit",
+                            "ollama": "https://ollama.com/library/ministral-3:8b"
+                        }
+                    },
+                    {
+                        "name": "Ministral-3-14B-Base-2512",
+                        "type": "chat",
+                        "last_updated": "2026-01-15",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Ministral-3-14B-Base-2512",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Ministral-3-14B-Instruct-2512",
+                        "type": "chat",
+                        "last_updated": "2026-01-15",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 7.88,
+                                "disk_gb": 7.88,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512",
+                            "mlx": "https://huggingface.co/mlx-community/Ministral-3-14B-Instruct-2512-4bit",
+                            "ollama": "https://ollama.com/library/ministral-3:14b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Mistral Small",
+                "models": [
+                    {
+                        "name": "mistral-small:22b",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "",
+                            "mlx": "",
+                            "ollama": "https://ollama.com/library/mistral-small:22b"
+                        }
+                    },
+                    {
+                        "name": "Mistral-Small-3.2-24B-Instruct-2506",
+                        "type": "chat",
+                        "last_updated": "2025-12-22",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 12.37,
+                                "disk_gb": 12.37,
+                                "ram_gb": 16
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+                            "mlx": "https://huggingface.co/mlx-community/Mistral-Small-3.2-24B-Instruct-2506-4bit",
+                            "ollama": "https://ollama.com/library/mistral-small3.2:24b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Mistral Large",
+                "models": [
+                    {
+                        "name": "Mistral-Large-Instruct-2411",
+                        "type": "chat",
+                        "last_updated": "2025-07-28",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 42.83,
+                                "disk_gb": 42.83,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mistral-Large-Instruct-2411",
+                            "mlx": "https://huggingface.co/zachlandes/Mistral-Large-Instruct-2411-Q2-MLX",
+                            "ollama": "https://ollama.com/library/mistral-large:123b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Mixtral",
+                "models": [
+                    {
+                        "name": "Mixtral-8x7B-v0.1",
+                        "type": "chat",
+                        "last_updated": "2025-07-24",
+                        "parameters": {
+                            "total": "46.7B",
+                            "active": "46.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
+                            "tags": [
+                                "moe",
+                                "mixture_of_experts"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 30.36,
+                                "disk_gb": 30.36,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "download_gb": 30.36,
+                                "disk_gb": 30.36,
+                                "ram_gb": 48
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mixtral-8x7B-v0.1",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Mixtral-8x7B-Instruct-v0.1",
+                        "type": "chat",
+                        "last_updated": "2025-07-24",
+                        "parameters": {
+                            "total": "46.7B",
+                            "active": "46.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 86.99,
+                                "disk_gb": 86.99,
+                                "ram_gb": 96
+                            },
+                            "ollama": {
+                                "download_gb": 30.36,
+                                "disk_gb": 30.36,
+                                "ram_gb": 48
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
+                            "mlx": "https://huggingface.co/mlx-community/Mixtral-8x7B-Instruct-v0.1",
+                            "ollama": "https://ollama.com/library/mixtral:8x7b"
+                        }
+                    },
+                    {
+                        "name": "Mixtral-8x22B-Instruct-v0.1",
+                        "type": "chat",
+                        "last_updated": "2025-07-24",
+                        "parameters": {
+                            "total": "140.6B",
+                            "active": "140.6B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 73.94,
+                                "disk_gb": 73.94,
+                                "ram_gb": 96
+                            },
+                            "ollama": {
+                                "download_gb": 91.39,
+                                "disk_gb": 91.39,
+                                "ram_gb": 96
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mixtral-8x22B-Instruct-v0.1",
+                            "mlx": "https://huggingface.co/mlx-community/Mixtral-8x22B-4bit",
+                            "ollama": "https://ollama.com/library/mixtral:8x22b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Mistral NeMo",
+                "models": [
+                    {
+                        "name": "Mistral-Nemo-Base-2407",
+                        "type": "chat",
+                        "last_updated": "2025-07-28",
+                        "parameters": {
+                            "total": "12.2B",
+                            "active": "12.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 6.43,
+                                "disk_gb": 6.43,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 7.93,
+                                "disk_gb": 7.93,
+                                "ram_gb": 12
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mistral-Nemo-Base-2407",
+                            "mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Base-2407-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Mistral-Nemo-Instruct-2407",
+                        "type": "chat",
+                        "last_updated": "2025-07-28",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 6.43,
+                                "disk_gb": 6.43,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407",
+                            "mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Instruct-2407-4bit",
+                            "ollama": "https://ollama.com/library/mistral-nemo:12b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Codestral",
+                "models": [
+                    {
+                        "name": "Codestral-22B-v0.1",
+                        "type": "chat",
+                        "last_updated": "2025-07-24",
+                        "parameters": {
+                            "total": "22.2B",
+                            "active": "22.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 11.66,
+                                "disk_gb": 11.66,
+                                "ram_gb": 16
+                            },
+                            "ollama": {
+                                "download_gb": 14.43,
+                                "disk_gb": 14.43,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Codestral-22B-v0.1",
+                            "mlx": "https://huggingface.co/mlx-community/Codestral-22B-v0.1-4bit",
+                            "ollama": "https://ollama.com/library/codestral:22b"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Moonshot AI (Kimi)",
+        "families": [
+            {
+                "label": "Kimi-Linear-A3B",
+                "models": [
+                    {
+                        "name": "Kimi-Linear-48B-A3B-Base",
+                        "type": "completion",
+                        "last_updated": "2026-01-30",
+                        "parameters": {
+                            "total": "49.1B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 31.92,
+                                "disk_gb": 31.92,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "download_gb": 31.92,
+                                "disk_gb": 31.92,
+                                "ram_gb": 48
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/moonshotai/Kimi-Linear-48B-A3B-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Kimi-Linear-48B-A3B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2025-12-16",
+                        "parameters": {
+                            "total": "49.1B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 25.75,
+                                "disk_gb": 25.75,
+                                "ram_gb": 32
+                            },
+                            "ollama": {
+                                "download_gb": 31.92,
+                                "disk_gb": 31.92,
+                                "ram_gb": 48
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/moonshotai/Kimi-Linear-48B-A3B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Kimi-Linear-48B-A3B-Instruct-4bit",
+                            "ollama": ""
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Moonlight-A3B",
+                "models": [
+                    {
+                        "name": "Moonlight-16B-A3B",
+                        "type": "chat",
+                        "last_updated": "2026-01-30",
+                        "parameters": {
+                            "total": "16.0B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 10.4,
+                                "disk_gb": 10.4,
+                                "ram_gb": 16
+                            },
+                            "ollama": {
+                                "download_gb": 10.4,
+                                "disk_gb": 10.4,
+                                "ram_gb": 16
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/moonshotai/Moonlight-16B-A3B",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Moonlight-16B-A3B-Instruct",
+                        "type": "chat",
+                        "last_updated": "2026-01-30",
+                        "parameters": {
+                            "total": "16.0B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 8.37,
+                                "disk_gb": 8.37,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 10.4,
+                                "disk_gb": 10.4,
+                                "ram_gb": 16
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/moonshotai/Moonlight-16B-A3B-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/Moonlight-16B-A3B-Instruct-4-bit",
+                            "ollama": ""
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "NousResearch (Hermes)",
+        "families": [
+            {
+                "label": "Hermes 3",
+                "models": [
+                    {
+                        "name": "Hermes-3-Llama-3.2-3B",
+                        "type": "chat",
+                        "last_updated": "2024-12-18",
+                        "parameters": {
+                            "total": "3.2B",
+                            "active": "3.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "instruct",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 1.7,
+                                "disk_gb": 1.7,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 2.08,
+                                "disk_gb": 2.08,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.2-3B",
+                            "mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.2-3B-4bit",
+                            "ollama": "https://ollama.com/library/hermes3:3b"
+                        }
+                    },
+                    {
+                        "name": "Hermes-3-Llama-3.1-8B",
+                        "type": "chat",
+                        "last_updated": "2024-09-08",
+                        "parameters": {
+                            "total": "8.0B",
+                            "active": "8.0B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "instruct",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 4.22,
+                                "disk_gb": 4.22,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "download_gb": 5.2,
+                                "disk_gb": 5.2,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
+                            "mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.1-8B-4bit",
+                            "ollama": "https://ollama.com/library/hermes3:8b"
+                        }
+                    },
+                    {
+                        "name": "Hermes-3-Llama-3.1-70B",
+                        "type": "chat",
+                        "last_updated": "2024-09-08",
+                        "parameters": {
+                            "total": "70.6B",
+                            "active": "70.6B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "instruct",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 36.97,
+                                "disk_gb": 36.97,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "download_gb": 45.89,
+                                "disk_gb": 45.89,
+                                "ram_gb": 64
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-70B",
+                            "mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.1-70B-4bit",
+                            "ollama": "https://ollama.com/library/hermes3:70b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Hermes 4",
+                "models": [
+                    {
+                        "name": "Hermes-4-14B",
+                        "type": "chat",
+                        "last_updated": "2026-01-09",
+                        "parameters": {
+                            "total": "14.8B",
+                            "active": "14.8B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation",
+                                "instruct",
+                                "reasoning"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 7.75,
+                                "disk_gb": 7.75,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 9.62,
+                                "disk_gb": 9.62,
+                                "ram_gb": 16
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/NousResearch/Hermes-4-14B",
+                            "mlx": "https://huggingface.co/mlx-community/Hermes-4-14B-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Hermes-4.3-36B",
+                        "type": "chat",
+                        "last_updated": "2025-12-06",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation",
+                                "instruct",
+                                "reasoning"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 18.95,
+                                "disk_gb": 18.95,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/NousResearch/Hermes-4.3-36B",
+                            "mlx": "https://huggingface.co/alexcovo/Hermes-4.3-36B-mlx-4Bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Hermes-4-70B",
+                        "type": "chat",
+                        "last_updated": "2025-09-02",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation",
+                                "instruct",
+                                "reasoning"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 36.98,
+                                "disk_gb": 36.98,
+                                "ram_gb": 48
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/NousResearch/Hermes-4-70B",
+                            "mlx": "https://huggingface.co/mlx-community/Hermes-4-70B-4bit",
+                            "ollama": ""
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "NVIDIA (Nemotron)",
+        "families": [
+            {
+                "label": "Nemotron v3",
+                "models": [
+                    {
+                        "name": "NVIDIA-Nemotron-3-Nano-4B-BF16",
+                        "type": "chat",
+                        "last_updated": "2026-03-20",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 2.1,
+                                "disk_gb": 2.1,
+                                "ram_gb": 8
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+                            "mlx": "https://huggingface.co/mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit",
+                            "ollama": "https://ollama.com/library/nemotron-3-nano:4b"
+                        }
+                    },
+                    {
+                        "name": "NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16",
+                        "type": "chat",
+                        "last_updated": "2026-03-15",
+                        "parameters": {
+                            "total": "0.0B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+                        "type": "chat",
+                        "last_updated": "2026-03-15",
+                        "parameters": {
+                            "total": "0.0B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 16.57,
+                                "disk_gb": 16.57,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+                            "mlx": "https://huggingface.co/mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-4bit",
+                            "ollama": "https://ollama.com/library/nemotron-3-nano:30b"
+                        }
+                    },
+                    {
+                        "name": "NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16",
+                        "type": "chat",
+                        "last_updated": "2026-03-14",
+                        "parameters": {
+                            "total": "123.6B",
+                            "active": "12B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 80.34,
+                                "disk_gb": 80.34,
+                                "ram_gb": 96
+                            },
+                            "ollama": {
+                                "download_gb": 80.34,
+                                "disk_gb": 80.34,
+                                "ram_gb": 96
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
+                        "type": "chat",
+                        "last_updated": "2026-04-06",
+                        "parameters": {
+                            "total": "0.0B",
+                            "active": "12B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 63.35,
+                                "disk_gb": 63.35,
+                                "ram_gb": 96
+                            },
+                            "ollama": {
+                                "download_gb": 0.0,
+                                "disk_gb": 0.0,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
+                            "mlx": "https://huggingface.co/inferencerlabs/NVIDIA-Nemotron-3-Super-120B-A12B-MLX-4.5bit",
+                            "ollama": "https://ollama.com/library/nemotron-3-super:120b"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "OpenAI (ChatGPT)",
+        "families": [
+            {
+                "label": "gpt-oss",
+                "models": [
+                    {
+                        "name": "gpt-oss-20b",
+                        "type": "chat",
+                        "last_updated": "2025-08-26",
+                        "parameters": {
+                            "total": "1.8B",
+                            "active": "5.1B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 11.27,
+                                "disk_gb": 11.27,
+                                "ram_gb": 16
+                            },
+                            "ollama": {
+                                "download_gb": 1.17,
+                                "disk_gb": 1.17,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/openai/gpt-oss-20b",
+                            "mlx": "https://huggingface.co/mlx-community/gpt-oss-20b-MXFP4-Q8",
+                            "ollama": "https://ollama.com/library/gpt-oss:20b"
+                        }
+                    },
+                    {
+                        "name": "gpt-oss-120b",
+                        "type": "chat",
+                        "last_updated": "2025-08-26",
+                        "parameters": {
+                            "total": "2.2B",
+                            "active": "5.1B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 59.06,
+                                "disk_gb": 59.06,
+                                "ram_gb": 64
+                            },
+                            "ollama": {
+                                "download_gb": 1.43,
+                                "disk_gb": 1.43,
+                                "ram_gb": 8
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/openai/gpt-oss-120b",
+                            "mlx": "https://huggingface.co/mlx-community/gpt-oss-120b-MXFP4-Q8",
+                            "ollama": "https://ollama.com/library/gpt-oss:120b"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Upstage (Solar)",
+        "families": [
+            {
+                "label": "Solar Mini",
+                "models": [
+                    {
+                        "name": "SOLAR-10.7B-v1.0",
+                        "type": "chat",
+                        "last_updated": "2024-09-10",
+                        "parameters": {
+                            "total": "10.7B",
+                            "active": "10.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 6.96,
+                                "disk_gb": 6.96,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 6.96,
+                                "disk_gb": 6.96,
+                                "ram_gb": 12
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/upstage/SOLAR-10.7B-v1.0",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "SOLAR-10.7B-Instruct-v1.0",
+                        "type": "chat",
+                        "last_updated": "2024-09-10",
+                        "parameters": {
+                            "total": "10.7B",
+                            "active": "10.7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 5.8,
+                                "disk_gb": 5.8,
+                                "ram_gb": 12
+                            },
+                            "ollama": {
+                                "download_gb": 6.96,
+                                "disk_gb": 6.96,
+                                "ram_gb": 12
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0",
+                            "mlx": "https://huggingface.co/mlx-community/SOLAR-10.7B-Instruct-v1.0-4bit",
+                            "ollama": "https://ollama.com/library/solar:10.7b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Solar Pro",
+                "models": [
+                    {
+                        "name": "solar-pro-preview-pretrained",
+                        "type": "chat",
+                        "last_updated": "2024-09-09",
+                        "parameters": {
+                            "total": "22.1B",
+                            "active": "22.1B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 14.37,
+                                "disk_gb": 14.37,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 14.37,
+                                "disk_gb": 14.37,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/upstage/solar-pro-preview-pretrained",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "solar-pro-preview-instruct",
+                        "type": "chat",
+                        "last_updated": "2024-09-20",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/upstage/solar-pro-preview-instruct",
+                            "mlx": "",
+                            "ollama": "https://ollama.com/library/solar-pro:22b"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "Solar Open",
+                "models": [
+                    {
+                        "name": "Solar-Open-100B",
+                        "type": "chat",
+                        "last_updated": "2026-01-30",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "12B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "mixture_of_experts",
+                                "text",
+                                "moe",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 53.83,
+                                "disk_gb": 53.83,
+                                "ram_gb": 64
+                            },
+                            "ollama": {
+                                "disk_gb": null,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/upstage/Solar-Open-100B",
+                            "mlx": "https://huggingface.co/mlx-community/Solar-Open-100B-4bit",
+                            "ollama": "https://ollama.com/modest_elion_47/solar-open-100b:latest"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Zhipu AI (GLM)",
+        "families": [
+            {
+                "label": "GLM-4.7",
+                "models": [
+                    {
+                        "name": "GLM-4.7-Flash",
+                        "type": "chat",
+                        "last_updated": "2026-01-29",
+                        "parameters": {
+                            "total": "31.2B",
+                            "active": "31.2B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "text",
+                                "conversational",
+                                "text-generation"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": 20.28,
+                                "disk_gb": 20.28,
+                                "ram_gb": 24
+                            },
+                            "ollama": {
+                                "download_gb": 20.28,
+                                "disk_gb": 20.28,
+                                "ram_gb": 24
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/zai-org/GLM-4.7-Flash",
+                            "mlx": "",
+                            "ollama": "https://ollama.com/library/glm-4.7-flash:q4_K_M"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+]

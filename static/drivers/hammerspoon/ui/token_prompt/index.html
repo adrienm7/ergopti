@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title>Connexion HuggingFace</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<div id="container">
+			<h2>🔐 Connexion HuggingFace</h2>
+
+			<div id="instruction">
+				Collez votre token HuggingFace (hf_...) pour déverrouiller les modèles gated.
+			</div>
+
+			<div id="link-section">
+				Vous n'avez pas de token ?
+				<a href="javascript:void(0)" onclick="doOpenLink()">👉 Cliquez ici pour en créer un</a>
+			</div>
+
+			<div id="token-input-wrapper">
+				<label for="token-input">Token HuggingFace :</label>
+				<input
+					type="text"
+					id="token-input"
+					placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+					autofocus
+				/>
+			</div>
+
+			<div id="button-group">
+				<button id="btn-cancel" onclick="doCancel()">Annuler</button>
+				<button id="btn-validate" onclick="doValidate()">Valider</button>
+			</div>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>

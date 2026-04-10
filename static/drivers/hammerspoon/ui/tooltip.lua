@@ -56,6 +56,7 @@ local _state = {
     current_index   = 1,
     on_navigate     = nil,
     on_accept       = nil,
+    on_cancel       = nil,
     info_bar        = nil,
     shortcut_mod    = "alt",
     nav_mods        = {},
@@ -66,6 +67,8 @@ local _state = {
     llm_timeout_sec = M.LLM_TIMEOUT_SEC_DEFAULT,
     current_is_llm  = false,
     bg_color        = nil,
+    loading_text    = nil,
+    enter_validates = false,  -- True only after user navigates with arrow keys
 }
 
 local _watchers = {}
@@ -137,6 +140,8 @@ local function start_watchers()
     local w_key = hs.eventtap.new({evTypes.keyDown}, function(e)
         local kc = e:getKeyCode()
         local flags = e:getFlags()
+        local key_chars = e:getCharacters(true) or e:getCharacters(false) or ""
+        local is_enter_key = (kc == 36 or kc == 76 or key_chars == "\r" or key_chars == "\n")
         
         -- Priority interception: STRICTLY consume TAB when LLM predictions are active
         if kc == 48 and _state.current_is_llm then
@@ -147,10 +152,38 @@ local function start_watchers()
                     return true
                 end
             else
-                if type(_state.on_accept) == "function" then
-                    _state.on_accept(_state.current_index)
+                -- Only accept prediction if Tab is pressed alone (no other modifier)
+                local has_other_mod = flags.cmd or flags.alt or flags.ctrl or (flags.shift == true)
+                if not has_other_mod then
+                    if type(_state.on_accept) == "function" then
+                        _state.on_accept(_state.current_index)
+                    end
+                    return true
                 end
-                return true
+                -- If Tab is pressed with modifiers, cancel predictions and let it pass through
+                if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+                return false
+            end
+        end
+
+        -- Priority interception: Enter accepts prediction ONLY if user has navigated with arrow keys first
+        if _state.current_is_llm and is_enter_key then
+            local has_other_mod = flags.cmd or flags.alt or flags.ctrl or flags.shift
+            if not has_other_mod then
+                if _state.enter_validates then
+                    if type(_state.on_accept) == "function" then
+                        _state.on_accept(_state.current_index)
+                    end
+                    return true
+                else
+                    -- Enter not yet validated by navigation: cancel predictions and let it pass through
+                    if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+                    return false
+                end
+            else
+                -- Enter with modifier: cancel predictions and let it pass through for user shortcuts
+                if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+                return false
             end
         end
         
@@ -164,8 +197,8 @@ local function start_watchers()
             end
         end
         
-        -- Ignored keys (Enter is handled directly by keymap.lua to accept predictions)
-        if kc == 48 or kc == 36 then return false end 
+        -- Ignored keys
+        if kc == 48 then return false end 
         
         local mod = _state.shortcut_mod or "alt"
         
@@ -207,6 +240,10 @@ local function start_watchers()
             return false
         end
         
+        -- Any other key: cancel active predictions and hide
+        if _state.current_is_llm then
+            if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+        end
         M.hide()
         return false
     end)
@@ -314,6 +351,7 @@ local C_HINT     = { white = 0.40, alpha = 1.0 }
 local C_INFO_BAR = { white = 0.30, alpha = 1.0 } 
 local C_SEP      = { white = 1.00, alpha = 0.09 }
 local C_INVIS    = { white = 0.00, alpha = 0.00 }
+local C_LOADING  = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
 
 local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧", ["cmd+shift"] = "⌘⇧" }
 
@@ -397,8 +435,27 @@ local function build_line(pred, is_sel, total_preds)
     local chunks   = pred.chunks
     local nw       = pred.nw or ""
     local has_corr = pred.has_corrections
+    local has_equal_chunk = false
+    local has_insert_chunk = false
 
-    local bold_diff = (not is_sel) and (total_preds > 1) and has_corr
+    if type(chunks) == "table" then
+        for _, chunk in ipairs(chunks) do
+            if type(chunk) == "table" then
+                local chunk_text = tostring(chunk.text or "")
+                if chunk_text:gsub("%s+", "") ~= "" then
+                    if chunk.type == "equal" then has_equal_chunk = true end
+                    if chunk.type == "insert" then has_insert_chunk = true end
+                end
+            end
+        end
+    end
+
+    local special_correction_mode = (has_corr == true) or ((tonumber(pred.deletes) or 0) > 0)
+    local should_emphasize_non_selected = (not is_sel)
+        and (total_preds > 1)
+        and special_correction_mode
+        and has_equal_chunk
+        and has_insert_chunk
 
     local first_done = false
     local function clean_first(s)
@@ -419,10 +476,16 @@ local function build_line(pred, is_sel, total_preds)
                 if s and s ~= "" then
                     last_char = s:sub(-1)
                     if chunk.type == "insert" then
-                        local color = is_sel and C_CORR_SEL or C_UNSELECTED_GRAY
-                        result = append_seg(result, s, color, bold_diff)
+                        local color = C_UNSELECTED_GRAY
+                        if is_sel then
+                            color = special_correction_mode and C_CORR_SEL or C_NW_SEL
+                        end
+                        result = append_seg(result, s, color, should_emphasize_non_selected)
                     else -- "equal"
-                        local color = is_sel and C_UNCH_SEL or C_UNSELECTED_GRAY
+                        local color = C_UNSELECTED_GRAY
+                        if is_sel then
+                            color = special_correction_mode and C_UNCH_SEL or C_NW_SEL
+                        end
                         result = append_seg(result, s, color, false)
                     end
                 end
@@ -437,7 +500,8 @@ local function build_line(pred, is_sel, total_preds)
             s_nw = " " .. s_nw
         end
         local color = is_sel and C_NW_SEL or C_UNSELECTED_GRAY
-        result = append_seg(result, s_nw, color, bold_diff)
+        local should_bold_nw = should_emphasize_non_selected and (s_nw:gsub("%s+", "") ~= "")
+        result = append_seg(result, s_nw, color, should_bold_nw)
     end
 
     return result
@@ -454,36 +518,54 @@ end
 -- ==============================
 
 --- Assembles all lines and bottom hints into styled blocks ready for rendering
-local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod, indent, nav_mod_str)
+--- If reserved_count > n, adds empty placeholder lines to pre-size the canvas
+local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod, indent, nav_mod_str, loading_text, reserved_count)
     local n = type(raw_preds) == "table" and #raw_preds or 0
-    if n == 0 then return { preds = hs.styledtext.new("") } end
+    local display_count = math.max(n, tonumber(reserved_count) or n)  -- Shows n actual + (reserved_count - n) empty lines
+    
+    if n == 0 and (not reserved_count or tonumber(reserved_count) == 0) then return { preds = hs.styledtext.new("") } end
 
     local PREFIX_SEL, PREFIX_OTHER
 
-    if n == 1 then
-        PREFIX_SEL   = "✨ "
+    -- Use display_count (not n) so placeholders align with real predictions from the start
+    if display_count == 1 then
+        PREFIX_SEL   = "✨ "
         PREFIX_OTHER = ""
-    elseif n >= 2 and indent > 0 then
-        PREFIX_SEL   = string.rep(" ", indent) .. "✨ "
+    elseif display_count >= 2 and indent > 0 then
+        PREFIX_SEL   = string.rep(" ", indent) .. "✨ "
         PREFIX_OTHER = ""
     else
         -- Case of negative indent values
-        PREFIX_SEL   = "✨ "
-        PREFIX_OTHER = string.rep("_", indent * -1) -- Using a space doesn’t work here for an unknown reason
+        PREFIX_SEL   = "✨ "
+        PREFIX_OTHER = string.rep("_", indent * -1) -- Using a space doesn't work here for an unknown reason
     end
+
+    -- Invisible prefix of same width as PREFIX_SEL, for alignment of placeholder lines
+    local PREFIX_PLACEHOLDER = hs.styledtext.new(PREFIX_SEL, { font = { name = FONT, size = SIZE_MAIN }, color = C_BG })
 
     local result = nil
     local gap    = hs.styledtext.new("\n", { font = { name = FONT, size = 3 }, color = C_INVIS })
 
-    for i, pred in ipairs(raw_preds) do
-        local is_sel = (i == current_index)
+    for i = 1, display_count do
+        local pred = raw_preds[i]
+        local is_sel = (i == current_index and pred ~= nil)
         local prefix = hs.styledtext.new(is_sel and PREFIX_SEL or PREFIX_OTHER, {
             font  = { name = FONT, size = SIZE_MAIN }, color = is_sel and C_CURSOR or C_BG,
         })
 
-        local body = build_line(pred, is_sel, n)
-        if not body then
-            body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_UNSELECTED_GRAY })
+        -- For reserved empty slots, show empty stub; otherwise show actual prediction
+        local body
+        if pred ~= nil then
+            body = build_line(pred, is_sel, n)
+            if not body then
+                body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_UNSELECTED_GRAY })
+            end
+        else
+            -- Reserved slot: align with non-selected predictions (PREFIX_OTHER), text in yellow
+            local placeholder_prefix = hs.styledtext.new(PREFIX_OTHER, { font = { name = FONT, size = SIZE_MAIN }, color = C_BG })
+            body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_LOADING })
+            result = result and (result .. gap .. (placeholder_prefix .. body)) or (placeholder_prefix .. body)
+            goto continue
         end
 
         local cmd_str = ""
@@ -503,12 +585,17 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         end
 
         result = result and (result .. gap .. line) or line
+        ::continue::
     end
 
     local SP = string.rep(" ", 6) -- 6 mathematical spaces for visual padding
+    -- Note: loading_text with spinner is not appended to result anymore
+    -- Each reserved slot already shows "…" as placeholder
+    local loading_st = nil
+
     local hint_st
     
-    if n > 1 then
+    if display_count > 1 then
         local left_hint  = "⇧G + Tab"
         local right_hint = "⇧D + Tab"
         if nav_mod_str ~= "none" then
@@ -529,7 +616,7 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         info_st = hs.styledtext.new(safe_info, { font = { name = FONT, size = SIZE_INFO }, color = C_INFO_BAR, paragraphStyle = { alignment = "center" } })
     end
 
-    return { preds = result, hint_st = hint_st, info_st = info_st, SP = SP }
+    return { preds = result, loading_st = loading_st, hint_st = hint_st, info_st = info_st, SP = SP }
 end
 
 
@@ -691,6 +778,8 @@ function M.hide()
     _state.info_bar        = nil
     _state.fixed_width     = nil
     _state.bg_color        = nil
+    _state.loading_text    = nil
+    _state.enter_validates = false
 end
 
 --- Sets the auto-hide timeout duration for normal hotstrings (called by menu.lua or keymap.lua)
@@ -705,6 +794,12 @@ function M.set_navigate_callback(fn) _state.on_navigate = fn end
 --- Assigns a callback executed when the user explicitly accepts a prediction via shortcut
 function M.set_accept_callback(fn) _state.on_accept = fn end
 
+--- Assigns a callback executed when the user presses any key that interrupts predictions (shortcuts, modifiers, etc.)
+function M.set_cancel_callback(fn) _state.on_cancel = fn end
+
+--- Sets whether Enter should validate the current prediction (true only after arrow navigation).
+function M.set_enter_validates(v) _state.enter_validates = (v == true) end
+
 --- Retrieves the currently highlighted prediction index
 function M.get_current_index()       return _state.current_index end
 
@@ -715,7 +810,7 @@ function M.navigate(delta)
     if n < 2 then return end
     
     _state.current_index = ((_state.current_index - 1 + delta) % n) + 1
-    render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str))
+    render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, _state.reserved_count))
     
     if type(_state.on_navigate) == "function" then 
         pcall(_state.on_navigate, _state.current_index) 
@@ -724,7 +819,8 @@ function M.navigate(delta)
 end
 
 --- Displays multiple LLM predictions with full UI capabilities
-function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mods, bg_color)
+--- @param max_predictions_count Optional: reserve space for N predictions (default: actual count)
+function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mods, bg_color, loading_text, max_predictions_count)
     if not enabled then return end
     if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
     
@@ -736,6 +832,7 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     _state.indent          = indent or 0
     _state.current_is_llm  = true -- Ensure extended timeout is used
     _state.bg_color        = type(bg_color) == "table" and bg_color or nil
+    _state.loading_text    = loading_text
     
     local nav_mod_str = "none"
     if #_state.nav_mods > 0 and not (#_state.nav_mods == 1 and _state.nav_mods[1] == "none") then
@@ -746,9 +843,10 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     end
     _state.nav_mod_str = nav_mod_str
 
+    local reserved_count = math.max(1, math.floor(tonumber(max_predictions_count) or #predictions))
     local max_width = 0
-    for i = 1, #predictions do
-        local b = assemble_blocks(predictions, i, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str)
+    for i = 1, reserved_count do
+        local b = assemble_blocks(predictions, i, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, reserved_count)
         local w_preds = canvas:minimumTextSize(3, b.preds).w
         
         local sz_hint = b.hint_st and canvas:minimumTextSize(3, b.hint_st) or {w=0}
@@ -771,8 +869,10 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
         if w_final > max_width then max_width = w_final end
     end
     _state.fixed_width = max_width
+    _state.reserved_count = reserved_count
+    _state.enter_validates = false  -- Reset: Enter must not validate until user navigates
 
-    render(assemble_blocks(predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str))
+    render(assemble_blocks(predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, reserved_count))
 end
 
 --- Displays simple tooltip content (Hotstrings or Loading state)
@@ -786,6 +886,7 @@ function M.show(content, is_llm, enabled, bg_color)
     _state.fixed_width     = nil
     _state.current_is_llm  = (is_llm == true)
     _state.bg_color        = type(bg_color) == "table" and bg_color or nil
+    _state.loading_text    = nil
     
     local styled
     if type(content) == "userdata" then

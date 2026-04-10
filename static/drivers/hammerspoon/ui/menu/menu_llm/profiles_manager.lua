@@ -95,27 +95,15 @@ local function build_profile_menu(deps, models_mgr)
 		title    = "✨ Détection automatique du meilleur profil",
 		disabled = paused or nil,
 		fn       = not paused and function()
+			if type(deps.apply_recommended_prompt_profile) == "function" then
+				deps.apply_recommended_prompt_profile({ dialog_title = "Profil recommandé", force_dialog = true })
+				return
+			end
+
 			local model_name = state.llm_model
 			if type(model_name) ~= "string" or model_name == "" or not models_mgr then return end
-			
-			local info = models_mgr.get_model_info(model_name) or {}
-			local rec_profile = "basic"
 
-			if info.type == "completion" then
-				rec_profile = "raw"
-			elseif info.params and info.params > 0 then
-				if info.params < 2 then rec_profile = "raw"
-				elseif info.params < 4 then rec_profile = "basic"
-				elseif info.params < 7 then rec_profile = "advanced"
-				else rec_profile = "batch_advanced" end
-			end
-			
-			state.llm_active_profile = rec_profile
-			llm_mod.set_active_profile(rec_profile)
-			sync_profiles(state)
-			pcall(deps.save_prefs)
-			pcall(deps.update_menu)
-			pcall(notifications.notify, "✨ Profil auto-détecté", "Le profil optimal a été sélectionné pour " .. model_name)
+			pcall(notifications.notify, "Profil recommandé indisponible", "Impossible d’appliquer la détection automatique dans ce contexte")
 		end or nil,
 	})
 	table.insert(menu, { title = "-" })
@@ -140,11 +128,15 @@ local function build_profile_menu(deps, models_mgr)
 			checked  = (state.llm_active_profile == pid) or nil,
 			disabled = paused or nil,
 			fn       = not paused and function()
-				state.llm_active_profile = pid
-				llm_mod.set_active_profile(pid)
-				sync_profiles(state)
-				pcall(deps.save_prefs)
-				pcall(deps.update_menu)
+				if type(deps.set_llm_profile) == "function" then
+					deps.set_llm_profile(pid)
+				else
+					state.llm_active_profile = pid
+					llm_mod.set_active_profile(pid)
+					sync_profiles(state)
+					pcall(deps.save_prefs)
+					pcall(deps.update_menu)
+				end
 			end or nil,
 		})
 	end
@@ -171,11 +163,15 @@ local function build_profile_menu(deps, models_mgr)
 					checked  = (state.llm_active_profile == pid) or nil,
 					disabled = paused or nil,
 					fn       = not paused and function()
-						state.llm_active_profile = pid
-						llm_mod.set_active_profile(pid)
-						sync_profiles(state)
-						pcall(deps.save_prefs)
-						pcall(deps.update_menu)
+						if type(deps.set_llm_profile) == "function" then
+							deps.set_llm_profile(pid)
+						else
+							state.llm_active_profile = pid
+							llm_mod.set_active_profile(pid)
+							sync_profiles(state)
+							pcall(deps.save_prefs)
+							pcall(deps.update_menu)
+						end
 					end or nil,
 				},
 				{
@@ -242,8 +238,8 @@ local function build_profile_menu(deps, models_mgr)
 								llm_mod.set_active_profile("basic")
 							end
 							sync_profiles(state)
-							pcall(deps.save_prefs)
-							pcall(deps.update_menu)
+						pcall(deps.save_prefs)
+						pcall(deps.update_menu)
 						end
 					end,
 				},

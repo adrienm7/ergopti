@@ -28,9 +28,13 @@ local function clean_model_output(text)
     
     text = utils.unescape_text(text)
     text = text:gsub("%*%*", ""):gsub("`", ""):gsub("\"", "")
+    text = text:gsub("<[^>]->", "")
     
     text = text:gsub("^Voici la suite%s*:?%s*", "")
     text = text:gsub("^Je propose%s*:?%s*", "")
+    text = text:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
+    text = text:gsub("</body>%s*</html>", "")
+    text = text:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
     
     text = text:gsub("%[[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%]", "TAIL_CORRECTED:")
     text = text:gsub("%[[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%]", "NEXT_WORDS:")
@@ -174,7 +178,11 @@ function M.process_prediction(full_text, tail_text, block)
         local nw = block:gsub("^%s+", ""):gsub("%s+$", "")
         nw = nw:match("([^\n\r]+)") or nw
         nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
+        nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
+        nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
+        nw = nw:gsub("^[-•*]+%s*", "")
         nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+        if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
         
         -- Robust overlap mitigation using word-by-word comparison for basic models
         local full_words = {}

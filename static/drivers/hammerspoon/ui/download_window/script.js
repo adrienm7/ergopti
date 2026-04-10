@@ -1,23 +1,24 @@
 // ui/download_window/script.js
 
-// ===========================================================================
-// Download Window UI Script.
-//
-// Manages the UI state, progress bars, and logging output for the Ollama
-// LLM model download window. Handles communication with the Hammerspoon backend.
-// ===========================================================================
+/**
+ * ==============================================================================
+ * MODULE: Download Window UI Script
+ * DESCRIPTION:
+ * Manages the UI state, progress bars, and logging output for the Ollama
+ * LLM model download window. Handles communication with the Hammerspoon backend.
+ *
+ * FEATURES & RATIONALE:
+ * 1. Vanilla DOM Updates: Keeps rendering fast without dependencies.
+ * 2. Message Bridge: Communicates state cleanly to Hammerspoon.
+ * ==============================================================================
+ */
 
-// ==================================
-// ==================================
-// ======= 1/ Globals & State =======
-// ==================================
-// ==================================
-
-let logLines = [];
+let globalLogLines = [];
+let globalDoneState = false;
 
 // ========================================
 // ========================================
-// ======= 2/ Backend Communication =======
+// ======= 1/ Backend Communication =======
 // ========================================
 // ========================================
 
@@ -43,9 +44,27 @@ function doTerm() {
 	}
 }
 
+/**
+ * Sends a request to resolve gated access directly from the UI.
+ */
+function doResolve() {
+	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
+		window.webkit.messageHandlers.dl_bridge.postMessage('resolve');
+	}
+}
+
+/**
+ * Sends a retry request to relaunch the download.
+ */
+function doRetry() {
+	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
+		window.webkit.messageHandlers.dl_bridge.postMessage('retry');
+	}
+}
+
 // =============================
 // =============================
-// ======= 3/ UI Updates =======
+// ======= 2/ UI Updates =======
 // =============================
 // =============================
 
@@ -58,20 +77,61 @@ function setModel(modelName) {
 }
 
 /**
+ * Injects model size parameters safely into the frontend.
+ * @param {Object} sizes - Object containing dl, disk, and ram sizes as formatted strings.
+ */
+function setSizes(sizes) {
+	const container = document.getElementById('model-sizes');
+	const szDl = document.getElementById('sz-dl');
+	const szDisk = document.getElementById('sz-disk');
+	const szRam = document.getElementById('sz-ram');
+
+	let hasSizes = false;
+	if (sizes.dl) {
+		szDl.textContent = '⬇️ ' + sizes.dl;
+		hasSizes = true;
+	}
+	if (sizes.disk) {
+		szDisk.textContent = '💽 ' + sizes.disk;
+		hasSizes = true;
+	}
+	if (sizes.params) {
+		szRam.textContent = '🧠 ' + sizes.params + ' paramètres';
+		hasSizes = true;
+	}
+
+	if (hasSizes) {
+		container.style.display = 'flex';
+	}
+}
+
+/**
  * Updates the progress bar and statistics display.
  * @param {number|string} percentage - The completion percentage.
  * @param {string} downloadedSize - The formatted downloaded size string.
  * @param {string} speed - The current download speed.
  * @param {string} eta - The estimated time remaining.
+ * @param {string} fileCount - Optional file progress string (e.g., "47/102").
  */
-function update(percentage, downloadedSize, speed, eta) {
-	document.getElementById('bar-fill').style.width = percentage + '%';
-	document.getElementById('pct').textContent = percentage + ' %';
+function update(percentage, downloadedSize, speed, eta, fileCount) {
+	if (globalDoneState) return;
+
+	// Cap at 99% during download: 100% is reserved exclusively for done()
+	const cappedPercentage = Math.min(Math.max(0, parseInt(percentage) || 0), 99);
+	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
+	document.getElementById('pct').textContent = cappedPercentage + ' %';
 
 	let statsHtml = '';
+	if (fileCount) statsHtml += '📁 ' + fileCount + ' fichiers<br>';
 	if (downloadedSize) statsHtml += '<b>' + downloadedSize + '</b><br>';
 	if (speed) statsHtml += 'Vitesse : <b>' + speed + '</b>';
 	if (eta) statsHtml += '  ·  Temps restant : <b>' + eta + '</b>';
+
+	// When capped at 99% with no speed info, all bytes are on disk but
+	// the backend is still verifying/symlinking files.
+	if (!statsHtml && cappedPercentage >= 99) {
+		statsHtml = '⏳ Finalisation en cours…';
+	}
 
 	document.getElementById('stats').innerHTML = statsHtml || 'Téléchargement en cours…';
 }
@@ -81,6 +141,9 @@ function update(percentage, downloadedSize, speed, eta) {
  */
 function showLog() {
 	document.getElementById('log-area').style.display = 'block';
+	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
+		window.webkit.messageHandlers.dl_bridge.postMessage('expand');
+	}
 }
 
 /**
@@ -89,11 +152,21 @@ function showLog() {
  * @param {string} line - The log string to append.
  */
 function addLog(line) {
-	logLines.push(line);
-	if (logLines.length > 200) logLines.shift();
+	if (!line) return;
+
+	// Strip ANSI colors and control sequences from terminal output
+	const cleanLine = String(line).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+
+	// Hide noisy transfer progress bars that visually duplicate the main UI bar
+	if (/%\|.*it\/s/.test(cleanLine) || /\|\s*\d+\s*\/\s*\d+\s*\[/.test(cleanLine)) {
+		return;
+	}
+
+	globalLogLines.push(cleanLine);
+	if (globalLogLines.length > 200) globalLogLines.shift();
 
 	const logArea = document.getElementById('log-area');
-	logArea.textContent = logLines.join('\n');
+	logArea.textContent = globalLogLines.join('\n');
 	logArea.scrollTop = logArea.scrollHeight;
 }
 
@@ -101,16 +174,47 @@ function addLog(line) {
  * Transitions the UI to its final state (success or error).
  * @param {boolean} isSuccess - True if the download completed successfully, false otherwise.
  * @param {string} message - The final message to display to the user.
+ * @param {string} errorKind - The error kind, such as "gated".
  */
-function done(isSuccess, message) {
+function done(isSuccess, message, errorKind) {
+	globalDoneState = true;
 	document.getElementById('btn-cancel').style.display = 'none';
-	document.getElementById('bar-fill').style.width = '100%';
-	document.getElementById('pct').textContent = isSuccess ? '100 %' : '—';
+
+	const progressBar = document.getElementById('bar-fill');
+	if (isSuccess) {
+		progressBar.style.width = '100%';
+		progressBar.classList.remove('error');
+		document.getElementById('pct').textContent = '100 %';
+	} else {
+		progressBar.classList.add('error');
+		if (
+			!progressBar.style.width ||
+			progressBar.style.width === '0%' ||
+			progressBar.style.width === ''
+		) {
+			progressBar.style.width = '100%';
+		}
+		document.getElementById('pct').textContent = '❌';
+		document.getElementById('pct').style.color = '#ff453a';
+	}
 
 	const doneMessageElement = document.getElementById('done-msg');
 	doneMessageElement.textContent = message;
 	doneMessageElement.className = isSuccess ? 'ok' : 'error';
-	doneMessageElement.style.display = 'block';
+	doneMessageElement.style.display = 'inline-block';
 
-	document.getElementById('stats').textContent = '';
+	const statsElement = document.getElementById('stats');
+	statsElement.textContent = '';
+
+	if (!isSuccess) {
+		// Keep the error label visually attached to the cross icon
+		doneMessageElement.textContent = 'Échec du téléchargement';
+	}
+
+	if (!isSuccess) {
+		const actions = document.getElementById('error-actions');
+		const resolveButton = document.getElementById('btn-resolve');
+		actions.style.display = 'flex';
+		resolveButton.style.display = errorKind === 'gated' ? 'inline-block' : 'none';
+	}
 }

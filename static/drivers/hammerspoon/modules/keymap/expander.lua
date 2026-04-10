@@ -19,6 +19,9 @@ local keyStrokes = hs.eventtap.keyStrokes
 
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
+local Logger     = require("lib.logger")
+
+local LOG = "keymap.expander"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -148,6 +151,11 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		"hotstring",
 		(m.group == "autocorrection") and "autocorrection" or nil
 	)
+
+	if keylogger and type(keylogger.log_hotstring) == "function" then
+		pcall(keylogger.log_hotstring, trigger, repl_text)
+	end
+	Logger.debug(LOG, "Hotstring auto-expand: '%s' -> '%s'", tostring(trigger), tostring(repl_text))
 	return true
 end
 
@@ -233,6 +241,11 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			"hotstring",
 			(m.group == "autocorrection") and "autocorrection" or nil
 		)
+
+		if keylogger and type(keylogger.log_hotstring) == "function" then
+			pcall(keylogger.log_hotstring, trigger, repl_text)
+		end
+		Logger.debug(LOG, "Hotstring terminator-expand: '%s' -> '%s'", tostring(trigger), tostring(repl_text))
 	end
 
 	if is_ignored then do_expansion() else hs.timer.doAfter(0, do_expansion) end
