@@ -1239,10 +1239,12 @@ function M.create(deps)
 		local function do_check_requirements()
 			local installed = models_mgr.get_installed_models()
 			local count = 0; for _ in pairs(installed) do count = count + 1 end
+			Logger.debug(LOG, "Startup installed-models cache count: %d", count)
 			if count == 0 then
 				-- Cache not yet ready — retry in 1s (max 10 attempts)
 				if not _check_startup_attempts then _check_startup_attempts = 0 end
 				_check_startup_attempts = _check_startup_attempts + 1
+				Logger.debug(LOG, "Startup requirements deferred (attempt %d/10)", _check_startup_attempts)
 				if _check_startup_attempts < 10 then
 					hs.timer.doAfter(1, do_check_requirements)
 					return
@@ -1250,7 +1252,16 @@ function M.create(deps)
 				-- After 10s, proceed anyway (Ollama may not be running)
 			end
 			_check_startup_attempts = nil
-			guarded_check_requirements(state.llm_model, function()
+
+			local check_fn = guarded_check_requirements
+			if state.llm_use_mlx and type(models_mgr.force_mlx_check) == "function" then
+				Logger.debug(LOG, "Startup MLX mode: forcing MLX requirements check for model %s", state.llm_model)
+				check_fn = function(model_name, on_ok, on_fail)
+					models_mgr.force_mlx_check(model_name, on_ok, on_fail, { silent_notifications = false })
+				end
+			end
+
+			check_fn(state.llm_model, function()
 				Logger.info(LOG, "Requirements OK pour modèle %s", state.llm_model)
 				if state.llm_use_mlx and state.llm_enabled
 					and keymap and type(keymap.set_llm_enabled) == "function" then
@@ -1260,6 +1271,22 @@ function M.create(deps)
 			end, disable_llm)
 		end
 		hs.timer.doAfter(1, do_check_requirements)
+
+		-- Backup startup path: ensure MLX boot is attempted even if requirements callback chain is skipped.
+		hs.timer.doAfter(3, function()
+			if state.llm_use_mlx and state.llm_enabled and state.llm_model and state.llm_model ~= ""
+				and type(models_mgr.force_mlx_check) == "function" then
+				Logger.debug(LOG, "Startup MLX backup check fired for model %s", state.llm_model)
+				models_mgr.force_mlx_check(state.llm_model, function()
+					Logger.info(LOG, "Startup MLX backup check succeeded for model %s", state.llm_model)
+					if keymap and type(keymap.set_llm_enabled) == "function" then
+						pcall(keymap.set_llm_enabled, true)
+					end
+				end, function()
+					Logger.warn(LOG, "Startup MLX backup check failed for model %s", state.llm_model)
+				end, { silent_notifications = false })
+			end
+		end)
 		Logger.info(LOG, "═══════════════ Démarrage menu_llm complété ═══════════════")
 	end
 

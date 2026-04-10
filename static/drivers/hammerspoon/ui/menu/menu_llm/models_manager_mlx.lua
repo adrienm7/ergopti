@@ -13,6 +13,9 @@
 local M = {}
 local notifications = require("lib.notifications")
 local ui_builder = require("ui.ui_builder")
+local Logger = require("lib.logger")
+
+local LOG = "menu_llm.mlx"
 
 local ok_dw, download_window = pcall(require, "ui.download_window")
 if not ok_dw then download_window = nil end
@@ -39,6 +42,8 @@ function M.new(deps, presets)
 	obj._mlx_upgrade_failed = false
 	obj._mlx_upgrade_in_progress = false
 	obj._mlx_upgrade_waiters = {}
+	obj._installed_cache = nil
+	obj._installed_cache_ts = 0
 
 	local module_source = debug.getinfo(1, "S").source:sub(2)
 	local project_root = module_source:match("^(.*)/static/drivers/hammerspoon/ui/menu/menu_llm/models_manager_mlx%.lua$")
@@ -434,9 +439,15 @@ PY
 	end
 
 	function obj.get_installed_models()
+		local now = hs.timer.secondsSinceEpoch()
+		if type(obj._installed_cache) == "table" and (now - (obj._installed_cache_ts or 0)) < 1.0 then
+			return obj._installed_cache
+		end
+
 		local installed = {}
 		local home = os.getenv("HOME")
 		local hub_dir = home .. "/.cache/huggingface/hub/"
+		Logger.debug(LOG, "Scanning MLX installed models cache…")
 		for _, provider in ipairs(presets) do
 			for _, family in ipairs(provider.families or {}) do
 				for _, m in ipairs(family.models or {}) do
@@ -454,8 +465,12 @@ PY
 									if attr_c and attr_c.mode == "directory" then
 										for file in hs.fs.dir(commit_dir) do
 											if file:match("%.safetensors$") or file:match("%.bin$") then
-												local fattr = hs.fs.attributes(commit_dir .. "/" .. file)
-												if fattr and fattr.size and fattr.size > 10000 then
+												local file_path = commit_dir .. "/" .. file
+												local fattr = hs.fs.attributes(file_path)
+
+												-- Hugging Face snapshots often expose large tensor weights as symlinks.
+												-- Accept symlinked weights as valid to avoid false negatives at startup.
+												if fattr and (fattr.mode == "link" or (fattr.size and fattr.size > 10000)) then
 													is_valid = true
 													break
 												end
@@ -467,18 +482,28 @@ PY
 							end
 							if is_valid then
 								installed[m.name] = true
+								Logger.debug(LOG, "MLX model detected in cache: %s", tostring(m.name))
 							end
 						end
 					end
 				end
 			end
 		end
+		local count = 0
+		for _ in pairs(installed) do count = count + 1 end
+		obj._installed_cache = installed
+		obj._installed_cache_ts = now
+		Logger.debug(LOG, "MLX installed models scan complete: %d model(s).", count)
 		return installed
 	end
 
 	function obj.start_server(target_model, on_success, opts)
 		local repo = obj.get_mlx_repo(target_model)
-		if not repo then return end
+		if not repo then
+			Logger.warn(LOG, "Cannot start MLX server: no repository found for model %s.", tostring(target_model))
+			return
+		end
+		Logger.info(LOG, "Ensuring MLX server for model %s…", tostring(target_model))
 		local silent_notifications = type(opts) == "table" and opts.silent_notifications == true
 
 		local function probe_matches_target(body)
@@ -538,6 +563,7 @@ PY
 		hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function(probe_status, body)
 			if probe_status == 200 and probe_matches_target(body) then
 				obj._server_target = target_model
+				Logger.info(LOG, "MLX server already ready for model %s.", tostring(target_model))
 				if not silent_notifications then
 					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif: " .. target_model)
 				end
@@ -546,6 +572,7 @@ PY
 			end
 
 			obj._server_target = target_model
+			Logger.info(LOG, "Starting MLX server process for model %s…", tostring(target_model))
 			if not silent_notifications then
 				pcall(notifications.notify, "🚀 Démarrage serveur MLX", "Chargement du modèle " .. target_model .. " en mémoire...")
 			end
@@ -1042,12 +1069,15 @@ PY
 			if type(on_success) == "function" then on_success() end
 			return 
 		end
+		Logger.debug(LOG, "Checking MLX requirements for model %s…", tostring(target_model))
 
 		local function do_check()
 			local installed = obj.get_installed_models()
 			if installed[target_model] then
+				Logger.info(LOG, "MLX model %s is installed. Starting server…", tostring(target_model))
 				obj.start_server(target_model, on_success, opts)
 			else
+				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)
 				if not repo then 
 					pcall(notifications.notify, "❌ Modèle MLX non disponible", "Le modèle " .. target_model .. " n’est pas compatible MLX ou n’a pas de dépôt MLX configuré")
@@ -1153,7 +1183,12 @@ PY
 			end
 		end, {"-c", "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; PYTHON_BIN=\"python3\"; if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; $PYTHON_BIN -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors'"})
 		
-		pcall(function() check_task:start() end)
+		if check_task then
+			pcall(function() check_task:start() end)
+		else
+			Logger.error(LOG, "Failed to create MLX requirement check task.")
+			if on_cancel then pcall(on_cancel) end
+		end
 	end
 
 	function obj.delete_model(model_name)

@@ -144,11 +144,14 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             stream      = false,
             temperature = opts.temperature,
             max_tokens  = opts.max_tokens,
-            stop        = opts.stop
+            stop        = opts.stop,
+            -- Some models (e.g. Qwen3) can emit only `message.reasoning` without
+            -- `message.content` when thinking mode is active, which breaks the pipeline.
+            chat_template_kwargs = { enable_thinking = false }
         }
     end
 
-    Logger.debug(LOG, "[%s] #%d PROMPT (%d car.) → %s", model_name, req_id, #prompt_preview, prompt_preview:sub(1, 250))
+    Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) -> %s", model_name, req_id, #prompt_preview, prompt_preview:sub(1, 250))
     Logger.debug(LOG, "[%s] #%d MODE is_batch=%s line_mode=%s max_tokens=%s endpoint=%s", model_name, req_id, tostring(is_batch), tostring(line_mode), tostring(opts.max_tokens), endpoint)
 
 	local ok, encoded = pcall(hs.json.encode, payload)
@@ -162,7 +165,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local timeout_timer = hs.timer.doAfter(8, function()
         if done then return end
         done = true
-        Logger.warning(LOG, "[%s] #%d TIMEOUT après 8s", model_name, req_id)
+        Logger.warning(LOG, "[%s] #%d TIMEOUT after 8s", model_name, req_id)
         if type(on_fail) == "function" then pcall(on_fail) end
     end)
 
@@ -180,7 +183,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             
             local ok_dec, resp = pcall(hs.json.decode, body)
             if not ok_dec or type(resp) ~= "table" or type(resp.choices) ~= "table" or not resp.choices[1] then
-                Logger.debug(LOG, "[%s] #%d Réponse non exploitable (decode/choices), body='%s'", model_name, req_id, tostring((body or ""):sub(1, 220)))
+                Logger.debug(LOG, "[%s] #%d Unusable response (decode/choices), body='%s'", model_name, req_id, tostring((body or ""):sub(1, 220)))
 				if type(on_fail) == "function" then pcall(on_fail) end
 				return
 			end
@@ -211,14 +214,18 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 			end
 
             if type(content) ~= "string" or content == "" then
-                Logger.debug(LOG, "[%s] #%d Contenu vide dans choices[1]", model_name, req_id)
+                local has_reasoning = type(choice.message) == "table" and type(choice.message.reasoning) == "string" and choice.message.reasoning ~= ""
+                if has_reasoning then
+                    Logger.debug(LOG, "[%s] #%d Reasoning-only response detected (empty content).", model_name, req_id)
+                end
+                Logger.debug(LOG, "[%s] #%d Empty content in choices[1]", model_name, req_id)
                 if type(on_fail) == "function" then pcall(on_fail) end
                 return
             end
 
             local raw     = Parser.strip_thinking(content)
             local ms_req  = math.floor((hs.timer.secondsSinceEpoch() - t0_req) * 1000)
-            Logger.debug(LOG, "[%s] #%d RAW (%dms, %d car.) → %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
+            Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
             local results = {}
 
             if not is_batch then
@@ -233,10 +240,10 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             end
 
             if #results == 0 then
-                Logger.debug(LOG, "[%s] #%d PARSED → 0 résultat (échec parseur)", model_name, req_id)
+                Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model_name, req_id)
                 if type(on_fail) == "function" then pcall(on_fail) end return
             end
-            Logger.debug(LOG, "[%s] #%d PARSED → %d résultat(s)", model_name, req_id, #results)
+            Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
             if keylogger and type(keylogger.log_llm) == "function" then pcall(keylogger.log_llm, full_text, results) end
             if type(on_success) == "function" then pcall(on_success, results) end
         end
@@ -336,7 +343,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                if attempt < 2 then
                                    local retry_tokens = math.max(28, math.floor(tokens * 0.72))
                                    local retry_temp = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
-                                   Logger.debug(LOG, "[%s] Variante %d/%d retry rapide en chat: tokens=%d temp=%.2f", model_name, variant_index, max_attempts, retry_tokens, retry_temp)
+                                   Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f", model_name, variant_index, max_attempts, retry_tokens, retry_temp)
                                    request_variant(attempt + 1, retry_tokens, retry_temp, false)
                                    return
                                end
