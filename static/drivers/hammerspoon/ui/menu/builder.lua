@@ -34,60 +34,60 @@ local LOG    = "builder"
 function M.generate(ctx, menu_mods, actions)
 	local items = {}
 	
-	-- Helper function to insert only valid components and log errors
+	-- Helper local pour insérer uniquement les composants valides et loguer les erreurs
 	local function push(label, fn, arg)
 		local result = Logger.build(LOG, label, fn, arg)
 		if result then
 			if type(result) == "table" and result[1] ~= nil then
-				-- Result is a list (build_groups)
+				-- Résultat est une liste (build_groups)
 				for _, it in ipairs(result) do table.insert(items, it) end
 			else
 				table.insert(items, result)
 			end
-			Logger.debug(LOG, string.format("Component '%s' added successfully.", label))
+			Logger.debug(LOG, "Composant '%s' ajouté avec succès", label)
 		else
-			Logger.warn(LOG, string.format("Component '%s' missing or in error — ignored.", label))
+			Logger.warn(LOG, "Composant '%s' absent ou en erreur — ignoré", label)
 		end
 	end
 
-	-- Hotstrings zone
+	-- Zone hotstrings
 	if type(menu_mods.hotstrings) == "table" then
-		Logger.debug(LOG, "Building hotstrings zone…")
+		Logger.debug(LOG, "Construction zone hotstrings")
 		push("hotstrings.build_groups",     menu_mods.hotstrings.build_groups,     ctx)
 		table.insert(items, { title = "-" })
 		push("hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
 		push("hotstrings.build_personal",   menu_mods.hotstrings.build_personal,   ctx)
 		push("hotstrings.build_custom",     menu_mods.hotstrings.build_custom,     ctx)
 	else
-		Logger.warn(LOG, "Hotstrings module missing — zone ignored.")
+		Logger.warn(LOG, "Module hotstrings absent — zone ignorée")
 	end
 
 	table.insert(items, { title = "-" })
 
-	-- AI zone
+	-- Zone IA
 	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_item) == "function" then
-		Logger.debug(LOG, "Building AI component…")
+		Logger.debug(LOG, "Construction composant IA")
 		local ok_b, llm_item = pcall(ctx.llm_handler.build_item)
 		if ok_b and llm_item then
 			table.insert(items, llm_item)
-			Logger.debug(LOG, "AI component added successfully.")
+			Logger.debug(LOG, "Composant IA ajouté")
 		elseif not ok_b then
-			Logger.error(LOG, string.format("Error building AI component: %s.", tostring(llm_item)))
+			Logger.error(LOG, "Erreur construction composant IA : %s", tostring(llm_item))
 		end
 	else
-		Logger.warn(LOG, "LLM handler missing or incomplete — AI component ignored.")
+		Logger.warn(LOG, "llm_handler absent ou incomplet — composant IA ignoré")
 	end
 
-	-- Metrics zone
+	-- Zone métriques
 	if type(menu_mods.keylogger) == "table" then
 		push("keylogger.build", menu_mods.keylogger.build, ctx)
 	else
-		Logger.warn(LOG, "Keylogger module missing.")
+		Logger.warn(LOG, "Module keylogger absent")
 	end
 
 	table.insert(items, { title = "-" })
 
-	-- Gestures and shortcuts zone
+	-- Zone gestes et raccourcis
 	if type(menu_mods.gestures) == "table" then
 		push("gestures.build", menu_mods.gestures.build, ctx)
 	end
@@ -95,12 +95,12 @@ function M.generate(ctx, menu_mods, actions)
 		push("shortcuts.build", menu_mods.shortcuts.build, ctx)
 	end
 
-	-- Script control zone (dynamic loading)
+	-- Zone script control (chargement dynamique)
 	local ok_sc, script_control_mod = pcall(require, "ui.menu.menu_script_control")
 	if ok_sc and type(script_control_mod) == "table" then
 		push("script_control.build", script_control_mod.build, ctx)
 	else
-		Logger.debug(LOG, "Script control module unavailable — ignored.")
+		Logger.debug(LOG, "Module script_control non disponible — ignoré")
 	end
 
 	table.insert(items, { title = "-" })

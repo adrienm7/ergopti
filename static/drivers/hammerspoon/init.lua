@@ -11,21 +11,18 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
-
-
-
-
--- ===============================
--- ===============================
--- ======= 0/ Logger Setup =======
--- ===============================
--- ===============================
+-- ====================================
+-- ====================================
+-- ======= 0/ Logger Setup ===========
+-- ====================================
+-- ====================================
 
 -- Must run BEFORE any require() to suppress "Enabled hotkey ⌃X" spam at startup
--- hs.hotkey hardcodes its logger level to "debug" via hs.logger.new("hotkey", "debug"),
--- so defaultLogLevel/setGlobalLogLevel have no effect
--- We intercept hs.logger.new() to force "warning" for known noisy internal modules before they are loaded
--- Uncomment the guard below to restore full hs.* logging when debugging Hammerspoon internals
+-- hs.hotkey hardcodes its logger level to "debug" via hs.logger.new("hotkey","debug"),
+-- so defaultLogLevel/setGlobalLogLevel have no effect. We intercept hs.logger.new()
+-- to force "warning" for known noisy internal modules before they are loaded.
+-- Uncomment the guard below to restore full hs.* logging when debugging Hammerspoon internals:
+-- local _suppress_hs_loggers = false
 do
 	local _orig_new = hs.logger.new
 	hs.logger.new = function(id, level, ...)
@@ -37,8 +34,8 @@ end
 local Logger             = require("lib.logger")
 local LOG                = "init"
 
--- Set our logger level, uncomment one to enable
--- Logger.set_level("DEBUG")  -- Show all logs (DEBUG, INFO, WARNING, ERROR)
+-- Set our logger level. Uncomment one to enable:
+Logger.set_level("DEBUG")  -- Show all logs (DEBUG, INFO, WARNING, ERROR)
 -- Logger.set_level("INFO")   -- Show INFO, WARNING, ERROR only
 -- Default: WARNING (production mode)
 
@@ -75,19 +72,22 @@ local notifications      = require("lib.notifications")
 
 
 
--- ===================================
--- ===================================
--- ======= 1/ Module Pre-start =======
--- ===================================
--- ===================================
+-- ====================================
+-- ====================================
+-- ======= 1/ Module Pre-start ========
+-- ====================================
+-- ====================================
 
 -- Pre-start modules so they are active before menu.lua reads saved prefs
 -- Menu.lua will honor saved state and stop/start them as needed
-Logger.debug(LOG, "Starting gestures module…")
+Logger.debug(LOG, "Démarrage gestures...")
 gestures.start()
-Logger.debug(LOG, "Starting shortcuts module…")
+Logger.debug(LOG, "Démarrage shortcuts...")
 shortcuts.start()
-Logger.info(LOG, "Main modules initialized successfully.")
+Logger.info(LOG, "Modules principaux initialisés")
+
+
+
 
 -- Background check: verify Python MLX dependencies are installed
 -- This runs asynchronously once per session, non-blocking
@@ -116,11 +116,11 @@ local config_file    = base_dir .. "config.json"
 
 
 
--- =================================
--- =================================
--- ======= 3/ Config Priming =======
--- =================================
--- =================================
+-- ===================================
+-- ===================================
+-- ======= 3/ Config Priming =========
+-- ===================================
+-- ===================================
 
 -- Restore section-enabled states and global trigger char from config.json BEFORE any TOML is parsed
 local magic_key = "★"
@@ -128,8 +128,7 @@ local magic_key = "★"
 do
 	local fh = io.open(config_file, "r")
 	if fh then
-		local raw = fh:read("*a")
-		fh:close()
+		local raw = fh:read("*a"); fh:close()
 		local ok, cfg = pcall(hs.json.decode, raw)
 		if ok and type(cfg) == "table" then
 			
@@ -162,11 +161,11 @@ end
 
 
 
--- ===========================================
--- ===========================================
--- ======= 4/ TOML Discovery & Loading =======
--- ===========================================
--- ===========================================
+-- =============================================
+-- =============================================
+-- ======= 4/ TOML Discovery & Loading =========
+-- =============================================
+-- =============================================
 
 local ordered_names   = nil
 local module_sections = nil
@@ -174,8 +173,7 @@ local module_sections = nil
 do
 	local fh = io.open(hotstrings_dir .. "_index.json", "r")
 	if fh then
-		local raw = fh:read("*a")
-		fh:close()
+		local raw = fh:read("*a"); fh:close()
 		local ok, data = pcall(hs.json.decode, raw)
 		if ok and data then
 			if type(data.categories_order) == "table" then ordered_names   = data.categories_order end
@@ -195,9 +193,9 @@ local toml_fnames = {}
 
 
 
--- ====================================
--- ===== 4.1) Private Files First =====
--- ====================================
+-- ========================================
+-- ===== 4.1) Private Files First =========
+-- ========================================
 
 local PRIVATE_STEMS  = { personal = true }
 local private_fnames = {}
@@ -212,9 +210,9 @@ end
 
 
 
--- ====================================
--- ===== 4.2) Index-Ordered Files =====
--- ====================================
+-- ========================================
+-- ===== 4.2) Index-Ordered Files =========
+-- ========================================
 
 if ordered_names then
 	for _, name in ipairs(ordered_names) do
@@ -227,9 +225,9 @@ end
 
 
 
--- ===============================================
--- ===== 4.3) Remaining Files Alphabetically =====
--- ===============================================
+-- ==================================================
+-- ===== 4.3) Remaining Files Alphabetically ========
+-- ==================================================
 
 local remaining = {}
 for _, fname in pairs(toml_set) do table.insert(remaining, fname) end
@@ -239,31 +237,31 @@ for _, fname in ipairs(remaining) do table.insert(toml_fnames, fname) end
 local hotfiles = {}
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
-	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
+	Logger.debug(LOG, "Chargement TOML: %s", name)
 	keymap.load_toml(name, hotstrings_dir .. fname)
 	table.insert(hotfiles, name)
 end
 
-Logger.info(LOG, string.format("Loaded TOML hotstring files: %d files.", #toml_fnames))
+Logger.info(LOG, "Fichiers hotstrings TOML chargés: %d fichiers", #toml_fnames)
 
 
 
 
 
--- ==================================
--- ==================================
--- ======= 5/ Post-load Hooks =======
--- ==================================
--- ==================================
+-- ===================================
+-- ===================================
+-- ======= 5/ Post-load Hooks ========
+-- ===================================
+-- ===================================
 
 keymap.sort_mappings()
 
 -- Start the dynamic hotstrings module which handles personal info internally
-Logger.debug(LOG, "Starting dynamic hotstrings module…")
+Logger.debug(LOG, "Démarrage module hotstrings dynamiques...")
 dynamic_hotstrings.start(base_dir, keymap)
 table.insert(hotfiles, "dynamichotstrings")
 
-Logger.debug(LOG, "Initializing custom hotstrings…")
+Logger.debug(LOG, "Initialisation hotstrings personnalisés...")
 
 
 
@@ -284,33 +282,33 @@ end
 
 
 
--- =============================
--- =============================
--- ======= 6/ UI Startup =======
--- =============================
--- =============================
+-- ==============================
+-- ==============================
+-- ======= 6/ UI Startup ========
+-- ==============================
+-- ==============================
 
-Logger.debug(LOG, "Starting user interface components…")
+Logger.debug(LOG, "Démarrage interface utilisateur (menu)...")
 menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections
 )
 
 -- Script control is now managed through the shortcuts module
-Logger.debug(LOG, "Starting script control engine…")
+Logger.debug(LOG, "Démarrage script control...")
 shortcuts.start_script_control(keymap, shortcuts, gestures)
 
-Logger.info(LOG, "User interface initialized successfully.")
+Logger.info(LOG, "Interface utilisateur initialisée")
 
 
 
 
 
--- ================================
--- ================================
--- ======= 7/ File Watchers =======
--- ================================
--- ================================
+-- ==================================
+-- ==================================
+-- ======= 7/ File Watchers =========
+-- ==================================
+-- ==================================
 
 -- Global variables to prevent the Garbage Collector from destroying the watchers
 _G.script_watchers = {}
@@ -328,14 +326,15 @@ do
 
 
 
-	-- ========================================
-	-- ===== 7.1) Directory-Level Watcher =====
-	-- ========================================
+	-- ==========================================
+	-- ===== 7.1) Directory-Level Watcher =======
+	-- ==========================================
 
 	-- Catches file creation, deletion, and renames in the hotstrings directory
 	local dir_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
 		for _, p in ipairs(paths) do
-			if p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$") then
+			if p:match("%.toml$") or p:match("_index%.json$")
+				or p:match("%.local_ahk_path$") then
 				schedule_reload("Hotstrings modifiés — rechargement…")
 				return
 			end
@@ -345,7 +344,7 @@ do
 	table.insert(_G.script_watchers, dir_watcher)
 
 	-- Catches modifications on Lua and UI scripts (HTML, JS, CSS) for auto-reload
-	Logger.debug(LOG, "Configuring file watchers for auto-reloading…")
+	Logger.debug(LOG, "Configuration file watcher...")
 	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
 		for _, p in ipairs(paths) do
 			-- Ignore temporary files (tokens, etc.)
@@ -363,9 +362,9 @@ do
 
 
 
-	-- ==================================
-	-- ===== 7.2) Per-File Watchers =====
-	-- ==================================
+	-- ===================================
+	-- ===== 7.2) Per-File Watchers ======
+	-- ===================================
 
 	-- Safety net for in-place edits that directory watchers may miss
 	for fname in hs.fs.dir(hotstrings_dir) do
@@ -383,22 +382,25 @@ end
 
 
 
--- ====================================
--- ====================================
--- ======= 8/ Shutdown Callback =======
--- ====================================
--- ====================================
+-- =====================================
+-- =====================================
+-- ======= 8/ Shutdown Callback ========
+-- =====================================
+-- =====================================
 
 hs.shutdownCallback = function()
-	Logger.info(LOG, "System shutdown — restoring all standard overrides.")
+	Logger.info(LOG, "Arrêt système — restauration des overrides")
 	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
 		pcall(gestures.restore_all_overrides)
 	else
-		Logger.warn(LOG, "restore_all_overrides unavailable — shutdown without restore.")
+		Logger.warn(LOG, "restore_all_overrides indisponible — arrêt sans restauration")
 	end
-	Logger.info(LOG, "Hammerspoon execution terminated.")
+	Logger.info(LOG, "Hammerspoon arrêté")
 end
 
+
+
+
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
-Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
+Logger.info(LOG, "✅ Démarrage Hammerspoon RÉUSSI")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")

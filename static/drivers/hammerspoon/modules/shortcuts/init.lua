@@ -22,18 +22,18 @@ local M = {}
 
 
 
--- ================================
--- ================================
--- ======= 1/ Default State =======
--- ================================
--- ================================
+-- ===================================
+-- ===================================
+-- ======= 1/ Default State ==========
+-- ===================================
+-- ===================================
 
 M.DEFAULT_STATE = {
-	shortcuts                = true,
-	script_control_enabled   = true,
-	script_control_shortcuts = { return_key = "pause", backspace = "reload" },
-	ahk_source_path          = "",
-	chatgpt_url              = Bindings.DEFAULT_CHATGPT_URL,
+    shortcuts                = true,
+    script_control_enabled   = true,
+    script_control_shortcuts = { return_key = "pause", backspace = "reload" },
+    ahk_source_path          = "",
+    chatgpt_url              = Bindings.DEFAULT_CHATGPT_URL,
 }
 
 

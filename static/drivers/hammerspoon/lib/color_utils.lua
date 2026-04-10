@@ -1,11 +1,11 @@
---- lib/color_utils.lua
+-- lib/color_utils.lua
 
---- ==============================================================================
---- MODULE: Color Utilities
---- DESCRIPTION:
---- Provides reusable color helpers for UI modules, including hex parsing
---- and weighted blending against white.
---- ==============================================================================
+-- ===========================================================================
+-- Color Utilities Module.
+--
+-- Provides reusable color helpers for UI modules, including hex parsing
+-- and weighted blending against white.
+-- ===========================================================================
 
 local M = {}
 
@@ -19,8 +19,8 @@ local M = {}
 -- ====================================
 -- ====================================
 
---- Converts a hex string format to normalized RGB values.
---- @param hex string The hex color string.
+--- Converts a #RRGGBB string to normalized RGB values.
+--- @param hex string Hex color string
 --- @return number|nil, number|nil, number|nil
 function M.hex_to_rgb(hex)
 	if type(hex) ~= "string" then return nil, nil, nil end
@@ -38,18 +38,17 @@ end
 
 
 
-
--- ===============================
--- ===============================
--- ======= 2/ Color Mixing =======
--- ===============================
--- ===============================
+-- ================================
+-- ================================
+-- ======= 2/ Color Mixing ========
+-- ================================
+-- ================================
 
 --- Mixes a source hex color with white.
---- @param hex string Source color as a hex string.
---- @param color_ratio number Source ratio from 0 to 1.
---- @param alpha number|nil Output alpha transparency.
---- @return table An hs.color compatible dictionary.
+--- @param hex string Source color as #RRGGBB
+--- @param color_ratio number Source ratio in [0, 1]
+--- @param alpha number|nil Output alpha
+--- @return table hs.color-compatible color
 function M.mix_hex_with_white(hex, color_ratio, alpha)
 	local ratio = math.min(1, math.max(0, color_ratio or 0.7))
 	local white_ratio = 1 - ratio

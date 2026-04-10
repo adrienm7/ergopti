@@ -1,4 +1,4 @@
-// ui/metrics_typing/script.js
+// ui/metrics/script.js
 
 /**
  * ==============================================================================
@@ -10,7 +10,6 @@
  * 1. Zero Lag Architecture: Deep in-memory caching for instant UI updates.
  * 2. Visual Modules: Dynamic Y-axis precision and trackpad pinch-to-zoom.
  * 3. Dynamic Coloring: CSS Variable inheritance directly into Chart.js elements.
- * 4. Real-Time Sync: Merges unencrypted live buffer with historical db streams.
  * ==============================================================================
  */
 
@@ -19,8 +18,7 @@ window.app_icons = window.app_icons || {};
 window._lua_request = null;
 
 const app_state = {
-	historical_cache: null,
-	today_live_data: null,
+	raw_data_cache: null,
 	data: { c: {}, bg: {}, tg: {}, qg: {}, pg: {}, hx: {}, hp: {}, w: {}, sc: {} },
 	time_series: {},
 	hourly_series: {},
@@ -54,8 +52,6 @@ const info_svg =
 
 /**
  * Escapes characters to prevent HTML injections.
- * @param {string} str - The raw string.
- * @returns {string} The escaped safe string.
  */
 function escape_html(str) {
 	if (!str) return '';
@@ -65,8 +61,6 @@ function escape_html(str) {
 /**
  * Formats a number with standard non-breaking spaces.
  * Also abbreviates millions (M) and billions (Md).
- * @param {number} num - The number to format.
- * @returns {string} The localized string representation.
  */
 function format_number(num) {
 	if (num === null || num === undefined || isNaN(num)) return '0';
@@ -96,9 +90,7 @@ function format_number(num) {
 }
 
 /**
- * Formats French dates for Chart.js tooltips.
- * @param {object} context - Chart context containing the date.
- * @returns {string} The formatted date string.
+ * Formats French Dates for tooltips (e.g. "mardi 23/04/2025")
  */
 const tooltipTitleCallback = (context) => {
 	const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
@@ -111,9 +103,7 @@ const tooltipTitleCallback = (context) => {
 };
 
 /**
- * Formats special characters safely for UI display.
- * @param {string} str - The raw keystroke sequence.
- * @returns {string} HTML string with visual chips.
+ * Formats special characters safely.
  */
 function format_display_key(str) {
 	let escaped = escape_html(str);
@@ -135,8 +125,6 @@ function format_display_key(str) {
 
 /**
  * Formats shortcuts with visual chips for modifiers and primary key.
- * @param {string} str - The raw shortcut string.
- * @returns {string} The styled HTML string.
  */
 function format_shortcut_key(str) {
 	if (!str) return '';
@@ -186,7 +174,7 @@ function format_shortcut_key(str) {
 
 /**
  * Keeps the dashboard in sync without aggressive polling.
- * Refreshes only when the window or tab becomes active again.
+ * Refreshes only when the window/tab becomes active again.
  */
 function ensure_live_refresh() {
 	if (auto_refresh_bound) return;
@@ -205,9 +193,7 @@ function ensure_live_refresh() {
 }
 
 /**
- * Procedurally generates an app color using string hashing.
- * @param {string} appName - The target app name.
- * @returns {string} A CSS hsl color string.
+ * Procedurally generates an app color.
  */
 function get_app_color(appName) {
 	let hash = 0;
@@ -216,9 +202,7 @@ function get_app_color(appName) {
 }
 
 /**
- * Generates an SVG trend arrow based on linear regression.
- * @param {Array} valid_points - An array of numerical Y values.
- * @returns {string} HTML string containing the SVG element.
+ * Linear Regression Trend SVG.
  */
 function get_trend_svg(valid_points) {
 	if (!valid_points || valid_points.length < 2) {
@@ -253,8 +237,7 @@ function get_trend_svg(valid_points) {
 }
 
 /**
- * Returns the default range from the first logged day to today.
- * @returns {object} Object with start and end date strings.
+ * Returns the default range: first logged day to today.
  */
 function get_default_date_range() {
 	const sorted_dates =
@@ -267,7 +250,7 @@ function get_default_date_range() {
 }
 
 /**
- * Applies default date inputs safely to the DOM.
+ * Applies default date inputs safely.
  */
 function apply_default_date_range() {
 	const start_input = document.getElementById('date_start');
@@ -286,14 +269,6 @@ function apply_default_date_range() {
 
 /**
  * Merges raw dictionary entries applying current UI filters.
- * @param {object} target - The destination dictionary.
- * @param {object} source - The raw source data.
- * @param {boolean} case_sensitive - Whether to match case.
- * @param {boolean} show_spaces - Whether to include space characters.
- * @param {boolean} show_hs - Include hotstrings.
- * @param {boolean} show_llm - Include LLM completions.
- * @param {boolean} show_manual - Include human manual typing.
- * @param {string} tabName - Identifier of the active tab.
  */
 function merge_dict(
 	target,
@@ -361,7 +336,7 @@ function merge_dict(
 }
 
 /**
- * Main boot function processing the fast manifest and bridging to Lua.
+ * Main boot function processing the fast manifest.
  */
 function process_manifest() {
 	if (Object.keys(window.metrics_manifest).length > 0) {
@@ -405,6 +380,7 @@ function process_manifest() {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
 		reset_filters();
+		// Explicitly request data on first load instead of relying on filter chain
 		request_range_data();
 		return;
 	}
@@ -580,6 +556,8 @@ function compute_manifest_metrics() {
 		wpm_points.map((p) => p.y).filter((y) => y > 0)
 	);
 
+	// Populate the global speed KPI instantly from manifest aggregates,
+	// then let detailed table-level computation refine it once raw data arrives.
 	const manifest_cpm = global_time_total > 0 ? global_chars_total / (global_time_total / 60000) : 0;
 	const manifest_wpm = manifest_cpm / 5;
 	const wpm_val_elem = document.getElementById('wpm_val');
@@ -607,10 +585,10 @@ function compute_manifest_metrics() {
 }
 
 /**
- * Deep merge of historical and live unencrypted dictionaries without disk IO.
+ * Deep merge of cached raw dictionaries without re-reading IO files.
  */
 function apply_local_filters() {
-	if (!app_state.historical_cache && !app_state.today_live_data) return;
+	if (!app_state.raw_data_cache) return;
 
 	app_state.data = { c: {}, bg: {}, tg: {}, qg: {}, pg: {}, hx: {}, hp: {}, w: {}, sc: {} };
 
@@ -620,57 +598,24 @@ function apply_local_filters() {
 	const show_manual = document.getElementById('btn_show_manual').classList.contains('active');
 	const case_sensitive = document.getElementById('btn_case_sensitive').classList.contains('active');
 
-	const merge_source = (source_cache) => {
-		if (!source_cache) return;
-		Object.keys(app_state.data).forEach((tab) => {
-			merge_dict(
-				app_state.data[tab],
-				source_cache[tab],
-				case_sensitive,
-				show_spaces,
-				show_hs,
-				show_llm,
-				show_manual,
-				tab
-			);
-		});
-	};
-
-	merge_source(app_state.historical_cache);
-
-	const start_val = document.getElementById('date_start').value;
-	const end_val = document.getElementById('date_end').value;
-	const today_str = new Date().toISOString().split('T')[0];
-
-	let include_today = true;
-	if (start_val && today_str < start_val) include_today = false;
-	if (end_val && today_str > end_val) include_today = false;
-
-	if (include_today && app_state.today_live_data) {
-		Object.keys(app_state.today_live_data).forEach((appName) => {
-			if (appName !== 'Unknown' && !app_state.selected_apps.has(appName)) return;
-			const appData = app_state.today_live_data[appName];
-			Object.keys(app_state.data).forEach((tab) => {
-				merge_dict(
-					app_state.data[tab],
-					appData[tab],
-					case_sensitive,
-					show_spaces,
-					show_hs,
-					show_llm,
-					show_manual,
-					tab
-				);
-			});
-		});
-	}
+	Object.keys(app_state.data).forEach((tab) => {
+		merge_dict(
+			app_state.data[tab],
+			app_state.raw_data_cache[tab],
+			case_sensitive,
+			show_spaces,
+			show_hs,
+			show_llm,
+			show_manual,
+			tab
+		);
+	});
 
 	render_current_tab();
 }
 
 /**
  * Queries Hammerspoon Lua thread for range data.
- * @param {boolean} show_loader - Display the loading spinner in UI.
  */
 function request_range_data(show_loader = true) {
 	if (app_state.loading_data) return;
@@ -684,7 +629,7 @@ function request_range_data(show_loader = true) {
 
 	if (show_loader) {
 		document.getElementById('metrics_table_body').innerHTML =
-			'<tr><td colspan="6" style="text-align:center; padding: 30px;"><div class="loader-spinner"></div> Récupération et déchiffrement depuis la DB...</td></tr>';
+			'<tr><td colspan="6" style="text-align:center; padding: 30px;"><div class="loader-spinner"></div> Lecture des fichiers en cours...</td></tr>';
 	}
 
 	setTimeout(() => {
@@ -693,30 +638,18 @@ function request_range_data(show_loader = true) {
 }
 
 /**
- * Native callback invoked by the Lua thread bridging the raw sqlite cache.
- * @param {object} payload - Combined object containing historical and today.
+ * Native Callback invoked by Lua Thread.
  */
-function receive_range_data(payload) {
+function receive_range_data(raw_data) {
 	app_state.loading_data = false;
-	if (!payload) return;
+	if (!raw_data) return;
 
-	app_state.historical_cache = payload.historical;
-	app_state.today_live_data = payload.today;
-	apply_local_filters();
-}
-
-/**
- * Native callback invoked immediately when you type for instant rendering.
- * @param {object} today_idx - The updated today dictionary from memory.
- */
-function receive_live_update(today_idx) {
-	app_state.today_live_data = today_idx;
+	app_state.raw_data_cache = raw_data;
 	apply_local_filters();
 }
 
 /**
  * Filter Toggles logic.
- * @param {string} btn_id - The ID of the clicked button.
  */
 function toggle_filter(btn_id) {
 	document.getElementById(btn_id).classList.toggle('active');
@@ -839,6 +772,8 @@ function render_charts() {
 
 	const rootStyle = getComputedStyle(document.documentElement);
 
+	// Dynamically read exact RGB values inherited from the CSS definitions
+	// Fallbacks provided just in case CSS hasn't painted yet on absolute first millisecond load
 	const rgbIA = rootStyle.getPropertyValue('--kpi-llm-rgb').trim() || '122, 54, 163';
 	const rgbHS = rootStyle.getPropertyValue('--kpi-hs-rgb').trim() || '204, 41, 34';
 	const rgbMan = rootStyle.getPropertyValue('--kpi-delegation-rgb').trim() || '0, 86, 179';
@@ -1056,6 +991,8 @@ function render_charts() {
 		});
 	}
 
+	// Always redraw sparklines with the dynamic CSS colors
+	// Ensure precision chart container is always visible regardless of filter state
 	if (precision_elem) {
 		const precisionChartContainer = precision_elem.closest('.chart-container');
 		if (precisionChartContainer) {
@@ -1063,6 +1000,7 @@ function render_charts() {
 			precisionChartContainer.style.visibility = 'visible';
 			precisionChartContainer.style.flex = '1';
 		}
+		// Ensure parent flex wrapper is also visible
 		const parentWrapper = precisionChartContainer?.parentElement;
 		if (parentWrapper) {
 			parentWrapper.style.display = 'flex';
@@ -1086,9 +1024,6 @@ function render_charts() {
 	);
 }
 
-/**
- * Re-renders small sparkline visual elements.
- */
 function render_sparkline(ctxId, chartRef, dataPoints, colorHex, updateRefFn) {
 	if (chartRef) chartRef.destroy();
 
@@ -1336,5 +1271,4 @@ window.deselect_all_apps = deselect_all_apps;
 window.toggle_app_selection = toggle_app_selection;
 window.render_app_list = render_app_list;
 window.receive_range_data = receive_range_data;
-window.receive_live_update = receive_live_update;
 window.toggle_filter = toggle_filter;
