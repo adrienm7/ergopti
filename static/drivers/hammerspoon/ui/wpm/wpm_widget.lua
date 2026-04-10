@@ -14,14 +14,10 @@
 --- ==============================================================================
 
 local M = {}
-
-local hs         = hs
-local keylogger  = require("modules.keylogger")
-local WPMShared  = require("ui.wpm.shared")
+local hs = hs
+local keylogger = require("modules.keylogger")
+local WPMShared = require("ui.wpm.shared")
 local ColorUtils = require("lib.color_utils")
-local Logger     = require("lib.logger")
-
-local LOG = "wpm_widget"
 
 
 
@@ -206,20 +202,16 @@ end
 --- Starts the floating widget loop.
 --- @param show_graph boolean Whether to draw the history curve.
 function M.start(show_graph)
-	Logger.debug(LOG, "Starting floating WPM widget…")
 	_show_graph = show_graph or false
 	if not _timer then _timer = hs.timer.new(0.2, update_widget) end
 	_timer:start()
 	update_widget()
-	Logger.info(LOG, "Floating WPM widget started successfully.")
 end
 
 --- Halts the widget and clears the screen.
 function M.stop()
-	Logger.debug(LOG, "Stopping floating WPM widget…")
 	if _timer then _timer:stop(); _timer = nil end
 	if _canvas then _canvas:delete(); _canvas = nil end
-	Logger.info(LOG, "Floating WPM widget stopped.")
 end
 
 --- Enables or disables source-based widget coloring.

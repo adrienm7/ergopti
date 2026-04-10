@@ -16,18 +16,16 @@
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
-local LOG = "ui_builder"
 
 
 
 
 
--- ===================================
--- ===================================
--- ======= 1/ Asset Operations =======
--- ===================================
--- ===================================
+-- =====================================
+-- =====================================
+-- ======= 1/ Asset Operations =========
+-- =====================================
+-- =====================================
 
 --- Reads a file and escapes special characters for Lua string substitution.
 --- @param path string Full path to the file.
@@ -49,7 +47,6 @@ end
 --- @param js_name string Optional name of the JS file.
 --- @return string The complete HTML with injected styles and scripts.
 function M.build_injected_html(assets_dir, html_name, css_name, js_name)
-	Logger.debug(LOG, "Building injected HTML assets…")
 	html_name = html_name or "index.html"
 	css_name  = css_name  or "style.css"
 	js_name   = js_name   or "script.js"
@@ -57,7 +54,7 @@ function M.build_injected_html(assets_dir, html_name, css_name, js_name)
 	local html_path = assets_dir .. html_name
 	local ok, fh = pcall(io.open, html_path, "r")
 	if not ok or not fh then 
-		Logger.error(LOG, string.format("Failed to find HTML template: %s.", html_name))
+		-- Inform the user directly in French about the missing template
 		return "<html><body><h1>Erreur de construction : " .. html_name .. " introuvable</h1></body></html>" 
 	end
 	local html = fh:read("*a")
@@ -66,15 +63,16 @@ function M.build_injected_html(assets_dir, html_name, css_name, js_name)
 	local css = read_and_escape(assets_dir .. css_name)
 	local js  = read_and_escape(assets_dir .. js_name)
 
+	-- Inject the CSS right before the closing head tag ignoring case
 	if css ~= "" then
 		html = html:gsub("(</[Hh][Ee][Aa][Dd]>)", "<style>" .. css .. "</style>%1")
 	end
 
+	-- Inject the JavaScript right before the closing body tag ignoring case
 	if js ~= "" then
 		html = html:gsub("(</[Bb][Oo][Dd][Yy]>)", "<script>" .. js .. "</script>%1")
 	end
 
-	Logger.info(LOG, "Injected HTML assets built successfully.")
 	return html
 end
 
@@ -82,11 +80,11 @@ end
 
 
 
--- ====================================
--- ====================================
--- ======= 2/ Window Management =======
--- ====================================
--- ====================================
+-- ===================================
+-- ===================================
+-- ======= 2/ Window Management ======
+-- ===================================
+-- ===================================
 
 --- Calculates a perfectly centered frame for a given width and height on the main screen.
 --- @param w number The desired width of the window.
@@ -108,12 +106,12 @@ end
 function M.force_focus(wv)
 	if not wv then return end
 	
-	Logger.debug(LOG, "Forcing window focus and teleporting to active space…")
 	-- Hiding and showing the window natively teleports it to the active macOS space
 	-- without changing its behavior property, which would destroy the webview state
 	pcall(function() wv:hide() end)
 	pcall(function() wv:show() end)
 	
+	-- Bring to front and request system focus
 	hs.timer.doAfter(0.05, function()
 		if type(wv.hswindow) == "function" then
 			local ok, win = pcall(function() return wv:hswindow() end)
@@ -130,8 +128,8 @@ function M.force_focus(wv)
 			pcall(function() wv:bringToFront() end)
 		end
 		
+		-- Ensure Hammerspoon application regains primary OS focus
 		pcall(hs.focus)
-		Logger.info(LOG, "Window focus applied.")
 	end)
 end
 
@@ -140,8 +138,8 @@ end
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
-	Logger.debug(LOG, "Creating new webview window…")
 
+	-- Prevent LuaSkin crash by not passing explicit nil for the third argument
 	local wv
 	if opts.usercontent then
 		wv = hs.webview.new(opts.frame, { developerExtrasEnabled = false }, opts.usercontent)
@@ -149,11 +147,9 @@ function M.show_webview(opts)
 		wv = hs.webview.new(opts.frame, { developerExtrasEnabled = false })
 	end
 	
-	if not wv then 
-		Logger.error(LOG, "Failed to instantiate webview object.")
-		return nil 
-	end
+	if not wv then return nil end
 
+	-- Apply core UI properties
 	pcall(function() wv:windowTitle(opts.title or "UI") end)
 	
 	if opts.style_masks then 
@@ -169,6 +165,7 @@ function M.show_webview(opts)
 	if opts.allow_gestures ~= nil then pcall(function() wv:allowGestures(opts.allow_gestures) end) end
 	if opts.allow_new_windows ~= nil then pcall(function() wv:allowNewWindows(opts.allow_new_windows) end) end
 
+	-- Bind closing cleanup callback
 	if type(opts.on_close) == "function" then
 		pcall(function()
 			wv:windowCallback(function(action)
@@ -177,19 +174,18 @@ function M.show_webview(opts)
 		end)
 	end
 
+	-- Bind navigation callback
 	if type(opts.on_navigation) == "function" then
 		pcall(function() wv:navigationCallback(opts.on_navigation) end)
 	end
 
-	if type(opts.html) == "string" then
-		pcall(function() wv:html(opts.html) end)
-	elseif type(opts.assets_dir) == "string" then
+	-- Inject HTML assets
+	if type(opts.assets_dir) == "string" then
 		local final_html = M.build_injected_html(opts.assets_dir)
 		pcall(function() wv:html(final_html) end)
 	end
 
 	M.force_focus(wv)
-	Logger.info(LOG, "Webview window created successfully.")
 	return wv
 end
 

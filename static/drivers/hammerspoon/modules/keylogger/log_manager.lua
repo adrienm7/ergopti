@@ -1,27 +1,22 @@
 --- modules/keylogger/log_manager.lua
 
 --- ==============================================================================
---- MODULE: Keylogger Log Manager (SQLite Encrypted)
+--- MODULE: Keylogger Log Manager
 --- DESCRIPTION:
---- Handles the heavy lifting of data aggregation and SQLite ingestion.
---- Compiles raw keystrokes into rich N-gram indexes and tracks native app categories.
+--- Handles the heavy lifting of data aggregation, JSON encoding, and file rotation.
+--- Compiles raw keystrokes into rich N-gram indexes and computes metrics.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Math Offloading: Keeps the mathematical processing out of the fast loop.
---- 2. Native Categorization: Dynamically queries macOS for official app categories.
---- 3. Instant UI Ready: Pushes live updates directly to Webview contexts.
---- 4. Built-in Security: Transparent encryption of the historical SQLite database.
+--- 2. Native File IO: Uses fast 'a' mode append to prevent UI/system lag.
+--- 3. Accurate Word Tracking: Handles punctuation, apostrophes, and synthetic backspaces.
 --- ==============================================================================
 
-local hs      = hs
-local fs      = require("hs.fs")
-local json    = require("hs.json")
-local timer   = require("hs.timer")
-local sqlite3 = require("hs.sqlite3")
-local utf8    = utf8
-
-local Logger  = require("lib.logger")
-local LOG     = "keylogger.log_manager"
+local hs    = hs
+local fs    = require("hs.fs")
+local json  = require("hs.json")
+local timer = require("hs.timer")
+local utf8  = utf8
 
 local M = {}
 
@@ -32,27 +27,11 @@ local _save_timer = nil
 
 
 
--- ===================================
--- ===================================
+-- =====================================
+-- =====================================
 -- ======= 1/ Helper Functions =======
--- ===================================
--- ===================================
-
---- Fetches the native macOS category for a given application dynamically.
---- @param app_name string The name of the application.
---- @return string The formatted native category.
-function M.get_native_app_category(app_name)
-	local app = hs.application.get(app_name)
-	if app then
-		local info = hs.application.infoForBundlePath(app:path())
-		if info and info.LSApplicationCategoryType then
-			local cat = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
-			cat = cat:gsub("%-", " ")
-			return cat:sub(1, 1):upper() .. cat:sub(2)
-		end
-	end
-	return "Unknown"
-end
+-- =====================================
+-- =====================================
 
 --- Removes the last UTF-8 character from a string.
 --- @param input_string string The input string.
@@ -86,14 +65,12 @@ local function add_metric(dict, key, delay, is_err, synth_type)
 	end
 end
 
---- Debounces local saves to prevent blocking the OS keystroke event loop.
+--- Debounces large JSON saves to prevent blocking the OS keystroke event loop.
 local function debounced_save()
 	if _save_timer then _save_timer:stop() end
 	_save_timer = timer.doAfter(1.5, function()
-		Logger.debug(LOG, "Executing debounced save…")
 		M.save_today_index()
 		M.save_manifest()
-		Logger.info(LOG, "Debounced save completed.")
 	end)
 end
 
@@ -101,11 +78,11 @@ end
 
 
 
--- ===================================
--- ===================================
+-- =====================================
+-- =====================================
 -- ======= 2/ Core Aggregation =======
--- ===================================
--- ===================================
+-- =====================================
+-- =====================================
 
 --- Compiles raw events into aggregated dictionaries safely.
 --- @param events table Raw key array.
@@ -126,7 +103,7 @@ function M.aggregate_events(events, app_name, date_str)
 	
 	local m_app = m_day[app_name]
 	if type(m_app) ~= "table" then 
-		m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }
+		m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {} }
 		m_day[app_name] = m_app 
 	end
 	
@@ -167,8 +144,7 @@ function M.aggregate_events(events, app_name, date_str)
 				if stype == "hotstring" then m_app.hs_chars = math.max(0, (m_app.hs_chars or 0) - 1)
 				elseif stype == "llm" then m_app.llm_chars = math.max(0, (m_app.llm_chars or 0) - 1) end
 			end
-			
-			-- Always pop char to reflect screen accurately
+			-- Always pop char to reflect screen accurately (both manual and synth backspaces)
 			cur_word = pop_utf8(cur_word)
 
 			if #hist > 0 then
@@ -185,6 +161,7 @@ function M.aggregate_events(events, app_name, date_str)
 			if is_synth then
 				m_app.hourly[current_hour].es = (m_app.hourly[current_hour].es or 0) + 1
 			else
+				-- Keep `e` aligned with manual backspaces so precision reflects human typing only
 				m_app.hourly[current_hour].e = (m_app.hourly[current_hour].e or 0) + 1
 				m_app.hourly[current_hour].em = (m_app.hourly[current_hour].em or 0) + 1
 			end
@@ -234,9 +211,11 @@ function M.aggregate_events(events, app_name, date_str)
 					elseif stype == "llm" then m_app.llm_chars = (m_app.llm_chars or 0) + 1 end
 				end
 
+				-- Universal Word Aggregation (for both human and synth keystrokes)
 				local is_separator = k_c:match("[%s.,!?;:\"()%%]") or k_c == "\n" or k_c == "\194\160" or k_c == "\226\128\175"
 				if is_separator then
 					if #cur_word > 0 then
+						-- Only count if it contains actual word characters (letters/numbers)
 						if cur_word:match("[%w\128-\255]") then
 							add_metric(a.w, cur_word, 0, word_err, "none")
 						end
@@ -259,162 +238,11 @@ end
 
 
 
--- ==================================
--- ==================================
--- ======= 3/ File Management =======
--- ==================================
--- ==================================
-
---- Returns today's active plain log file.
---- @return string Filepath.
-local function get_log_file() 
-	local d = os.date("%Y_%m_%d")
-	return _state.LOG_DIR .. "/" .. d .. ".log" 
-end
-
---- Persists today's index into a dedicated JSON file (fast write).
-function M.save_today_index()
-	local idx_file = _state.LOG_DIR .. "/" .. os.date("%Y_%m_%d") .. ".idx"
-	local ok, raw = pcall(json.encode, _state.today_idx)
-	if not ok then return end
-
-	local f = io.open(idx_file .. ".tmp", "w")
-	if f then 
-		f:write(raw)
-		f:close() 
-		os.execute(string.format("mv %q %q", idx_file .. ".tmp", idx_file))
-	end
-end
-
---- Persists the fast-load manifest into JSON.
-function M.save_manifest()
-	local manifest_file = _state.LOG_DIR .. "/manifest.json"
-	local ok, raw = pcall(json.encode, _state.manifest)
-	if not ok then return end
-
-	local f = io.open(manifest_file .. ".tmp", "w")
-	if f then 
-		f:write(raw)
-		f:close() 
-		os.execute(string.format("mv %q %q", manifest_file .. ".tmp", manifest_file))
-	end
-end
-
---- Parses unindexed raw files on boot to heal the state.
-function M.rebuild_index_if_needed()
-	Logger.debug(LOG, "Rebuilding log index if necessary…")
-	if not fs.attributes(_state.LOG_DIR) then fs.mkdir(_state.LOG_DIR) end
-
-	local manifest_file = _state.LOG_DIR .. "/manifest.json"
-	local f = io.open(manifest_file, "r")
-	if f then
-		local c = f:read("*a")
-		f:close()
-		pcall(function() _state.manifest = json.decode(c) or {} end)
-	end
-
-	local today_str = os.date("%Y_%m_%d")
-	local today_idx_file = _state.LOG_DIR .. "/" .. today_str .. ".idx"
-	local f_idx = io.open(today_idx_file, "r")
-	if f_idx then
-		local c = f_idx:read("*a")
-		f_idx:close()
-		pcall(function() _state.today_idx = json.decode(c) or {} end)
-	end
-
-	-- Look for old orphan .idx files and merge them into the DB
-	for f_name in hs.fs.dir(_state.LOG_DIR) do
-		local y, m, d = f_name:match("^(%d%d%d%d)_(%d%d)_(%d%d)%.idx$")
-		if y and m and d then
-			local d_str = string.format("%s_%s_%s", y, m, d)
-			if d_str ~= today_str then
-				local full_path = _state.LOG_DIR .. "/" .. f_name
-				local file = io.open(full_path, "r")
-				if file then
-					local c = file:read("*a")
-					file:close()
-					local ok, old_idx = pcall(json.decode, c)
-					if ok and type(old_idx) == "table" then
-						local m_date_str = string.format("%s-%s-%s", y, m, d)
-						local old_manifest = _state.manifest[m_date_str] or {}
-						M.merge_day_to_db(m_date_str, old_idx, old_manifest)
-						os.remove(full_path)
-					end
-				end
-			end
-		end
-	end
-	Logger.info(LOG, "Index rebuild evaluation completed.")
-end
-
-
-
-
-
--- ====================================
--- ====================================
--- ======= 4/ Encrypted DB Core =======
--- ====================================
--- ====================================
-
---- Securely opens, merges a day, and re-encrypts the SQLite DB.
---- @param date_str string The date string (YYYY-MM-DD).
---- @param idx_data table The daily index object.
---- @param manifest_data table The daily manifest object.
-function M.merge_day_to_db(date_str, idx_data, manifest_data)
-	Logger.debug(LOG, string.format("Merging daily logs into encrypted database for %s…", date_str))
-	local db_path = _state.LOG_DIR .. "/metrics.sqlite"
-	local enc_path = db_path .. ".enc"
-	local tmp_path = os.tmpname()
-	local pwd = _state.get_mac_serial():gsub("\"", "\\\"")
-
-	if fs.attributes(enc_path) then
-		hs.execute(string.format("openssl enc -d -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" -in %q > %q 2>/dev/null", pwd, enc_path, tmp_path))
-	end
-	
-	local db = sqlite3.open(tmp_path)
-	if db then
-		db:exec([[
-			CREATE TABLE IF NOT EXISTS daily_manifest (date TEXT, app_name TEXT, stats_json TEXT, UNIQUE(date, app_name));
-			CREATE TABLE IF NOT EXISTS daily_index (date TEXT, app_name TEXT, index_json TEXT, UNIQUE(date, app_name));
-		]])
-		
-		db:exec("BEGIN TRANSACTION;")
-		
-		local stmt_idx = db:prepare("INSERT OR REPLACE INTO daily_index (date, app_name, index_json) VALUES (?, ?, ?)")
-		if stmt_idx then
-			for app_name, data in pairs(idx_data or {}) do
-				stmt_idx:bind_values(date_str, app_name, json.encode(data))
-				stmt_idx:step()
-				stmt_idx:reset()
-			end
-			stmt_idx:finalize()
-		end
-		
-		local stmt_man = db:prepare("INSERT OR REPLACE INTO daily_manifest (date, app_name, stats_json) VALUES (?, ?, ?)")
-		if stmt_man then
-			for app_name, data in pairs(manifest_data or {}) do
-				stmt_man:bind_values(date_str, app_name, json.encode(data))
-				stmt_man:step()
-				stmt_man:reset()
-			end
-			stmt_man:finalize()
-		end
-		
-		db:exec("COMMIT;")
-		db:close()
-		
-		hs.execute(string.format("openssl enc -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" -in %q > %q", pwd, tmp_path, enc_path))
-	end
-	os.remove(tmp_path)
-	Logger.info(LOG, "Daily logs merged successfully.")
-end
-
---- Retrieves a unique device serial key safely.
---- @return string The MAC serial or fallback identifier.
-function M.get_mac_serial()
-	return _state.get_mac_serial()
-end
+-- ===================================
+-- ===================================
+-- ======= 3/ File Management ========
+-- ===================================
+-- ===================================
 
 --- Increments a simple stat in the fast manifest immediately.
 --- @param app_name string Focus app.
@@ -424,42 +252,14 @@ function M.increment_manifest_stat(app_name, stat_key)
 	local m_day = _state.manifest[date_str]
 	if type(m_day) ~= "table" then m_day = {}; _state.manifest[date_str] = m_day end
 	local m_app = m_day[app_name or "Unknown"]
-	if type(m_app) ~= "table" then m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }; m_day[app_name or "Unknown"] = m_app end
+	if type(m_app) ~= "table" then m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {} }; m_day[app_name or "Unknown"] = m_app end
 	
 	m_app[stat_key] = (m_app[stat_key] or 0) + 1
 	debounced_save()
 end
 
---- Records an application context switch with focus duration.
---- @param prev_app string Previously focused application.
---- @param next_app string The new application taking focus.
---- @param duration_ms number Duration spent in the previous app.
-function M.log_app_switch(prev_app, next_app, duration_ms)
-	local date_str = os.date("%Y-%m-%d")
-	local m_day = _state.manifest[date_str]
-	if type(m_day) ~= "table" then m_day = {}; _state.manifest[date_str] = m_day end
-
-	local m_app = m_day[prev_app or "Unknown"]
-	if type(m_app) ~= "table" then
-		m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(prev_app) }
-		m_day[prev_app or "Unknown"] = m_app
-	end
-
-	m_app.app_time_ms = (m_app.app_time_ms or 0) + duration_ms
-	m_app.switches_to = type(m_app.switches_to) == "table" and m_app.switches_to or {}
-	m_app.switches_to[next_app or "Unknown"] = (m_app.switches_to[next_app or "Unknown"] or 0) + 1
-
-	M.append_log({ type = "app_switch", prev_app = prev_app, next_app = next_app, duration_ms = duration_ms })
-	debounced_save()
-end
-
---- Records system-level activities like waking or sleeping.
---- @param event_type string Identifier for the event ("sleep", "wake").
-function M.log_system_event(event_type)
-	M.append_log({ type = "system_event", action = event_type })
-end
-
 --- Records a single keyboard shortcut immediately into the index and the log file.
+--- Bypasses the typing buffer entirely so shortcuts are persisted on the spot.
 --- @param shortcut_key string The formatted shortcut string (e.g. "Cmd+C").
 --- @param app_name string The frontmost application name at time of press.
 function M.log_shortcut(shortcut_key, app_name)
@@ -482,7 +282,179 @@ function M.log_shortcut(shortcut_key, app_name)
 	debounced_save()
 end
 
---- Atomic log appender. Uses fast native append mode.
+--- Compresses old log files retroactively.
+function M.ensure_dir_and_rotate()
+	if not fs.attributes(_state.LOG_DIR) then fs.mkdir(_state.LOG_DIR) end
+	
+	local today = os.date("%Y_%m_%d")
+	for f in hs.fs.dir(_state.LOG_DIR) do
+		if f:match("^%d%d%d%d_%d%d_%d%d%.log$") and not f:find(today) then
+			local full_path = _state.LOG_DIR .. "/" .. f
+			if _state.options.encrypt then
+				local enc_path = full_path .. ".gz.enc"
+				local safe_pwd = _state.get_mac_serial():gsub("\"", "\\\"")
+				os.execute(string.format("gzip -c %q | openssl enc -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" > %q && rm %q", full_path, safe_pwd, enc_path, full_path))
+			else
+				os.execute(string.format("gzip %q", full_path))
+			end
+		end
+		
+		if f:match("^%d%d%d%d_%d%d_%d%d%.idx$") and not f:find(today) then
+			local full_path = _state.LOG_DIR .. "/" .. f
+			os.execute(string.format("gzip %q", full_path))
+		end
+	end
+end
+
+--- Returns today's active plain log file.
+--- @return string Filepath.
+local function get_log_file() return _state.LOG_DIR .. "/" .. os.date("%Y_%m_%d") .. ".log" end
+
+--- Persists today's index into a dedicated file.
+function M.save_today_index()
+	local idx_file = _state.LOG_DIR .. "/" .. os.date("%Y_%m_%d") .. ".idx"
+	local ok, raw = pcall(json.encode, _state.today_idx)
+	if not ok then return end
+
+	local f = io.open(idx_file .. ".tmp", "w")
+	if f then 
+		f:write(raw)
+		f:close() 
+		os.execute(string.format("mv %q %q", idx_file .. ".tmp", idx_file))
+	end
+end
+
+--- Persists the fast-load manifest.
+function M.save_manifest()
+	local manifest_file = _state.LOG_DIR .. "/manifest.json"
+	local ok, raw = pcall(json.encode, _state.manifest)
+	if not ok then return end
+
+	local f = io.open(manifest_file .. ".tmp", "w")
+	if f then 
+		f:write(raw)
+		f:close() 
+		os.execute(string.format("mv %q %q", manifest_file .. ".tmp", manifest_file))
+	end
+end
+
+--- Parses unindexed raw logs on boot to heal the state.
+function M.rebuild_index_if_needed()
+	local manifest_file = _state.LOG_DIR .. "/manifest.json"
+	local f = io.open(manifest_file, "r")
+	if f then
+		local c = f:read("*a")
+		f:close()
+		pcall(function() _state.manifest = json.decode(c) or {} end)
+	end
+
+	local today_idx_file = _state.LOG_DIR .. "/" .. os.date("%Y_%m_%d") .. ".idx"
+	local f_idx = io.open(today_idx_file, "r")
+	if f_idx then
+		local c = f_idx:read("*a")
+		f_idx:close()
+		pcall(function() _state.today_idx = json.decode(c) or {} end)
+	end
+
+	local changed = false
+	
+	for f_name in hs.fs.dir(_state.LOG_DIR) do
+		local y, m, d = f_name:match("^(%d%d%d%d)_(%d%d)_(%d%d)%.log")
+		if not y then y, m, d = f_name:match("^(%d%d%d%d)_(%d%d)_(%d%d)%.log%.gz") end
+		
+		if y and m and d then
+			local date_str = y .. "-" .. m .. "-" .. d
+			local idx_file = string.format("%s/%s_%s_%s.idx", _state.LOG_DIR, y, m, d)
+			local idx_gz_file = idx_file .. ".gz"
+			
+			if not fs.attributes(idx_file) and not fs.attributes(idx_gz_file) then
+				local full_path = _state.LOG_DIR .. "/" .. f_name
+				local content = ""
+				
+				if f_name:match("%.log%.gz%.enc$") then
+					local safe_pwd = _state.get_mac_serial():gsub("\"", "\\\"")
+					local p = io.popen(string.format("gzip -c -d %q | openssl enc -d -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" 2>/dev/null", full_path, safe_pwd), "r")
+					if p then content = p:read("*a"); p:close() end
+				elseif f_name:match("%.gz$") then
+					local p = io.popen(string.format("gzip -c -d %q 2>/dev/null", full_path), "r")
+					if p then content = p:read("*a"); p:close() end
+				else
+					local file = io.open(full_path, "r")
+					if file then content = file:read("*a"); file:close() end
+				end
+
+				if content and content ~= "" then
+					local backup_today = _state.today_idx
+					_state.today_idx = {}
+					
+					for line in content:gmatch("[^\r\n]+") do
+						if _state.options.encrypt and not line:match("^{") then
+							local safe_line = line:gsub("\"", "\\\"")
+							local safe_pwd = _state.get_mac_serial():gsub("\"", "\\\"")
+							local dec = hs.execute(string.format("echo \"%s\" | openssl enc -d -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" 2>/dev/null", safe_line, safe_pwd))
+							if dec and dec:match("^{") then line = dec end
+						end
+
+						if line:match("^{") then
+							local ok, entry = pcall(json.decode, line)
+							if ok and entry then
+								if entry.type == "typing" and entry.events then
+									M.aggregate_events(entry.events, entry.app or "Unknown", date_str)
+									changed = true
+								elseif entry.type == "shortcut" and type(entry.key) == "string" and entry.key ~= "" then
+									local sc_app = entry.app or "Unknown"
+									local s_a = _state.today_idx[sc_app]
+									if type(s_a) ~= "table" then
+										s_a = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
+										_state.today_idx[sc_app] = s_a
+									end
+									s_a.sc = type(s_a.sc) == "table" and s_a.sc or {}
+									local sc_item = s_a.sc[entry.key]
+									if type(sc_item) ~= "table" then sc_item = {}; s_a.sc[entry.key] = sc_item end
+									sc_item.c = (sc_item.c or 0) + 1
+									changed = true
+								elseif entry.type == "hotstring_suggested" then
+									local m_day = _state.manifest[date_str]
+									if type(m_day) ~= "table" then m_day = {}; _state.manifest[date_str] = m_day end
+									local m_app = m_day[entry.app or "Unknown"]
+									if type(m_app) ~= "table" then m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {} }; m_day[entry.app or "Unknown"] = m_app end
+									m_app.hs_suggested = (m_app.hs_suggested or 0) + 1
+									changed = true
+								elseif entry.type == "llm_generation" then
+									local m_day = _state.manifest[date_str]
+									if type(m_day) ~= "table" then m_day = {}; _state.manifest[date_str] = m_day end
+									local m_app = m_day[entry.app or "Unknown"]
+									if type(m_app) ~= "table" then m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {} }; m_day[entry.app or "Unknown"] = m_app end
+									m_app.llm_suggested = (m_app.llm_suggested or 0) + 1
+									changed = true
+								end
+							end
+						end
+					end
+					
+					if date_str ~= os.date("%Y-%m-%d") then
+						local tmp = idx_file .. ".tmp"
+						local tmp_f = io.open(tmp, "w")
+						if tmp_f then
+							tmp_f:write(json.encode(_state.today_idx))
+							tmp_f:close()
+							os.execute(string.format("gzip -c %q > %q && rm %q", tmp, idx_gz_file, tmp))
+						end
+					else
+						M.save_today_index()
+						backup_today = _state.today_idx
+					end
+					
+					_state.today_idx = backup_today
+				end
+			end
+		end
+	end
+	
+	if changed then M.save_manifest() end
+end
+
+--- Atomic log appender. Fast native append mode.
 --- @param entry table Dictionary payload.
 function M.append_log(entry)
 	local filepath = get_log_file()
@@ -501,10 +473,9 @@ function M.append_log(entry)
 	end
 end
 
---- Writes buffer to disk, aggregates, and alerts the UI contexts real-time.
+--- Writes buffer to disk and resets memory strings safely.
 function M.flush_buffer()
-	if #_state.buffer_events == 0 and _state.session_mouse_clicks == 0 and _state.session_mouse_scrolls == 0 then return end
-	Logger.debug(LOG, "Flushing event buffer…")
+	if #_state.buffer_events == 0 then return end
 	
 	local total_time_ms, total_chars = 0, 0
 	for _, ev in ipairs(_state.buffer_events) do
@@ -537,22 +508,11 @@ function M.flush_buffer()
 	end
 
 	M.append_log({ 
-		type            = "typing", 
-		text            = _state.buffer_text, 
-		rich_text       = rich_str, 
-		app             = _state.session_app_name, 
-		title           = _state.session_win_title, 
-		url             = _state.session_url,
-		field_role      = _state.session_field_role, 
-		layout          = _state.session_layout,
-		document_path   = _state.session_document_path,
-		is_fullscreen   = _state.is_fullscreen,
-		in_meeting      = _state.in_meeting,
-		mouse_clicks    = _state.session_mouse_clicks,
-		mouse_scrolls   = _state.session_mouse_scrolls,
+		type = "typing", text = _state.buffer_text, rich_text = rich_str, 
+		app = _state.session_app_name, title = _state.session_win_title, url = _state.session_url,
+		field_role = _state.session_field_role, layout = _state.session_layout,
 		pause_before_ms = _state.current_session_pause,
-		wpm             = tonumber(string.format("%.1f", wpm)), 
-		events          = _state.buffer_events 
+		wpm = tonumber(string.format("%.1f", wpm)), events = _state.buffer_events 
 	})
 
 	local ok, err = pcall(function()
@@ -560,29 +520,114 @@ function M.flush_buffer()
 		debounced_save()
 	end)
 	
-	if not ok then Logger.error(LOG, string.format("Aggregation failure: %s.", tostring(err))) end
-	
-	-- Push Real-Time Updates to Open WebViews
-	local ok_metrics, metrics = pcall(require, "ui.metrics_typing.init")
-	if ok_metrics and type(metrics.push_live_update) == "function" then
-		metrics.push_live_update(_state.today_idx)
-	end
-
-	local ok_apps, apps_time = pcall(require, "ui.metrics_apps.init")
-	if ok_apps and type(apps_time.push_live_update) == "function" then
-		apps_time.push_live_update(_state.manifest)
-	end
+	if not ok then print("[Keylogger] aggregation failure: " .. tostring(err)) end
 	
 	_state.buffer_events = {}
 	_state.buffer_text = ""
 	_state.rich_chunks = {}
 	_state.last_time = 0
 	_state.pending_keyup = {}
-	_state.session_mouse_clicks = 0
-	_state.session_mouse_scrolls = 0
 	_state.last_flush_time = hs.timer.absoluteTime() / 1000000
-	Logger.info(LOG, "Event buffer flushed successfully.")
 end
+
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 4/ OS Crypto Helpers ========
+-- =======================================
+-- =======================================
+
+--- Exposes a helper to the UI to execute LaunchServices registration.
+function M.register_encryptor_app()
+	local app_path = hs.configdir .. "/utils/encryptor/Encryptor.app"
+	if fs.attributes(app_path) then
+		local lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+		hs.execute(string.format("%s -f %q", lsregister, app_path))
+	end
+end
+
+--- Retrieves a unique device serial key safely.
+--- @return string The MAC serial or fallback identifier.
+function M.get_mac_serial()
+	return _state.get_mac_serial()
+end
+
+--- Processes file encryption asynchronously with UI feedback hooks.
+--- @param files_to_process table Files list.
+--- @param is_encrypt boolean Operation type.
+--- @param password string Secret.
+--- @param on_progress function Callback triggered per file.
+--- @param on_complete function Callback triggered at end.
+function M.process_files_async(files_to_process, is_encrypt, password, on_progress, on_complete)
+	local total_files = #files_to_process
+	local current_index = 0
+	local success_count = 0
+	local error_count = 0
+	local has_bad_password = false
+
+	local function process_next()
+		if current_index >= total_files then
+			if type(on_complete) == "function" then
+				on_complete(success_count, error_count, has_bad_password)
+			end
+			return
+		end
+
+		current_index = current_index + 1
+		local target_file = files_to_process[current_index]
+		local safe_password = password:gsub("\"", "\\\"")
+
+		if is_encrypt then
+			local output_file = target_file .. ".enc"
+			local shell_cmd = string.format("openssl enc -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" -in %q > %q 2>&1", safe_password, target_file, output_file)
+			local output, status = hs.execute(shell_cmd)
+			
+			if status then
+				os.remove(target_file)
+				success_count = success_count + 1
+			else
+				os.remove(output_file)
+				error_count = error_count + 1
+			end
+		else
+			local output_file = target_file:gsub("%.enc$", "")
+			local shell_cmd = string.format("openssl enc -d -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" -in %q > %q 2>&1", safe_password, target_file, output_file)
+			local output, status = hs.execute(shell_cmd)
+			
+			if status then
+				os.remove(target_file)
+				success_count = success_count + 1
+			else
+				os.remove(output_file)
+				error_count = error_count + 1
+				if output and output:match("bad decrypt") then
+					has_bad_password = true
+				end
+			end
+		end
+
+		if type(on_progress) == "function" then
+			on_progress(current_index)
+		end
+		
+		hs.timer.doAfter(0.01, process_next)
+	end
+
+	hs.timer.doAfter(0.05, process_next)
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 5/ Module API =======
+-- =============================
+-- =============================
 
 --- Mounts the shared state.
 --- @param core_state table The shared state object.

@@ -1,42 +1,21 @@
---- lib/app_picker.lua
+-- lib/app_picker.lua
 
---- ==============================================================================
---- MODULE: Application Picker
---- DESCRIPTION:
---- Provides shared logic for discovering installed applications and building
---- a standardized exclusion menu.
----
---- FEATURES & RATIONALE:
---- 1. App Discovery: Scans the system for installed applications.
---- 2. Menu Building: Creates a standardized exclusion list submenu.
---- ==============================================================================
+-- ===========================================================================
+-- Application Picker Library.
+--
+-- Provides shared logic for discovering installed applications and building
+-- a standardized "Exclusion Menu" (used by LLM and Keylogger).
+-- ===========================================================================
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
 
-local LOG = "app_picker"
-
-
-
-
-
--- ========================================
--- ========================================
--- ======= 1/ Application Discovery =======
--- ========================================
--- ========================================
-
---- Scans the system for installed applications.
---- @return table A list of choices for hs.chooser.
+--- Scans the system for installed applications
+--- @return table A list of choices for hs.chooser
 function M.discover_apps()
-	Logger.debug(LOG, "Discovering installed applications…")
 	local cmd = "find /Applications \"$HOME/Applications\" -maxdepth 2 -name \"*.app\" -not -name \".*\" 2>/dev/null | sort"
 	local ok, raw = pcall(hs.execute, cmd)
-	if not ok or type(raw) ~= "string" then
-		Logger.warn(LOG, "Failed to execute application discovery command.")
-		return {}
-	end
+	if not ok or type(raw) ~= "string" then return {} end
 	
 	local choices, seen = {}, {}
 	for app_path in raw:gmatch("[^\n]+") do
@@ -66,27 +45,15 @@ function M.discover_apps()
 	end
 	
 	table.sort(choices, function(a, b) return a.text:lower() < b.text:lower() end)
-	Logger.info(LOG, "Application discovery completed.")
 	return choices
 end
 
-
-
-
-
--- ================================
--- ================================
--- ======= 2/ Menu Building =======
--- ================================
--- ================================
-
---- Builds a standardized exclusion list submenu.
---- @param current_apps table The current list of disabled apps.
---- @param on_change function Callback triggered when the list changes.
---- @param placeholder_text string Text to display in the chooser.
---- @return table The menu structure.
+--- Builds a standardized exclusion list submenu
+--- @param current_apps table The current list of disabled apps
+--- @param on_change function Callback triggered when the list changes
+--- @param placeholder_text string Text to display in the chooser
+--- @return table The menu structure
 function M.build_menu(current_apps, on_change, placeholder_text)
-	Logger.debug(LOG, "Building application exclusion menu…")
 	local apps = type(current_apps) == "table" and current_apps or {}
 	local menu = {}
 	
@@ -123,7 +90,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	
 	if #menu > 0 then table.insert(menu, {title = "-"}) end
 
-	-- One-click exclusion of the currently focused application
+	-- Exclure l'application actuelle en un clic
 	local frontApp = hs.application.frontmostApplication()
 	if frontApp then
 		local bundleID = type(frontApp.bundleID) == "function" and frontApp:bundleID() or nil
@@ -196,7 +163,6 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 		end,
 	})
 	
-	Logger.info(LOG, "Application exclusion menu built successfully.")
 	return menu
 end
 

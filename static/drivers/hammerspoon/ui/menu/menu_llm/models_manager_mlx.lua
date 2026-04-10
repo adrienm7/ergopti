@@ -11,8 +11,6 @@
 --- ==============================================================================
 
 local M = {}
-
-local hs            = hs
 local notifications = require("lib.notifications")
 local ui_builder = require("ui.ui_builder")
 

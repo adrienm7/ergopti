@@ -20,7 +20,8 @@ local keyStrokes = hs.eventtap.keyStrokes
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
-local LOG        = "keymap.expander"
+
+local LOG = "keymap.expander"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -36,11 +37,11 @@ local _llm      = nil
 
 
 
--- ====================================
--- ====================================
--- ======= 1/ Core Replacements =======
--- ====================================
--- ====================================
+-- =====================================
+-- =====================================
+-- ======= 1/ Core Replacements ========
+-- =====================================
+-- =====================================
 
 --- Internal helper executing character manipulation via backspaces and pasting.
 --- @param deletes number Quantity of backspaces to issue.
@@ -51,7 +52,6 @@ local _llm      = nil
 --- @param source_type string Specifies the module triggering the generation.
 --- @param source_variant string|nil Optional subtype used by UI widgets.
 function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant)
-	Logger.debug(LOG, "Performing text replacement…")
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
 	if not is_ignored and tooltip.hide then tooltip.hide() end
 	
@@ -81,18 +81,17 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	if not is_ignored and _llm.get_llm_enabled() then
 		_llm.start_timer()
 	end
-	Logger.info(LOG, "Text replacement completed.")
 end
 
 
 
 
 
--- ======================================
--- ======================================
--- ======= 2/ Expansion Scenarios =======
--- ======================================
--- ======================================
+-- =========================================
+-- =========================================
+-- ======= 2/ Expansion Scenarios ==========
+-- =========================================
+-- =========================================
 
 --- Attempts to resolve and execute an auto-expanding hotstring sequence.
 --- @param m table The dictionary mapping matched sequence.
@@ -109,8 +108,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		local before   = tstart and _state.buffer:sub(1, tstart - 1) or ""
 		local last_ch  = utf8.offset(before, -1)
 		local prev_char = last_ch and before:sub(last_ch) or ""
-		
-		-- Treat the '@' prefix as word continuation to prevent collision with personal info triggers
+		-- @ is intentional (personal_info prefix) — treat as word continuation
 		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
 			return false
 		end
@@ -182,8 +180,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		local before    = buf_start and _state.buffer:sub(1, buf_start - 1) or ""
 		local last_ch   = utf8.offset(before, -1)
 		local prev_char = last_ch and before:sub(last_ch) or ""
-		
-		-- Treat the '@' prefix as word continuation to prevent collision with personal info triggers
+		-- @ is intentional (personal_info prefix) — treat as word continuation
 		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
 			return false
 		end
@@ -197,7 +194,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		return true
 	end
 
-	-- Records acceptance ONLY upon effective completion by a terminator (e.g. star)
+	-- Enregistre l'acceptation UNIQUEMENT lors d'une complétion effective par un terminateur (ex: étoile)
 	if keylogger and type(keylogger.log_hotstring_suggested) == "function" then
 		pcall(keylogger.log_hotstring_suggested)
 	end
@@ -311,11 +308,9 @@ end
 --- @param registry_mod table The registry submodule reference.
 --- @param llm_mod table The LLM bridge submodule reference.
 function M.init(core_state, registry_mod, llm_mod)
-	Logger.debug(LOG, "Initializing expander dependencies…")
 	_state    = core_state
 	_registry = registry_mod
 	_llm      = llm_mod
-	Logger.info(LOG, "Expander initialized successfully.")
 end
 
 return M

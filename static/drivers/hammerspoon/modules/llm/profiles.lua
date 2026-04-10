@@ -8,18 +8,15 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
-local LOG    = "llm.profiles"
 
 
 
 
-
--- ===================================
--- ===================================
--- ======= 1/ Built-in Prompts =======
--- ===================================
--- ===================================
+-- ======================================
+-- ======================================
+-- ======= 1/ Built-in Prompts ==========
+-- ======================================
+-- ======================================
 
 local RAW_PROMPT_SINGLE = [[{context}]]
 
@@ -74,7 +71,7 @@ NEXT_WORDS: return price * (1 + tax)
 --- @param n number The number of predictions required.
 --- @return string The formatted prompt string.
 local function BATCH_ADVANCED_PROMPT(n)
-	return ADVANCED_PROMPT_SINGLE .. "\n\n" ..
+    return ADVANCED_PROMPT_SINGLE .. "\n\n" ..
 [[=========================================
 RÈGLE SPÉCIALE BATCH : Tu DOIS OBLIGATOIREMENT générer EXACTEMENT ]] .. tostring(n) .. [[ suites logiques différentes.
 Ne t’arrête SURTOUT PAS avant d’avoir donné les ]] .. tostring(n) .. [[ propositions.
@@ -95,53 +92,53 @@ end
 
 
 
--- ========================================
--- ========================================
--- ======= 2/ Registry & Resolution =======
--- ========================================
--- ========================================
+-- =======================================
+-- =======================================
+-- ======= 2/ Registry & Resolution ======
+-- =======================================
+-- =======================================
 
 M.BUILTIN_PROFILES = {
-	{
-		id            = "raw",
-		label         = "○○○ Raw — Aucun prompt, juste le contexte",
-		batch         = false,
-		system_single = RAW_PROMPT_SINGLE,
-		system_multi  = nil,
-	},
-	{
-		id            = "basic",
-		label         = "●○○ Basique — Prédiction simple",
-		batch         = false,
-		system_single = BASIC_PROMPT_SINGLE,
-		system_multi  = nil,
-	},
-	{
-		id            = "advanced",
-		label         = "●●○ Avancé — Correction + Prédiction",
-		batch         = false,
-		system_single = ADVANCED_PROMPT_SINGLE,
-		system_multi  = nil,
-	},
-	{
-		id            = "batch_advanced",
-		label         = "●●● Batch Avancé — 1 req. avancée avec {n} prédiction{s}",
-		batch         = true,
-		system_single = ADVANCED_PROMPT_SINGLE,
-		system_multi  = BATCH_ADVANCED_PROMPT,
-	},
+    {
+        id            = "raw",
+        label         = "○○○ Raw — Aucun prompt, juste le contexte",
+        batch         = false,
+        system_single = RAW_PROMPT_SINGLE,
+        system_multi  = nil,
+    },
+    {
+        id            = "basic",
+        label         = "●○○ Basique — Prédiction simple",
+        batch         = false,
+        system_single = BASIC_PROMPT_SINGLE,
+        system_multi  = nil,
+    },
+    {
+        id            = "advanced",
+        label         = "●●○ Avancé — Correction + Prédiction",
+        batch         = false,
+        system_single = ADVANCED_PROMPT_SINGLE,
+        system_multi  = nil,
+    },
+    {
+        id            = "batch_advanced",
+        label         = "●●● Batch Avancé — 1 req. avancée avec {n} prédiction{s}",
+        batch         = true,
+        system_single = ADVANCED_PROMPT_SINGLE,
+        system_multi  = BATCH_ADVANCED_PROMPT,
+    },
 }
 
 --- Combines built-in profiles and user profiles into a single table.
 --- @param user_profiles table Current user defined profiles.
 --- @return table An array containing all available profiles.
 function M.get_all_profiles(user_profiles)
-	local all = {}
-	for _, p in ipairs(M.BUILTIN_PROFILES) do table.insert(all, p) end
-	if type(user_profiles) == "table" then
-		for _, p in ipairs(user_profiles) do table.insert(all, p) end
-	end
-	return all
+    local all = {}
+    for _, p in ipairs(M.BUILTIN_PROFILES) do table.insert(all, p) end
+    if type(user_profiles) == "table" then
+        for _, p in ipairs(user_profiles) do table.insert(all, p) end
+    end
+    return all
 end
 
 --- Retrieves the currently active profile object, falling back to basic if invalid.
@@ -149,19 +146,18 @@ end
 --- @param user_profiles table Current user defined profiles.
 --- @return table The active profile object.
 function M.get_active_profile(active_id, user_profiles)
-	local id = tostring(active_id)
-	
-	-- Auto-migrate legacy profiles to maintain compatibility
-	if id == "parallel" or id == "parallel_simple" then id = "basic" end
-	if id == "batch" or id == "batch_simple" then id = "batch_advanced" end
-	if id == "parallel_advanced" then id = "advanced" end
-	if id == "base_completion" then id = "raw" end
-	
-	for _, p in ipairs(M.get_all_profiles(user_profiles)) do
-		if type(p) == "table" and p.id == id then return p end
-	end
-	Logger.warn(LOG, string.format("Profile %s not found, falling back to basic.", id))
-	return M.BUILTIN_PROFILES[2]  -- Fallback: basic
+    local id = tostring(active_id)
+    
+    -- Auto-migrate legacy profiles to maintain compatibility
+    if id == "parallel" or id == "parallel_simple" then id = "basic" end
+    if id == "batch" or id == "batch_simple" then id = "batch_advanced" end
+    if id == "parallel_advanced" then id = "advanced" end
+    if id == "base_completion" then id = "raw" end
+    
+    for _, p in ipairs(M.get_all_profiles(user_profiles)) do
+        if type(p) == "table" and p.id == id then return p end
+    end
+    return M.BUILTIN_PROFILES[2]  -- Fallback: basic
 end
 
 --- Resolves the appropriate system prompt logic based on the current profile.
@@ -169,20 +165,20 @@ end
 --- @param n number The number of predictions expected.
 --- @return string The resolved system prompt.
 function M.resolve_system_prompt(profile, n)
-	if type(profile) ~= "table" then return BASIC_PROMPT_SINGLE end
-	
-	-- Support for custom profiles built from the Prompt Editor
-	if type(profile.raw_prompt) == "string" and profile.raw_prompt ~= "" then
-		return profile.raw_prompt
-	end
+    if type(profile) ~= "table" then return BASIC_PROMPT_SINGLE end
+    
+    -- Support for custom profiles built from the Prompt Editor
+    if type(profile.raw_prompt) == "string" and profile.raw_prompt ~= "" then
+        return profile.raw_prompt
+    end
 
-	if n == 1 then
-		return type(profile.system_single) == "string" and profile.system_single or BASIC_PROMPT_SINGLE
-	else
-		if type(profile.system_multi) == "function" then return profile.system_multi(n) end
-		if type(profile.system_multi) == "string"   then return profile.system_multi    end
-	end
-	return BASIC_PROMPT_SINGLE
+    if n == 1 then
+        return type(profile.system_single) == "string" and profile.system_single or BASIC_PROMPT_SINGLE
+    else
+        if type(profile.system_multi) == "function" then return profile.system_multi(n) end
+        if type(profile.system_multi) == "string"   then return profile.system_multi    end
+    end
+    return BASIC_PROMPT_SINGLE
 end
 
 return M

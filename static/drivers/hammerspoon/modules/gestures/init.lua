@@ -14,7 +14,7 @@
 
 local M = {}
 
-local hs            = hs
+local hs = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local LOG           = "gestures"
@@ -37,40 +37,40 @@ local Conflicts = require("modules.gestures.conflicts")
 -- =======================================
 
 M.DEFAULT_GESTURES = {
-	tap_3         = "none",
-	tap_4         = "none",
-	tap_5         = "none",
-	swipe_2_diag  = "none",
-	swipe_3_horiz = "none",
-	swipe_3_diag  = "none",
-	swipe_3_up    = "none",
-	swipe_3_down  = "none",
-	swipe_4_horiz = "none",
-	swipe_4_diag  = "none",
-	swipe_4_up    = "none",
-	swipe_4_down  = "none",
-	swipe_5_horiz = "none",
-	swipe_5_diag  = "none",
-	swipe_5_up    = "none",
-	swipe_5_down  = "none",
+    tap_3         = "none",
+    tap_4         = "none",
+    tap_5         = "none",
+    swipe_2_diag  = "none",
+    swipe_3_horiz = "none",
+    swipe_3_diag  = "none",
+    swipe_3_up    = "none",
+    swipe_3_down  = "none",
+    swipe_4_horiz = "none",
+    swipe_4_diag  = "none",
+    swipe_4_up    = "none",
+    swipe_4_down  = "none",
+    swipe_5_horiz = "none",
+    swipe_5_diag  = "none",
+    swipe_5_up    = "none",
+    swipe_5_down  = "none",
 }
 
 M.DEFAULT_STATE = {
-	gestures = true
+    gestures = true
 }
 
 M.AXIS_SLOTS = {
-	"swipe_2_diag",
-	"swipe_3_horiz", "swipe_3_diag",
-	"swipe_4_horiz", "swipe_4_diag",
-	"swipe_5_horiz", "swipe_5_diag",
+    "swipe_2_diag",
+    "swipe_3_horiz", "swipe_3_diag",
+    "swipe_4_horiz", "swipe_4_diag",
+    "swipe_5_horiz", "swipe_5_diag",
 }
 
 M.SINGLE_SLOTS = {
-	"tap_3", "tap_4", "tap_5",
-	"swipe_3_up", "swipe_3_down",
-	"swipe_4_up", "swipe_4_down",
-	"swipe_5_up", "swipe_5_down",
+    "tap_3", "tap_4", "tap_5",
+    "swipe_3_up", "swipe_3_down",
+    "swipe_4_up", "swipe_4_down",
+    "swipe_5_up", "swipe_5_down",
 }
 
 
@@ -84,14 +84,14 @@ M.SINGLE_SLOTS = {
 -- ====================================
 
 local CoreState = {
-	enabled        = true,
-	ga             = {},
-	natural_scroll = false
+    enabled        = true,
+    ga             = {},
+    natural_scroll = false
 }
 
 -- Initialize active actions with defaults
 for k, v in pairs(M.DEFAULT_GESTURES) do
-	CoreState.ga[k] = v
+    CoreState.ga[k] = v
 end
 
 -- Initialize Engine dependencies
@@ -100,10 +100,9 @@ Engine.init(CoreState, Actions)
 local touch_watchers = {}
 
 --- Determines natural scroll setting from macOS.
---- @return boolean True if natural scroll is enabled.
 local function readNaturalScroll()
-	local ok, out = pcall(hs.execute, "defaults read -g com.apple.swipescrolldirection 2>/dev/null")
-	return ok and type(out) == "string" and out:match("1") ~= nil
+    local ok, out = pcall(hs.execute, "defaults read -g com.apple.swipescrolldirection 2>/dev/null")
+    return ok and type(out) == "string" and out:match("1") ~= nil
 end
 
 
@@ -116,41 +115,37 @@ end
 -- ==================================
 -- ==================================
 
---- Safely creates a touch frame watcher for a specific device ID.
---- @param deviceID number The hardware identifier of the touch device.
 local function create_watcher(deviceID)
-	if not touchdevice then return end
-	
-	if touch_watchers[deviceID] then
-		local ok, r = pcall(function() return touch_watchers[deviceID]:isRunning() end)
-		if ok and r then return end
-		pcall(function() touch_watchers[deviceID]:stop() end)
-	end
-	
-	local ok_dev, dev = pcall(touchdevice.forDeviceID, deviceID)
-	if not ok_dev or not dev then return end
-	
-	local w = dev:frameCallback(function(_, touches, _, _)
-		pcall(Engine.process_frame, touches)
-	end)
-	
-	touch_watchers[deviceID] = w
-	if w and type(w.start) == "function" then
-		pcall(function() w:start() end)
-		Logger.debug(LOG, string.format("Trackpad listener created for device: %s.", tostring(deviceID)))
-		if type(notifications.debugLog) == "function" then
-			pcall(notifications.debugLog, "watcher created for device", deviceID)
-		end
-	end
+    if not touchdevice then return end
+    
+    if touch_watchers[deviceID] then
+        local ok, r = pcall(function() return touch_watchers[deviceID]:isRunning() end)
+        if ok and r then return end
+        pcall(function() touch_watchers[deviceID]:stop() end)
+    end
+    
+    local ok_dev, dev = pcall(touchdevice.forDeviceID, deviceID)
+    if not ok_dev or not dev then return end
+    
+    local w = dev:frameCallback(function(_, touches, _, _)
+        pcall(Engine.process_frame, touches)
+    end)
+    
+    touch_watchers[deviceID] = w
+    if w and type(w.start) == "function" then
+        pcall(function() w:start() end)
+        if type(notifications.debugLog) == "function" then
+            pcall(notifications.debugLog, "watcher created for device", deviceID)
+        end
+    end
 end
 
---- Ensures all connected touch devices have active watchers.
 local function ensure_watchers()
-	if not touchdevice then return end
-	local ok, devices = pcall(touchdevice.devices)
-	if ok and type(devices) == "table" then
-		for _, id in ipairs(devices) do pcall(create_watcher, id) end
-	end
+    if not touchdevice then return end
+    local ok, devices = pcall(touchdevice.devices)
+    if ok and type(devices) == "table" then
+        for _, id in ipairs(devices) do pcall(create_watcher, id) end
+    end
 end
 
 
@@ -175,31 +170,21 @@ M.isLeftClickPressed = Actions.is_left_click_pressed
 -- Expose Conflict management
 M.on_action_changed = Conflicts.on_action_changed
 
---- Applies all gesture overrides globally.
 function M.apply_all_overrides()
-	Conflicts.apply_all_overrides(CoreState.ga)
+    Conflicts.apply_all_overrides(CoreState.ga)
 end
 
 function M.restore_all_overrides()
-	Conflicts.restore_all_overrides()
+    Conflicts.restore_all_overrides()
 end
 
---- Gets the configured action for a specific gesture slot.
---- @param slot string The internal gesture slot name.
---- @return string The mapped action identifier.
 function M.get_action(slot)         return CoreState.ga[slot] end
-
---- Sets the behavior action for a specific gesture slot.
---- @param slot string The internal gesture slot name.
---- @param action string The action identifier to bind.
 function M.set_action(slot, action) CoreState.ga[slot] = action end
 
---- Retrieves a copy of the entire gestures mapping table.
---- @return table The dictionary of gestures and their actions.
 function M.get_all_actions()
-	local t = {}
-	for k, v in pairs(CoreState.ga) do t[k] = v end
-	return t
+    local t = {}
+    for k, v in pairs(CoreState.ga) do t[k] = v end
+    return t
 end
 
 function M.enable_all()  CoreState.enabled = true  end
@@ -211,30 +196,26 @@ function M.is_enabled()  return CoreState.enabled end
 
 --- Initializes and binds multi-touch listeners.
 function M.start()
-	Logger.debug(LOG, "Starting gestures module…")
-	if not touchdevice then
-		Logger.warn(LOG, "Touchdevice API is not available — gestures module disabled.")
-		return
-	end
-	
-	CoreState.enabled = true
-	CoreState.natural_scroll = readNaturalScroll()
-	pcall(ensure_watchers)
-	
-	-- Health check timer to restore dead device hooks
-	hs.timer.doEvery(5, function()
-		for id, w in pairs(touch_watchers) do
-			local ok, r = pcall(function() return w:isRunning() end)
-			if not ok or not r then
-				Logger.warn(LOG, string.format("Dead listener detected for device %s, attempting restart…", tostring(id)))
-				touch_watchers[id] = nil
-				pcall(create_watcher, id)
-			end
-		end
-		pcall(ensure_watchers)
-	end)
-	
-	Logger.info(LOG, "Gestures module started successfully.")
+    if not touchdevice then
+        Logger.warn(LOG, "Module touchdevice non disponible — gestes désactivés")
+        return
+    end
+    
+    CoreState.enabled = true
+    CoreState.natural_scroll = readNaturalScroll()
+    pcall(ensure_watchers)
+    
+    -- Health check timer to restore dead device hooks
+    hs.timer.doEvery(5, function()
+        for id, w in pairs(touch_watchers) do
+            local ok, r = pcall(function() return w:isRunning() end)
+            if not ok or not r then
+                touch_watchers[id] = nil
+                pcall(create_watcher, id)
+            end
+        end
+        pcall(ensure_watchers)
+    end)
 end
 
 return M

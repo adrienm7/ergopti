@@ -1,47 +1,20 @@
---- lib/vscode_bridge.lua
-
---- ==============================================================================
---- MODULE: VSCode Bridge
---- DESCRIPTION:
---- Exposes the exact pixel position of the VSCode caret via an auto-generated
---- extension and a local HTTP server.
---- ==============================================================================
+-- lib/vscode_bridge.lua
+-- Expose la position exacte du caret VSCode via une extension auto-générée
+-- et un serveur HTTP local. Intégration dans getBestUIAnchor() de hotstrings.lua.
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
-local LOG    = "vscode_bridge"
-
-
-
-
-
--- ====================================
--- ====================================
--- ======= 1/ Constants & State =======
--- ====================================
--- ====================================
-
 local PORT          = 7878
 local EXT_ID        = "hs-caret-bridge"
-local EXT_VERSION   = "0.0.3"
+local EXT_VERSION   = "0.0.3"          -- bump = réinstallation auto
 local EXT_DIR       = os.getenv("HOME") .. "/.vscode/extensions/" .. EXT_ID .. "-" .. EXT_VERSION
 
--- VSCode rendering constants for pixel math.
-M.LINE_HEIGHT  = 19
-M.CHAR_WIDTH   = 7.65
-M.GUTTER_WIDTH = 62
+-- ── Constantes de rendu VSCode (ajustables) ─────────────────────────────────
+M.LINE_HEIGHT  = 19    -- px, fonte 14pt par défaut
+M.CHAR_WIDTH   = 7.65  -- px, Menlo/Consolas 14pt
+M.GUTTER_WIDTH = 62    -- px, numéros de ligne (approximatif)
 
-
-
-
-
--- ====================================
--- ====================================
--- ======= 2/ Extension Scripts =======
--- ====================================
--- ====================================
+-- ── Fichiers de l’extension (embarqués comme strings Lua) ───────────────────
 
 local PACKAGE_JSON = string.format([[{
   "name": "%s",
@@ -55,6 +28,10 @@ local PACKAGE_JSON = string.format([[{
   "contributes": {}
 }]], EXT_ID, EXT_VERSION)
 
+-- L’extension :
+--   • écoute onDidChangeTextEditorSelection / VisibleRanges / ActiveEditor
+--   • debounce 40 ms pour ne pas saturer le serveur
+--   • envoie {line, character, visibleStartLine, lineCount, tabSize, active}
 local EXTENSION_JS = [[
 'use strict';
 const vscode = require('vscode');
@@ -116,189 +93,138 @@ function deactivate() {}
 module.exports = { activate, deactivate };
 ]]
 
+-- ── Installation ─────────────────────────────────────────────────────────────
 
-
-
-
--- =========================================
--- =========================================
--- ======= 3/ Extension Installation =======
--- =========================================
--- =========================================
-
---- Writes string content to a file safely.
---- @param path string Target file path.
---- @param content string File content.
---- @return boolean True if successful.
 local function write_file(path, content)
-	local f = io.open(path, "w")
-	if not f then return false end
-	f:write(content)
-	f:close()
-	return true
+    local f = io.open(path, "w")
+    if not f then return false end
+    f:write(content); f:close()
+    return true
 end
 
---- Reads string content from a file safely.
---- @param path string Target file path.
---- @return string|nil The file content or nil.
 local function read_file(path)
-	local f = io.open(path, "r")
-	if not f then return nil end
-	local c = f:read("*a")
-	f:close()
-	return c
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local c = f:read("*a"); f:close()
+    return c
 end
 
---- Installs or updates the VSCode extension files locally.
---- @return boolean True if installation occurred and VSCode reload is required.
 function M.install_extension()
-	Logger.debug(LOG, "Verifying VSCode extension installation…")
-	os.execute("mkdir -p \"" .. EXT_DIR .. "\"")
+    os.execute('mkdir -p "' .. EXT_DIR .. '"')
 
-	local pkg_path = EXT_DIR .. "/package.json"
-	local ext_path = EXT_DIR .. "/extension.js"
+    local pkg_path = EXT_DIR .. "/package.json"
+    local ext_path = EXT_DIR .. "/extension.js"
 
-	local already_ok = (read_file(pkg_path) == PACKAGE_JSON) and (read_file(ext_path) == EXTENSION_JS)
+    local already_ok = (read_file(pkg_path) == PACKAGE_JSON)
+                    and (read_file(ext_path) == EXTENSION_JS)
 
-	if already_ok then
-		Logger.info(LOG, string.format("Extension already up to date (v%s).", EXT_VERSION))
-		return false
-	end
+    if already_ok then
+        print("[vscode_bridge] Extension déjà à jour (" .. EXT_VERSION .. ")")
+        return false   -- pas réinstallée
+    end
 
-	write_file(pkg_path, PACKAGE_JSON)
-	write_file(ext_path, EXTENSION_JS)
-	Logger.info(LOG, string.format("Extension installed in %s.", EXT_DIR))
-	hs.alert.show("Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe", 4)
-	return true
+    write_file(pkg_path, PACKAGE_JSON)
+    write_file(ext_path, EXTENSION_JS)
+    print("[vscode_bridge] Extension installée → " .. EXT_DIR)
+    print("[vscode_bridge] Rechargez VSCode : Cmd+Shift+P > Reload Window")
+    return true    -- réinstallée, rechargement VSCode nécessaire
 end
 
-
-
-
-
--- =================================
--- =================================
--- ======= 4/ HTTP Server API ======
--- =================================
--- =================================
+-- ── Serveur HTTP ─────────────────────────────────────────────────────────────
 
 local _caret  = nil
 local _server = nil
 
---- Starts the HTTP server listening for caret payloads.
 function M.start_server()
-	if _server then _server:stop() end
-	Logger.debug(LOG, string.format("Starting HTTP server on port %d…", PORT))
-	
-	_server = hs.httpserver.new(false, false)
-	_server:setPort(PORT)
-	_server:setCallback(function(method, path, _, body)
-		if path == "/caret" and method == "POST" then
-			local ok, data = pcall(hs.json.decode, body)
-			if ok and data then
-				data._ts = hs.timer.secondsSinceEpoch()
-				_caret = data
-			end
-		end
-		return "{}", 200, { ["Content-Type"] = "application/json" }
-	end)
-	_server:start()
-	Logger.info(LOG, "HTTP server started successfully.")
+    if _server then _server:stop() end
+    _server = hs.httpserver.new(false, false)
+    _server:setPort(PORT)
+    _server:setCallback(function(method, path, _headers, body)
+        if path == "/caret" and method == "POST" then
+            local ok, data = pcall(hs.json.decode, body)
+            if ok and data then
+                data._ts = hs.timer.secondsSinceEpoch()
+                _caret = data
+            end
+        end
+        return "{}", 200, { ["Content-Type"] = "application/json" }
+    end)
+    _server:start()
+    print("[vscode_bridge] Serveur HTTP démarré sur le port " .. PORT)
 end
 
---- Stops the HTTP server.
 function M.stop_server()
-	if _server then
-		Logger.debug(LOG, "Stopping HTTP server…")
-		_server:stop()
-		_server = nil
-		Logger.info(LOG, "HTTP server stopped.")
-	end
+    if _server then _server:stop(); _server = nil end
 end
 
---- Returns the latest caret data if it is fresh enough.
---- @param max_age number Maximum allowed age in seconds.
---- @return table|nil The caret data table.
+-- Retourne les dernières données caret si elles ont moins de max_age secondes
 function M.get_caret(max_age)
-	if not _caret then return nil end
-	if hs.timer.secondsSinceEpoch() - _caret._ts > (max_age or 5) then
-		return nil
-	end
-	return _caret
+    if not _caret then return nil end
+    if hs.timer.secondsSinceEpoch() - _caret._ts > (max_age or 5) then
+        return nil
+    end
+    return _caret
 end
 
+-- ── Détection VSCode ─────────────────────────────────────────────────────────
 
-
-
-
--- =========================================
--- =========================================
--- ======= 5/ VSCode Window Tracking =======
--- =========================================
--- =========================================
-
---- Evaluates if VSCode is the currently active window.
---- @return boolean True if VSCode is active.
 function M.is_vscode()
-	local app = hs.application.frontmostApplication()
-	return app ~= nil and app:bundleID() == "com.microsoft.VSCode"
+    local app = hs.application.frontmostApplication()
+    return app ~= nil and app:bundleID() == "com.microsoft.VSCode"
 end
 
---- Extracts the accessibility frame of the active editor to bound the calculation.
---- @return table|nil The bounds frame table.
+-- ── Frame AX de l’éditeur actif ─────────────────────────────────────────────
+-- Renvoie le frame de l’élément AX focalisé (textarea de l’éditeur VSCode).
+-- Fiable même sous Electron : on obtient la zone de texte, pas le caret.
+
 local function get_editor_ax_frame()
-	local ok, frame = pcall(function()
-		local ax      = require("hs.axuielement")
-		local focused = ax.systemWideElement():attributeValue("AXFocusedUIElement")
-		if not focused then return nil end
-		local f = focused:attributeValue("AXFrame")
-		if f and f.x and f.y and f.w and f.h and f.w > 100 and f.h > 50 then
-			return f
-		end
-		return nil
-	end)
-	return ok and frame or nil
+    local ok, frame = pcall(function()
+        local ax      = require("hs.axuielement")
+        local focused = ax.systemWideElement():attributeValue("AXFocusedUIElement")
+        if not focused then return nil end
+        local f = focused:attributeValue("AXFrame")
+        if f and f.x and f.y and f.w and f.h and f.w > 100 and f.h > 50 then
+            return f
+        end
+        return nil
+    end)
+    return ok and frame or nil
 end
 
+-- ── Estimation de la position pixel ─────────────────────────────────────────
+-- Combine données de l’extension (line/character) + frame AX de l’éditeur.
+-- Précision : ±1-2 lignes selon le thème / zoom VSCode.
 
-
-
-
--- =======================================
--- =======================================
--- ======= 6/ Position Estimation ========
--- =======================================
--- =======================================
-
---- Calculates the estimated pixel position based on API telemetry and AX bounds.
---- @return table|nil The estimated coordinates.
 function M.estimate_position()
-	if not M.is_vscode() then return nil end
+    if not M.is_vscode() then return nil end
 
-	local caret = M.get_caret(5)
-	if not caret or not caret.active then return nil end
+    local caret = M.get_caret(5)
+    if not caret or not caret.active then return nil end
 
-	local editor_frame = get_editor_ax_frame()
-	if not editor_frame then return nil end
+    local editor_frame = get_editor_ax_frame()
+    if not editor_frame then return nil end
 
-	local relative_line = caret.line - caret.visibleStartLine
-	if relative_line < 0 then return nil end
+    local relative_line = caret.line - caret.visibleStartLine
+    if relative_line < 0 then return nil end
 
-	local x = editor_frame.x + M.GUTTER_WIDTH + (caret.character * M.CHAR_WIDTH)
-	local y = editor_frame.y + (relative_line * M.LINE_HEIGHT)
+    local x = editor_frame.x + M.GUTTER_WIDTH
+              + (caret.character * M.CHAR_WIDTH)
+    local y = editor_frame.y + (relative_line * M.LINE_HEIGHT)
 
-	if y > editor_frame.y + editor_frame.h - M.LINE_HEIGHT then return nil end
-	if x > editor_frame.x + editor_frame.w - 20 then
-		x = editor_frame.x + editor_frame.w - 20
-	end
+    -- Garde la bulle dans les limites de l’éditeur
+    if y > editor_frame.y + editor_frame.h - M.LINE_HEIGHT then return nil end
+    if x > editor_frame.x + editor_frame.w - 20 then
+        x = editor_frame.x + editor_frame.w - 20
+    end
 
-	return { x = x, y = y, h = M.LINE_HEIGHT, type = "vscode_caret" }
+    return { x = x, y = y, h = M.LINE_HEIGHT, type = "vscode_caret" }
 end
 
---- Initializes the bridge daemons on module load.
+-- ── Init (appelé depuis init.lua ou hotstrings.lua) ─────────────────────────
+
 function M.setup()
-	M.install_extension()
-	M.start_server()
+    M.install_extension()
+    M.start_server()
 end
 
 return M
