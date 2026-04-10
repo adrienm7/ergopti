@@ -13,9 +13,13 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
+
+local hs        = hs
 local keylogger = require("modules.keylogger")
 local WPMShared = require("ui.wpm.shared")
+local Logger    = require("lib.logger")
+
+local LOG = "wpm_menubar"
 
 local _menubar = nil
 local _timer   = nil
@@ -45,7 +49,10 @@ local function update_menubar()
 	end
 	
 	if display_wpm > 0 or tooltip_visible or (active_source ~= "none") then
-		if not _menubar then _menubar = hs.menubar.new() end
+		if not _menubar then 
+			_menubar = hs.menubar.new() 
+			Logger.debug(LOG, "Menubar item created.")
+		end
 		
 		-- Add a translucent background to preserve readability in the menubar
 		local bg_color = nil
@@ -60,7 +67,11 @@ local function update_menubar()
 		local styled_title = hs.styledtext.new(WPMShared.format_mpm_label(display_wpm, true), attrs)
 		_menubar:setTitle(styled_title)
 	else
-		if _menubar then _menubar:delete(); _menubar = nil end
+		if _menubar then 
+			_menubar:delete()
+			_menubar = nil 
+			Logger.debug(LOG, "Menubar item hidden (idle).")
+		end
 	end
 end
 
@@ -76,15 +87,19 @@ end
 
 --- Starts the menubar monitoring loop.
 function M.start()
+	Logger.debug(LOG, "Starting WPM menubar widget…")
 	if not _timer then _timer = hs.timer.new(0.5, update_menubar) end
 	_timer:start()
 	update_menubar()
+	Logger.info(LOG, "WPM menubar widget started successfully.")
 end
 
 --- Halts the menubar updating and removes the icon.
 function M.stop()
+	Logger.debug(LOG, "Stopping WPM menubar widget…")
 	if _timer then _timer:stop(); _timer = nil end
 	if _menubar then _menubar:delete(); _menubar = nil end
+	Logger.info(LOG, "WPM menubar widget stopped.")
 end
 
 --- Enables or disables source-based menubar coloring.

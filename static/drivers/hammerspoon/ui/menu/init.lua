@@ -33,28 +33,28 @@ local function safe_require(module_id, label)
 	if not ok then
 		local err_msg = tostring(mod_or_err)
 		load_errors[module_id] = err_msg
-		Logger.error(LOG, "Échec chargement '%s' (%s): %s", tostring(label), tostring(module_id), err_msg)
+		Logger.error(LOG, string.format("Failed to load \"%s\" (%s): %s.", tostring(label), tostring(module_id), err_msg))
 		return nil
 	end
-	Logger.debug(LOG, "Module '%s' chargé (%s)", tostring(label), tostring(module_id))
+	Logger.debug(LOG, string.format("Module \"%s\" loaded successfully (%s).", tostring(label), tostring(module_id)))
 	return mod_or_err
 end
 
 -- Load isolated sub-menu builders safely
 local menu_mods = {
-	gestures   = safe_require("ui.menu.menu_gestures", "menu gestes"),
-	shortcuts  = safe_require("ui.menu.menu_shortcuts", "menu raccourcis"),
-	hotstrings = safe_require("ui.menu.menu_hotstrings", "menu hotstrings"),
-	llm        = safe_require("ui.menu.menu_llm", "menu IA"),
-	keylogger  = safe_require("ui.menu.menu_keylogger", "menu métriques"),
+	gestures   = safe_require("ui.menu.menu_gestures", "gestures menu"),
+	shortcuts  = safe_require("ui.menu.menu_shortcuts", "shortcuts menu"),
+	hotstrings = safe_require("ui.menu.menu_hotstrings", "hotstrings menu"),
+	llm        = safe_require("ui.menu.menu_llm", "AI menu"),
+	keylogger  = safe_require("ui.menu.menu_keylogger", "metrics menu"),
 }
 
 -- Load core modules
 local core_mods = {
-	llm           = safe_require("modules.llm", "moteur IA"),
-	keylogger     = safe_require("modules.keylogger", "moteur métriques"),
-	shortcuts_mod = safe_require("modules.shortcuts", "moteur raccourcis"),
-	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "moteur hotstrings dynamiques"),
+	llm           = safe_require("modules.llm", "AI engine"),
+	keylogger     = safe_require("modules.keylogger", "metrics engine"),
+	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
+	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "dynamic hotstrings engine"),
 }
 
 M._active_tasks = {}
@@ -86,10 +86,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local ok, myMenu = pcall(hs.menubar.new)
 	if not ok or not myMenu then
-		Logger.error(LOG, "Impossible de créer l'objet hs.menubar")
+		Logger.error(LOG, "Failed to create hs.menubar object.")
 		return nil, nil
 	end
-	Logger.info(LOG, "Menubar créé avec succès")
+	Logger.info(LOG, "Menubar created successfully.")
 
 	local updateMenu
 	local _suppress_watcher_until = 0
@@ -225,20 +225,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				{ fn = "set_preview_ai_enabled",          val = state.preview_ai_enabled },
 				{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
 				{ fn = "set_llm_after_hotstring",         val = state.llm_after_hotstring },
-				{ fn = "set_llm_enabled",         val = state.llm_enabled },
-				{ fn = "set_llm_debounce",        val = state.llm_debounce },
-				{ fn = "set_llm_model",           val = state.llm_model },
-				{ fn = "set_trigger_char",        val = state.trigger_char },
-				{ fn = "set_llm_context_length",  val = state.llm_context_length },
-				{ fn = "set_llm_reset_on_nav",    val = state.llm_reset_on_nav },
-				{ fn = "set_llm_temperature",     val = state.llm_temperature },
-				{ fn = "set_llm_num_predictions", val = state.llm_num_predictions },
-				{ fn = "set_llm_arrow_nav_enabled", val = state.llm_arrow_nav_enabled },
-				{ fn = "set_llm_nav_modifiers",   val = state.llm_nav_modifiers },
-				{ fn = "set_llm_show_info_bar",   val = state.llm_show_info_bar },
-				{ fn = "set_llm_val_modifiers",   val = state.llm_val_modifiers },
-				{ fn = "set_llm_pred_indent",     val = state.llm_pred_indent },
-				{ fn = "set_llm_disabled_apps",   val = state.llm_disabled_apps },
+				{ fn = "set_llm_enabled",                 val = state.llm_enabled },
+				{ fn = "set_llm_debounce",                val = state.llm_debounce },
+				{ fn = "set_llm_model",                   val = state.llm_model },
+				{ fn = "set_trigger_char",                val = state.trigger_char },
+				{ fn = "set_llm_context_length",          val = state.llm_context_length },
+				{ fn = "set_llm_reset_on_nav",            val = state.llm_reset_on_nav },
+				{ fn = "set_llm_temperature",             val = state.llm_temperature },
+				{ fn = "set_llm_num_predictions",         val = state.llm_num_predictions },
+				{ fn = "set_llm_arrow_nav_enabled",       val = state.llm_arrow_nav_enabled },
+				{ fn = "set_llm_nav_modifiers",           val = state.llm_nav_modifiers },
+				{ fn = "set_llm_show_info_bar",           val = state.llm_show_info_bar },
+				{ fn = "set_llm_val_modifiers",           val = state.llm_val_modifiers },
+				{ fn = "set_llm_pred_indent",             val = state.llm_pred_indent },
+				{ fn = "set_llm_disabled_apps",           val = state.llm_disabled_apps },
 			}
 			for _, item in ipairs(map) do
 				if type(keymap[item.fn]) == "function" then pcall(keymap[item.fn], item.val) end
@@ -445,9 +445,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		})
 		if ok_h then
 			llm_handler = res
-			Logger.info(LOG, "Handler LLM créé avec succès")
+			Logger.info(LOG, "LLM handler created successfully.")
 		else
-			Logger.error(LOG, "create() échoué pour ui.menu.menu_llm: %s", tostring(res))
+			Logger.error(LOG, string.format("create() failed for ui.menu.menu_llm: %s.", tostring(res)))
 		end
 	end
 	
@@ -525,11 +525,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			enable_all      = function() set_all_enabled(true) end,
 			disable_all     = function() set_all_enabled(false) end,
 			reset_defaults  = function() reset_all_defaults() end,
-			open_console = function() pcall(hs.openConsole) end,
-			open_init    = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
-			open_prefs   = function() pcall(hs.openPreferences) end,
-			reload       = function() do_reload("menu") end,
-			quit         = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
+			open_console    = function() pcall(hs.openConsole) end,
+			open_init       = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
+			open_prefs      = function() pcall(hs.openPreferences) end,
+			reload          = function() do_reload("menu") end,
+			quit            = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
 		}
 
 		local items = Builder.generate(ctx, menu_mods, actions)

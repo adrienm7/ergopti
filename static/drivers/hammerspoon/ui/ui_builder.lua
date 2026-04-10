@@ -16,16 +16,18 @@
 
 local M = {}
 local hs = hs
+local Logger = require("lib.logger")
+local LOG = "ui_builder"
 
 
 
 
 
--- =====================================
--- =====================================
--- ======= 1/ Asset Operations =========
--- =====================================
--- =====================================
+-- ===================================
+-- ===================================
+-- ======= 1/ Asset Operations =======
+-- ===================================
+-- ===================================
 
 --- Reads a file and escapes special characters for Lua string substitution.
 --- @param path string Full path to the file.
@@ -47,6 +49,7 @@ end
 --- @param js_name string Optional name of the JS file.
 --- @return string The complete HTML with injected styles and scripts.
 function M.build_injected_html(assets_dir, html_name, css_name, js_name)
+	Logger.debug(LOG, "Building injected HTML assets…")
 	html_name = html_name or "index.html"
 	css_name  = css_name  or "style.css"
 	js_name   = js_name   or "script.js"
@@ -54,7 +57,7 @@ function M.build_injected_html(assets_dir, html_name, css_name, js_name)
 	local html_path = assets_dir .. html_name
 	local ok, fh = pcall(io.open, html_path, "r")
 	if not ok or not fh then 
-		-- Inform the user directly in French about the missing template
+		Logger.error(LOG, string.format("Failed to find HTML template: %s.", html_name))
 		return "<html><body><h1>Erreur de construction : " .. html_name .. " introuvable</h1></body></html>" 
 	end
 	local html = fh:read("*a")
@@ -73,6 +76,7 @@ function M.build_injected_html(assets_dir, html_name, css_name, js_name)
 		html = html:gsub("(</[Bb][Oo][Dd][Yy]>)", "<script>" .. js .. "</script>%1")
 	end
 
+	Logger.info(LOG, "Injected HTML assets built successfully.")
 	return html
 end
 
@@ -80,11 +84,11 @@ end
 
 
 
--- ===================================
--- ===================================
--- ======= 2/ Window Management ======
--- ===================================
--- ===================================
+-- ====================================
+-- ====================================
+-- ======= 2/ Window Management =======
+-- ====================================
+-- ====================================
 
 --- Calculates a perfectly centered frame for a given width and height on the main screen.
 --- @param w number The desired width of the window.
@@ -106,6 +110,7 @@ end
 function M.force_focus(wv)
 	if not wv then return end
 	
+	Logger.debug(LOG, "Forcing window focus and teleporting to active space…")
 	-- Hiding and showing the window natively teleports it to the active macOS space
 	-- without changing its behavior property, which would destroy the webview state
 	pcall(function() wv:hide() end)
@@ -130,6 +135,7 @@ function M.force_focus(wv)
 		
 		-- Ensure Hammerspoon application regains primary OS focus
 		pcall(hs.focus)
+		Logger.info(LOG, "Window focus applied.")
 	end)
 end
 
@@ -138,6 +144,7 @@ end
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	Logger.debug(LOG, "Creating new webview window…")
 
 	-- Prevent LuaSkin crash by not passing explicit nil for the third argument
 	local wv
@@ -147,9 +154,11 @@ function M.show_webview(opts)
 		wv = hs.webview.new(opts.frame, { developerExtrasEnabled = false })
 	end
 	
-	if not wv then return nil end
+	if not wv then 
+		Logger.error(LOG, "Failed to instantiate webview object.")
+		return nil 
+	end
 
-	-- Apply core UI properties
 	pcall(function() wv:windowTitle(opts.title or "UI") end)
 	
 	if opts.style_masks then 
@@ -186,6 +195,7 @@ function M.show_webview(opts)
 	end
 
 	M.force_focus(wv)
+	Logger.info(LOG, "Webview window created successfully.")
 	return wv
 end
 

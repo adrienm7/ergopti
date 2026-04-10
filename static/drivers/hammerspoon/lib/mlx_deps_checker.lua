@@ -1,4 +1,4 @@
---- utilities/mlx_deps_checker.lua
+--- lib/mlx_deps_checker.lua
 
 --- ==============================================================================
 --- MODULE: MLX Dependencies Checker  
@@ -8,22 +8,31 @@
 --- ==============================================================================
 
 local M = {}
-
 local hs     = hs
 local Logger = require("lib.logger")
-local LOG    = "mlx_deps"
 
+local LOG = "mlx_deps"
+
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 1/ Dependency Validation =======
+-- ========================================
+-- ========================================
+
+--- Runs the bash script verifying python dependencies for MLX asynchronously.
 function M.check_and_install_deps()
-	-- Dynamically find the script path from the current Hammerspoon config location
+	Logger.debug(LOG, "Locating MLX dependency script…")
 	local script_path = nil
 	
-	-- Try multiple locations for flexibility:
-	-- 1. Symlink in ~/.hammerspoon (standard Hammerspoon location)
+	-- Try multiple locations for flexibility
 	local hs_config = os.getenv("HOME") .. "/.hammerspoon"
 	local candidate = hs_config .. "/../../scripts/ensure-mlx-deps.sh"
-	
-	-- 2. Direct path from project repo
 	local project_root = os.getenv("HOME") .. "/Documents/perso/ergopti"
+	
 	if hs.fs.attributes(project_root .. "/scripts/ensure-mlx-deps.sh", "mode") then
 		script_path = project_root .. "/scripts/ensure-mlx-deps.sh"
 	elseif hs.fs.attributes(candidate, "mode") then
@@ -31,16 +40,16 @@ function M.check_and_install_deps()
 	end
 	
 	if not script_path then
-		Logger.warn(LOG, "Script ensure-mlx-deps.sh introuvable")
+		Logger.warn(LOG, "Script ensure-mlx-deps.sh introuvable.")
 		return
 	end
 	
-	-- Run asynchronously in background; failures are non-critical
-	hs.task.new("/bin/bash", function(exitCode, stdOut, stdErr)
+	Logger.debug(LOG, "Executing dependency validation script in background…")
+	hs.task.new("/bin/bash", function(exitCode, _, _)
 		if exitCode == 0 then
-			Logger.info(LOG, "✅ All dependencies verified")
+			Logger.info(LOG, "Toutes les dépendances sont vérifiées.")
 		else
-			Logger.warn(LOG, "Dépendances non vérifiées (non critique)")
+			Logger.warn(LOG, "Dépendances non vérifiées (non critique).")
 		end
 	end, { script_path }):start()
 end

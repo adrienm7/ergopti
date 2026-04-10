@@ -44,20 +44,20 @@ hs.timer.doAfter(0, function() pcall(ensure_ollama_running) end)
 
 
 
--- =======================================
--- =======================================
--- ======= 1/ Model Heuristics ===========
--- =======================================
--- =======================================
+-- ===================================
+-- ===================================
+-- ======= 1/ Model Heuristics =======
+-- ===================================
+-- ===================================
 
 --- Determines if a model is categorized as a "thinking" model based on its name.
 --- @param name string The model name to evaluate.
 --- @return boolean True if it is a thinking model, false otherwise.
 local function is_thinking_model(name)
-    if type(name) ~= "string" then return false end
-    name = name:lower()
-    if name:match("qwen3") or name:match("deepseek") or name:match("%-r1") or name:match(":r1") or name:match("think") then return true end
-    return false
+	if type(name) ~= "string" then return false end
+	name = name:lower()
+	if name:match("qwen3") or name:match("deepseek") or name:match("%-r1") or name:match(":r1") or name:match("think") then return true end
+	return false
 end
 M.is_thinking_model = is_thinking_model
 
@@ -66,32 +66,49 @@ M.is_thinking_model = is_thinking_model
 --- @param on_available function Callback executed if the model is found.
 --- @param on_missing function Callback executed if the model is missing or API is unreachable.
 function M.check_availability(model_name, on_available, on_missing)
-    if type(model_name) ~= "string" then return end
-    hs.http.asyncGet("http://127.0.0.1:11434/api/tags", {}, function(status, body)
-        if status ~= 200 then if type(on_missing) == "function" then pcall(on_missing, true) end return end
-        local ok, tags = pcall(hs.json.decode, body)
-        if ok and type(tags) == "table" and type(tags.models) == "table" then
-            local found = false
-            for _, m in ipairs(tags.models) do
-                if type(m.name) == "string" and m.name:find(model_name, 1, true) then found = true break end
-            end
-            if found then if type(on_available) == "function" then pcall(on_available) end
-            else if type(on_missing) == "function" then pcall(on_missing, false) end end
-        else
-            if type(on_missing) == "function" then pcall(on_missing, false) end
-        end
-    end)
+	if type(model_name) ~= "string" then return end
+	Logger.debug(LOG, "Checking Ollama server availability…")
+	
+	hs.http.asyncGet("http://127.0.0.1:11434/api/tags", {}, function(status, body)
+		if status ~= 200 then
+			Logger.warn(LOG, "Ollama server is unreachable.")
+			if type(on_missing) == "function" then pcall(on_missing, true) end
+			return
+		end
+		
+		local ok, tags = pcall(hs.json.decode, body)
+		if ok and type(tags) == "table" and type(tags.models) == "table" then
+			local found = false
+			for _, m in ipairs(tags.models) do
+				if type(m.name) == "string" and m.name:find(model_name, 1, true) then
+					found = true
+					break
+				end
+			end
+			
+			if found then
+				Logger.info(LOG, "Ollama server and model are available.")
+				if type(on_available) == "function" then pcall(on_available) end
+			else
+				Logger.warn(LOG, "Ollama model is missing.")
+				if type(on_missing) == "function" then pcall(on_missing, false) end
+			end
+		else
+			Logger.error(LOG, "Failed to parse Ollama tags response.")
+			if type(on_missing) == "function" then pcall(on_missing, false) end
+		end
+	end)
 end
 
 
 
 
 
--- =======================================
--- =======================================
--- ======= 2/ Core Request Engine ========
--- =======================================
--- =======================================
+-- ======================================
+-- ======================================
+-- ======= 2/ Core Request Engine =======
+-- ======================================
+-- ======================================
 
 -- Pre-allocated stop sequences for performance (avoid repeated allocations)
 local STOP_BASE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" }
@@ -136,24 +153,24 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local req_id = _req_counter
     local messages = {}
 
-    local final_sys = system_prompt
-    if type(final_sys) == "string" then
-        final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
-    end
+	local final_sys = system_prompt
+	if type(final_sys) == "string" then
+		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+	end
 
-    local user_prompt = ""
-    if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
-        user_prompt = string.format('PREFIX: "%s"\nTAIL: "%s"', full_text or "", tail_text or "")
-    else
-        local context_str = type(full_text) == "string" and full_text or ""
-        if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
-            final_sys = final_sys:gsub("%{context%}", function() return context_str end)
-            user_prompt = final_sys
-            final_sys = nil
-        else
-            user_prompt = context_str
-        end
-    end
+	local user_prompt = ""
+	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
+		user_prompt = string.format("PREFIX: \"%s\"\nTAIL: \"%s\"", full_text or "", tail_text or "")
+	else
+		local context_str = type(full_text) == "string" and full_text or ""
+		if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
+			final_sys = final_sys:gsub("%{context%}", function() return context_str end)
+			user_prompt = final_sys
+			final_sys = nil
+		else
+			user_prompt = context_str
+		end
+	end
 
     local is_advanced_prompt = type(final_sys) == "string" and (
         final_sys:find("TAIL_CORRECTED", 1, true) or final_sys:find("NEXT_WORDS", 1, true)
@@ -177,8 +194,12 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
     }
 
-    local ok, encoded = pcall(hs.json.encode, payload)
-    if not ok or not encoded then if type(on_fail) == "function" then pcall(on_fail) end return end
+	local ok, encoded = pcall(hs.json.encode, payload)
+	if not ok or not encoded then
+		Logger.error(LOG, "Failed to encode Ollama payload.")
+		if type(on_fail) == "function" then pcall(on_fail) end
+		return
+	end
 
     hs.http.asyncPost("http://127.0.0.1:11434/api/chat", encoded, { ["Content-Type"] = "application/json" },
         function(status, body, _)
@@ -248,13 +269,22 @@ end
 
 
 
--- =========================================
--- =========================================
+-- ===================================
+-- ===================================
 -- ======= 3/ Fetch Strategies =======
--- =========================================
--- =========================================
+-- ===================================
+-- ===================================
 
 --- Dispatches a single API request asking for N clustered predictions.
+--- @param full_text string The complete tracked context string.
+--- @param tail_text string The most recent segment of the context.
+--- @param model_name string Name of the targeted local model.
+--- @param temperature number Base sampling temperature.
+--- @param max_predict number Maximum allowed output tokens.
+--- @param num_predictions number Request quantity for prediction arrays.
+--- @param profile table Active profile mapping.
+--- @param on_success function Function to execute on success.
+--- @param on_fail function Function to execute on failure.
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
                              max_predict, num_predictions, profile,
                              on_success, on_fail, request_id_provider)
@@ -289,6 +319,15 @@ function M.fetch_parallel(full_text, tail_text, model_name, temperature,
 end
 
 --- Dispatches multiple sequential API requests to avoid parallel connection dropping.
+--- @param full_text string The complete tracked context string.
+--- @param tail_text string The most recent segment of the context.
+--- @param model_name string Name of the targeted local model.
+--- @param temperature number Base sampling temperature.
+--- @param max_predict number Maximum allowed output tokens.
+--- @param num_predictions number Request quantity for prediction arrays.
+--- @param profile table Active profile mapping.
+--- @param on_success function Function to execute on success.
+--- @param on_fail function Function to execute on failure.
 function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                   max_predict, num_predictions, profile,
                                   on_success, on_fail, request_id_provider)
@@ -361,7 +400,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
         request_variant(1, primary_tokens, variant_temp, false)
     end
 
-    do_next()
+	do_next()
 end
 
 return M

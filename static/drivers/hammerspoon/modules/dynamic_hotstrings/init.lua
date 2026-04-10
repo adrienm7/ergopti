@@ -4,8 +4,8 @@
 --- MODULE: Dynamic Hotstrings Core
 --- DESCRIPTION:
 --- Orchestrates dynamic expansions by coupling the Personal Info engine (which
---- acts on @ tags) and the Rules Engine (which acts on dynamic suffixes like
---- 'dt' and generates real-time prefixes).
+--- acts on "@" tags) and the Rules Engine (which acts on dynamic suffixes like
+--- "dt" and generates real-time prefixes).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared Data Pipeline: Extracts personal info automatically and passes it
@@ -17,23 +17,25 @@ local M = {}
 
 local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
 local RulesEngine  = require("modules.dynamic_hotstrings.rules_engine")
+local Logger       = require("lib.logger")
+local LOG          = "dynamic_hotstrings"
 
 
 
 
 
--- ===================================
--- ===================================
--- ======= 1/ Default State ==========
--- ===================================
--- ===================================
+-- ================================
+-- ================================
+-- ======= 1/ Default State =======
+-- ================================
+-- ================================
 
 M.DEFAULT_STATE = {
-    personal_info                   = true,
-    dynamichotstrings_enabled       = true,
-    dynamichotstrings_date          = true,
-    dynamichotstrings_phoneprefixes = true,
-    dynamichotstrings_ssnprefixes   = true,
+	personal_info                   = true,
+	dynamichotstrings_enabled       = true,
+	dynamichotstrings_date          = true,
+	dynamichotstrings_phoneprefixes = true,
+	dynamichotstrings_ssnprefixes   = true,
 }
 
 
@@ -50,14 +52,22 @@ M.DEFAULT_STATE = {
 --- @param base_dir string Base configuration directory.
 --- @param keymap_module table The active keymap module reference.
 function M.start(base_dir, keymap_module)
-    -- Start the personal info tracker
-    PersonalInfo.start(base_dir, keymap_module)
-    
-    -- Pass the securely loaded data from PersonalInfo to the Rules Engine
-    RulesEngine.inject_data(PersonalInfo.get_info(), PersonalInfo.get_trigger_char())
-    
-    -- Start the dynamic rules engine
-    RulesEngine.start(keymap_module)
+	Logger.debug(LOG, "Starting the personal info tracker…")
+	
+	-- Start the personal info tracker
+	PersonalInfo.start(base_dir, keymap_module)
+	
+	Logger.debug(LOG, "Injecting personal data into the rules engine…")
+	
+	-- Pass the securely loaded data from PersonalInfo to the Rules Engine
+	RulesEngine.inject_data(PersonalInfo.get_info(), PersonalInfo.get_trigger_char())
+	
+	Logger.debug(LOG, "Starting the dynamic rules engine…")
+	
+	-- Start the dynamic rules engine
+	RulesEngine.start(keymap_module)
+	
+	Logger.info(LOG, "The dynamic hotstrings core initialized successfully.")
 end
 
 -- Proxy Personal Info UI and state controls for the menu

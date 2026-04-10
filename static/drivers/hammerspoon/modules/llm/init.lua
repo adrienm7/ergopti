@@ -9,10 +9,13 @@
 
 local M = {}
 
-local hs = hs
+local hs        = hs
 local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
+local Logger    = require("lib.logger")
+
+local LOG = "llm.core"
 
 M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 
@@ -127,26 +130,27 @@ end)
 --- Retrieves the currently active profile object.
 --- @return table The active profile object.
 function M.get_active_profile()
-    return Profiles.get_active_profile(CoreState.active_profile_id, CoreState.user_profiles)
+	return Profiles.get_active_profile(CoreState.active_profile_id, CoreState.user_profiles)
 end
 
 --- Updates the active profile ID and logic state.
 --- @param id string The ID of the profile to activate.
 function M.set_active_profile(id)
-    if type(id) == "string" then
-        CoreState.active_profile_id = id
-    end
+	if type(id) == "string" then
+		CoreState.active_profile_id = id
+	end
 end
 
---- Sets whether to route queries to MLX or Ollama
+--- Sets whether to route queries to MLX or Ollama.
+--- @param enabled boolean True to enable the MLX backend.
 function M.set_use_mlx(enabled)
-    CoreState.use_mlx = enabled == true
+	CoreState.use_mlx = enabled == true
 end
 
 --- Returns whether MLX is currently enabled as inference backend.
 --- @return boolean True when MLX backend is active.
 function M.is_using_mlx()
-    return CoreState.use_mlx == true
+	return CoreState.use_mlx == true
 end
 
 
@@ -229,19 +233,21 @@ end
 --- Exposes built-in profiles and user profiles.
 --- @return table An array containing all available profiles.
 function M.get_all_profiles()
-    return Profiles.get_all_profiles(CoreState.user_profiles)
+	return Profiles.get_all_profiles(CoreState.user_profiles)
 end
 
 --- Overrides user profiles globally.
+--- @param profiles_table table The new user profile map.
 function M.set_user_profiles(profiles_table)
-    if type(profiles_table) == "table" then
-        CoreState.user_profiles = profiles_table
-    end
+	if type(profiles_table) == "table" then
+		CoreState.user_profiles = profiles_table
+	end
 end
 
---- Returns the active API engine
+--- Returns the active API engine.
+--- @return table The specific backend module object.
 local function get_api()
-    return CoreState.use_mlx and ApiMlx or ApiOllama
+	return CoreState.use_mlx and ApiMlx or ApiOllama
 end
 
 --- Initiates a new LLM prediction request, selecting the optimal fetch strategy based on profile state.
@@ -258,27 +264,28 @@ end
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
                                   max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider)
 
-    -- Prevent firing requests if the active application is blacklisted by user settings
-    if not force then
-        local ok_front, front = pcall(hs.application.frontmostApplication)
-        if ok_front and front then
-            local disabled = hs.settings.get("llm_disabled_apps")
-            if type(disabled) == "table" then
-                local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
-                local path = type(front.path) == "function" and front:path() or ""
-                for _, app in ipairs(disabled) do
-                    if type(app) == "table" and ((app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path)) then
-                        if type(on_fail) == "function" then pcall(on_fail) end
-                        return
-                    end
-                end
-            end
-        end
-    end
+	-- Prevent firing requests if the active application is blacklisted by user settings
+	if not force then
+		local ok_front, front = pcall(hs.application.frontmostApplication)
+		if ok_front and front then
+			local disabled = hs.settings.get("llm_disabled_apps")
+			if type(disabled) == "table" then
+				local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
+				local path = type(front.path) == "function" and front:path() or ""
+				for _, app in ipairs(disabled) do
+					if type(app) == "table" and ((app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path)) then
+						Logger.info(LOG, "Prediction aborted due to application blacklist.")
+						if type(on_fail) == "function" then pcall(on_fail) end
+						return
+					end
+				end
+			end
+		end
+	end
 
-    num_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
-    local profile = M.get_active_profile()
-    local api = get_api()
+	num_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
+	local profile = M.get_active_profile()
+	local api = get_api()
 
     if type(profile) == "table" and (not profile.batch) then
         if num_predictions > 1 and not sequential_mode then
@@ -296,18 +303,18 @@ end
 --- @param targetMods table A list of expected modifier keys (e.g., {"cmd", "shift"}).
 --- @return boolean True if the flags exactly match the target criteria, false otherwise.
 function M.check_modifiers(eventFlags, targetMods)
-    if type(targetMods) ~= "table" then return false end
-    if #targetMods == 1 and targetMods[1] == "none" then return false end
-    
-    local target_map = { cmd = false, alt = false, shift = false, ctrl = false }
-    for _, mod in ipairs(targetMods) do if target_map[mod] ~= nil then target_map[mod] = true end end
-    
-    if (eventFlags.cmd or false)   ~= target_map.cmd   then return false end
-    if (eventFlags.alt or false)   ~= target_map.alt   then return false end
-    if (eventFlags.shift or false) ~= target_map.shift then return false end
-    if (eventFlags.ctrl or false)  ~= target_map.ctrl  then return false end
-    
-    return true
+	if type(targetMods) ~= "table" then return false end
+	if #targetMods == 1 and targetMods[1] == "none" then return false end
+	
+	local target_map = { cmd = false, alt = false, shift = false, ctrl = false }
+	for _, mod in ipairs(targetMods) do if target_map[mod] ~= nil then target_map[mod] = true end end
+	
+	if (eventFlags.cmd or false)   ~= target_map.cmd   then return false end
+	if (eventFlags.alt or false)   ~= target_map.alt   then return false end
+	if (eventFlags.shift or false) ~= target_map.shift then return false end
+	if (eventFlags.ctrl or false)  ~= target_map.ctrl  then return false end
+	
+	return true
 end
 
 -- Proxy Model Heuristics Methods

@@ -18,11 +18,11 @@ local dh_mod = require("modules.dynamic_hotstrings")
 
 
 
--- ===================================
--- ===================================
--- ======= 1/ Default State ==========
--- ===================================
--- ===================================
+-- ================================
+-- ================================
+-- ======= 1/ Default State =======
+-- ================================
+-- ================================
 
 M.DEFAULT_STATE = {
 	preview_star_enabled          = true,
@@ -45,11 +45,11 @@ M.DEFAULT_STATE = {
 
 
 
--- ===================================
--- ===================================
--- ======= 2/ Menu Construction ======
--- ===================================
--- ===================================
+-- ====================================
+-- ====================================
+-- ======= 2/ Menu Construction =======
+-- ====================================
+-- ====================================
 
 --- Formats a number with spaces as thousands separators.
 --- @param n number|string The number to format.
@@ -304,7 +304,6 @@ function M.build_management(ctx)
 	local magic_item = nil
 	local magic_reset_item = nil
 
-	-- Valeurs par défaut des couleurs (cohérentes avec llm_bridge et DEFAULT_STATE)
 	local c_star        = M.DEFAULT_STATE.preview_star_color
 	local c_autocorrect = M.DEFAULT_STATE.preview_autocorrect_color
 	local c_ai          = M.DEFAULT_STATE.preview_ai_color
@@ -393,7 +392,7 @@ function M.build_management(ctx)
 				disabled = paused or nil,
 				fn       = not paused and (function(k) return function()
 					local res = hs.dialog.blockAlert(
-						"Supprimer l'expanseur",
+						"Supprimer l’expanseur",
 						"Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
 						"Supprimer", "Annuler"
 					)
@@ -447,7 +446,7 @@ function M.build_management(ctx)
 			-- 2. Ask consume behaviour (default: non consommé)
 			local consume_res = hs.dialog.blockAlert(
 				"Comportement du déclencheur",
-				"Voulez-vous que le caractère soit consommé (non tapé) lors de l'expansion ?",
+				"Voulez-vous que le caractère soit consommé (non tapé) lors de l’expansion ?",
 				"Non — taper le caractère", "Oui — consommer", "Annuler"
 			)
 			if consume_res == "Annuler" then return end
@@ -524,11 +523,11 @@ function M.build_management(ctx)
 
 	local def_base = ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT
 	if not def_base then
-		Logger.warn(LOG, "keymap.BASE_DELAY_SEC_DEFAULT manquant — délai de base indéfini")
+		Logger.warn(LOG, "keymap.BASE_DELAY_SEC_DEFAULT missing — base delay undefined.")
 	end
 	local def_delays = ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT
 	if not def_delays then
-		Logger.warn(LOG, "keymap.DELAYS_DEFAULT manquant — délais individuels indéfinis")
+		Logger.warn(LOG, "keymap.DELAYS_DEFAULT missing — individual delays undefined.")
 	end
 
 	table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
@@ -619,7 +618,7 @@ function M.build_personal(ctx)
 		end
 	end
 
-	local base_label = "Hotstrings AHK" -- Libellé ajusté comme demandé
+	local base_label = "Hotstrings AHK"
 	local item = {
 		title   = has_count and (base_label .. " (" .. fmt_count(total) .. ")") or base_label,
 		checked = (enabled and not paused) or nil,
