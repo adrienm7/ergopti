@@ -183,7 +183,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     table.insert(messages, { role = "user", content = user_prompt })
 
     local t0_req = hs.timer.secondsSinceEpoch()
-    Logger.debug(LOG, "[%s] #%d PROMPT (%d car.) mode_line=%s → %s", model_name, req_id, #user_prompt, tostring(line_mode), user_prompt:sub(1, 250))
+    Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) mode_line=%s -> %s", model_name, req_id, #user_prompt, tostring(line_mode), user_prompt:sub(1, 250))
 
     local payload = {
         model      = tostring(model_name),
@@ -231,15 +231,21 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                     return
                 end
                 
-                if type(resp.message.content) ~= "string" then
-                    Logger.error(LOG, "[%s] #%d CONTENT_INVALID: content type=%s", model_name, req_id, type(resp.message.content))
+                local content = type(resp.message.content) == "string" and resp.message.content or ""
+                local thinking = type(resp.message.thinking) == "string" and resp.message.thinking or ""
+                if content == "" then
+                    if thinking ~= "" then
+                        Logger.debug(LOG, "[%s] #%d Ollama reasoning-only response detected (empty content, thinking present).", model_name, req_id)
+                    else
+                        Logger.error(LOG, "[%s] #%d CONTENT_INVALID: content type=%s", model_name, req_id, type(resp.message.content))
+                    end
                     if type(on_fail) == "function" then pcall(on_fail) end
                     return
                 end
 
-                local raw     = Parser.strip_thinking(resp.message.content)
+                local raw     = Parser.strip_thinking(content)
                 local ms_req  = math.floor((hs.timer.secondsSinceEpoch() - t0_req) * 1000)
-                Logger.debug(LOG, "[%s] #%d RAW (%dms, %d car.) → %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
+                Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
                 local results = {}
 
                 if not is_batch then
@@ -254,10 +260,10 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                 end
 
                 if #results == 0 then
-                    Logger.debug(LOG, "[%s] #%d PARSED → 0 résultat (échec parseur)", model_name, req_id)
+                    Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model_name, req_id)
                     if type(on_fail) == "function" then pcall(on_fail) end return
                 end
-                Logger.debug(LOG, "[%s] #%d PARSED → %d résultat(s)", model_name, req_id, #results)
+                Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
                 if keylogger and type(keylogger.log_llm) == "function" then pcall(keylogger.log_llm, full_text, results) end
                 if type(on_success) == "function" then pcall(on_success, results) end
             end)
@@ -388,7 +394,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                if attempt < 2 then
                                    local retry_tokens = math.max(28, math.floor(tokens * 0.72))
                                    local retry_temp = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
-                                   Logger.debug(LOG, "[%s] Variante %d/%d retry rapide en chat: tokens=%d temp=%.2f", model_name, variant_index, max_attempts, retry_tokens, retry_temp)
+                                   Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f", model_name, variant_index, max_attempts, retry_tokens, retry_temp)
                                    request_variant(attempt + 1, retry_tokens, retry_temp, false)
                                    return
                                end
