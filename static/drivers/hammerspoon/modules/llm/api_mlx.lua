@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local M = {}
+
 local hs       = hs
 local Logger   = require("lib.logger")
 local Parser   = require("modules.llm.parser")
@@ -24,15 +25,31 @@ local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
 
 -- M.is_thinking_model is injected by init.lua
 
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 1/ Check Availability =======
+-- =====================================
+-- =====================================
+
 --- Asynchronously checks if the MLX server is reachable and loaded.
+--- @param model_name string Name of the model (not strictly checked in MLX).
+--- @param on_available function Callback if server answers.
+--- @param on_missing function Callback if server fails to answer.
 function M.check_availability(model_name, on_available, on_missing)
-    hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function(status, body)
-        if status == 200 then
-            if type(on_available) == "function" then pcall(on_available) end
-        else
-            if type(on_missing) == "function" then pcall(on_missing, false) end
-        end
-    end)
+	Logger.debug(LOG, "Checking MLX server availability…")
+	hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function(status, body)
+		if status == 200 then
+			Logger.info(LOG, "MLX server is available.")
+			if type(on_available) == "function" then pcall(on_available) end
+		else
+			Logger.warn(LOG, "MLX server is missing or unreachable.")
+			if type(on_missing) == "function" then pcall(on_missing, false) end
+		end
+	end)
 end
 
 --- Builds the options payload for the OpenAI API format (MLX Server) - optimized.
@@ -49,6 +66,16 @@ local function build_options(temperature, num_predict_tokens, is_batch, line_mod
 end
 
 --- Posts data to the local MLX LLM and parses the response.
+--- @param model_name string Model identifier.
+--- @param system_prompt string System instructions.
+--- @param full_text string Context text.
+--- @param tail_text string Recent context text.
+--- @param temperature number Model temperature.
+--- @param num_predict_tokens number Token limits.
+--- @param num_predictions number Expected completions count.
+--- @param is_batch boolean True if batch format requested.
+--- @param on_success function Success callback.
+--- @param on_fail function Failure callback.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, num_predict_tokens, num_predictions, is_batch,
                                on_success, on_fail, dedup_stats, force_line_mode)
@@ -56,24 +83,24 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local req_id = _req_counter
     local messages = {}
 
-    local final_sys = system_prompt
-    if type(final_sys) == "string" then
-        final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
-    end
+	local final_sys = system_prompt
+	if type(final_sys) == "string" then
+		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+	end
 
-    local user_prompt = ""
-    if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
-        user_prompt = string.format('PREFIX: "%s"\nTAIL: "%s"', full_text or "", tail_text or "")
-    else
-        local context_str = type(full_text) == "string" and full_text or ""
-        if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
-            final_sys = final_sys:gsub("%{context%}", function() return context_str end)
-            user_prompt = final_sys
-            final_sys = nil
-        else
-            user_prompt = context_str
-        end
-    end
+	local user_prompt = ""
+	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
+		user_prompt = string.format("PREFIX: \"%s\"\nTAIL: \"%s\"", full_text or "", tail_text or "")
+	else
+		local context_str = type(full_text) == "string" and full_text or ""
+		if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
+			final_sys = final_sys:gsub("%{context%}", function() return context_str end)
+			user_prompt = final_sys
+			final_sys = nil
+		else
+			user_prompt = context_str
+		end
+	end
 
     -- MLX OpenAI-compatible endpoint can reject "system" roles for some models
     -- (e.g. Mistral) with strict user/assistant alternation checks.
@@ -124,8 +151,12 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     Logger.debug(LOG, "[%s] #%d PROMPT (%d car.) → %s", model_name, req_id, #prompt_preview, prompt_preview:sub(1, 250))
     Logger.debug(LOG, "[%s] #%d MODE is_batch=%s line_mode=%s max_tokens=%s endpoint=%s", model_name, req_id, tostring(is_batch), tostring(line_mode), tostring(opts.max_tokens), endpoint)
 
-    local ok, encoded = pcall(hs.json.encode, payload)
-    if not ok or not encoded then if type(on_fail) == "function" then pcall(on_fail) end return end
+	local ok, encoded = pcall(hs.json.encode, payload)
+	if not ok or not encoded then
+		Logger.error(LOG, "Failed to encode MLX payload.")
+		if type(on_fail) == "function" then pcall(on_fail) end
+		return
+	end
 
     local done = false
     local timeout_timer = hs.timer.doAfter(8, function()
@@ -150,34 +181,34 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             local ok_dec, resp = pcall(hs.json.decode, body)
             if not ok_dec or type(resp) ~= "table" or type(resp.choices) ~= "table" or not resp.choices[1] then
                 Logger.debug(LOG, "[%s] #%d Réponse non exploitable (decode/choices), body='%s'", model_name, req_id, tostring((body or ""):sub(1, 220)))
-                if type(on_fail) == "function" then pcall(on_fail) end
-                return
-            end
+				if type(on_fail) == "function" then pcall(on_fail) end
+				return
+			end
 
-            local choice = resp.choices[1]
-            local content = nil
+			local choice = resp.choices[1]
+			local content = nil
 
-            -- OpenAI-like format
-            if type(choice.message) == "table" then
-                if type(choice.message.content) == "string" then
-                    content = choice.message.content
-                elseif type(choice.message.content) == "table" then
-                    local chunks = {}
-                    for _, item in ipairs(choice.message.content) do
-                        if type(item) == "table" and type(item.text) == "string" then
-                            table.insert(chunks, item.text)
-                        elseif type(item) == "string" then
-                            table.insert(chunks, item)
-                        end
-                    end
-                    if #chunks > 0 then content = table.concat(chunks, "") end
-                end
-            end
+			-- OpenAI-like format
+			if type(choice.message) == "table" then
+				if type(choice.message.content) == "string" then
+					content = choice.message.content
+				elseif type(choice.message.content) == "table" then
+					local chunks = {}
+					for _, item in ipairs(choice.message.content) do
+						if type(item) == "table" and type(item.text) == "string" then
+							table.insert(chunks, item.text)
+						elseif type(item) == "string" then
+							table.insert(chunks, item)
+						end
+					end
+					if #chunks > 0 then content = table.concat(chunks, "") end
+				end
+			end
 
-            -- Legacy completion fallback
-            if not content and type(choice.text) == "string" then
-                content = choice.text
-            end
+			-- Legacy completion fallback
+			if not content and type(choice.text) == "string" then
+				content = choice.text
+			end
 
             if type(content) ~= "string" or content == "" then
                 Logger.debug(LOG, "[%s] #%d Contenu vide dans choices[1]", model_name, req_id)
@@ -318,7 +349,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
         request_variant(1, primary_tokens, variant_temp, false)
     end
 
-    do_next()
+	do_next()
 end
 
 return M

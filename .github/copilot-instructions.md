@@ -22,13 +22,15 @@ Copilot is authorized to create, edit, and delete any file type in any directory
 
 - **Indentation:** Always use **tabs** for indentation (no spaces).
 - **Sections:** Major functional sections MUST be preceded by **EXACTLY 5 blank lines**.
-  - The header must consist of 2 top lines of `=`, the title line, and 2 bottom lines of `=`.
-  - The title line must be formatted with 7 `=` on each side: `======= X/ Title =======`
+  - The title line must be formatted with EXACTLY 7 `=` on each side: `======= X/ Title =======`
+  - **Alignment Rule:** The 2 top lines and 2 bottom lines of `=` MUST perfectly match the total character length of the title line.
+    - _Calculation:_ `7 (left =) + 1 (space) + length_of_title + 1 (space) + 7 (right =)`.
 - **Subsections:** Minor functional subdivisions MUST be preceded by **EXACTLY 3 blank lines**.
-  - The header must consist of 1 top line of `=`, the title line, and 1 bottom line of `=`.
-  - The title line must be formatted with 5 `=` on each side: `===== X.Y) Title =====`
+  - The title line must be formatted with EXACTLY 5 `=` on each side: `===== X.Y) Title =====`
+  - **Alignment Rule:** The 1 top line and 1 bottom line of `=` MUST perfectly match the total character length of the title line.
+    - _Calculation:_ `5 (left =) + 1 (space) + length_of_title + 1 (space) + 5 (right =)`.
 
-Example of the required section and subsection headers (adapt the comment symbol `//`, `--`, `#`, or `;` to the language):
+Example of the required perfectly aligned section and subsection headers (adapt the comment symbol `//`, `--`, `#`, or `;` to the language):
 
 ```text
 [5 BLANK LINES HERE]
@@ -56,6 +58,13 @@ more_code_here()
   - **Docstrings** (formal documentation) **MUST ALWAYS end with a period (`.`)**. They are formal sentences and start with a capital letter.
   - **Inline comments** (quick developer notes like `//`, `--`, `#`) **MUST NEVER end with a period** but need to start with a capital letter. They are not formal sentences but should still be clear and well-written.
 - **Context:** Comments should explain _why_ something is done, not _what_ is done.
+
+## 4. Logging Conventions
+
+- **Use Standard Logger:** Utilize the central logger system (e.g., `lib.logger` in Lua, equivalent systems elsewhere).
+- **Ongoing vs. Completed Actions:**
+  - When logging an action that is starting or in progress, use an ellipsis (`…`) (e.g., `Logger.debug(LOG, "Starting engine…")`).
+  - When logging a completed action or assertion, end with a period (`.`) (e.g., `Logger.info(LOG, "Engine started successfully.")`).
 
 # Language-Specific Guidelines
 
@@ -150,16 +159,16 @@ local hs = hs
 --- Safely starts the keylogger engine and binds the event tap.
 --- @param script_control table The module reference to check pause state.
 function M.start(script_control)
-  -- Wrap in pcall to avoid locking the OS keyboard
-  local ok, err = pcall(function()
-    -- Implementation logic here
-  end)
+	-- Wrap in pcall to avoid locking the OS keyboard
+	local ok, err = pcall(function()
+		-- Implementation logic here
+	end)
 
-  if not ok then
-    hs.dialog.alert("Erreur", "Le lancement a échoué.")
-  else
-    print("[keylogger] Système activé.")
-  end
+	if not ok then
+		hs.dialog.alert("Erreur", "Le lancement a échoué.", "OK")
+	else
+		print("[keylogger] Système activé.")
+	end
 end
 ```
 
@@ -201,20 +210,20 @@ from typing import Optional
 # ==================================
 
 def parse_driver_config(file_path: str) -> Optional[dict]:
-  """Parses a configuration file for the keyboard drivers.
+	"""Parses a configuration file for the keyboard drivers.
 
-  Args:
-    file_path: The absolute path to the configuration file.
+	Args:
+		file_path: The absolute path to the configuration file.
 
-  Returns:
-    A dictionary containing the parsed configuration, or None if it fails.
-  """
-  # Ensure file exists to prevent IO exceptions
-  if not os.path.exists(file_path):
-    print("Erreur : Le fichier de configuration est introuvable.")
-    return None
+	Returns:
+		A dictionary containing the parsed configuration, or None if it fails.
+	"""
+	# Ensure file exists to prevent IO exceptions
+	if not os.path.exists(file_path):
+		print("Erreur : Le fichier de configuration est introuvable.")
+		return None
 
-  return {}
+	return {}
 ```
 
 ## AutoHotkey (`.ahk`)
@@ -246,6 +255,6 @@ global IsPaused := False
 ; ==================================
 
 SetupTrayMenu() {
-  ; Logic goes here
+	; Logic goes here
 }
 ```
