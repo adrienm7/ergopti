@@ -20,14 +20,12 @@ local M = {}
 
 local RAW_PROMPT_SINGLE = [[{context}]]
 
-local BASIC_PROMPT_SINGLE = [[Tu es un assistant de frappe au clavier intelligent et ultra-concis.
-Voici le texte saisi : {context}
+local BASIC_PROMPT_SINGLE = [[Tu es un moteur de complétion clavier ultra-concis.
+Contexte utilisateur : {context}
 
-Prédis UNIQUEMENT la suite directe (1 à 5 mots).
-RÈGLES ABSOLUES :
-- NE RÉPÈTE JAMAIS le contexte.
-- NE FAIS AUCUN COMMENTAIRE. Pas de "Voici la suite", pas de salutations.
-- N’utilise AUCUN guillemet. Donne juste les mots suivants nus.]]
+Donne strictement la suite immédiate du contexte en 1 à 5 mots maximum.
+N’ajoute aucune explication, aucun commentaire, aucune liste, aucune puce, aucun guillemet, aucune reformulation du contexte.
+Retourne uniquement les mots à ajouter.]]
 
 local ADVANCED_PROMPT_SINGLE = [[Tu es un moteur strict de correction et de complétion de texte.
 RÈGLES CRITIQUES :

@@ -2,18 +2,27 @@
 <html lang="fr">
 	<head>
 		<meta charset="utf-8" />
-		<title>Téléchargement</title>
+		<title>Téléchargement en cours</title>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
 		<h2>📥 Téléchargement en cours</h2>
 		<div id="model">—</div>
 
+		<div id="model-sizes" style="display: none">
+			<span id="sz-dl"></span>
+			<span id="sz-disk"></span>
+			<span id="sz-ram"></span>
+		</div>
+
 		<div id="bar-bg">
 			<div id="bar-fill"></div>
 		</div>
 
-		<div id="pct">0 %</div>
+		<div id="status-line">
+			<div id="pct">0 %</div>
+			<div id="done-msg"></div>
+		</div>
 		<div id="stats">Démarrage…</div>
 
 		<div class="btn-row">
@@ -21,8 +30,12 @@
 			<button id="btn-term" onclick="doTerm()">🖥 Terminal</button>
 		</div>
 
-		<div id="done-msg"></div>
 		<div id="log-area"></div>
+
+		<div id="error-actions" class="btn-row" style="display: none">
+			<button id="btn-resolve" onclick="doResolve()">🔑 Résoudre l’accès gated</button>
+			<button id="btn-retry" onclick="doRetry()">🔄 Relancer le téléchargement</button>
+		</div>
 
 		<script src="script.js"></script>
 	</body>

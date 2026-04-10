@@ -29,10 +29,16 @@ if not ok_kl then keylogger = nil end
 
 local ok_tt, tooltip = pcall(require, "ui.tooltip")
 if not ok_tt then
+	Logger.warning(LOG, "❌ Module ui.tooltip failed to load! LLM predictions will NOT display.")
 	tooltip = { 
 		show = function() end, 
 		hide = function() end,
-		show_predictions = function() end, 
+		show_predictions = function() 
+			-- Placeholder: log instead of displaying
+			if Logger and type(Logger.debug) == "function" then
+				Logger.debug(LOG, "⚠️  show_predictions called but tooltip module failed to load!")
+			end
+		end, 
 		navigate = function() end,
 		get_current_index = function() return 1 end,
 		make_diff_styled = function() return true end,
@@ -63,10 +69,14 @@ local _pending_predictions     = {}
 local _predictions_active      = false
 local _enter_validates_pred    = false 
 local _llm_request_id          = 0
+local _llm_fetch_request_id    = 0
 local _last_suggested_hs       = nil
+local _last_llm_input_signature = nil
 
-local current_llm_model        = core_llm.DEFAULT_LLM_MODEL or "llama3.2"
-local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED or false
+local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED
+local current_llm_model        = core_llm.DEFAULT_LLM_MODEL
+local current_llm_display_name = core_llm.DEFAULT_LLM_MODEL
+local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED
 local preview_star_enabled        = true
 local preview_autocorrect_enabled = true
 local preview_ai_enabled          = true
@@ -119,8 +129,23 @@ local function parse_mods(mod_input, default)
 	return default
 end
 
-function M.set_llm_model(m)               current_llm_model      = tostring(m) end
+function M.set_llm_model(m)
+	local model_name = tostring(m)
+	if type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() then
+		if type(core_llm.set_llm_model_mlx) == "function" then
+			core_llm.set_llm_model_mlx(model_name)
+		end
+	else
+		if type(core_llm.set_llm_model_ollama) == "function" then
+			core_llm.set_llm_model_ollama(model_name)
+		end
+	end
+	current_llm_model = model_name  -- also update local cache for display
+end
 function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
+function M.set_llm_display_model_name(name)
+	if type(name) == "string" and name ~= "" then current_llm_display_name = name end
+end
 function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) end
 function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
 function M.set_llm_max_words(w)           llm_max_words          = math.max(0, tonumber(w) or 5) end
@@ -146,6 +171,7 @@ function M.set_llm_enabled(enabled)
 		_predictions_active   = false
 		_enter_validates_pred = false
 		_llm_request_id       = _llm_request_id + 1
+		_llm_fetch_request_id = _llm_fetch_request_id + 1
 		if M._llm_timer and type(M._llm_timer.running) == "function" and M._llm_timer:running() then 
 			M._llm_timer:stop() 
 		end
@@ -230,8 +256,10 @@ function M.reset_predictions()
 	_predictions_active   = false
 	_enter_validates_pred = false
 	_last_suggested_hs    = nil
+	_last_llm_input_signature = nil
 	
 	_llm_request_id       = _llm_request_id + 1
+	_llm_fetch_request_id = _llm_fetch_request_id + 1
 	
 	if tooltip.hide then tooltip.hide() end
 	M.stop_timer()
@@ -348,6 +376,13 @@ end
 if tooltip.set_navigate_callback then
 	tooltip.set_navigate_callback(function(idx)
 		_enter_validates_pred = true
+		if tooltip.set_enter_validates then tooltip.set_enter_validates(true) end
+	end)
+end
+
+if tooltip.set_cancel_callback then
+	tooltip.set_cancel_callback(function()
+		M.reset_predictions()
 	end)
 end
 
@@ -375,6 +410,50 @@ local function truncate_words(text, max_w)
 	local res = table.concat(words)
 	if #words >= max_w then res = res:gsub("%s+$", "") end
 	return res
+end
+
+--- Builds a stable deduplication key from the final text effectively shown in the tooltip.
+--- @param pred table The final prediction payload.
+--- @return string The normalized display key.
+local function build_tooltip_dedup_key(pred)
+	if type(pred) ~= "table" then return "" end
+
+	local chunks = pred.chunks
+	local nw = tostring(pred.nw or "")
+	local first_done = false
+	local last_char = ""
+	local parts = {}
+
+	local function clean_first(s)
+		local str = tostring(s or "")
+		if not first_done and str ~= "" then
+			str = str:gsub("^%s+", "")
+			if str ~= "" then first_done = true end
+		end
+		return str
+	end
+
+	if type(chunks) == "table" and #chunks > 0 then
+		for _, chunk in ipairs(chunks) do
+			if type(chunk) == "table" then
+				local s = clean_first(chunk.text)
+				if s ~= "" then
+					table.insert(parts, s)
+					last_char = s:sub(-1)
+				end
+			end
+		end
+	end
+
+	local s_nw = clean_first(nw)
+	if s_nw ~= "" then
+		if last_char ~= "" and not last_char:match("%s") and not s_nw:match("^%s") then
+			s_nw = " " .. s_nw
+		end
+		table.insert(parts, s_nw)
+	end
+
+	return table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
 --- Verifies if the active window is blacklisted from generating LLM predictions.
@@ -478,34 +557,121 @@ function M._perform_llm_check(force_trigger, profile_name)
 		return
 	end
 
+	local llm_input_signature = clean_buffer .. "\n" .. tail
+	if not force_trigger and _last_llm_input_signature == llm_input_signature then
+		Logger.debug(LOG, "Requête LLM ignorée (entrée inchangée)")
+		return
+	end
+	_last_llm_input_signature = llm_input_signature
+
 	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, C_TINT_AI_LOADING) end
 
 	local num_pred = llm_num_predictions
+	local req_temperature = llm_temperature
 
 	_llm_request_id = _llm_request_id + 1
-	local my_request_id = _llm_request_id
+	_llm_fetch_request_id = _llm_fetch_request_id + 1
+	local my_request_id = _llm_fetch_request_id
 
 	if type(core_llm.fetch_llm_prediction) == "function" then
+		if type(core_llm.get_active_profile) == "function" then
+			local active_profile = core_llm.get_active_profile()
+			if type(active_profile) == "table" then
+				Logger.debug(LOG, "Profil actif: id=%s, label=%s, batch=%s", tostring(active_profile.id), tostring(active_profile.label), tostring(active_profile.batch))
+			end
+		end
+
+		-- Keep generations short for typing autocomplete to reduce latency.
+		local model_to_use = type(core_llm.get_current_model) == "function" and core_llm.get_current_model() or current_llm_model
+		local using_mlx_backend = type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() or false
+		local max_predict_tokens = 80
+		if using_mlx_backend then
+			-- MLX typing mode must stay short, otherwise responses often arrive too late for live preview.
+			max_predict_tokens = 48
+		elseif llm_max_words > 0 then
+			max_predict_tokens = math.max(20, math.min(80, llm_max_words * 6 + 8))
+		end
+		local effective_num_pred = num_pred
+		Logger.debug(LOG, "LLM dispatch tuned: mlx=%s, num_pred=%d, max_tokens=%d", tostring(using_mlx_backend), effective_num_pred, max_predict_tokens)
+		
 		core_llm.fetch_llm_prediction(
 			clean_buffer, tail,
-			current_llm_model, llm_temperature, 80, num_pred,
-			function(predictions, elapsed_ms)
-				if _llm_request_id ~= my_request_id then return end
+			model_to_use, req_temperature, max_predict_tokens, effective_num_pred,
+			function(predictions, elapsed_ms, is_final)
+				if _llm_fetch_request_id ~= my_request_id then return end
+
+				local function get_pred_key(pred)
+					if type(pred) ~= "table" then return "" end
+					local k = build_tooltip_dedup_key(pred)
+					if k ~= "" then return k end
+					return tostring(pred.to_type or "")
+				end
 				
 				local valid_preds = {}
+				local seen_tooltip_texts = {}
+				local ctx_words = {}
+				for w in clean_buffer:lower():gmatch("[%aÀ-ÿ0-9]+") do
+					ctx_words[w] = true
+				end
 				for _, p in ipairs(predictions) do
 					if p.to_type then
 						local tt = p.to_type
+						local original_tt = tt
 						
 						if llm_max_words > 0 then
 							tt = truncate_words(tt, llm_max_words)
-							if p.nw then
-								p.nw = truncate_words(p.nw, llm_max_words)
-							end
 						end
 						
-						if tt:gsub("[%s%.…]", "") ~= "" then
+						local tt_norm = tt:lower():gsub("’", "'")
+						local ctx_norm = clean_buffer:lower():gsub("’", "'")
+						local prev_non_space = clean_buffer:match(".*(%S)")
+						local first_char = tt:match("^%s*(.)") or ""
+						local starts_upper_ascii = first_char:match("[A-Z]") ~= nil
+						local prev_ends_sentence = prev_non_space and prev_non_space:match("[%.%!%?…:;]") ~= nil
+						local generic_pronoun_start = tt_norm:match("^%s*vous%s") and not ctx_norm:match("vous")
+						local has_unrelated_pronoun = tt_norm:match("%f[%a]vous%f[%A]") and not ctx_norm:match("%f[%a]vous%f[%A]")
+						local has_htmlish = tt_norm:find("<", 1, true) or tt_norm:find(">", 1, true) or tt_norm:find("%[user", 1, true)
+						local has_urlish = tt_norm:find("http", 1, true) or tt_norm:find("www", 1, true) or tt_norm:match("%.com") or tt_norm:match("%.net")
+						local has_hashish = tt_norm:match("%x%x%x%x%x%x%x") ~= nil
+						local repeated_word = tt_norm:match("(%a+)%s+%1%s+%1") ~= nil
+						local repeated_syllable = tt_norm:match("^([%aÀ-ÿ][%aÀ-ÿ])%1%1") ~= nil
+							or tt_norm:match("^([%aÀ-ÿ][%aÀ-ÿ][%aÀ-ÿ])%1%1") ~= nil
+						local has_novel_word = false
+						for w in tt_norm:gmatch("[%aÀ-ÿ0-9]+") do
+							if not ctx_words[w] then
+								has_novel_word = true
+								break
+							end
+						end
+
+						local is_noise = tt_norm:match("^%s*suite%s+finale")
+							or tt_norm:match("^%s*</")
+							or tt_norm:match("^%s*vous avez besoin de plus")
+							or tt_norm:match("^%s*vous etes les plus")
+							or tt_norm:match("^%s*les versions a partir")
+							or tt_norm:match("^%s*toujours accompagne")
+							or tt_norm:match("^%s*grand etranger")
+							or tt_norm:match("^%s*artiste prefere")
+							or generic_pronoun_start
+							or has_unrelated_pronoun
+							or has_htmlish
+							or has_urlish
+							or has_hashish
+							or (not has_novel_word)
+							or repeated_word
+							or repeated_syllable
+							or (starts_upper_ascii and not prev_ends_sentence)
+							or tt:find(":", 1, true) ~= nil
+
+						if tt:gsub("[%s%.…]", "") ~= "" and not is_noise then
 							p.to_type = tt
+
+							if original_tt ~= tt then
+								-- Keep UI and emitted text perfectly aligned after truncation
+								p.nw = tt
+								p.chunks = {}
+								p.has_corrections = false
+							end
 							
 							local has_visual = true
 							if type(tooltip.make_diff_styled) == "function" then
@@ -513,16 +679,59 @@ function M._perform_llm_check(force_trigger, profile_name)
 							end
 							
 							if has_visual then
-								table.insert(valid_preds, p)
+								local dedup_key = build_tooltip_dedup_key(p)
+								if dedup_key ~= "" and not seen_tooltip_texts[dedup_key] then
+									seen_tooltip_texts[dedup_key] = true
+									table.insert(valid_preds, p)
+								elseif dedup_key == "" then
+									table.insert(valid_preds, p)
+								else
+									Logger.debug(LOG, "Prédiction rejetée (doublon tooltip): '%s'", dedup_key)
+								end
 							end
+						elseif is_noise then
+							Logger.debug(LOG, "Prédiction rejetée (bruit): '%s'", tt)
 						end
 					end
 				end
 
-				if #valid_preds == 0 then
-					M.reset_predictions(); return
+				-- Keep already displayed order stable and append only genuinely new predictions.
+				if _predictions_active and type(_pending_predictions) == "table" and #_pending_predictions > 0 then
+					local merged_preds = {}
+					local seen_merge = {}
+
+					for _, ep in ipairs(_pending_predictions) do
+						local key = get_pred_key(ep)
+						if key == "" or not seen_merge[key] then
+							if key ~= "" then seen_merge[key] = true end
+							table.insert(merged_preds, ep)
+						end
+					end
+
+					for _, np in ipairs(valid_preds) do
+						local key = get_pred_key(np)
+						if key == "" or not seen_merge[key] then
+							if key ~= "" then seen_merge[key] = true end
+							table.insert(merged_preds, np)
+						end
+					end
+
+					valid_preds = merged_preds
 				end
-				
+
+				if #valid_preds == 0 then
+					if is_final == true then
+						M.reset_predictions()
+					end
+					return
+				end
+
+				Logger.debug(LOG, "%d prédiction(s) valide(s) en %dms :", #valid_preds, elapsed_ms or 0)
+				for i, p in ipairs(valid_preds) do
+					local nw_info = (p.nw and p.nw ~= "") and (" | nw='" .. p.nw .. "'") or ""
+					Logger.debug(LOG, "  #%d → del=%d to_type='%s'%s", i, p.deletes or 0, p.to_type or "", nw_info)
+				end
+
 				-- Notify keylogger that we suggested a prediction
 				if keylogger and type(keylogger.log_llm_suggested) == "function" then
 					pcall(keylogger.log_llm_suggested)
@@ -542,7 +751,17 @@ function M._perform_llm_check(force_trigger, profile_name)
 					end
 				end
 				
-				local info = llm_show_info_bar and build_info_bar(current_llm_model, elapsed_ms, using_mlx, display_profile_name) or nil
+				local display_model = (current_llm_display_name ~= "" and current_llm_display_name)
+					or (type(core_llm.get_current_model) == "function" and core_llm.get_current_model())
+					or current_llm_model
+				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, using_mlx, display_profile_name) or nil
+				local loading_text = nil
+				if is_final ~= true and #valid_preds < llm_num_predictions then
+					local spinner_frames = { "◐", "◓", "◑", "◒" }
+					local idx = (math.floor(hs.timer.secondsSinceEpoch() * 6) % #spinner_frames) + 1
+					loading_text = string.format("%s Enrichissement… %d/%d", spinner_frames[idx], #valid_preds, llm_num_predictions)
+				end
+				local reserved_count = (is_final ~= true) and llm_num_predictions or #valid_preds
 				
 				local val_mods = llm_val_modifiers
 				local val_mod_str = "none"
@@ -550,16 +769,43 @@ function M._perform_llm_check(force_trigger, profile_name)
 					val_mod_str = (#val_mods == 0) and "\226\128\139" or table.concat(val_mods, "+")
 				end
 
+				local selected_index = 1
+				if _predictions_active and type(tooltip.get_current_index) == "function" then
+					local current_index = tooltip.get_current_index()
+					if type(current_index) == "number" then
+						selected_index = math.max(1, math.floor(current_index))
+					end
+				end
+				selected_index = math.min(selected_index, #valid_preds)
+
 				if tooltip.show_predictions then
-					tooltip.show_predictions(valid_preds, 1, preview_ai_enabled, info, val_mod_str, llm_pred_indent, llm_nav_modifiers, preview_ai_color)
+					tooltip.show_predictions(valid_preds, selected_index, preview_ai_enabled, info, val_mod_str, llm_pred_indent, llm_nav_modifiers, preview_ai_color, loading_text, reserved_count)
+				else
+					-- Fallback: display predictions via log and notification if tooltip failed
+					if #valid_preds > 0 then
+						local pred_str = ""
+						for i, pred in ipairs(valid_preds) do
+							if i <= 3 then  -- Show top 3
+								pred_str = pred_str .. "\n" .. i .. ". " .. (pred.to_type or "?")
+							end
+						end
+						Logger.warning(LOG, "📝 LLM Prédictions reçues (tooltip indisponible):%s", pred_str)
+						pcall(function()
+							local ok_notif, notifications = pcall(require, "lib.notifications")
+							if ok_notif and notifications and type(notifications.notify) == "function" then
+								notifications.notify("🤖 IA Prédictions", "Reçues: " ..#valid_preds .. " suggestion(s)\n" .. pred_str:sub(1, 100))
+							end
+						end)
+					end
 				end
 			end,
 			function()
-				if _llm_request_id ~= my_request_id then return end
+				if _llm_fetch_request_id ~= my_request_id then return end
 				M.reset_predictions()
 			end,
 			llm_sequential_mode,
-			force_trigger
+			force_trigger,
+			function() return _llm_fetch_request_id end
 		)
 	end
 end
@@ -593,6 +839,7 @@ function M.update_preview(buf)
 
 	-- Essentiel: ne pas conserver la mémoire des suggestions inexploitées
 	if not buf or #buf == 0 then 
+		_last_llm_input_signature = nil
 		M.reset_predictions()
 		return 
 	end
@@ -729,20 +976,38 @@ end
 function M.handle_llm_keys(keyCode, flags, is_ignored)
 	if is_ignored or not _predictions_active then return false end
 
-	if keyCode == 36 then
-		if _enter_validates_pred then
-			local idx = tooltip.get_current_index and tooltip.get_current_index() or 1
-			return M.apply_prediction(idx)
-		else
+	-- Arrow navigation: once user navigates at least once, Enter becomes an accept key.
+	if keyCode >= 123 and keyCode <= 126 then
+		local n_preds = type(_pending_predictions) == "table" and #_pending_predictions or 0
+		if n_preds > 1 then
+			local nav_mods = parse_mods(llm_nav_modifiers, {})
+			if core_llm.check_modifiers(flags, nav_mods) then
+				local nav_dir = (keyCode == 123 or keyCode == 126) and -1 or 1
+				if type(tooltip.navigate) == "function" then
+					tooltip.navigate(nav_dir)
+				end
+				_enter_validates_pred = true
+				return true
+			end
+		end
+	end
+
+	if keyCode == 36 or keyCode == 76 then
+		local idx = tooltip.get_current_index and tooltip.get_current_index() or 1
+		local applied = M.apply_prediction(idx)
+		if not applied then
 			M.reset_predictions()
 		end
-		return false
+		-- Enter is reserved for prediction validation while predictions are active.
+		return true
 	end
 
 	local val_mods = parse_mods(llm_val_modifiers, M.LLM_VAL_MODIFIERS_DEFAULT)
 	if #_pending_predictions > 1 and core_llm.check_modifiers(flags, val_mods) then
 		local n = NUM_KEYCODES[keyCode]
-		if n and n <= #_pending_predictions then return M.apply_prediction(n) end
+		if n and n <= #_pending_predictions then
+			return M.apply_prediction(n)
+		end
 	end
 
 	return false

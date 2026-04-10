@@ -7,9 +7,10 @@
 --- ==============================================================================
 
 local M = {}
-local hs     = hs
-local Logger = require("lib.logger")
-local LOG    = "menu_hotstrings"
+local hs            = hs
+local Logger        = require("lib.logger")
+local notifications = require("lib.notifications")
+local LOG           = "menu_hotstrings"
 
 local dh_mod = require("modules.dynamic_hotstrings")
 
@@ -503,7 +504,7 @@ function M.build_management(ctx)
 				
 				local val = tonumber(raw)
 				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(function() hs.notify.new({ title = "Délai invalide", informativeText = "Veuillez saisir un entier ≥ 0." }):send() end)
+					pcall(notifications.notify, "Délai invalide", "Veuillez saisir un entier ≥ 0.")
 					return
 				end
 				

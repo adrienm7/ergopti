@@ -71,8 +71,8 @@ PY
 "$PYTHON_BIN" -m pip install --user --upgrade packaging >/dev/null 2>&1 || true
 check_and_install "jinja2" "3.1.0"
 check_and_install "huggingface_hub" "0.21.0"
+check_and_install "truststore" "0.10.0"
 check_and_install "mlx-lm" "0.0.1"
-check_and_install "truststore" "0.7.0"
 check_and_install "safetensors" "0.4.0"
 
 echo "[MLX-DEPS] ✅ All required packages checked and installed."

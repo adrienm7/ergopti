@@ -65,16 +65,24 @@ end
 -- =============================
 -- =============================
 
---- Sends a system notification with the Ergopti+ branding
---- @param msg string The informative text to display
-function M.notify(msg)
-    if msg == nil then return end
+--- Sends a system notification with the Ergopti+ branding.
+--- @param title_or_msg string Main title when body is provided, or message when body is omitted.
+--- @param body string|nil Optional detail body.
+function M.notify(title_or_msg, body)
+    if title_or_msg == nil then return end
+    local title_text = "Ergopti+"
+    local info_text = tostring(title_or_msg)
+
+    if body ~= nil then
+        title_text = tostring(title_or_msg)
+        info_text = tostring(body)
+    end
     
     -- Ensure the notification process never crashes the script
     pcall(function()
         local n = hs.notify.new({
-            title           = "Ergopti+",
-            informativeText = tostring(msg),
+            title           = title_text,
+            informativeText = info_text,
             contentImage    = _get_logo(),
         })
         if n and type(n.send) == "function" then 

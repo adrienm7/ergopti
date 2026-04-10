@@ -15,12 +15,13 @@
 
 local M = {}
 
-local hs          = hs
-local toml_reader = require("lib.toml_reader")
-local toml_writer = require("lib.toml_writer")
-local ui_builder  = require("ui.ui_builder")
-local Logger      = require("lib.logger")
-local LOG         = "hotstring_editor"
+local hs            = hs
+local toml_reader   = require("lib.toml_reader")
+local toml_writer   = require("lib.toml_writer")
+local ui_builder    = require("ui.ui_builder")
+local Logger        = require("lib.logger")
+local notifications = require("lib.notifications")
+local LOG           = "hotstring_editor"
 
 
 
@@ -275,12 +276,7 @@ local function handle_message(msg)
 			end
 			if type(_update_menu) == "function" then hs.timer.doAfter(0, function() pcall(_update_menu) end) end
 		else
-			pcall(function()
-				hs.notify.new({ 
-					title = "Erreur de sauvegarde",
-					informativeText = tostring(err) 
-				}):send()
-			end)
+			pcall(notifications.notify, "Erreur de sauvegarde", tostring(err))
 		end
 		return
 	end

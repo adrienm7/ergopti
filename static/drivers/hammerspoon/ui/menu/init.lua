@@ -135,16 +135,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function notify_feature(label, is_enabled)
-		pcall(function()
-			hs.notify.new({
-				title           = is_enabled and "🟢 ACTIVÉ" or "🔴 DÉSACTIVÉ",
-				informativeText = tostring(label),
-			}):send()
-		end)
+		pcall(notifications.notify, is_enabled and "🟢 ACTIVÉ" or "🔴 DÉSACTIVÉ", tostring(label))
 	end
 
 	local function save_prefs()
-		_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 1.0
 		Preferences.save(base_dir .. "config.json", state, hotfiles, core_mods)
 	end
 
@@ -290,7 +284,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 		-- Start/stop engines
 		if keymap then
-			if state.keymap then if type(keymap.start) == "function" then pcall(keymap.start) end else if type(keymap.stop) == "function" then pcall(keymap.stop) end end
+			if state.keymap then
+				if type(keymap.start) == "function" then pcall(keymap.start) end
+
+				-- Recover from a stale paused state when script control is not paused
+				local paused = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false
+				if not paused and type(keymap.is_processing_paused) == "function" and keymap.is_processing_paused() then
+					if type(keymap.resume_processing) == "function" then pcall(keymap.resume_processing) end
+				end
+			else
+				if type(keymap.stop) == "function" then pcall(keymap.stop) end
+			end
 		end
 		if gestures then
 			if state.gestures then if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end else if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end end
@@ -535,12 +539,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	updateMenu()
 
 	local function reloadConfig(files)
+		-- Only reload for code files — config.json and runtime-generated files must never trigger a reload
 		if hs.timer.secondsSinceEpoch() < _suppress_watcher_until then return end
 		if type(files) == "table" then
 			for _, file in pairs(files) do
-				if type(file) == "string" then
-					local filename = file:match("[^/]+$")
-					if file:sub(-4) == ".lua" or filename == "config.json" then do_reload("watcher"); return end
+				if type(file) == "string"
+					and (file:match("%.lua$") or file:match("%.html$") or file:match("%.css$") or file:match("%.js$") or file:match("%.toml$"))
+					and not file:match("logs/") then
+					do_reload("watcher"); return
 				end
 			end
 		end

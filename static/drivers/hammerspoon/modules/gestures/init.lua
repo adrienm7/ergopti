@@ -174,6 +174,10 @@ function M.apply_all_overrides()
     Conflicts.apply_all_overrides(CoreState.ga)
 end
 
+function M.restore_all_overrides()
+    Conflicts.restore_all_overrides()
+end
+
 function M.get_action(slot)         return CoreState.ga[slot] end
 function M.set_action(slot, action) CoreState.ga[slot] = action end
 

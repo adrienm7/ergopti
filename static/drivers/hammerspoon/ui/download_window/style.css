@@ -50,6 +50,25 @@ h2 {
 	word-break: break-all;
 }
 
+#model-sizes {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 14px;
+}
+
+#model-sizes span {
+	background: #3a3a3c;
+	border-radius: 4px;
+	color: #ccc;
+	font-size: 10px;
+	font-weight: 500;
+	padding: 3px 6px;
+}
+
+#model-sizes span:empty {
+	display: none;
+}
+
 /* ======================================= */
 /* ======================================= */
 /* ======= 3/ Progress Bar & Stats ======= */
@@ -72,12 +91,23 @@ h2 {
 	width: 0%;
 }
 
+#bar-fill.error {
+	background: linear-gradient(90deg, #ff453a, #ff6b5f);
+}
+
+#status-line {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+	margin-bottom: 4px;
+}
+
 #pct {
 	color: #30d158;
 	font-size: 30px;
 	font-weight: 700;
 	letter-spacing: -1px;
-	margin-bottom: 5px;
+	margin-bottom: 0;
 }
 
 #stats {
@@ -139,6 +169,26 @@ button {
 	background: rgba(100, 100, 100, 0.28);
 }
 
+#btn-retry {
+	background: rgba(48, 209, 88, 0.12);
+	border-color: rgba(48, 209, 88, 0.45);
+	color: #30d158;
+}
+
+#btn-retry:hover {
+	background: rgba(48, 209, 88, 0.22);
+}
+
+#btn-resolve {
+	background: rgba(10, 132, 255, 0.14);
+	border-color: rgba(10, 132, 255, 0.45);
+	color: #5eb1ff;
+}
+
+#btn-resolve:hover {
+	background: rgba(10, 132, 255, 0.24);
+}
+
 /* ================================== */
 /* ================================== */
 /* ======= 5/ Messages & Logs ======= */
@@ -149,7 +199,7 @@ button {
 	display: none;
 	font-size: 13px;
 	font-weight: 600;
-	margin-top: 10px;
+	margin-top: 0;
 }
 
 #done-msg.ok {
@@ -168,9 +218,15 @@ button {
 	font-family: 'SF Mono', monospace;
 	font-size: 10px;
 	margin-top: 10px;
-	max-height: 80px;
+	max-height: 50vh;
+	min-height: 120px;
+	overflow-wrap: anywhere;
 	overflow-y: auto;
 	padding: 8px;
 	white-space: pre-wrap;
-	word-break: break-all;
+	word-break: break-word;
+}
+
+#error-actions {
+	margin-top: 10px;
 }

@@ -1,0 +1,1092 @@
+[
+	{
+		"provider": "Alibaba Cloud (Qwen)",
+		"families": [
+			{
+				"family": "Qwen3-Coder",
+				"models": [
+					{
+						"name": "Qwen3-Coder-30B-A3B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+							"ollama": "https://ollama.com/library/qwen3-coder:30b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Qwen3-Coder-Next",
+				"models": [
+					{
+						"name": "Qwen3-Coder-Next-Base",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3-Coder-Next-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Qwen3-Coder-Next",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3-Coder-Next",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3-Coder-Next-4bit",
+							"ollama": "https://ollama.com/library/qwen3-coder-next:q4_K_M"
+						}
+					}
+				]
+			},
+			{
+				"family": "Qwen 3.5",
+				"models": [
+					{
+						"name": "Qwen3.5-0.8B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-0.8B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Qwen3.5-0.8B",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-0.8B",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-MLX-4bit",
+							"ollama": "https://ollama.com/library/qwen3.5:0.8b"
+						}
+					},
+					{
+						"name": "Qwen3.5-2B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-2B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Qwen3.5-2B",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-2B",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-2B-4bit",
+							"ollama": "https://ollama.com/library/qwen3.5:2b"
+						}
+					},
+					{
+						"name": "Qwen3.5-4B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-4B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Qwen3.5-4B",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-4B",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-4B-MLX-4bit",
+							"ollama": "https://ollama.com/library/qwen3.5:4b"
+						}
+					},
+					{
+						"name": "Qwen3.5-9B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-9B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Qwen3.5-9B",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-9B",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-9B-MLX-4bit",
+							"ollama": "https://ollama.com/library/qwen3.5:9b"
+						}
+					},
+					{
+						"name": "Qwen3.5-27B",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-27B",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-27B-4bit",
+							"ollama": "https://ollama.com/library/qwen3.5:27b"
+						}
+					},
+					{
+						"name": "Qwen3.5-35B-A3B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Qwen3.5-35B-A3B",
+						"urls": {
+							"hf": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-35B-A3B-4bit",
+							"ollama": "https://ollama.com/library/qwen3.5:35b"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "BigCode (StarCoder)",
+		"families": [
+			{
+				"family": "StarCoder2",
+				"models": [
+					{
+						"name": "starcoder2-3b",
+						"urls": {
+							"hf": "https://huggingface.co/bigcode/starcoder2-3b",
+							"mlx": "https://huggingface.co/mlx-community/starcoder2-3b-4bit",
+							"ollama": "https://ollama.com/library/starcoder2:3b"
+						}
+					},
+					{
+						"name": "starcoder2-7b",
+						"urls": {
+							"hf": "https://huggingface.co/bigcode/starcoder2-7b",
+							"mlx": "https://huggingface.co/mlx-community/starcoder2-7b-4bit",
+							"ollama": "https://ollama.com/library/starcoder2:7b"
+						}
+					},
+					{
+						"name": "starcoder2-15b",
+						"urls": {
+							"hf": "https://huggingface.co/bigcode/starcoder2-15b",
+							"mlx": "https://huggingface.co/mlx-community/starcoder2-15b-4bit",
+							"ollama": "https://ollama.com/library/starcoder2:15b"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "DeepSeek",
+		"families": [
+			{
+				"family": "DeepSeek V2",
+				"models": [
+					{
+						"name": "DeepSeek-V2-Lite-Chat",
+						"urls": {
+							"hf": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
+							"mlx": "https://huggingface.co/mlx-community/DeepSeek-V2-Lite-Chat-4bit-mlx",
+							"ollama": "https://ollama.com/library/deepseek-v2:16b"
+						}
+					}
+				]
+			},
+			{
+				"family": "DeepSeek V2.5",
+				"models": [
+					{
+						"name": "DeepSeek-V2.5-1210",
+						"urls": {
+							"hf": "https://huggingface.co/deepseek-ai/DeepSeek-V2.5-1210",
+							"mlx": "https://huggingface.co/mlx-community/DeepSeek-V2.5-1210-4bit",
+							"ollama": "https://ollama.com/milkey/deepseek-v2.5-1210:IQ1_S"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Google (Gemma)",
+		"families": [
+			{
+				"family": "Gemma 4",
+				"models": [
+					{
+						"name": "gemma-4-E2B",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-E2B",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-e2b-mxfp4",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "gemma-4-E2B-it",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-E2B-it",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-e2b-it-mxfp4",
+							"ollama": "https://ollama.com/library/gemma4:e2b"
+						}
+					},
+					{
+						"name": "gemma-4-E4B",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-E4B",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-e4b-4bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "gemma-4-E4B-it",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-E4B-it",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-e4b-it-mxfp4",
+							"ollama": "https://ollama.com/library/gemma4:e4b"
+						}
+					},
+					{
+						"name": "gemma-4-26B-A4B",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-26B-A4B",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-26b-a4b-mxfp4",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "gemma-4-26B-A4B-it",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-26B-A4B-it",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-mxfp4",
+							"ollama": "https://ollama.com/library/gemma4:26b"
+						}
+					},
+					{
+						"name": "gemma-4-31B",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-31B",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-31b-mxfp4",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "gemma-4-31B-it",
+						"urls": {
+							"hf": "https://huggingface.co/google/gemma-4-31B-it",
+							"mlx": "https://huggingface.co/mlx-community/gemma-4-31b-it-mxfp4",
+							"ollama": "https://ollama.com/library/gemma4:31b"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "HuggingFace (SmolLM)",
+		"families": [
+			{
+				"family": "SmolLM3",
+				"models": [
+					{
+						"name": "SmolLM3-3B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/HuggingFaceTB/SmolLM3-3B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "SmolLM3-3B",
+						"urls": {
+							"hf": "https://huggingface.co/HuggingFaceTB/SmolLM3-3B",
+							"mlx": "https://huggingface.co/mlx-community/SmolLM3-3B-4bit",
+							"ollama": "https://ollama.com/alibayram/smollm3:latest"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "IBM (Granite)",
+		"families": [
+			{
+				"family": "Granite 4.0 Nano Language Models",
+				"models": [
+					{
+						"name": "granite-4.0-350m-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-350m-base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-h-350m-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-350m-base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-350m",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-350m",
+							"mlx": "",
+							"ollama": "https://ollama.com/library/granite4:350m"
+						}
+					},
+					{
+						"name": "granite-4.0-h-350m",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-350m",
+							"mlx": "",
+							"ollama": "https://ollama.com/library/granite4:350m-h"
+						}
+					},
+					{
+						"name": "granite-4.0-1b-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-1b-base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-h-1b-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-1b-base",
+							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-1b-base-4bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-1b",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-1b",
+							"mlx": "",
+							"ollama": "https://ollama.com/library/granite4:1b"
+						}
+					},
+					{
+						"name": "granite-4.0-h-1b",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-1b",
+							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-1b-4bit",
+							"ollama": "https://ollama.com/library/granite4:1b-h"
+						}
+					}
+				]
+			},
+			{
+				"family": "Granite 4.0 Language Models",
+				"models": [
+					{
+						"name": "granite-4.0-micro-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-micro-base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-h-micro-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-micro-base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-micro",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-micro",
+							"mlx": "https://huggingface.co/mlx-community/granite-4.0-micro-8bit",
+							"ollama": "https://ollama.com/library/granite4:micro"
+						}
+					},
+					{
+						"name": "granite-4.0-h-micro",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-micro",
+							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-micro-8bit",
+							"ollama": "https://ollama.com/library/granite4:micro-h"
+						}
+					},
+					{
+						"name": "granite-4.0-h-tiny-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-tiny-base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-tiny-base-preview",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-tiny-base-preview",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-tiny-preview",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-tiny-preview",
+							"mlx": "https://huggingface.co/mlx-community/granite-4.0-tiny-preview-4bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-h-tiny",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-tiny",
+							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-tiny-8bit",
+							"ollama": "https://ollama.com/library/granite4:tiny-h"
+						}
+					},
+					{
+						"name": "granite-4.0-h-small-base",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-small-base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "granite-4.0-h-small",
+						"urls": {
+							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-small",
+							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-small-4bit",
+							"ollama": "https://ollama.com/library/granite4:small-h"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "LiquidAI (LFM)",
+		"families": [
+			{
+				"family": "LFM2.5",
+				"models": [
+					{
+						"name": "LFM2.5-350M",
+						"urls": {
+							"hf": "https://huggingface.co/LiquidAI/LFM2.5-350M",
+							"mlx": "https://huggingface.co/LiquidAI/LFM2.5-350M-MLX-8bit",
+							"ollama": "https://ollama.com/LiquidAI/lfm2.5-350m"
+						}
+					},
+					{
+						"name": "LFM2.5-1.2B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "LFM2.5-1.2B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct",
+							"mlx": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit",
+							"ollama": "https://ollama.com/LiquidAI/lfm2.5-1.2b-instruct:latest"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Meta (Llama)",
+		"families": [
+			{
+				"family": "Llama 3.1",
+				"models": [
+					{
+						"name": "Llama-3.1-8B",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.1-8B",
+							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-8B-4bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Llama-3.1-8B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",
+							"ollama": "https://ollama.com/library/llama3.1:8b"
+						}
+					},
+					{
+						"name": "Llama-3.1-70B",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.1-70B",
+							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-70B-4bit",
+							"ollama": "https://ollama.com/library/llama3.1:70b"
+						}
+					},
+					{
+						"name": "Llama-3.1-70B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-70B-Instruct-4bit",
+							"ollama": ""
+						}
+					}
+				]
+			},
+			{
+				"family": "Llama 3.2",
+				"models": [
+					{
+						"name": "Llama-3.2-1B",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.2-1B",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Llama-3.2-1B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit",
+							"ollama": "https://ollama.com/library/llama3.2:1b"
+						}
+					},
+					{
+						"name": "Llama-3.2-3B",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.2-3B",
+							"mlx": "https://huggingface.co/mlx-community/Llama-3.2-3B-8bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Llama-3.2-3B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Llama-3.2-3B-Instruct-4bit",
+							"ollama": "https://ollama.com/library/llama3.2:3b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Llama 3.3",
+				"models": [
+					{
+						"name": "Llama-3.3-70B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Llama-3.3-70B-Instruct-3bit",
+							"ollama": "https://ollama.com/library/llama3.3:70b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Llama 4",
+				"models": [
+					{
+						"name": "Llama-4-Scout-17B-16E",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E",
+							"mlx": "https://huggingface.co/mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Llama-4-Scout-17B-16E-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Llama-4-Scout-17B-16E-Instruct-4bit",
+							"ollama": "https://ollama.com/library/llama4:16x17b"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Microsoft",
+		"families": [
+			{
+				"family": "Phi-4",
+				"models": [
+					{
+						"name": "Phi-4-mini-instruct",
+						"urls": {
+							"hf": "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+							"mlx": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit",
+							"ollama": "https://ollama.com/library/phi4-mini:3.8b"
+						}
+					},
+					{
+						"name": "phi-4",
+						"urls": {
+							"hf": "https://huggingface.co/microsoft/phi-4",
+							"mlx": "https://huggingface.co/mlx-community/phi-4-4bit",
+							"ollama": "https://ollama.com/library/phi4:14b"
+						}
+					}
+				]
+			},
+			{
+				"family": "NextCoder",
+				"models": [
+					{
+						"name": "NextCoder-7B",
+						"urls": {
+							"hf": "https://huggingface.co/microsoft/NextCoder-7B",
+							"mlx": "https://huggingface.co/jedisct1/NextCoder-7B-q4-mlx",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "NextCoder-14B",
+						"urls": {
+							"hf": "https://huggingface.co/microsoft/NextCoder-14B",
+							"mlx": "https://huggingface.co/jedisct1/NextCoder-14B-q4-mlx",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "NextCoder-32B",
+						"urls": {
+							"hf": "https://huggingface.co/microsoft/NextCoder-32B",
+							"mlx": "https://huggingface.co/jedisct1/NextCoder-32B-q4-mlx",
+							"ollama": ""
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Mistral AI",
+		"families": [
+			{
+				"family": "Mistral",
+				"models": [
+					{
+						"name": "Mistral-7B-Instruct-v0.3",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+							"mlx": "https://huggingface.co/mlx-community/Mistral-7B-Instruct-v0.3-4bit",
+							"ollama": "https://ollama.com/library/mistral:7b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Ministral",
+				"models": [
+					{
+						"name": "Ministral-3-3B-Base-2512",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Ministral-3-3B-Base-2512",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Ministral-3-3B-Instruct-2512",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512",
+							"mlx": "https://huggingface.co/mlx-community/Ministral-3-3B-Instruct-2512",
+							"ollama": "https://ollama.com/library/ministral-3:3b"
+						}
+					},
+					{
+						"name": "Ministral-3-8B-Base-2512",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Ministral-3-8B-Base-2512",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Ministral-3-8B-Instruct-2512",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512",
+							"mlx": "https://huggingface.co/mlx-community/Ministral-3-8B-Instruct-2512-4bit",
+							"ollama": "https://ollama.com/library/ministral-3:8b"
+						}
+					},
+					{
+						"name": "Ministral-3-14B-Base-2512",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Ministral-3-14B-Base-2512",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Ministral-3-14B-Instruct-2512",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512",
+							"mlx": "https://huggingface.co/mlx-community/Ministral-3-14B-Instruct-2512-4bit",
+							"ollama": "https://ollama.com/library/ministral-3:14b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Mistral Small",
+				"models": [
+					{
+						"name": "mistral-small:22b",
+						"urls": {
+							"hf": "",
+							"mlx": "",
+							"ollama": "https://ollama.com/library/mistral-small:22b"
+						}
+					},
+					{
+						"name": "Mistral-Small-3.2-24B-Instruct-2506",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+							"mlx": "https://huggingface.co/mlx-community/Mistral-Small-3.2-24B-Instruct-2506-4bit",
+							"ollama": "https://ollama.com/library/mistral-small3.2:24b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Mistral Large",
+				"models": [
+					{
+						"name": "Mistral-Large-Instruct-2411",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mistral-Large-Instruct-2411",
+							"mlx": "https://huggingface.co/zachlandes/Mistral-Large-Instruct-2411-Q2-MLX",
+							"ollama": "https://ollama.com/library/mistral-large:123b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Mixtral",
+				"models": [
+					{
+						"name": "Mixtral-8x7B-v0.1",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mixtral-8x7B-v0.1",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Mixtral-8x7B-Instruct-v0.1",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
+							"mlx": "https://huggingface.co/mlx-community/Mixtral-8x7B-Instruct-v0.1",
+							"ollama": "https://ollama.com/library/mixtral:8x7b"
+						}
+					},
+					{
+						"name": "Mixtral-8x22B-Instruct-v0.1",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mixtral-8x22B-Instruct-v0.1",
+							"mlx": "https://huggingface.co/mlx-community/Mixtral-8x22B-4bit",
+							"ollama": "https://ollama.com/library/mixtral:8x22b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Mistral NeMo",
+				"models": [
+					{
+						"name": "Mistral-Nemo-Base-2407",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mistral-Nemo-Base-2407",
+							"mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Base-2407-4bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Mistral-Nemo-Instruct-2407",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407",
+							"mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Instruct-2407-4bit",
+							"ollama": "https://ollama.com/library/mistral-nemo:12b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Codestral",
+				"models": [
+					{
+						"name": "Codestral-22B-v0.1",
+						"urls": {
+							"hf": "https://huggingface.co/mistralai/Codestral-22B-v0.1",
+							"mlx": "https://huggingface.co/mlx-community/Codestral-22B-v0.1-4bit",
+							"ollama": "https://ollama.com/library/codestral:22b"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Moonshot AI (Kimi)",
+		"families": [
+			{
+				"family": "Kimi-Linear-A3B",
+				"models": [
+					{
+						"name": "Kimi-Linear-48B-A3B-Base",
+						"urls": {
+							"hf": "https://huggingface.co/moonshotai/Kimi-Linear-48B-A3B-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Kimi-Linear-48B-A3B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/moonshotai/Kimi-Linear-48B-A3B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Kimi-Linear-48B-A3B-Instruct-4bit",
+							"ollama": ""
+						}
+					}
+				]
+			},
+			{
+				"family": "Moonlight-A3B",
+				"models": [
+					{
+						"name": "Moonlight-16B-A3B",
+						"urls": {
+							"hf": "https://huggingface.co/moonshotai/Moonlight-16B-A3B",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Moonlight-16B-A3B-Instruct",
+						"urls": {
+							"hf": "https://huggingface.co/moonshotai/Moonlight-16B-A3B-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/Moonlight-16B-A3B-Instruct-4-bit",
+							"ollama": ""
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "NousResearch (Hermes)",
+		"families": [
+			{
+				"family": "Hermes 3",
+				"models": [
+					{
+						"name": "Hermes-3-Llama-3.2-3B",
+						"urls": {
+							"hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.2-3B",
+							"mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.2-3B-4bit",
+							"ollama": "https://ollama.com/library/hermes3:3b"
+						}
+					},
+					{
+						"name": "Hermes-3-Llama-3.1-8B",
+						"urls": {
+							"hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
+							"mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.1-8B-4bit",
+							"ollama": "https://ollama.com/library/hermes3:8b"
+						}
+					},
+					{
+						"name": "Hermes-3-Llama-3.1-70B",
+						"urls": {
+							"hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-70B",
+							"mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.1-70B-4bit",
+							"ollama": "https://ollama.com/library/hermes3:70b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Hermes 4",
+				"models": [
+					{
+						"name": "Hermes-4-14B",
+						"urls": {
+							"hf": "https://huggingface.co/NousResearch/Hermes-4-14B",
+							"mlx": "https://huggingface.co/mlx-community/Hermes-4-14B-4bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Hermes-4.3-36B",
+						"urls": {
+							"hf": "https://huggingface.co/NousResearch/Hermes-4.3-36B",
+							"mlx": "https://huggingface.co/alexcovo/Hermes-4.3-36B-mlx-4Bit",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "Hermes-4-70B",
+						"urls": {
+							"hf": "https://huggingface.co/NousResearch/Hermes-4-70B",
+							"mlx": "https://huggingface.co/mlx-community/Hermes-4-70B-4bit",
+							"ollama": ""
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "NVIDIA (Nemotron)",
+		"families": [
+			{
+				"family": "Nemotron v3",
+				"models": [
+					{
+						"name": "NVIDIA-Nemotron-3-Nano-4B-BF16",
+						"urls": {
+							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+							"mlx": "https://huggingface.co/mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit",
+							"ollama": "https://ollama.com/library/nemotron-3-nano:4b"
+						}
+					},
+					{
+						"name": "NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16",
+						"urls": {
+							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+						"urls": {
+							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+							"mlx": "https://huggingface.co/mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-4bit",
+							"ollama": "https://ollama.com/library/nemotron-3-nano:30b"
+						}
+					},
+					{
+						"name": "NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16",
+						"urls": {
+							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
+						"urls": {
+							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
+							"mlx": "https://huggingface.co/inferencerlabs/NVIDIA-Nemotron-3-Super-120B-A12B-MLX-4.5bit",
+							"ollama": "https://ollama.com/library/nemotron-3-super:120b"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "OpenAI (ChatGPT)",
+		"families": [
+			{
+				"family": "gpt-oss",
+				"models": [
+					{
+						"name": "gpt-oss-20b",
+						"urls": {
+							"hf": "https://huggingface.co/openai/gpt-oss-20b",
+							"mlx": "https://huggingface.co/mlx-community/gpt-oss-20b-MXFP4-Q8",
+							"ollama": "https://ollama.com/library/gpt-oss:20b"
+						}
+					},
+					{
+						"name": "gpt-oss-120b",
+						"urls": {
+							"hf": "https://huggingface.co/openai/gpt-oss-120b",
+							"mlx": "https://huggingface.co/mlx-community/gpt-oss-120b-MXFP4-Q8",
+							"ollama": "https://ollama.com/library/gpt-oss:120b"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Upstage (Solar)",
+		"families": [
+			{
+				"family": "Solar Mini",
+				"models": [
+					{
+						"name": "SOLAR-10.7B-v1.0",
+						"urls": {
+							"hf": "https://huggingface.co/upstage/SOLAR-10.7B-v1.0",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "SOLAR-10.7B-Instruct-v1.0",
+						"urls": {
+							"hf": "https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0",
+							"mlx": "https://huggingface.co/mlx-community/SOLAR-10.7B-Instruct-v1.0-4bit",
+							"ollama": "https://ollama.com/library/solar:10.7b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Solar Pro",
+				"models": [
+					{
+						"name": "solar-pro-preview-pretrained",
+						"urls": {
+							"hf": "https://huggingface.co/upstage/solar-pro-preview-pretrained",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "solar-pro-preview-instruct",
+						"urls": {
+							"hf": "https://huggingface.co/upstage/solar-pro-preview-instruct",
+							"mlx": "",
+							"ollama": "https://ollama.com/library/solar-pro:22b"
+						}
+					}
+				]
+			},
+			{
+				"family": "Solar Open",
+				"models": [
+					{
+						"name": "Solar-Open-100B",
+						"urls": {
+							"hf": "https://huggingface.co/upstage/Solar-Open-100B",
+							"mlx": "https://huggingface.co/mlx-community/Solar-Open-100B-4bit",
+							"ollama": "https://ollama.com/modest_elion_47/solar-open-100b:latest"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Zhipu AI (GLM)",
+		"families": [
+			{
+				"family": "GLM-4.7",
+				"models": [
+					{
+						"name": "GLM-4.7-Flash",
+						"urls": {
+							"hf": "https://huggingface.co/zai-org/GLM-4.7-Flash",
+							"mlx": "",
+							"ollama": "https://ollama.com/library/glm-4.7-flash:q4_K_M"
+						}
+					}
+				]
+			}
+		]
+	}
+]
