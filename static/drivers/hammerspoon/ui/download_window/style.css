@@ -86,7 +86,7 @@ h2 {
 #bar-bg {
 	background: #3a3a3c;
 	border-radius: 4px;
-	height: 12px;
+	height: 34px;
 	margin-bottom: 10px;
 	overflow: hidden;
 }
@@ -104,7 +104,7 @@ h2 {
 }
 
 #status-line {
-	align-items: baseline; /* Align % text with the file count text on the bottom line */
+	align-items: center; /* Align vertically % text with the file count text */
 	display: flex;
 	margin-bottom: 4px;
 	width: 100%;
