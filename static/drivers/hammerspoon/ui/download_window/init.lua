@@ -172,6 +172,8 @@ function M.hide()
 	_queued    = {}
 	_log_shown = false
 	_is_hiding = false
+	M._total_files = nil
+	M._last_file_count = nil
 end
 
 --- Shows the download window for a given model.
@@ -195,6 +197,8 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 		_queued    = {}
 		_ready     = true
 		_log_shown = false
+		M._total_files = nil
+		M._last_file_count = nil
 		
 		eval("resetUI()")
 		local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
@@ -205,6 +209,8 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 	_start_ts  = hs.timer.secondsSinceEpoch()
 	_ready     = false
 	_queued    = {}
+	M._total_files = nil
+	M._last_file_count = nil
 
 	local screen = hs.screen.mainScreen()
 	local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
@@ -243,6 +249,8 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 			-- Skip if we are programmatically closing the window via M.hide()
 			if _is_hiding then return end
 			_wv = nil
+			M._total_files = nil
+			M._last_file_count = nil
 			
 			-- Auto-abort download and reset menubar if the window is closed natively
 			local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
@@ -271,9 +279,7 @@ end
 function M.update(pct_str, bytes_done, bytes_total, raw_line)
 	if not _wv then return end
 	
-	local pct     = tonumber(pct_str) or 0
-	-- Cap at 99% during download: 100% is reserved exclusively for done()
-	pct = math.min(math.max(0, pct), 99)
+	local pct = tonumber(pct_str) or 0
 	local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
 
 	local dl_str, speed_str, eta_str, file_count_str
@@ -314,19 +320,26 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
 			if o_eta then eta_str = o_eta end
 		end
 
-		-- 2. MLX / HuggingFace file progress
+		-- 2. MLX / HuggingFace file progress - Extremely strict matching
+		for total in clean_line:gmatch("Fetching (%d+) files") do
+			M._total_files = tonumber(total)
+		end
+		
 		local found_files = false
-		for a, b in clean_line:gmatch("Fetching.-(%d+)%s*/%s*(%d+)") do
+		-- [^\n\r]- forbids the regex to span across newlines (which avoids catching file-specific progress bars)
+		for a, b in clean_line:gmatch("Fetching[^\n\r]-(%d+)%s*/%s*(%d+)") do
 			file_count_str = a .. "/" .. b
 			M._last_file_count = file_count_str
 			found_files = true
 		end
 		
-		if not found_files then
-			for a, b in clean_line:gmatch("|%s*(%d+)%s*/%s*(%d+)%s*%[") do
-				if tonumber(b) and tonumber(b) < 1000 then
+		-- Fallback: Look for X/Y anywhere, BUT only if Y matches our known absolute total files exactly
+		if not found_files and M._total_files then
+			for a, b in clean_line:gmatch("(%d+)%s*/%s*(%d+)") do
+				if tonumber(b) == M._total_files then
 					file_count_str = a .. "/" .. b
 					M._last_file_count = file_count_str
+					found_files = true
 				end
 			end
 		end
