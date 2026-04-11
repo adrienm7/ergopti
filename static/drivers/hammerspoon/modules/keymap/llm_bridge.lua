@@ -415,7 +415,7 @@ end
 -- ========================================
 -- ========================================
 
---- Truncates text output based on word count limitations.
+--- Truncates text output based on word count limitations without altering early structure.
 --- @param text string The raw output to limit.
 --- @param max_w number Max allowed words.
 --- @return string The truncated text.
@@ -856,7 +856,9 @@ function M._perform_llm_check(force_trigger, profile_name)
 					local idx = (math.floor(hs.timer.secondsSinceEpoch() * 6) % #spinner_frames) + 1
 					loading_text = string.format("%s Enrichissement… %d/%d", spinner_frames[idx], #valid_preds, llm_num_predictions)
 				end
-				local reserved_count = (is_final ~= true) and llm_num_predictions or #valid_preds
+				
+				-- Dynamic reservation: organically expands as predictions trickle in without blocking empty lines
+				local reserved_count = #valid_preds
 				
 				local val_mods = llm_val_modifiers
 				local val_mod_str = "none"

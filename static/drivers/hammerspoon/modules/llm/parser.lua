@@ -109,27 +109,38 @@ function M.process_prediction(full_text, tail_text, block)
 
 		if tc == "" and nw == "" then return nil end
 
-		-- Sliding window alignment logic: We find where the LLM’s correction seamlessly aligns with the user’s full context
 		local normalized_full = (full_text or ""):gsub("'", "’")
 		local tc_norm = tc:gsub("'", "’")
 		
-		-- Restore trailing spaces (including unicode non-breaking spaces) entered by the user
+		-- Restore trailing spaces entered by the user
 		local tail_trailing_space = normalized_full:match("([%s\194\160\226\128\175]+)$")
 		if tail_trailing_space and not tc_norm:match("[%s\194\160\226\128\175]$") then
 			tc_norm = tc_norm .. tail_trailing_space
 		end
+
+		-- Smart spacing merge to prevent LLM cutting mid-word without space
+		local last_char = utils.utf8_sub(tc_norm, -1)
+		local first_char = utils.utf8_sub(nw, 1, 1)
+		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
 		
-		-- Search in the last 300 characters to ensure speed while accounting for verbose hallucinations
+		local nw_norm = nw
+		if needs_space then 
+			nw_norm = " " .. nw_norm 
+		end
+
+		-- Build the absolute complete intended string from the LLM
+		local full_llm = tc_norm .. nw_norm
+		
+		-- Sliding window alignment logic against the full intended string
 		local search_start = math.max(1, #normalized_full - 300)
 		local best_c_len = -1
 		local best_suffix = ""
 		
 		for i = search_start, #normalized_full do
 			local b = normalized_full:byte(i)
-			-- Ensure alignment search only starts on valid UTF-8 character boundaries
 			if b < 0x80 or b >= 0xC0 then
 				local suffix = normalized_full:sub(i)
-				local c_len = utils.get_common_prefix_utf8(suffix, tc_norm)
+				local c_len = utils.get_common_prefix_utf8(suffix, full_llm)
 				if c_len > best_c_len then
 					best_c_len = c_len
 					best_suffix = suffix
@@ -137,75 +148,59 @@ function M.process_prediction(full_text, tail_text, block)
 			end
 		end
 		
-		-- Fallback: If alignment failed (LLM hallucinated a completely disconnected word), default to strictly substituting the tail
-		if best_c_len < 2 and #tc_norm > 5 then
+		if best_c_len < 2 and #full_llm > 5 then
 			best_suffix = (tail_text or ""):gsub("'", "’")
-			best_c_len = utils.get_common_prefix_utf8(best_suffix, tc_norm)
+			best_c_len = utils.get_common_prefix_utf8(best_suffix, full_llm)
 		end
 
-		-- The exact mathematical calculation of deletes ensuring zero UI artifacts
+		local tail_len = utils.utf8_len(tail_text)
+		if best_c_len < tail_len * 0.4 and utils.utf8_len(tc_norm) < tail_len * 0.4 then return nil end
+
 		local deletes = utils.utf8_len(best_suffix) - best_c_len
-		local tc_remainder = utils.utf8_sub(tc_norm, best_c_len + 1)
-		
-		local has_corr = (deletes > 0)
+		local to_type = utils.utf8_sub(full_llm, best_c_len + 1)
+
+		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+
+		local has_corr = false
 		local chunks = {}
-		local to_type = ""
 		local display_nw = ""
 
-		if has_corr then
-			-- We have a real typo correction
-			local last_char = utils.utf8_sub(tc_norm, -1)
-			local first_char = utils.utf8_sub(nw, 1, 1)
-			local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
+		-- If deletes > 0, the LLM actively modified or removed a user character
+		if deletes > 0 then
+			has_corr = true
 			
-			if needs_space then 
-				nw = " " .. nw 
-			end
-			
-			to_type = tc_remainder .. nw
-			display_nw = nw
-			
-			-- Isolate the exact word where the correction starts for a clean UI diff
-			local prefix = utils.utf8_sub(tc_norm, 1, best_c_len)
+			local prefix = utils.utf8_sub(full_llm, 1, best_c_len)
 			local word_start_char = 1
-			for i = #prefix, 1, -1 do
-				local b = prefix:byte(i)
-				if b == 32 or b == 9 or b == 10 or b == 13 then
-					word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+			
+			-- Look backwards to find the start of the corrected word
+			for i = utils.utf8_len(prefix), 1, -1 do
+				local c = utils.utf8_sub(prefix, i, i)
+				if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
+					word_start_char = i + 1
 					break
 				end
-				if i >= 2 and prefix:byte(i-1) == 194 and prefix:byte(i) == 160 then
-					word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
-					break
-				end
-				if i >= 3 and prefix:byte(i-2) == 226 and prefix:byte(i-1) == 128 and prefix:byte(i) == 175 then
-					word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+			end
+
+			-- Look forwards to isolate ONLY the corrected word, leaving the rest to nw
+			local word_end_char = utils.utf8_len(full_llm)
+			for i = best_c_len + 1, utils.utf8_len(full_llm) do
+				local c = utils.utf8_sub(full_llm, i, i)
+				if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
+					word_end_char = i - 1
 					break
 				end
 			end
 
 			local display_orig = utils.utf8_sub(best_suffix, word_start_char)
-			local display_corr = utils.utf8_sub(tc_norm, word_start_char)
+			local display_corr = utils.utf8_sub(full_llm, word_start_char, word_end_char)
+			
 			chunks = utils.diff_strings(display_orig, display_corr)
+			display_nw = utils.utf8_sub(full_llm, word_end_char + 1)
 		else
-			-- No correction, pure continuation.
-			-- Merge any leftover word-completion from tc_norm directly into the new words
-			local merged_nw = tc_remainder .. nw
-
-			local last_char = utils.utf8_sub(best_suffix, -1)
-			local first_char = utils.utf8_sub(merged_nw, 1, 1)
-			local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or merged_nw == "")
-			
-			if needs_space then 
-				merged_nw = " " .. merged_nw 
-			end
-			
-			to_type = merged_nw
-			display_nw = merged_nw
+			has_corr = false
 			chunks = {}
+			display_nw = to_type
 		end
-
-		if to_type:gsub("[%s%.…]", "") == "" then return nil end
 
 		return { 
 			deletes = deletes, 
