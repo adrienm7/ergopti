@@ -23,6 +23,7 @@ local _on_retry  = nil
 local _start_ts  = nil
 local _ready     = false
 local _queued    = {}
+local _log_shown = false
 
 local _src  = debug.getinfo(1, "S").source:sub(2)
 local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
@@ -117,8 +118,8 @@ end
 --- @return string|nil The formatted string.
 local function fmt_time(s)
     if type(s) ~= "number" or s <= 0 or s ~= s or s == math.huge then return nil end
-    if s > 3600 then return string.format("%dh%02dm", math.floor(s / 3600), math.floor((s % 3600) / 60)) end
-    if s > 60   then return string.format("%dm%02ds", math.floor(s / 60), math.floor(s % 60)) end
+    if s > 3600 then return string.format("%dh %02dm", math.floor(s / 3600), math.floor((s % 3600) / 60)) end
+    if s > 60   then return string.format("%dm %02ds", math.floor(s / 60), math.floor(s % 60)) end
     return string.format("%ds", math.floor(s))
 end
 
@@ -185,6 +186,7 @@ function M.hide()
     _start_ts  = nil
     _ready     = false
     _queued    = {}
+    _log_shown = false
 end
 
 --- Shows the download window for a given model.
@@ -210,7 +212,7 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
     local screen = hs.screen.mainScreen()
     local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
     
-    local W, H = 380, 260
+    local W, H = 460, math.floor((f.h or 1080) / 3)
     local frame = {
         x = f.x + f.w - W - 18,
         y = f.y + f.h - H - 50,
@@ -290,11 +292,28 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
         end
     end
 
+    -- Try to extract a file progress like "7/12" from the raw log line.
+    if type(raw_line) == "string" and raw_line ~= "" then
+        local a, b = raw_line:match("(%d+)%s*/%s*(%d+)")
+        if a and b then
+            file_count_str = a .. "/" .. b
+            M._last_file_count = file_count_str
+        elseif M._last_file_count then
+            file_count_str = M._last_file_count
+        end
+    elseif M._last_file_count then
+        file_count_str = M._last_file_count
+    end
+
     local js = string.format("update(%d,%s,%s,%s,%s)",
         math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
 
     if _ready then
         eval(js)
+        if not _log_shown then
+            _log_shown = true
+            eval("showLog()")
+        end
         if type(raw_line) == "string" and raw_line ~= "" then
             local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
             for line in normalized:gmatch("([^\n]+)") do
@@ -303,9 +322,18 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
                     eval("addLog(\"" .. safe .. "\")")
                 end
             end
+            -- Make sure the log area is visible and the window expanded the first time we receive output
+            if not _log_shown then
+                _log_shown = true
+                eval("showLog()")
+            end
         end
     else
         table.insert(_queued, js)
+        if not _log_shown then
+            _log_shown = true
+            table.insert(_queued, "showLog()")
+        end
         if type(raw_line) == "string" and raw_line ~= "" then
             local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
             for line in normalized:gmatch("([^\n]+)") do
@@ -313,6 +341,10 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
                     local safe = line:gsub("\\", "\\\\"):gsub("\"", "\\\"")
                     table.insert(_queued, "addLog(\"" .. safe .. "\")")
                 end
+            end
+            if not _log_shown then
+                _log_shown = true
+                table.insert(_queued, "showLog()")
             end
         end
         if #_queued > 30 then table.remove(_queued, 1) end
