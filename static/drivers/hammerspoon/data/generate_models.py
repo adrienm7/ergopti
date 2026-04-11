@@ -1,4 +1,4 @@
-# data/generate_models.py
+# hammerspoon/data/generate_models.py
 """
 ==============================================================================
 MODULE: Generate Models JSON
@@ -48,9 +48,9 @@ def extract_repo_id(url: Optional[str]) -> Optional[str]:
     return url.split("huggingface.co/")[-1].strip("/")
 
 
-# =====================================
-# ===== 1.1) HuggingFace Metadata =====
-# =====================================
+# =========================================
+# ===== 1.1) HuggingFace API Metadata =====
+# =========================================
 
 
 def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
@@ -102,14 +102,22 @@ def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
         relevant_tags.append("mixture_of_experts")
 
     total_params = "N/A"
-    safetensors = data.get("safetensors", {}).get("parameters", {})
-    for _, val in safetensors.items():
-        if isinstance(val, int):
-            billions = val / 1e9
-            total_params = (
-                f"{round(billions, 1) if billions % 1 != 0 else int(billions)}B"
-            )
-            break
+    safetensors = data.get("safetensors", {})
+    total_p_count = safetensors.get("total")
+
+    # If 'total' is missing, sum the individual parameter counts
+    if not isinstance(total_p_count, int):
+        params_dict = safetensors.get("parameters", {})
+        total_p_count = sum(
+            v for v in params_dict.values() if isinstance(v, int)
+        )
+
+    if total_p_count and total_p_count > 0:
+        billions = total_p_count / 1e9
+        if billions.is_integer():
+            total_params = f"{int(billions)}B"
+        else:
+            total_params = f"{round(billions, 2):g}B"
 
     last_modified = data.get("lastModified")
     created_at = data.get("createdAt")
@@ -219,6 +227,11 @@ def get_ollama_size_gb(ollama_url: Optional[str]) -> Optional[float]:
     return None
 
 
+# ==================================
+# ===== 2.1) Parameter Parsing =====
+# ==================================
+
+
 def extract_active_params(
     model_name: str, readme_text: str, total_params: str
 ) -> str:
@@ -278,9 +291,9 @@ def estimate_ram(total_params_str: str) -> Optional[float]:
     except ValueError:
         return None
 
-    # 4-bit weights = ~0.6 GB per billion parameters
+    # 4-bit weights = ~0.55 GB per billion parameters
     # Inference engine overhead + small context = ~0.5 GB
-    ram_gb = (total_p * 0.6) + 0.5
+    ram_gb = (total_p * 0.55) + 0.5
 
     return round(ram_gb, 1)
 
@@ -365,11 +378,28 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
                 hf_meta = get_hf_metadata(urls.get("hf"))
 
                 total_p = hf_meta["total_params"]
+
+                # Smart fallback: Parse model name if HuggingFace API lacks the parameter count
+                if total_p in ("N/A", "0.0B", "0B"):
+                    match_b = re.search(
+                        r"(?i)(\d+(?:\.\d+)?(?:x\d+(?:\.\d+)?)?)B", model_name
+                    )
+                    if match_b:
+                        total_p = f"{match_b.group(1).upper()}B"
+                    else:
+                        match_m = re.search(r"(?i)(\d+(?:\.\d+)?)M", model_name)
+                        if match_m:
+                            mb = float(match_m.group(1))
+                            total_p = f"{round(mb / 1000, 2):g}B"
+
                 active_p = extract_active_params(
                     model_name, hf_meta["readme"], total_p
                 )
-                speed_data = estimate_speed(active_p)
 
+                if active_p in ("N/A", "0.0B", "0B"):
+                    active_p = total_p
+
+                speed_data = estimate_speed(active_p)
                 model_type = model_item.get("type", "chat")
                 hardware = {}
 

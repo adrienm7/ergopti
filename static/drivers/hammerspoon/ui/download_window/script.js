@@ -27,11 +27,13 @@ let globalDoneState = false;
  */
 function doCancel() {
 	const cancelButton = document.getElementById('btn-cancel');
-	cancelButton.disabled = true;
-	cancelButton.textContent = 'Annulation…';
+	if (cancelButton) {
+		cancelButton.disabled = true;
+		cancelButton.textContent = 'Annulation…';
+	}
 
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'cancel' });
+		window.webkit.messageHandlers.dl_bridge.postMessage('cancel');
 	}
 }
 
@@ -40,7 +42,7 @@ function doCancel() {
  */
 function doTerm() {
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'terminal' });
+		window.webkit.messageHandlers.dl_bridge.postMessage('terminal');
 	}
 }
 
@@ -49,7 +51,7 @@ function doTerm() {
  */
 function doRetry() {
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'retry' });
+		window.webkit.messageHandlers.dl_bridge.postMessage('retry');
 	}
 }
 
@@ -107,58 +109,33 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
 	document.getElementById('pct').textContent = cappedPercentage + ' %';
 
-	// Update downloaded size next to percentage
-	const fileCountEl = document.getElementById('file-count');
-	if (downloadedSize) {
-		fileCountEl.style.display = 'inline-block';
-		fileCountEl.textContent = downloadedSize;
-	} else {
-		fileCountEl.style.display = 'none';
-		fileCountEl.textContent = '';
-	}
-
-	// Speed and ETA line
-	const speedEtaEl = document.getElementById('speed-eta');
-	const speedEl = document.getElementById('speed');
+	// Line 1: ETA
+	const etaContainer = document.getElementById('eta-container');
 	const etaEl = document.getElementById('eta');
-	let hasSpeedEta = false;
-	if (speed) {
-		speedEl.textContent = speed;
-		hasSpeedEta = true;
-	} else {
-		speedEl.textContent = '';
-	}
 	if (eta) {
 		etaEl.textContent = eta;
-		hasSpeedEta = true;
+		etaContainer.style.display = 'inline-block';
 	} else {
-		etaEl.textContent = '';
-	}
-	speedEtaEl.style.display = hasSpeedEta ? 'block' : 'none';
-
-	// Files line
-	const filesLine = document.getElementById('files-line');
-	const fileCur = document.getElementById('file-current');
-	const fileTot = document.getElementById('file-total');
-	if (fileCount) {
-		const parts = String(fileCount).split('/');
-		const cur = parts[0] || fileCount;
-		const tot = parts[1] || '';
-		fileCur.textContent = cur;
-		fileTot.textContent = tot;
-		filesLine.style.display = 'block';
-	} else {
-		fileCur.textContent = '';
-		fileTot.textContent = '';
-		filesLine.style.display = 'none';
+		etaContainer.style.display = 'none';
 	}
 
-	// Fallback message shown when nothing else
-	const fallback = document.getElementById('stats-fallback');
-	if (!hasSpeedEta && !fileCount) {
-		fallback.style.display = 'block';
+	// Line 2: Size | Speed | Files
+	const statsDetails = document.getElementById('stats-details');
+	let detailsParts = [];
+
+	if (downloadedSize) detailsParts.push(`📦 Taille : <b>${downloadedSize}</b>`);
+	if (speed) detailsParts.push(`⚡ Vitesse : <b>${speed}</b>`);
+	if (fileCount) detailsParts.push(`📁 Fichiers : <b>${fileCount}</b>`);
+
+	if (detailsParts.length > 0) {
+		statsDetails.innerHTML = detailsParts.join(
+			'<span class="gap"></span>—<span class="gap"></span>'
+		);
+		statsDetails.style.display = 'block';
+		document.getElementById('stats-fallback').style.display = 'none';
 	} else {
-		fallback.style.display = 'none';
+		statsDetails.style.display = 'none';
+		document.getElementById('stats-fallback').style.display = 'block';
 	}
 }
 
@@ -168,7 +145,7 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 function showLog() {
 	document.getElementById('log-area').style.display = 'block';
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'expand' });
+		window.webkit.messageHandlers.dl_bridge.postMessage('expand');
 	}
 }
 
@@ -204,7 +181,9 @@ function addLog(line) {
  */
 function done(isSuccess, message, errorKind) {
 	globalDoneState = true;
-	document.getElementById('btn-cancel').style.display = 'none';
+
+	const cancelButton = document.getElementById('btn-cancel');
+	if (cancelButton) cancelButton.style.display = 'none';
 
 	const progressBar = document.getElementById('bar-fill');
 	if (isSuccess) {

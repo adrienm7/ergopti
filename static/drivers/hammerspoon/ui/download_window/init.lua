@@ -40,45 +40,45 @@ local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
 
 local _ucc = hs.webview.usercontent.new("dl_bridge")
 _ucc:setCallback(function(msg)
-    if type(msg) ~= "table" then return end
-    
-    if msg.body == "cancel" then
-        -- Notify central manager hook (if set) so it can mark downloads aborted.
-        local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
-        if type(hook) == "function" then pcall(hook) end
-        if type(_on_cancel) == "function" then pcall(_on_cancel) end
+	if type(msg) ~= "table" then return end
+	
+	if msg.body == "cancel" then
+		-- Notify central manager hook (if set) so it can mark downloads aborted.
+		local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
+		if type(hook) == "function" then pcall(hook) end
+		if type(_on_cancel) == "function" then pcall(_on_cancel) end
 
-    elseif msg.body == "resolve" then
-        if type(_on_resolve) == "function" then pcall(_on_resolve) end
+	elseif msg.body == "resolve" then
+		if type(_on_resolve) == "function" then pcall(_on_resolve) end
 
-    elseif msg.body == "retry" then
-        if type(_on_retry) == "function" then pcall(_on_retry) end
-        
-    elseif msg.body == "terminal" then
-        local cmd   = M._terminal_cmd or ("ollama pull " .. (M._current_model or ""))
-        local apple_script = string.format(
-            "osascript -e 'tell application \"Terminal\" to do script \"%s\"' -e 'tell application \"Terminal\" to activate'",
-            cmd:gsub("\"", "\\\"")
-        )
-        pcall(hs.execute, apple_script)
+	elseif msg.body == "retry" then
+		if type(_on_retry) == "function" then pcall(_on_retry) end
+		
+	elseif msg.body == "terminal" then
+		local cmd   = M._terminal_cmd or ("ollama pull " .. (M._current_model or ""))
+		local apple_script = string.format(
+			"osascript -e 'tell application \"Terminal\" to do script \"%s\"' -e 'tell application \"Terminal\" to activate'",
+			cmd:gsub("\"", "\\\"")
+		)
+		pcall(hs.execute, apple_script)
 
-    elseif msg.body == "expand" then
-        if _wv and type(_wv.frame) == "function" then
-            local current = _wv:frame()
-            local screen = hs.screen.mainScreen()
-            local sf = screen and type(screen.frame) == "function" and screen:frame() or { x = 0, y = 0, w = 1920, h = 1080 }
-            local target_h = math.floor((sf.h or 1080) * 0.5)
+	elseif msg.body == "expand" then
+		if _wv and type(_wv.frame) == "function" then
+			local current = _wv:frame()
+			local screen = hs.screen.mainScreen()
+			local sf = screen and type(screen.frame) == "function" and screen:frame() or { x = 0, y = 0, w = 1920, h = 1080 }
+			local target_h = math.floor((sf.h or 1080) * 0.5)
 
-            if target_h > current.h then
-                local bottom = current.y + current.h
-                local new_frame = {
-                    x = current.x,
-                    y = bottom - target_h,
-                    w = current.w,
-                    h = target_h,
-                }
-                pcall(function() _wv:frame(new_frame) end)
-            end
+			if target_h > current.h then
+				local bottom = current.y + current.h
+				local new_frame = {
+					x = current.x,
+					y = bottom - target_h,
+					w = current.w,
+					h = target_h,
+				}
+				pcall(function() _wv:frame(new_frame) end)
+			end
         end
     end
 end)
@@ -97,72 +97,72 @@ end)
 --- @param b number The amount in bytes.
 --- @return string|nil The formatted string.
 local function fmt_bytes(b)
-    if type(b) ~= "number" or b <= 0 then return nil end
-    if b > 1e9 then return string.format("%.1f Go", b / 1e9) end
-    if b > 1e6 then return string.format("%.0f Mo", b / 1e6) end
-    return string.format("%.0f Ko", b / 1e3)
+	if type(b) ~= "number" or b <= 0 then return nil end
+	if b > 1e9 then return string.format("%.1f Go", b / 1e9) end
+	if b > 1e6 then return string.format("%.0f Mo", b / 1e6) end
+	return string.format("%.0f Ko", b / 1e3)
 end
 
 --- Formats a raw size value properly whether it's bytes or GB.
 --- @param val any The value to format.
 --- @return string|nil The cleanly formatted size string.
 local function format_size(val)
-    if type(val) == "string" then return val end
-    if type(val) == "number" then
-        -- High magnitude means bytes. Low magnitude means GB.
-        if val > 1e6 then return fmt_bytes(val) end
-        return string.format("%.1f Go", val)
-    end
-    return nil
+	if type(val) == "string" then return val end
+	if type(val) == "number" then
+		-- High magnitude means bytes. Low magnitude means GB.
+		if val > 1e6 then return fmt_bytes(val) end
+		return string.format("%.1f Go", val)
+	end
+	return nil
 end
 
 --- Formats seconds into a human-readable time string.
 --- @param s number Seconds.
 --- @return string|nil The formatted string.
 local function fmt_time(s)
-    if type(s) ~= "number" or s <= 0 or s ~= s or s == math.huge then return nil end
-    if s > 3600 then return string.format("%dh %02dm", math.floor(s / 3600), math.floor((s % 3600) / 60)) end
-    if s > 60   then return string.format("%dm %02ds", math.floor(s / 60), math.floor(s % 60)) end
-    return string.format("%ds", math.floor(s))
+	if type(s) ~= "number" or s <= 0 or s ~= s or s == math.huge then return nil end
+	if s > 3600 then return string.format("%dh %02dm", math.floor(s / 3600), math.floor((s % 3600) / 60)) end
+	if s > 60   then return string.format("%dm %02ds", math.floor(s / 60), math.floor(s % 60)) end
+	return string.format("%ds", math.floor(s))
 end
 
 --- Safely escapes a string for injection into JavaScript.
 --- @param s string|nil The input string.
 --- @return string The escaped string wrapped in quotes.
 local function js_str(s)
-    if not s then return "null" end
-    return "\"" .. tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+	if not s then return "null" end
+	return "\"" .. tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
 end
 
 --- Safely evaluates a JavaScript string in the active webview.
 --- @param code string The JS code to execute.
 local function eval(code)
-    if _wv and type(_wv.evaluateJavaScript) == "function" then 
-        pcall(function() _wv:evaluateJavaScript(code) end) 
-    end
+	if _wv and type(_wv.evaluateJavaScript) == "function" then 
+		pcall(function() _wv:evaluateJavaScript(code) end) 
+	end
 end
 
 --- Injects the target model size metadata safely.
 --- @param tgt_model table|string The target model data.
 --- @param tgt_sizes table The optionally predefined sizes.
 local function inject_sizes(tgt_model, tgt_sizes)
-    local final_sizes = tgt_sizes
-    if not final_sizes and type(tgt_model) == "table" then
-        local hw = tgt_model.hardware_requirements or {}
-        local hw_spec = hw.mlx_4bit or hw.ollama_q4 or {}
-        final_sizes = {
-            dl     = tgt_model.size_download or tgt_model.download_size or hw_spec.download_gb,
-            params = tgt_model.parameters and tgt_model.parameters.total
-        }
-    end
-    
-    if final_sizes then
-        local formatted = {
-            dl     = format_size(final_sizes.dl),
-            params = type(final_sizes.params) == "string" and final_sizes.params or nil
-        }
-        eval(string.format("if(window.setSizes) setSizes(%s);", hs.json.encode(formatted)))
-    end
+	local final_sizes = tgt_sizes
+	if not final_sizes and type(tgt_model) == "table" then
+		local hw = tgt_model.hardware_requirements or {}
+		local hw_spec = hw.mlx_4bit or hw.ollama_q4 or {}
+		final_sizes = {
+			dl     = tgt_model.size_download or tgt_model.download_size or hw_spec.download_gb,
+			params = tgt_model.parameters and tgt_model.parameters.total
+		}
+	end
+	
+	if final_sizes then
+		local formatted = {
+			dl     = format_size(final_sizes.dl),
+			params = type(final_sizes.params) == "string" and final_sizes.params or nil
+		}
+		eval(string.format("if(window.setSizes) setSizes(%s);", hs.json.encode(formatted)))
+	end
 end
 
 
@@ -177,17 +177,17 @@ end
 
 --- Hides and destroys the download window.
 function M.hide()
-    if _wv and type(_wv.delete) == "function" then 
-        pcall(function() _wv:delete() end) 
-        _wv = nil 
-    end
-    _on_cancel = nil
-    _on_resolve = nil
-    _on_retry = nil
-    _start_ts  = nil
-    _ready     = false
-    _queued    = {}
-    _log_shown = false
+	if _wv and type(_wv.delete) == "function" then 
+		pcall(function() _wv:delete() end) 
+		_wv = nil 
+	end
+	_on_cancel = nil
+	_on_resolve = nil
+	_on_retry = nil
+	_start_ts  = nil
+	_ready     = false
+	_queued    = {}
+	_log_shown = false
 end
 
 --- Shows the download window for a given model.
@@ -197,68 +197,72 @@ end
 --- @param sizes table Optional table explicitly containing the sizes metadata to display.
 --- @param actions table|nil Optional callbacks: on_resolve and on_retry.
 function M.show(model, on_cancel, terminal_cmd, sizes, actions)
-    M.hide()
-    
-    local model_name = type(model) == "table" and (model.name or model.repo) or model
-    M._current_model = type(model_name) == "string" and model_name or "inconnu"
-    M._terminal_cmd  = type(terminal_cmd) == "string" and terminal_cmd or ("ollama pull " .. M._current_model)
-    
-    _on_cancel = type(on_cancel) == "function" and on_cancel or nil
-    _on_resolve = type(actions) == "table" and type(actions.on_resolve) == "function" and actions.on_resolve or nil
-    _on_retry = type(actions) == "table" and type(actions.on_retry) == "function" and actions.on_retry or nil
-    _start_ts  = hs.timer.secondsSinceEpoch()
-    _ready     = false
-    _queued    = {}
+	M.hide()
+	
+	local model_name = type(model) == "table" and (model.name or model.repo) or model
+	M._current_model = type(model_name) == "string" and model_name or "inconnu"
+	M._terminal_cmd  = type(terminal_cmd) == "string" and terminal_cmd or ("ollama pull " .. M._current_model)
+	
+	_on_cancel = type(on_cancel) == "function" and on_cancel or nil
+	_on_resolve = type(actions) == "table" and type(actions.on_resolve) == "function" and actions.on_resolve or nil
+	_on_retry = type(actions) == "table" and type(actions.on_retry) == "function" and actions.on_retry or nil
+	_start_ts  = hs.timer.secondsSinceEpoch()
+	_ready     = false
+	_queued    = {}
 
-    local screen = hs.screen.mainScreen()
-    local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
-    
-    local W, H = 460, math.floor((f.h or 1080) / 3)
-    local frame = {
-        x = f.x + f.w - W - 18,
-        y = f.y + f.h - H - 50,
-        w = W,
-        h = H
-    }
+	local screen = hs.screen.mainScreen()
+	local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
+	
+	local W, H = 460, math.floor((f.h or 1080) / 3)
+	local frame = {
+		x = f.x + f.w - W - 18,
+		y = f.y + f.h - H - 50,
+		w = W,
+		h = H
+	}
 
-    _wv = ui_builder.show_webview({
-        frame             = frame,
-        title             = "Téléchargement du modèle",
-        style_masks       = {"titled", "closable", "nonactivating"},
-        level             = hs.drawing.windowLevels.floating,
-        allow_text_entry  = false,
-        allow_gestures    = false,
-        allow_new_windows = false,
-        usercontent       = _ucc,
-        assets_dir        = ASSETS_DIR,
-        on_navigation     = function(action)
-            if action == "didFinishNavigation" then
-                _ready = true
-                local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
-                eval("setModel(\"" .. safe .. "\")")
-                inject_sizes(model, sizes)
-                
-                for _, q in ipairs(_queued) do eval(q) end
-                _queued = {}
-            end
-            return true
-        end,
-        on_close          = function()
-            _wv = nil
-        end
-    })
+	_wv = ui_builder.show_webview({
+		frame             = frame,
+		title             = "Téléchargement du modèle",
+		style_masks       = {"titled", "closable", "nonactivating", "resizable"},
+		level             = hs.drawing.windowLevels.floating,
+		allow_text_entry  = false,
+		allow_gestures    = false,
+		allow_new_windows = false,
+		usercontent       = _ucc,
+		assets_dir        = ASSETS_DIR,
+		on_navigation     = function(action)
+			if action == "didFinishNavigation" then
+				_ready = true
+				local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
+				eval("setModel(\"" .. safe .. "\")")
+				inject_sizes(model, sizes)
+				
+				for _, q in ipairs(_queued) do eval(q) end
+				_queued = {}
+			end
+			return true
+		end,
+		on_close          = function()
+			_wv = nil
+			-- Auto-abort download and reset menubar if the window is closed natively
+			local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
+			if type(hook) == "function" then pcall(hook) end
+			if type(_on_cancel) == "function" then pcall(_on_cancel) end
+		end
+	})
 
-    hs.timer.doAfter(1.0, function()
-        if _wv and not _ready then
-            _ready = true
-            local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
-            eval("setModel(\"" .. safe .. "\")")
-            inject_sizes(model, sizes)
-            
-            for _, q in ipairs(_queued) do eval(q) end
-            _queued = {}
-        end
-    end)
+	hs.timer.doAfter(1.0, function()
+		if _wv and not _ready then
+			_ready = true
+			local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
+			eval("setModel(\"" .. safe .. "\")")
+			inject_sizes(model, sizes)
+			
+			for _, q in ipairs(_queued) do eval(q) end
+			_queued = {}
+		end
+	end)
 end
 
 --- Updates the UI with current download metrics.
@@ -267,89 +271,89 @@ end
 --- @param bytes_total number Total bytes expected.
 --- @param raw_line string The raw log line from Ollama to display.
 function M.update(pct_str, bytes_done, bytes_total, raw_line)
-    if not _wv then return end
-    
-    local pct     = tonumber(pct_str) or 0
-    -- Cap at 99% during download: 100% is reserved exclusively for done()
-    pct = math.min(math.max(0, pct), 99)
-    local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
+	if not _wv then return end
+	
+	local pct     = tonumber(pct_str) or 0
+	-- Cap at 99% during download: 100% is reserved exclusively for done()
+	pct = math.min(math.max(0, pct), 99)
+	local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
 
-    local dl_str, speed_str, eta_str, file_count_str
+	local dl_str, speed_str, eta_str, file_count_str
 
-    if type(bytes_total) == "number" and bytes_total > 0 then
-        local ds = fmt_bytes(bytes_done)
-        local ts = fmt_bytes(bytes_total)
-        if ds and ts then dl_str = ds .. " / " .. ts end
-    elseif type(bytes_done) == "number" and bytes_done > 0 then
-        dl_str = fmt_bytes(bytes_done)
-    end
+	if type(bytes_total) == "number" and bytes_total > 0 then
+		local ds = fmt_bytes(bytes_done)
+		local ts = fmt_bytes(bytes_total)
+		if ds and ts then dl_str = ds .. " / " .. ts end
+	elseif type(bytes_done) == "number" and bytes_done > 0 then
+		dl_str = fmt_bytes(bytes_done)
+	end
 
-    if type(bytes_done) == "number" and bytes_done > 0 and elapsed > 2 then
-        local speed = bytes_done / elapsed
-        speed_str = fmt_bytes(speed) and (fmt_bytes(speed) .. "/s") or nil
-        
-        if type(bytes_total) == "number" and bytes_total > bytes_done and speed > 0 then
-            eta_str = fmt_time((bytes_total - bytes_done) / speed)
-        end
-    end
+	if type(bytes_done) == "number" and bytes_done > 0 and elapsed > 2 then
+		local speed = bytes_done / elapsed
+		speed_str = fmt_bytes(speed) and (fmt_bytes(speed) .. "/s") or nil
+		
+		if type(bytes_total) == "number" and bytes_total > bytes_done and speed > 0 then
+			eta_str = fmt_time((bytes_total - bytes_done) / speed)
+		end
+	end
 
-    -- Try to extract a file progress like "7/12" from the raw log line.
-    if type(raw_line) == "string" and raw_line ~= "" then
-        local a, b = raw_line:match("(%d+)%s*/%s*(%d+)")
-        if a and b then
-            file_count_str = a .. "/" .. b
-            M._last_file_count = file_count_str
-        elseif M._last_file_count then
-            file_count_str = M._last_file_count
-        end
-    elseif M._last_file_count then
-        file_count_str = M._last_file_count
-    end
+	-- Try to extract a file progress like "7/12" from the raw log line.
+	if type(raw_line) == "string" and raw_line ~= "" then
+		local a, b = raw_line:match("(%d+)%s*/%s*(%d+)")
+		if a and b then
+			file_count_str = a .. "/" .. b
+			M._last_file_count = file_count_str
+		elseif M._last_file_count then
+			file_count_str = M._last_file_count
+		end
+	elseif M._last_file_count then
+		file_count_str = M._last_file_count
+	end
 
-    local js = string.format("update(%d,%s,%s,%s,%s)",
-        math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
+	local js = string.format("update(%d,%s,%s,%s,%s)",
+		math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
 
-    if _ready then
-        eval(js)
-        if not _log_shown then
-            _log_shown = true
-            eval("showLog()")
-        end
-        if type(raw_line) == "string" and raw_line ~= "" then
-            local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
-            for line in normalized:gmatch("([^\n]+)") do
-                if line ~= "" then
-                    local safe = line:gsub("\\", "\\\\"):gsub("\"", "\\\"")
-                    eval("addLog(\"" .. safe .. "\")")
-                end
-            end
-            -- Make sure the log area is visible and the window expanded the first time we receive output
-            if not _log_shown then
-                _log_shown = true
-                eval("showLog()")
-            end
-        end
-    else
-        table.insert(_queued, js)
-        if not _log_shown then
-            _log_shown = true
-            table.insert(_queued, "showLog()")
-        end
-        if type(raw_line) == "string" and raw_line ~= "" then
-            local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
-            for line in normalized:gmatch("([^\n]+)") do
-                if line ~= "" then
-                    local safe = line:gsub("\\", "\\\\"):gsub("\"", "\\\"")
-                    table.insert(_queued, "addLog(\"" .. safe .. "\")")
-                end
-            end
-            if not _log_shown then
-                _log_shown = true
-                table.insert(_queued, "showLog()")
-            end
-        end
-        if #_queued > 30 then table.remove(_queued, 1) end
-    end
+	if _ready then
+		eval(js)
+		if not _log_shown then
+			_log_shown = true
+			eval("showLog()")
+		end
+		if type(raw_line) == "string" and raw_line ~= "" then
+			local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
+			for line in normalized:gmatch("([^\n]+)") do
+				if line ~= "" then
+					local safe = line:gsub("\\", "\\\\"):gsub("\"", "\\\"")
+					eval("addLog(\"" .. safe .. "\")")
+				end
+			end
+			-- Make sure the log area is visible and the window expanded the first time we receive output
+			if not _log_shown then
+				_log_shown = true
+				eval("showLog()")
+			end
+		end
+	else
+		table.insert(_queued, js)
+		if not _log_shown then
+			_log_shown = true
+			table.insert(_queued, "showLog()")
+		end
+		if type(raw_line) == "string" and raw_line ~= "" then
+			local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
+			for line in normalized:gmatch("([^\n]+)") do
+				if line ~= "" then
+					local safe = line:gsub("\\", "\\\\"):gsub("\"", "\\\"")
+					table.insert(_queued, "addLog(\"" .. safe .. "\")")
+				end
+			end
+			if not _log_shown then
+				_log_shown = true
+				table.insert(_queued, "showLog()")
+			end
+		end
+		if #_queued > 30 then table.remove(_queued, 1) end
+	end
 end
 
 --- Finalizes the download UI state.
@@ -357,21 +361,21 @@ end
 --- @param _model_name string The name of the downloaded model.
 --- @param error_kind string|nil Error kind metadata for contextual actions.
 function M.complete(success, _model_name, error_kind)
-    if not _wv then return end
-    
-    local is_ok = success == true
-    local msg   = is_ok and "✅ Installation terminée !" or "❌ Échec du téléchargement"
-    local js    = string.format("done(%s,%s,%s); showLog()", is_ok and "true" or "false", js_str(msg), js_str(error_kind))
-    
-    if _ready then 
-        eval(js)
-    else 
-        table.insert(_queued, js) 
-    end
-    
-    if is_ok then 
-        hs.timer.doAfter(4, M.hide) 
-    end
+	if not _wv then return end
+	
+	local is_ok = success == true
+	local msg   = is_ok and "✅ Installation terminée !" or "❌ Échec du téléchargement"
+	local js    = string.format("done(%s,%s,%s); showLog()", is_ok and "true" or "false", js_str(msg), js_str(error_kind))
+	
+	if _ready then 
+		eval(js)
+	else 
+		table.insert(_queued, js) 
+	end
+	
+	if is_ok then 
+		hs.timer.doAfter(4, M.hide) 
+	end
 end
 
 return M

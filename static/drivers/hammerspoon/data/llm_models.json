@@ -10,7 +10,7 @@
                         "type": "chat",
                         "last_updated": "2025-12-03",
                         "parameters": {
-                            "total": "30.5B",
+                            "total": "30.53B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -25,11 +25,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 16.02,
-                                "ram_gb": 18.8
+                                "ram_gb": 17.3
                             },
                             "ollama": {
                                 "download_gb": 19.0,
-                                "ram_gb": 18.8
+                                "ram_gb": 17.3
                             }
                         },
                         "urls": {
@@ -48,8 +48,8 @@
                         "type": "completion",
                         "last_updated": "2026-02-03",
                         "parameters": {
-                            "total": "79.7B",
-                            "active": "79.7B"
+                            "total": "79.67B",
+                            "active": "79.67B"
                         },
                         "capabilities": {
                             "speed_tok_s": 3,
@@ -63,11 +63,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 48.3
+                                "ram_gb": 44.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 48.3
+                                "ram_gb": 44.3
                             }
                         },
                         "urls": {
@@ -81,8 +81,8 @@
                         "type": "chat",
                         "last_updated": "2026-02-03",
                         "parameters": {
-                            "total": "79.7B",
-                            "active": "79.7B"
+                            "total": "79.67B",
+                            "active": "79.67B"
                         },
                         "capabilities": {
                             "speed_tok_s": 3,
@@ -96,11 +96,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 41.78,
-                                "ram_gb": 48.3
+                                "ram_gb": 44.3
                             },
                             "ollama": {
                                 "download_gb": 52.0,
-                                "ram_gb": 48.3
+                                "ram_gb": 44.3
                             }
                         },
                         "urls": {
@@ -119,8 +119,8 @@
                         "type": "completion",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "0.0B",
-                            "active": "0.0B"
+                            "total": "0.87B",
+                            "active": "0.87B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -133,11 +133,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.0
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.0
                             }
                         },
                         "urls": {
@@ -151,8 +151,8 @@
                         "type": "chat",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "0.0B",
-                            "active": "0.0B"
+                            "total": "0.87B",
+                            "active": "0.87B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -165,11 +165,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 0.61,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.0
                             },
                             "ollama": {
                                 "download_gb": 1.0,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.0
                             }
                         },
                         "urls": {
@@ -183,8 +183,8 @@
                         "type": "completion",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "0.0B",
-                            "active": "0.0B"
+                            "total": "2.27B",
+                            "active": "2.27B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -197,11 +197,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.7
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.7
                             }
                         },
                         "urls": {
@@ -215,8 +215,8 @@
                         "type": "chat",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "0.0B",
-                            "active": "0.0B"
+                            "total": "2.27B",
+                            "active": "2.27B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -229,11 +229,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 1.63,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.7
                             },
                             "ollama": {
                                 "download_gb": 2.7,
-                                "ram_gb": 0.5
+                                "ram_gb": 1.7
                             }
                         },
                         "urls": {
@@ -247,8 +247,8 @@
                         "type": "completion",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "4.7B",
-                            "active": "4.7B"
+                            "total": "4.66B",
+                            "active": "4.66B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -261,11 +261,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 3.3
+                                "ram_gb": 3.1
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 3.3
+                                "ram_gb": 3.1
                             }
                         },
                         "urls": {
@@ -279,8 +279,8 @@
                         "type": "chat",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "4.7B",
-                            "active": "4.7B"
+                            "total": "4.66B",
+                            "active": "4.66B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -293,11 +293,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 2.85,
-                                "ram_gb": 3.3
+                                "ram_gb": 3.1
                             },
                             "ollama": {
                                 "download_gb": 3.4,
-                                "ram_gb": 3.3
+                                "ram_gb": 3.1
                             }
                         },
                         "urls": {
@@ -311,8 +311,8 @@
                         "type": "completion",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "9.7B",
-                            "active": "9.7B"
+                            "total": "9.65B",
+                            "active": "9.65B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -325,11 +325,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 6.3
+                                "ram_gb": 5.8
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 6.3
+                                "ram_gb": 5.8
                             }
                         },
                         "urls": {
@@ -343,8 +343,8 @@
                         "type": "chat",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "9.7B",
-                            "active": "9.7B"
+                            "total": "9.65B",
+                            "active": "9.65B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -357,11 +357,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 5.57,
-                                "ram_gb": 6.3
+                                "ram_gb": 5.8
                             },
                             "ollama": {
                                 "download_gb": 6.6,
-                                "ram_gb": 6.3
+                                "ram_gb": 5.8
                             }
                         },
                         "urls": {
@@ -375,8 +375,8 @@
                         "type": "chat",
                         "last_updated": "2026-02-25",
                         "parameters": {
-                            "total": "27.8B",
-                            "active": "27.8B"
+                            "total": "27.78B",
+                            "active": "27.78B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -389,11 +389,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 14.98,
-                                "ram_gb": 17.2
+                                "ram_gb": 15.8
                             },
                             "ollama": {
                                 "download_gb": 17.0,
-                                "ram_gb": 17.2
+                                "ram_gb": 15.8
                             }
                         },
                         "urls": {
@@ -407,7 +407,7 @@
                         "type": "completion",
                         "last_updated": "2026-03-02",
                         "parameters": {
-                            "total": "36.0B",
+                            "total": "35.95B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -421,11 +421,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 22.1
+                                "ram_gb": 20.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 22.1
+                                "ram_gb": 20.3
                             }
                         },
                         "urls": {
@@ -439,7 +439,7 @@
                         "type": "chat",
                         "last_updated": "2026-02-27",
                         "parameters": {
-                            "total": "36.0B",
+                            "total": "35.95B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -453,11 +453,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 19.02,
-                                "ram_gb": 22.1
+                                "ram_gb": 20.3
                             },
                             "ollama": {
                                 "download_gb": 24.0,
-                                "ram_gb": 22.1
+                                "ram_gb": 20.3
                             }
                         },
                         "urls": {
@@ -481,8 +481,8 @@
                         "type": "completion",
                         "last_updated": "2024-03-04",
                         "parameters": {
-                            "total": "3.0B",
-                            "active": "3.0B"
+                            "total": "3.03B",
+                            "active": "3.03B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -495,11 +495,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 1.79,
-                                "ram_gb": 2.3
+                                "ram_gb": 2.2
                             },
                             "ollama": {
                                 "download_gb": 1.7,
-                                "ram_gb": 2.3
+                                "ram_gb": 2.2
                             }
                         },
                         "urls": {
@@ -513,8 +513,8 @@
                         "type": "completion",
                         "last_updated": "2024-06-11",
                         "parameters": {
-                            "total": "7.2B",
-                            "active": "7.2B"
+                            "total": "7.17B",
+                            "active": "7.17B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -527,11 +527,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.07,
-                                "ram_gb": 4.8
+                                "ram_gb": 4.4
                             },
                             "ollama": {
                                 "download_gb": 4.0,
-                                "ram_gb": 4.8
+                                "ram_gb": 4.4
                             }
                         },
                         "urls": {
@@ -545,12 +545,12 @@
                         "type": "completion",
                         "last_updated": "2024-06-05",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "15B",
+                            "active": "15B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
                                 "text",
                                 "text-generation"
@@ -559,11 +559,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 12.83,
-                                "ram_gb": null
+                                "ram_gb": 8.8
                             },
                             "ollama": {
                                 "download_gb": 9.1,
-                                "ram_gb": null
+                                "ram_gb": 8.8
                             }
                         },
                         "urls": {
@@ -587,7 +587,7 @@
                         "type": "chat",
                         "last_updated": "2024-06-25",
                         "parameters": {
-                            "total": "15.7B",
+                            "total": "15.71B",
                             "active": "2.4B"
                         },
                         "capabilities": {
@@ -602,11 +602,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 8.24,
-                                "ram_gb": 9.9
+                                "ram_gb": 9.1
                             },
                             "ollama": {
                                 "download_gb": 8.9,
-                                "ram_gb": 9.9
+                                "ram_gb": 9.1
                             }
                         },
                         "urls": {
@@ -625,8 +625,8 @@
                         "type": "chat",
                         "last_updated": "2024-12-11",
                         "parameters": {
-                            "total": "235.7B",
-                            "active": "235.7B"
+                            "total": "235.74B",
+                            "active": "235.74B"
                         },
                         "capabilities": {
                             "speed_tok_s": 3,
@@ -640,11 +640,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 123.57,
-                                "ram_gb": 141.9
+                                "ram_gb": 130.2
                             },
                             "ollama": {
                                 "download_gb": 47.0,
-                                "ram_gb": 141.9
+                                "ram_gb": 130.2
                             }
                         },
                         "urls": {
@@ -668,7 +668,7 @@
                         "type": "completion",
                         "last_updated": "2026-04-02",
                         "parameters": {
-                            "total": "5.1B",
+                            "total": "5.12B",
                             "active": "2B"
                         },
                         "capabilities": {
@@ -682,11 +682,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.0,
-                                "ram_gb": 3.6
+                                "ram_gb": 3.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 3.6
+                                "ram_gb": 3.3
                             }
                         },
                         "urls": {
@@ -700,7 +700,7 @@
                         "type": "chat",
                         "last_updated": "2026-04-10",
                         "parameters": {
-                            "total": "5.1B",
+                            "total": "5.12B",
                             "active": "2B"
                         },
                         "capabilities": {
@@ -714,11 +714,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.0,
-                                "ram_gb": 3.6
+                                "ram_gb": 3.3
                             },
                             "ollama": {
                                 "download_gb": 7.2,
-                                "ram_gb": 3.6
+                                "ram_gb": 3.3
                             }
                         },
                         "urls": {
@@ -732,7 +732,7 @@
                         "type": "completion",
                         "last_updated": "2026-04-02",
                         "parameters": {
-                            "total": "8.0B",
+                            "total": "8B",
                             "active": "4B"
                         },
                         "capabilities": {
@@ -746,11 +746,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.89,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             }
                         },
                         "urls": {
@@ -764,7 +764,7 @@
                         "type": "chat",
                         "last_updated": "2026-04-10",
                         "parameters": {
-                            "total": "8.0B",
+                            "total": "8B",
                             "active": "4B"
                         },
                         "capabilities": {
@@ -778,11 +778,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 6.31,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             },
                             "ollama": {
                                 "download_gb": 9.6,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             }
                         },
                         "urls": {
@@ -796,7 +796,7 @@
                         "type": "completion",
                         "last_updated": "2026-04-02",
                         "parameters": {
-                            "total": "25.8B",
+                            "total": "26.54B",
                             "active": "4B"
                         },
                         "capabilities": {
@@ -810,11 +810,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 13.85,
-                                "ram_gb": 16.0
+                                "ram_gb": 15.1
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 16.0
+                                "ram_gb": 15.1
                             }
                         },
                         "urls": {
@@ -828,7 +828,7 @@
                         "type": "chat",
                         "last_updated": "2026-04-10",
                         "parameters": {
-                            "total": "25.8B",
+                            "total": "26.54B",
                             "active": "4B"
                         },
                         "capabilities": {
@@ -842,11 +842,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 13.85,
-                                "ram_gb": 16.0
+                                "ram_gb": 15.1
                             },
                             "ollama": {
                                 "download_gb": 18.0,
-                                "ram_gb": 16.0
+                                "ram_gb": 15.1
                             }
                         },
                         "urls": {
@@ -860,8 +860,8 @@
                         "type": "completion",
                         "last_updated": "2026-04-02",
                         "parameters": {
-                            "total": "31.3B",
-                            "active": "31.3B"
+                            "total": "32.68B",
+                            "active": "32.68B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -874,11 +874,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 16.28,
-                                "ram_gb": 19.3
+                                "ram_gb": 18.5
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 19.3
+                                "ram_gb": 18.5
                             }
                         },
                         "urls": {
@@ -892,8 +892,8 @@
                         "type": "chat",
                         "last_updated": "2026-04-10",
                         "parameters": {
-                            "total": "31.3B",
-                            "active": "31.3B"
+                            "total": "32.68B",
+                            "active": "32.68B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -906,11 +906,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 16.28,
-                                "ram_gb": 19.3
+                                "ram_gb": 18.5
                             },
                             "ollama": {
                                 "download_gb": 20.0,
-                                "ram_gb": 19.3
+                                "ram_gb": 18.5
                             }
                         },
                         "urls": {
@@ -934,8 +934,8 @@
                         "type": "completion",
                         "last_updated": "2025-08-14",
                         "parameters": {
-                            "total": "3.1B",
-                            "active": "3.1B"
+                            "total": "3.08B",
+                            "active": "3.08B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -948,11 +948,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.2
                             }
                         },
                         "urls": {
@@ -966,8 +966,8 @@
                         "type": "chat",
                         "last_updated": "2025-09-10",
                         "parameters": {
-                            "total": "3.1B",
-                            "active": "3.1B"
+                            "total": "3.08B",
+                            "active": "3.08B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -981,11 +981,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 1.63,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.2
                             },
                             "ollama": {
                                 "download_gb": 1.9,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.2
                             }
                         },
                         "urls": {
@@ -1009,8 +1009,8 @@
                         "type": "completion",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "0.4B",
-                            "active": "0.4B"
+                            "total": "0.35B",
+                            "active": "0.35B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1041,8 +1041,8 @@
                         "type": "completion",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "0.3B",
-                            "active": "0.3B"
+                            "total": "0.34B",
+                            "active": "0.34B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1073,8 +1073,8 @@
                         "type": "chat",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "0.4B",
-                            "active": "0.4B"
+                            "total": "0.35B",
+                            "active": "0.35B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1106,12 +1106,12 @@
                         "type": "chat",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "0.35B",
+                            "active": "0.35B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
                             "tags": [
                                 "conversational",
                                 "text",
@@ -1121,11 +1121,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 0.7
                             },
                             "ollama": {
                                 "download_gb": 0.36,
-                                "ram_gb": null
+                                "ram_gb": 0.7
                             }
                         },
                         "urls": {
@@ -1139,8 +1139,8 @@
                         "type": "completion",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "1.6B",
-                            "active": "1.6B"
+                            "total": "1.63B",
+                            "active": "1.63B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1153,11 +1153,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 1.5
+                                "ram_gb": 1.4
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.5
+                                "ram_gb": 1.4
                             }
                         },
                         "urls": {
@@ -1171,8 +1171,8 @@
                         "type": "completion",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "1.5B",
-                            "active": "1.5B"
+                            "total": "1.46B",
+                            "active": "1.46B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1185,11 +1185,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 0.78,
-                                "ram_gb": 1.4
+                                "ram_gb": 1.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.4
+                                "ram_gb": 1.3
                             }
                         },
                         "urls": {
@@ -1203,12 +1203,12 @@
                         "type": "chat",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "1B",
+                            "active": "1B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
                             "tags": [
                                 "conversational",
                                 "text",
@@ -1218,11 +1218,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 1.1
                             },
                             "ollama": {
                                 "download_gb": 3.3,
-                                "ram_gb": null
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1236,8 +1236,8 @@
                         "type": "chat",
                         "last_updated": "2025-10-23",
                         "parameters": {
-                            "total": "1.5B",
-                            "active": "1.5B"
+                            "total": "1.46B",
+                            "active": "1.46B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1251,11 +1251,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 0.78,
-                                "ram_gb": 1.4
+                                "ram_gb": 1.3
                             },
                             "ollama": {
                                 "download_gb": 1.6,
-                                "ram_gb": 1.4
+                                "ram_gb": 1.3
                             }
                         },
                         "urls": {
@@ -1288,11 +1288,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 2.5
+                                "ram_gb": 2.4
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 2.5
+                                "ram_gb": 2.4
                             }
                         },
                         "urls": {
@@ -1306,8 +1306,8 @@
                         "type": "completion",
                         "last_updated": "2025-11-03",
                         "parameters": {
-                            "total": "3.2B",
-                            "active": "3.2B"
+                            "total": "3.19B",
+                            "active": "3.19B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1320,11 +1320,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             }
                         },
                         "urls": {
@@ -1371,8 +1371,8 @@
                         "type": "chat",
                         "last_updated": "2025-11-03",
                         "parameters": {
-                            "total": "3.2B",
-                            "active": "3.2B"
+                            "total": "3.19B",
+                            "active": "3.19B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1386,11 +1386,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 3.17,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             },
                             "ollama": {
                                 "download_gb": 1.9,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             }
                         },
                         "urls": {
@@ -1404,8 +1404,8 @@
                         "type": "completion",
                         "last_updated": "2025-11-03",
                         "parameters": {
-                            "total": "6.9B",
-                            "active": "6.9B"
+                            "total": "6.94B",
+                            "active": "6.94B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -1418,11 +1418,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 4.6
+                                "ram_gb": 4.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 4.6
+                                "ram_gb": 4.3
                             }
                         },
                         "urls": {
@@ -1436,8 +1436,8 @@
                         "type": "completion",
                         "last_updated": "2025-11-03",
                         "parameters": {
-                            "total": "6.7B",
-                            "active": "6.7B"
+                            "total": "6.67B",
+                            "active": "6.67B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -1450,11 +1450,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 4.5
+                                "ram_gb": 4.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 4.5
+                                "ram_gb": 4.2
                             }
                         },
                         "urls": {
@@ -1501,8 +1501,8 @@
                         "type": "chat",
                         "last_updated": "2025-11-03",
                         "parameters": {
-                            "total": "6.9B",
-                            "active": "6.9B"
+                            "total": "6.94B",
+                            "active": "6.94B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -1516,11 +1516,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 6.88,
-                                "ram_gb": 4.6
+                                "ram_gb": 4.3
                             },
                             "ollama": {
                                 "download_gb": 4.2,
-                                "ram_gb": 4.6
+                                "ram_gb": 4.3
                             }
                         },
                         "urls": {
@@ -1534,8 +1534,8 @@
                         "type": "completion",
                         "last_updated": "2025-11-03",
                         "parameters": {
-                            "total": "32.2B",
-                            "active": "32.2B"
+                            "total": "32.21B",
+                            "active": "32.21B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -1548,11 +1548,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 19.8
+                                "ram_gb": 18.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 19.8
+                                "ram_gb": 18.2
                             }
                         },
                         "urls": {
@@ -1609,8 +1609,8 @@
                         "type": "chat",
                         "last_updated": "2026-04-01",
                         "parameters": {
-                            "total": "0.4B",
-                            "active": "0.4B"
+                            "total": "0.35B",
+                            "active": "0.35B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1642,8 +1642,8 @@
                         "type": "completion",
                         "last_updated": "2026-03-30",
                         "parameters": {
-                            "total": "1.2B",
-                            "active": "1.2B"
+                            "total": "1.17B",
+                            "active": "1.17B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1657,11 +1657,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 1.2
+                                "ram_gb": 1.1
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.2
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1675,8 +1675,8 @@
                         "type": "chat",
                         "last_updated": "2026-03-30",
                         "parameters": {
-                            "total": "1.2B",
-                            "active": "1.2B"
+                            "total": "1.17B",
+                            "active": "1.17B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1690,11 +1690,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 1.16,
-                                "ram_gb": 1.2
+                                "ram_gb": 1.1
                             },
                             "ollama": {
                                 "download_gb": 1.2,
-                                "ram_gb": 1.2
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1718,8 +1718,8 @@
                         "type": "completion",
                         "last_updated": "2024-10-16",
                         "parameters": {
-                            "total": "8.0B",
-                            "active": "8.0B"
+                            "total": "8.03B",
+                            "active": "8.03B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -1732,11 +1732,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.22,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             }
                         },
                         "urls": {
@@ -1750,8 +1750,8 @@
                         "type": "chat",
                         "last_updated": "2024-09-25",
                         "parameters": {
-                            "total": "8.0B",
-                            "active": "8.0B"
+                            "total": "8.03B",
+                            "active": "8.03B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -1765,11 +1765,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.22,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             },
                             "ollama": {
                                 "download_gb": 4.9,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             }
                         },
                         "urls": {
@@ -1783,8 +1783,8 @@
                         "type": "completion",
                         "last_updated": "2024-09-25",
                         "parameters": {
-                            "total": "70.6B",
-                            "active": "70.6B"
+                            "total": "70.55B",
+                            "active": "70.55B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
@@ -1797,11 +1797,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 36.97,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             },
                             "ollama": {
                                 "download_gb": 43.0,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             }
                         },
                         "urls": {
@@ -1815,8 +1815,8 @@
                         "type": "chat",
                         "last_updated": "2024-12-15",
                         "parameters": {
-                            "total": "70.6B",
-                            "active": "70.6B"
+                            "total": "70.55B",
+                            "active": "70.55B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
@@ -1830,11 +1830,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 36.97,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             }
                         },
                         "urls": {
@@ -1853,8 +1853,8 @@
                         "type": "completion",
                         "last_updated": "2024-10-24",
                         "parameters": {
-                            "total": "1.2B",
-                            "active": "1.2B"
+                            "total": "1.24B",
+                            "active": "1.24B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1885,8 +1885,8 @@
                         "type": "chat",
                         "last_updated": "2024-10-24",
                         "parameters": {
-                            "total": "1.2B",
-                            "active": "1.2B"
+                            "total": "1.24B",
+                            "active": "1.24B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1918,8 +1918,8 @@
                         "type": "completion",
                         "last_updated": "2024-10-24",
                         "parameters": {
-                            "total": "3.2B",
-                            "active": "3.2B"
+                            "total": "3.21B",
+                            "active": "3.21B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1932,11 +1932,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 3.19,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             }
                         },
                         "urls": {
@@ -1950,8 +1950,8 @@
                         "type": "chat",
                         "last_updated": "2024-10-24",
                         "parameters": {
-                            "total": "3.2B",
-                            "active": "3.2B"
+                            "total": "3.21B",
+                            "active": "3.21B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -1965,11 +1965,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 1.7,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             },
                             "ollama": {
                                 "download_gb": 2.0,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             }
                         },
                         "urls": {
@@ -1988,8 +1988,8 @@
                         "type": "chat",
                         "last_updated": "2024-12-21",
                         "parameters": {
-                            "total": "70.6B",
-                            "active": "70.6B"
+                            "total": "70.55B",
+                            "active": "70.55B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
@@ -2003,11 +2003,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 28.77,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             },
                             "ollama": {
                                 "download_gb": 43.0,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             }
                         },
                         "urls": {
@@ -2026,12 +2026,12 @@
                         "type": "completion",
                         "last_updated": "2025-04-09",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "17B",
+                            "active": "17B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
                                 "conversational",
                                 "text"
@@ -2040,11 +2040,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 56.48,
-                                "ram_gb": null
+                                "ram_gb": 9.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 9.9
                             }
                         },
                         "urls": {
@@ -2058,12 +2058,12 @@
                         "type": "chat",
                         "last_updated": "2025-05-22",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "17B",
+                            "active": "17B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
                                 "conversational",
                                 "text"
@@ -2072,11 +2072,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 56.94,
-                                "ram_gb": null
+                                "ram_gb": 9.9
                             },
                             "ollama": {
                                 "download_gb": 67.0,
-                                "ram_gb": null
+                                "ram_gb": 9.9
                             }
                         },
                         "urls": {
@@ -2171,8 +2171,8 @@
                         "type": "chat",
                         "last_updated": "2025-06-12",
                         "parameters": {
-                            "total": "7.6B",
-                            "active": "7.6B"
+                            "total": "7.62B",
+                            "active": "7.62B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -2186,11 +2186,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.45,
-                                "ram_gb": 5.1
+                                "ram_gb": 4.7
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 5.1
+                                "ram_gb": 4.7
                             }
                         },
                         "urls": {
@@ -2204,8 +2204,8 @@
                         "type": "chat",
                         "last_updated": "2025-06-12",
                         "parameters": {
-                            "total": "14.8B",
-                            "active": "14.8B"
+                            "total": "14.77B",
+                            "active": "14.77B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -2219,11 +2219,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 7.75,
-                                "ram_gb": 9.4
+                                "ram_gb": 8.6
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 9.4
+                                "ram_gb": 8.6
                             }
                         },
                         "urls": {
@@ -2237,8 +2237,8 @@
                         "type": "chat",
                         "last_updated": "2025-06-12",
                         "parameters": {
-                            "total": "32.8B",
-                            "active": "32.8B"
+                            "total": "32.76B",
+                            "active": "32.76B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -2252,11 +2252,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 19.09,
-                                "ram_gb": 20.2
+                                "ram_gb": 18.5
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 20.2
+                                "ram_gb": 18.5
                             }
                         },
                         "urls": {
@@ -2280,8 +2280,8 @@
                         "type": "chat",
                         "last_updated": "2025-12-03",
                         "parameters": {
-                            "total": "7.2B",
-                            "active": "7.2B"
+                            "total": "7.25B",
+                            "active": "7.25B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -2294,11 +2294,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 3.8,
-                                "ram_gb": 4.8
+                                "ram_gb": 4.5
                             },
                             "ollama": {
                                 "download_gb": 4.4,
-                                "ram_gb": 4.8
+                                "ram_gb": 4.5
                             }
                         },
                         "urls": {
@@ -2317,12 +2317,12 @@
                         "type": "completion",
                         "last_updated": "2026-01-15",
                         "parameters": {
-                            "total": "3.8B",
-                            "active": "3.8B"
+                            "total": "4.25B",
+                            "active": "4.25B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 80,
-                            "speed_tier": "Very Fast",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
                             "tags": [
                                 "dense",
                                 "text"
@@ -2349,12 +2349,12 @@
                         "type": "chat",
                         "last_updated": "2026-01-15",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "3B",
+                            "active": "3B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
                             "tags": [
                                 "dense",
                                 "text"
@@ -2363,11 +2363,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 6.4,
-                                "ram_gb": null
+                                "ram_gb": 2.2
                             },
                             "ollama": {
                                 "download_gb": 3.0,
-                                "ram_gb": null
+                                "ram_gb": 2.2
                             }
                         },
                         "urls": {
@@ -2381,8 +2381,8 @@
                         "type": "completion",
                         "last_updated": "2026-01-15",
                         "parameters": {
-                            "total": "8.9B",
-                            "active": "8.9B"
+                            "total": "8.92B",
+                            "active": "8.92B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -2395,11 +2395,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 5.8
+                                "ram_gb": 5.4
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 5.8
+                                "ram_gb": 5.4
                             }
                         },
                         "urls": {
@@ -2413,12 +2413,12 @@
                         "type": "chat",
                         "last_updated": "2026-01-15",
                         "parameters": {
-                            "total": "1.5B",
-                            "active": "1.5B"
+                            "total": "8.92B",
+                            "active": "8.92B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 80,
-                            "speed_tier": "Very Fast",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Fast",
                             "tags": [
                                 "dense",
                                 "text"
@@ -2427,11 +2427,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 5.24,
-                                "ram_gb": 1.4
+                                "ram_gb": 5.4
                             },
                             "ollama": {
                                 "download_gb": 6.0,
-                                "ram_gb": 1.4
+                                "ram_gb": 5.4
                             }
                         },
                         "urls": {
@@ -2445,12 +2445,12 @@
                         "type": "completion",
                         "last_updated": "2026-01-15",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "14B",
+                            "active": "14B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
                                 "dense",
                                 "text"
@@ -2459,11 +2459,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 8.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 8.2
                             }
                         },
                         "urls": {
@@ -2477,12 +2477,12 @@
                         "type": "chat",
                         "last_updated": "2026-01-15",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "14B",
+                            "active": "14B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
                                 "dense",
                                 "text"
@@ -2491,11 +2491,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 7.88,
-                                "ram_gb": null
+                                "ram_gb": 8.2
                             },
                             "ollama": {
                                 "download_gb": 9.1,
-                                "ram_gb": null
+                                "ram_gb": 8.2
                             }
                         },
                         "urls": {
@@ -2514,12 +2514,12 @@
                         "type": "chat",
                         "last_updated": "Unknown",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "22B",
+                            "active": "22B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
                                 "dense",
                                 "text"
@@ -2528,11 +2528,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 12.6
                             },
                             "ollama": {
                                 "download_gb": 13.0,
-                                "ram_gb": null
+                                "ram_gb": 12.6
                             }
                         },
                         "urls": {
@@ -2546,12 +2546,12 @@
                         "type": "chat",
                         "last_updated": "2025-12-22",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "24B",
+                            "active": "24B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
                                 "dense",
                                 "text"
@@ -2560,11 +2560,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 12.37,
-                                "ram_gb": null
+                                "ram_gb": 13.7
                             },
                             "ollama": {
                                 "download_gb": 15.0,
-                                "ram_gb": null
+                                "ram_gb": 13.7
                             }
                         },
                         "urls": {
@@ -2634,11 +2634,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 28.5
+                                "ram_gb": 26.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 28.5
+                                "ram_gb": 26.2
                             }
                         },
                         "urls": {
@@ -2666,11 +2666,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 86.99,
-                                "ram_gb": 28.5
+                                "ram_gb": 26.2
                             },
                             "ollama": {
                                 "download_gb": 26.0,
-                                "ram_gb": 28.5
+                                "ram_gb": 26.2
                             }
                         },
                         "urls": {
@@ -2684,8 +2684,8 @@
                         "type": "chat",
                         "last_updated": "2025-07-24",
                         "parameters": {
-                            "total": "140.6B",
-                            "active": "140.6B"
+                            "total": "140.63B",
+                            "active": "140.63B"
                         },
                         "capabilities": {
                             "speed_tok_s": 3,
@@ -2698,11 +2698,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 73.94,
-                                "ram_gb": 84.9
+                                "ram_gb": 77.8
                             },
                             "ollama": {
                                 "download_gb": 80.0,
-                                "ram_gb": 84.9
+                                "ram_gb": 77.8
                             }
                         },
                         "urls": {
@@ -2721,8 +2721,8 @@
                         "type": "completion",
                         "last_updated": "2025-07-28",
                         "parameters": {
-                            "total": "12.2B",
-                            "active": "12.2B"
+                            "total": "12.25B",
+                            "active": "12.25B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -2735,11 +2735,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 6.43,
-                                "ram_gb": 7.8
+                                "ram_gb": 7.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 7.8
+                                "ram_gb": 7.2
                             }
                         },
                         "urls": {
@@ -2790,8 +2790,8 @@
                         "type": "chat",
                         "last_updated": "2025-07-24",
                         "parameters": {
-                            "total": "22.2B",
-                            "active": "22.2B"
+                            "total": "22.25B",
+                            "active": "22.25B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -2804,11 +2804,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 11.66,
-                                "ram_gb": 13.8
+                                "ram_gb": 12.7
                             },
                             "ollama": {
                                 "download_gb": 13.0,
-                                "ram_gb": 13.8
+                                "ram_gb": 12.7
                             }
                         },
                         "urls": {
@@ -2832,7 +2832,7 @@
                         "type": "completion",
                         "last_updated": "2026-01-30",
                         "parameters": {
-                            "total": "49.1B",
+                            "total": "49.12B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -2847,11 +2847,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 30.0
+                                "ram_gb": 27.5
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 30.0
+                                "ram_gb": 27.5
                             }
                         },
                         "urls": {
@@ -2865,7 +2865,7 @@
                         "type": "chat",
                         "last_updated": "2025-12-16",
                         "parameters": {
-                            "total": "49.1B",
+                            "total": "49.12B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -2880,11 +2880,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 25.75,
-                                "ram_gb": 30.0
+                                "ram_gb": 27.5
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 30.0
+                                "ram_gb": 27.5
                             }
                         },
                         "urls": {
@@ -2903,7 +2903,7 @@
                         "type": "completion",
                         "last_updated": "2026-01-30",
                         "parameters": {
-                            "total": "16.0B",
+                            "total": "15.96B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -2918,11 +2918,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 10.1
+                                "ram_gb": 9.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 10.1
+                                "ram_gb": 9.3
                             }
                         },
                         "urls": {
@@ -2936,7 +2936,7 @@
                         "type": "chat",
                         "last_updated": "2026-01-30",
                         "parameters": {
-                            "total": "16.0B",
+                            "total": "15.96B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -2951,11 +2951,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 8.37,
-                                "ram_gb": 10.1
+                                "ram_gb": 9.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 10.1
+                                "ram_gb": 9.3
                             }
                         },
                         "urls": {
@@ -2979,8 +2979,8 @@
                         "type": "chat",
                         "last_updated": "2024-12-18",
                         "parameters": {
-                            "total": "3.2B",
-                            "active": "3.2B"
+                            "total": "3.21B",
+                            "active": "3.21B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
@@ -2995,11 +2995,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 1.7,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             },
                             "ollama": {
                                 "download_gb": 2.0,
-                                "ram_gb": 2.4
+                                "ram_gb": 2.3
                             }
                         },
                         "urls": {
@@ -3013,8 +3013,8 @@
                         "type": "chat",
                         "last_updated": "2024-09-08",
                         "parameters": {
-                            "total": "8.0B",
-                            "active": "8.0B"
+                            "total": "8.03B",
+                            "active": "8.03B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -3029,11 +3029,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 4.22,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             },
                             "ollama": {
                                 "download_gb": 4.7,
-                                "ram_gb": 5.3
+                                "ram_gb": 4.9
                             }
                         },
                         "urls": {
@@ -3047,8 +3047,8 @@
                         "type": "chat",
                         "last_updated": "2024-09-08",
                         "parameters": {
-                            "total": "70.6B",
-                            "active": "70.6B"
+                            "total": "70.55B",
+                            "active": "70.55B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
@@ -3063,11 +3063,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 36.97,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             },
                             "ollama": {
                                 "download_gb": 40.0,
-                                "ram_gb": 42.9
+                                "ram_gb": 39.3
                             }
                         },
                         "urls": {
@@ -3086,8 +3086,8 @@
                         "type": "chat",
                         "last_updated": "2026-01-09",
                         "parameters": {
-                            "total": "14.8B",
-                            "active": "14.8B"
+                            "total": "14B",
+                            "active": "14B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -3103,11 +3103,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 7.75,
-                                "ram_gb": 9.4
+                                "ram_gb": 8.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 9.4
+                                "ram_gb": 8.2
                             }
                         },
                         "urls": {
@@ -3121,12 +3121,12 @@
                         "type": "chat",
                         "last_updated": "2025-12-06",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "36B",
+                            "active": "36B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
                             "tags": [
                                 "conversational",
                                 "instruct",
@@ -3138,11 +3138,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 18.95,
-                                "ram_gb": null
+                                "ram_gb": 20.3
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 20.3
                             }
                         },
                         "urls": {
@@ -3156,12 +3156,12 @@
                         "type": "chat",
                         "last_updated": "2025-09-02",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "70B",
+                            "active": "70B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 10,
+                            "speed_tier": "Slow",
                             "tags": [
                                 "conversational",
                                 "instruct",
@@ -3173,11 +3173,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 36.98,
-                                "ram_gb": null
+                                "ram_gb": 39.0
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": null
+                                "ram_gb": 39.0
                             }
                         },
                         "urls": {
@@ -3201,12 +3201,12 @@
                         "type": "chat",
                         "last_updated": "2026-03-20",
                         "parameters": {
-                            "total": "N/A",
-                            "active": "N/A"
+                            "total": "4B",
+                            "active": "4B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Unknown",
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
                             "tags": [
                                 "conversational",
                                 "text",
@@ -3216,11 +3216,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 2.1,
-                                "ram_gb": null
+                                "ram_gb": 2.7
                             },
                             "ollama": {
                                 "download_gb": 2.8,
-                                "ram_gb": null
+                                "ram_gb": 2.7
                             }
                         },
                         "urls": {
@@ -3234,7 +3234,7 @@
                         "type": "completion",
                         "last_updated": "2026-03-15",
                         "parameters": {
-                            "total": "0.0B",
+                            "total": "31.58B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -3248,11 +3248,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 0.5
+                                "ram_gb": 17.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 0.5
+                                "ram_gb": 17.9
                             }
                         },
                         "urls": {
@@ -3266,7 +3266,7 @@
                         "type": "chat",
                         "last_updated": "2026-03-15",
                         "parameters": {
-                            "total": "0.0B",
+                            "total": "31.58B",
                             "active": "3B"
                         },
                         "capabilities": {
@@ -3281,11 +3281,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 16.57,
-                                "ram_gb": 0.5
+                                "ram_gb": 17.9
                             },
                             "ollama": {
                                 "download_gb": 24.0,
-                                "ram_gb": 0.5
+                                "ram_gb": 17.9
                             }
                         },
                         "urls": {
@@ -3299,7 +3299,7 @@
                         "type": "completion",
                         "last_updated": "2026-03-14",
                         "parameters": {
-                            "total": "123.6B",
+                            "total": "123.61B",
                             "active": "12B"
                         },
                         "capabilities": {
@@ -3313,11 +3313,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 74.7
+                                "ram_gb": 68.5
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 74.7
+                                "ram_gb": 68.5
                             }
                         },
                         "urls": {
@@ -3331,7 +3331,7 @@
                         "type": "chat",
                         "last_updated": "2026-04-10",
                         "parameters": {
-                            "total": "0.0B",
+                            "total": "123.61B",
                             "active": "12B"
                         },
                         "capabilities": {
@@ -3346,11 +3346,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 63.35,
-                                "ram_gb": 0.5
+                                "ram_gb": 68.5
                             },
                             "ollama": {
                                 "download_gb": 87.0,
-                                "ram_gb": 0.5
+                                "ram_gb": 68.5
                             }
                         },
                         "urls": {
@@ -3374,7 +3374,7 @@
                         "type": "chat",
                         "last_updated": "2025-08-26",
                         "parameters": {
-                            "total": "1.8B",
+                            "total": "21.51B",
                             "active": "5.1B"
                         },
                         "capabilities": {
@@ -3389,11 +3389,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 11.27,
-                                "ram_gb": 1.6
+                                "ram_gb": 12.3
                             },
                             "ollama": {
                                 "download_gb": 14.0,
-                                "ram_gb": 1.6
+                                "ram_gb": 12.3
                             }
                         },
                         "urls": {
@@ -3407,7 +3407,7 @@
                         "type": "chat",
                         "last_updated": "2025-08-26",
                         "parameters": {
-                            "total": "2.2B",
+                            "total": "120.41B",
                             "active": "5.1B"
                         },
                         "capabilities": {
@@ -3422,11 +3422,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 59.06,
-                                "ram_gb": 1.8
+                                "ram_gb": 66.7
                             },
                             "ollama": {
                                 "download_gb": 65.0,
-                                "ram_gb": 1.8
+                                "ram_gb": 66.7
                             }
                         },
                         "urls": {
@@ -3450,8 +3450,8 @@
                         "type": "completion",
                         "last_updated": "2024-09-10",
                         "parameters": {
-                            "total": "10.7B",
-                            "active": "10.7B"
+                            "total": "10.73B",
+                            "active": "10.73B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -3464,11 +3464,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 6.9
+                                "ram_gb": 6.4
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 6.9
+                                "ram_gb": 6.4
                             }
                         },
                         "urls": {
@@ -3482,8 +3482,8 @@
                         "type": "chat",
                         "last_updated": "2024-09-10",
                         "parameters": {
-                            "total": "10.7B",
-                            "active": "10.7B"
+                            "total": "10.73B",
+                            "active": "10.73B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -3497,11 +3497,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 5.8,
-                                "ram_gb": 6.9
+                                "ram_gb": 6.4
                             },
                             "ollama": {
                                 "download_gb": 6.1,
-                                "ram_gb": 6.9
+                                "ram_gb": 6.4
                             }
                         },
                         "urls": {
@@ -3520,8 +3520,8 @@
                         "type": "completion",
                         "last_updated": "2024-09-09",
                         "parameters": {
-                            "total": "22.1B",
-                            "active": "22.1B"
+                            "total": "22.14B",
+                            "active": "22.14B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -3535,11 +3535,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 13.8
+                                "ram_gb": 12.7
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 13.8
+                                "ram_gb": 12.7
                             }
                         },
                         "urls": {
@@ -3591,7 +3591,7 @@
                         "type": "chat",
                         "last_updated": "2026-01-30",
                         "parameters": {
-                            "total": "N/A",
+                            "total": "100B",
                             "active": "12B"
                         },
                         "capabilities": {
@@ -3608,11 +3608,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": 53.83,
-                                "ram_gb": null
+                                "ram_gb": 55.5
                             },
                             "ollama": {
                                 "download_gb": 62.0,
-                                "ram_gb": null
+                                "ram_gb": 55.5
                             }
                         },
                         "urls": {
@@ -3636,8 +3636,8 @@
                         "type": "chat",
                         "last_updated": "2026-01-29",
                         "parameters": {
-                            "total": "31.2B",
-                            "active": "31.2B"
+                            "total": "31.22B",
+                            "active": "31.22B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -3651,11 +3651,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 19.2
+                                "ram_gb": 17.7
                             },
                             "ollama": {
                                 "download_gb": 19.0,
-                                "ram_gb": 19.2
+                                "ram_gb": 17.7
                             }
                         },
                         "urls": {
