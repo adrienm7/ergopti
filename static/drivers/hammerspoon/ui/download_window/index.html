@@ -6,6 +6,7 @@
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
+		<button id="btn-close-ui" onclick="doCancel()" title="Fermer et annuler"></button>
 		<h2>📥 Téléchargement en cours</h2>
 		<div id="model">—</div>
 
@@ -31,6 +32,7 @@
 					font-weight: 600;
 				"
 			></div>
+			<div id="done-msg"></div>
 		</div>
 
 		<div id="stats">
@@ -38,7 +40,6 @@
 			<div id="eta-container" style="display: none; margin-top: 4px">
 				⏳ Temps restant : <b id="eta" style="color: #fff"></b>
 			</div>
-			<div id="done-msg"></div>
 			<div id="stats-fallback">Démarrage…</div>
 		</div>
 

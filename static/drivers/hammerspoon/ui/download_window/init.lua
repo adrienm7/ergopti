@@ -200,8 +200,6 @@ end
 --- @param sizes table Optional table explicitly containing the sizes metadata to display.
 --- @param actions table|nil Optional callbacks: on_resolve and on_retry.
 function M.show(model, on_cancel, terminal_cmd, sizes, actions)
-	M.hide()
-	
 	local model_name = type(model) == "table" and (model.name or model.repo) or model
 	M._current_model = type(model_name) == "string" and model_name or "inconnu"
 	M._terminal_cmd  = type(terminal_cmd) == "string" and terminal_cmd or ("ollama pull " .. M._current_model)
@@ -209,6 +207,21 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 	_on_cancel = type(on_cancel) == "function" and on_cancel or nil
 	_on_resolve = type(actions) == "table" and type(actions.on_resolve) == "function" and actions.on_resolve or nil
 	_on_retry = type(actions) == "table" and type(actions.on_retry) == "function" and actions.on_retry or nil
+	
+	if _wv then
+		-- Window is already open, just reset its state to prevent zombie placeholders
+		_start_ts  = hs.timer.secondsSinceEpoch()
+		_queued    = {}
+		_ready     = true
+		_log_shown = false
+		
+		eval("resetUI()")
+		local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
+		eval("setModel(\"" .. safe .. "\")")
+		inject_sizes(model, sizes)
+		return
+	end
+
 	_start_ts  = hs.timer.secondsSinceEpoch()
 	_ready     = false
 	_queued    = {}
@@ -371,7 +384,7 @@ function M.complete(success, _model_name, error_kind)
 	if not _wv then return end
 	
 	local is_ok = success == true
-	local msg   = is_ok and "✅ Installation terminée !" or "❌ Échec du téléchargement"
+	local msg   = is_ok and "✅ Installation terminée !" or "Échec du téléchargement"
 	local js    = string.format("done(%s,%s,%s); showLog()", is_ok and "true" or "false", js_str(msg), js_str(error_kind))
 	
 	if _ready then 

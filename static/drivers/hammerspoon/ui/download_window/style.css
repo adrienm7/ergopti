@@ -86,7 +86,7 @@ h2 {
 #bar-bg {
 	background: #3a3a3c;
 	border-radius: 4px;
-	height: 20px;
+	height: 12px;
 	margin-bottom: 10px;
 	overflow: hidden;
 }
@@ -190,6 +190,50 @@ button {
 
 #btn-retry:hover {
 	background: rgba(48, 209, 88, 0.22);
+}
+
+#btn-close-ui {
+	background-color: #ff5f56;
+	border: 1px solid #e0443e;
+	border-radius: 50%;
+	cursor: pointer;
+	height: 12px;
+	padding: 0;
+	position: absolute;
+	right: 16px;
+	top: 16px;
+	width: 12px;
+	-webkit-app-region: no-drag;
+	align-items: center;
+	display: flex;
+	justify-content: center;
+}
+
+#btn-close-ui:hover {
+	background-color: #ff3b30;
+}
+
+#btn-close-ui::before,
+#btn-close-ui::after {
+	background-color: #4a0002;
+	content: '';
+	height: 1px;
+	opacity: 0;
+	position: absolute;
+	width: 6px;
+}
+
+#btn-close-ui::before {
+	transform: rotate(45deg);
+}
+
+#btn-close-ui::after {
+	transform: rotate(-45deg);
+}
+
+#btn-close-ui:hover::before,
+#btn-close-ui:hover::after {
+	opacity: 1;
 }
 
 /* ================================== */

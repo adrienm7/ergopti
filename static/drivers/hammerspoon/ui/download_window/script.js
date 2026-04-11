@@ -62,6 +62,44 @@ function doRetry() {
 // =============================
 
 /**
+ * Resets the UI to its initial state for a retry, preventing zombie placeholders.
+ */
+function resetUI() {
+	globalLogLines = [];
+	globalDoneState = false;
+
+	const barFill = document.getElementById('bar-fill');
+	barFill.style.width = '0%';
+	barFill.classList.remove('error');
+
+	const pctEl = document.getElementById('pct');
+	pctEl.textContent = '0 %';
+	pctEl.style.color = '#30d158';
+
+	document.getElementById('file-count').style.display = 'none';
+	document.getElementById('file-count').textContent = '';
+
+	document.getElementById('stats-details').style.display = 'none';
+	document.getElementById('eta-container').style.display = 'none';
+	document.getElementById('done-msg').style.display = 'none';
+	document.getElementById('stats-fallback').style.display = 'block';
+
+	const logArea = document.getElementById('log-area');
+	logArea.textContent = '';
+	logArea.style.display = 'none';
+
+	const cancelBtn = document.getElementById('btn-cancel');
+	if (cancelBtn) {
+		cancelBtn.style.display = 'inline-block';
+		cancelBtn.disabled = false;
+		cancelBtn.textContent = '🛑 Annuler';
+	}
+
+	const retryBtn = document.getElementById('btn-retry');
+	if (retryBtn) retryBtn.style.display = 'none';
+}
+
+/**
  * Sets the displayed model name in the UI.
  * @param {string} modelName - The name of the model being downloaded.
  */
@@ -211,7 +249,8 @@ function done(isSuccess, message, errorKind) {
 		document.getElementById('pct').style.color = '#ff453a';
 	}
 
-	// Hide specific stats and ETA to make room for the final message
+	// Hide specific stats, files count and ETA to make room for the final message
+	document.getElementById('file-count').style.display = 'none';
 	document.getElementById('eta-container').style.display = 'none';
 	document.getElementById('stats-details').style.display = 'none';
 	document.getElementById('stats-fallback').style.display = 'none';
@@ -220,7 +259,10 @@ function done(isSuccess, message, errorKind) {
 	doneMessageElement.textContent =
 		message || (isSuccess ? '✅ Terminé' : 'Échec du téléchargement');
 	doneMessageElement.className = isSuccess ? 'ok' : 'error';
-	doneMessageElement.style.display = 'block';
+
+	// Show it inline inside the status-line
+	doneMessageElement.style.display = 'inline-block';
+	doneMessageElement.style.marginLeft = '12px';
 
 	if (!isSuccess) {
 		const retryBtn = document.getElementById('btn-retry');
