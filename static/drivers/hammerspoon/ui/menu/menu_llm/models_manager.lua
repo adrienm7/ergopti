@@ -359,9 +359,12 @@ function M.new(deps)
 		end
 	end
 
-	-- Expose a simple global hook so the download_window can notify us on user cancel.
+	-- Expose global hooks so the download_window can notify us on user cancel or retry.
 	package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"] = function()
 		if deps and type(deps.mark_download_aborted) == "function" then pcall(deps.mark_download_aborted) end
+	end
+	package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"] = function()
+		if deps and type(deps.clear_download_abort) == "function" then pcall(deps.clear_download_abort) end
 	end
 
 	local ollama = OllamaMgr.new(deps, presets, get_model_ram_logic)

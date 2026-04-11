@@ -53,6 +53,10 @@ _ucc:setCallback(function(msg)
 		if type(_on_resolve) == "function" then pcall(_on_resolve) end
 
 	elseif msg.body == "retry" then
+		-- Un-abort the menubar icon lock so we can display progress again
+		local retry_hook = package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"]
+		if type(retry_hook) == "function" then pcall(retry_hook) end
+
 		if type(_on_retry) == "function" then pcall(_on_retry) end
 		
 	elseif msg.body == "terminal" then

@@ -6,7 +6,6 @@
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
-		<button id="btn-close-ui" onclick="doCancel()" title="Fermer et annuler"></button>
 		<h2>📥 Téléchargement en cours</h2>
 		<div id="model">—</div>
 
@@ -21,18 +20,8 @@
 
 		<div id="status-line">
 			<div id="pct">0 %</div>
-			<div
-				id="file-count"
-				style="
-					display: none;
-					margin-left: 12px;
-					color: #cdd;
-					font-family: 'SF Mono', monospace;
-					font-size: 13px;
-					font-weight: 600;
-				"
-			></div>
 			<div id="done-msg"></div>
+			<div id="file-count" style="display: none"></div>
 		</div>
 
 		<div id="stats">

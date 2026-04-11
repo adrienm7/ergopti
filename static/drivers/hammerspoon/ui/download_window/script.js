@@ -147,11 +147,11 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
 	document.getElementById('pct').textContent = cappedPercentage + ' %';
 
-	// Line 1: Fichiers (next to percentage)
+	// Line 1: Fichiers (next to percentage, pushed right by CSS)
 	const fileCountEl = document.getElementById('file-count');
 	if (fileCount) {
 		fileCountEl.textContent = `📁 Fichiers : ${fileCount}`;
-		fileCountEl.style.display = 'inline-block';
+		fileCountEl.style.display = 'block';
 	} else {
 		fileCountEl.style.display = 'none';
 	}
@@ -261,8 +261,7 @@ function done(isSuccess, message, errorKind) {
 	doneMessageElement.className = isSuccess ? 'ok' : 'error';
 
 	// Show it inline inside the status-line
-	doneMessageElement.style.display = 'inline-block';
-	doneMessageElement.style.marginLeft = '12px';
+	doneMessageElement.style.display = 'block';
 
 	if (!isSuccess) {
 		const retryBtn = document.getElementById('btn-retry');
