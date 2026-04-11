@@ -545,7 +545,7 @@ PY
 				obj._server_target = target_model
 				Logger.info(LOG, "MLX server already ready for model %s.", tostring(target_model))
 				if not silent_notifications then
-					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif: " .. target_model)
+					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif : " .. target_model)
 				end
 				if on_success then pcall(on_success) end
 				return
@@ -565,7 +565,7 @@ PY
 				if startup_confirmed or startup_closed then return end
 				startup_confirmed = true
 				if not silent_notifications then
-					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif: " .. target_model)
+					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif : " .. target_model)
 				end
 				if on_success then pcall(on_success) on_success = nil end
 			end
