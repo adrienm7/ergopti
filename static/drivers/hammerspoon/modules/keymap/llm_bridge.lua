@@ -772,8 +772,9 @@ function M._perform_llm_check(force_trigger, profile_name)
 				end
 
 				if #valid_preds == 0 then
-					if is_final == true then
-						M.reset_predictions()
+					-- Do not reset the entire predictions buffer if a single parallel thread fails or is noisy.
+					if is_final == true and not _predictions_active then
+						if tooltip.hide then tooltip.hide() end
 					end
 					return
 				end
@@ -807,20 +808,21 @@ function M._perform_llm_check(force_trigger, profile_name)
 					or current_llm_model
 					
 				local backend_name = current_llm_backend_name
-				if not backend_name then
+				if not backend_name or backend_name == "" then
 					if backend == "mlx" then backend_name = "MLX 🚀"
+					elseif backend == "ollama" then backend_name = "Ollama 🦙"
 					else backend_name = "" end
 				end
 				
 				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, backend_name, display_profile_name) or nil
 				
 				local loading_text = nil
-				if is_final ~= true and #valid_preds < llm_num_predictions then
+				if #valid_preds < llm_num_predictions then
 					local spinner_frames = { "◐", "◓", "◑", "◒" }
 					local idx = (math.floor(hs.timer.secondsSinceEpoch() * 6) % #spinner_frames) + 1
 					loading_text = string.format("%s Enrichissement… %d/%d", spinner_frames[idx], #valid_preds, llm_num_predictions)
 				end
-				local reserved_count = (is_final ~= true) and llm_num_predictions or #valid_preds
+				local reserved_count = (#valid_preds < llm_num_predictions) and llm_num_predictions or #valid_preds
 				
 				local val_mods = llm_val_modifiers
 				local val_mod_str = "none"
@@ -863,7 +865,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 				-- DO NOT reset the entire predictions buffer if one of the parallel threads drops.
 				-- Let the successful ones continue to be displayed.
 				if not _predictions_active then
-					M.reset_predictions()
+					if tooltip.hide then tooltip.hide() end
 				end
 			end,
 			llm_sequential_mode,

@@ -946,7 +946,7 @@ function M.create(deps)
                     Logger.debug(LOG, "MLX server stopped.")
 
                     if keymap and type(keymap.set_llm_backend_name) == "function" then
-                        pcall(keymap.set_llm_backend_name, "")
+                        pcall(keymap.set_llm_backend_name, "Ollama 🦙")
                     end
 
                     local target_model = get_display_model_name(state.llm_model_ollama or M.DEFAULT_STATE.llm_model_ollama or "")
@@ -1267,7 +1267,8 @@ function M.create(deps)
 
         if keymap and type(keymap.set_llm_backend_name) == "function" then
             local startup_backend = ""
-            if state.llm_backend == "mlx" then startup_backend = "MLX 🚀" end
+            if state.llm_backend == "mlx" then startup_backend = "MLX 🚀"
+            elseif state.llm_backend == "ollama" then startup_backend = "Ollama 🦙" end
             pcall(keymap.set_llm_backend_name, startup_backend)
         end
 
