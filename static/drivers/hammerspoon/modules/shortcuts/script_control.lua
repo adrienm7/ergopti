@@ -44,7 +44,8 @@ local ACTION_DEFINITIONS = {
 	{ id = "open_logs",          label = "Ouvrir le dossier de logs" },
 	{ id = "add_hotstring",      label = "Ajouter un hotstring" },
 	{ id = "trigger_prediction", label = "Déclencher une prédiction IA" },
-	{ id = "show_metrics",       label = "Afficher les métriques" },
+	{ id = "show_metrics",       label = "Afficher les métriques de frappe" },
+	{ id = "show_apps_time",     label = "Afficher le temps sur les applications" },
 }
 
 local ACTION_LABELS = {}
@@ -206,6 +207,10 @@ local function dispatch_action(action)
 	elseif action == "show_metrics" then
 		if type(_extras.show_metrics) == "function" then pcall(_extras.show_metrics) end
 		return true
+		
+	elseif action == "show_apps_time" then
+		if type(_extras.show_apps_time) == "function" then pcall(_extras.show_apps_time) end
+		return true
 
 	elseif action == "open_config" then
 		if type(_extras.open_config) == "function" then pcall(_extras.open_config) end
@@ -220,7 +225,7 @@ local function dispatch_action(action)
 		return true
 		
 	elseif action == "quit_hammerspoon" then
-		Logger.info(LOG, "Shutting down Hammerspoon…")
+		Logger.info(LOG, "Shutting down Hammerspoon.")
 		hs.timer.doAfter(0.1, function() os.exit(0) end)
 		return true
 	end

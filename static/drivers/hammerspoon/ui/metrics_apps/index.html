@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Temps sur les applications</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<div class="top-fixed-bar">
+			<div class="header">
+				<h1>Temps sur les applications</h1>
+			</div>
+			<div class="filters-bar">
+				<label for="date-select">Jour :</label>
+				<select id="date-select"></select>
+				<button class="filter-btn active" id="btn-refresh">Rafraîchir</button>
+				<button class="filter-btn" id="btn-add-app">Classer une application…</button>
+			</div>
+			<div class="stats-grid">
+				<div class="stat-card card-global">
+					<h2>Temps d’écran total</h2>
+					<div class="stat-value" id="kpi-total-time">--</div>
+					<div class="stat-details">Activité globale de la journée</div>
+				</div>
+				<div class="stat-card card-hs">
+					<h2>Application principale</h2>
+					<div class="stat-value" id="kpi-top-app">--</div>
+					<div class="stat-details">Temps passé : <strong id="kpi-top-app-time">--</strong></div>
+				</div>
+				<div class="stat-card card-llm">
+					<h2>Changements de contexte</h2>
+					<div class="stat-value" id="kpi-switches">--</div>
+					<div class="stat-details">Bascules entre applications</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="main-content">
+			<div class="table-container">
+				<table id="apps-table">
+					<thead>
+						<tr>
+							<th>Application</th>
+							<th>Temps actif</th>
+							<th>Proportion de frappe</th>
+							<th>Principales destinations</th>
+						</tr>
+					</thead>
+					<tbody id="apps-tbody">
+						<tr>
+							<td class="app-name-cell">--</td>
+							<td class="app-time-cell">--</td>
+							<td class="app-type-cell">--</td>
+							<td class="app-dest-cell">--</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>
