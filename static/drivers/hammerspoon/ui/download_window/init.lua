@@ -43,6 +43,9 @@ _ucc:setCallback(function(msg)
     if type(msg) ~= "table" then return end
     
     if msg.body == "cancel" then
+        -- Notify central manager hook (if set) so it can mark downloads aborted.
+        local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
+        if type(hook) == "function" then pcall(hook) end
         if type(_on_cancel) == "function" then pcall(_on_cancel) end
 
     elseif msg.body == "resolve" then

@@ -935,7 +935,7 @@ PY
 				on_retry = do_retry,
 			}) 
 		end
-		pcall(deps.update_icon, "📥 MLX")
+		pcall(deps.update_icon, "📥 0%")
 		
 		local _bytes_done, _bytes_total = 0, estimated_bytes_total
 		local _current_pct = 0
