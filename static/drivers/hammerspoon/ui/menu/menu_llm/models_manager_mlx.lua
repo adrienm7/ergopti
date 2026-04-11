@@ -791,8 +791,6 @@ PY
 						local hw = m.hardware_requirements and m.hardware_requirements.mlx or {}
 						if type(hw.download_gb) == "number" then
 							estimated_bytes_total = math.floor(hw.download_gb * 1e9)
-						elseif type(hw.disk_gb) == "number" then
-							estimated_bytes_total = math.floor(hw.disk_gb * 1e9)
 						elseif type(hw.ram_gb) == "number" then
 							estimated_bytes_total = math.floor(hw.ram_gb * 0.14 * 1e9)
 						end
@@ -807,7 +805,6 @@ PY
 			local hw = m_table.hardware_requirements and m_table.hardware_requirements.mlx or {}
 			ui_sizes = {
 				dl     = hw.download_gb and (hw.download_gb .. " Go"),
-				disk   = hw.disk_gb and (hw.disk_gb .. " Go"),
 				params = m_table.parameters and m_table.parameters.total
 			}
 		end

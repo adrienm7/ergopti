@@ -7,6 +7,7 @@
 				"models": [
 					{
 						"name": "Qwen3-Coder-30B-A3B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
@@ -20,6 +21,7 @@
 				"models": [
 					{
 						"name": "Qwen3-Coder-Next-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3-Coder-Next-Base",
 							"mlx": "",
@@ -28,6 +30,7 @@
 					},
 					{
 						"name": "Qwen3-Coder-Next",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3-Coder-Next",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3-Coder-Next-4bit",
@@ -41,6 +44,7 @@
 				"models": [
 					{
 						"name": "Qwen3.5-0.8B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-0.8B-Base",
 							"mlx": "",
@@ -49,6 +53,7 @@
 					},
 					{
 						"name": "Qwen3.5-0.8B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-0.8B",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-MLX-4bit",
@@ -57,6 +62,7 @@
 					},
 					{
 						"name": "Qwen3.5-2B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-2B-Base",
 							"mlx": "",
@@ -65,6 +71,7 @@
 					},
 					{
 						"name": "Qwen3.5-2B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-2B",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-2B-4bit",
@@ -73,6 +80,7 @@
 					},
 					{
 						"name": "Qwen3.5-4B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-4B-Base",
 							"mlx": "",
@@ -81,6 +89,7 @@
 					},
 					{
 						"name": "Qwen3.5-4B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-4B",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-4B-MLX-4bit",
@@ -89,6 +98,7 @@
 					},
 					{
 						"name": "Qwen3.5-9B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-9B-Base",
 							"mlx": "",
@@ -97,6 +107,7 @@
 					},
 					{
 						"name": "Qwen3.5-9B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-9B",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-9B-MLX-4bit",
@@ -105,6 +116,7 @@
 					},
 					{
 						"name": "Qwen3.5-27B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-27B",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-27B-4bit",
@@ -113,6 +125,7 @@
 					},
 					{
 						"name": "Qwen3.5-35B-A3B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B-Base",
 							"mlx": "",
@@ -121,6 +134,7 @@
 					},
 					{
 						"name": "Qwen3.5-35B-A3B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B",
 							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-35B-A3B-4bit",
@@ -139,6 +153,7 @@
 				"models": [
 					{
 						"name": "starcoder2-3b",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/bigcode/starcoder2-3b",
 							"mlx": "https://huggingface.co/mlx-community/starcoder2-3b-4bit",
@@ -147,6 +162,7 @@
 					},
 					{
 						"name": "starcoder2-7b",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/bigcode/starcoder2-7b",
 							"mlx": "https://huggingface.co/mlx-community/starcoder2-7b-4bit",
@@ -155,6 +171,7 @@
 					},
 					{
 						"name": "starcoder2-15b",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/bigcode/starcoder2-15b",
 							"mlx": "https://huggingface.co/mlx-community/starcoder2-15b-4bit",
@@ -173,6 +190,7 @@
 				"models": [
 					{
 						"name": "DeepSeek-V2-Lite-Chat",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite-Chat",
 							"mlx": "https://huggingface.co/mlx-community/DeepSeek-V2-Lite-Chat-4bit-mlx",
@@ -186,6 +204,7 @@
 				"models": [
 					{
 						"name": "DeepSeek-V2.5-1210",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/deepseek-ai/DeepSeek-V2.5-1210",
 							"mlx": "https://huggingface.co/mlx-community/DeepSeek-V2.5-1210-4bit",
@@ -204,6 +223,7 @@
 				"models": [
 					{
 						"name": "gemma-4-E2B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-E2B",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-e2b-mxfp4",
@@ -212,6 +232,7 @@
 					},
 					{
 						"name": "gemma-4-E2B-it",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-E2B-it",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-e2b-it-mxfp4",
@@ -220,6 +241,7 @@
 					},
 					{
 						"name": "gemma-4-E4B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-E4B",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-e4b-4bit",
@@ -228,6 +250,7 @@
 					},
 					{
 						"name": "gemma-4-E4B-it",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-E4B-it",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-e4b-it-mxfp4",
@@ -236,6 +259,7 @@
 					},
 					{
 						"name": "gemma-4-26B-A4B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-26B-A4B",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-26b-a4b-mxfp4",
@@ -244,6 +268,7 @@
 					},
 					{
 						"name": "gemma-4-26B-A4B-it",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-26B-A4B-it",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-26b-a4b-it-mxfp4",
@@ -252,6 +277,7 @@
 					},
 					{
 						"name": "gemma-4-31B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-31B",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-31b-mxfp4",
@@ -260,6 +286,7 @@
 					},
 					{
 						"name": "gemma-4-31B-it",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/google/gemma-4-31B-it",
 							"mlx": "https://huggingface.co/mlx-community/gemma-4-31b-it-mxfp4",
@@ -278,6 +305,7 @@
 				"models": [
 					{
 						"name": "SmolLM3-3B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/HuggingFaceTB/SmolLM3-3B-Base",
 							"mlx": "",
@@ -286,6 +314,7 @@
 					},
 					{
 						"name": "SmolLM3-3B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/HuggingFaceTB/SmolLM3-3B",
 							"mlx": "https://huggingface.co/mlx-community/SmolLM3-3B-4bit",
@@ -304,6 +333,7 @@
 				"models": [
 					{
 						"name": "granite-4.0-350m-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-350m-base",
 							"mlx": "",
@@ -312,6 +342,7 @@
 					},
 					{
 						"name": "granite-4.0-h-350m-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-350m-base",
 							"mlx": "",
@@ -320,6 +351,7 @@
 					},
 					{
 						"name": "granite-4.0-350m",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-350m",
 							"mlx": "",
@@ -328,6 +360,7 @@
 					},
 					{
 						"name": "granite-4.0-h-350m",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-350m",
 							"mlx": "",
@@ -336,6 +369,7 @@
 					},
 					{
 						"name": "granite-4.0-1b-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-1b-base",
 							"mlx": "",
@@ -344,6 +378,7 @@
 					},
 					{
 						"name": "granite-4.0-h-1b-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-1b-base",
 							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-1b-base-4bit",
@@ -352,6 +387,7 @@
 					},
 					{
 						"name": "granite-4.0-1b",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-1b",
 							"mlx": "",
@@ -360,6 +396,7 @@
 					},
 					{
 						"name": "granite-4.0-h-1b",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-1b",
 							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-1b-4bit",
@@ -373,6 +410,7 @@
 				"models": [
 					{
 						"name": "granite-4.0-micro-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-micro-base",
 							"mlx": "",
@@ -381,6 +419,7 @@
 					},
 					{
 						"name": "granite-4.0-h-micro-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-micro-base",
 							"mlx": "",
@@ -389,6 +428,7 @@
 					},
 					{
 						"name": "granite-4.0-micro",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-micro",
 							"mlx": "https://huggingface.co/mlx-community/granite-4.0-micro-8bit",
@@ -397,6 +437,7 @@
 					},
 					{
 						"name": "granite-4.0-h-micro",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-micro",
 							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-micro-8bit",
@@ -405,6 +446,7 @@
 					},
 					{
 						"name": "granite-4.0-h-tiny-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-tiny-base",
 							"mlx": "",
@@ -413,6 +455,7 @@
 					},
 					{
 						"name": "granite-4.0-tiny-base-preview",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-tiny-base-preview",
 							"mlx": "",
@@ -421,6 +464,7 @@
 					},
 					{
 						"name": "granite-4.0-tiny-preview",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-tiny-preview",
 							"mlx": "https://huggingface.co/mlx-community/granite-4.0-tiny-preview-4bit",
@@ -429,6 +473,7 @@
 					},
 					{
 						"name": "granite-4.0-h-tiny",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-tiny",
 							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-tiny-8bit",
@@ -437,6 +482,7 @@
 					},
 					{
 						"name": "granite-4.0-h-small-base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-small-base",
 							"mlx": "",
@@ -445,6 +491,7 @@
 					},
 					{
 						"name": "granite-4.0-h-small",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/ibm-granite/granite-4.0-h-small",
 							"mlx": "https://huggingface.co/mlx-community/granite-4.0-h-small-4bit",
@@ -463,6 +510,7 @@
 				"models": [
 					{
 						"name": "LFM2.5-350M",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/LiquidAI/LFM2.5-350M",
 							"mlx": "https://huggingface.co/LiquidAI/LFM2.5-350M-MLX-8bit",
@@ -471,6 +519,7 @@
 					},
 					{
 						"name": "LFM2.5-1.2B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Base",
 							"mlx": "",
@@ -479,6 +528,7 @@
 					},
 					{
 						"name": "LFM2.5-1.2B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct",
 							"mlx": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-MLX-8bit",
@@ -497,6 +547,7 @@
 				"models": [
 					{
 						"name": "Llama-3.1-8B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.1-8B",
 							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-8B-4bit",
@@ -505,6 +556,7 @@
 					},
 					{
 						"name": "Llama-3.1-8B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",
@@ -513,6 +565,7 @@
 					},
 					{
 						"name": "Llama-3.1-70B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.1-70B",
 							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-70B-4bit",
@@ -521,6 +574,7 @@
 					},
 					{
 						"name": "Llama-3.1-70B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Meta-Llama-3.1-70B-Instruct-4bit",
@@ -534,6 +588,7 @@
 				"models": [
 					{
 						"name": "Llama-3.2-1B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.2-1B",
 							"mlx": "",
@@ -542,6 +597,7 @@
 					},
 					{
 						"name": "Llama-3.2-1B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit",
@@ -550,6 +606,7 @@
 					},
 					{
 						"name": "Llama-3.2-3B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.2-3B",
 							"mlx": "https://huggingface.co/mlx-community/Llama-3.2-3B-8bit",
@@ -558,6 +615,7 @@
 					},
 					{
 						"name": "Llama-3.2-3B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Llama-3.2-3B-Instruct-4bit",
@@ -571,6 +629,7 @@
 				"models": [
 					{
 						"name": "Llama-3.3-70B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Llama-3.3-70B-Instruct-3bit",
@@ -584,6 +643,7 @@
 				"models": [
 					{
 						"name": "Llama-4-Scout-17B-16E",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E",
 							"mlx": "https://huggingface.co/mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit",
@@ -592,6 +652,7 @@
 					},
 					{
 						"name": "Llama-4-Scout-17B-16E-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Llama-4-Scout-17B-16E-Instruct-4bit",
@@ -610,6 +671,7 @@
 				"models": [
 					{
 						"name": "Phi-4-mini-instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/microsoft/Phi-4-mini-instruct",
 							"mlx": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit",
@@ -618,6 +680,7 @@
 					},
 					{
 						"name": "phi-4",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/microsoft/phi-4",
 							"mlx": "https://huggingface.co/mlx-community/phi-4-4bit",
@@ -631,6 +694,7 @@
 				"models": [
 					{
 						"name": "NextCoder-7B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/microsoft/NextCoder-7B",
 							"mlx": "https://huggingface.co/jedisct1/NextCoder-7B-q4-mlx",
@@ -639,6 +703,7 @@
 					},
 					{
 						"name": "NextCoder-14B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/microsoft/NextCoder-14B",
 							"mlx": "https://huggingface.co/jedisct1/NextCoder-14B-q4-mlx",
@@ -647,6 +712,7 @@
 					},
 					{
 						"name": "NextCoder-32B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/microsoft/NextCoder-32B",
 							"mlx": "https://huggingface.co/jedisct1/NextCoder-32B-q4-mlx",
@@ -665,6 +731,7 @@
 				"models": [
 					{
 						"name": "Mistral-7B-Instruct-v0.3",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
 							"mlx": "https://huggingface.co/mlx-community/Mistral-7B-Instruct-v0.3-4bit",
@@ -678,6 +745,7 @@
 				"models": [
 					{
 						"name": "Ministral-3-3B-Base-2512",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Ministral-3-3B-Base-2512",
 							"mlx": "",
@@ -686,6 +754,7 @@
 					},
 					{
 						"name": "Ministral-3-3B-Instruct-2512",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512",
 							"mlx": "https://huggingface.co/mlx-community/Ministral-3-3B-Instruct-2512",
@@ -694,6 +763,7 @@
 					},
 					{
 						"name": "Ministral-3-8B-Base-2512",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Ministral-3-8B-Base-2512",
 							"mlx": "",
@@ -702,6 +772,7 @@
 					},
 					{
 						"name": "Ministral-3-8B-Instruct-2512",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512",
 							"mlx": "https://huggingface.co/mlx-community/Ministral-3-8B-Instruct-2512-4bit",
@@ -710,6 +781,7 @@
 					},
 					{
 						"name": "Ministral-3-14B-Base-2512",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Ministral-3-14B-Base-2512",
 							"mlx": "",
@@ -718,6 +790,7 @@
 					},
 					{
 						"name": "Ministral-3-14B-Instruct-2512",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512",
 							"mlx": "https://huggingface.co/mlx-community/Ministral-3-14B-Instruct-2512-4bit",
@@ -731,6 +804,7 @@
 				"models": [
 					{
 						"name": "mistral-small:22b",
+						"type": "chat",
 						"urls": {
 							"hf": "",
 							"mlx": "",
@@ -739,6 +813,7 @@
 					},
 					{
 						"name": "Mistral-Small-3.2-24B-Instruct-2506",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506",
 							"mlx": "https://huggingface.co/mlx-community/Mistral-Small-3.2-24B-Instruct-2506-4bit",
@@ -752,6 +827,7 @@
 				"models": [
 					{
 						"name": "Mistral-Large-Instruct-2411",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mistral-Large-Instruct-2411",
 							"mlx": "https://huggingface.co/zachlandes/Mistral-Large-Instruct-2411-Q2-MLX",
@@ -765,6 +841,7 @@
 				"models": [
 					{
 						"name": "Mixtral-8x7B-v0.1",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mixtral-8x7B-v0.1",
 							"mlx": "",
@@ -773,6 +850,7 @@
 					},
 					{
 						"name": "Mixtral-8x7B-Instruct-v0.1",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
 							"mlx": "https://huggingface.co/mlx-community/Mixtral-8x7B-Instruct-v0.1",
@@ -781,6 +859,7 @@
 					},
 					{
 						"name": "Mixtral-8x22B-Instruct-v0.1",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mixtral-8x22B-Instruct-v0.1",
 							"mlx": "https://huggingface.co/mlx-community/Mixtral-8x22B-4bit",
@@ -794,6 +873,7 @@
 				"models": [
 					{
 						"name": "Mistral-Nemo-Base-2407",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mistral-Nemo-Base-2407",
 							"mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Base-2407-4bit",
@@ -802,6 +882,7 @@
 					},
 					{
 						"name": "Mistral-Nemo-Instruct-2407",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407",
 							"mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Instruct-2407-4bit",
@@ -815,6 +896,7 @@
 				"models": [
 					{
 						"name": "Codestral-22B-v0.1",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/mistralai/Codestral-22B-v0.1",
 							"mlx": "https://huggingface.co/mlx-community/Codestral-22B-v0.1-4bit",
@@ -833,6 +915,7 @@
 				"models": [
 					{
 						"name": "Kimi-Linear-48B-A3B-Base",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/moonshotai/Kimi-Linear-48B-A3B-Base",
 							"mlx": "",
@@ -841,6 +924,7 @@
 					},
 					{
 						"name": "Kimi-Linear-48B-A3B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/moonshotai/Kimi-Linear-48B-A3B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Kimi-Linear-48B-A3B-Instruct-4bit",
@@ -854,6 +938,7 @@
 				"models": [
 					{
 						"name": "Moonlight-16B-A3B",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/moonshotai/Moonlight-16B-A3B",
 							"mlx": "",
@@ -862,6 +947,7 @@
 					},
 					{
 						"name": "Moonlight-16B-A3B-Instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/moonshotai/Moonlight-16B-A3B-Instruct",
 							"mlx": "https://huggingface.co/mlx-community/Moonlight-16B-A3B-Instruct-4-bit",
@@ -880,6 +966,7 @@
 				"models": [
 					{
 						"name": "Hermes-3-Llama-3.2-3B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.2-3B",
 							"mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.2-3B-4bit",
@@ -888,6 +975,7 @@
 					},
 					{
 						"name": "Hermes-3-Llama-3.1-8B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
 							"mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.1-8B-4bit",
@@ -896,6 +984,7 @@
 					},
 					{
 						"name": "Hermes-3-Llama-3.1-70B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-70B",
 							"mlx": "https://huggingface.co/mlx-community/Hermes-3-Llama-3.1-70B-4bit",
@@ -909,6 +998,7 @@
 				"models": [
 					{
 						"name": "Hermes-4-14B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/NousResearch/Hermes-4-14B",
 							"mlx": "https://huggingface.co/mlx-community/Hermes-4-14B-4bit",
@@ -917,6 +1007,7 @@
 					},
 					{
 						"name": "Hermes-4.3-36B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/NousResearch/Hermes-4.3-36B",
 							"mlx": "https://huggingface.co/alexcovo/Hermes-4.3-36B-mlx-4Bit",
@@ -925,6 +1016,7 @@
 					},
 					{
 						"name": "Hermes-4-70B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/NousResearch/Hermes-4-70B",
 							"mlx": "https://huggingface.co/mlx-community/Hermes-4-70B-4bit",
@@ -943,6 +1035,7 @@
 				"models": [
 					{
 						"name": "NVIDIA-Nemotron-3-Nano-4B-BF16",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
 							"mlx": "https://huggingface.co/mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit",
@@ -951,6 +1044,7 @@
 					},
 					{
 						"name": "NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16",
 							"mlx": "",
@@ -959,6 +1053,7 @@
 					},
 					{
 						"name": "NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
 							"mlx": "https://huggingface.co/mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-4bit",
@@ -967,6 +1062,7 @@
 					},
 					{
 						"name": "NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16",
 							"mlx": "",
@@ -975,6 +1071,7 @@
 					},
 					{
 						"name": "NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
 							"mlx": "https://huggingface.co/inferencerlabs/NVIDIA-Nemotron-3-Super-120B-A12B-MLX-4.5bit",
@@ -993,6 +1090,7 @@
 				"models": [
 					{
 						"name": "gpt-oss-20b",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/openai/gpt-oss-20b",
 							"mlx": "https://huggingface.co/mlx-community/gpt-oss-20b-MXFP4-Q8",
@@ -1001,6 +1099,7 @@
 					},
 					{
 						"name": "gpt-oss-120b",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/openai/gpt-oss-120b",
 							"mlx": "https://huggingface.co/mlx-community/gpt-oss-120b-MXFP4-Q8",
@@ -1019,6 +1118,7 @@
 				"models": [
 					{
 						"name": "SOLAR-10.7B-v1.0",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/upstage/SOLAR-10.7B-v1.0",
 							"mlx": "",
@@ -1027,6 +1127,7 @@
 					},
 					{
 						"name": "SOLAR-10.7B-Instruct-v1.0",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0",
 							"mlx": "https://huggingface.co/mlx-community/SOLAR-10.7B-Instruct-v1.0-4bit",
@@ -1040,6 +1141,7 @@
 				"models": [
 					{
 						"name": "solar-pro-preview-pretrained",
+						"type": "completion",
 						"urls": {
 							"hf": "https://huggingface.co/upstage/solar-pro-preview-pretrained",
 							"mlx": "",
@@ -1048,6 +1150,7 @@
 					},
 					{
 						"name": "solar-pro-preview-instruct",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/upstage/solar-pro-preview-instruct",
 							"mlx": "",
@@ -1061,6 +1164,7 @@
 				"models": [
 					{
 						"name": "Solar-Open-100B",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/upstage/Solar-Open-100B",
 							"mlx": "https://huggingface.co/mlx-community/Solar-Open-100B-4bit",
@@ -1079,6 +1183,7 @@
 				"models": [
 					{
 						"name": "GLM-4.7-Flash",
+						"type": "chat",
 						"urls": {
 							"hf": "https://huggingface.co/zai-org/GLM-4.7-Flash",
 							"mlx": "",

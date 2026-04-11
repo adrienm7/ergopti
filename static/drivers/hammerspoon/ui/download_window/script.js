@@ -31,7 +31,7 @@ function doCancel() {
 	cancelButton.textContent = 'Annulation…';
 
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('cancel');
+		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'cancel' });
 	}
 }
 
@@ -40,19 +40,16 @@ function doCancel() {
  */
 function doTerm() {
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('terminal');
+		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'terminal' });
 	}
 }
 
-/**
- * Sends a request to resolve gated access directly from the UI.
- */
 /**
  * Sends a retry request to relaunch the download.
  */
 function doRetry() {
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('retry');
+		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'retry' });
 	}
 }
 
@@ -77,16 +74,11 @@ function setModel(modelName) {
 function setSizes(sizes) {
 	const container = document.getElementById('model-sizes');
 	const szDl = document.getElementById('sz-dl');
-	const szDisk = document.getElementById('sz-disk');
 	const szRam = document.getElementById('sz-ram');
 
 	let hasSizes = false;
 	if (sizes.dl) {
 		szDl.textContent = '⬇️ ' + sizes.dl;
-		hasSizes = true;
-	}
-	if (sizes.disk) {
-		szDisk.textContent = '💽 ' + sizes.disk;
 		hasSizes = true;
 	}
 	if (sizes.params) {
@@ -176,7 +168,7 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 function showLog() {
 	document.getElementById('log-area').style.display = 'block';
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('expand');
+		window.webkit.messageHandlers.dl_bridge.postMessage({ body: 'expand' });
 	}
 }
 

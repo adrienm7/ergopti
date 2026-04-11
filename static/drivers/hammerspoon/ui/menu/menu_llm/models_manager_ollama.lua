@@ -78,9 +78,11 @@ function M.new(deps, presets, ram_getter)
 		cancel_task("ollama_upgrade")
 	end
 
-	local function show_progress_ui(title, terminal_cmd, initial_message, cancel_cb)
+	local function show_progress_ui(title, terminal_cmd, initial_message, cancel_cb, retry_cb)
 		if not download_window then return end
-		pcall(download_window.show, title, cancel_cb or cancel_pull_and_upgrade, terminal_cmd)
+		pcall(download_window.show, title, cancel_cb or cancel_pull_and_upgrade, terminal_cmd, nil, {
+			on_retry = retry_cb
+		})
 		if type(initial_message) == "string" and initial_message ~= "" then
 			pcall(download_window.update, 0, nil, nil, initial_message)
 		end
@@ -335,7 +337,14 @@ function M.new(deps, presets, ram_getter)
 		local bin = get_ollama_path() or "/usr/local/bin/ollama"
 		local pull_output = ""
 		
-		show_progress_ui(target_model, "ollama pull " .. repo, "Téléchargement Ollama en cours...", cancel_pull_and_upgrade)
+		local function do_retry()
+			if deps.active_tasks and deps.active_tasks["ollama_pull"] then return end
+			hs.timer.doAfter(0.05, function()
+				obj.pull_model(target_model, repo, on_success)
+			end)
+		end
+		
+		show_progress_ui(target_model, "ollama pull " .. repo, "Téléchargement Ollama en cours...", cancel_pull_and_upgrade, do_retry)
 		
 		local task = hs.task.new(bin, function(code)
 			if deps.active_tasks then deps.active_tasks["ollama_pull"] = nil end

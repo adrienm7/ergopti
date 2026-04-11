@@ -1,4 +1,4 @@
-; Last modified on 2026-04-10 at 21:32 (UTC+2)
+; Last modified on 2026-04-11 at 19:56 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -99,7 +99,7 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := Map()) {
     HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
         "TimeActivationSeconds", OptionTimeActivationSeconds)
 
-    FlagsPortion := ":" Flags "B0:"
+    FlagsPortion := ":" Flags "B0O:" ; O is to omit the ending character from the abbreviation
     Hotstring(
         FlagsPortion Abbreviation,
         (*) => HotstringHandler(
@@ -128,11 +128,6 @@ HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) 
     ; This is to make it work everywhere, like in URL bar or in the code inspector inside navigators
     ; Otherwise, typing hc to get wh gives hwh for example when trying to type "white"
     NumberOfCharactersToDelete := StrLen(Abbreviation)
-    if (EndChar != "") {
-        ; Delete ending character too if present, to then add it again
-        ; Tab is now safely included here, relying on the modern editors' smart backspace
-        NumberOfCharactersToDelete := NumberOfCharactersToDelete + 1
-    }
 
     if WinActive("ahk_class Notepad") {
         ; In Windows 11 Notepad, hotstrings don’t work properly, this is a Windows bug, not AutoHotkey one
@@ -175,7 +170,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
 
     HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
         "TimeActivationSeconds", OptionTimeActivationSeconds)
-    FlagsPortion := ":" Flags "CB0:"
+    FlagsPortion := ":" Flags "CB0O:" ; O is to omit the ending character from the abbreviation
 
     UppercasedSymbols := Map(
         ",", [" ;", " :"], ; Order matters, the nbsp abbreviations need to trigger first the engine, otherwise the nbsp won’t be deleted
@@ -5258,11 +5253,11 @@ if Features["Autocorrection"]["Caps"].Enabled {
     CreateHotstring("", "bic", "BIC")
     CreateHotstring("", "catboost", "CatBoost")
     CreateHotstring("", "chatgpt", "ChatGPT")
-    CreateHotstring("", "citroen", "Citroën")
     CreateHotstring("", "cli", "CLI")
     CreateHotstring("", "comex", "COMEX")
     CreateHotstring("", "cpu", "CPU")
     CreateHotstring("", "csp", "CSP")
+    CreateHotstring("", "css", "CSS")
     CreateHotstring("", "cv", "CV")
     CreateHotstring("", "data science", "Data Science")
     CreateHotstring("", "data scientist", "Data Scientist")
@@ -5403,16 +5398,21 @@ if Features["Autocorrection"]["Names"].Enabled {
     CreateHotstring("", "bahrein", "Bahreïn")
     CreateHotstring("", "benoit", "Benoît")
     CreateHotstring("", "caraibes", "Caraïbes")
+    CreateHotstring("", "citroen", "Citroën")
     CreateHotstring("", "cleopatre", "Cléopâtre")
     CreateHotstring("", "cléopatre", "Cléopâtre")
+    CreateHotstring("", "dostoievski", "Dostoïevski")
+    CreateHotstring("", "dostoieski", "Dostoïevski")
     CreateHotstring("", "dubai", "Dubaï")
     CreateHotstring("", "gaetan", "Gaëtan")
     CreateHotstring("", "hanoi", "Hanoï")
     CreateHotstring("", "héloise", "Héloïse")
     CreateHotstring("", "israel", "Israël")
+    CreateHotstring("", "jamaique", "Jamaïque")
     CreateHotstring("", "jerome", "Jérôme")
     CreateHotstring("", "jérome", "Jérôme")
     CreateHotstring("", "joel", "Joël")
+    CreateHotstring("", "joelle", "Joëlle")
     CreateHotstring("", "koweit", "Koweït")
     ; CreateHotstring("", "michael", "Michaël") ; Probably better to not make it the default, as it is "Michael" Jackson and not Michaël
     CreateHotstring("", "mickael", "Mickaël")
@@ -5503,6 +5503,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "buche", "bûche")
 
     ; === C ===
+    ; CreateCaseSensitiveHotstrings("*", "cable", "câble ") ; Conflict with the English word "cable"
+    CreateCaseSensitiveHotstrings("*", "cabler", "câbler")
     CreateCaseSensitiveHotstrings("*", "calin", "câlin")
     CreateCaseSensitiveHotstrings("*", "canoe", "canoë")
     CreateCaseSensitiveHotstrings("*", "prochaine", "prochaine")
@@ -5510,6 +5512,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*?", "chaîned", "chained")
     CreateCaseSensitiveHotstrings("*?", "chainé", "chaîné")
     CreateCaseSensitiveHotstrings("*", "chassis", "châssis")
+    CreateCaseSensitiveHotstrings("*", "chatain", "châtain")
+    CreateCaseSensitiveHotstrings("*", "chataigne", "châtaigne")
     CreateCaseSensitiveHotstrings("*", "chateau", "château")
     CreateCaseSensitiveHotstrings("*", "chatier", "châtier")
     CreateCaseSensitiveHotstrings("*", "chatiment", "châtiment")
@@ -5517,6 +5521,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "chomer", "chômer")
     CreateCaseSensitiveHotstrings("*", "chomeu", "chômeu")
     CreateCaseSensitiveHotstrings("*", "chomé", "chômé")
+    CreateCaseSensitiveHotstrings("*", "cloitre", "cloître")
     CreateCaseSensitiveHotstrings("*", "cloture", "clôture")
     CreateCaseSensitiveHotstrings("*", "cloturé", "clôturé")
     CreateCaseSensitiveHotstrings("*", "cocaine", "cocaïne")
@@ -5524,8 +5529,10 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "coeur", "cœur")
     CreateCaseSensitiveHotstrings("*", "coincide", "coïncide")
     CreateCaseSensitiveHotstrings("*?", "connait", "connaît")
+    CreateCaseSensitiveHotstrings("*", "controla", "contrôla")
     CreateCaseSensitiveHotstrings("*", "controle", "contrôle")
     CreateCaseSensitiveHotstrings("*", "controlé", "contrôlé")
+    CreateCaseSensitiveHotstrings("*", "controlo", "contrôlo")
     CreateCaseSensitiveHotstrings("", "cout", "coût")
     CreateCaseSensitiveHotstrings("", "coute", "coûte")
     CreateCaseSensitiveHotstrings("", "couter", "coûter")
@@ -5539,6 +5546,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "cotoy", "côtoy")
     CreateCaseSensitiveHotstrings("*?", "croitre", "croître")
     CreateCaseSensitiveHotstrings("*", "crouton", "croûton")
+    CreateCaseSensitiveHotstrings("*", "crument", "crûment")
 
     ; === D ===
     CreateCaseSensitiveHotstrings("*", "débacle", "débâcle")
@@ -5554,6 +5562,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "dument", "dûment")
 
     ; === E ===
+    CreateCaseSensitiveHotstrings("*", "écoeuré", "écoeuré")
+    CreateCaseSensitiveHotstrings("*", "écoeure", "écoeure")
     CreateCaseSensitiveHotstrings("*", "egoisme", "égoïsme")
     CreateCaseSensitiveHotstrings("*", "égoisme", "égoïsme")
     CreateCaseSensitiveHotstrings("*", "egoiste", "égoïste")
@@ -5616,19 +5626,22 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "gout", "goût")
     CreateCaseSensitiveHotstrings("", "gouta", "goûta")
     CreateCaseSensitiveHotstrings("", "goute", "goûte")
-    CreateCaseSensitiveHotstrings("", "gouter", "goûter")
-    CreateCaseSensitiveHotstrings("", "goutes", "goûtes")
-    CreateCaseSensitiveHotstrings("", "goutez", "goûtez")
-    CreateCaseSensitiveHotstrings("", "goutons", "goûtons")
+    CreateCaseSensitiveHotstrings("*", "gouter", "goûter")
+    CreateCaseSensitiveHotstrings("*", "gouteux", "goûteux")
+    CreateCaseSensitiveHotstrings("*", "goutes", "goûtes")
+    CreateCaseSensitiveHotstrings("*", "goutez", "goûtez")
+    CreateCaseSensitiveHotstrings("*", "goutons", "goûtons")
     CreateCaseSensitiveHotstrings("", "grele", "grêle")
     CreateCaseSensitiveHotstrings("", "grèle", "grêle")
     CreateCaseSensitiveHotstrings("*", "greler", "grêler")
     CreateCaseSensitiveHotstrings("*", "guepe", "guêpe")
+    CreateCaseSensitiveHotstrings("*", "guepier", "guêpier")
 
     ; === H ===
     ; CreateCaseSensitiveHotstrings("*", "hair", "haïr") ; Conflict with "hair" in English
     CreateCaseSensitiveHotstrings("*", "heroiq", "héroïq")
     CreateCaseSensitiveHotstrings("*", "heroisme", "héroïsme")
+    CreateCaseSensitiveHotstrings("*", "héroin", "héroïn")
     CreateCaseSensitiveHotstrings("*", "héroiq", "héroïq")
     CreateCaseSensitiveHotstrings("*", "héroisme", "héroïsme")
     CreateCaseSensitiveHotstrings("*?", "honnete", "honnête")
@@ -5660,6 +5673,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
 
     ; === L ===
     CreateCaseSensitiveHotstrings("*", "lache", "lâche")
+    CreateCaseSensitiveHotstrings("*", "laic", "laïc")
     CreateCaseSensitiveHotstrings("*", "laique", "laïque")
     CreateCaseSensitiveHotstrings("*", "laius", "laïus")
     CreateCaseSensitiveHotstrings("*", "les notres", "les nôtres")
@@ -5681,6 +5695,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "manoeuvr", "manœuvr")
     CreateCaseSensitiveHotstrings("*", "maratre", "marâtre")
     CreateCaseSensitiveHotstrings("*?", "meler", "mêler")
+    CreateCaseSensitiveHotstrings("", "meme", "même")
     CreateCaseSensitiveHotstrings("", "mome", "môme")
     CreateCaseSensitiveHotstrings("", "momes", "mômes")
     CreateCaseSensitiveHotstrings("*", "mosaique", "mosaïque")
@@ -5692,7 +5707,10 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "naif", "naïf")
     CreateCaseSensitiveHotstrings("*", "naifs", "naïfs")
     CreateCaseSensitiveHotstrings("*", "naivement", "naïvement")
+    CreateCaseSensitiveHotstrings("", "naive", "naïve")
     CreateCaseSensitiveHotstrings("*", "naives", "naïves")
+    CreateCaseSensitiveHotstrings("*", "naiveté", "naïveté")
+    CreateCaseSensitiveHotstrings("*", "nait", "naît")
     CreateCaseSensitiveHotstrings("*", "naitre", "naître")
     CreateCaseSensitiveHotstrings("*", "noeud", "nœud")
     CreateCaseSensitiveHotstrings("*", "la notre", "la nôtre")
@@ -5713,11 +5731,13 @@ if Features["Autocorrection"]["Accents"].Enabled {
 
     ; === P ===
     CreateCaseSensitiveHotstrings("*", "paella", "paëlla")
+    ; CreateCaseSensitiveHotstrings("*", "pale", "pâle") ; Conflict with the English word "pale"
     CreateCaseSensitiveHotstrings("*", "palir", "pâlir")
     CreateCaseSensitiveHotstrings("*", "paquerette", "pâquerette")
     CreateCaseSensitiveHotstrings("*?", "parait", "paraît")
     CreateCaseSensitiveHotstrings("*?", "paranoia", "paranoïa")
     CreateCaseSensitiveHotstrings("", "paté", "pâté")
+    CreateCaseSensitiveHotstrings("*", "patée", "pâtée")
     CreateCaseSensitiveHotstrings("", "patés", "pâtés")
     CreateCaseSensitiveHotstrings("", "pate", "pâte")
     CreateCaseSensitiveHotstrings("", "pates", "pâtes")
@@ -5747,9 +5767,14 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "quete", "quête")
 
     ; === R ===
+    CreateCaseSensitiveHotstrings("*", "rala", "râla")
+    CreateCaseSensitiveHotstrings("*", "ralais", "râlais")
+    CreateCaseSensitiveHotstrings("*", "ralait", "râlait")
     CreateCaseSensitiveHotstrings("*", "raler", "râler")
+    CreateCaseSensitiveHotstrings("*", "ralez", "râlez")
+    CreateCaseSensitiveHotstrings("*", "ralons", "râlons")
     CreateCaseSensitiveHotstrings("*", "rebatir", "rebâtir")
-    CreateCaseSensitiveHotstrings("*", "relache", "relâche")
+    CreateCaseSensitiveHotstrings("*", "relach", "relâch")
     CreateCaseSensitiveHotstrings("*", "revasse", "rêvasse")
     CreateCaseSensitiveHotstrings("", "reve", "rêve")
     CreateCaseSensitiveHotstrings("", "rever", "rêver")
@@ -5768,7 +5793,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("*", "soulé", "soûlé")
     CreateCaseSensitiveHotstrings("*", "stoique", "stoïque")
     CreateCaseSensitiveHotstrings("*", "stoicisme", "stoïcisme")
-    ; CreateCaseSensitiveHotstrings("", "sure", "sûre") ; Conflict with "to be sure"
+    ; CreateCaseSensitiveHotstrings("", "sure", "sûre") ; Conflict with "to be sure", "for sure"
     CreateCaseSensitiveHotstrings("*", "surement", "sûrement")
     CreateCaseSensitiveHotstrings("*", "sureté", "sûreté")
     CreateCaseSensitiveHotstrings("*", "surcout", "surcoût")
@@ -5778,6 +5803,7 @@ if Features["Autocorrection"]["Accents"].Enabled {
 
     ; === T ===
     CreateCaseSensitiveHotstrings("*", "tantot", "tantôt")
+    CreateCaseSensitiveHotstrings("", "tater", "tâter")
     CreateCaseSensitiveHotstrings("", "tatons", "tâtons")
     CreateCaseSensitiveHotstrings("", "tete", "tête")
     CreateCaseSensitiveHotstrings("", "tetes", "têtes")
@@ -5786,11 +5812,15 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "tole", "tôle")
     CreateCaseSensitiveHotstrings("", "toles", "tôles")
     ; CreateCaseSensitiveHotstrings("", "tot", "tôt") ; Deactivated to be able to use the abbreviation "tot" for total
+    CreateCaseSensitiveHotstrings("", "traina", "traîna")
+    CreateCaseSensitiveHotstrings("", "traine", "traîne")
+    CreateCaseSensitiveHotstrings("*", "trainer", "traîner")
     CreateCaseSensitiveHotstrings("*", "traitr", "traîtr")
     CreateCaseSensitiveHotstrings("", "treve", "trêve")
     CreateCaseSensitiveHotstrings("", "treves", "trêves")
     CreateCaseSensitiveHotstrings("*", "trinome", "trinôme")
-    CreateCaseSensitiveHotstrings("*?*", "trone", "trône")
+    CreateCaseSensitiveHotstrings("*?", "trona", "trôna")
+    CreateCaseSensitiveHotstrings("*?", "trone", "trône")
     CreateCaseSensitiveHotstrings("*", "tempete", "tempête")
 
     ; === U ===

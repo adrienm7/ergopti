@@ -152,7 +152,6 @@ local function inject_sizes(tgt_model, tgt_sizes)
         local hw_spec = hw.mlx_4bit or hw.ollama_q4 or {}
         final_sizes = {
             dl     = tgt_model.size_download or tgt_model.download_size or hw_spec.download_gb,
-            disk   = tgt_model.size_disk or tgt_model.disk_size or hw_spec.disk_gb,
             params = tgt_model.parameters and tgt_model.parameters.total
         }
     end
@@ -160,7 +159,6 @@ local function inject_sizes(tgt_model, tgt_sizes)
     if final_sizes then
         local formatted = {
             dl     = format_size(final_sizes.dl),
-            disk   = format_size(final_sizes.disk),
             params = type(final_sizes.params) == "string" and final_sizes.params or nil
         }
         eval(string.format("if(window.setSizes) setSizes(%s);", hs.json.encode(formatted)))
