@@ -527,15 +527,29 @@ end
 --- Increments a simple stat in the fast manifest immediately.
 --- @param app_name string Focus app.
 --- @param stat_key string The metric to increment.
-function M.increment_manifest_stat(app_name, stat_key)
+function M.increment_manifest_stat(app_name, stat_key, amount)
 	local date_str = os.date("%Y-%m-%d")
 	local m_day = _state.manifest[date_str]
 	if type(m_day) ~= "table" then m_day = {}; _state.manifest[date_str] = m_day end
 	local m_app = m_day[app_name or "Unknown"]
 	if type(m_app) ~= "table" then m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }; m_day[app_name or "Unknown"] = m_app end
-	
-	m_app[stat_key] = (m_app[stat_key] or 0) + 1
+	local inc = tonumber(amount) or 1
+	m_app[stat_key] = (m_app[stat_key] or 0) + inc
 	debounced_save()
+
+	-- Push real-time manifest update to any open Apps metrics UI so
+	-- acceptance/suggestion counters appear immediately.
+	local ok_apps, apps_time = pcall(require, "ui.metrics_apps.init")
+	if ok_apps and type(apps_time.push_live_update) == "function" then
+		pcall(function() apps_time.push_live_update(_state.manifest) end)
+	end
+
+	-- Push real-time manifest update to any open Apps metrics UI so
+	-- acceptance/suggestion counters appear immediately.
+	local ok_apps, apps_time = pcall(require, "ui.metrics_apps.init")
+	if ok_apps and type(apps_time.push_live_update) == "function" then
+		pcall(function() apps_time.push_live_update(_state.manifest) end)
+	end
 end
 
 --- Records an application context switch with focus duration.

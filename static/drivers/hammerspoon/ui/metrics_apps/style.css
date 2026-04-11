@@ -44,6 +44,14 @@
 	--global-border: rgba(var(--kpi-wpm-rgb), 0.5);
 
 	--strong-color: #1d1d1f;
+
+	/* Score badge colors */
+	--score-pos-color: #34c759;
+	--score-neg-color: #ff3b30;
+	--score-neutral-color: #86868b;
+	--score-pos-bg: rgba(52, 199, 89, 0.08);
+	--score-neg-bg: rgba(255, 59, 48, 0.08);
+	--score-neutral-bg: rgba(0, 0, 0, 0.04);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,6 +79,13 @@
 		--global-bg: rgba(var(--kpi-wpm-rgb), 0.1);
 
 		--strong-color: #ffffff;
+
+		--score-pos-color: #32d74b;
+		--score-neg-color: #ff453a;
+		--score-neutral-color: #bdbdbd;
+		--score-pos-bg: rgba(50, 215, 75, 0.08);
+		--score-neg-bg: rgba(255, 69, 58, 0.08);
+		--score-neutral-bg: rgba(255, 255, 255, 0.04);
 	}
 }
 
@@ -234,6 +249,33 @@ h1 {
 
 .stat-details strong {
 	color: var(--strong-color);
+}
+
+/* Score badge used in KPI area to ensure contrast with colored cards */
+.score-badge {
+	border: 1px solid transparent;
+	border-radius: 8px;
+	display: inline-block;
+	font-size: 0.9em;
+	font-weight: 700;
+	line-height: 1;
+	padding: 4px 8px;
+	vertical-align: middle;
+}
+.score-badge.positive {
+	background: var(--score-pos-bg);
+	border-color: rgba(52, 199, 89, 0.18);
+	color: var(--score-pos-color);
+}
+.score-badge.negative {
+	background: var(--score-neg-bg);
+	border-color: rgba(255, 59, 48, 0.18);
+	color: var(--score-neg-color);
+}
+.score-badge.neutral {
+	background: var(--score-neutral-bg);
+	border-color: rgba(0, 0, 0, 0.06);
+	color: var(--score-neutral-color);
 }
 
 /* ========================= */
