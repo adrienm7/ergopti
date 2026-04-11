@@ -997,7 +997,7 @@ function M.create(deps)
 
         -- ================= DÉCLENCHEMENT =================
         table.insert(main_menu, { title = "-" })
-        table.insert(main_menu, { title = "— DÉCLENCHEMENT DE L'IA —", disabled = true })
+        table.insert(main_menu, { title = "— DÉCLENCHEMENT DE L’IA —", disabled = true })
         
         local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce or 0.5
         local debounce_display = (debounce_val <= 0) and "Jamais" or (math.floor(debounce_val * 1000) .. " ms…")
@@ -1054,18 +1054,6 @@ function M.create(deps)
         table.insert(main_menu, { title = "-" })
         table.insert(main_menu, { title = "— PARAMÈTRES DE GÉNÉRATION —", disabled = true })
 
-        local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or "Illimité"
-        table.insert(main_menu, { title = "Mots max par suggestion : " .. max_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
-        if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
-            local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or "Illimité"
-            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. def_w_disp .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
-        end
-        
-        table.insert(main_menu, { title = "Température (Créativité) : " .. tostring(state.llm_temperature), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
-        if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
-            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_temperature) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
-        end
-
         table.insert(main_menu, { title = "Taille du contexte : " .. tostring(state.llm_context_length) .. " derniers caractères", disabled = is_disabled or nil, fn = settings_mgr.set_context_length })
         if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
             table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_context_length) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
@@ -1081,6 +1069,18 @@ function M.create(deps)
                 save_prefs(); update_menu()
             end
         })
+
+        local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or "Illimité"
+        table.insert(main_menu, { title = "Mots max par suggestion : " .. max_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
+        if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
+            local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or "Illimité"
+            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. def_w_disp .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
+        end
+        
+        table.insert(main_menu, { title = "Température (Créativité) : " .. tostring(state.llm_temperature), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
+        if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
+            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_temperature) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
+        end
 
         -- ================= AFFICHAGE & NAV =================
         table.insert(main_menu, { title = "-" })
@@ -1106,14 +1106,14 @@ function M.create(deps)
         if keymap and type(keymap.set_llm_val_modifiers) == "function" then pcall(keymap.set_llm_val_modifiers, val_mods) end
 
         local num_preds_safe = tonumber(state.llm_num_predictions) or 1
-        local nav_title = (num_preds_safe < 2) and "Modificateur navigation (↑/← et ↓/→) : Désactivé (1 suggestion)" or format_shortcut_title("Naviguer dans les suggestions (↑/← et ↓/→)", nav_mods, "Flèches seules", "Flèches")
+        local nav_title = format_shortcut_title("Naviguer dans les suggestions (↑/← et ↓/→)", nav_mods, "Flèches seules", "Flèches")
         table.insert(main_menu, {
             title    = nav_title,
             disabled = (is_disabled or num_preds_safe < 2) or nil,
             menu     = settings_mgr.build_nav_modifier_menu()
         })
 
-        local val_title = (num_preds_safe < 2) and "Modificateur sélection (chiffres) : Désactivé (1 suggestion)" or format_shortcut_title("Sélectionner la suggestion n° (" .. ((num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)) .. ")", val_mods, "Chiffres seuls", "Chiffres")
+        local val_title = format_shortcut_title("Sélectionner la suggestion n° (" .. ((num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)) .. ")", val_mods, "Chiffres seuls", "Chiffres")
         table.insert(main_menu, {
             title    = val_title,
             disabled = (is_disabled or num_preds_safe < 2) or nil,
