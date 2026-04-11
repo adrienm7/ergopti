@@ -435,7 +435,7 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
 				-- Extract first UTF-8 character and check nothing follows
-				local first = char_raw:match("^[%z\1-\127\194-\244][\128-\191]*")
+				local first = char_raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
 				if first and first ~= "" and first == char_raw then
 					char = first
 					break

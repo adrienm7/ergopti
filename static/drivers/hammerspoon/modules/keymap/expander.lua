@@ -20,8 +20,7 @@ local keyStrokes = hs.eventtap.keyStrokes
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
-
-local LOG = "keymap.expander"
+local LOG        = "keymap.expander"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
