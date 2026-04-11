@@ -184,6 +184,9 @@ function M.restore_all_overrides()
     Conflicts.restore_all_overrides()
 end
 
+--- Gets the configured action for a specific gesture slot.
+--- @param slot string The internal gesture slot name.
+--- @return string The mapped action identifier.
 function M.get_action(slot)         return CoreState.ga[slot] end
 
 --- Sets the behavior action for a specific gesture slot.

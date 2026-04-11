@@ -52,6 +52,16 @@ function M.check_availability(model_name, on_available, on_missing)
 	end)
 end
 
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 2/ Core Request Engine =======
+-- ======================================
+-- ======================================
+
 --- Builds the options payload for the OpenAI API format (MLX Server) - optimized.
 local STOP_BASE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:" }
 local STOP_LINE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
@@ -250,6 +260,26 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     )
 end
 
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 3/ Fetch Strategies =======
+-- ===================================
+-- ===================================
+
+--- Dispatches a single API request asking for N clustered predictions.
+--- @param full_text string The complete tracked context string.
+--- @param tail_text string The most recent segment of the context.
+--- @param model_name string Name of the targeted local model.
+--- @param temperature number Base sampling temperature.
+--- @param max_predict number Maximum allowed output tokens.
+--- @param num_predictions number Request quantity for prediction arrays.
+--- @param profile table Active profile mapping.
+--- @param on_success function Function to execute on success.
+--- @param on_fail function Function to execute on failure.
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
                              max_predict, num_predictions, profile,
                              on_success, on_fail, request_id_provider)
@@ -273,6 +303,16 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                    false)
 end
 
+--- Dispatches multiple parallel API requests incrementing the temperature to aggregate predictions.
+--- @param full_text string The complete tracked context string.
+--- @param tail_text string The most recent segment of the context.
+--- @param model_name string Name of the targeted local model.
+--- @param temperature number Base sampling temperature.
+--- @param max_predict number Maximum allowed output tokens.
+--- @param num_predictions number Request quantity for prediction arrays.
+--- @param profile table Active profile mapping.
+--- @param on_success function Function to execute on success.
+--- @param on_fail function Function to execute on failure.
 function M.fetch_parallel(full_text, tail_text, model_name, temperature,
                                 max_predict, num_predictions, profile,
                                 on_success, on_fail, request_id_provider)
@@ -283,6 +323,16 @@ function M.fetch_parallel(full_text, tail_text, model_name, temperature,
                               on_success, on_fail, request_id_provider)
 end
 
+--- Dispatches multiple sequential API requests to avoid parallel connection dropping.
+--- @param full_text string The complete tracked context string.
+--- @param tail_text string The most recent segment of the context.
+--- @param model_name string Name of the targeted local model.
+--- @param temperature number Base sampling temperature.
+--- @param max_predict number Maximum allowed output tokens.
+--- @param num_predictions number Request quantity for prediction arrays.
+--- @param profile table Active profile mapping.
+--- @param on_success function Function to execute on success.
+--- @param on_fail function Function to execute on failure.
 function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                   max_predict, num_predictions, profile,
                                   on_success, on_fail, request_id_provider)

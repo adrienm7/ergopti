@@ -92,6 +92,8 @@ function M.notify(title_or_msg, body)
             n:send() 
         end
     end)
+	
+	Logger.info(LOG, "Notification dispatched successfully:", title_text, info_text)
 end
 
 --- Prints styled debug information to the Hammerspoon console if DEBUG is enabled.
