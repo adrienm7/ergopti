@@ -446,8 +446,7 @@ local function build_line(pred, is_sel, total_preds)
 	local chunks = pred.chunks
 	local nw     = pred.nw or ""
 
-	local has_corr = pred.has_corrections
-	local special_correction_mode = (has_corr == true) or ((tonumber(pred.deletes) or 0) > 0)
+	local has_corr = pred.has_corrections == true
 
 	local first_done = false
 	local function clean_first(s)
@@ -468,8 +467,8 @@ local function build_line(pred, is_sel, total_preds)
 				if s and s ~= "" then
 					last_char = s:sub(-1)
 					if chunk.type == "insert" then
-						local color = is_sel and (special_correction_mode and C_CORR_SEL or C_NW_SEL) or C_UNSELECTED_GRAY
-						local is_bold = (not is_sel) and special_correction_mode
+						local color = is_sel and C_CORR_SEL or C_UNSELECTED_GRAY
+						local is_bold = (not is_sel) and has_corr
 						result = append_seg(result, s, color, is_bold)
 					elseif chunk.type == "equal" then
 						local color = C_UNSELECTED_GRAY
@@ -487,7 +486,7 @@ local function build_line(pred, is_sel, total_preds)
 			s_nw = " " .. s_nw
 		end
 		local color = is_sel and C_NW_SEL or C_UNSELECTED_GRAY
-		local is_bold = (not is_sel) and special_correction_mode
+		local is_bold = (not is_sel) and has_corr
 		result = append_seg(result, s_nw, color, is_bold)
 	end
 

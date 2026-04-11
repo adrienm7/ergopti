@@ -623,7 +623,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 		local effective_num_pred = num_pred
 		
 		-- Automatically boost temperature if user requests multiple parallel predictions
-		-- to prevent greedy deterministic engines from generating exact identical strings.
+		-- to prevent greedy deterministic engines from generating exactly identical strings.
 		if effective_num_pred > 1 and req_temperature < 0.6 then
 			req_temperature = 0.7
 			Logger.debug(LOG, string.format("Boosted temperature to %.1f for parallel variety.", req_temperature))
@@ -704,8 +704,15 @@ function M._perform_llm_check(force_trigger, profile_name)
 						local tt = p.to_type
 						local original_tt = tt
 						
-						if llm_max_words > 0 then
-							tt = truncate_words(tt, llm_max_words)
+						if llm_max_words > 0 and p.nw and p.nw ~= "" then
+							local truncated_nw = truncate_words(p.nw, llm_max_words)
+							if truncated_nw ~= p.nw then
+								-- Remove the extra bytes from the end of to_type
+								local diff_len = #p.nw - #truncated_nw
+								p.to_type = p.to_type:sub(1, -(diff_len + 1))
+								p.nw = truncated_nw
+								tt = p.to_type
+							end
 						end
 						
 						local tt_norm = tt:lower():gsub("’", "'")
@@ -751,13 +758,6 @@ function M._perform_llm_check(force_trigger, profile_name)
 
 						if tt:gsub("[%s%.…]", "") ~= "" and not is_noise then
 							p.to_type = tt
-
-							if original_tt ~= tt then
-								-- Keep UI and emitted text perfectly aligned after truncation
-								p.nw = tt
-								p.chunks = {}
-								p.has_corrections = false
-							end
 							
 							local has_visual = true
 							if type(tooltip.make_diff_styled) == "function" then

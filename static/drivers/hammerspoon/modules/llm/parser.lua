@@ -143,53 +143,69 @@ function M.process_prediction(full_text, tail_text, block)
 			best_c_len = utils.get_common_prefix_utf8(best_suffix, tc_norm)
 		end
 
-		-- Smart spacing check between corrected context and prediction
-		local last_char = utils.utf8_sub(tc_norm, -1)
-		local first_char = utils.utf8_sub(nw, 1, 1)
-		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
-		
-		local display_nw = nw
-		if needs_space then 
-			nw = " " .. nw 
-			display_nw = " " .. display_nw
-		end
-
-		-- Critical security: cancel if AI did not copy a reasonable amount of the tail
-		local tail_len = utils.utf8_len(tail_text)
-		local tc_len = utils.utf8_len(tc)
-		if best_c_len < tail_len * 0.4 and tc_len < tail_len * 0.4 then return nil end
-
 		-- The exact mathematical calculation of deletes ensuring zero UI artifacts
 		local deletes = utils.utf8_len(best_suffix) - best_c_len
-		local to_type = utils.utf8_sub(tc_norm, best_c_len + 1) .. nw
+		local tc_remainder = utils.utf8_sub(tc_norm, best_c_len + 1)
+		
+		local has_corr = (deletes > 0)
+		local chunks = {}
+		local to_type = ""
+		local display_nw = ""
 
-		-- Ultimate rejection: if the string to type contains nothing left after removing spaces and dots
-		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+		if has_corr then
+			-- We have a real typo correction
+			local last_char = utils.utf8_sub(tc_norm, -1)
+			local first_char = utils.utf8_sub(nw, 1, 1)
+			local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
+			
+			if needs_space then 
+				nw = " " .. nw 
+			end
+			
+			to_type = tc_remainder .. nw
+			display_nw = nw
+			
+			-- Isolate the exact word where the correction starts for a clean UI diff
+			local prefix = utils.utf8_sub(tc_norm, 1, best_c_len)
+			local word_start_char = 1
+			for i = #prefix, 1, -1 do
+				local b = prefix:byte(i)
+				if b == 32 or b == 9 or b == 10 or b == 13 then
+					word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+					break
+				end
+				if i >= 2 and prefix:byte(i-1) == 194 and prefix:byte(i) == 160 then
+					word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+					break
+				end
+				if i >= 3 and prefix:byte(i-2) == 226 and prefix:byte(i-1) == 128 and prefix:byte(i) == 175 then
+					word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+					break
+				end
+			end
 
-		-- Isolate the exact word where the correction starts for a clean UI diff
-		local prefix = utils.utf8_sub(tc_norm, 1, best_c_len)
-		local word_start_char = 1
-		for i = #prefix, 1, -1 do
-			local b = prefix:byte(i)
-			if b == 32 or b == 9 or b == 10 or b == 13 then
-				word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
-				break
+			local display_orig = utils.utf8_sub(best_suffix, word_start_char)
+			local display_corr = utils.utf8_sub(tc_norm, word_start_char)
+			chunks = utils.diff_strings(display_orig, display_corr)
+		else
+			-- No correction, pure continuation.
+			-- Merge any leftover word-completion from tc_norm directly into the new words
+			local merged_nw = tc_remainder .. nw
+
+			local last_char = utils.utf8_sub(best_suffix, -1)
+			local first_char = utils.utf8_sub(merged_nw, 1, 1)
+			local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or merged_nw == "")
+			
+			if needs_space then 
+				merged_nw = " " .. merged_nw 
 			end
-			if i >= 2 and prefix:byte(i-1) == 194 and prefix:byte(i) == 160 then
-				word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
-				break
-			end
-			if i >= 3 and prefix:byte(i-2) == 226 and prefix:byte(i-1) == 128 and prefix:byte(i) == 175 then
-				word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
-				break
-			end
+			
+			to_type = merged_nw
+			display_nw = merged_nw
+			chunks = {}
 		end
 
-		local display_orig = utils.utf8_sub(best_suffix, word_start_char)
-		local display_corr = utils.utf8_sub(tc_norm, word_start_char)
-
-		local has_corr = (deletes > 0 or utils.utf8_sub(tc_norm, best_c_len + 1) ~= "")
-		local chunks = utils.diff_strings(display_orig, display_corr)
+		if to_type:gsub("[%s%.…]", "") == "" then return nil end
 
 		return { 
 			deletes = deletes, 
