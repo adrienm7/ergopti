@@ -109,23 +109,21 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
 	document.getElementById('pct').textContent = cappedPercentage + ' %';
 
-	// Line 1: ETA
-	const etaContainer = document.getElementById('eta-container');
-	const etaEl = document.getElementById('eta');
-	if (eta) {
-		etaEl.textContent = eta;
-		etaContainer.style.display = 'inline-block';
+	// Line 1: Fichiers (next to percentage)
+	const fileCountEl = document.getElementById('file-count');
+	if (fileCount) {
+		fileCountEl.textContent = `📁 Fichiers : ${fileCount}`;
+		fileCountEl.style.display = 'inline-block';
 	} else {
-		etaContainer.style.display = 'none';
+		fileCountEl.style.display = 'none';
 	}
 
-	// Line 2: Size | Speed | Files
+	// Line 2: Taille & Vitesse
 	const statsDetails = document.getElementById('stats-details');
 	let detailsParts = [];
 
 	if (downloadedSize) detailsParts.push(`📦 Taille : <b>${downloadedSize}</b>`);
 	if (speed) detailsParts.push(`⚡ Vitesse : <b>${speed}</b>`);
-	if (fileCount) detailsParts.push(`📁 Fichiers : <b>${fileCount}</b>`);
 
 	if (detailsParts.length > 0) {
 		statsDetails.innerHTML = detailsParts.join(
@@ -136,6 +134,16 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	} else {
 		statsDetails.style.display = 'none';
 		document.getElementById('stats-fallback').style.display = 'block';
+	}
+
+	// Line 3: Temps restant
+	const etaContainer = document.getElementById('eta-container');
+	const etaEl = document.getElementById('eta');
+	if (eta) {
+		etaEl.textContent = eta;
+		etaContainer.style.display = 'block';
+	} else {
+		etaContainer.style.display = 'none';
 	}
 }
 
@@ -203,25 +211,19 @@ function done(isSuccess, message, errorKind) {
 		document.getElementById('pct').style.color = '#ff453a';
 	}
 
+	// Hide specific stats and ETA to make room for the final message
+	document.getElementById('eta-container').style.display = 'none';
+	document.getElementById('stats-details').style.display = 'none';
+	document.getElementById('stats-fallback').style.display = 'none';
+
 	const doneMessageElement = document.getElementById('done-msg');
-	doneMessageElement.textContent = message;
+	doneMessageElement.textContent =
+		message || (isSuccess ? '✅ Terminé' : 'Échec du téléchargement');
 	doneMessageElement.className = isSuccess ? 'ok' : 'error';
-	doneMessageElement.style.display = 'inline-block';
-
-	const statsElement = document.getElementById('stats');
-	statsElement.textContent = '';
+	doneMessageElement.style.display = 'block';
 
 	if (!isSuccess) {
-		// Keep the error label visually attached to the cross icon
-		doneMessageElement.textContent = 'Échec du téléchargement';
-	}
-
-	if (!isSuccess) {
-		// show retry button in main controls
 		const retryBtn = document.getElementById('btn-retry');
 		if (retryBtn) retryBtn.style.display = 'inline-block';
-	} else {
-		const retryBtn = document.getElementById('btn-retry');
-		if (retryBtn) retryBtn.style.display = 'none';
 	}
 }

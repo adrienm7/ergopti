@@ -6,7 +6,6 @@
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
-		<button id="btn-close-ui" onclick="doCancel()" title="Fermer et annuler"></button>
 		<h2>📥 Téléchargement en cours</h2>
 		<div id="model">—</div>
 
@@ -22,16 +21,24 @@
 		<div id="status-line">
 			<div id="pct">0 %</div>
 			<div
-				id="eta-container"
-				style="display: none; margin-left: 12px; color: #cdd; font-size: 13px"
-			>
-				Temps restant : <b id="eta" style="color: #fff"></b>
-			</div>
-			<div id="done-msg"></div>
+				id="file-count"
+				style="
+					display: none;
+					margin-left: 12px;
+					color: #cdd;
+					font-family: 'SF Mono', monospace;
+					font-size: 13px;
+					font-weight: 600;
+				"
+			></div>
 		</div>
 
 		<div id="stats">
 			<div id="stats-details" style="display: none"></div>
+			<div id="eta-container" style="display: none; margin-top: 4px">
+				⏳ Temps restant : <b id="eta" style="color: #fff"></b>
+			</div>
+			<div id="done-msg"></div>
 			<div id="stats-fallback">Démarrage…</div>
 		</div>
 

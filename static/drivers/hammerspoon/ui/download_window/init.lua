@@ -24,6 +24,7 @@ local _start_ts  = nil
 local _ready     = false
 local _queued    = {}
 local _log_shown = false
+local _is_hiding = false
 
 local _src  = debug.getinfo(1, "S").source:sub(2)
 local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
@@ -79,8 +80,8 @@ _ucc:setCallback(function(msg)
 				}
 				pcall(function() _wv:frame(new_frame) end)
 			end
-        end
-    end
+		end
+	end
 end)
 
 
@@ -177,10 +178,11 @@ end
 
 --- Hides and destroys the download window.
 function M.hide()
+	_is_hiding = true
 	if _wv and type(_wv.delete) == "function" then 
 		pcall(function() _wv:delete() end) 
-		_wv = nil 
 	end
+	_wv = nil 
 	_on_cancel = nil
 	_on_resolve = nil
 	_on_retry = nil
@@ -188,6 +190,7 @@ function M.hide()
 	_ready     = false
 	_queued    = {}
 	_log_shown = false
+	_is_hiding = false
 end
 
 --- Shows the download window for a given model.
@@ -213,10 +216,11 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 	local screen = hs.screen.mainScreen()
 	local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
 	
-	local W, H = 460, math.floor((f.h or 1080) / 3)
+	-- Fixed size perfectly crafted to contain ~7 terminal log lines without overflowing
+	local W, H = 460, 380
 	local frame = {
-		x = f.x + f.w - W - 18,
-		y = f.y + f.h - H - 50,
+		x = f.x + f.w - W - 24,
+		y = f.y + f.h - H - 24,
 		w = W,
 		h = H
 	}
@@ -224,7 +228,7 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 	_wv = ui_builder.show_webview({
 		frame             = frame,
 		title             = "Téléchargement du modèle",
-		style_masks       = {"titled", "closable", "nonactivating", "resizable"},
+		style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
 		level             = hs.drawing.windowLevels.floating,
 		allow_text_entry  = false,
 		allow_gestures    = false,
@@ -244,7 +248,10 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 			return true
 		end,
 		on_close          = function()
+			-- Skip if we are programmatically closing the window via M.hide()
+			if _is_hiding then return end
 			_wv = nil
+			
 			-- Auto-abort download and reset menubar if the window is closed natively
 			local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
 			if type(hook) == "function" then pcall(hook) end
