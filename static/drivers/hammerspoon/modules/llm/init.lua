@@ -30,30 +30,30 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 -- =======================================
 
 M.DEFAULT_STATE = {
-    llm_enabled           = false,
-    llm_use_mlx           = false,
-    llm_model_ollama      = "gemma-4-E2B-it",
-    llm_model_mlx         = "gemma-4-E2B-it",
-    llm_debounce          = 0.2,
-    llm_num_predictions   = 3,
-    llm_sequential_mode   = false,
-    llm_context_length    = 500,
-    llm_temperature       = 0.1,
-    llm_max_words         = 5,
-    llm_arrow_nav_enabled = false,
-    llm_nav_modifiers     = {},
-    llm_show_info_bar     = false,
-    llm_val_modifiers     = {"alt"},
-    llm_pred_indent       = -3,
-    llm_active_profile    = "basic",
+	llm_enabled           = false,
+	llm_backend           = "ollama",
+	llm_model_ollama      = "gemma-4-E2B-it",
+	llm_model_mlx         = "gemma-4-E2B-it",
+	llm_debounce          = 0.2,
+	llm_num_predictions   = 3,
+	llm_sequential_mode   = false,
+	llm_context_length    = 500,
+	llm_temperature       = 0.1,
+	llm_max_words         = 5,
+	llm_arrow_nav_enabled = false,
+	llm_nav_modifiers     = {},
+	llm_show_info_bar     = false,
+	llm_val_modifiers     = {"alt"},
+	llm_pred_indent       = -3,
+	llm_active_profile    = "basic",
 }
 
 local CoreState = {
-    active_profile_id = M.DEFAULT_STATE.llm_active_profile,
-    user_profiles     = {},
-    use_mlx           = M.DEFAULT_STATE.llm_use_mlx,
-    last_backend_check = 0,
-    backend_check_interval = 10,  -- Re-check backend every 10s
+	active_profile_id      = M.DEFAULT_STATE.llm_active_profile,
+	user_profiles          = {},
+	backend                = M.DEFAULT_STATE.llm_backend,
+	last_backend_check     = 0,
+	backend_check_interval = 10,
 }
 
 
@@ -66,65 +66,65 @@ local CoreState = {
 -- =======================================
 -- =======================================
 
---- Auto-detect best available backend (Ollama or MLX) and set it as active.
+--- Auto-detect best available backend and set it as active.
 --- Uses async HTTP checks — never blocks the main thread.
 --- @param callback function|nil Optional callback(backend_name) called when detection completes.
 function M.auto_detect_backend(callback)
-    local now = hs.timer.secondsSinceEpoch()
+	local now = hs.timer.secondsSinceEpoch()
 
-    -- Return cached result immediately if checked recently (within 10s)
-    if now - CoreState.last_backend_check < CoreState.backend_check_interval then
-        local result = CoreState.use_mlx and "mlx" or "ollama"
-        if type(callback) == "function" then pcall(callback, result) end
-        return result
-    end
+	-- Return cached result immediately if checked recently (within 10s)
+	if now - CoreState.last_backend_check < CoreState.backend_check_interval then
+		local result = CoreState.backend
+		if type(callback) == "function" then pcall(callback, result) end
+		return result
+	end
 
-    CoreState.last_backend_check = now
+	CoreState.last_backend_check = now
 
-    -- Async parallel health checks — both fire at once, state resolved in callbacks
-    local ollama_done, mlx_done = false, false
-    local ollama_ok, mlx_ok = false, false
+	-- Async parallel health checks — both fire at once, state resolved in callbacks
+	local ollama_done, mlx_done = false, false
+	local ollama_ok, mlx_ok = false, false
 
-    local function on_both_done()
-        if not (ollama_done and mlx_done) then return end
-        -- Prefer Ollama if both available, otherwise use MLX if available
-        if ollama_ok then
-            CoreState.use_mlx = false
-        elseif mlx_ok then
-            CoreState.use_mlx = true
-        else
-            CoreState.use_mlx = false
-        end
-        local result = CoreState.use_mlx and "mlx" or "ollama"
-        if type(callback) == "function" then pcall(callback, result) end
-    end
+	local function on_both_done()
+		if not (ollama_done and mlx_done) then return end
+		-- Prefer Ollama if both available, otherwise use MLX if available
+		if ollama_ok then
+			CoreState.backend = "ollama"
+		elseif mlx_ok then
+			CoreState.backend = "mlx"
+		else
+			CoreState.backend = "ollama"
+		end
+		
+		if type(callback) == "function" then pcall(callback, CoreState.backend) end
+	end
 
-    pcall(hs.http.asyncGet, "http://127.0.0.1:11434/api/version", {}, function(status, body)
-        ollama_ok = (status == 200) and type(body) == "string" and body:find('"version"') ~= nil
-        ollama_done = true
-        on_both_done()
-    end)
+	pcall(hs.http.asyncGet, "http://127.0.0.1:11434/api/version", {}, function(status, body)
+		ollama_ok = (status == 200) and type(body) == "string" and body:find('"version"') ~= nil
+		ollama_done = true
+		on_both_done()
+	end)
 
-    pcall(hs.http.asyncGet, "http://127.0.0.1:8080/v1/models", {}, function(status, body)
-        mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
-        mlx_done = true
-        on_both_done()
-    end)
+	pcall(hs.http.asyncGet, "http://127.0.0.1:8080/v1/models", {}, function(status, body)
+		mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
+		mlx_done = true
+		on_both_done()
+	end)
 end
 
 --- Pre-warms API connections to reduce first-request latency (async, non-blocking).
 function M.warm_up_connections()
-    pcall(function()
-        -- Parallel async pings to both backends (fire-and-forget)
-        hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
-        hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function() end)
-    end)
+	pcall(function()
+		-- Parallel async pings to backends (fire-and-forget)
+		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
+		hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function() end)
+	end)
 end
 
 -- Defer backend detection entirely off the synchronous init path
 hs.timer.doAfter(0, function()
-    pcall(function() M.auto_detect_backend() end)
-    pcall(function() M.warm_up_connections() end)
+	pcall(function() M.auto_detect_backend() end)
+	pcall(function() M.warm_up_connections() end)
 end)
 
 --- Retrieves the currently active profile object.
@@ -141,18 +141,19 @@ function M.set_active_profile(id)
 	end
 end
 
---- Sets whether to route queries to MLX or Ollama.
---- @param enabled boolean True to enable the MLX backend.
-function M.set_use_mlx(enabled)
-	CoreState.use_mlx = enabled == true
+--- Sets the active LLM backend identifier.
+--- @param backend string The backend identifier (e.g., "mlx", "ollama").
+function M.set_backend(backend)
+	if type(backend) == "string" and backend ~= "" then
+		CoreState.backend = backend
+	end
 end
 
---- Returns whether MLX is currently enabled as inference backend.
---- @return boolean True when MLX backend is active.
-function M.is_using_mlx()
-	return CoreState.use_mlx == true
+--- Returns the currently active LLM backend identifier.
+--- @return string The backend identifier.
+function M.get_backend()
+	return CoreState.backend
 end
-
 
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON
 local _model_index = nil
@@ -198,36 +199,36 @@ end
 --- Translates a JSON model label to the backend-specific identifier in O(1).
 --- e.g., "gemma-4-E2B-it" -> "gemma4:e2b" (Ollama) or "gemma-4-e2b-it-mxfp4" (MLX)
 --- @param label string The model label ("name" field from llm_models.json).
---- @param is_mlx boolean True for MLX backend, false for Ollama.
+--- @param backend string The target backend identifier.
 --- @return string The backend-specific identifier, or label unchanged if not found.
-local function resolve_model_for_backend(label, is_mlx)
+local function resolve_model_for_backend(label, backend)
 	if type(label) ~= "string" or label == "" then return label end
 	local entry = get_model_index()[label]
 	if not entry then return label end
-	return (is_mlx and entry.mlx or entry.ollama) or label
+	return (entry[backend]) or label
 end
 
---- Resolves the current model name based on active backend.
---- @return string The model name for the active backend (Ollama or MLX).
+--- Resolves the current model name based on the active backend.
+--- @return string The model name for the active backend.
 function M.get_current_model()
-	local label = CoreState.use_mlx and CoreState.llm_model_mlx or CoreState.llm_model_ollama
-	return resolve_model_for_backend(label, CoreState.use_mlx)
+	local label = (CoreState.backend == "mlx") and CoreState.llm_model_mlx or CoreState.llm_model_ollama
+	return resolve_model_for_backend(label, CoreState.backend)
 end
 
 --- Sets the model for Ollama backend.
 --- @param model_name string The model identifier for Ollama.
 function M.set_llm_model_ollama(model_name)
-    if type(model_name) == "string" then
-        CoreState.llm_model_ollama = model_name
-    end
+	if type(model_name) == "string" then
+		CoreState.llm_model_ollama = model_name
+	end
 end
 
 --- Sets the model for MLX backend.
 --- @param model_name string The model identifier for MLX.
 function M.set_llm_model_mlx(model_name)
-    if type(model_name) == "string" then
-        CoreState.llm_model_mlx = model_name
-    end
+	if type(model_name) == "string" then
+		CoreState.llm_model_mlx = model_name
+	end
 end
 
 --- Exposes built-in profiles and user profiles.
@@ -244,10 +245,13 @@ function M.set_user_profiles(profiles_table)
 	end
 end
 
---- Returns the active API engine.
+--- Returns the active API engine based on the current backend state.
 --- @return table The specific backend module object.
 local function get_api()
-	return CoreState.use_mlx and ApiMlx or ApiOllama
+	if CoreState.backend == "mlx" then
+		return ApiMlx
+	end
+	return ApiOllama
 end
 
 --- Initiates a new LLM prediction request, selecting the optimal fetch strategy based on profile state.
@@ -287,15 +291,15 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 	local profile = M.get_active_profile()
 	local api = get_api()
 
-    if type(profile) == "table" and (not profile.batch) then
-        if num_predictions > 1 and not sequential_mode then
-            api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
-        else
-            api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
-        end
-    else
-        api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
-    end
+	if type(profile) == "table" and (not profile.batch) then
+		if num_predictions > 1 and not sequential_mode then
+			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+		else
+			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+		end
+	else
+		api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+	end
 end
 
 --- Validates keystroke event modifiers against an expected explicit modifier set.

@@ -73,12 +73,9 @@ local _llm_fetch_request_id    = 0
 local _last_suggested_hs       = nil
 local _last_llm_input_signature = nil
 
-local current_llm_backend_name = nil
-
 local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED
 local current_llm_model        = core_llm.DEFAULT_LLM_MODEL
 local current_llm_display_name = core_llm.DEFAULT_LLM_MODEL
-local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED
 local preview_star_enabled        = true
 local preview_autocorrect_enabled = true
 local preview_ai_enabled          = true
@@ -132,7 +129,8 @@ end
 
 function M.set_llm_model(m)
 	local model_name = tostring(m)
-	if type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() then
+	local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "ollama"
+	if backend == "mlx" then
 		if type(core_llm.set_llm_model_mlx) == "function" then
 			core_llm.set_llm_model_mlx(model_name)
 		end
@@ -141,11 +139,7 @@ function M.set_llm_model(m)
 			core_llm.set_llm_model_ollama(model_name)
 		end
 	end
-	current_llm_model = model_name  -- also update local cache for display
-end
-
-function M.set_llm_backend_name(n)
-	current_llm_backend_name = (type(n) == "string") and n or nil
+	current_llm_model = model_name
 end
 
 function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
@@ -603,18 +597,21 @@ function M._perform_llm_check(force_trigger, profile_name)
 			end
 		end
 
+		local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "ollama"
+		
 		-- Keep generations short for typing autocomplete to reduce latency.
 		local model_to_use = type(core_llm.get_current_model) == "function" and core_llm.get_current_model() or current_llm_model
-		local using_mlx_backend = type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() or false
 		local max_predict_tokens = 80
-		if using_mlx_backend then
+		
+		if backend == "mlx" then
 			-- MLX typing mode must stay short, otherwise responses often arrive too late for live preview.
 			max_predict_tokens = 48
 		elseif llm_max_words > 0 then
 			max_predict_tokens = math.max(20, math.min(80, llm_max_words * 6 + 8))
 		end
+		
 		local effective_num_pred = num_pred
-		Logger.debug(LOG, string.format("LLM dispatch tuned: mlx=%s, num_pred=%d, max_tokens=%d", tostring(using_mlx_backend), effective_num_pred, max_predict_tokens))
+		Logger.debug(LOG, string.format("LLM dispatch tuned: backend=%s, num_pred=%d, max_tokens=%d", tostring(backend), effective_num_pred, max_predict_tokens))
 		
 		core_llm.fetch_llm_prediction(
 			clean_buffer, tail,
@@ -789,14 +786,8 @@ function M._perform_llm_check(force_trigger, profile_name)
 					or (type(core_llm.get_current_model) == "function" and core_llm.get_current_model())
 					or current_llm_model
 					
-				local backend_name = current_llm_backend_name
-				if not backend_name then
-				    -- Retro-compatibility fallback
-					local using_mlx = type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() or false
-					backend_name = using_mlx and "Apple MLX 🚀" or "Ollama 🦙"
-				end
-				
-				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, backend_name, display_profile_name) or nil
+				local backend_display = (backend == "mlx") and "Apple MLX 🚀" or "Ollama 🦙"
+				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, backend_display, display_profile_name) or nil
 				
 				local loading_text = nil
 				if is_final ~= true and #valid_preds < llm_num_predictions then

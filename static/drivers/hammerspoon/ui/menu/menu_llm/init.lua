@@ -60,7 +60,7 @@ local is_apple_silicon = hs.fs.attributes("/opt/homebrew", "mode") == "directory
 
 M.DEFAULT_STATE = {
     llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
-    llm_use_mlx           = is_apple_silicon,
+    llm_backend           = is_apple_silicon and "mlx" or "ollama",
     llm_debounce          = llm_mod.DEFAULT_STATE.llm_debounce,
     llm_model             = llm_mod.DEFAULT_STATE.llm_model,
     llm_model_ollama      = llm_mod.DEFAULT_STATE.llm_model_ollama,
@@ -134,8 +134,15 @@ function M.create(deps)
     deps.active_tasks = deps.active_tasks or {}
     local state       = deps.state
     
-    if state.llm_use_mlx == nil then state.llm_use_mlx = M.DEFAULT_STATE.llm_use_mlx end
-    llm_mod.set_use_mlx(state.llm_use_mlx)
+    -- Migration logic for older configs
+    if state.llm_use_mlx ~= nil then
+        state.llm_backend = state.llm_use_mlx and "mlx" or "ollama"
+        state.llm_use_mlx = nil
+    end
+    if state.llm_backend == nil then 
+        state.llm_backend = M.DEFAULT_STATE.llm_backend 
+    end
+    llm_mod.set_backend(state.llm_backend)
 
     local models_mgr   = Models.new(deps)
     
@@ -253,7 +260,7 @@ function M.create(deps)
 
         local actual_name = models_mgr.get_actual_model_name(display_name)
         Logger.debug(LOG, string.format("Resolving model name on startup: '%s' -> '%s'", display_name, actual_name))
-        if state.llm_use_mlx then
+        if state.llm_backend == "mlx" then
             state.llm_model_mlx = display_name
             llm_mod.set_llm_model_mlx(actual_name)
         else
@@ -488,7 +495,7 @@ function M.create(deps)
             
             -- Resolve display name to actual backend model name and persist per backend
             local actual_backend_name = models_mgr.get_actual_model_name(new_model)
-            if state.llm_use_mlx then
+            if state.llm_backend == "mlx" then
                 state.llm_model_mlx = new_model
                 llm_mod.set_llm_model_mlx(actual_backend_name)
                 Logger.debug(LOG, string.format("Actual MLX model: %s -> %s", new_model, actual_backend_name))
@@ -527,7 +534,7 @@ function M.create(deps)
         local installed = models_mgr.get_installed_models()
         Logger.debug(LOG, string.format("Installed models detected: %d", installed and (function() local c=0 for _ in pairs(installed) do c=c+1 end return c end)() or 0))
         local presets = models_mgr.get_presets()
-        local is_mlx = state.llm_use_mlx
+        local active_backend = state.llm_backend
         local active_display_model = get_display_model_name(state.llm_model, presets)
 
         local config_file = debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./"
@@ -559,7 +566,7 @@ function M.create(deps)
         })
 
         -- Reset to backend-specific default model
-        local backend_default_raw = state.llm_use_mlx and M.DEFAULT_STATE.llm_model_mlx or M.DEFAULT_STATE.llm_model_ollama
+        local backend_default_raw = (active_backend == "mlx") and M.DEFAULT_STATE.llm_model_mlx or M.DEFAULT_STATE.llm_model_ollama
         local backend_default = get_display_model_name(backend_default_raw, presets)
         if backend_default and backend_default ~= "" then
             table.insert(menu, {
@@ -573,7 +580,7 @@ function M.create(deps)
         end
 
         -- Only show HuggingFace token when using a backend that downloads from HuggingFace
-        if is_mlx then
+        if active_backend == "mlx" then
             local token_status = has_hf_token and "✅ Configuré" or "❌ Non configuré"
             table.insert(menu, {
                 title = "🔑 Token HuggingFace : " .. token_status,
@@ -608,9 +615,9 @@ function M.create(deps)
                     local title = string.format("%s%s%s%s%s", prefix, status, m_name, type_str, params_ram_str)
 
                     local hw = m.hardware_requirements or {}
-                    local hw_active = is_mlx and hw.mlx or hw.ollama or {}
-                    local active_backend = is_mlx and "MLX" or "Ollama"
-                    local active_source = is_mlx and (m.urls and m.urls.mlx) or (m.urls and m.urls.ollama)
+                    local hw_active = hw[active_backend] or {}
+                    local display_backend = (active_backend == "mlx") and "MLX" or "Ollama"
+                    local active_source = m.urls and m.urls[active_backend]
                     local has_active_source = (type(active_source) == "string" and active_source ~= "")
 
                     if not has_active_source then
@@ -639,7 +646,7 @@ function M.create(deps)
 
                     table.insert(model_submenu, { title = "-" })
 
-                    table.insert(model_submenu, { title = "Backend : " .. active_backend, fn = function() end })
+                    table.insert(model_submenu, { title = "Backend : " .. display_backend, fn = function() end })
 
                     table.insert(model_submenu, {
                         title = "Source : " .. active_source,
@@ -678,7 +685,7 @@ function M.create(deps)
 
                     if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
                         table.insert(model_submenu, { title = "-" })
-                        table.insert(model_submenu, { title = "— CONFIGURATION REQUISE (" .. active_backend .. ") —", disabled = true })
+                        table.insert(model_submenu, { title = "— CONFIGURATION REQUISE (" .. display_backend .. ") —", disabled = true })
                         if hw_active.download_gb then table.insert(model_submenu, { title = "Téléchargement : " .. hw_active.download_gb .. " Go", fn = function() end }) end
                         if hw_active.disk_gb then table.insert(model_submenu, { title = "Espace disque : " .. hw_active.disk_gb .. " Go", fn = function() end }) end
                         if hw_active.ram_gb then table.insert(model_submenu, { title = "Mémoire (RAM) : " .. hw_active.ram_gb .. " Go", fn = function() end }) end
@@ -886,22 +893,18 @@ function M.create(deps)
         Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
         local main_menu = {}
 
-        local backend_title = "Moteur IA (Backend) : " .. (state.llm_use_mlx and "Apple MLX 🚀" or "Ollama 🦙")
+        local backend_title = "Moteur IA (Backend) : " .. (state.llm_backend == "mlx" and "Apple MLX 🚀" or "Ollama 🦙")
         local backend_menu = {}
 
         table.insert(backend_menu, {
             title    = "Apple MLX 🚀 — Recommandé (natif Mac, ultra-rapide)",
-            checked  = state.llm_use_mlx,
+            checked  = (state.llm_backend == "mlx"),
             disabled = (not is_apple_silicon) or paused or nil,
             fn       = not paused and function()
-                if not state.llm_use_mlx then
+                if state.llm_backend ~= "mlx" then
                     Logger.info(LOG, "Activating MLX backend…")
-                    state.llm_use_mlx = true
-                    llm_mod.set_use_mlx(true)
-                    
-                    if keymap and type(keymap.set_llm_backend_name) == "function" then
-                        pcall(keymap.set_llm_backend_name, "MLX 🚀")
-                    end
+                    state.llm_backend = "mlx"
+                    llm_mod.set_backend("mlx")
 
                     local target_model = get_display_model_name(state.llm_model_mlx or M.DEFAULT_STATE.llm_model_mlx or "")
                     if target_model and target_model ~= "" then
@@ -923,19 +926,15 @@ function M.create(deps)
 
         table.insert(backend_menu, {
             title    = "Ollama 🦙 — Standard (idéal si MLX est indisponible)",
-            checked  = not state.llm_use_mlx,
+            checked  = (state.llm_backend == "ollama"),
             disabled = paused or nil,
             fn       = not paused and function()
-                if state.llm_use_mlx then
+                if state.llm_backend ~= "ollama" then
                     Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
-                    state.llm_use_mlx = false
-                    llm_mod.set_use_mlx(false)
+                    state.llm_backend = "ollama"
+                    llm_mod.set_backend("ollama")
                     if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
                     Logger.debug(LOG, "MLX server stopped.")
-
-                    if keymap and type(keymap.set_llm_backend_name) == "function" then
-                        pcall(keymap.set_llm_backend_name, "Ollama 🦙")
-                    end
 
                     local target_model = get_display_model_name(state.llm_model_ollama or M.DEFAULT_STATE.llm_model_ollama or "")
                     if target_model and target_model ~= "" then
@@ -1246,15 +1245,11 @@ function M.create(deps)
             return 
         end
 
-        if state.llm_use_mlx then
+        if state.llm_backend == "mlx" then
             Logger.debug(LOG, "MLX mode: locking predictions during initialization.")
             if keymap and type(keymap.set_llm_enabled) == "function" then
                 pcall(keymap.set_llm_enabled, false)
             end
-        end
-
-        if keymap and type(keymap.set_llm_backend_name) == "function" then
-            pcall(keymap.set_llm_backend_name, state.llm_use_mlx and "Apple MLX 🚀" or "Ollama 🦙")
         end
 
         Logger.debug(LOG, string.format("Checking model requirements: %s", state.llm_model))
@@ -1278,7 +1273,7 @@ function M.create(deps)
             _check_startup_attempts = nil
 
             local check_fn = guarded_check_requirements
-            if state.llm_use_mlx and type(models_mgr.force_mlx_check) == "function" then
+            if state.llm_backend == "mlx" and type(models_mgr.force_mlx_check) == "function" then
                 Logger.debug(LOG, string.format("Startup MLX mode: forcing MLX requirements check for model %s", state.llm_model))
                 check_fn = function(model_name, on_ok, on_fail)
                     models_mgr.force_mlx_check(model_name, on_ok, on_fail, { silent_notifications = false })
@@ -1287,7 +1282,7 @@ function M.create(deps)
 
             check_fn(state.llm_model, function()
                 Logger.info(LOG, string.format("Requirements verified for model %s.", state.llm_model))
-                if state.llm_use_mlx and state.llm_enabled
+                if state.llm_backend == "mlx" and state.llm_enabled
                     and keymap and type(keymap.set_llm_enabled) == "function" then
                     Logger.debug(LOG, "Reactivating MLX predictions.")
                     pcall(keymap.set_llm_enabled, true)
@@ -1298,7 +1293,7 @@ function M.create(deps)
 
         -- Backup startup path: ensure MLX boot is attempted even if requirements callback chain is skipped.
         hs.timer.doAfter(3, function()
-            if state.llm_use_mlx and state.llm_enabled and state.llm_model and state.llm_model ~= ""
+            if state.llm_backend == "mlx" and state.llm_enabled and state.llm_model and state.llm_model ~= ""
                 and type(models_mgr.force_mlx_check) == "function" then
                 Logger.debug(LOG, string.format("Startup MLX backup check fired for model %s", state.llm_model))
                 models_mgr.force_mlx_check(state.llm_model, function()
