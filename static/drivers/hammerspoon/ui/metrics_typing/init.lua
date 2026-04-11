@@ -126,7 +126,7 @@ local function fetch_range(log_dir, start_date, end_date, selected_apps)
 		os.remove(tmp_path)
 	end
 	
-	local f_idx = io.open(log_dir .. "/" .. os.date("%Y_%m_%d") .. ".idx", "r")
+	local f_idx = io.open(log_dir .. "/" .. os.date("%Y-%m-%d") .. ".idx", "r")
 	local today_idx = {}
 	if f_idx then
 		local c = f_idx:read("*a")
