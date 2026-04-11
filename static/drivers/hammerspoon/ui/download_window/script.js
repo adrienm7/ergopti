@@ -238,13 +238,7 @@ function done(isSuccess, message, errorKind) {
 		document.getElementById('pct').textContent = '100 %';
 	} else {
 		progressBar.classList.add('error');
-		if (
-			!progressBar.style.width ||
-			progressBar.style.width === '0%' ||
-			progressBar.style.width === ''
-		) {
-			progressBar.style.width = '100%';
-		}
+		progressBar.style.width = '100%';
 		document.getElementById('pct').textContent = '❌';
 		document.getElementById('pct').style.color = '#ff453a';
 	}

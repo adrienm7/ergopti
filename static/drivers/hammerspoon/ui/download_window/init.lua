@@ -236,8 +236,8 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 	-- Fixed size perfectly crafted to contain ~7 terminal log lines without overflowing
 	local W, H = 460, 380
 	local frame = {
-		x = f.x + f.w - W - 24,
-		y = f.y + f.h - H - 24,
+		x = f.x + f.w - W - 10,
+		y = f.y + f.h - H - 10,
 		w = W,
 		h = H
 	}
