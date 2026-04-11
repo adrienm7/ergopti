@@ -143,7 +143,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             prompt      = prompt,
             stream      = false,
             temperature = opts.temperature,
-            max_tokens  = math.min(tonumber(opts.max_tokens) or 24, 24),
+            max_tokens  = tonumber(opts.max_tokens) or 50,
             stop        = { "\n", "\r", "</", "\"", "- " }
         }
     else

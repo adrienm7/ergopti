@@ -289,6 +289,11 @@ function M.apply_prediction(idx)
 
 	local ok_overlap, res_deletes, res_to = pcall(function()
 		if km_utils and type(km_utils.resolve_prediction_overlap) == "function" then
+			local tail = _state.buffer:sub(-20)
+			-- Bypass to prevent byte corruption on multibyte characters in third-party logic
+			if text_utils and type(text_utils.contains_high_unicode) == "function" and (text_utils.contains_high_unicode(original_to_type) or text_utils.contains_high_unicode(tail)) then
+				return original_deletes, original_to_type
+			end
 			return km_utils.resolve_prediction_overlap(_state.buffer, original_deletes, original_to_type)
 		end
 		return original_deletes, original_to_type
@@ -611,13 +616,13 @@ function M._perform_llm_check(force_trigger, profile_name)
 		
 		-- Keep generations short for typing autocomplete to reduce latency.
 		local model_to_use = type(core_llm.get_current_model) == "function" and core_llm.get_current_model() or current_llm_model
-		local max_predict_tokens = 80
+		local max_predict_tokens = 150
 		
 		if backend == "mlx" then
 			-- MLX typing mode must stay short, otherwise responses often arrive too late for live preview.
-			max_predict_tokens = 48
+			max_predict_tokens = llm_max_words > 0 and math.max(48, llm_max_words * 6 + 10) or 80
 		elseif llm_max_words > 0 then
-			max_predict_tokens = math.max(20, math.min(80, llm_max_words * 6 + 8))
+			max_predict_tokens = math.max(40, llm_max_words * 6 + 10)
 		end
 		
 		local effective_num_pred = num_pred
@@ -707,9 +712,11 @@ function M._perform_llm_check(force_trigger, profile_name)
 						if llm_max_words > 0 and p.nw and p.nw ~= "" then
 							local truncated_nw = truncate_words(p.nw, llm_max_words)
 							if truncated_nw ~= p.nw then
-								-- Remove the extra bytes from the end of to_type
-								local diff_len = #p.nw - #truncated_nw
-								p.to_type = p.to_type:sub(1, -(diff_len + 1))
+								-- Remove the extra characters from the end of to_type safely
+								local diff_chars = text_utils.utf8_len(p.nw) - text_utils.utf8_len(truncated_nw)
+								if diff_chars > 0 then
+									p.to_type = text_utils.utf8_sub(p.to_type, 1, text_utils.utf8_len(p.to_type) - diff_chars)
+								end
 								p.nw = truncated_nw
 								tt = p.to_type
 							end
