@@ -359,8 +359,6 @@ local C_SEP      = { white = 1.00, alpha = 0.09 }
 local C_INVIS    = { white = 0.00, alpha = 0.00 }
 local C_LOADING  = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
 
-local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧", ["shift+cmd"] = "⇧⌘" }
-
 --- Extracts the hue from an RGB color and rebuilds a dark, barely-saturated background.
 --- @param tint table|nil RGBA tint color whose hue is used, or nil for neutral dark.
 --- @return table RGBA resulting background color.
@@ -371,7 +369,7 @@ local function apply_tint(tint)
 	local g = math.max(0, math.min(1, tint.green or 0))
 	local b = math.max(0, math.min(1, tint.blue  or 0))
 
-    -- Extract hue from RGB
+    -- Extracts hue from RGB
 	local max_c = math.max(r, g, b)
 	local min_c = math.min(r, g, b)
 	local delta = max_c - min_c
@@ -392,7 +390,7 @@ local function apply_tint(tint)
 	local L = 0.10
 	local S = 0.40
 
-    -- HSL → RGB
+    -- HSL -> RGB
 	local c  = (1 - math.abs(2 * L - 1)) * S
 	local x  = c * (1 - math.abs((hue * 6) % 2 - 1))
 	local m  = L - c / 2
@@ -497,7 +495,7 @@ local function build_line(pred, is_sel, total_preds)
 
     local s_nw = clean_first(nw)
     if s_nw and s_nw ~= "" then
-        -- FIX: Automatically insert a space if the previous text (gray) and the new text (orange) are glued together
+        -- Automatically insert a space if the previous text (gray) and the new text (orange) are glued together
         if last_char ~= "" and not last_char:match("%s") and not s_nw:match("^%s") then
             s_nw = " " .. s_nw
         end
@@ -519,8 +517,8 @@ end
 -- ==============================
 -- ==============================
 
---- Assembles all lines and bottom hints into styled blocks ready for rendering
---- If reserved_count > n, adds empty placeholder lines to pre-size the canvas
+--- Assembles all lines and bottom hints into styled blocks ready for rendering.
+--- If reserved_count > n, adds empty placeholder lines to pre-size the canvas.
 local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod, indent, nav_mod_str, loading_text, reserved_count)
     local n = type(raw_preds) == "table" and #raw_preds or 0
     local display_count = math.max(n, tonumber(reserved_count) or n)  -- Shows n actual + (reserved_count - n) empty lines
@@ -553,8 +551,8 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
         PREFIX_OTHER_TEXT = PREFIX_SEL .. string.rep(" ", math.max(0, (-indent_n) - 3))
     end
 
-    -- Global visual compensation for emoji side bearing on non-selected lines.
-    -- Keep indent <= -3 untouched because that range is anchored on exact PREFIX_SEL width.
+    -- Global visual compensation for emoji side bearing on non-selected lines
+    -- Keep indent <= -3 untouched because that range is anchored on exact PREFIX_SEL width
     if indent_n > -3 then
         PREFIX_OTHER_TEXT = PREFIX_OTHER_TEXT .. PREFIX_VISUAL_COMP_TEXT
     end
@@ -818,13 +816,16 @@ function M.set_navigate_callback(fn) _state.on_navigate = fn end
 --- @param fn function The callback function.
 function M.set_accept_callback(fn) _state.on_accept = fn end
 
---- Assigns a callback executed when the user presses any key that interrupts predictions (shortcuts, modifiers, etc.)
+--- Assigns a callback executed when the user presses any key that interrupts predictions (shortcuts, modifiers, etc.).
+--- @param fn function The callback function.
 function M.set_cancel_callback(fn) _state.on_cancel = fn end
 
 --- Sets whether Enter should validate the current prediction (true only after arrow navigation).
+--- @param v boolean True to enable enter validation.
 function M.set_enter_validates(v) _state.enter_validates = (v == true) end
 
---- Retrieves the currently highlighted prediction index
+--- Retrieves the currently highlighted prediction index.
+--- @return number The current index.
 function M.get_current_index()       return _state.current_index end
 
 --- Navigates through the predictions list safely.
@@ -842,8 +843,17 @@ function M.navigate(delta)
     reset_idle_timer() -- Restart the inactivity timer on navigation
 end
 
---- Displays multiple LLM predictions with full UI capabilities
---- @param max_predictions_count Optional: reserve space for N predictions (default: actual count)
+--- Displays multiple LLM predictions with full UI capabilities.
+--- @param predictions table The list of predictions.
+--- @param current_index number The currently selected index.
+--- @param enabled boolean True to display.
+--- @param info_bar string The info bar text.
+--- @param shortcut_mod string The modifier string.
+--- @param indent number The indentation level.
+--- @param nav_mods table The navigation modifiers.
+--- @param bg_color table Optional background tint.
+--- @param loading_text string The loading text.
+--- @param max_predictions_count number Optional: reserve space for N predictions (default: actual count).
 function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mods, bg_color, loading_text, max_predictions_count)
     if not enabled then return end
     if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end

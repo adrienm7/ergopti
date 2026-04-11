@@ -103,9 +103,9 @@ end
 
 
 
--- =========================================
--- ===== 1.1) Shortcut Title Formatting ====
--- =========================================
+-- ==========================================
+-- ===== 1.1) Shortcut Title Formatting =====
+-- ==========================================
 
 local function format_shortcut_title(action, mods, none_label, mod_label)
     if not mods or (#mods == 1 and mods[1] == "none") then
@@ -122,11 +122,11 @@ end
 
 
 
--- ================================
--- ================================
--- ======= 2/ Main Factory ========
--- ================================
--- ================================
+-- ===============================
+-- ===============================
+-- ======= 2/ Main Factory =======
+-- ===============================
+-- ===============================
 
 function M.create(deps)
     if type(deps) ~= "table" then return {} end
@@ -139,7 +139,7 @@ function M.create(deps)
 
     local models_mgr   = Models.new(deps)
     
-    --- Calculates the raw power level of a model based on its size
+    --- Calculates the raw power level of a model based on its size.
     local function get_effective_model_params(info)
         if type(info) ~= "table" then return 0, false, 0, 0 end
 
@@ -201,7 +201,7 @@ function M.create(deps)
         return profile_id
     end
 
-    --- Calculates the raw power level of a model based on its size
+    --- Calculates the raw power level of a model based on its size.
     local function get_model_power_level(model_name)
         if type(model_name) ~= "string" or model_name == "" then return PROFILE_POWER_BASIC end
         
@@ -247,12 +247,12 @@ function M.create(deps)
             end
         end
         if display_name ~= state.llm_model then
-            Logger.debug(LOG, "Correction nom modèle au démarrage (backend→display): '%s' → '%s'", state.llm_model, display_name)
+            Logger.debug(LOG, string.format("Correcting model name on startup (backend->display): '%s' -> '%s'", state.llm_model, display_name))
             state.llm_model = display_name
         end
 
         local actual_name = models_mgr.get_actual_model_name(display_name)
-        Logger.debug(LOG, "Résolution nom modèle au démarrage: '%s' → '%s'", display_name, actual_name)
+        Logger.debug(LOG, string.format("Resolving model name on startup: '%s' -> '%s'", display_name, actual_name))
         if state.llm_use_mlx then
             state.llm_model_mlx = display_name
             llm_mod.set_llm_model_mlx(actual_name)
@@ -265,9 +265,9 @@ function M.create(deps)
             pcall(deps.keymap.set_llm_display_model_name, display_name)
         end
 
-        -- Also cache the model power level for instant profile selection
+        -- Also cache the model power level for instant access
         state.llm_model_power = get_model_power_level(display_name)
-        Logger.debug(LOG, "Puissance modèle au démarrage: %d", state.llm_model_power)
+        Logger.debug(LOG, string.format("Model power on startup: %d", state.llm_model_power))
     end
     local profiles_mgr = Profiles.new(deps, models_mgr)
     local settings_mgr = Settings.new(deps)
@@ -281,13 +281,13 @@ function M.create(deps)
         local my_token = req_token
         models_mgr.check_requirements(model_name, function(...)
             if my_token ~= req_token then
-                Logger.debug(LOG, "check_requirements callback obsolète ignoré (modèle=%s)", tostring(model_name))
+                Logger.debug(LOG, string.format("Obsolete check_requirements callback ignored (model=%s)", tostring(model_name)))
                 return
             end
             if type(on_ok) == "function" then on_ok(...) end
         end, function(...)
             if my_token ~= req_token then
-                Logger.debug(LOG, "check_requirements cancel obsolète ignoré (modèle=%s)", tostring(model_name))
+                Logger.debug(LOG, string.format("Obsolete check_requirements cancel ignored (model=%s)", tostring(model_name)))
                 return
             end
             if type(on_fail) == "function" then on_fail(...) end
@@ -303,11 +303,11 @@ function M.create(deps)
 
 
 
-    -- ========================================
-    -- ===== 2.1) Model Switching Logic =======
-    -- ========================================
+    -- ======================================
+    -- ===== 2.1) Model Switching Logic =====
+    -- ======================================
 
-    --- Calculates the recommended profile and power level for a model
+    --- Calculates the recommended profile and power level for a model.
     local function get_recommended_profile_info(model_name)
         if type(model_name) ~= "string" or model_name == "" then return "basic", PROFILE_POWER_BASIC end
 
@@ -332,7 +332,7 @@ function M.create(deps)
         return rec_profile, PROFILE_POWER_LEVELS[rec_profile] or PROFILE_POWER_BASIC
     end
 
-    --- Gets a human-readable label for a profile
+    --- Gets a human-readable label for a profile.
     local function get_profile_label(profile_id)
         local current_preds = tonumber(state.llm_num_predictions) or 1
         local batch_suffix = current_preds > 1 and "s" or ""
@@ -373,13 +373,13 @@ function M.create(deps)
         return model_name
     end
 
-    --- Checks if a profile is too powerful for the model and shows non-blocking warning
+    --- Checks if a profile is too powerful for the model and shows a non-blocking warning.
     local function check_profile_power_mismatch(selected_profile_id, model_name)
         -- Use already-calculated model power (set when model was selected)
         local model_power = tonumber(state.llm_model_power) or PROFILE_POWER_BASIC
         local selected_power = PROFILE_POWER_LEVELS[normalize_profile_power_key(selected_profile_id)] or PROFILE_POWER_BASIC
 
-        Logger.debug(LOG, "Vérification profil: sélectionné=%d vs modèle=%d", selected_power, model_power)
+        Logger.debug(LOG, string.format("Checking profile power mismatch: selected=%d vs model=%d", selected_power, model_power))
         
         -- Only warn if selected profile is significantly more powerful than model
         if selected_power > model_power + 1 then
@@ -398,8 +398,8 @@ function M.create(deps)
         end
     end
 
-    --- Changes the active profile and checks for power mismatch warnings
-    --- @param profile_id string The profile ID to activate
+    --- Changes the active profile and checks for power mismatch warnings.
+    --- @param profile_id string The profile ID to activate.
     local function set_llm_profile(profile_id)
         if type(profile_id) ~= "string" then return end
         state.llm_active_profile = profile_id
@@ -437,24 +437,24 @@ function M.create(deps)
         local cur_profile = get_normalized_active_profile_id()
         local cur_label = get_profile_label(cur_profile)
 
-        Logger.debug(LOG, "Profil recommandé: %s (actuellement: %s)", rec_profile, cur_profile)
+        Logger.debug(LOG, string.format("Recommended profile: %s (currently: %s)", rec_profile, cur_profile))
         if cur_profile ~= rec_profile then
             local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Changement de modèle"
-            Logger.debug(LOG, "Affichage dialogue suggestion de profil")
+            Logger.debug(LOG, "Displaying profile suggestion dialog…")
             pcall(hs.focus)
             local msg = string.format(
                 "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nValider pour appliquer le prompt conseillé.",
                 display_model_name, power_desc, cur_label, rec_label
             )
             local ok, choice = pcall(hs.dialog.blockAlert, title, msg, "Valider", "Annuler", "informational")
-            Logger.debug(LOG, "Réponse dialogue: %s, choice=%s", tostring(ok), tostring(choice))
+            Logger.debug(LOG, string.format("Dialog response: %s, choice=%s", tostring(ok), tostring(choice)))
             if ok and choice == "Valider" then
-                Logger.info(LOG, "Changement profil vers %s (dialogue accepté)", rec_profile)
+                Logger.info(LOG, string.format("Profile changed to %s (dialog accepted).", rec_profile))
                 state.llm_active_profile = rec_profile
                 llm_mod.set_active_profile(rec_profile)
                 save_prefs(); update_menu()
             else
-                Logger.info(LOG, "Maintien profil %s (dialogue refusé)", cur_profile)
+                Logger.info(LOG, string.format("Profile kept at %s (dialog refused).", cur_profile))
                 state.llm_active_profile = cur_profile
                 llm_mod.set_active_profile(cur_profile)
             end
@@ -467,7 +467,7 @@ function M.create(deps)
             )
             pcall(hs.dialog.blockAlert, title, msg, "Valider", "Annuler", "informational")
         else
-            Logger.debug(LOG, "Profil recommandé = profil actuel")
+            Logger.debug(LOG, "Recommended profile is already the current profile.")
         end
     end
 
@@ -476,33 +476,33 @@ function M.create(deps)
     end
 
     local function switch_model(new_model)
-        Logger.debug(LOG, "switch_model(\"%s\") lancé", new_model or "nil")
+        Logger.debug(LOG, string.format("Executing switch_model('%s')…", new_model or "nil"))
         guarded_check_requirements(new_model, function()
-            Logger.info(LOG, "Changement de modèle → %s", new_model)
+            Logger.info(LOG, string.format("Model successfully switched to %s.", new_model))
             state.llm_model = new_model
             
             -- Calculate and store model power level for instant access
             local model_power = get_model_power_level(new_model)
             state.llm_model_power = model_power
-            Logger.debug(LOG, "Puissance modèle: %d", model_power)
+            Logger.debug(LOG, string.format("Model power cached: %d", model_power))
             
             -- Resolve display name to actual backend model name and persist per backend
             local actual_backend_name = models_mgr.get_actual_model_name(new_model)
             if state.llm_use_mlx then
                 state.llm_model_mlx = new_model
                 llm_mod.set_llm_model_mlx(actual_backend_name)
-                Logger.debug(LOG, "Modèle réel MLX: %s → %s", new_model, actual_backend_name)
+                Logger.debug(LOG, string.format("Actual MLX model: %s -> %s", new_model, actual_backend_name))
             else
                 state.llm_model_ollama = new_model
                 llm_mod.set_llm_model_ollama(actual_backend_name)
-                Logger.debug(LOG, "Modèle réel Ollama: %s → %s", new_model, actual_backend_name)
+                Logger.debug(LOG, string.format("Actual Ollama model: %s -> %s", new_model, actual_backend_name))
             end
             
             if keymap and type(keymap.set_llm_model) == "function" then
                 local ok = pcall(keymap.set_llm_model, actual_backend_name)
-                Logger.debug(LOG, "keymap.set_llm_model() → %s", tostring(ok))
+                Logger.debug(LOG, string.format("keymap.set_llm_model() execution -> %s", tostring(ok)))
             else
-                Logger.warn(LOG, "keymap.set_llm_model non disponible")
+                Logger.warn(LOG, "keymap.set_llm_model is unavailable.")
             end
 
             if keymap and type(keymap.set_llm_display_model_name) == "function" then
@@ -517,15 +517,15 @@ function M.create(deps)
 
 
 
-    -- ========================================
-    -- ===== 2.2) Dynamic Menu Builders =======
-    -- ========================================
+    -- ======================================
+    -- ===== 2.2) Dynamic Menu Builders =====
+    -- ======================================
 
     local function build_models_selection()
-        Logger.debug(LOG, "Création menu sélection modèles")
+        Logger.debug(LOG, "Building models selection menu…")
         local menu = {}
         local installed = models_mgr.get_installed_models()
-        Logger.debug(LOG, "Modèles installés détectés: %d", installed and (function() local c=0 for _ in pairs(installed) do c=c+1 end return c end)() or 0)
+        Logger.debug(LOG, string.format("Installed models detected: %d", installed and (function() local c=0 for _ in pairs(installed) do c=c+1 end return c end)() or 0))
         local presets = models_mgr.get_presets()
         local is_mlx = state.llm_use_mlx
         local active_display_model = get_display_model_name(state.llm_model, presets)
@@ -548,11 +548,11 @@ function M.create(deps)
             title   = "Aucun modèle (Désactivé)",
             checked = (not state.llm_model or state.llm_model == ""),
             fn      = function() 
-                Logger.info(LOG, "Changement modèle → Aucun (désactivé)")
+                Logger.info(LOG, "Switching model to None (disabled).")
                 state.llm_model = ""
                 if keymap and type(keymap.set_llm_model) == "function" then 
                     local ok = pcall(keymap.set_llm_model, "")
-                    Logger.debug(LOG, "keymap.set_llm_model(\"\") → %s", tostring(ok))
+                    Logger.debug(LOG, string.format("keymap.set_llm_model('') execution -> %s", tostring(ok)))
                 end
                 save_prefs(); update_menu()
             end
@@ -566,7 +566,7 @@ function M.create(deps)
                 title   = "↺ Modèle par défaut du backend (" .. backend_default .. ")",
                 checked = (active_display_model == backend_default),
                 fn      = function()
-                    Logger.info(LOG, "Restauration modèle par défaut backend → %s", backend_default)
+                    Logger.info(LOG, string.format("Restoring backend default model -> %s", backend_default))
                     switch_model(backend_default)
                 end
             })
@@ -639,7 +639,7 @@ function M.create(deps)
 
                     table.insert(model_submenu, { title = "-" })
 
-                                        table.insert(model_submenu, { title = "Backend : " .. active_backend, fn = function() end })
+                    table.insert(model_submenu, { title = "Backend : " .. active_backend, fn = function() end })
 
                     table.insert(model_submenu, {
                         title = "Source : " .. active_source,
@@ -712,20 +712,20 @@ function M.create(deps)
     end
 
     local function build_num_pred_menu()
-        Logger.debug(LOG, "Création menu nombre prédictions")
+        Logger.debug(LOG, "Building prediction count menu…")
         local m = {}
         for i = 1, 10 do
             table.insert(m, {
                 title   = i .. " suggestion" .. (i > 1 and "s" or ""),
                 checked = (state.llm_num_predictions == i),
                 fn      = function()
-                    Logger.info(LOG, "Changement nombre prédictions → %d", i)
+                    Logger.info(LOG, string.format("Changing number of predictions -> %d", i))
                     state.llm_num_predictions = i
                     if keymap and type(keymap.set_llm_num_predictions) == "function" then 
                         local ok = pcall(keymap.set_llm_num_predictions, i)
-                        Logger.debug(LOG, "keymap.set_llm_num_predictions(%d) → %s", i, tostring(ok))
+                        Logger.debug(LOG, string.format("keymap.set_llm_num_predictions(%d) execution -> %s", i, tostring(ok)))
                     else
-                        Logger.warn(LOG, "keymap.set_llm_num_predictions non disponible")
+                        Logger.warn(LOG, "keymap.set_llm_num_predictions is unavailable.")
                     end
                     save_prefs(); update_menu()
                 end
@@ -736,25 +736,25 @@ function M.create(deps)
 
 
 
-    -- ========================================
-    -- ===== 2.3) Hotkeys & Triggers ==========
-    -- ========================================
+    -- =====================================
+    -- ===== 2.3) Hotkeys & Triggers =======
+    -- =====================================
 
     local _llm_trigger_hk = nil
     local _llm_profile_hks = {}
     local _startup_silence = false
 
     local function bind_hotkey(mods, key, callback)
-        Logger.debug(LOG, "Tentative bind hotkey: mods=%s, key=%s",
+        Logger.debug(LOG, string.format("Attempting hotkey bind: mods=%s, key=%s",
             type(mods) == "table" and table.concat(mods, "+") or tostring(mods),
-            key or "nil")
+            key or "nil"))
         local ok, hk = pcall(hs.hotkey.new, mods, key, callback)
         if ok and hk then
-            Logger.debug(LOG, "Hotkey créé: %s+%s",
-                type(mods) == "table" and table.concat(mods, "+") or "", key or "")
+            Logger.debug(LOG, string.format("Hotkey created successfully: %s+%s",
+                type(mods) == "table" and table.concat(mods, "+") or "", key or ""))
             return hk
         else
-            Logger.error(LOG, "Bind hotkey échoué: ok=%s, err=%s", tostring(ok), tostring(hk))
+            Logger.error(LOG, string.format("Hotkey binding failed: ok=%s, err=%s", tostring(ok), tostring(hk)))
             return nil
         end
     end
@@ -769,23 +769,23 @@ function M.create(deps)
 
     local function trigger_prediction_with_profile(profile_id)
         if type(profile_id) ~= "string" or profile_id == "" then 
-            Logger.warn(LOG, "trigger_prediction_with_profile: profile_id invalide: %s", tostring(profile_id))
+            Logger.warn(LOG, string.format("trigger_prediction_with_profile: invalid profile_id: %s", tostring(profile_id)))
             return 
         end
         if not keymap or type(keymap.trigger_prediction) ~= "function" then 
-            Logger.error(LOG, "trigger_prediction_with_profile: keymap ou trigger_prediction non disponible")
+            Logger.error(LOG, "trigger_prediction_with_profile: keymap or trigger_prediction is unavailable.")
             return 
         end
 
-        Logger.debug(LOG, "Déclenchement prédiction avec profil \"%s\"", profile_id)
+        Logger.debug(LOG, string.format("Triggering prediction with profile '%s'", profile_id))
         
         if type(keymap.reset_predictions) == "function" then
             pcall(keymap.reset_predictions)
-            Logger.debug(LOG, "Prédictions en cours annulées avant trigger profil")
+            Logger.debug(LOG, "Active predictions cancelled before profile trigger.")
         end
         
         local previous_profile = state.llm_active_profile or "basic"
-        Logger.debug(LOG, "Changement de profil: %s → %s", previous_profile, profile_id)
+        Logger.debug(LOG, string.format("Changing profile: %s -> %s", previous_profile, profile_id))
         
         local profile_label = profile_id
         for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
@@ -807,7 +807,7 @@ function M.create(deps)
         pcall(keymap.trigger_prediction, true, profile_label)
         llm_mod.set_active_profile(previous_profile)
         
-        Logger.debug(LOG, "Profil restauré: %s", previous_profile)
+        Logger.debug(LOG, string.format("Profile restored: %s", previous_profile))
     end
 
     local function apply_llm_shortcut(mods, key)
@@ -837,28 +837,28 @@ function M.create(deps)
         if type(state.llm_profile_shortcuts) ~= "table" then state.llm_profile_shortcuts = {} end
 
         local normalized = shortcut_ui.normalize_shortcut(mods, key, {"ctrl"})
-        Logger.debug(LOG, "apply_llm_profile_shortcut(\"%s\", mods=%s, key=%s) → normalized=%s",
+        Logger.debug(LOG, string.format("apply_llm_profile_shortcut('%s', mods=%s, key=%s) -> normalized=%s",
             profile_id,
             type(mods) == "table" and table.concat(mods, "+") or tostring(mods),
             key or "nil",
-            normalized and (table.concat(normalized.mods, "+") .. "+" .. normalized.key) or "nil")
+            normalized and (table.concat(normalized.mods, "+") .. "+" .. normalized.key) or "nil"))
         
         if normalized then
             state.llm_profile_shortcuts[profile_id] = { mods = normalized.mods, key = normalized.key }
             local hk = bind_hotkey(normalized.mods, normalized.key, function()
-                Logger.debug(LOG, "Raccourci profil déclenché: \"%s\"", profile_id)
+                Logger.debug(LOG, string.format("Profile shortcut triggered: '%s'", profile_id))
                 trigger_prediction_with_profile(profile_id)
             end)
             if hk and not (type(opts) == "table" and opts.silent == true) then activate_hotkey(hk) end
             _llm_profile_hks[profile_id] = hk
             if hk then
-                Logger.debug(LOG, "Raccourci lié avec succès pour profil \"%s\"", profile_id)
+                Logger.debug(LOG, string.format("Shortcut bound successfully for profile '%s'", profile_id))
             else
-                Logger.error(LOG, "Bind raccourci échoué pour profil \"%s\"", profile_id)
+                Logger.error(LOG, string.format("Shortcut binding failed for profile '%s'", profile_id))
             end
         else
             state.llm_profile_shortcuts[profile_id] = nil
-            Logger.debug(LOG, "Raccourci désactivé pour profil \"%s\"", profile_id)
+            Logger.debug(LOG, string.format("Shortcut disabled for profile '%s'", profile_id))
         end
 
         if not (type(opts) == "table" and opts.silent == true) then
@@ -872,18 +872,18 @@ function M.create(deps)
 
 
 
-    -- ========================================
-    -- ===== 2.4) Lifecycle & Main Build ======
-    -- ========================================
+    -- =========================================
+    -- ===== 2.4) Lifecycle & Main Build =======
+    -- =========================================
 
     local check_startup
     local _check_startup_attempts = nil
 
     local function build_item()
-        Logger.debug(LOG, "Création menu IA (build_item)")
+        Logger.debug(LOG, "Building LLM menu item (build_item)…")
         local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
         local is_disabled = (not state.llm_enabled) or paused
-        Logger.debug(LOG, "État menu: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled))
+        Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
         local main_menu = {}
 
         local backend_title = "Moteur IA (Backend) : " .. (state.llm_use_mlx and "Apple MLX 🚀" or "Ollama 🦙")
@@ -895,24 +895,28 @@ function M.create(deps)
             disabled = (not is_apple_silicon) or paused or nil,
             fn       = not paused and function()
                 if not state.llm_use_mlx then
-                    Logger.info(LOG, "Activation MLX")
+                    Logger.info(LOG, "Activating MLX backend…")
                     state.llm_use_mlx = true
                     llm_mod.set_use_mlx(true)
+                    
+                    if keymap and type(keymap.set_llm_backend_name) == "function" then
+                        pcall(keymap.set_llm_backend_name, "MLX 🚀")
+                    end
 
                     local target_model = get_display_model_name(state.llm_model_mlx or M.DEFAULT_STATE.llm_model_mlx or "")
-                    state.llm_model = target_model
-                    if target_model ~= "" then
-                        llm_mod.set_llm_model_mlx(models_mgr.get_actual_model_name(target_model))
+                    if target_model and target_model ~= "" then
+                        switch_model(target_model)
+                    else
+                        state.llm_model = ""
+                        if keymap and type(keymap.set_llm_model) == "function" then
+                            pcall(keymap.set_llm_model, "")
+                        end
+                        if keymap and type(keymap.set_llm_display_model_name) == "function" then
+                            pcall(keymap.set_llm_display_model_name, "")
+                        end
+                        save_prefs()
+                        update_menu()
                     end
-
-                    if keymap and type(keymap.set_llm_model) == "function" then
-                        pcall(keymap.set_llm_model, models_mgr.get_actual_model_name(target_model))
-                    end
-                    if keymap and type(keymap.set_llm_display_model_name) == "function" then
-                        pcall(keymap.set_llm_display_model_name, target_model)
-                    end
-
-                    save_prefs(); update_menu()
                 end
             end or nil
         })
@@ -923,26 +927,30 @@ function M.create(deps)
             disabled = paused or nil,
             fn       = not paused and function()
                 if state.llm_use_mlx then
-                    Logger.info(LOG, "Désactivation MLX (passage à Ollama)")
+                    Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
                     state.llm_use_mlx = false
                     llm_mod.set_use_mlx(false)
                     if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
-                    Logger.debug(LOG, "Serveur MLX arrêté")
+                    Logger.debug(LOG, "MLX server stopped.")
+
+                    if keymap and type(keymap.set_llm_backend_name) == "function" then
+                        pcall(keymap.set_llm_backend_name, "Ollama 🦙")
+                    end
 
                     local target_model = get_display_model_name(state.llm_model_ollama or M.DEFAULT_STATE.llm_model_ollama or "")
-                    state.llm_model = target_model
-                    if target_model ~= "" then
-                        llm_mod.set_llm_model_ollama(models_mgr.get_actual_model_name(target_model))
+                    if target_model and target_model ~= "" then
+                        switch_model(target_model)
+                    else
+                        state.llm_model = ""
+                        if keymap and type(keymap.set_llm_model) == "function" then
+                            pcall(keymap.set_llm_model, "")
+                        end
+                        if keymap and type(keymap.set_llm_display_model_name) == "function" then
+                            pcall(keymap.set_llm_display_model_name, "")
+                        end
+                        save_prefs()
+                        update_menu()
                     end
-
-                    if keymap and type(keymap.set_llm_model) == "function" then
-                        pcall(keymap.set_llm_model, models_mgr.get_actual_model_name(target_model))
-                    end
-                    if keymap and type(keymap.set_llm_display_model_name) == "function" then
-                        pcall(keymap.set_llm_display_model_name, target_model)
-                    end
-
-                    save_prefs(); update_menu()
                 end
             end or nil
         })
@@ -1131,13 +1139,13 @@ function M.create(deps)
             checked = (state.llm_enabled and not paused) or nil,
             fn      = not paused and function()
                 local function toggle_state()
-                    Logger.info(LOG, "Toggle IA: %s → %s", tostring(state.llm_enabled), tostring(not state.llm_enabled))
+                    Logger.info(LOG, string.format("Toggling LLM: %s -> %s", tostring(state.llm_enabled), tostring(not state.llm_enabled)))
                     state.llm_enabled = not state.llm_enabled
                     if keymap and type(keymap.set_llm_enabled) == "function" then 
                         local ok = pcall(keymap.set_llm_enabled, state.llm_enabled)
-                        Logger.debug(LOG, "keymap.set_llm_enabled(%s) → %s", tostring(state.llm_enabled), tostring(ok))
+                        Logger.debug(LOG, string.format("keymap.set_llm_enabled(%s) execution -> %s", tostring(state.llm_enabled), tostring(ok)))
                     else
-                        Logger.warn(LOG, "keymap.set_llm_enabled non disponible")
+                        Logger.warn(LOG, "keymap.set_llm_enabled is unavailable.")
                     end
                     save_prefs(); update_menu()
                     pcall(function() hs.notify.new({title = state.llm_enabled and "🟢 ACTIVÉ" or "🔴 DÉSACTIVÉ", informativeText = "Suggestions IA"}):send() end)
@@ -1158,17 +1166,17 @@ function M.create(deps)
     end
 
     check_startup = function()
-        Logger.info(LOG, "═══════════════ Démarrage menu_llm ═══════════════")
+        Logger.info(LOG, "═══════════════ Starting menu_llm ═══════════════")
         
         _startup_silence = true
         
         if type(state.llm_trigger_shortcut) == "table" then
-            Logger.debug(LOG, "Restauration raccourci déclenchement général: %s+%s",
+            Logger.debug(LOG, string.format("Restoring trigger shortcut: %s+%s",
                 table.concat(state.llm_trigger_shortcut.mods or {}, "+"),
-                state.llm_trigger_shortcut.key or "nil")
+                state.llm_trigger_shortcut.key or "nil"))
             apply_llm_shortcut(state.llm_trigger_shortcut.mods, state.llm_trigger_shortcut.key)
         else
-            Logger.debug(LOG, "Aucun raccourci déclenchement général")
+            Logger.debug(LOG, "No global trigger shortcut configured.")
         end
 
         local valid_profile_ids = {}
@@ -1179,7 +1187,7 @@ function M.create(deps)
                 builtin_count = builtin_count + 1
             end
         end
-        Logger.debug(LOG, "Profils built-in chargés: %d", builtin_count)
+        Logger.debug(LOG, string.format("Built-in profiles loaded: %d", builtin_count))
         
         local user_count = 0
         for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
@@ -1188,28 +1196,28 @@ function M.create(deps)
                 user_count = user_count + 1
             end
         end
-        Logger.debug(LOG, "Profils utilisateur chargés: %d", user_count)
+        Logger.debug(LOG, string.format("User profiles loaded: %d", user_count))
 
         local profile_shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
         local sc_count = 0
         for _ in pairs(profile_shortcuts) do sc_count = sc_count + 1 end
-        Logger.info(LOG, "Raccourcis de profils au démarrage: %d entrées", sc_count)
+        Logger.info(LOG, string.format("Profile shortcuts loaded: %d entries", sc_count))
         
         for profile_id, sc in pairs(profile_shortcuts) do
             local mods_str = (type(sc) == "table" and type(sc.mods) == "table") and table.concat(sc.mods, "+") or "nil"
             local key_str = (type(sc) == "table" and type(sc.key) == "string") and sc.key or "nil"
-            Logger.debug(LOG, "Profil \"%s\" : mods=%s, key=%s", profile_id, mods_str, key_str)
+            Logger.debug(LOG, string.format("Profile '%s': mods=%s, key=%s", profile_id, mods_str, key_str))
             
             if valid_profile_ids[profile_id] and type(sc) == "table" then
-                Logger.debug(LOG, "Binding raccourci au démarrage pour profil \"%s\"", profile_id)
+                Logger.debug(LOG, string.format("Binding shortcut for profile '%s' on startup.", profile_id))
                 apply_llm_profile_shortcut(profile_id, sc.mods, sc.key, { silent = true })
             else
-                Logger.warn(LOG, "Suppression raccourci de profil invalide \"%s\"", profile_id)
+                Logger.warn(LOG, string.format("Removing invalid shortcut for profile '%s'.", profile_id))
                 apply_llm_profile_shortcut(profile_id, nil, nil, { silent = true })
             end
         end
 
-        Logger.debug(LOG, "Activation batch des hotkeys...")
+        Logger.debug(LOG, "Activating bound hotkeys…")
         if _llm_trigger_hk then activate_hotkey(_llm_trigger_hk) end
         for _, hk in pairs(_llm_profile_hks) do
             if hk then activate_hotkey(hk) end
@@ -1218,14 +1226,14 @@ function M.create(deps)
         _startup_silence = false
 
         if not state.llm_enabled then 
-            Logger.debug(LOG, "IA désactivée au démarrage")
+            Logger.debug(LOG, "LLM disabled at startup.")
             return 
         end
         
-        Logger.info(LOG, "IA activée au démarrage, modèle: %s", state.llm_model or "nil")
+        Logger.info(LOG, string.format("LLM enabled at startup, model: %s", state.llm_model or "nil"))
         
         local function disable_llm()
-            Logger.error(LOG, "Désactivation IA (check_requirements échoué)")
+            Logger.error(LOG, "Disabling LLM (requirements check failed).")
             state.llm_enabled = false
             if keymap and type(keymap.set_llm_enabled) == "function" then 
                 pcall(keymap.set_llm_enabled, false)
@@ -1234,29 +1242,33 @@ function M.create(deps)
         end
 
         if not state.llm_model or state.llm_model == "" then 
-            Logger.warn(LOG, "Aucun modèle configuré au démarrage")
+            Logger.warn(LOG, "No model configured at startup.")
             return 
         end
 
         if state.llm_use_mlx then
-            Logger.debug(LOG, "Mode MLX: blocage prédictions durant initialisation")
+            Logger.debug(LOG, "MLX mode: locking predictions during initialization.")
             if keymap and type(keymap.set_llm_enabled) == "function" then
                 pcall(keymap.set_llm_enabled, false)
             end
         end
 
-        Logger.debug(LOG, "Vérification requirements modèle: %s", state.llm_model)
+        if keymap and type(keymap.set_llm_backend_name) == "function" then
+            pcall(keymap.set_llm_backend_name, state.llm_use_mlx and "Apple MLX 🚀" or "Ollama 🦙")
+        end
+
+        Logger.debug(LOG, string.format("Checking model requirements: %s", state.llm_model))
         -- Defer until the async installed-models cache is populated (refresh_installed_async
         -- fires at doAfter(0)); polling here avoids a false "not installed" dialog at startup
         local function do_check_requirements()
             local installed = models_mgr.get_installed_models()
             local count = 0; for _ in pairs(installed) do count = count + 1 end
-            Logger.debug(LOG, "Startup installed-models cache count: %d", count)
+            Logger.debug(LOG, string.format("Startup installed-models cache count: %d", count))
             if count == 0 then
                 -- Cache not yet ready — retry in 1s (max 10 attempts)
                 if not _check_startup_attempts then _check_startup_attempts = 0 end
                 _check_startup_attempts = _check_startup_attempts + 1
-                Logger.debug(LOG, "Startup requirements deferred (attempt %d/10)", _check_startup_attempts)
+                Logger.debug(LOG, string.format("Startup requirements deferred (attempt %d/10)", _check_startup_attempts))
                 if _check_startup_attempts < 10 then
                     hs.timer.doAfter(1, do_check_requirements)
                     return
@@ -1267,17 +1279,17 @@ function M.create(deps)
 
             local check_fn = guarded_check_requirements
             if state.llm_use_mlx and type(models_mgr.force_mlx_check) == "function" then
-                Logger.debug(LOG, "Startup MLX mode: forcing MLX requirements check for model %s", state.llm_model)
+                Logger.debug(LOG, string.format("Startup MLX mode: forcing MLX requirements check for model %s", state.llm_model))
                 check_fn = function(model_name, on_ok, on_fail)
                     models_mgr.force_mlx_check(model_name, on_ok, on_fail, { silent_notifications = false })
                 end
             end
 
             check_fn(state.llm_model, function()
-                Logger.info(LOG, "Requirements OK pour modèle %s", state.llm_model)
+                Logger.info(LOG, string.format("Requirements verified for model %s.", state.llm_model))
                 if state.llm_use_mlx and state.llm_enabled
                     and keymap and type(keymap.set_llm_enabled) == "function" then
-                    Logger.debug(LOG, "Réactivation prédictions MLX")
+                    Logger.debug(LOG, "Reactivating MLX predictions.")
                     pcall(keymap.set_llm_enabled, true)
                     end
             end, disable_llm)
@@ -1288,18 +1300,18 @@ function M.create(deps)
         hs.timer.doAfter(3, function()
             if state.llm_use_mlx and state.llm_enabled and state.llm_model and state.llm_model ~= ""
                 and type(models_mgr.force_mlx_check) == "function" then
-                Logger.debug(LOG, "Startup MLX backup check fired for model %s", state.llm_model)
+                Logger.debug(LOG, string.format("Startup MLX backup check fired for model %s", state.llm_model))
                 models_mgr.force_mlx_check(state.llm_model, function()
-                    Logger.info(LOG, "Startup MLX backup check succeeded for model %s", state.llm_model)
+                    Logger.info(LOG, string.format("Startup MLX backup check succeeded for model %s", state.llm_model))
                     if keymap and type(keymap.set_llm_enabled) == "function" then
                         pcall(keymap.set_llm_enabled, true)
                     end
                 end, function()
-                    Logger.warn(LOG, "Startup MLX backup check failed for model %s", state.llm_model)
+                    Logger.warn(LOG, string.format("Startup MLX backup check failed for model %s", state.llm_model))
                 end, { silent_notifications = false })
             end
         end)
-        Logger.info(LOG, "═══════════════ Démarrage menu_llm complété ═══════════════")
+        Logger.info(LOG, "═══════════════ Startup completed for menu_llm ═══════════════")
     end
 
     return { 

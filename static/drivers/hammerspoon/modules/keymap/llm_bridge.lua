@@ -73,6 +73,8 @@ local _llm_fetch_request_id    = 0
 local _last_suggested_hs       = nil
 local _last_llm_input_signature = nil
 
+local current_llm_backend_name = nil
+
 local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED
 local current_llm_model        = core_llm.DEFAULT_LLM_MODEL
 local current_llm_display_name = core_llm.DEFAULT_LLM_MODEL
@@ -141,6 +143,11 @@ function M.set_llm_model(m)
 	end
 	current_llm_model = model_name  -- also update local cache for display
 end
+
+function M.set_llm_backend_name(n)
+	current_llm_backend_name = (type(n) == "string") and n or nil
+end
+
 function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
 function M.set_llm_display_model_name(name)
 	if type(name) == "string" and name ~= "" then current_llm_display_name = name end
@@ -503,13 +510,13 @@ local function trim_prompt_title(prompt_title)
 	return clean
 end
 
---- Generates the string for the information bar tooltip.
+--- Generates the string for the information bar tooltip dynamically passing the backend string.
 --- @param model_name string Model identifier.
 --- @param elapsed_ms number Milliseconds taken for generation.
---- @param is_mlx boolean Whether MLX backend is active.
+--- @param backend_name string|nil The active backend string.
 --- @param profile_name string|nil Profile/prompt name for display.
 --- @return string Formatted string.
-local function build_info_bar(model_name, elapsed_ms, is_mlx, profile_name)
+local function build_info_bar(model_name, elapsed_ms, backend_name, profile_name)
 	if not model_name or model_name == "" then return nil end
 	
 	local parts = {}
@@ -523,7 +530,8 @@ local function build_info_bar(model_name, elapsed_ms, is_mlx, profile_name)
 	if elapsed_ms and elapsed_ms > 0 then
 		local secs = elapsed_ms / 1000
 		local time_str = secs < 10 and string.format("%.1fs", secs) or string.format("%ds", math.floor(secs + 0.5))
-		local time_block = "⏱️ " .. time_str .. (is_mlx and " (MLX 🚀)" or "")
+		local backend_str = type(backend_name) == "string" and backend_name or ""
+		local time_block = "⏱️ " .. time_str .. (backend_str ~= "" and (" — " .. backend_str) or "")
 		table.insert(parts, time_block)
 		return table.concat(parts, " — ")
 	end
@@ -573,12 +581,12 @@ function M._perform_llm_check(force_trigger, profile_name)
 
 	local llm_input_signature = clean_buffer .. "\n" .. tail
 	if not force_trigger and _last_llm_input_signature == llm_input_signature then
-		Logger.debug(LOG, "Requête LLM ignorée (entrée inchangée)")
+		Logger.debug(LOG, "LLM request ignored (input unchanged).")
 		return
 	end
 	_last_llm_input_signature = llm_input_signature
 
-	if tooltip.show then tooltip.show("⏳ Génération en cours...", true, preview_ai_enabled, C_TINT_AI_LOADING) end
+	if tooltip.show then tooltip.show("⏳ Génération en cours…", true, preview_ai_enabled, C_TINT_AI_LOADING) end
 
 	local num_pred = llm_num_predictions
 	local req_temperature = llm_temperature
@@ -591,7 +599,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 		if type(core_llm.get_active_profile) == "function" then
 			local active_profile = core_llm.get_active_profile()
 			if type(active_profile) == "table" then
-				Logger.debug(LOG, "Profil actif: id=%s, label=%s, batch=%s", tostring(active_profile.id), tostring(active_profile.label), tostring(active_profile.batch))
+				Logger.debug(LOG, string.format("Active profile: id=%s, label=%s, batch=%s", tostring(active_profile.id), tostring(active_profile.label), tostring(active_profile.batch)))
 			end
 		end
 
@@ -606,7 +614,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 			max_predict_tokens = math.max(20, math.min(80, llm_max_words * 6 + 8))
 		end
 		local effective_num_pred = num_pred
-		Logger.debug(LOG, "LLM dispatch tuned: mlx=%s, num_pred=%d, max_tokens=%d", tostring(using_mlx_backend), effective_num_pred, max_predict_tokens)
+		Logger.debug(LOG, string.format("LLM dispatch tuned: mlx=%s, num_pred=%d, max_tokens=%d", tostring(using_mlx_backend), effective_num_pred, max_predict_tokens))
 		
 		core_llm.fetch_llm_prediction(
 			clean_buffer, tail,
@@ -713,16 +721,16 @@ function M._perform_llm_check(force_trigger, profile_name)
 								elseif dedup_key == "" then
 									table.insert(valid_preds, p)
 								else
-									Logger.debug(LOG, "Prédiction rejetée (doublon tooltip): '%s'", dedup_key)
+									Logger.debug(LOG, string.format("Prediction rejected (tooltip duplicate): '%s'", dedup_key))
 								end
 							end
 						elseif is_noise then
-							Logger.debug(LOG, "Prédiction rejetée (bruit): '%s'", tt)
+							Logger.debug(LOG, string.format("Prediction rejected (noise): '%s'", tt))
 						end
 					end
 				end
 
-				-- Keep already displayed order stable and append only genuinely new predictions.
+				-- Keeps already displayed order stable and appends only genuinely new predictions.
 				if _predictions_active and type(_pending_predictions) == "table" and #_pending_predictions > 0 then
 					local merged_preds = {}
 					local seen_merge = {}
@@ -753,10 +761,10 @@ function M._perform_llm_check(force_trigger, profile_name)
 					return
 				end
 
-				Logger.debug(LOG, "%d prédiction(s) valide(s) en %dms :", #valid_preds, elapsed_ms or 0)
+				Logger.debug(LOG, string.format("%d valid prediction(s) in %dms:", #valid_preds, elapsed_ms or 0))
 				for i, p in ipairs(valid_preds) do
 					local nw_info = (p.nw and p.nw ~= "") and (" | nw='" .. p.nw .. "'") or ""
-					Logger.debug(LOG, "  #%d → del=%d to_type='%s'%s", i, p.deletes or 0, p.to_type or "", nw_info)
+					Logger.debug(LOG, string.format("  #%d -> del=%d to_type='%s'%s", i, p.deletes or 0, p.to_type or "", nw_info))
 				end
 
 				-- Notify keylogger that we suggested a prediction
@@ -766,7 +774,6 @@ function M._perform_llm_check(force_trigger, profile_name)
 				
 				_pending_predictions = valid_preds
 				_predictions_active  = true
-				local using_mlx = type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() or false
 				
 				local display_profile_name = profile_name
 				if not display_profile_name then
@@ -781,7 +788,16 @@ function M._perform_llm_check(force_trigger, profile_name)
 				local display_model = (current_llm_display_name ~= "" and current_llm_display_name)
 					or (type(core_llm.get_current_model) == "function" and core_llm.get_current_model())
 					or current_llm_model
-				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, using_mlx, display_profile_name) or nil
+					
+				local backend_name = current_llm_backend_name
+				if not backend_name then
+				    -- Retro-compatibility fallback
+					local using_mlx = type(core_llm.is_using_mlx) == "function" and core_llm.is_using_mlx() or false
+					backend_name = using_mlx and "Apple MLX 🚀" or "Ollama 🦙"
+				end
+				
+				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, backend_name, display_profile_name) or nil
+				
 				local loading_text = nil
 				if is_final ~= true and #valid_preds < llm_num_predictions then
 					local spinner_frames = { "◐", "◓", "◑", "◒" }
@@ -816,7 +832,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 								pred_str = pred_str .. "\n" .. i .. ". " .. (pred.to_type or "?")
 							end
 						end
-						Logger.warning(LOG, "📝 LLM Prédictions reçues (tooltip indisponible):%s", pred_str)
+						Logger.warning(LOG, string.format("📝 LLM Predictions received (tooltip unavailable):%s", pred_str))
 						pcall(function()
 							local ok_notif, notifications = pcall(require, "lib.notifications")
 							if ok_notif and notifications and type(notifications.notify) == "function" then
