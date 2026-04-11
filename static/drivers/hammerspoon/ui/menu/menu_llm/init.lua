@@ -893,11 +893,16 @@ function M.create(deps)
         Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
         local main_menu = {}
 
-        local backend_title = "Moteur IA (Backend) : " .. (state.llm_backend == "mlx" and "Apple MLX 🚀" or "Ollama 🦙")
+        local backend_title_str = "Moteur IA (Backend) : "
+        if state.llm_backend == "mlx" then backend_title_str = backend_title_str .. "MLX 🚀"
+        elseif state.llm_backend == "ollama" then backend_title_str = backend_title_str .. "Ollama 🦙"
+        else backend_title_str = backend_title_str .. "Inconnu" end
+
+        local backend_title = backend_title_str
         local backend_menu = {}
 
         table.insert(backend_menu, {
-            title    = "Apple MLX 🚀 — Recommandé (natif Mac, ultra-rapide)",
+            title    = "MLX 🚀 — Recommandé (natif Mac, ultra-rapide)",
             checked  = (state.llm_backend == "mlx"),
             disabled = (not is_apple_silicon) or paused or nil,
             fn       = not paused and function()
@@ -905,6 +910,10 @@ function M.create(deps)
                     Logger.info(LOG, "Activating MLX backend…")
                     state.llm_backend = "mlx"
                     llm_mod.set_backend("mlx")
+
+                    if keymap and type(keymap.set_llm_backend_name) == "function" then
+                        pcall(keymap.set_llm_backend_name, "MLX 🚀")
+                    end
 
                     local target_model = get_display_model_name(state.llm_model_mlx or M.DEFAULT_STATE.llm_model_mlx or "")
                     if target_model and target_model ~= "" then
@@ -935,6 +944,10 @@ function M.create(deps)
                     llm_mod.set_backend("ollama")
                     if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
                     Logger.debug(LOG, "MLX server stopped.")
+
+                    if keymap and type(keymap.set_llm_backend_name) == "function" then
+                        pcall(keymap.set_llm_backend_name, "")
+                    end
 
                     local target_model = get_display_model_name(state.llm_model_ollama or M.DEFAULT_STATE.llm_model_ollama or "")
                     if target_model and target_model ~= "" then
@@ -1250,6 +1263,12 @@ function M.create(deps)
             if keymap and type(keymap.set_llm_enabled) == "function" then
                 pcall(keymap.set_llm_enabled, false)
             end
+        end
+
+        if keymap and type(keymap.set_llm_backend_name) == "function" then
+            local startup_backend = ""
+            if state.llm_backend == "mlx" then startup_backend = "MLX 🚀" end
+            pcall(keymap.set_llm_backend_name, startup_backend)
         end
 
         Logger.debug(LOG, string.format("Checking model requirements: %s", state.llm_model))

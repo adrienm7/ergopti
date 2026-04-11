@@ -73,6 +73,8 @@ local _llm_fetch_request_id    = 0
 local _last_suggested_hs       = nil
 local _last_llm_input_signature = nil
 
+local current_llm_backend_name = nil
+
 local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED
 local current_llm_model        = core_llm.DEFAULT_LLM_MODEL
 local current_llm_display_name = core_llm.DEFAULT_LLM_MODEL
@@ -140,6 +142,10 @@ function M.set_llm_model(m)
 		end
 	end
 	current_llm_model = model_name
+end
+
+function M.set_llm_backend_name(n)
+	current_llm_backend_name = (type(n) == "string") and n or nil
 end
 
 function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
@@ -597,7 +603,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 			end
 		end
 
-		local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "ollama"
+		local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "inconnu"
 		
 		-- Keep generations short for typing autocomplete to reduce latency.
 		local model_to_use = type(core_llm.get_current_model) == "function" and core_llm.get_current_model() or current_llm_model
@@ -611,6 +617,14 @@ function M._perform_llm_check(force_trigger, profile_name)
 		end
 		
 		local effective_num_pred = num_pred
+		
+		-- Automatically boost temperature if user requests multiple parallel predictions
+		-- to prevent greedy deterministic engines from generating 3 identical strings.
+		if effective_num_pred > 1 and req_temperature < 0.4 then
+			req_temperature = 0.5
+			Logger.debug(LOG, string.format("Boosted temperature to %.1f for parallel variety.", req_temperature))
+		end
+		
 		Logger.debug(LOG, string.format("LLM dispatch tuned: backend=%s, num_pred=%d, max_tokens=%d", tostring(backend), effective_num_pred, max_predict_tokens))
 		
 		core_llm.fetch_llm_prediction(
@@ -645,7 +659,13 @@ function M._perform_llm_check(force_trigger, profile_name)
 				for w in clean_buffer:lower():gmatch("[%aÀ-ÿ0-9]+") do
 					ctx_words[w] = true
 				end
-				for _, p in ipairs(predictions) do
+				
+				for _, p_raw in ipairs(predictions) do
+					-- Clone the prediction to avoid mutating the API's internal tables
+					-- which is critical if the API streams and updates chunks progressively.
+					local p = {}
+					for k, v in pairs(p_raw) do p[k] = v end
+
 					if p.to_type then
 						local tt = p.to_type
 						local original_tt = tt
@@ -786,8 +806,13 @@ function M._perform_llm_check(force_trigger, profile_name)
 					or (type(core_llm.get_current_model) == "function" and core_llm.get_current_model())
 					or current_llm_model
 					
-				local backend_display = (backend == "mlx") and "Apple MLX 🚀" or "Ollama 🦙"
-				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, backend_display, display_profile_name) or nil
+				local backend_name = current_llm_backend_name
+				if not backend_name then
+					if backend == "mlx" then backend_name = "MLX 🚀"
+					else backend_name = "" end
+				end
+				
+				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, backend_name, display_profile_name) or nil
 				
 				local loading_text = nil
 				if is_final ~= true and #valid_preds < llm_num_predictions then
@@ -835,7 +860,11 @@ function M._perform_llm_check(force_trigger, profile_name)
 			end,
 			function()
 				if _llm_fetch_request_id ~= my_request_id then return end
-				M.reset_predictions()
+				-- DO NOT reset the entire predictions buffer if one of the parallel threads drops.
+				-- Let the successful ones continue to be displayed.
+				if not _predictions_active then
+					M.reset_predictions()
+				end
 			end,
 			llm_sequential_mode,
 			force_trigger,

@@ -93,7 +93,7 @@ function M.auto_detect_backend(callback)
 		elseif mlx_ok then
 			CoreState.backend = "mlx"
 		else
-			CoreState.backend = "ollama"
+			CoreState.backend = "inconnu"
 		end
 		
 		if type(callback) == "function" then pcall(callback, CoreState.backend) end
@@ -152,7 +152,7 @@ end
 --- Returns the currently active LLM backend identifier.
 --- @return string The backend identifier.
 function M.get_backend()
-	return CoreState.backend
+	return CoreState.backend or "inconnu"
 end
 
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON
