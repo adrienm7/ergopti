@@ -278,13 +278,13 @@ end
 --- Returns today's active plain log file.
 --- @return string Filepath.
 local function get_log_file() 
-	local d = os.date("%Y_%m_%d")
+	local d = os.date("%Y-%m-%d")
 	return _state.LOG_DIR .. "/" .. d .. ".log" 
 end
 
 --- Persists today's index into a dedicated JSON file (fast write).
 function M.save_today_index()
-	local idx_file = _state.LOG_DIR .. "/" .. os.date("%Y_%m_%d") .. ".idx"
+	local idx_file = _state.LOG_DIR .. "/" .. os.date("%Y-%m-%d") .. ".idx"
 	local ok, raw = pcall(json.encode, _state.today_idx)
 	if not ok then return end
 
@@ -314,7 +314,7 @@ end
 --- @return boolean True when at least one typing event was reconstructed.
 function M.rebuild_today_from_raw_log()
 	local day_dash = os.date("%Y-%m-%d")
-	local day_underscore = os.date("%Y_%m_%d")
+	local day_underscore = os.date("%Y-%m-%d")
 	local raw_log_path = _state.LOG_DIR .. "/" .. day_underscore .. ".log"
 
 	if not fs.attributes(raw_log_path) then return false end
@@ -416,7 +416,7 @@ function M.rebuild_index_if_needed()
 		pcall(function() _state.manifest = json.decode(c) or {} end)
 	end
 
-	local today_str = os.date("%Y_%m_%d")
+	local today_str = os.date("%Y-%m-%d")
 	local today_idx_file = _state.LOG_DIR .. "/" .. today_str .. ".idx"
 	local f_idx = io.open(today_idx_file, "r")
 	if f_idx then

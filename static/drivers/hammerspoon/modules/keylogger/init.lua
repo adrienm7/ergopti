@@ -313,7 +313,9 @@ local function handle_key(event_obj)
 		local flags = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
 
-		-- Shortcut detection runs first
+		-- Shortcut detection runs FIRST — before any early-exit that would silently
+		-- drop candidates like Cmd+A (keycode 0). Shortcuts bypass the typing buffer
+		-- entirely and are persisted immediately via a dedicated log entry.
 		if is_shortcut_candidate(flags, keycode) then
 			LogManager.flush_buffer()
 			local app_sc = hs.application.frontmostApplication()
@@ -321,6 +323,7 @@ local function handle_key(event_obj)
 			return false
 		end
 
+		-- F1-F12 keys, Escape, Modifiers etc. flush the buffer to ensure continuous tracking across window switches
 		if keycode >= 96 and keycode <= 122 then
 			LogManager.flush_buffer()
 			return false
@@ -408,6 +411,7 @@ local function handle_key(event_obj)
 			end
 		end
 
+		-- Only count real (non-synthetic) non-BS chars: they represent effective net output
 		if not is_synth and keycode ~= 51 then
 			table.insert(CoreState.recent_typing, now)
 		end
@@ -438,6 +442,7 @@ local function handle_key(event_obj)
 		local ev_entry = nil
 
 		if keycode == 51 then
+			-- A real BS erases a char previously counted as effective output
 			if not is_synth and #CoreState.recent_typing > 0 then table.remove(CoreState.recent_typing) end
 			local deleted_char = ""
 			if not is_synth and #CoreState.buffer_text > 0 then
@@ -468,6 +473,8 @@ local function handle_key(event_obj)
 
 		if ev_entry then CoreState.pending_keyup[keycode] = { down_time = now, event = ev_entry } end
 
+		-- Metrics webview requires near-real-time updates: flush each key so the
+		-- table reflects typed characters immediately (including search field typing).
 		local title = CoreState.session_win_title or ""
 		if CoreState.session_app_name == "Hammerspoon" and (title:find("Métriques", 1, true) or title:find("Metrics", 1, true)) then
 			LogManager.flush_buffer()
@@ -553,6 +560,7 @@ function M.notify_synthetic(text, source_type, deletes, source_variant)
 		for i = 1, deletes do
 			table.insert(CoreState.synth_queue, { char = "[BS]", type = source_type })
 		end
+		-- Debit the trigger chars that were previously counted as effective output
 		for i = 1, deletes do
 			if #CoreState.recent_typing > 0 then table.remove(CoreState.recent_typing) end
 		end
@@ -562,6 +570,7 @@ function M.notify_synthetic(text, source_type, deletes, source_variant)
 		for _, code in utf8.codes(text) do
 			table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type })
 		end
+		-- Credit the output chars to the effective MPM counter
 		local now_ms = hs.timer.absoluteTime() / 1000000
 		local out_len = utf8.len(text) or 0
 		for i = 1, out_len do
@@ -659,10 +668,11 @@ function M.start(script_control)
 		end
 		_caffeinate_watcher:start()
 		
-		if not _audio_watcher then
-			_audio_watcher = hs.audiodevice.watcher.setCallback(check_meeting_status)
-		end
-		_audio_watcher:start()
+        -- breaks the wpm widget !!!
+		-- if not _audio_watcher then
+		-- 	_audio_watcher = hs.audiodevice.watcher.setCallback(check_meeting_status)
+		-- end
+		-- _audio_watcher:start()
 
 		if not _tap then 
 			_tap = hs.eventtap.new({ 
