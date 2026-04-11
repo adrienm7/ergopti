@@ -86,6 +86,7 @@ h2 {
 #bar-bg {
 	background: #3a3a3c;
 	border-radius: 4px;
+	flex-shrink: 0; /* Prevent the progress bar from shrinking when logs fill up */
 	height: 12px;
 	margin-bottom: 10px;
 	overflow: hidden;
