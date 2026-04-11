@@ -686,7 +686,11 @@ function M.create(deps)
 
 					table.insert(family_sub, {
 						title   = title,
-						menu    = model_submenu
+						menu    = model_submenu,
+						fn      = function()
+							-- clicking the model title selects it and triggers the same flow
+							pcall(function() switch_model(m_name) end)
+						end
 					})
 
 					::continue_model::

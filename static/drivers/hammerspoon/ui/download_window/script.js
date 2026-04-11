@@ -47,12 +47,6 @@ function doTerm() {
 /**
  * Sends a request to resolve gated access directly from the UI.
  */
-function doResolve() {
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('resolve');
-	}
-}
-
 /**
  * Sends a retry request to relaunch the download.
  */
@@ -121,19 +115,59 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
 	document.getElementById('pct').textContent = cappedPercentage + ' %';
 
-	let statsHtml = '';
-	if (fileCount) statsHtml += '📁 ' + fileCount + ' fichiers<br>';
-	if (downloadedSize) statsHtml += '<b>' + downloadedSize + '</b><br>';
-	if (speed) statsHtml += 'Vitesse : <b>' + speed + '</b>';
-	if (eta) statsHtml += '  ·  Temps restant : <b>' + eta + '</b>';
-
-	// When capped at 99% with no speed info, all bytes are on disk but
-	// the backend is still verifying/symlinking files.
-	if (!statsHtml && cappedPercentage >= 99) {
-		statsHtml = '⏳ Finalisation en cours…';
+	// Update downloaded size next to percentage
+	const fileCountEl = document.getElementById('file-count');
+	if (downloadedSize) {
+		fileCountEl.style.display = 'inline-block';
+		fileCountEl.textContent = downloadedSize;
+	} else {
+		fileCountEl.style.display = 'none';
+		fileCountEl.textContent = '';
 	}
 
-	document.getElementById('stats').innerHTML = statsHtml || 'Téléchargement en cours…';
+	// Speed and ETA line
+	const speedEtaEl = document.getElementById('speed-eta');
+	const speedEl = document.getElementById('speed');
+	const etaEl = document.getElementById('eta');
+	let hasSpeedEta = false;
+	if (speed) {
+		speedEl.textContent = speed;
+		hasSpeedEta = true;
+	} else {
+		speedEl.textContent = '';
+	}
+	if (eta) {
+		etaEl.textContent = eta;
+		hasSpeedEta = true;
+	} else {
+		etaEl.textContent = '';
+	}
+	speedEtaEl.style.display = hasSpeedEta ? 'block' : 'none';
+
+	// Files line
+	const filesLine = document.getElementById('files-line');
+	const fileCur = document.getElementById('file-current');
+	const fileTot = document.getElementById('file-total');
+	if (fileCount) {
+		const parts = String(fileCount).split('/');
+		const cur = parts[0] || fileCount;
+		const tot = parts[1] || '';
+		fileCur.textContent = cur;
+		fileTot.textContent = tot;
+		filesLine.style.display = 'block';
+	} else {
+		fileCur.textContent = '';
+		fileTot.textContent = '';
+		filesLine.style.display = 'none';
+	}
+
+	// Fallback message shown when nothing else
+	const fallback = document.getElementById('stats-fallback');
+	if (!hasSpeedEta && !fileCount) {
+		fallback.style.display = 'block';
+	} else {
+		fallback.style.display = 'none';
+	}
 }
 
 /**
@@ -212,9 +246,11 @@ function done(isSuccess, message, errorKind) {
 	}
 
 	if (!isSuccess) {
-		const actions = document.getElementById('error-actions');
-		const resolveButton = document.getElementById('btn-resolve');
-		actions.style.display = 'flex';
-		resolveButton.style.display = errorKind === 'gated' ? 'inline-block' : 'none';
+		// show retry button in main controls
+		const retryBtn = document.getElementById('btn-retry');
+		if (retryBtn) retryBtn.style.display = 'inline-block';
+	} else {
+		const retryBtn = document.getElementById('btn-retry');
+		if (retryBtn) retryBtn.style.display = 'none';
 	}
 }
