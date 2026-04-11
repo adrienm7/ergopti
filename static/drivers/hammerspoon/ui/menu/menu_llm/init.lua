@@ -603,8 +603,8 @@ function M.create(deps)
                     local status = is_inst and "🟢 " or ""
                     local type_str = (info.type == "completion") and " [📝 Complétion]" or " [💬 Chat]"
                     local params_ram_str = (info.params and info.params > 0)
-                        and string.format(" (%gB params, ~%d Go RAM)", info.params, math.floor(ram))
-                        or string.format(" (~%d Go RAM)", math.floor(ram))
+                        and string.format(" (%gB params, ~%d Go RAM)", math.ceil(info.params * 10) / 10, math.ceil(ram))
+                        or string.format(" (~%d Go RAM)", math.ceil(ram))
                     local title = string.format("%s%s%s%s%s", prefix, status, m_name, type_str, params_ram_str)
 
                     local hw = m.hardware_requirements or {}
@@ -958,8 +958,8 @@ function M.create(deps)
         local ram = models_mgr.get_model_ram(active_display_model) or 0
         local type_str = (info.type == "completion") and " [📝 Complétion]" or " [💬 Chat]"
         local params_ram_str = (info.params and info.params > 0)
-            and string.format(" (%gB params, ~%d Go RAM)", info.params, math.floor(ram))
-            or string.format(" (~%d Go RAM)", math.floor(ram))
+            and string.format(" (%gB params, ~%d Go RAM)", info.params, math.ceil(ram))
+            or string.format(" (~%d Go RAM)", math.ceil(ram))
         
         local rich_model_title = "Modèle actif : "
         if not state.llm_model or state.llm_model == "" then
