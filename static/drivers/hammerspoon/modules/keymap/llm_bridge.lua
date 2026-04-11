@@ -345,6 +345,17 @@ function M.apply_prediction(idx)
 		keylogger.notify_synthetic(emitted_str, "llm", deletes)
 	end
 
+	-- Immediately record acceptance in the keylogger/manifest for real-time metrics
+	if keylogger and type(keylogger.log_llm_accepted) == "function" then
+		local ok_app2, front_app2 = pcall(function() return hs.application.frontmostApplication() end)
+		local app_name2 = nil
+		if ok_app2 and front_app2 then
+			local ok_title2, title2 = pcall(function() return front_app2:title() end)
+			if ok_title2 and title2 then app_name2 = title2 end
+		end
+		pcall(keylogger.log_llm_accepted, to_type, app_name2)
+	end
+
 	if deletes == 0 then
 		_state.buffer = _state.buffer .. to_type
 	else
@@ -603,6 +614,19 @@ function M._perform_llm_check(force_trigger, profile_name)
 			function(predictions, elapsed_ms, is_final)
 				if _llm_fetch_request_id ~= my_request_id then return end
 
+				-- Determine frontmost application to attribute logs correctly
+				local ok_app, front_app = pcall(function() return hs.application.frontmostApplication() end)
+				local app_name = nil
+				if ok_app and front_app then
+					local ok_title, title = pcall(function() return front_app:title() end)
+					if ok_title and title then app_name = title end
+				end
+
+				-- Log the raw generation response (context + full predictions list) with explicit app
+				if keylogger and type(keylogger.log_llm) == "function" then
+					pcall(keylogger.log_llm, clean_buffer, predictions, app_name)
+				end
+
 				local function get_pred_key(pred)
 					if type(pred) ~= "table" then return "" end
 					local k = build_tooltip_dedup_key(pred)
@@ -737,7 +761,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 
 				-- Notify keylogger that we suggested a prediction
 				if keylogger and type(keylogger.log_llm_suggested) == "function" then
-					pcall(keylogger.log_llm_suggested)
+					pcall(keylogger.log_llm_suggested, app_name, #valid_preds)
 				end
 				
 				_pending_predictions = valid_preds

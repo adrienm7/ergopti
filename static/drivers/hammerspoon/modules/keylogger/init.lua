@@ -742,12 +742,13 @@ end
 --- Captures LLM generations.
 --- @param context string Previous words.
 --- @param results table Options generated.
-function M.log_llm(context, results)
+function M.log_llm(context, results, app_name)
 	if not CoreState.is_enabled then return end
 	LogManager.flush_buffer()
 	local preds = {}
 	for _, r in ipairs(results or {}) do table.insert(preds, r.to_type) end
-	LogManager.append_log({ type = "llm_generation", app = CoreState.session_app_name, context = context, predictions = preds, tag = "<llm_generated>" .. (preds[1] or "") .. "</llm_generated>" })
+	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
+	LogManager.append_log({ type = "llm_generation", app = target_app, context = context, predictions = preds, tag = "<llm_generated>" .. (preds[1] or "") .. "</llm_generated>" })
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 
@@ -759,16 +760,29 @@ function M.log_shortcut(shortcut_key, app_name)
 end
 
 --- Logs that a Hotstring was proposed to the user but not necessarily executed.
-function M.log_hotstring_suggested()
+function M.log_hotstring_suggested(app_name)
 	if not CoreState.is_enabled then return end
-	LogManager.append_log({ type = "hotstring_suggested", app = CoreState.session_app_name })
-	LogManager.increment_manifest_stat(CoreState.session_app_name, "hs_suggested")
+	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
+	LogManager.append_log({ type = "hotstring_suggested", app = target_app })
+	LogManager.increment_manifest_stat(target_app, "hs_suggested")
 end
 
 --- Logs that an LLM string was proposed to the user.
-function M.log_llm_suggested()
+function M.log_llm_suggested(app_name, count)
 	if not CoreState.is_enabled then return end
-	LogManager.increment_manifest_stat(CoreState.session_app_name, "llm_suggested")
+	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
+	local c = tonumber(count) or 1
+	LogManager.append_log({ type = "llm_suggested", app = target_app, count = c })
+	LogManager.increment_manifest_stat(target_app, "llm_suggested", c)
+end
+
+--- Logs that an LLM prediction was accepted/applied by the user.
+function M.log_llm_accepted(prediction_text, app_name)
+	if not CoreState.is_enabled then return end
+	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
+	LogManager.increment_manifest_stat(target_app, "llm_triggers")
+	LogManager.append_log({ type = "llm_accepted", app = target_app, prediction = prediction_text or "" })
+	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 
 --- Triggers the massive HTML interface metrics canvas.

@@ -476,11 +476,11 @@ function compute_manifest_metrics() {
 
 			if (show_hs) {
 				global_hs_triggers += app.hs_triggers || 0;
-				global_hs_suggested += Math.max(app.hs_suggested || 0, app.hs_triggers || 0);
+				global_hs_suggested += app.hs_suggested || 0;
 			}
 			if (show_llm) {
 				global_llm_triggers += app.llm_triggers || 0;
-				global_llm_suggested += Math.max(app.llm_suggested || 0, app.llm_triggers || 0);
+				global_llm_suggested += app.llm_suggested || 0;
 			}
 
 			app_state.time_series[dateStr].chars += effective_chars;
