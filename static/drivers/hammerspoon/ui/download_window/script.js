@@ -116,23 +116,20 @@ function setModel(modelName) {
  * @param {string} fileCount - Optional file progress string (e.g., "47/102").
  */
 function update(percentage, downloadedSize, speed, eta, fileCount) {
-	if (globalDoneState) return;
+	if (globalDoneState) return; // Cap at 99% during download: 100% is reserved exclusively for done()
 
-	// Cap at 99% during download: 100% is reserved exclusively for done()
 	const cappedPercentage = Math.min(Math.max(0, parseInt(percentage) || 0), 99);
 	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
-	document.getElementById('pct').textContent = cappedPercentage + ' %';
+	document.getElementById('pct').textContent = cappedPercentage + ' %'; // Line 1: Fichiers (next to percentage, pushed right by CSS)
 
-	// Line 1: Fichiers (next to percentage, pushed right by CSS)
 	const fileCountEl = document.getElementById('file-count');
 	if (fileCount) {
 		fileCountEl.textContent = `📁 Fichiers : ${fileCount}`;
 		fileCountEl.style.display = 'block';
 	} else {
 		fileCountEl.style.display = 'none';
-	}
+	} // Line 2: Taille & Vitesse
 
-	// Line 2: Taille & Vitesse
 	const statsDetails = document.getElementById('stats-details');
 	let detailsParts = [];
 
@@ -148,9 +145,8 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	} else {
 		statsDetails.style.display = 'none';
 		document.getElementById('stats-fallback').style.display = 'block';
-	}
+	} // Line 3: Temps restant
 
-	// Line 3: Temps restant
 	const etaContainer = document.getElementById('eta-container');
 	const etaEl = document.getElementById('eta');
 	if (eta) {
@@ -177,12 +173,10 @@ function showLog() {
  * @param {string} line - The log string to append.
  */
 function addLog(line) {
-	if (!line) return;
+	if (!line) return; // Strip ANSI colors and control sequences from terminal output
 
-	// Strip ANSI colors and control sequences from terminal output
-	const cleanLine = String(line).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+	const cleanLine = String(line).replace(/\x1b\[[0-9;]*[A-Za-z]/g, ''); // Hide noisy transfer progress bars that visually duplicate the main UI bar
 
-	// Hide noisy transfer progress bars that visually duplicate the main UI bar
 	if (/%\|.*it\/s/.test(cleanLine) || /\|\s*\d+\s*\/\s*\d+\s*\[/.test(cleanLine)) {
 		return;
 	}
@@ -217,9 +211,8 @@ function done(isSuccess, message, errorKind) {
 		progressBar.style.width = '100%';
 		document.getElementById('pct').textContent = '❌';
 		document.getElementById('pct').style.color = '#ff453a';
-	}
+	} // Hide specific stats, files count and ETA to make room for the final message
 
-	// Hide specific stats, files count and ETA to make room for the final message
 	document.getElementById('file-count').style.display = 'none';
 	document.getElementById('eta-container').style.display = 'none';
 	document.getElementById('stats-details').style.display = 'none';
@@ -228,9 +221,8 @@ function done(isSuccess, message, errorKind) {
 	const doneMessageElement = document.getElementById('done-msg');
 	doneMessageElement.textContent =
 		message || (isSuccess ? '✅ Terminé' : 'Échec du téléchargement');
-	doneMessageElement.className = isSuccess ? 'ok' : 'error';
+	doneMessageElement.className = isSuccess ? 'ok' : 'error'; // Show it inline inside the status-line
 
-	// Show it inline inside the status-line
 	doneMessageElement.style.display = 'block';
 
 	if (!isSuccess) {
