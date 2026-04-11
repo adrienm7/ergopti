@@ -281,58 +281,9 @@ function M.apply_prediction(idx)
 	if not pred then return false end
 	M.reset_predictions()
 
-	local original_deletes = pred.deletes or 0
-	local original_to_type = pred.to_type or ""
-	
-	local deletes = original_deletes
-	local to_type = original_to_type
-
-	local ok_overlap, res_deletes, res_to = pcall(function()
-		if km_utils and type(km_utils.resolve_prediction_overlap) == "function" then
-			local tail = _state.buffer:sub(-20)
-			-- Bypass to prevent byte corruption on multibyte characters in third-party logic
-			if text_utils and type(text_utils.contains_high_unicode) == "function" and (text_utils.contains_high_unicode(original_to_type) or text_utils.contains_high_unicode(tail)) then
-				return original_deletes, original_to_type
-			end
-			return km_utils.resolve_prediction_overlap(_state.buffer, original_deletes, original_to_type)
-		end
-		return original_deletes, original_to_type
-	end)
-	
-	if ok_overlap then
-		deletes = res_deletes
-		to_type = res_to
-		
-		local function starts_with_space(s)
-			return s:match("^%s") or s:sub(1, 2) == "\194\160" or s:sub(1, 3) == "\226\128\175"
-		end
-		local function ends_with_space(s)
-			return s:match("%s$") or s:sub(-2) == "\194\160" or s:sub(-3) == "\226\128\175"
-		end
-
-		local orig_started_with_space = starts_with_space(original_to_type)
-		local new_starts_with_space   = starts_with_space(to_type)
-		
-		if orig_started_with_space and not new_starts_with_space then
-			local buffer_kept = ""
-			if deletes == 0 then
-				buffer_kept = _state.buffer
-			else
-				local start_del = utf8.offset(_state.buffer, -deletes)
-				if start_del and start_del > 1 then
-					buffer_kept = _state.buffer:sub(1, start_del - 1)
-				end
-			end
-			
-			if not ends_with_space(buffer_kept) then
-				to_type = " " .. to_type
-			end
-		end
-	else
-		Logger.error(LOG, string.format("Expansion solver error: %s.", tostring(res_deletes)))
-		deletes = original_deletes
-		to_type = original_to_type
-	end
+	-- We trust the parser.lua strictly. No overlap guessing that breaks UTF-8 or spacing.
+	local deletes = pred.deletes or 0
+	local to_type = pred.to_type or ""
 
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
 	for _ = 1, deletes do keyStroke({}, "delete", 0) end
@@ -419,22 +370,6 @@ end
 -- ======= 4/ Execution Constraints =======
 -- ========================================
 -- ========================================
-
---- Truncates text output based on word count limitations without altering early structure.
---- @param text string The raw output to limit.
---- @param max_w number Max allowed words.
---- @return string The truncated text.
-local function truncate_words(text, max_w)
-	if max_w <= 0 then return text end
-	local words = {}
-	for w in text:gmatch("%S+%s*") do
-		table.insert(words, w)
-		if #words >= max_w then break end
-	end
-	local res = table.concat(words)
-	if #words >= max_w then res = res:gsub("%s+$", "") end
-	return res
-end
 
 --- Builds a stable deduplication key from the final text effectively shown in the tooltip.
 --- @param pred table The final prediction payload.
@@ -614,15 +549,14 @@ function M._perform_llm_check(force_trigger, profile_name)
 
 		local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "inconnu"
 		
-		-- Keep generations short for typing autocomplete to reduce latency.
+		-- Give the model plenty of room to respect the user's max_words requirement.
 		local model_to_use = type(core_llm.get_current_model) == "function" and core_llm.get_current_model() or current_llm_model
 		local max_predict_tokens = 150
 		
 		if backend == "mlx" then
-			-- MLX typing mode must stay short, otherwise responses often arrive too late for live preview.
-			max_predict_tokens = llm_max_words > 0 and math.max(48, llm_max_words * 6 + 10) or 80
+			max_predict_tokens = llm_max_words > 0 and math.max(60, llm_max_words * 6 + 20) or 100
 		elseif llm_max_words > 0 then
-			max_predict_tokens = math.max(40, llm_max_words * 6 + 10)
+			max_predict_tokens = math.max(60, llm_max_words * 6 + 20)
 		end
 		
 		local effective_num_pred = num_pred
@@ -707,21 +641,6 @@ function M._perform_llm_check(force_trigger, profile_name)
 
 					if p.to_type then
 						local tt = p.to_type
-						local original_tt = tt
-						
-						if llm_max_words > 0 and p.nw and p.nw ~= "" then
-							local truncated_nw = truncate_words(p.nw, llm_max_words)
-							if truncated_nw ~= p.nw then
-								-- Remove the extra characters from the end of to_type safely
-								local diff_chars = text_utils.utf8_len(p.nw) - text_utils.utf8_len(truncated_nw)
-								if diff_chars > 0 then
-									p.to_type = text_utils.utf8_sub(p.to_type, 1, text_utils.utf8_len(p.to_type) - diff_chars)
-								end
-								p.nw = truncated_nw
-								tt = p.to_type
-							end
-						end
-						
 						local tt_norm = tt:lower():gsub("’", "'")
 						local ctx_norm = clean_buffer:lower():gsub("’", "'")
 						local prev_non_space = clean_buffer:match(".*(%S)")
