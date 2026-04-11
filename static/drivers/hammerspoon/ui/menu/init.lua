@@ -121,9 +121,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if ok_img and ico then
 			pcall(function() if type(ico.setSize) == "function" then ico:setSize({ w = 18, h = 18 }) end end)
 			pcall(function() myMenu:setIcon(ico, false) end)
-		elseif not custom_text then
-			pcall(function() myMenu:setTitle("🔧") end)
+			-- Ensure title is cleared when no custom text provided.
+			if not custom_text then pcall(function() myMenu:setTitle("") end) end
+		else
+			-- If no image available, ensure we explicitly clear any previous icon
+			-- and set the default title when no custom text is present.
+			if not custom_text then
+				pcall(function() myMenu:setIcon(nil) end)
+				pcall(function() myMenu:setTitle("🔧") end)
+			end
 		end
+	end
+
+	local function reset_menubar()
+		pcall(function() myMenu:setIcon(nil) end)
+		pcall(function() myMenu:setTitle("") end)
 	end
 
 	local function do_reload(source)
@@ -459,6 +471,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			state          = state,
 			active_tasks   = M._active_tasks,
 			update_icon    = update_icon,
+			reset_menubar  = reset_menubar,
 			update_menu    = function() updateMenu() end,
 			save_prefs     = save_prefs,
 			keymap         = keymap,

@@ -155,7 +155,9 @@ local function get_model_info_logic(model_name, presets)
 		local oa = EMOJI_ORDER[a] or 99; local ob = EMOJI_ORDER[b] or 99
 		if oa == ob then return a < b end; return oa < ob
 	end)
-	
+
+	-- Instantiate backend managers after injecting wrappers.
+
 	local tag_str = #tag_list > 0 and (" " .. table.concat(tag_list, "")) or ""
 	return {
 		type = m_type,
@@ -357,8 +359,40 @@ function M.new(deps)
 		end)
 	end
 
-	local ollama = OllamaMgr.new(deps, presets, get_model_ram_logic)
-	local mlx    = MlxMgr.new(deps, presets)
+		-- Inject minimal wrappers into deps to centralize download abort/reset
+		do
+			deps._orig_update_icon = deps.update_icon
+			deps._orig_reset_menubar = deps.reset_menubar
+			local download_aborted = false
+
+			deps.mark_download_aborted = function()
+				download_aborted = true
+				if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) end
+				if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
+			end
+
+			deps.clear_download_abort = function()
+				download_aborted = false
+			end
+
+			deps.update_icon = function(text)
+				if download_aborted then return end
+				if type(deps._orig_update_icon) == "function" then return deps._orig_update_icon(text) end
+			end
+
+			deps.reset_menubar = function()
+				if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) return end
+				if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
+			end
+		end
+
+		-- Expose a simple global hook so the download_window can notify us on user cancel.
+		package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"] = function()
+			if deps and type(deps.mark_download_aborted) == "function" then pcall(deps.mark_download_aborted) end
+		end
+
+		local ollama = OllamaMgr.new(deps, presets, get_model_ram_logic)
+		local mlx    = MlxMgr.new(deps, presets)
 
 	local function get_active()
 		return deps.state.llm_use_mlx and mlx or ollama
