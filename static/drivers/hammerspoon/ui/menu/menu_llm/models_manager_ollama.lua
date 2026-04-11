@@ -333,6 +333,44 @@ function M.new(deps, presets, ram_getter)
 	--- Pre-warms the installed models cache in the background at startup.
 	hs.timer.doAfter(0, function() pcall(refresh_installed_async) end)
 
+	local function check_model_loadable(target_model, on_success, on_fail)
+		if type(target_model) ~= "string" or target_model == "" then
+			if type(on_fail) == "function" then on_fail("invalid_model", false) end
+			return
+		end
+
+		local payload = {
+			model = target_model,
+			messages = {{ role = "user", content = "ok" }},
+			stream = false,
+			think = false,
+			options = {
+				num_predict = 1,
+				think = false,
+				thinking_budget = 0,
+			},
+		}
+
+		local ok_enc, body = pcall(hs.json.encode, payload)
+		if not ok_enc or type(body) ~= "string" then
+			if type(on_fail) == "function" then on_fail("encode_error", false) end
+			return
+		end
+
+		hs.http.asyncPost("http://127.0.0.1:11434/api/chat", body, { ["Content-Type"] = "application/json" },
+			function(status, resp_body, _)
+				if status == 200 then
+					if type(on_success) == "function" then on_success() end
+					return
+				end
+
+				local err_text = type(resp_body) == "string" and resp_body or ""
+				local load_error = err_text:find("unable to load model", 1, true) ~= nil
+				if type(on_fail) == "function" then on_fail(err_text, load_error) end
+			end
+		)
+	end
+
 	function obj.pull_model(target_model, repo, on_success)
 		local bin = get_ollama_path() or "/usr/local/bin/ollama"
 		local pull_output = ""
@@ -379,7 +417,13 @@ function M.new(deps, presets, ram_getter)
 					if type(deps.keymap.set_llm_display_model_name) == "function" then pcall(deps.keymap.set_llm_display_model_name, display_model) end
 				end
 				pcall(deps.save_prefs)
-				if on_success then pcall(on_success) else pcall(hs.reload) end
+				
+				-- Pre-load the model in Ollama immediately after pulling
+				check_model_loadable(target_model, function()
+					if on_success then pcall(on_success) end
+				end, function()
+					if on_success then pcall(on_success) end
+				end)
 			elseif code == 15 then
 				pcall(notifications.notify, "🛑 Annulé", "Téléchargement Ollama interrompu")
 				complete_progress_ui(false, target_model)
@@ -437,44 +481,6 @@ function M.new(deps, presets, ram_getter)
 	function obj.install_ollama_then_pull(target_model, repo, on_success)
 		pcall(hs.urlevent.openURL, "https://ollama.com/download")
 		pcall(notifications.notify, "Ollama non détecté", "Veuillez installer Ollama puis réessayer.")
-	end
-
-	local function check_model_loadable(target_model, on_success, on_fail)
-		if type(target_model) ~= "string" or target_model == "" then
-			if type(on_fail) == "function" then on_fail("invalid_model", false) end
-			return
-		end
-
-		local payload = {
-			model = target_model,
-			messages = {{ role = "user", content = "ok" }},
-			stream = false,
-			think = false,
-			options = {
-				num_predict = 1,
-				think = false,
-				thinking_budget = 0,
-			},
-		}
-
-		local ok_enc, body = pcall(hs.json.encode, payload)
-		if not ok_enc or type(body) ~= "string" then
-			if type(on_fail) == "function" then on_fail("encode_error", false) end
-			return
-		end
-
-		hs.http.asyncPost("http://127.0.0.1:11434/api/chat", body, { ["Content-Type"] = "application/json" },
-			function(status, resp_body, _)
-				if status == 200 then
-					if type(on_success) == "function" then on_success() end
-					return
-				end
-
-				local err_text = type(resp_body) == "string" and resp_body or ""
-				local load_error = err_text:find("unable to load model", 1, true) ~= nil
-				if type(on_fail) == "function" then on_fail(err_text, load_error) end
-			end
-		)
 	end
 
 	--- Verifies if the target model is installed, triggering the download prompt otherwise.
