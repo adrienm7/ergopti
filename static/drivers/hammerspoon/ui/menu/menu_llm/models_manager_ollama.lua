@@ -134,6 +134,47 @@ function M.new(deps, presets, ram_getter)
 		return clean
 	end
 
+	local function restart_ollama_daemon()
+		local ollama_bin = get_ollama_path()
+		if not ollama_bin or ollama_bin == "" then return false end
+		
+		-- Launch daemon via bash nohup to ensure it survives subprocess termination
+		local ok = pcall(hs.execute, "nohup " .. ollama_bin .. " serve > /tmp/ollama.serve.log 2>&1 &")
+		return ok == true
+	end
+
+	--- Ensures the Ollama daemon is running, starts it otherwise.
+	--- @param on_ready function Callback executed when ready.
+	--- @param on_fail function Callback executed when failed.
+	local function ensure_ollama_running(on_ready, on_fail)
+		local ok, result = pcall(hs.execute, "curl -s http://localhost:11434/api/version 2>/dev/null")
+		if ok and result and result:find('"version"') then
+			if type(on_ready) == "function" then on_ready() end
+			return
+		end
+
+		pcall(notifications.notify, "Démarrage Ollama", "Le service Ollama est arrêté. Démarrage en cours…")
+		if restart_ollama_daemon() then
+			local retries = 0
+			local function check_ready()
+				retries = retries + 1
+				local ok2, result2 = pcall(hs.execute, "curl -s http://localhost:11434/api/version 2>/dev/null")
+				if ok2 and result2 and result2:find('"version"') then
+					if type(on_ready) == "function" then on_ready() end
+				elseif retries < 30 then
+					hs.timer.doAfter(0.5, check_ready)
+				else
+					pcall(notifications.notify, "❌ Échec Ollama", "Impossible de démarrer le service.")
+					if type(on_fail) == "function" then on_fail() end
+				end
+			end
+			hs.timer.doAfter(0.5, check_ready)
+		else
+			pcall(notifications.notify, "❌ Échec Ollama", "Impossible de lancer le démon Ollama.")
+			if type(on_fail) == "function" then on_fail() end
+		end
+	end
+
 	local function wait_for_ollama_api(retries)
 		retries = tonumber(retries) or 20
 		local done = false
@@ -160,15 +201,6 @@ function M.new(deps, presets, ram_getter)
 		end
 
 		return success
-	end
-
-	local function restart_ollama_daemon()
-		local ollama_bin = get_ollama_path()
-		if not ollama_bin or ollama_bin == "" then return false end
-		
-		-- Launch daemon via bash nohup to ensure it survives subprocess termination
-		local ok = pcall(hs.execute, "nohup " .. ollama_bin .. " serve > /tmp/ollama.serve.log 2>&1 &")
-		return ok == true
 	end
 
 	local function get_ollama_repo(model_name)
@@ -418,7 +450,7 @@ function M.new(deps, presets, ram_getter)
 				end
 				pcall(deps.save_prefs)
 				
-				-- Pre-load the model in Ollama immediately after pulling
+				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
 					if on_success then pcall(on_success) end
 				end, function()
@@ -429,6 +461,8 @@ function M.new(deps, presets, ram_getter)
 				complete_progress_ui(false, target_model)
 			else
 				local requires_upgrade = needs_ollama_upgrade(pull_output)
+				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
+				
 				if requires_upgrade and not obj._ollama_upgrade_attempted[repo] then
 					obj._ollama_upgrade_attempted[repo] = true
 					pcall(notifications.notify, "⚙️ Mise à jour Ollama", "Version trop ancienne détectée. Mise à jour automatique en cours…")
@@ -451,10 +485,13 @@ function M.new(deps, presets, ram_getter)
 						end
 					end)
 					return
+				elseif connection_error then
+					pcall(notifications.notify, "❌ Échec Ollama", "Le service Ollama a cessé de répondre.")
+					complete_progress_ui(false, target_model)
+				else
+					pcall(notifications.notify, "❌ Échec Ollama", "Erreur lors du téléchargement de " .. target_model)
+					complete_progress_ui(false, target_model)
 				end
-
-				pcall(notifications.notify, "❌ Échec Ollama", "Erreur lors du téléchargement de " .. target_model)
-				complete_progress_ui(false, target_model)
 			end
 		end, function(_, stdout, stderr)
 			local out = sanitize_terminal_stream((stdout or "") .. (stderr or ""))
@@ -490,48 +527,64 @@ function M.new(deps, presets, ram_getter)
 	function obj.check_requirements(target_model, on_success, on_cancel)
 		if not target_model or target_model == "" then return end
 		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
-		local installed = obj.get_installed_models()
-		local repo = get_ollama_repo(target_model)
-		-- Resolve the actual Ollama name (repo may differ from display name, e.g. "gemma-4-E2B-it" vs "gemma4:e2b")
-		local actual_model = (repo and repo ~= target_model) and repo or target_model
 		
-		if installed[actual_model] or installed[actual_model .. ":latest"] or installed[repo] or installed[repo .. ":latest"] then
-			check_model_loadable(actual_model, function()
-				if type(on_success) == "function" then on_success() end
-			end, function(_, is_load_error)
-				if is_load_error and get_ollama_path() then
-					pcall(notifications.notify, "Réparation du modèle Ollama", "Le modèle semble corrompu. Tentative de re-téléchargement: " .. target_model)
-					obj.pull_model(target_model, repo, on_success)
-					return
+		ensure_ollama_running(function()
+			-- Force a fresh synchronous check since daemon is confirmed up
+			local bin = get_ollama_path() or "/usr/local/bin/ollama"
+			local ok, stdout = pcall(hs.execute, bin .. " list 2>/dev/null")
+			local installed = {}
+			if ok and type(stdout) == "string" then
+				for line in stdout:gmatch("[^\r\n]+") do
+					local name = line:match("^(%S+)")
+					if name and name ~= "NAME" then installed[name] = true end
 				end
-				if type(on_cancel) == "function" then on_cancel() end
-			end)
-		else
-			if type(deps.shared_system_check) == "function" then
-				deps.shared_system_check(target_model, "Ollama", repo, function()
+			end
+
+			local repo = get_ollama_repo(target_model)
+			-- Resolve the actual Ollama name (repo may differ from display name, e.g. "gemma-4-E2B-it" vs "gemma4:e2b")
+			local actual_model = (repo and repo ~= target_model) and repo or target_model
+			
+			if installed[actual_model] or installed[actual_model .. ":latest"] or installed[repo] or installed[repo .. ":latest"] then
+				check_model_loadable(actual_model, function()
+					if type(on_success) == "function" then on_success() end
+				end, function(_, is_load_error)
+					if is_load_error and get_ollama_path() then
+						pcall(notifications.notify, "Réparation du modèle Ollama", "Le modèle semble corrompu. Tentative de re-téléchargement: " .. target_model)
+						obj.pull_model(target_model, repo, on_success)
+						return
+					end
+					if type(on_cancel) == "function" then on_cancel() end
+				end)
+			else
+				if type(deps.shared_system_check) == "function" then
+					deps.shared_system_check(target_model, "Ollama", repo, function()
+						if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
+						else obj.install_ollama_then_pull(target_model, repo, on_success) end
+					end, on_cancel)
+				else
 					if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
 					else obj.install_ollama_then_pull(target_model, repo, on_success) end
-				end, on_cancel)
-			else
-				if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
-				else obj.install_ollama_then_pull(target_model, repo, on_success) end
+				end
 			end
-		end
+		end, on_cancel)
 	end
 
 	function obj.delete_model(model_name)
 		if not model_name or model_name == "" then return end
 		Logger.debug(LOG, string.format("Deleting Ollama model %s…", model_name))
-		local bin = get_ollama_path() or "/usr/local/bin/ollama"
-		local ok, output = pcall(hs.execute, bin .. " rm " .. model_name .. " 2>&1")
 		
-		if ok then
-			pcall(notifications.notify, "🗑️ Supprimé (Ollama)", "Modèle supprimé: " .. model_name)
-			if deps.update_menu then pcall(deps.update_menu) end
-			Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
-		else
-			pcall(notifications.notify, "❌ Échec de la suppression Ollama", "Modèle: " .. model_name .. "\n" .. tostring(output))
-		end
+		ensure_ollama_running(function()
+			local bin = get_ollama_path() or "/usr/local/bin/ollama"
+			local ok, output = pcall(hs.execute, bin .. " rm " .. model_name .. " 2>&1")
+			
+			if ok then
+				pcall(notifications.notify, "🗑️ Supprimé (Ollama)", "Modèle supprimé: " .. model_name)
+				if deps.update_menu then pcall(deps.update_menu) end
+				Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
+			else
+				pcall(notifications.notify, "❌ Échec de la suppression Ollama", "Modèle: " .. model_name .. "\n" .. tostring(output))
+			end
+		end)
 	end
 
 	return obj
