@@ -5,6 +5,14 @@
 --- DESCRIPTION:
 --- Handles the rendering and lifecycle of the on-screen tooltip used for
 --- both standard hotstring previews and LLM predictions.
+---
+--- STYLING RULES (LLM Predictions):
+--- 1. Selected Prediction: Original text is gray. New words (predictions) are
+---    orange. If the prediction corrects a typo, the corrected part is green.
+--- 2. Non-Selected Predictions: Entirely gray. If a non-selected prediction
+---    contains a correction, the modified parts (correction + new words) are
+---    made bold to distinguish them from what the user actually typed. If
+---    there are no corrections, the text remains normal (non-bold) gray.
 --- ==============================================================================
 
 local M = {}
@@ -430,35 +438,16 @@ local function append_seg(result, s, color, is_bold)
 	return result and (result .. seg) or seg
 end
 
---- Builds a single line of text reflecting the diff states.
+--- Builds a single line of text reflecting the diff states with precise coloring.
 local function build_line(pred, is_sel, total_preds)
 	if type(pred) ~= "table" then return nil end
 	
-	local result   = nil
-	local chunks   = pred.chunks
-	local nw       = pred.nw or ""
+	local result = nil
+	local chunks = pred.chunks
+	local nw     = pred.nw or ""
+
 	local has_corr = pred.has_corrections
-	local has_equal_chunk = false
-	local has_insert_chunk = false
-
-	if type(chunks) == "table" then
-		for _, chunk in ipairs(chunks) do
-			if type(chunk) == "table" then
-				local chunk_text = tostring(chunk.text or "")
-				if chunk_text:gsub("%s+", "") ~= "" then
-					if chunk.type == "equal" then has_equal_chunk = true end
-					if chunk.type == "insert" then has_insert_chunk = true end
-				end
-			end
-		end
-	end
-
 	local special_correction_mode = (has_corr == true) or ((tonumber(pred.deletes) or 0) > 0)
-	local should_emphasize_non_selected = (not is_sel)
-		and (total_preds > 1)
-		and special_correction_mode
-		and has_equal_chunk
-		and has_insert_chunk
 
 	local first_done = false
 	local function clean_first(s)
@@ -479,14 +468,13 @@ local function build_line(pred, is_sel, total_preds)
 				if s and s ~= "" then
 					last_char = s:sub(-1)
 					if chunk.type == "insert" then
+						local color = is_sel and (special_correction_mode and C_CORR_SEL or C_NW_SEL) or C_UNSELECTED_GRAY
+						local is_bold = (not is_sel) and special_correction_mode
+						result = append_seg(result, s, color, is_bold)
+					elseif chunk.type == "equal" then
 						local color = C_UNSELECTED_GRAY
-						if is_sel then
-							color = special_correction_mode and C_CORR_SEL or C_NW_SEL
-						end
-						result = append_seg(result, s, color, should_emphasize_non_selected)
-					else -- "equal"
-						local color = C_UNSELECTED_GRAY
-						result = append_seg(result, s, color, false)
+						local is_bold = false
+						result = append_seg(result, s, color, is_bold)
 					end
 				end
 			end
@@ -495,13 +483,12 @@ local function build_line(pred, is_sel, total_preds)
 
 	local s_nw = clean_first(nw)
 	if s_nw and s_nw ~= "" then
-		-- Automatically insert a space if the previous text (gray) and the new text (orange) are glued together
 		if last_char ~= "" and not last_char:match("%s") and not s_nw:match("^%s") then
 			s_nw = " " .. s_nw
 		end
 		local color = is_sel and C_NW_SEL or C_UNSELECTED_GRAY
-		local should_bold_nw = should_emphasize_non_selected and (s_nw:gsub("%s+", "") ~= "")
-		result = append_seg(result, s_nw, color, should_bold_nw)
+		local is_bold = (not is_sel) and special_correction_mode
+		result = append_seg(result, s_nw, color, is_bold)
 	end
 
 	return result

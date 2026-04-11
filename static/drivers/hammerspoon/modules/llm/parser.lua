@@ -27,24 +27,24 @@ local LOG    = "llm.parser"
 --- @param text string The raw output from the LLM.
 --- @return string The cleaned text.
 local function clean_model_output(text)
-    if type(text) ~= "string" then return "" end
-    
-    text = utils.unescape_text(text)
-    text = text:gsub("%*%*", ""):gsub("`", ""):gsub("\"", "")
-    text = text:gsub("<[^>]->", "")
-    
-    text = text:gsub("^Voici la suite%s*:?%s*", "")
-    text = text:gsub("^Je propose%s*:?%s*", "")
-    text = text:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
-    text = text:gsub("</body>%s*</html>", "")
-    text = text:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
-    
-    text = text:gsub("%[[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%]", "TAIL_CORRECTED:")
-    text = text:gsub("%[[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%]", "NEXT_WORDS:")
-    text = text:gsub("[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%s*:", "TAIL_CORRECTED:")
-    text = text:gsub("[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%s*:", "NEXT_WORDS:")
-    
-    return text
+	if type(text) ~= "string" then return "" end
+	
+	text = utils.unescape_text(text)
+	text = text:gsub("%*%*", ""):gsub("`", ""):gsub("\"", "")
+	text = text:gsub("<[^>]->", "")
+	
+	text = text:gsub("^Voici la suite%s*:?%s*", "")
+	text = text:gsub("^Je propose%s*:?%s*", "")
+	text = text:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
+	text = text:gsub("</body>%s*</html>", "")
+	text = text:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
+	
+	text = text:gsub("%[[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%]", "TAIL_CORRECTED:")
+	text = text:gsub("%[[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%]", "NEXT_WORDS:")
+	text = text:gsub("[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%s*:", "TAIL_CORRECTED:")
+	text = text:gsub("[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%s*:", "NEXT_WORDS:")
+	
+	return text
 end
 
 --- Removes XML-like thinking tags from the model’s response to isolate the final answer.
@@ -109,24 +109,24 @@ function M.process_prediction(full_text, tail_text, block)
 
 		if tc == "" and nw == "" then return nil end
 
-        -- Sliding window alignment logic: We find where the LLM’s correction seamlessly aligns with the user’s full context
+		-- Sliding window alignment logic: We find where the LLM’s correction seamlessly aligns with the user’s full context
 		local normalized_full = (full_text or ""):gsub("'", "’")
 		local tc_norm = tc:gsub("'", "’")
 		
-        -- Restore trailing spaces (including unicode non-breaking spaces) entered by the user
+		-- Restore trailing spaces (including unicode non-breaking spaces) entered by the user
 		local tail_trailing_space = normalized_full:match("([%s\194\160\226\128\175]+)$")
 		if tail_trailing_space and not tc_norm:match("[%s\194\160\226\128\175]$") then
 			tc_norm = tc_norm .. tail_trailing_space
 		end
 		
-        -- Search in the last 300 characters to ensure speed while accounting for verbose hallucinations
+		-- Search in the last 300 characters to ensure speed while accounting for verbose hallucinations
 		local search_start = math.max(1, #normalized_full - 300)
 		local best_c_len = -1
 		local best_suffix = ""
 		
 		for i = search_start, #normalized_full do
 			local b = normalized_full:byte(i)
-            -- Ensure alignment search only starts on valid UTF-8 character boundaries
+			-- Ensure alignment search only starts on valid UTF-8 character boundaries
 			if b < 0x80 or b >= 0xC0 then
 				local suffix = normalized_full:sub(i)
 				local c_len = utils.get_common_prefix_utf8(suffix, tc_norm)
@@ -137,13 +137,13 @@ function M.process_prediction(full_text, tail_text, block)
 			end
 		end
 		
-        -- Fallback: If alignment failed (LLM hallucinated a completely disconnected word), default to strictly substituting the tail
+		-- Fallback: If alignment failed (LLM hallucinated a completely disconnected word), default to strictly substituting the tail
 		if best_c_len < 2 and #tc_norm > 5 then
 			best_suffix = (tail_text or ""):gsub("'", "’")
 			best_c_len = utils.get_common_prefix_utf8(best_suffix, tc_norm)
 		end
 
-        -- Smart spacing check between corrected context and prediction
+		-- Smart spacing check between corrected context and prediction
 		local last_char = utils.utf8_sub(tc_norm, -1)
 		local first_char = utils.utf8_sub(nw, 1, 1)
 		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
@@ -154,88 +154,110 @@ function M.process_prediction(full_text, tail_text, block)
 			display_nw = " " .. display_nw
 		end
 
-        -- Critical security: cancel if AI did not copy a reasonable amount of the tail
+		-- Critical security: cancel if AI did not copy a reasonable amount of the tail
 		local tail_len = utils.utf8_len(tail_text)
 		local tc_len = utils.utf8_len(tc)
 		if best_c_len < tail_len * 0.4 and tc_len < tail_len * 0.4 then return nil end
 
-        -- The exact mathematical calculation of deletes ensuring zero UI artifacts
+		-- The exact mathematical calculation of deletes ensuring zero UI artifacts
 		local deletes = utils.utf8_len(best_suffix) - best_c_len
 		local to_type = utils.utf8_sub(tc_norm, best_c_len + 1) .. nw
 
-        -- Ultimate rejection: if the string to type contains nothing left after removing spaces and dots
+		-- Ultimate rejection: if the string to type contains nothing left after removing spaces and dots
 		if to_type:gsub("[%s%.…]", "") == "" then return nil end
 
-		local has_corr = (deletes > 0 or utils.utf8_sub(tc_norm, best_c_len + 1) ~= "")
-		local chunks = utils.diff_strings(best_suffix, tc_norm)
+		-- Isolate the exact word where the correction starts for a clean UI diff
+		local prefix = utils.utf8_sub(tc_norm, 1, best_c_len)
+		local word_start_char = 1
+		for i = #prefix, 1, -1 do
+			local b = prefix:byte(i)
+			if b == 32 or b == 9 or b == 10 or b == 13 then
+				word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+				break
+			end
+			if i >= 2 and prefix:byte(i-1) == 194 and prefix:byte(i) == 160 then
+				word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+				break
+			end
+			if i >= 3 and prefix:byte(i-2) == 226 and prefix:byte(i-1) == 128 and prefix:byte(i) == 175 then
+				word_start_char = utils.utf8_len(prefix:sub(1, i)) + 1
+				break
+			end
+		end
 
-        return { 
-            deletes = deletes, 
-            to_type = to_type, 
-            nw = display_nw, 
-            has_corrections = has_corr, 
-            chunks = chunks 
-        }
-        
-    else
-        -- Basic / Raw Mode: Grab only the first line to truncate chatty paragraphs
-        local nw = block:gsub("^%s+", ""):gsub("%s+$", "")
-        nw = nw:match("([^\n\r]+)") or nw
-        nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
-        nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
-        nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
-        nw = nw:gsub("^[-•*]+%s*", "")
-        nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
-        if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
-        
-        -- Robust overlap mitigation using word-by-word comparison for basic models
-        local full_words = {}
-        for w in (full_text or ""):gmatch("%S+") do table.insert(full_words, w) end
-        
-        local nw_words = {}
-        for w in nw:gmatch("%S+") do table.insert(nw_words, w) end
-        
-        local start_idx = math.max(1, #full_words - 20)
-        for i = start_idx, #full_words do
-            local buf_suffix_count = #full_words - i + 1
-            if buf_suffix_count <= #nw_words then
-                local match = true
-                for j = 1, buf_suffix_count do
-                    local bw = full_words[i + j - 1]:lower():gsub("[%p%c]", "")
-                    local pw = nw_words[j]:lower():gsub("[%p%c]", "")
-                    if bw ~= pw or bw == "" then
-                        match = false
-                        break
-                    end
-                end
-                
-                if match then
-                    local remaining = {}
-                    for j = buf_suffix_count + 1, #nw_words do
-                        table.insert(remaining, nw_words[j])
-                    end
-                    nw = table.concat(remaining, " ")
-                    break
-                end
-            end
-        end
-        
-        nw = nw:gsub("%s*%]$", ""):gsub("%s+$", "")
-        local to_type = nw
-        local deletes = 0
-        
-        -- Smart spacing taking UTF-8 apostrophes and raw bytes into account for basic mode
-        if to_type ~= "" and tail_text ~= "" then
-            local t_last = utils.utf8_sub(tail_text, -1)
-            local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
-            local is_apos  = t_last:match("['’]")
-            local type_start = utils.utf8_sub(to_type, 1, 1)
-            
-            if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
-                to_type = " " .. to_type
-                nw = " " .. nw
-            end
-        end
+		local display_orig = utils.utf8_sub(best_suffix, word_start_char)
+		local display_corr = utils.utf8_sub(tc_norm, word_start_char)
+
+		local has_corr = (deletes > 0 or utils.utf8_sub(tc_norm, best_c_len + 1) ~= "")
+		local chunks = utils.diff_strings(display_orig, display_corr)
+
+		return { 
+			deletes = deletes, 
+			to_type = to_type, 
+			nw = display_nw, 
+			has_corrections = has_corr, 
+			chunks = chunks 
+		}
+		
+	else
+		-- Basic / Raw Mode: Grab only the first line to truncate chatty paragraphs
+		local nw = block:gsub("^%s+", ""):gsub("%s+$", "")
+		nw = nw:match("([^\n\r]+)") or nw
+		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
+		nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
+		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
+		nw = nw:gsub("^[-•*]+%s*", "")
+		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
+		
+		-- Robust overlap mitigation using word-by-word comparison for basic models
+		local full_words = {}
+		for w in (full_text or ""):gmatch("%S+") do table.insert(full_words, w) end
+		
+		local nw_words = {}
+		for w in nw:gmatch("%S+") do table.insert(nw_words, w) end
+		
+		local start_idx = math.max(1, #full_words - 20)
+		for i = start_idx, #full_words do
+			local buf_suffix_count = #full_words - i + 1
+			if buf_suffix_count <= #nw_words then
+				local match = true
+				for j = 1, buf_suffix_count do
+					local bw = full_words[i + j - 1]:lower():gsub("[%p%c]", "")
+					local pw = nw_words[j]:lower():gsub("[%p%c]", "")
+					if bw ~= pw or bw == "" then
+						match = false
+						break
+					end
+				end
+				
+				if match then
+					local remaining = {}
+					for j = buf_suffix_count + 1, #nw_words do
+						table.insert(remaining, nw_words[j])
+					end
+					nw = table.concat(remaining, " ")
+					break
+				end
+			end
+		end
+		
+		nw = nw:gsub("%s*%]$", ""):gsub("%s+$", "")
+		local to_type = nw
+		local deletes = 0
+		
+		-- Smart spacing taking UTF-8 apostrophes and raw bytes into account for basic mode
+		if to_type ~= "" and tail_text ~= "" then
+			local t_last = utils.utf8_sub(tail_text, -1)
+			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
+			local is_apos  = t_last:match("['’]")
+			local type_start = utils.utf8_sub(to_type, 1, 1)
+			
+			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
+				to_type = " " .. to_type
+				nw = " " .. nw
+			end
+		end
 
 		if to_type:gsub("[%s%.…]", "") == "" then return nil end
 		
