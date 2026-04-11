@@ -46,7 +46,7 @@ local menu_mods = {
 	shortcuts  = safe_require("ui.menu.menu_shortcuts", "shortcuts menu"),
 	hotstrings = safe_require("ui.menu.menu_hotstrings", "hotstrings menu"),
 	llm        = safe_require("ui.menu.menu_llm", "AI menu"),
-	keylogger  = safe_require("ui.menu.menu_keylogger", "metrics menu"),
+	keylogger  = safe_require("ui.menu.menu_metrics", "metrics menu"),
 }
 
 -- Load core modules
@@ -165,6 +165,23 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if type(updateMenu) == "function" then updateMenu() end
 	end
 
+	local _apps_time_hk = nil
+	local function apply_apps_time_shortcut(mods, key)
+		if _apps_time_hk then pcall(function() _apps_time_hk:delete() end); _apps_time_hk = nil end
+		if mods and key then
+			state.apps_time_shortcut = { mods = mods, key = key }
+			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+				local ok_mod, at = pcall(require, "ui.metrics_apps")
+				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
+			end)
+			if ok and hk then _apps_time_hk = hk; hk:enable() end
+		else
+			state.apps_time_shortcut = false
+		end
+		save_prefs()
+		if type(updateMenu) == "function" then updateMenu() end
+	end
+
 	local function sync_state_to_modules(saved, config_absent)
 		-- Sync section states
 		if type(saved.section_states) == "table" then
@@ -261,6 +278,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 		if type(state.metrics_shortcut) == "table" then
 			apply_metrics_shortcut(state.metrics_shortcut.mods, state.metrics_shortcut.key)
+		end
+
+		if type(state.apps_time_shortcut) == "table" then
+			apply_apps_time_shortcut(state.apps_time_shortcut.mods, state.apps_time_shortcut.key)
 		end
 
 		-- Sync keylogger engine
@@ -494,6 +515,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
 			add_hotstring = function() if hotstring_editor and type(hotstring_editor.open) == "function" then pcall(hotstring_editor.open, "shortcut") end end,
 			show_metrics = function() if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end end,
+			show_apps_time = function() local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end end,
 			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "config.json\"") end) end,
 			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
 		})
@@ -518,6 +540,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			shortcuts              = core_mods.shortcuts_mod,
 			script_control         = core_mods.shortcuts_mod,
 			apply_metrics_shortcut = apply_metrics_shortcut,
+			apply_apps_time_shortcut = apply_apps_time_shortcut,
 			llm_handler            = llm_handler,
 		}
 

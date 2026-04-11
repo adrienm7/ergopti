@@ -359,7 +359,7 @@ local C_SEP      = { white = 1.00, alpha = 0.09 }
 local C_INVIS    = { white = 0.00, alpha = 0.00 }
 local C_LOADING  = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
 
-local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧", ["cmd+shift"] = "⌘⇧" }
+local MOD_SYMBOL = { cmd = "⌘", ctrl = "⌃", alt = "⌥", shift = "⇧", ["shift+cmd"] = "⇧⌘" }
 
 --- Extracts the hue from an RGB color and rebuilds a dark, barely-saturated background.
 --- @param tint table|nil RGBA tint color whose hue is used, or nil for neutral dark.
@@ -488,9 +488,6 @@ local function build_line(pred, is_sel, total_preds)
                         result = append_seg(result, s, color, should_emphasize_non_selected)
                     else -- "equal"
                         local color = C_UNSELECTED_GRAY
-                        if is_sel then
-                            color = special_correction_mode and C_UNCH_SEL or C_NW_SEL
-                        end
                         result = append_seg(result, s, color, false)
                     end
                 end
@@ -530,23 +527,41 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
     
     if n == 0 and (not reserved_count or tonumber(reserved_count) == 0) then return { preds = hs.styledtext.new("") } end
 
-	local PREFIX_SEL, PREFIX_OTHER
+    local PREFIX_SEL = ""
+    local PREFIX_OTHER_TEXT = ""
+    local PREFIX_OTHER_DEBUG_TEXT = ""
+    local PREFIX_VISUAL_COMP_TEXT = " "
 
     -- Use display_count (not n) so placeholders align with real predictions from the start
     if display_count == 1 then
-        PREFIX_SEL   = "✨ "
-        PREFIX_OTHER = ""
+        PREFIX_SEL = "✨ "
     elseif display_count >= 2 and indent > 0 then
-        PREFIX_SEL   = string.rep(" ", indent) .. "✨ "
-        PREFIX_OTHER = ""
+        PREFIX_SEL = string.rep(" ", indent) .. "✨ "
     else
         -- Case of negative indent values
-        PREFIX_SEL   = "✨ "
-        PREFIX_OTHER = string.rep("_", indent * -1) -- Using a space doesn't work here for an unknown reason
+        PREFIX_SEL = "✨ "
     end
 
-    -- Invisible prefix of same width as PREFIX_SEL, for alignment of placeholder lines
-    local PREFIX_PLACEHOLDER = hs.styledtext.new(PREFIX_SEL, { font = { name = FONT, size = SIZE_MAIN }, color = C_BG })
+    -- Indent rules for non-selected predictions
+    -- indent = 0  -> no left margin
+    -- indent = -3 -> exact PREFIX_SEL width
+    -- indent = -4 -> PREFIX_SEL width + 1 space
+    local indent_n = math.floor(tonumber(indent) or 0)
+    if indent_n < 0 and indent_n > -3 then
+        PREFIX_OTHER_TEXT = string.rep(" ", -indent_n)
+    elseif indent_n <= -3 then
+        PREFIX_OTHER_TEXT = PREFIX_SEL .. string.rep(" ", math.max(0, (-indent_n) - 3))
+    end
+
+    -- Global visual compensation for emoji side bearing on non-selected lines.
+    -- Keep indent <= -3 untouched because that range is anchored on exact PREFIX_SEL width.
+    if indent_n > -3 then
+        PREFIX_OTHER_TEXT = PREFIX_OTHER_TEXT .. PREFIX_VISUAL_COMP_TEXT
+    end
+
+    local PREFIX_OTHER_INVIS = hs.styledtext.new(PREFIX_OTHER_TEXT, { font = { name = FONT, size = SIZE_MAIN }, color = C_INVIS })
+    local PREFIX_OTHER_DEBUG = hs.styledtext.new(PREFIX_OTHER_DEBUG_TEXT, { font = { name = FONT, size = SIZE_MAIN }, color = C_UNSELECTED_GRAY })
+    local PREFIX_EMPTY = hs.styledtext.new("", { font = { name = FONT, size = SIZE_MAIN }, color = C_INVIS })
 
     local result = nil
     local gap    = hs.styledtext.new("\n", { font = { name = FONT, size = 3 }, color = C_INVIS })
@@ -554,9 +569,10 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
     for i = 1, display_count do
         local pred = raw_preds[i]
         local is_sel = (i == current_index and pred ~= nil)
-        local prefix = hs.styledtext.new(is_sel and PREFIX_SEL or PREFIX_OTHER, {
-            font  = { name = FONT, size = SIZE_MAIN }, color = is_sel and C_CURSOR or C_BG,
-        })
+        local prefix_other = (PREFIX_OTHER_DEBUG_TEXT ~= "") and PREFIX_OTHER_DEBUG or PREFIX_OTHER_INVIS
+        local prefix = is_sel
+            and hs.styledtext.new(PREFIX_SEL, { font = { name = FONT, size = SIZE_MAIN }, color = C_CURSOR })
+            or (PREFIX_OTHER_TEXT ~= "" and prefix_other or PREFIX_EMPTY)
 
         -- For reserved empty slots, show empty stub; otherwise show actual prediction
         local body
@@ -566,8 +582,8 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
                 body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_UNSELECTED_GRAY })
             end
         else
-            -- Reserved slot: align with non-selected predictions (PREFIX_OTHER), text in yellow
-            local placeholder_prefix = hs.styledtext.new(PREFIX_OTHER, { font = { name = FONT, size = SIZE_MAIN }, color = C_BG })
+            -- Reserved slot: keep the same left margin as real predictions
+            local placeholder_prefix = PREFIX_OTHER_TEXT ~= "" and prefix_other or PREFIX_EMPTY
             body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_LOADING })
             result = result and (result .. gap .. (placeholder_prefix .. body)) or (placeholder_prefix .. body)
             goto continue
@@ -883,7 +899,11 @@ function M.show_predictions(predictions, current_index, enabled, info_bar, short
     render(assemble_blocks(predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, reserved_count))
 end
 
---- Displays simple tooltip content (Hotstrings or Loading state)
+--- Displays simple tooltip content.
+--- @param content string|userdata The text to display.
+--- @param is_llm boolean True if triggered by LLM.
+--- @param enabled boolean True to display.
+--- @param bg_color table Optional background tint.
 function M.show(content, is_llm, enabled, bg_color)
     if not enabled then return end
     if content == nil or tostring(content) == "" then M.hide(); return end

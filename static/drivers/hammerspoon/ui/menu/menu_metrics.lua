@@ -1,4 +1,4 @@
---- ui/menu/menu_keylogger.lua
+--- ui/menu/menu_metrics.lua
 
 --- ==============================================================================
 --- MODULE: Keylogger Menu UI
@@ -46,6 +46,7 @@ M.DEFAULT_STATE = {
 	keylogger_float_graph    = kl_mod.DEFAULT_STATE.keylogger_float_graph,
 	keylogger_float_colors   = kl_mod.DEFAULT_STATE.keylogger_float_colors,
 	metrics_shortcut         = false,
+	apps_time_shortcut       = false,
 }
 
 
@@ -95,7 +96,6 @@ end
 --- @param password string The security key to provide to OpenSSL.
 local function process_files_with_ui(files_to_process, is_encrypt, password)
 	local total_files = #files_to_process
-	
 	update_progress(0, total_files)
 
 	local function on_progress(current_index)
@@ -107,12 +107,12 @@ local function process_files_with_ui(files_to_process, is_encrypt, password)
 			_prog_canvas:delete()
 			_prog_canvas = nil
 		end
-		
+
 		local alert_msg = string.format("Opération terminée.\n\nFichiers traités avec succès : %d\nErreurs rencontrées : %d", success_count, error_count)
 		if has_bad_password then
 			alert_msg = alert_msg .. "\n\n⚠️ Attention : Échec de déchiffrement détecté. Le mot de passe est potentiellement incorrect."
 		end
-		
+
 		hs.dialog.blockAlert("Encryptor", alert_msg, "OK")
 	end
 
@@ -141,7 +141,6 @@ function M.build(ctx)
 	local updateMenu     = ctx.updateMenu
 	local script_control = ctx.script_control
 
-    -- Safely auto-start the daemons once upon Hammerspoon reload
 	if not _is_initialized then
 		_is_initialized = true
 		if state.keylogger_enabled then
@@ -194,7 +193,7 @@ function M.build(ctx)
 	end
 
 	table.insert(menu, {
-		title = "Raccourci : " .. sc_label_metrics,
+		title = "↳ Raccourci : " .. sc_label_metrics,
 		disabled = not state.keylogger_enabled,
 		fn = function()
 			local current_str = ""
@@ -227,6 +226,62 @@ function M.build(ctx)
 		end
 	})
 
+	table.insert(menu, {
+		title    = "Afficher le temps sur les applications",
+		disabled = not state.keylogger_enabled,
+		fn       = function() 
+			local ok, at = pcall(require, "ui.metrics_apps")
+			if ok and type(at.show) == "function" then
+				pcall(at.show, hs.configdir .. "/logs")
+			end
+		end
+	})
+
+	local sc_label_apps = "Aucun"
+	if type(state.apps_time_shortcut) == "table" then
+		local mods_cap = {}
+		for _, m in ipairs(state.apps_time_shortcut.mods or {}) do
+			table.insert(mods_cap, m:sub(1,1):upper() .. m:sub(2))
+		end
+		local mods_str = table.concat(mods_cap, "+")
+		sc_label_apps = (mods_str ~= "" and (mods_str .. " + ") or "") .. string.upper(state.apps_time_shortcut.key or "")
+	end
+
+	table.insert(menu, {
+		title = "↳ Raccourci : " .. sc_label_apps,
+		disabled = not state.keylogger_enabled,
+		fn = function()
+			local current_str = ""
+			if type(state.apps_time_shortcut) == "table" then
+				current_str = table.concat(state.apps_time_shortcut.mods or {}, "+") .. "+" .. (state.apps_time_shortcut.key or "")
+			end
+			local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+				"Raccourci temps apps",
+				"Format : mods+touche  (ex : cmd+alt+t)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+				current_str, "OK", "Annuler"
+			)
+			if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
+			raw = raw:match("^%s*(.-)%s*$"):lower()
+			if raw == "" then 
+				if type(ctx.apply_apps_time_shortcut) == "function" then ctx.apply_apps_time_shortcut(nil, nil) end
+				return 
+			end
+			local parts = {}
+			for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
+			if #parts < 1 then return end
+			local key  = parts[#parts]
+			local mods = {}
+			for i = 1, #parts - 1 do
+				local m = parts[i]
+				if m == "option" then m = "alt" end
+				table.insert(mods, m)
+			end
+			if #mods == 0 then mods = {"ctrl"} end
+			if type(ctx.apply_apps_time_shortcut) == "function" then ctx.apply_apps_time_shortcut(mods, key) end
+		end
+	})
+
+	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
 
 	table.insert(menu, {
@@ -310,10 +365,11 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, { title = "-" })
+	table.insert(menu, { title = "-" })
 
 	local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
 	local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
-	
+
 	table.insert(menu, {
 		title    = label,
 		disabled = not state.keylogger_enabled,
@@ -332,6 +388,7 @@ function M.build(ctx)
 		)
 	})
 
+	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
 
 
@@ -371,7 +428,7 @@ function M.build(ctx)
 
 				state.keylogger_encrypt = true
 				save_prefs()
-				
+
 				local Keylogger = require("modules.keylogger")
 				if type(Keylogger.set_options) == "function" then
 					Keylogger.set_options({ encrypt = state.keylogger_encrypt })
@@ -381,25 +438,24 @@ function M.build(ctx)
 				if #files_to_process > 0 then
 					process_files_with_ui(files_to_process, true, pwd)
 				end
-
 			else
 				local alert_msg = "Tous vos logs chiffrés vont être restaurés en clair sur le disque.\n\nConfirmer ?"
 				local res = hs.dialog.blockAlert("Désactivation", alert_msg, "Déchiffrer", "Annuler")
 				if res ~= "Déchiffrer" then return end
-				
+
 				local ok_prompt, btn, pwd = pcall(hs.dialog.textPrompt, "Clé de sécurité", "Entrez la clé de sécurité nécessaire au déchiffrement :", default_pwd, "OK", "Annuler")
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
-				
+
 				local files_to_process = {}
 				for file in fs.dir(log_dir) do
 					if file:match("%.enc$") then
 						table.insert(files_to_process, log_dir .. "/" .. file)
 					end
 				end
-				
+
 				state.keylogger_encrypt = false
 				save_prefs()
-				
+
 				local Keylogger = require("modules.keylogger")
 				if type(Keylogger.set_options) == "function" then
 					Keylogger.set_options({ encrypt = state.keylogger_encrypt })
@@ -434,9 +490,9 @@ function M.build(ctx)
 				local res = hs.dialog.blockAlert("Avertissement de Sécurité", warnMsg, "Activer", "Annuler", "warning")
 				if res ~= "Activer" then return end
 			end
-			
+
 			state.keylogger_enabled = not state.keylogger_enabled
-			
+
 			local Keylogger  = require("modules.keylogger")
 			local WpmMenubar = require("ui.wpm.wpm_menubar")
 			local WpmWidget  = require("ui.wpm.wpm_widget")
@@ -448,9 +504,9 @@ function M.build(ctx)
 				if type(Keylogger.set_disabled_apps) == "function" then
 					Keylogger.set_disabled_apps(state.keylogger_disabled_apps or {})
 				end
-				
+
 				Keylogger.start(script_control)
-				
+
 				if type(WpmMenubar.set_use_source_colors) == "function" then
 					WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
 				end

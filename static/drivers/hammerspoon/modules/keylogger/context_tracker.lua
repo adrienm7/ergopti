@@ -9,6 +9,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Context Awareness: Captures window titles and roles to tag events correctly.
 --- 2. Autocorrect Detection: Isolates macOS text substitution events to prevent log errors.
+--- 3. Time Tracking: Monitors app active times and context switches.
+--- 4. Document Paths: Identifies local file paths for deep work categorization.
 --- ==============================================================================
 
 local hs     = hs
@@ -116,15 +118,33 @@ end
 -- =======================================
 -- =======================================
 
---- Checks if focused browser is in incognito mode.
+--- Checks if focused browser is in incognito mode and tracks fullscreen states.
 function M.update_private_status()
 	local win = hs.window.focusedWindow()
 	_state.is_private_window = false
+	_state.is_fullscreen = false
+	_state.session_document_path = nil
+
 	if win then
+		_state.is_fullscreen = win:isFullScreen()
+		
 		local title = win:title()
 		local keywords = { "Navigation privée", "Private Browsing", "Incognito", "InPrivate", "Anonymous" }
 		for _, kw in ipairs(keywords) do
-			if title:find(kw) then _state.is_private_window = true break end
+			if title:find(kw) then 
+				_state.is_private_window = true 
+				Logger.debug(LOG, "Private browsing window detected.")
+				break 
+			end
+		end
+		
+		-- Retrieve AXDocument for local file path tracking (e.g. VSCode, Word)
+		local ok_ax, ax_win = pcall(hs.axuielement.windowElement, win)
+		if ok_ax and ax_win then
+			local doc_url = ax_win:attributeValue("AXDocument")
+			if doc_url and type(doc_url) == "string" and doc_url:sub(1, 7) == "file://" then
+				_state.session_document_path = hs.http.urlDecode(doc_url:sub(8))
+			end
 		end
 	end
 end
@@ -135,9 +155,27 @@ end
 --- @param app_object table The hs.application object.
 function M.app_watcher_cb(app_name, event_type, app_object)
 	if event_type == hs.application.watcher.activated and app_object then
-		_state.active_app_bundle = app_object:bundleID()
-		_state.active_app_path   = app_object:path()
-		_state.active_app_pid    = app_object:pid()
+		local now = hs.timer.absoluteTime() / 1000000
+		local new_bundle = app_object:bundleID()
+		local new_path   = app_object:path()
+		local new_pid    = app_object:pid()
+		local new_name   = app_name
+
+		-- Track the time spent in the previous application before switching
+		if _state.active_app_name and _state.active_app_name ~= new_name then
+			local duration = now - (_state.active_app_start or now)
+			if _log_manager and type(_log_manager.log_app_switch) == "function" then
+				Logger.debug(LOG, string.format("Logging app switch from %s to %s…", _state.active_app_name, new_name))
+				_log_manager.log_app_switch(_state.active_app_name, new_name, duration)
+			end
+		end
+
+		_state.active_app_name   = new_name
+		_state.active_app_start  = now
+		_state.active_app_bundle = new_bundle
+		_state.active_app_path   = new_path
+		_state.active_app_pid    = new_pid
+
 		M.update_private_status()
 		M.update_ax_observer(_state.active_app_pid)
 	end
