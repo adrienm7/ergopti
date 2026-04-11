@@ -181,6 +181,7 @@ function M.set_llm_enabled(enabled)
 		if M._llm_timer and type(M._llm_timer.running) == "function" and M._llm_timer:running() then 
 			M._llm_timer:stop() 
 		end
+		if M._watchdog_timer then M._watchdog_timer:stop() end
 	end
 end
 
@@ -269,6 +270,7 @@ function M.reset_predictions()
 	
 	if tooltip.hide then tooltip.hide() end
 	M.stop_timer()
+	if M._watchdog_timer then M._watchdog_timer:stop() end
 end
 
 --- Validates and applies the selected LLM prediction with robust fail-safes.
@@ -510,7 +512,7 @@ local function trim_prompt_title(prompt_title)
 	return clean
 end
 
---- Generates the string for the information bar tooltip dynamically passing the backend string.
+--- Generates the string for the information bar tooltip with strict ordering: Model -> Backend -> Prompt -> Time
 --- @param model_name string Model identifier.
 --- @param elapsed_ms number Milliseconds taken for generation.
 --- @param backend_name string|nil The active backend string.
@@ -522,6 +524,10 @@ local function build_info_bar(model_name, elapsed_ms, backend_name, profile_name
 	local parts = {}
 	table.insert(parts, model_name)
 	
+	if type(backend_name) == "string" and backend_name ~= "" then
+		table.insert(parts, backend_name)
+	end
+	
 	local profile_short = trim_prompt_title(profile_name)
 	if profile_short then
 		table.insert(parts, profile_short)
@@ -530,11 +536,9 @@ local function build_info_bar(model_name, elapsed_ms, backend_name, profile_name
 	if elapsed_ms and elapsed_ms > 0 then
 		local secs = elapsed_ms / 1000
 		local time_str = secs < 10 and string.format("%.1fs", secs) or string.format("%ds", math.floor(secs + 0.5))
-		local backend_str = type(backend_name) == "string" and backend_name or ""
-		local time_block = "⏱️ " .. time_str .. (backend_str ~= "" and (" — " .. backend_str) or "")
-		table.insert(parts, time_block)
-		return table.concat(parts, " — ")
+		table.insert(parts, "⏱️ " .. time_str)
 	end
+	
 	return table.concat(parts, " — ")
 end
 
@@ -619,19 +623,49 @@ function M._perform_llm_check(force_trigger, profile_name)
 		local effective_num_pred = num_pred
 		
 		-- Automatically boost temperature if user requests multiple parallel predictions
-		-- to prevent greedy deterministic engines from generating 3 identical strings.
-		if effective_num_pred > 1 and req_temperature < 0.4 then
-			req_temperature = 0.5
+		-- to prevent greedy deterministic engines from generating exact identical strings.
+		if effective_num_pred > 1 and req_temperature < 0.6 then
+			req_temperature = 0.7
 			Logger.debug(LOG, string.format("Boosted temperature to %.1f for parallel variety.", req_temperature))
 		end
 		
 		Logger.debug(LOG, string.format("LLM dispatch tuned: backend=%s, num_pred=%d, max_tokens=%d", tostring(backend), effective_num_pred, max_predict_tokens))
+
+		-- Watchdog timer to prevent eternal "..." placeholders if some parallel threads die silently
+		if M._watchdog_timer then M._watchdog_timer:stop() end
+		M._watchdog_timer = hs.timer.doAfter(12, function()
+			if _llm_fetch_request_id == my_request_id and _predictions_active then
+				local backend_name = current_llm_backend_name
+				if not backend_name or backend_name == "" then
+					if backend == "mlx" then backend_name = "MLX 🚀"
+					elseif backend == "ollama" then backend_name = "Ollama 🦙"
+					else backend_name = "" end
+				end
+				
+				local info = llm_show_info_bar and build_info_bar(current_llm_display_name, nil, backend_name, "Timeout partiel") or nil
+				
+				local val_mods = llm_val_modifiers
+				local val_mod_str = "none"
+				if llm_num_predictions > 1 and not (#val_mods == 1 and val_mods[1] == "none") then
+					val_mod_str = (#val_mods == 0) and "\226\128\139" or table.concat(val_mods, "+")
+				end
+				
+				if tooltip.show_predictions then
+					tooltip.show_predictions(_pending_predictions, 1, preview_ai_enabled, info, val_mod_str, llm_pred_indent, llm_nav_modifiers, preview_ai_color, nil, #_pending_predictions)
+				end
+			end
+		end)
 		
 		core_llm.fetch_llm_prediction(
 			clean_buffer, tail,
 			model_to_use, req_temperature, max_predict_tokens, effective_num_pred,
 			function(predictions, elapsed_ms, is_final)
 				if _llm_fetch_request_id ~= my_request_id then return end
+
+				if is_final == true and M._watchdog_timer then
+					M._watchdog_timer:stop()
+					M._watchdog_timer = nil
+				end
 
 				-- Determine frontmost application to attribute logs correctly
 				local ok_app, front_app = pcall(function() return hs.application.frontmostApplication() end)
@@ -650,7 +684,7 @@ function M._perform_llm_check(force_trigger, profile_name)
 					if type(pred) ~= "table" then return "" end
 					local k = build_tooltip_dedup_key(pred)
 					if k ~= "" then return k end
-					return tostring(pred.to_type or "")
+					return tostring(pred.to_type or ""):gsub("%s+$", "")
 				end
 				
 				local valid_preds = {}
@@ -817,12 +851,12 @@ function M._perform_llm_check(force_trigger, profile_name)
 				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, backend_name, display_profile_name) or nil
 				
 				local loading_text = nil
-				if #valid_preds < llm_num_predictions then
+				if is_final ~= true and #valid_preds < llm_num_predictions then
 					local spinner_frames = { "◐", "◓", "◑", "◒" }
 					local idx = (math.floor(hs.timer.secondsSinceEpoch() * 6) % #spinner_frames) + 1
 					loading_text = string.format("%s Enrichissement… %d/%d", spinner_frames[idx], #valid_preds, llm_num_predictions)
 				end
-				local reserved_count = (#valid_preds < llm_num_predictions) and llm_num_predictions or #valid_preds
+				local reserved_count = (is_final ~= true) and llm_num_predictions or #valid_preds
 				
 				local val_mods = llm_val_modifiers
 				local val_mod_str = "none"

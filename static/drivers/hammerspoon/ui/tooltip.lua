@@ -31,12 +31,12 @@ if canvas then
 	canvas:level(hs.canvas.windowLevels.cursor)
 	canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
 	canvas:appendElements(
-        { type = "rectangle", action = "fill",        fillColor  = { white = 0.10, alpha = 0.97 }, roundedRectRadii = { xRadius = 7, yRadius = 7 } }, -- [1] Background
-        { type = "rectangle", action = "strokeAndFill", fillColor = { white = 0, alpha = 0 }, strokeColor = { white = 1, alpha = 0.13 }, strokeWidth = 1, roundedRectRadii = { xRadius = 7, yRadius = 7 } }, -- [2] Border
-        { type = "text" },      -- [3] Predictions (Main text block)
-        { type = "rectangle" }, -- [4] Full-width separator line
-        { type = "text" },      -- [5] Hint / Shortcut OR Combined (Hint + Info)
-        { type = "text" }       -- [6] Info Bar (Time/Model) if not combined
+		{ type = "rectangle", action = "fill",        fillColor  = { white = 0.10, alpha = 0.97 }, roundedRectRadii = { xRadius = 7, yRadius = 7 } }, -- [1] Background
+		{ type = "rectangle", action = "strokeAndFill", fillColor = { white = 0, alpha = 0 }, strokeColor = { white = 1, alpha = 0.13 }, strokeWidth = 1, roundedRectRadii = { xRadius = 7, yRadius = 7 } }, -- [2] Border
+		{ type = "text" },      -- [3] Predictions (Main text block)
+		{ type = "rectangle" }, -- [4] Full-width separator line
+		{ type = "text" },      -- [5] Hint / Shortcut OR Combined (Hint + Info)
+		{ type = "text" }       -- [6] Info Bar (Time/Model) if not combined
 	)
 end
 
@@ -55,23 +55,23 @@ M.LLM_TIMEOUT_SEC_DEFAULT = 12.0
 M.HOTSTRING_TIMEOUT_MARGIN_SEC = 0.1
 
 local _state = {
-    raw_predictions = {},
-    current_index   = 1,
-    on_navigate     = nil,
-    on_accept       = nil,
-    on_cancel       = nil,
-    info_bar        = nil,
-    shortcut_mod    = "alt",
-    nav_mods        = {},
-    nav_mod_str     = "none",
-    indent          = 0,
-    fixed_width     = nil,
-    timeout_sec     = M.TIMEOUT_SEC_DEFAULT,
-    llm_timeout_sec = M.LLM_TIMEOUT_SEC_DEFAULT,
-    current_is_llm  = false,
-    bg_color        = nil,
-    loading_text    = nil,
-    enter_validates = false,  -- True only after user navigates with arrow keys
+	raw_predictions = {},
+	current_index   = 1,
+	on_navigate     = nil,
+	on_accept       = nil,
+	on_cancel       = nil,
+	info_bar        = nil,
+	shortcut_mod    = "alt",
+	nav_mods        = {},
+	nav_mod_str     = "none",
+	indent          = 0,
+	fixed_width     = nil,
+	timeout_sec     = M.TIMEOUT_SEC_DEFAULT,
+	llm_timeout_sec = M.LLM_TIMEOUT_SEC_DEFAULT,
+	current_is_llm  = false,
+	bg_color        = nil,
+	loading_text    = nil,
+	enter_validates = false,  -- True only after user navigates with arrow keys
 }
 
 local _watchers = {}
@@ -134,7 +134,7 @@ local function start_watchers()
 	
 	local evTypes = hs.eventtap.event.types
 	
-    -- Hide tooltip on mouse movement or click
+	-- Hide tooltip on mouse movement or click
 	local w_mouse = hs.eventtap.new({evTypes.mouseMoved, evTypes.leftMouseDown, evTypes.rightMouseDown, evTypes.scrollWheel}, function(_)
 		M.hide()
 		return false
@@ -142,119 +142,119 @@ local function start_watchers()
 	w_mouse:start()
 	table.insert(_watchers, w_mouse)
 
-    -- Handle explicit key overrides
-    local w_key = hs.eventtap.new({evTypes.keyDown}, function(e)
-        local kc = e:getKeyCode()
-        local flags = e:getFlags()
-        local key_chars = e:getCharacters(true) or e:getCharacters(false) or ""
-        local is_enter_key = (kc == 36 or kc == 76 or key_chars == "\r" or key_chars == "\n")
-        
-        -- Priority interception: STRICTLY consume TAB when LLM predictions are active
-        if kc == 48 and _state.current_is_llm then
-            if flags.shift then
-                local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
-                if n > 1 then
-                    M.navigate(-1)
-                    return true
-                end
-            else
-                -- Only accept prediction if Tab is pressed alone (no other modifier)
-                local has_other_mod = flags.cmd or flags.alt or flags.ctrl or (flags.shift == true)
-                if not has_other_mod then
-                    if type(_state.on_accept) == "function" then
-                        _state.on_accept(_state.current_index)
-                    end
-                    return true
-                end
-                -- If Tab is pressed with modifiers, cancel predictions and let it pass through
-                if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-                return false
-            end
-        end
+	-- Handle explicit key overrides
+	local w_key = hs.eventtap.new({evTypes.keyDown}, function(e)
+		local kc = e:getKeyCode()
+		local flags = e:getFlags()
+		local key_chars = e:getCharacters(true) or e:getCharacters(false) or ""
+		local is_enter_key = (kc == 36 or kc == 76 or key_chars == "\r" or key_chars == "\n")
+		
+		-- Priority interception: STRICTLY consume TAB when LLM predictions are active
+		if kc == 48 and _state.current_is_llm then
+			if flags.shift then
+				local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+				if n > 1 then
+					M.navigate(-1)
+					return true
+				end
+			else
+				-- Only accept prediction if Tab is pressed alone (no other modifier)
+				local has_other_mod = flags.cmd or flags.alt or flags.ctrl or (flags.shift == true)
+				if not has_other_mod then
+					if type(_state.on_accept) == "function" then
+						_state.on_accept(_state.current_index)
+					end
+					return true
+				end
+				-- If Tab is pressed with modifiers, cancel predictions and let it pass through
+				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+				return false
+			end
+		end
 
-        -- Priority interception: Enter accepts prediction ONLY if user has navigated with arrow keys first
-        if _state.current_is_llm and is_enter_key then
-            local has_other_mod = flags.cmd or flags.alt or flags.ctrl or flags.shift
-            if not has_other_mod then
-                if _state.enter_validates then
-                    if type(_state.on_accept) == "function" then
-                        _state.on_accept(_state.current_index)
-                    end
-                    return true
-                else
-                    -- Enter not yet validated by navigation: cancel predictions and let it pass through
-                    if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-                    return false
-                end
-            else
-                -- Enter with modifier: cancel predictions and let it pass through for user shortcuts
-                if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-                return false
-            end
-        end
-        
-        -- Priority interception: Arrow keys for secure navigation
-        if _state.current_is_llm and kc >= 123 and kc <= 126 then
-            local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
-            if n > 1 and check_modifiers(flags, _state.nav_mods) then
-                local nav_dir = (kc == 123 or kc == 126) and -1 or 1
-                M.navigate(nav_dir)
-                return true
-            end
-        end
-        
-        -- Ignored keys
-        if kc == 48 then return false end 
-        
-        local mod = _state.shortcut_mod or "alt"
-        
-        -- Priority interception: Selection shortcuts (1-0)
-        if mod ~= "none" then
-            local match_all = true
-            local req_flags = {}
-            for m in mod:gmatch("[^+]+") do
-                req_flags[m] = true
-                if not flags[m] then match_all = false; break end
-            end
-            
-            -- Strict check: no OTHER modifier should be pressed
-            if match_all then
-                for k, v in pairs(flags) do
-                    if v and not req_flags[k] and (k == "cmd" or k == "alt" or k == "shift" or k == "ctrl") then
-                        match_all = false; break
-                    end
-                end
-            end
-            
-            if match_all and num_keycodes[kc] then
-                local idx = num_keycodes[kc]
-                local n_preds = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
-                
-                if idx <= n_preds then
-                    if type(_state.on_accept) == "function" then
-                        _state.on_accept(idx)
-                    end
-                end
-                
-                -- RETURN TRUE: We fully consume the keystroke so macOS never receives it
-                return true
-            end
-        end
-        
-        -- Ignore raw modifier presses (Shift, Ctrl, Alt, Cmd) and common hyper/layer keys (F13-F20) to prevent premature dismissal
-        if kc == 54 or kc == 55 or kc == 56 or kc == 58 or kc == 59 or kc == 60 or kc == 105 or kc == 107 or kc == 113 or kc == 106 or kc == 64 or kc == 79 or kc == 80 or kc == 90 then
-            return false
-        end
-        
-        -- Any other key: cancel active predictions and hide
-        if _state.current_is_llm then
-            if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-        end
-        M.hide()
-        return false
-    end)
-    w_key:start()
-    table.insert(_watchers, w_key)
+		-- Priority interception: Enter accepts prediction ONLY if user has navigated with arrow keys first
+		if _state.current_is_llm and is_enter_key then
+			local has_other_mod = flags.cmd or flags.alt or flags.ctrl or flags.shift
+			if not has_other_mod then
+				if _state.enter_validates then
+					if type(_state.on_accept) == "function" then
+						_state.on_accept(_state.current_index)
+					end
+					return true
+				else
+					-- Enter not yet validated by navigation: cancel predictions and let it pass through
+					if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+					return false
+				end
+			else
+				-- Enter with modifier: cancel predictions and let it pass through for user shortcuts
+				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+				return false
+			end
+		end
+		
+		-- Priority interception: Arrow keys for secure navigation
+		if _state.current_is_llm and kc >= 123 and kc <= 126 then
+			local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+			if n > 1 and check_modifiers(flags, _state.nav_mods) then
+				local nav_dir = (kc == 123 or kc == 126) and -1 or 1
+				M.navigate(nav_dir)
+				return true
+			end
+		end
+		
+		-- Ignored keys
+		if kc == 48 then return false end 
+		
+		local mod = _state.shortcut_mod or "alt"
+		
+		-- Priority interception: Selection shortcuts (1-0)
+		if mod ~= "none" then
+			local match_all = true
+			local req_flags = {}
+			for m in mod:gmatch("[^+]+") do
+				req_flags[m] = true
+				if not flags[m] then match_all = false; break end
+			end
+			
+			-- Strict check: no OTHER modifier should be pressed
+			if match_all then
+				for k, v in pairs(flags) do
+					if v and not req_flags[k] and (k == "cmd" or k == "alt" or k == "shift" or k == "ctrl") then
+						match_all = false; break
+					end
+				end
+			end
+			
+			if match_all and num_keycodes[kc] then
+				local idx = num_keycodes[kc]
+				local n_preds = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+				
+				if idx <= n_preds then
+					if type(_state.on_accept) == "function" then
+						_state.on_accept(idx)
+					end
+				end
+				
+				-- RETURN TRUE: We fully consume the keystroke so macOS never receives it
+				return true
+			end
+		end
+		
+		-- Ignore raw modifier presses (Shift, Ctrl, Alt, Cmd) and common hyper/layer keys (F13-F20) to prevent premature dismissal
+		if kc == 54 or kc == 55 or kc == 56 or kc == 58 or kc == 59 or kc == 60 or kc == 105 or kc == 107 or kc == 113 or kc == 106 or kc == 64 or kc == 79 or kc == 80 or kc == 90 then
+			return false
+		end
+		
+		-- Any other key: cancel active predictions and hide
+		if _state.current_is_llm then
+			if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+		end
+		M.hide()
+		return false
+	end)
+	w_key:start()
+	table.insert(_watchers, w_key)
 end
 
 
@@ -270,19 +270,19 @@ end
 --- Resolves the best screen coordinates to display the tooltip based on the current context.
 --- @return table|nil Table containing x, y, and optionally h and type, or nil if resolution fails.
 local function resolve_anchor()
-    -- Native VSCode integration check
+	-- Native VSCode integration check
 	if vscode_bridge and type(vscode_bridge.is_vscode) == "function" and vscode_bridge.is_vscode() then
 		local ok, pos = pcall(vscode_bridge.estimate_position)
 		if ok and type(pos) == "table" then return pos end
 	end
 	
-    -- Accessibility API evaluation
+	-- Accessibility API evaluation
 	local ax_ok, pos = pcall(function()
 		local ax = require("hs.axuielement")
 		local focused = ax.systemWideElement():attributeValue("AXFocusedUIElement")
 		if not focused then return nil end
 		
-        -- 1. Try text range selection
+		-- 1. Try text range selection
 		local range = focused:attributeValue("AXSelectedTextRange")
 		if range and type(range) == "table" then
 			local b = focused:parameterizedAttributeValue("AXBoundsForRange", { location = range.location, length = 0 })
@@ -291,7 +291,7 @@ local function resolve_anchor()
 			end
 		end
 		
-        -- 2. Try line number detection
+		-- 2. Try line number detection
 		local ln = focused:attributeValue("AXInsertionPointLineNumber")
 		if ln then
 			local lr = focused:parameterizedAttributeValue("AXRangeForLine", ln)
@@ -303,7 +303,7 @@ local function resolve_anchor()
 			end
 		end
 		
-        -- 3. Fallback to input box container frame
+		-- 3. Fallback to input box container frame
 		local f = focused:attributeValue("AXFrame")
 		if f and type(f) == "table" and f.x and f.y and f.w and f.h then 
 			return { x = f.x + f.w / 2, y = f.y + f.h, h = 0, type = "input_box" } 
@@ -314,7 +314,7 @@ local function resolve_anchor()
 	
 	if ax_ok and type(pos) == "table" then return pos end
 
-    -- Absolute fallback to the center-bottom of the active window bounds
+	-- Absolute fallback to the center-bottom of the active window bounds
 	local win = hs.window.focusedWindow()
 	if win then
 		local ok, f = pcall(function() return win:frame() end)
@@ -369,7 +369,7 @@ local function apply_tint(tint)
 	local g = math.max(0, math.min(1, tint.green or 0))
 	local b = math.max(0, math.min(1, tint.blue  or 0))
 
-    -- Extracts hue from RGB
+	-- Extracts hue from RGB
 	local max_c = math.max(r, g, b)
 	local min_c = math.min(r, g, b)
 	local delta = max_c - min_c
@@ -386,11 +386,11 @@ local function apply_tint(tint)
 		hue = hue / 6
 	end
 
-    -- Fixed dark lightness and very low saturation — only the hue changes
+	-- Fixed dark lightness and very low saturation — only the hue changes
 	local L = 0.10
 	local S = 0.40
 
-    -- HSL -> RGB
+	-- HSL -> RGB
 	local c  = (1 - math.abs(2 * L - 1)) * S
 	local x  = c * (1 - math.abs((hue * 6) % 2 - 1))
 	local m  = L - c / 2
@@ -432,33 +432,33 @@ end
 
 --- Builds a single line of text reflecting the diff states.
 local function build_line(pred, is_sel, total_preds)
-    if type(pred) ~= "table" then return nil end
-    
-    local result   = nil
-    local chunks   = pred.chunks
-    local nw       = pred.nw or ""
-    local has_corr = pred.has_corrections
-    local has_equal_chunk = false
-    local has_insert_chunk = false
+	if type(pred) ~= "table" then return nil end
+	
+	local result   = nil
+	local chunks   = pred.chunks
+	local nw       = pred.nw or ""
+	local has_corr = pred.has_corrections
+	local has_equal_chunk = false
+	local has_insert_chunk = false
 
-    if type(chunks) == "table" then
-        for _, chunk in ipairs(chunks) do
-            if type(chunk) == "table" then
-                local chunk_text = tostring(chunk.text or "")
-                if chunk_text:gsub("%s+", "") ~= "" then
-                    if chunk.type == "equal" then has_equal_chunk = true end
-                    if chunk.type == "insert" then has_insert_chunk = true end
-                end
-            end
-        end
-    end
+	if type(chunks) == "table" then
+		for _, chunk in ipairs(chunks) do
+			if type(chunk) == "table" then
+				local chunk_text = tostring(chunk.text or "")
+				if chunk_text:gsub("%s+", "") ~= "" then
+					if chunk.type == "equal" then has_equal_chunk = true end
+					if chunk.type == "insert" then has_insert_chunk = true end
+				end
+			end
+		end
+	end
 
-    local special_correction_mode = (has_corr == true) or ((tonumber(pred.deletes) or 0) > 0)
-    local should_emphasize_non_selected = (not is_sel)
-        and (total_preds > 1)
-        and special_correction_mode
-        and has_equal_chunk
-        and has_insert_chunk
+	local special_correction_mode = (has_corr == true) or ((tonumber(pred.deletes) or 0) > 0)
+	local should_emphasize_non_selected = (not is_sel)
+		and (total_preds > 1)
+		and special_correction_mode
+		and has_equal_chunk
+		and has_insert_chunk
 
 	local first_done = false
 	local function clean_first(s)
@@ -472,37 +472,37 @@ local function build_line(pred, is_sel, total_preds)
 
 	local last_char = ""
 
-    if type(chunks) == "table" and #chunks > 0 then
-        for _, chunk in ipairs(chunks) do
-            if type(chunk) == "table" then
-                local s = clean_first(chunk.text)
-                if s and s ~= "" then
-                    last_char = s:sub(-1)
-                    if chunk.type == "insert" then
-                        local color = C_UNSELECTED_GRAY
-                        if is_sel then
-                            color = special_correction_mode and C_CORR_SEL or C_NW_SEL
-                        end
-                        result = append_seg(result, s, color, should_emphasize_non_selected)
-                    else -- "equal"
-                        local color = C_UNSELECTED_GRAY
-                        result = append_seg(result, s, color, false)
-                    end
-                end
-            end
-        end
-    end
+	if type(chunks) == "table" and #chunks > 0 then
+		for _, chunk in ipairs(chunks) do
+			if type(chunk) == "table" then
+				local s = clean_first(chunk.text)
+				if s and s ~= "" then
+					last_char = s:sub(-1)
+					if chunk.type == "insert" then
+						local color = C_UNSELECTED_GRAY
+						if is_sel then
+							color = special_correction_mode and C_CORR_SEL or C_NW_SEL
+						end
+						result = append_seg(result, s, color, should_emphasize_non_selected)
+					else -- "equal"
+						local color = C_UNSELECTED_GRAY
+						result = append_seg(result, s, color, false)
+					end
+				end
+			end
+		end
+	end
 
-    local s_nw = clean_first(nw)
-    if s_nw and s_nw ~= "" then
-        -- Automatically insert a space if the previous text (gray) and the new text (orange) are glued together
-        if last_char ~= "" and not last_char:match("%s") and not s_nw:match("^%s") then
-            s_nw = " " .. s_nw
-        end
-        local color = is_sel and C_NW_SEL or C_UNSELECTED_GRAY
-        local should_bold_nw = should_emphasize_non_selected and (s_nw:gsub("%s+", "") ~= "")
-        result = append_seg(result, s_nw, color, should_bold_nw)
-    end
+	local s_nw = clean_first(nw)
+	if s_nw and s_nw ~= "" then
+		-- Automatically insert a space if the previous text (gray) and the new text (orange) are glued together
+		if last_char ~= "" and not last_char:match("%s") and not s_nw:match("^%s") then
+			s_nw = " " .. s_nw
+		end
+		local color = is_sel and C_NW_SEL or C_UNSELECTED_GRAY
+		local should_bold_nw = should_emphasize_non_selected and (s_nw:gsub("%s+", "") ~= "")
+		result = append_seg(result, s_nw, color, should_bold_nw)
+	end
 
 	return result
 end
@@ -520,76 +520,75 @@ end
 --- Assembles all lines and bottom hints into styled blocks ready for rendering.
 --- If reserved_count > n, adds empty placeholder lines to pre-size the canvas.
 local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod, indent, nav_mod_str, loading_text, reserved_count)
-    local n = type(raw_preds) == "table" and #raw_preds or 0
-    local display_count = math.max(n, tonumber(reserved_count) or n)  -- Shows n actual + (reserved_count - n) empty lines
-    
-    if n == 0 and (not reserved_count or tonumber(reserved_count) == 0) then return { preds = hs.styledtext.new("") } end
+	local n = type(raw_preds) == "table" and #raw_preds or 0
+	local display_count = math.max(n, tonumber(reserved_count) or n)
+	
+	if n == 0 and (not reserved_count or tonumber(reserved_count) == 0) then return { preds = hs.styledtext.new("") } end
 
-    local PREFIX_SEL = ""
-    local PREFIX_OTHER_TEXT = ""
-    local PREFIX_OTHER_DEBUG_TEXT = ""
-    local PREFIX_VISUAL_COMP_TEXT = " "
+	local PREFIX_SEL = ""
+	local PREFIX_OTHER_TEXT = ""
+	local PREFIX_OTHER_DEBUG_TEXT = ""
+	local PREFIX_VISUAL_COMP_TEXT = " "
 
-    -- Use display_count (not n) so placeholders align with real predictions from the start
-    if display_count == 1 then
-        PREFIX_SEL = "✨ "
-    elseif display_count >= 2 and indent > 0 then
-        PREFIX_SEL = string.rep(" ", indent) .. "✨ "
-    else
-        -- Case of negative indent values
-        PREFIX_SEL = "✨ "
-    end
+	-- Use display_count (not n) so placeholders align with real predictions from the start
+	if display_count == 1 then
+		PREFIX_SEL = "✨ "
+	elseif display_count >= 2 and indent > 0 then
+		PREFIX_SEL = string.rep(" ", indent) .. "✨ "
+	else
+		-- Case of negative indent values
+		PREFIX_SEL = "✨ "
+	end
 
-    -- Indent rules for non-selected predictions
-    -- indent = 0  -> no left margin
-    -- indent = -3 -> exact PREFIX_SEL width
-    -- indent = -4 -> PREFIX_SEL width + 1 space
-    local indent_n = math.floor(tonumber(indent) or 0)
-    if indent_n < 0 and indent_n > -3 then
-        PREFIX_OTHER_TEXT = string.rep(" ", -indent_n)
-    elseif indent_n <= -3 then
-        PREFIX_OTHER_TEXT = PREFIX_SEL .. string.rep(" ", math.max(0, (-indent_n) - 3))
-    end
+	-- Indent rules for non-selected predictions
+	-- indent = 0  -> no left margin
+	-- indent = -3 -> exact PREFIX_SEL width
+	-- indent = -4 -> PREFIX_SEL width + 1 space
+	local indent_n = math.floor(tonumber(indent) or 0)
+	if indent_n < 0 and indent_n > -3 then
+		PREFIX_OTHER_TEXT = string.rep(" ", -indent_n)
+	elseif indent_n <= -3 then
+		PREFIX_OTHER_TEXT = PREFIX_SEL .. string.rep(" ", math.max(0, (-indent_n) - 3))
+	end
 
-    -- Global visual compensation for emoji side bearing on non-selected lines
-    -- Keep indent <= -3 untouched because that range is anchored on exact PREFIX_SEL width
-    if indent_n > -3 then
-        PREFIX_OTHER_TEXT = PREFIX_OTHER_TEXT .. PREFIX_VISUAL_COMP_TEXT
-    end
+	-- Global visual compensation for emoji side bearing on non-selected lines
+	if indent_n > -3 then
+		PREFIX_OTHER_TEXT = PREFIX_OTHER_TEXT .. PREFIX_VISUAL_COMP_TEXT
+	end
 
-    local PREFIX_OTHER_INVIS = hs.styledtext.new(PREFIX_OTHER_TEXT, { font = { name = FONT, size = SIZE_MAIN }, color = C_INVIS })
-    local PREFIX_OTHER_DEBUG = hs.styledtext.new(PREFIX_OTHER_DEBUG_TEXT, { font = { name = FONT, size = SIZE_MAIN }, color = C_UNSELECTED_GRAY })
-    local PREFIX_EMPTY = hs.styledtext.new("", { font = { name = FONT, size = SIZE_MAIN }, color = C_INVIS })
+	local PREFIX_OTHER_INVIS = hs.styledtext.new(PREFIX_OTHER_TEXT, { font = { name = FONT, size = SIZE_MAIN }, color = C_INVIS })
+	local PREFIX_OTHER_DEBUG = hs.styledtext.new(PREFIX_OTHER_DEBUG_TEXT, { font = { name = FONT, size = SIZE_MAIN }, color = C_UNSELECTED_GRAY })
+	local PREFIX_EMPTY = hs.styledtext.new("", { font = { name = FONT, size = SIZE_MAIN }, color = C_INVIS })
 
-    local result = nil
-    local gap    = hs.styledtext.new("\n", { font = { name = FONT, size = 3 }, color = C_INVIS })
+	local result = nil
+	local gap    = hs.styledtext.new("\n", { font = { name = FONT, size = 3 }, color = C_INVIS })
 
-    for i = 1, display_count do
-        local pred = raw_preds[i]
-        local is_sel = (i == current_index and pred ~= nil)
-        local prefix_other = (PREFIX_OTHER_DEBUG_TEXT ~= "") and PREFIX_OTHER_DEBUG or PREFIX_OTHER_INVIS
-        local prefix = is_sel
-            and hs.styledtext.new(PREFIX_SEL, { font = { name = FONT, size = SIZE_MAIN }, color = C_CURSOR })
-            or (PREFIX_OTHER_TEXT ~= "" and prefix_other or PREFIX_EMPTY)
+	for i = 1, display_count do
+		local pred = raw_preds[i]
+		local is_sel = (i == current_index and pred ~= nil)
+		local prefix_other = (PREFIX_OTHER_DEBUG_TEXT ~= "") and PREFIX_OTHER_DEBUG or PREFIX_OTHER_INVIS
+		local prefix = is_sel
+			and hs.styledtext.new(PREFIX_SEL, { font = { name = FONT, size = SIZE_MAIN }, color = C_CURSOR })
+			or (PREFIX_OTHER_TEXT ~= "" and prefix_other or PREFIX_EMPTY)
 
-        -- For reserved empty slots, show empty stub; otherwise show actual prediction
-        local body
-        if pred ~= nil then
-            body = build_line(pred, is_sel, n)
-            if not body then
-                body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_UNSELECTED_GRAY })
-            end
-        else
-            -- Reserved slot: keep the same left margin as real predictions
-            local placeholder_prefix = PREFIX_OTHER_TEXT ~= "" and prefix_other or PREFIX_EMPTY
-            body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_LOADING })
-            result = result and (result .. gap .. (placeholder_prefix .. body)) or (placeholder_prefix .. body)
-            goto continue
-        end
+		-- For reserved empty slots, show empty stub; otherwise show actual prediction
+		local body
+		if pred ~= nil then
+			body = build_line(pred, is_sel, n)
+			if not body then
+				body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_UNSELECTED_GRAY })
+			end
+		else
+			-- Reserved slot: keep the same left margin as real predictions
+			local placeholder_prefix = PREFIX_OTHER_TEXT ~= "" and prefix_other or PREFIX_EMPTY
+			body = hs.styledtext.new("…", { font = { name = FONT, size = SIZE_MAIN, traits = { italic = true } }, color = C_LOADING })
+			result = result and (result .. gap .. (placeholder_prefix .. body)) or (placeholder_prefix .. body)
+			goto continue
+		end
 
 		local cmd_str = ""
 		if n > 1 and shortcut_mod ~= "none" then
-			local mod_sym = MOD_SYMBOL[shortcut_mod] or "⌃"
+			local mod_sym = MOD_SYMBOL and MOD_SYMBOL[shortcut_mod] or "⌃"
 			if i <= 9 then cmd_str = "   " .. mod_sym .. i
 			elseif i == 10 then cmd_str = "   " .. mod_sym .. "0"
 			end
@@ -603,39 +602,37 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
 			line = prefix .. body
 		end
 
-        result = result and (result .. gap .. line) or line
-        ::continue::
-    end
+		result = result and (result .. gap .. line) or line
+		::continue::
+	end
 
-    local SP = string.rep(" ", 6) -- 6 mathematical spaces for visual padding
-    -- Note: loading_text with spinner is not appended to result anymore
-    -- Each reserved slot already shows "…" as placeholder
-    local loading_st = nil
+	local SP = string.rep(" ", 6)
+	local loading_st = nil
 
-    local hint_st
-    
-    if display_count > 1 then
-        local left_hint  = "⇧G + Tab"
-        local right_hint = "⇧D + Tab"
-        if nav_mod_str ~= "none" then
-            left_hint  = left_hint  .. " ou " .. ((nav_mod_str ~= "" and nav_mod_str ~= "none") and (nav_mod_str .. " + ") or "") .. "↑/←"
-            right_hint = right_hint .. " ou " .. ((nav_mod_str ~= "" and nav_mod_str ~= "none") and (nav_mod_str .. " + ") or "") .. "↓/→"
-        end
-        hint_st = hs.styledtext.new(
-            left_hint .. SP .. " ◀" .. SP .. "Tab = accepter" .. SP .. "▶ " .. SP .. right_hint,
-            { font = { name = FONT, size = SIZE_HINT }, color = C_HINT, paragraphStyle = { alignment = "center" } }
-        )
-    else
-        hint_st = hs.styledtext.new("Tab pour accepter", { font = { name = FONT, size = SIZE_HINT }, color = C_HINT, paragraphStyle = { alignment = "center" } })
-    end
+	local hint_st
+	
+	if display_count > 1 then
+		local left_hint  = "⇧G + Tab"
+		local right_hint = "⇧D + Tab"
+		if nav_mod_str ~= "none" then
+			left_hint  = left_hint  .. " ou " .. ((nav_mod_str ~= "" and nav_mod_str ~= "none") and (nav_mod_str .. " + ") or "") .. "↑/←"
+			right_hint = right_hint .. " ou " .. ((nav_mod_str ~= "" and nav_mod_str ~= "none") and (nav_mod_str .. " + ") or "") .. "↓/→"
+		end
+		hint_st = hs.styledtext.new(
+			left_hint .. SP .. " ◀" .. SP .. "Tab = accepter" .. SP .. "▶ " .. SP .. right_hint,
+			{ font = { name = FONT, size = SIZE_HINT }, color = C_HINT, paragraphStyle = { alignment = "center" } }
+		)
+	else
+		hint_st = hs.styledtext.new("Tab pour accepter", { font = { name = FONT, size = SIZE_HINT }, color = C_HINT, paragraphStyle = { alignment = "center" } })
+	end
 
 	local info_st = nil
 	if info_bar and tostring(info_bar) ~= "" then
-		local safe_info = tostring(info_bar):gsub("%s*·%s*", " — ⏱️ ")
+		local safe_info = tostring(info_bar)
 		info_st = hs.styledtext.new(safe_info, { font = { name = FONT, size = SIZE_INFO }, color = C_INFO_BAR, paragraphStyle = { alignment = "center" } })
 	end
 
-    return { preds = result, loading_st = loading_st, hint_st = hint_st, info_st = info_st, SP = SP }
+	return { preds = result, loading_st = loading_st, hint_st = hint_st, info_st = info_st, SP = SP }
 end
 
 
@@ -674,7 +671,7 @@ local function render(blocks)
 	local is_combined = false
 	local combined_st = nil
 
-    -- Attempt to visually merge Hint and Info texts if horizontal space allows it
+	-- Attempt to visually merge Hint and Info texts if horizontal space allows it
 	if info_st and hint_st then
 		local sep_st = hs.styledtext.new(SP .. "|" .. SP, { font = { name = FONT, size = SIZE_HINT }, color = C_SEP })
 		combined_st = hs.styledtext.new("") .. hint_st .. sep_st .. info_st
@@ -686,20 +683,20 @@ local function render(blocks)
 		end
 	end
 
-    -- [1] Apply tinted dark background according to the active tooltip type
+	-- [1] Apply tinted dark background according to the active tooltip type
 	canvas[1].fillColor = apply_tint(_state.bg_color)
 
-    -- [2] Border: always covers the full canvas size (updated after size is known)
+	-- [2] Border: always covers the full canvas size (updated after size is known)
 
 	local w = max_w + PAD_X * 2
 	local cur_y = PAD_Y
 
-    -- [3] Main text block rendering
+	-- [3] Main text block rendering
 	canvas[3].text  = blocks.preds
 	canvas[3].frame = { x = PAD_X, y = cur_y, w = max_w, h = sz_preds.h }
 	cur_y = cur_y + sz_preds.h + 8
 
-    -- [4] Full-width separator line rendering
+	-- [4] Full-width separator line rendering
 	if hint_st or info_st then
 		canvas[4].action    = "fill"
 		canvas[4].fillColor = C_SEP
@@ -709,7 +706,7 @@ local function render(blocks)
 		canvas[4].action = "skip"
 	end
 
-    -- [5] and [6] Hint / Info text blocks rendering
+	-- [5] and [6] Hint / Info text blocks rendering
 	if is_combined then
 		local sz_comb = canvas:minimumTextSize(3, combined_st)
 		canvas[5].action = "fill"
@@ -739,7 +736,7 @@ local function render(blocks)
 
 	local h = cur_y - 8 + PAD_Y
 
-    -- Dynamic absolute positioning
+	-- Dynamic absolute positioning
 	local anchor = resolve_anchor()
 	local fw     = hs.window.focusedWindow()
 	local scr    = nil
@@ -757,20 +754,20 @@ local function render(blocks)
 			if py + h > screen.y + screen.h then py = anchor.y - h - 5 end
 		end
 	else
-        -- Absolute center-bottom fallback if no context is found
+		-- Absolute center-bottom fallback if no context is found
 		px = screen.x + (screen.w - w) / 2
 		py = screen.y + screen.h - h - 5
 	end
 
-    -- Keep coordinates strictly within screen bounds
+	-- Keep coordinates strictly within screen bounds
 	local margin = 5
 	px = math.max(screen.x + margin, math.min(px, screen.x + screen.w - w  - margin))
 	py = math.max(screen.y + margin, math.min(py, screen.y + screen.h - h  - margin))
 
-    -- Final render execution
+	-- Final render execution
 	local ok, err = pcall(function()
 		canvas:frame({ x = px, y = py, w = w, h = h })
-        -- [2] Border frame is set after w/h are computed
+		-- [2] Border frame is set after w/h are computed
 		canvas[2].frame = { x = 0, y = 0, w = w, h = h }
 		canvas:show()
 		start_watchers()
@@ -790,15 +787,15 @@ end
 
 --- Hides the tooltip and resets all local UI states.
 function M.hide()
-    if canvas and type(canvas.hide) == "function" then canvas:hide() end
-    stop_watchers()
-    _state.raw_predictions = {}
-    _state.current_index   = 1
-    _state.info_bar        = nil
-    _state.fixed_width     = nil
-    _state.bg_color        = nil
-    _state.loading_text    = nil
-    _state.enter_validates = false
+	if canvas and type(canvas.hide) == "function" then canvas:hide() end
+	stop_watchers()
+	_state.raw_predictions = {}
+	_state.current_index   = 1
+	_state.info_bar        = nil
+	_state.fixed_width     = nil
+	_state.bg_color        = nil
+	_state.loading_text    = nil
+	_state.enter_validates = false
 end
 
 --- Sets the auto-hide timeout duration for normal hotstrings.
@@ -831,16 +828,16 @@ function M.get_current_index()       return _state.current_index end
 --- Navigates through the predictions list safely.
 --- @param delta number Direction modifier (+1 or -1).
 function M.navigate(delta)
-    local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
-    if n < 2 then return end
-    
-    _state.current_index = ((_state.current_index - 1 + delta) % n) + 1
-    render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, _state.reserved_count))
-    
-    if type(_state.on_navigate) == "function" then 
-        pcall(_state.on_navigate, _state.current_index) 
-    end
-    reset_idle_timer() -- Restart the inactivity timer on navigation
+	local n = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+	if n < 2 then return end
+	
+	_state.current_index = ((_state.current_index - 1 + delta) % n) + 1
+	render(assemble_blocks(_state.raw_predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, _state.reserved_count))
+	
+	if type(_state.on_navigate) == "function" then 
+		pcall(_state.on_navigate, _state.current_index) 
+	end
+	reset_idle_timer() -- Restart the inactivity timer on navigation
 end
 
 --- Displays multiple LLM predictions with full UI capabilities.
@@ -855,58 +852,58 @@ end
 --- @param loading_text string The loading text.
 --- @param max_predictions_count number Optional: reserve space for N predictions (default: actual count).
 function M.show_predictions(predictions, current_index, enabled, info_bar, shortcut_mod, indent, nav_mods, bg_color, loading_text, max_predictions_count)
-    if not enabled then return end
-    if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
-    
-    _state.raw_predictions = predictions
-    _state.current_index   = current_index or 1
-    _state.info_bar        = info_bar
-    _state.shortcut_mod    = shortcut_mod or "alt"
-    _state.nav_mods        = type(nav_mods) == "table" and nav_mods or {}
-    _state.indent          = indent or 0
-    _state.current_is_llm  = true -- Ensure extended timeout is used
-    _state.bg_color        = type(bg_color) == "table" and bg_color or nil
-    _state.loading_text    = loading_text
-    
-    local nav_mod_str = "none"
-    if #_state.nav_mods > 0 and not (#_state.nav_mods == 1 and _state.nav_mods[1] == "none") then
-        nav_mod_str = table.concat(_state.nav_mods, "+")
-        nav_mod_str = nav_mod_str:gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
-    elseif #_state.nav_mods == 0 then
-        nav_mod_str = ""
-    end
-    _state.nav_mod_str = nav_mod_str
+	if not enabled then return end
+	if type(predictions) ~= "table" or #predictions == 0 then M.hide(); return end
+	
+	_state.raw_predictions = predictions
+	_state.current_index   = current_index or 1
+	_state.info_bar        = info_bar
+	_state.shortcut_mod    = shortcut_mod or "alt"
+	_state.nav_mods        = type(nav_mods) == "table" and nav_mods or {}
+	_state.indent          = indent or 0
+	_state.current_is_llm  = true -- Ensure extended timeout is used
+	_state.bg_color        = type(bg_color) == "table" and bg_color or nil
+	_state.loading_text    = loading_text
+	
+	local nav_mod_str = "none"
+	if #_state.nav_mods > 0 and not (#_state.nav_mods == 1 and _state.nav_mods[1] == "none") then
+		nav_mod_str = table.concat(_state.nav_mods, "+")
+		nav_mod_str = nav_mod_str:gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
+	elseif #_state.nav_mods == 0 then
+		nav_mod_str = ""
+	end
+	_state.nav_mod_str = nav_mod_str
 
-    local reserved_count = math.max(1, math.floor(tonumber(max_predictions_count) or #predictions))
-    local max_width = 0
-    for i = 1, reserved_count do
-        local b = assemble_blocks(predictions, i, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, reserved_count)
-        local w_preds = canvas:minimumTextSize(3, b.preds).w
-        
-        local sz_hint = b.hint_st and canvas:minimumTextSize(3, b.hint_st) or {w=0}
-        local sz_info = b.info_st and canvas:minimumTextSize(3, b.info_st) or {w=0}
-        
-        local w_final = w_preds
-        if b.info_st and b.hint_st then
-            local SP = b.SP or "      "
-            local sep_st = hs.styledtext.new(SP .. "|" .. SP, { font = { name = FONT, size = SIZE_HINT } })
-            local combined_st = hs.styledtext.new("") .. b.hint_st .. sep_st .. b.info_st
-            local sz_comb = canvas:minimumTextSize(3, combined_st)
-            
-            if sz_comb.w > w_preds then
-                w_final = math.max(w_preds, sz_hint.w, sz_info.w)
-            end
-        else
-            w_final = math.max(w_preds, sz_hint.w, sz_info.w)
-        end
-        
-        if w_final > max_width then max_width = w_final end
-    end
-    _state.fixed_width = max_width
-    _state.reserved_count = reserved_count
-    _state.enter_validates = false  -- Reset: Enter must not validate until user navigates
+	local reserved_count = math.max(1, math.floor(tonumber(max_predictions_count) or #predictions))
+	local max_width = 0
+	for i = 1, reserved_count do
+		local b = assemble_blocks(predictions, i, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, reserved_count)
+		local w_preds = canvas:minimumTextSize(3, b.preds).w
+		
+		local sz_hint = b.hint_st and canvas:minimumTextSize(3, b.hint_st) or {w=0}
+		local sz_info = b.info_st and canvas:minimumTextSize(3, b.info_st) or {w=0}
+		
+		local w_final = w_preds
+		if b.info_st and b.hint_st then
+			local SP = b.SP or "      "
+			local sep_st = hs.styledtext.new(SP .. "|" .. SP, { font = { name = FONT, size = SIZE_HINT } })
+			local combined_st = hs.styledtext.new("") .. b.hint_st .. sep_st .. b.info_st
+			local sz_comb = canvas:minimumTextSize(3, combined_st)
+			
+			if sz_comb.w > w_preds then
+				w_final = math.max(w_preds, sz_hint.w, sz_info.w)
+			end
+		else
+			w_final = math.max(w_preds, sz_hint.w, sz_info.w)
+		end
+		
+		if w_final > max_width then max_width = w_final end
+	end
+	_state.fixed_width = max_width
+	_state.reserved_count = reserved_count
+	_state.enter_validates = false  -- Reset: Enter must not validate until user navigates
 
-    render(assemble_blocks(predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, reserved_count))
+	render(assemble_blocks(predictions, _state.current_index, _state.info_bar, _state.shortcut_mod, _state.indent, _state.nav_mod_str, _state.loading_text, reserved_count))
 end
 
 --- Displays simple tooltip content.
@@ -915,27 +912,27 @@ end
 --- @param enabled boolean True to display.
 --- @param bg_color table Optional background tint.
 function M.show(content, is_llm, enabled, bg_color)
-    if not enabled then return end
-    if content == nil or tostring(content) == "" then M.hide(); return end
-    
-    _state.raw_predictions = {}
-    _state.current_index   = 1
-    _state.info_bar        = nil
-    _state.fixed_width     = nil
-    _state.current_is_llm  = (is_llm == true)
-    _state.bg_color        = type(bg_color) == "table" and bg_color or nil
-    _state.loading_text    = nil
-    
-    local styled
-    if type(content) == "userdata" then
-        styled = content
-    else
-        styled = hs.styledtext.new(tostring(content), {
-            font  = { name = FONT, size = SIZE_MAIN, traits = is_llm and { italic = true } or {} },
-            color = is_llm and { white = 0.80, alpha = 1.0 } or { white = 1.00, alpha = 1.0 },
-        })
-    end
-    render(styled)
+	if not enabled then return end
+	if content == nil or tostring(content) == "" then M.hide(); return end
+	
+	_state.raw_predictions = {}
+	_state.current_index   = 1
+	_state.info_bar        = nil
+	_state.fixed_width     = nil
+	_state.current_is_llm  = (is_llm == true)
+	_state.bg_color        = type(bg_color) == "table" and bg_color or nil
+	_state.loading_text    = nil
+	
+	local styled
+	if type(content) == "userdata" then
+		styled = content
+	else
+		styled = hs.styledtext.new(tostring(content), {
+			font  = { name = FONT, size = SIZE_MAIN, traits = is_llm and { italic = true } or {} },
+			color = is_llm and { white = 0.80, alpha = 1.0 } or { white = 1.00, alpha = 1.0 },
+		})
+	end
+	render(styled)
 end
 
 --- Fallback mock interface used for diff styling extraction outside the module.
