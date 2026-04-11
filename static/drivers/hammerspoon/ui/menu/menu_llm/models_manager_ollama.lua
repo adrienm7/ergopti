@@ -502,7 +502,7 @@ function M.new(deps, presets, ram_getter)
 				for line in out:gmatch("([^\n]+)") do
 					if line:len() > 0 then last_line = line end
 				end
-				if last_line ~= "" then update_progress_ui(50, last_line) end
+				if last_line ~= "" then update_progress_ui(0, last_line) end
 				print("[Ollama Pull] " .. out)
 			end
 			return true
