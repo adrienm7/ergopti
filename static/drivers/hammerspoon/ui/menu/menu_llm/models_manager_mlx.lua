@@ -128,13 +128,14 @@ function M.new(deps, presets)
 		if obj._mlx_upgrade_in_progress then return end
 		obj._mlx_upgrade_in_progress = true
 
-		local dry_run_cmd =
-			"source ~/.venv/bin/activate 2>/dev/null || true; " ..
-			"python3 -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		local py_detect =
+			"PYTHON_BIN=\"python3\"; " ..
+			"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
+			"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
+			"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; "
 
-		local upgrade_cmd =
-			"source ~/.venv/bin/activate 2>/dev/null || true; " ..
-			"python3 -u -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		local dry_run_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		local upgrade_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore"
 
 		local function finish_upgrade(ok)
 			if ok then
@@ -406,7 +407,7 @@ try:
     sys.exit(0)
 
 except Exception as e:
-	print(f"Erreur HuggingFace: {str(e)Remplace '...(e)' par '...'str}", file=sys.stderr)
+	print(f"Erreur HuggingFace: {str(e)}", file=sys.stderr)
     sys.exit(1)
 PY
 		]]
@@ -594,15 +595,7 @@ PY
 				"PYTHON_BIN=\"python3\"; " ..
 				"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
 				"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
-				"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
-				"if ! $PYTHON_BIN -m pip --version >/dev/null 2>&1; then $PYTHON_BIN -m ensurepip --upgrade >/dev/null 2>&1 || true; fi; " ..
-				"if ! $PYTHON_BIN -m pip --version >/dev/null 2>&1; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
-				"if ! $PYTHON_BIN -m pip --version >/dev/null 2>&1; then $PYTHON_BIN -m ensurepip --upgrade >/dev/null 2>&1 || true; fi; " ..
-				"if ! $PYTHON_BIN -c 'import mlx_lm, huggingface_hub, truststore' >/dev/null 2>&1; then " ..
-				"echo \"[MLX] Dépendances manquantes: tentative d'installation...\"; " ..
-				"$PYTHON_BIN -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore || " ..
-				"$PYTHON_BIN -m pip install --user --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore || exit 1; " ..
-				"$PYTHON_BIN -c 'import mlx_lm, huggingface_hub, truststore' || exit 1; fi; " ..
+				"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
 				"echo \"[MLX] Python utilisé: $PYTHON_BIN\"; " ..
 				"pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; sleep 0.3; " ..
 				"$PYTHON_BIN -m mlx_lm server --model " .. repo .. " 2>&1 | tee \"" .. server_log_file .. "\""
@@ -661,36 +654,6 @@ PY
 					end
 
 					local detail = (error_msg ~= "") and ("\nDetail: " .. error_msg) or ""
-
-					local unsupported_model_backend =
-						((error_msg:lower():match("model type") ~= nil) and (error_msg:lower():match("not supported") ~= nil))
-						or (error_msg:match("No module named 'mlx_lm%.models%.") ~= nil)
-						or (error_msg:match("No module named 'mlx_lm'") ~= nil)
-						or (error_msg:match("No module named 'mlx_ml'") ~= nil)
-
-					if unsupported_model_backend and not obj._mlx_upgrade_attempted[repo] then
-						obj._mlx_upgrade_attempted[repo] = true
-						if not silent_notifications then
-							pcall(notifications.notify, "⚙️ Mise à jour MLX-LM", "Compatibilité détectée pour le modèle " .. target_model .. ". Mise à jour en cours…")
-						end
-						upgrade_mlx_stack(function(ok)
-							if ok then
-								if not silent_notifications then
-									pcall(notifications.notify, "✅ MLX-LM mis à jour", "Redémarrage du serveur MLX pour le modèle " .. target_model .. "…")
-								end
-								hs.timer.doAfter(0.5, function()
-									obj.start_server(target_model, on_success, opts)
-								end)
-							else
-								if not silent_notifications then
-									pcall(notifications.notify, "❌ Échec mise à jour MLX-LM", "La mise à jour automatique a échoué pour le modèle " .. target_model .. ". Lancez : python3 -m pip install --user --upgrade mlx-lm")
-								end
-							end
-						end)
-
-						print("MLX server exited with code " .. code)
-						return
-					end
 
 					if not silent_notifications then
 						pcall(notifications.notify, "❌ Échec serveur MLX", "Modèle " .. target_model .. " non démarré." .. detail)
@@ -818,7 +781,7 @@ PY
 			f:write("export SSL_CERT_FILE=/etc/ssl/cert.pem\n")
 			f:write("export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem\n")
 			f:write("export HF_HUB_DISABLE_XET=1\n")
-			f:write("if ! $PYTHON_BIN -c 'import huggingface_hub' >/dev/null 2>&1; then\n")
+			f:write("if ! $PYTHON_BIN -c 'import huggingface_hub, truststore, hf_transfer' >/dev/null 2>&1; then\n")
 			f:write("  echo '[MLX] Dépendances Hugging Face manquantes, installation... '\n")
 			f:write("  if ! $PYTHON_BIN -m pip install --disable-pip-version-check --upgrade huggingface_hub hf_transfer truststore; then\n")
 			f:write("    echo '[MLX] Installation globale impossible, tentative en --user'\n")
@@ -880,7 +843,7 @@ PY
 			f:write("try:\n")
 			f:write("    snapshot_download('" .. clean_repo .. "', max_workers=8)\n")
 			f:write("except Exception as e:\n")
-			f:write("    err_str = str(e)Remplace '...(e)' par '...'str.lower()\n")
+			f:write("    err_str = str(e).lower()\n")
 			f:write("    if '401' in err_str or '403' in err_str or 'gated' in err_str or 'unauthorized' in err_str:\n")
 			f:write("        print('\\n❌ ERREUR : Ce modèle est PRIVÉ (Gated) par son créateur.')\n")
 			f:write("        print('Pour le télécharger, vous devez :')\n")
