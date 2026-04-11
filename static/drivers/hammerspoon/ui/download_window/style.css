@@ -54,27 +54,20 @@ h2 {
 	color: #999;
 	font-family: 'SF Mono', monospace;
 	font-size: 11px;
-	margin-bottom: 12px;
 	word-break: break-all;
 }
 
-#model-sizes {
+#ui-controls {
 	display: flex;
-	gap: 8px;
-	margin-bottom: 14px;
+	flex-direction: column;
+	flex-shrink: 0; /* Garantit que l'UI ne s'écrase jamais face au terminal */
+	gap: 20px; /* Crée un espacement parfait et identique entre les 3 blocs */
 }
 
-#model-sizes span {
-	background: #3a3a3c;
-	border-radius: 4px;
-	color: #ccc;
-	font-size: 10px;
-	font-weight: 500;
-	padding: 3px 6px;
-}
-
-#model-sizes span:empty {
-	display: none;
+.header-group,
+.progress-group {
+	display: flex;
+	flex-direction: column;
 }
 
 /* ======================================= */
@@ -88,7 +81,7 @@ h2 {
 	border-radius: 4px;
 	flex-shrink: 0; /* Prevent the progress bar from shrinking when logs fill up */
 	height: 12px;
-	margin-bottom: 10px;
+	margin-bottom: 6px;
 	overflow: hidden;
 }
 
@@ -107,7 +100,7 @@ h2 {
 #status-line {
 	align-items: center; /* Align vertically % text with the file count text */
 	display: flex;
-	margin-bottom: 4px;
+	margin-bottom: 8px;
 	width: 100%;
 }
 
@@ -132,7 +125,6 @@ h2 {
 	color: #888;
 	font-size: 12px;
 	line-height: 1.8;
-	margin-bottom: 14px;
 	min-height: 44px;
 }
 
@@ -234,7 +226,7 @@ button {
 	font-family: 'SF Mono', monospace;
 	font-size: 10px;
 	line-height: 1.2;
-	margin-top: 10px;
+	margin-top: 20px;
 	min-height: 0;
 	overflow-wrap: anywhere;
 	overflow-y: auto;

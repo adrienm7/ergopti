@@ -108,30 +108,6 @@ function setModel(modelName) {
 }
 
 /**
- * Injects model size parameters safely into the frontend.
- * @param {Object} sizes - Object containing dl, disk, and ram sizes as formatted strings.
- */
-function setSizes(sizes) {
-	const container = document.getElementById('model-sizes');
-	const szDl = document.getElementById('sz-dl');
-	const szRam = document.getElementById('sz-ram');
-
-	let hasSizes = false;
-	if (sizes.dl) {
-		szDl.textContent = '⬇️ ' + sizes.dl;
-		hasSizes = true;
-	}
-	if (sizes.params) {
-		szRam.textContent = '🧠 ' + sizes.params + ' paramètres';
-		hasSizes = true;
-	}
-
-	if (hasSizes) {
-		container.style.display = 'flex';
-	}
-}
-
-/**
  * Updates the progress bar and statistics display.
  * @param {number|string} percentage - The completion percentage.
  * @param {string} downloadedSize - The formatted downloaded size string.

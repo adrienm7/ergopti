@@ -6,38 +6,39 @@
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
-		<h2>📥 Téléchargement en cours</h2>
-		<div id="model">—</div>
-
-		<div id="model-sizes" style="display: none">
-			<span id="sz-dl"></span>
-			<span id="sz-ram"></span>
-		</div>
-
-		<div id="bar-bg">
-			<div id="bar-fill"></div>
-		</div>
-
-		<div id="status-line">
-			<div id="pct">0 %</div>
-			<div id="done-msg"></div>
-			<div id="file-count" style="display: none"></div>
-		</div>
-
-		<div id="stats">
-			<div id="stats-details" style="display: none"></div>
-			<div id="eta-container" style="display: none; margin-top: 4px">
-				⏳ Temps restant : <b id="eta" style="color: #fff"></b>
+		<div id="ui-controls">
+			<div class="header-group">
+				<h2>📥 Téléchargement en cours</h2>
+				<div id="model">—</div>
 			</div>
-			<div id="stats-fallback">Démarrage…</div>
-		</div>
 
-		<div class="btn-row">
-			<button id="btn-cancel" onclick="doCancel()">🛑 Annuler</button>
-			<button id="btn-term" onclick="doTerm()">🖥 Terminal</button>
-			<button id="btn-retry" onclick="doRetry()" style="display: none">
-				🔄 Relancer le téléchargement
-			</button>
+			<div class="progress-group">
+				<div id="status-line">
+					<div id="pct">0 %</div>
+					<div id="done-msg"></div>
+					<div id="file-count" style="display: none"></div>
+				</div>
+
+				<div id="bar-bg">
+					<div id="bar-fill"></div>
+				</div>
+
+				<div id="stats">
+					<div id="stats-details" style="display: none"></div>
+					<div id="eta-container" style="display: none; margin-top: 4px">
+						⏳ Temps restant : <b id="eta" style="color: #fff"></b>
+					</div>
+					<div id="stats-fallback">Démarrage…</div>
+				</div>
+			</div>
+
+			<div class="btn-row">
+				<button id="btn-cancel" onclick="doCancel()">🛑 Annuler</button>
+				<button id="btn-term" onclick="doTerm()">🖥 Terminal</button>
+				<button id="btn-retry" onclick="doRetry()" style="display: none">
+					🔄 Relancer le téléchargement
+				</button>
+			</div>
 		</div>
 
 		<div id="log-area"></div>
