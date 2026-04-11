@@ -166,7 +166,7 @@ function M.hide()
 	_wv = nil 
 	_on_cancel = nil
 	_on_resolve = nil
-	_on_retry = nil
+	_on_retry  = nil
 	_start_ts  = nil
 	_ready     = false
 	_queued    = {}
@@ -295,21 +295,51 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
 		end
 	end
 
-	-- Extract the file progress securely by iterating over ALL matches and keeping the last valid one
+	-- Parse file counts for MLX and rich stats for Ollama directly from the logs
 	if type(raw_line) == "string" and raw_line ~= "" then
-		for a, b in raw_line:gmatch("(%d+)%s*/%s*(%d+)") do
-			-- Exclude arbitrary large sizes (e.g. 1024 / 2048 bytes) which aren't file counts
-			if tonumber(b) and tonumber(b) < 1000 then
-				file_count_str = a .. "/" .. b
-				M._last_file_count = file_count_str
+		local clean_line = raw_line:gsub("\27%[[%d;]*%a", "")
+		
+		-- 1. Extract Ollama native progress (Ollama doesn't pass bytes_done via parameters)
+		if not bytes_done then
+			local o_pct = clean_line:match("(%d+)%%")
+			if o_pct and tonumber(o_pct) then pct = tonumber(o_pct) end
+			
+			local o_dl = clean_line:match("(%d+%.?%d*%s*[KMG]?B%s*/%s*%d+%.?%d*%s*[KMG]?B)")
+			if o_dl then dl_str = o_dl end
+			
+			local o_speed = clean_line:match("(%d+%.?%d*%s*[KMG]?B/s)")
+			if o_speed then speed_str = o_speed end
+			
+			local o_eta = clean_line:match("%s+(%d+[hms%d]+)%s*$")
+			if o_eta then eta_str = o_eta end
+		end
+
+		-- 2. MLX / HuggingFace file progress
+		local found_files = false
+		for a, b in clean_line:gmatch("Fetching.-(%d+)%s*/%s*(%d+)") do
+			file_count_str = a .. "/" .. b
+			M._last_file_count = file_count_str
+			found_files = true
+		end
+		
+		if not found_files then
+			for a, b in clean_line:gmatch("|%s*(%d+)%s*/%s*(%d+)%s*%[") do
+				if tonumber(b) and tonumber(b) < 1000 then
+					file_count_str = a .. "/" .. b
+					M._last_file_count = file_count_str
+				end
 			end
 		end
+
 		if not file_count_str and M._last_file_count then
 			file_count_str = M._last_file_count
 		end
 	elseif M._last_file_count then
 		file_count_str = M._last_file_count
 	end
+
+	-- Cap at 99% during download: 100% is reserved exclusively for done()
+	pct = math.min(math.max(0, pct), 99)
 
 	local js = string.format("update(%d,%s,%s,%s,%s)",
 		math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
