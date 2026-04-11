@@ -147,29 +147,6 @@ local function eval(code)
 	end
 end
 
---- Injects the target model size metadata safely.
---- @param tgt_model table|string The target model data.
---- @param tgt_sizes table The optionally predefined sizes.
-local function inject_sizes(tgt_model, tgt_sizes)
-	local final_sizes = tgt_sizes
-	if not final_sizes and type(tgt_model) == "table" then
-		local hw = tgt_model.hardware_requirements or {}
-		local hw_spec = hw.mlx_4bit or hw.ollama_q4 or {}
-		final_sizes = {
-			dl     = tgt_model.size_download or tgt_model.download_size or hw_spec.download_gb,
-			params = tgt_model.parameters and tgt_model.parameters.total
-		}
-	end
-	
-	if final_sizes then
-		local formatted = {
-			dl     = format_size(final_sizes.dl),
-			params = type(final_sizes.params) == "string" and final_sizes.params or nil
-		}
-		eval(string.format("if(window.setSizes) setSizes(%s);", hs.json.encode(formatted)))
-	end
-end
-
 
 
 
@@ -222,7 +199,6 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 		eval("resetUI()")
 		local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
 		eval("setModel(\"" .. safe .. "\")")
-		inject_sizes(model, sizes)
 		return
 	end
 
@@ -257,7 +233,6 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 				_ready = true
 				local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
 				eval("setModel(\"" .. safe .. "\")")
-				inject_sizes(model, sizes)
 				
 				for _, q in ipairs(_queued) do eval(q) end
 				_queued = {}
@@ -281,7 +256,6 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
 			_ready = true
 			local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
 			eval("setModel(\"" .. safe .. "\")")
-			inject_sizes(model, sizes)
 			
 			for _, q in ipairs(_queued) do eval(q) end
 			_queued = {}
@@ -321,13 +295,16 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
 		end
 	end
 
-	-- Try to extract a file progress like "7/12" from the raw log line.
+	-- Extract the file progress securely by iterating over ALL matches and keeping the last valid one
 	if type(raw_line) == "string" and raw_line ~= "" then
-		local a, b = raw_line:match("(%d+)%s*/%s*(%d+)")
-		if a and b then
-			file_count_str = a .. "/" .. b
-			M._last_file_count = file_count_str
-		elseif M._last_file_count then
+		for a, b in raw_line:gmatch("(%d+)%s*/%s*(%d+)") do
+			-- Exclude arbitrary large sizes (e.g. 1024 / 2048 bytes) which aren't file counts
+			if tonumber(b) and tonumber(b) < 1000 then
+				file_count_str = a .. "/" .. b
+				M._last_file_count = file_count_str
+			end
+		end
+		if not file_count_str and M._last_file_count then
 			file_count_str = M._last_file_count
 		end
 	elseif M._last_file_count then
