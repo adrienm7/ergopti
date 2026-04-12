@@ -1,4 +1,5 @@
 --- modules/llm/parser.lua
+
 --- ==============================================================================
 --- MODULE: LLM Output Parser
 --- DESCRIPTION:
@@ -434,13 +435,18 @@ function M.process_prediction(full_text, tail_text, block)
 		local first_op = ops[first_change_idx]
 		local needs_anchor = false
 		
-		-- We need the preceding word as an anchor if the modification starts at the very first letter
-		if first_op.type == "del" or first_op.type == "ins" then
+		if first_op.type == "del" then
 			needs_anchor = true
 		elseif first_op.type == "sub" then
 			local c1 = get_chars(first_op.t1)
 			local c2 = get_chars(first_op.t2)
+			-- We need the preceding word as an anchor if the modification starts at the very first letter
 			if #c1 > 0 and #c2 > 0 and c1[1] ~= c2[1] then
+				needs_anchor = true
+			end
+		elseif first_op.type == "ins" then
+			-- Anchor needed if inserting directly attached word characters
+			if first_op.t2:match("^[%w’']") then
 				needs_anchor = true
 			end
 		end
@@ -457,24 +463,50 @@ function M.process_prediction(full_text, tail_text, block)
 		local visual_ops = {}
 		for i = visual_start, #ops do table.insert(visual_ops, ops[i]) end
 
-		-- Extract absolute trailing insertions (Orange text)
+		-- Find the boundary where strictly new words (Orange) begin by ignoring trailing DP space matching
+		local last_anchor_idx = 0
+		for i = #visual_ops, 1, -1 do
+			local op = visual_ops[i]
+			if op.type ~= "ins" then
+				local t1_strip = (op.t1 or ""):gsub("[%s\194\160\226\128\175]", "")
+				if t1_strip ~= "" then
+					last_anchor_idx = i
+					break
+				end
+			end
+		end
+
+		local nw_start_idx = #visual_ops + 1
+		if last_anchor_idx > 0 then
+			local anchor_op = visual_ops[last_anchor_idx]
+			if anchor_op.type == "del" then
+				-- Replacement scenario: NW starts after the first inserted word (Green)
+				local found_word = false
+				for j = last_anchor_idx + 1, #visual_ops do
+					if visual_ops[j].type == "ins" and visual_ops[j].t2:match("[%w’']") then
+						found_word = true
+					elseif found_word and not visual_ops[j].t2:match("[%w’']") then
+						nw_start_idx = j
+						break
+					end
+				end
+				if not found_word then nw_start_idx = #visual_ops + 1 end
+			else
+				-- Equal or Sub: NW starts immediately after
+				nw_start_idx = last_anchor_idx + 1
+			end
+		else
+			nw_start_idx = 1
+		end
+
 		local display_nw = ""
-		local last_idx = #visual_ops
-		local ins_count = 0
-		while last_idx > 0 and visual_ops[last_idx].type == "ins" do
-			ins_count = ins_count + 1
-			last_idx = last_idx - 1
+		for k = nw_start_idx, #visual_ops do
+			display_nw = display_nw .. visual_ops[k].t2
 		end
 		
-		-- Only extract as NW if it's NOT a replacement for a deleted word
-		local is_replacement = false
-		if ins_count > 0 and last_idx > 0 and visual_ops[last_idx].type == "del" then
-			is_replacement = true
-		end
-		
-		if not is_replacement then
-			for k = last_idx + 1, #visual_ops do display_nw = display_nw .. visual_ops[k].t2 end
-			for k = #visual_ops, last_idx + 1, -1 do table.remove(visual_ops, k) end
+		-- Remove NW operations from visual_ops chunks
+		for k = #visual_ops, nw_start_idx, -1 do
+			table.remove(visual_ops, k)
 		end
 
 		-- Map Visual Ops to UI Chunks
