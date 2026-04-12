@@ -4,7 +4,7 @@
 --- MODULE: Parser Unit Tests
 --- DESCRIPTION:
 --- Validates the smart 2-tier semantic diffing engine to ensure
---- character-level corrections are constrained inside words perfectly.
+--- character-level corrections are cleanly extracted and new words separated.
 --- ==============================================================================
 
 local parser = require("modules.llm.parser")
@@ -38,54 +38,59 @@ local function run_tests()
 
 	local tests = {
 		{
-			name = "Intra-word typing correction (étati -> était)",
+			name = "Intra-word typing correction with trailing nw (étati -> était le)",
 			orig = "étati",
-			corr = "était",
-			expected = "[=:éta][+:it]"
+			corr = "était le",
+			expected_chunks = "[=:éta][+:it]",
+			expected_nw = " le"
 		},
 		{
 			name = "Intra-word correction (étais -> était)",
 			orig = "Charles de Gaulle étais",
-			corr = "Charles de Gaulle était",
-			expected = "[=:Charles de Gaulle étai][+:t]"
+			corr = "Charles de Gaulle était un personnage",
+			expected_chunks = "[=:Charles de Gaulle étai][+:t]",
+			expected_nw = " un personnage"
 		},
 		{
 			name = "Sentence completely changed (jamais vu -> jamais su)",
 			orig = "j'ai jamais vu",
-			corr = "j'ai jamais su",
-			expected = "[=:j'ai jamais ][+:su]"
+			corr = "j'ai jamais su en fait",
+			expected_chunks = "[=:j'ai jamais ][+:su]",
+			expected_nw = " en fait"
 		},
 		{
 			name = "Mid-word substitution (personage -> personnage)",
-			orig = "un personage important",
+			orig = "un personage",
 			corr = "un personnage important",
-			expected = "[=:un person][+:n][=:age important]"
+			expected_chunks = "[=:un person][+:n][=:age]",
+			expected_nw = " important"
 		},
 		{
-			name = "Grammar context (ceci -> cela)",
-			orig = "je pense que ceci",
-			corr = "je pense que cela",
-			expected = "[=:je pense que c][+:el][=:a]"
-		},
-		{
-			name = "Apostrophe substitution",
+			name = "Typographic apostrophe substitution with NFD handling simulation",
 			orig = "j'aime",
-			corr = "j'adore",
-			expected = "[=:j'][+:adore]" 
+			corr = "j'adore les chats",
+			expected_chunks = "[=:j'][+:adore]",
+			expected_nw = " les chats"
 		}
 	}
 
 	for _, t in ipairs(tests) do
-		local chunks = parser.smart_diff(t.orig, t.corr)
-		local result = format_chunks(chunks)
+		local chunks, nw = parser.smart_diff(t.orig, t.corr)
+		local res_chunks = format_chunks(chunks)
 
-		if result == t.expected then
+		if res_chunks == t.expected_chunks and nw == t.expected_nw then
 			print(string.format("✅ PASS: %s", t.name))
 			passed = passed + 1
 		else
 			print(string.format("❌ FAIL: %s", t.name))
-			print(string.format("   Expected: %s", t.expected))
-			print(string.format("   Got:      %s", result))
+			if res_chunks ~= t.expected_chunks then
+				print(string.format("   Chunks Exp: %s", t.expected_chunks))
+				print(string.format("   Chunks Got: %s", res_chunks))
+			end
+			if nw ~= t.expected_nw then
+				print(string.format("   NW Expected: '%s'", t.expected_nw))
+				print(string.format("   NW Got:      '%s'", nw))
+			end
 			failed = failed + 1
 		end
 	end

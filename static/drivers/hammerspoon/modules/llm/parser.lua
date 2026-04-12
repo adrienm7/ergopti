@@ -7,9 +7,9 @@
 --- algorithm to align LLM predictions perfectly with the user's active buffer.
 ---
 --- FEATURES & RATIONALE:
---- 1. Two-Tier Smart Diffing: Aligns words first to prevent cross-word
+--- 1. NFD Normalization: Intercepts decomposed macOS characters (e + ´).
+--- 2. Two-Tier Smart Diffing: Aligns words first to prevent cross-word
 ---    scrambling, then diffs characters within the word to show exact typos.
---- 2. Physical Decoupling: Separates visual tooltips from OS key injections.
 --- ==============================================================================
 
 local M = {}
@@ -45,6 +45,36 @@ local function enforce_word_limits(text, max_w)
 		if count < max_w then rebuilt = rebuilt .. s end
 	end
 	return rebuilt:gsub("%s+$", "")
+end
+
+--- Normalizes macOS NFD characters (decomposed) into standard NFC characters.
+--- @param s string The input string from the macOS buffer.
+--- @return string The normalized string.
+local function normalize_nfd(s)
+	if type(s) ~= "string" then return s end
+	local replacements = {
+		["e\204\129"] = "é",
+		["e\204\128"] = "è",
+		["e\204\130"] = "ê",
+		["e\204\136"] = "ë",
+		["a\204\128"] = "à",
+		["a\204\130"] = "â",
+		["u\204\128"] = "ù",
+		["u\204\130"] = "û",
+		["u\204\136"] = "ü",
+		["i\204\130"] = "î",
+		["i\204\136"] = "ï",
+		["o\204\130"] = "ô",
+		["c\204\167"] = "ç",
+		["E\204\129"] = "É",
+		["E\204\128"] = "È",
+		["C\204\167"] = "Ç",
+		["A\204\128"] = "À"
+	}
+	for nfd, nfc in pairs(replacements) do
+		s = s:gsub(nfd, nfc)
+	end
+	return s
 end
 
 --- Strips conversational filler and markdown from the model’s raw text.
@@ -128,7 +158,7 @@ local function tokenize(s)
 		local t = 0
 		if c:match("%s") or c == "\194\160" or c == "\226\128\175" then
 			t = 2
-		elseif c:match("[%w’']") or c:byte() >= 128 then
+		elseif c:match("[%w']") or c == "’" or c:byte() >= 128 then
 			t = 1
 		else
 			t = 3
@@ -157,6 +187,7 @@ end
 --- @return number The substitution cost.
 local function token_sub_cost(t1, t2)
 	if t1 == t2 then return 0 end
+	
 	local type1 = (t1:match("%s") and 2) or (t1:match("[%w’']") and 1) or 3
 	local type2 = (t2:match("%s") and 2) or (t2:match("[%w’']") and 1) or 3
 	
@@ -212,9 +243,10 @@ local function intra_word_diff(w1, w2)
 end
 
 --- Computes a smart semantic diff preventing cross-word character scrambling.
+--- Also cleanly isolates trailing insertions to feed the 'next words' (orange) UI.
 --- @param s1 string The original text context.
 --- @param s2 string The corrected prediction text.
---- @return table The resulting styled chunk array.
+--- @return table, string The resulting styled chunk array, and the trailing new words.
 function M.smart_diff(s1, s2)
 	local tokens1 = tokenize(s1)
 	local tokens2 = tokenize(s2)
@@ -259,6 +291,22 @@ function M.smart_diff(s1, s2)
 		end
 	end
 
+	-- Isolate strictly trailing insertions into display_nw (orange section)
+	local trailing_nw = ""
+	local last_idx = #ops
+	while last_idx > 0 and ops[last_idx].type == "ins" do
+		last_idx = last_idx - 1
+	end
+	
+	for k = last_idx + 1, #ops do
+		trailing_nw = trailing_nw .. ops[k].t2
+	end
+	
+	for k = #ops, last_idx + 1, -1 do
+		table.remove(ops, k)
+	end
+
+	-- Transform remaining operations into UI chunks
 	local chunks = {}
 	for _, op in ipairs(ops) do
 		if op.type == "equal" then
@@ -281,6 +329,7 @@ function M.smart_diff(s1, s2)
 		end
 	end
 
+	-- Merge contiguous chunks of the same type
 	local merged = {}
 	for _, c in ipairs(chunks) do
 		local last = merged[#merged]
@@ -291,7 +340,7 @@ function M.smart_diff(s1, s2)
 		end
 	end
 
-	return merged
+	return merged, trailing_nw
 end
 
 
@@ -317,10 +366,10 @@ function M.process_prediction(full_text, tail_text, block)
 	local max_w = tonumber(hs.settings.get("llm_max_words")) or Core.DEFAULT_STATE.llm_max_words
 	if max_w > 0 and max_w < min_w then max_w = min_w end
 	
-	-- Normalize apostrophes to prevent false positive corrections in the diffing engine
-	full_text = type(full_text) == "string" and full_text:gsub("'", "’") or ""
-	tail_text = type(tail_text) == "string" and tail_text:gsub("'", "’") or ""
-	block     = type(block) == "string" and block:gsub("'", "’") or ""
+	-- Normalize NFD (macOS decomposed characters) and apostrophes before diffing
+	full_text = normalize_nfd(type(full_text) == "string" and full_text or ""):gsub("'", "’")
+	tail_text = normalize_nfd(type(tail_text) == "string" and tail_text or ""):gsub("'", "’")
+	block     = normalize_nfd(type(block) == "string" and block or ""):gsub("'", "’")
 	
 	block = clean_model_output(block)
 	
@@ -337,7 +386,7 @@ function M.process_prediction(full_text, tail_text, block)
 		tc = trim(tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		nw = trim(nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		
-		-- Enforce typography normalisation on model predictions to match input state
+		-- Enforce typography normalisation on model predictions
 		tc = tc:gsub("'", "’")
 		nw = nw:gsub("'", "’")
 		
@@ -437,7 +486,7 @@ function M.process_prediction(full_text, tail_text, block)
 			local display_corr = utils.utf8_sub(full_llm, active_start_char)
 			
 			-- Deploy 2-tier smart semantic diff
-			chunks = M.smart_diff(display_orig, display_corr)
+			chunks, display_nw = M.smart_diff(display_orig, display_corr)
 
 			-- If there is no gray word before the first correction, 
 			-- move back one word in the buffer to force its appearance in the tooltip
@@ -469,37 +518,10 @@ function M.process_prediction(full_text, tail_text, block)
 					active_start_char = prev_word_start
 					display_orig = utils.utf8_sub(best_suffix, active_start_char)
 					display_corr = utils.utf8_sub(full_llm, active_start_char)
-					chunks = M.smart_diff(display_orig, display_corr)
+					chunks, display_nw = M.smart_diff(display_orig, display_corr)
 				end
 			end
 
-			-- Extract the trailing new words into display_nw securely
-			display_nw = ""
-			if #chunks > 0 and chunks[#chunks].type == "insert" then
-				local last_text = chunks[#chunks].text
-				
-				-- Safe byte-free search to prevent Lua multibyte pattern matching crashes
-				local space_idx = last_text:find("%s")
-				local nbsp_idx  = last_text:find("\194\160")
-				local nnsp_idx  = last_text:find("\226\128\175")
-				
-				local min_idx = space_idx
-				if nbsp_idx and (not min_idx or nbsp_idx < min_idx) then min_idx = nbsp_idx end
-				if nnsp_idx and (not min_idx or nnsp_idx < min_idx) then min_idx = nnsp_idx end
-
-				-- If the trailing insert contains a space, it means it holds entirely new words
-				if min_idx then
-					local keep_part = last_text:sub(1, min_idx - 1)
-					local nw_part   = last_text:sub(min_idx)
-					
-					if keep_part ~= "" then
-						chunks[#chunks].text = keep_part
-					else
-						table.remove(chunks, #chunks)
-					end
-					display_nw = nw_part
-				end
-			end
 		else
 			has_corr = false
 			chunks = {}
