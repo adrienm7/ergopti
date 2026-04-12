@@ -17,11 +17,11 @@ local LOG    = "llm.parser"
 
 
 
--- =====================================
--- =====================================
--- ======= 1/ Cleanup & Extraction =======
--- =====================================
--- =====================================
+--- =====================================
+--- =====================================
+--- ======= 1/ Cleanup & Extraction =======
+--- =====================================
+--- =====================================
 
 --- Enforces strict maximum word limits by truncating excess.
 --- @param text string The predicted next words.
@@ -93,11 +93,132 @@ end
 
 
 
--- ========================================
--- ========================================
--- ======= 2/ Core Processing Logic =======
--- ========================================
--- ========================================
+--- =======================================
+--- =======================================
+--- ======= 2/ Weighted Diff Engine =======
+--- =======================================
+--- =======================================
+
+--- Extracts UTF-8 characters from a string safely.
+--- @param s string The input string.
+--- @return table An array of characters.
+local function get_chars(s)
+	local chars = {}
+	for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		table.insert(chars, c)
+	end
+	return chars
+end
+
+--- Applies a Wagner-Fischer diffing algorithm with severe penalties for space
+--- manipulation. This ensures diffs remain cleanly aligned to word boundaries.
+--- @param s1 string The original text.
+--- @param s2 string The corrected text.
+--- @return table An array of chunk objects {type, text}.
+function M.weighted_diff(s1, s2)
+	local chars1 = get_chars(s1)
+	local chars2 = get_chars(s2)
+	local len1, len2 = #chars1, #chars2
+
+	local d = {}
+	for i = 0, len1 do
+		d[i] = {}
+		if i == 0 then
+			d[i][0] = 0
+		else
+			-- Heavily penalize deleting a space to avoid cross-word matching
+			local cost = chars1[i]:match("%s") and 10 or 1
+			d[i][0] = d[i-1][0] + cost
+		end
+	end
+
+	for j = 1, len2 do
+		local cost = chars2[j]:match("%s") and 10 or 1
+		d[0][j] = d[0][j-1] + cost
+	end
+
+	for i = 1, len1 do
+		for j = 1, len2 do
+			local c1, c2 = chars1[i], chars2[j]
+			local is_space1 = c1:match("%s") ~= nil
+			local is_space2 = c2:match("%s") ~= nil
+
+			local cost_del = d[i-1][j] + (is_space1 and 10 or 1)
+			local cost_ins = d[i][j-1] + (is_space2 and 10 or 1)
+
+			local cost_sub
+			if c1 == c2 then
+				cost_sub = d[i-1][j-1]
+			else
+				-- Substituting a space with a character (or vice versa) is extremely expensive
+				local sub_penalty = (is_space1 or is_space2) and 12 or 2
+				cost_sub = d[i-1][j-1] + sub_penalty
+			end
+
+			d[i][j] = math.min(cost_del, cost_ins, cost_sub)
+		end
+	end
+
+	-- Backtrack to build the diff path
+	local i, j = len1, len2
+	local ops = {}
+	while i > 0 or j > 0 do
+		local c1 = i > 0 and chars1[i] or nil
+		local c2 = j > 0 and chars2[j] or nil
+
+		if i > 0 and j > 0 and c1 == c2 then
+			table.insert(ops, 1, {type="equal", text=c1})
+			i = i - 1
+			j = j - 1
+		else
+			local is_space1 = c1 and c1:match("%s") ~= nil
+			local is_space2 = c2 and c2:match("%s") ~= nil
+
+			local cost_del = i > 0 and (d[i-1][j] + (is_space1 and 10 or 1)) or math.huge
+			local cost_ins = j > 0 and (d[i][j-1] + (is_space2 and 10 or 1)) or math.huge
+			local sub_penalty = (is_space1 or is_space2) and 12 or 2
+			local cost_sub = (i > 0 and j > 0) and (d[i-1][j-1] + sub_penalty) or math.huge
+
+			local min_cost = math.min(cost_del, cost_ins, cost_sub)
+
+			if min_cost == cost_sub and min_cost < math.huge then
+				-- Treat substitutions as insertions of new text (visual green)
+				table.insert(ops, 1, {type="insert", text=c2})
+				i = i - 1
+				j = j - 1
+			elseif min_cost == cost_del and min_cost < math.huge then
+				-- Deletions are physically performed but hidden in the UI chunk stream
+				i = i - 1
+			else
+				table.insert(ops, 1, {type="insert", text=c2})
+				j = j - 1
+			end
+		end
+	end
+
+	-- Consolidate contiguous operations of the same type
+	local merged = {}
+	for _, op in ipairs(ops) do
+		local last = merged[#merged]
+		if last and last.type == op.type then
+			last.text = last.text .. op.text
+		else
+			table.insert(merged, {type=op.type, text=op.text})
+		end
+	end
+
+	return merged
+end
+
+
+
+
+
+--- ========================================
+--- ========================================
+--- ======= 3/ Core Processing Logic =======
+--- ========================================
+--- ========================================
 
 --- Parses explicit prompt tags to determine insertions and deletions securely.
 --- @param full_text string The full user context provided to the LLM.
@@ -231,7 +352,7 @@ function M.process_prediction(full_text, tail_text, block)
 			local display_orig = utils.utf8_sub(best_suffix, active_start_char)
 			local display_corr = utils.utf8_sub(full_llm, active_start_char)
 			
-			chunks = utils.diff_strings(display_orig, display_corr)
+			chunks = M.weighted_diff(display_orig, display_corr)
 
 			-- If there is no gray word before the first correction, 
 			-- move back one word in the buffer to force its appearance in the tooltip
@@ -263,7 +384,7 @@ function M.process_prediction(full_text, tail_text, block)
 					active_start_char = prev_word_start
 					display_orig = utils.utf8_sub(best_suffix, active_start_char)
 					display_corr = utils.utf8_sub(full_llm, active_start_char)
-					chunks = utils.diff_strings(display_orig, display_corr)
+					chunks = M.weighted_diff(display_orig, display_corr)
 				end
 			end
 
