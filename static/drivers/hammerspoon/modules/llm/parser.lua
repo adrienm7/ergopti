@@ -128,7 +128,7 @@ local function tokenize(s)
 		local t = 0
 		if c:match("%s") or c == "\194\160" or c == "\226\128\175" then
 			t = 2
-		elseif c:match("%w") or c == "’" or c == "'" or c:byte() >= 128 then
+		elseif c:match("[%w’']") or c:byte() >= 128 then
 			t = 1
 		else
 			t = 3
@@ -149,6 +149,35 @@ local function tokenize(s)
 	end
 	if current ~= "" then table.insert(tokens, current) end
 	return tokens
+end
+
+--- Calculates the cost of substituting two semantic tokens.
+--- @param t1 string The original token.
+--- @param t2 string The target token.
+--- @return number The substitution cost.
+local function token_sub_cost(t1, t2)
+	if t1 == t2 then return 0 end
+	local type1 = (t1:match("%s") and 2) or (t1:match("[%w’']") and 1) or 3
+	local type2 = (t2:match("%s") and 2) or (t2:match("[%w’']") and 1) or 3
+	
+	-- Heavy penalty for crossing token types to prevent visual scrambling
+	if type1 ~= type2 then return 1000 end
+	
+	local c1 = get_chars(t1)
+	local c2 = get_chars(t2)
+	
+	local matrix = {}
+	for i = 0, #c1 do matrix[i] = {[0] = i} end
+	for j = 0, #c2 do matrix[0][j] = j end
+	
+	for i = 1, #c1 do
+		for j = 1, #c2 do
+			local cost = (c1[i] == c2[j] and 0 or 1)
+			matrix[i][j] = math.min(matrix[i-1][j] + 1, matrix[i][j-1] + 1, matrix[i-1][j-1] + cost)
+		end
+	end
+	
+	return matrix[#c1][#c2]
 end
 
 --- Performs a precise character-level diff strictly bounded within a single word.
@@ -192,14 +221,14 @@ function M.smart_diff(s1, s2)
 	local len1, len2 = #tokens1, #tokens2
 
 	local d = {}
-	for i = 0, len1 do d[i] = {[0] = i} end
-	for j = 0, len2 do d[0][j] = j end
+	for i = 0, len1 do d[i] = {[0] = i * 2} end
+	for j = 0, len2 do d[0][j] = j * 2 end
 
 	for i = 1, len1 do
 		for j = 1, len2 do
-			local cost_del = d[i-1][j] + 1
-			local cost_ins = d[i][j-1] + 1
-			local cost_sub = d[i-1][j-1] + (tokens1[i] == tokens2[j] and 0 or 2)
+			local cost_del = d[i-1][j] + #get_chars(tokens1[i])
+			local cost_ins = d[i][j-1] + #get_chars(tokens2[j])
+			local cost_sub = d[i-1][j-1] + token_sub_cost(tokens1[i], tokens2[j])
 			d[i][j] = math.min(cost_del, cost_ins, cost_sub)
 		end
 	end
@@ -211,9 +240,9 @@ function M.smart_diff(s1, s2)
 			table.insert(ops, 1, {type="equal", t1=tokens1[i], t2=tokens2[j]})
 			i, j = i - 1, j - 1
 		else
-			local cost_del = i > 0 and d[i-1][j] or math.huge
-			local cost_ins = j > 0 and d[i][j-1] or math.huge
-			local cost_sub = (i > 0 and j > 0) and d[i-1][j-1] or math.huge
+			local cost_del = i > 0 and (d[i-1][j] + #get_chars(tokens1[i])) or math.huge
+			local cost_ins = j > 0 and (d[i][j-1] + #get_chars(tokens2[j])) or math.huge
+			local cost_sub = (i > 0 and j > 0) and (d[i-1][j-1] + token_sub_cost(tokens1[i], tokens2[j])) or math.huge
 
 			local min_cost = math.min(cost_del, cost_ins, cost_sub)
 
@@ -407,6 +436,7 @@ function M.process_prediction(full_text, tail_text, block)
 			local display_orig = utils.utf8_sub(best_suffix, active_start_char)
 			local display_corr = utils.utf8_sub(full_llm, active_start_char)
 			
+			-- Deploy 2-tier smart semantic diff
 			chunks = M.smart_diff(display_orig, display_corr)
 
 			-- If there is no gray word before the first correction, 

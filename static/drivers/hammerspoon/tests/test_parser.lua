@@ -4,7 +4,7 @@
 --- MODULE: Parser Unit Tests
 --- DESCRIPTION:
 --- Validates the smart 2-tier semantic diffing engine to ensure
---- character-level corrections are constrained inside words correctly.
+--- character-level corrections are constrained inside words perfectly.
 --- ==============================================================================
 
 local parser = require("modules.llm.parser")
