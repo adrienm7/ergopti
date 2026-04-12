@@ -239,6 +239,40 @@ function M.process_prediction(full_text, tail_text, block)
 			local display_corr = utils.utf8_sub(full_llm, word_start_char, word_end_char)
 			
 			chunks = utils.diff_strings(display_orig, display_corr)
+			
+			-- If there is no gray word before the correction of the first word, 
+			-- move back one word in the buffer to force its appearance in the tooltip.
+			local has_equal_before_insert = false
+			for _, ch in ipairs(chunks) do
+				if ch.type == "equal" then
+					has_equal_before_insert = true
+					break
+				elseif ch.type == "insert" then
+					break
+				end
+			end
+			
+			if not has_equal_before_insert and word_start_char > 1 then
+				local prev_word_start = 1
+				local space_count = 0
+				for i = word_start_char - 1, 1, -1 do
+					local c = utils.utf8_sub(full_llm, i, i)
+					if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
+						space_count = space_count + 1
+						if space_count == 2 then
+							prev_word_start = i + 1
+							break
+						end
+					end
+				end
+				
+				if prev_word_start < word_start_char then
+					display_orig = utils.utf8_sub(best_suffix, prev_word_start)
+					display_corr = utils.utf8_sub(full_llm, prev_word_start, word_end_char)
+					chunks = utils.diff_strings(display_orig, display_corr)
+				end
+			end
+
 			display_nw = utils.utf8_sub(full_llm, word_end_char + 1)
 		else
 			has_corr = false

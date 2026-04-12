@@ -448,6 +448,19 @@ local function build_line(pred, is_sel, total_preds)
 
 	local has_corr = pred.has_corrections == true
 
+	-- Prevent all text from becoming bold if there is absolutely no gray reference text
+	local has_gray = false
+	if type(chunks) == "table" then
+		for _, chunk in ipairs(chunks) do
+			if chunk.type == "equal" and tostring(chunk.text or ""):match("%S") then
+				has_gray = true
+				break
+			end
+		end
+	end
+	
+	local apply_bold = has_corr and has_gray
+
 	local first_done = false
 	local function clean_first(s)
 		local str = tostring(s or "")
@@ -468,7 +481,7 @@ local function build_line(pred, is_sel, total_preds)
 					last_char = s:sub(-1)
 					if chunk.type == "insert" then
 						local color = is_sel and C_CORR_SEL or C_UNSELECTED_GRAY
-						local is_bold = (not is_sel) and has_corr
+						local is_bold = (not is_sel) and apply_bold
 						result = append_seg(result, s, color, is_bold)
 					elseif chunk.type == "equal" then
 						local color = C_UNSELECTED_GRAY
@@ -486,7 +499,7 @@ local function build_line(pred, is_sel, total_preds)
 			s_nw = " " .. s_nw
 		end
 		local color = is_sel and C_NW_SEL or C_UNSELECTED_GRAY
-		local is_bold = (not is_sel) and has_corr
+		local is_bold = (not is_sel) and apply_bold
 		result = append_seg(result, s_nw, color, is_bold)
 	end
 
