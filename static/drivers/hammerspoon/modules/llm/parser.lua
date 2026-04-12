@@ -8,8 +8,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. NFD Normalization: Intercepts decomposed macOS characters (e + ´).
---- 2. Two-Tier Smart Diffing: Aligns words first to prevent cross-word
----    scrambling, then diffs characters within the word to show exact typos.
+--- 2. Semantic Token Diff: Prevents cross-word scrambling and massive deletes.
 --- ==============================================================================
 
 local M = {}
@@ -251,10 +250,6 @@ end
 --- @param s2 string The corrected prediction text.
 --- @return table, string The resulting styled chunk array, and the trailing new words.
 function M.smart_diff(s1, s2)
-	-- Normalize NFD characters safely before any logic is applied
-	s1 = normalize_nfd(s1)
-	s2 = normalize_nfd(s2)
-	
 	local tokens1 = tokenize(s1)
 	local tokens2 = tokenize(s2)
 	local len1, len2 = #tokens1, #tokens2
@@ -298,11 +293,19 @@ function M.smart_diff(s1, s2)
 		end
 	end
 
-	-- Isolate strictly trailing insertions into display_nw (orange section)
+	-- Isolate strictly trailing insertions into display_nw (orange section).
+	-- Stop extracting if the insertion acts as a replacement for a deleted word.
 	local trailing_nw = ""
 	local last_idx = #ops
-	while last_idx > 0 and ops[last_idx].type == "ins" do
-		last_idx = last_idx - 1
+	while last_idx > 0 do
+		if ops[last_idx].type == "ins" then
+			if last_idx > 1 and ops[last_idx-1].type == "del" then
+				break
+			end
+			last_idx = last_idx - 1
+		else
+			break
+		end
 	end
 	
 	for k = last_idx + 1, #ops do
@@ -373,7 +376,7 @@ function M.process_prediction(full_text, tail_text, block)
 	local max_w = tonumber(hs.settings.get("llm_max_words")) or Core.DEFAULT_STATE.llm_max_words
 	if max_w > 0 and max_w < min_w then max_w = min_w end
 	
-	-- Normalize NFD (macOS decomposed characters) and apostrophes before diffing
+	-- Normalize NFD (macOS decomposed characters) and apostrophes before any diffing
 	full_text = normalize_nfd(type(full_text) == "string" and full_text or ""):gsub("'", "’")
 	tail_text = normalize_nfd(type(tail_text) == "string" and tail_text or ""):gsub("'", "’")
 	block     = normalize_nfd(type(block) == "string" and block or ""):gsub("'", "’")
@@ -431,8 +434,8 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Build the absolute complete intended string from the LLM
 		local full_llm = tc_norm .. nw_norm
 		
-		-- Sliding window alignment
-		local search_start = math.max(1, #normalized_full - 300)
+		-- Sliding window alignment bounded to the tail to prevent deep false positives
+		local search_start = math.max(1, #normalized_full - 120)
 		local best_c_len = -1
 		local best_suffix = ""
 		
@@ -459,6 +462,13 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Physical exact limits for OS injection (Decoupled from visual rendering)
 		local true_deletes = utils.utf8_len(best_suffix) - best_c_len
 		local true_to_type = utils.utf8_sub(full_llm, best_c_len + 1)
+		
+		-- Absolute safety circuit breaker: Prevent massive buffer wipes
+		local max_allowed_dels = tail_len + 15
+		if true_deletes > max_allowed_dels then
+			Logger.warning(LOG, "Safety trip: Prevented massive buffer wipe.")
+			return nil
+		end
 
 		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
 
