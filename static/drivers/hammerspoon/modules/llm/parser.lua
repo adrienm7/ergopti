@@ -23,6 +23,28 @@ local LOG    = "llm.parser"
 -- =======================================
 -- =======================================
 
+--- Enforces strict word limits by truncating excess and rejecting if below minimum.
+--- @param text string The predicted next words.
+--- @param min_w number Minimum allowed words.
+--- @param max_w number Maximum allowed words (0 for unlimited).
+--- @return string|nil The processed string, or nil if below minimum.
+local function enforce_word_limits(text, min_w, max_w)
+	if type(text) ~= "string" or text == "" then
+		return (min_w > 0) and nil or ""
+	end
+	local count = 0
+	local rebuilt = ""
+	for w, s in text:gmatch("(%S+)(%s*)") do
+		count = count + 1
+		if max_w > 0 and count > max_w then break end
+		rebuilt = rebuilt .. w
+		if max_w <= 0 or count < max_w then rebuilt = rebuilt .. s end
+	end
+	rebuilt = rebuilt:gsub("%s+$", "")
+	if count < min_w then return nil end
+	return rebuilt
+end
+
 --- Strips conversational filler and markdown from the model’s raw text.
 --- @param text string The raw output from the LLM.
 --- @return string The cleaned text.
@@ -88,6 +110,10 @@ end
 function M.process_prediction(full_text, tail_text, block)
 	Logger.debug(LOG, "Parsing model output block…")
 	
+	local Core = require("modules.llm.init")
+	local min_w = tonumber(hs.settings.get("llm_min_words")) or Core.DEFAULT_STATE.llm_min_words
+	local max_w = tonumber(hs.settings.get("llm_max_words")) or Core.DEFAULT_STATE.llm_max_words
+	
 	-- Normalize apostrophes to prevent false positive corrections in the diffing engine
 	full_text = type(full_text) == "string" and full_text:gsub("'", "’") or ""
 	tail_text = type(tail_text) == "string" and tail_text:gsub("'", "’") or ""
@@ -107,7 +133,16 @@ function M.process_prediction(full_text, tail_text, block)
 
 		tc = trim(tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		nw = trim(nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
+		
+		-- Enforce typography normalisation on model predictions to match input state
+		tc = tc:gsub("'", "’")
+		nw = nw:gsub("'", "’")
+		
 		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+
+		-- Apply strict word limits before any diffing evaluation
+		nw = enforce_word_limits(nw, min_w, max_w)
+		if not nw then return nil end
 
 		if tc == "" and nw ~= "" then
 			tc = trim((tail_text or ""):gsub("^\"", ""):gsub("\"$", ""))
@@ -225,6 +260,7 @@ function M.process_prediction(full_text, tail_text, block)
 		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
 		nw = nw:gsub("^[-•*]+%s*", "")
 		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		nw = nw:gsub("'", "’")
 		
 		if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
 		
@@ -261,6 +297,11 @@ function M.process_prediction(full_text, tail_text, block)
 		end
 		
 		nw = nw:gsub("%s*%]$", ""):gsub("%s+$", "")
+
+		-- Apply strict word limits before any diffing evaluation
+		nw = enforce_word_limits(nw, min_w, max_w)
+		if not nw then return nil end
+
 		local to_type = nw
 		local deletes = 0
 		

@@ -19,21 +19,19 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local _ollama_started = false
-local _model_cache = {}  -- Cache model metadata to avoid repeated checks
+local _model_cache = {}  
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 local RETRY_FAILED_PREDICTION_ENABLED = true
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
 
---- Ensure Ollama daemon is running (optimized for speed).
---- Called lazily on first prediction request, not at module load.
+-- Ensure Ollama daemon is running with optimized background start
 local function ensure_ollama_running()
 	if _ollama_started then return end
 	_ollama_started = true
 	pcall(function()
 		hs.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
-		hs.timer.usleep(50 * 1000)  -- Reduced from 100ms to 50ms
+		hs.timer.usleep(50 * 1000)
 		hs.execute("nohup /opt/homebrew/bin/ollama serve > /tmp/ollama.serve.log 2>&1 &")
-		-- No delay here - let it start in background, API will retry if needed
 	end)
 end
 
@@ -50,7 +48,7 @@ hs.timer.doAfter(0, function() pcall(ensure_ollama_running) end)
 -- ===================================
 -- ===================================
 
---- Determines if a model is categorized as a "thinking" model based on its name.
+--- Determines if a model is categorized as a thinking model based on its name.
 --- @param name string The model name to evaluate.
 --- @return boolean True if it is a thinking model, false otherwise.
 local function is_thinking_model(name)
@@ -110,7 +108,7 @@ end
 -- ======================================
 -- ======================================
 
--- Pre-allocated stop sequences for performance (avoid repeated allocations)
+-- Pre-allocated stop sequences for performance optimization
 local STOP_BASE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" }
 local STOP_BATCH    = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" }
 local STOP_LINE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
@@ -129,7 +127,6 @@ local function build_options(temperature, num_predict_tokens, model_name, is_bat
         stop        = (line_mode and not is_batch) and STOP_LINE or STOP_BATCH,
     }
     
-    -- Disable thinking for ALL models to speed up inference
     opts.think = false
     opts.thinking_budget = 0
     
@@ -300,7 +297,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                              
     local effective_temp = tonumber(temperature) or 0.1
     local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-    local tokens         = tonumber(max_predict) * num_predictions + 150
+    local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
     local is_batch       = profile.batch
     local dedup_stats    = ApiCommon.new_dedup_stats()
 
@@ -316,9 +313,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                    dedup_stats)
 end
 
---- Dispatches multiple sequential API requests (Ollama handles one request at a time).
---- Redirects to fetch_sequential for reliability, as Ollama serializes concurrent requests
---- which causes parallel fan-out to timeout or drop silently.
+--- Dispatches multiple sequential API requests.
 function M.fetch_parallel(full_text, tail_text, model_name, temperature,
                                 max_predict, num_predictions, profile,
                                 on_success, on_fail, request_id_provider)
@@ -356,7 +351,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
     local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
 
     local function do_next()
-        -- Check if this request batch was cancelled (request_id changed)
+        -- Check if this request batch was cancelled dynamically
         if type(request_id_provider) == "function" then
             local current_request_id = request_id_provider()
             if initial_request_id ~= nil and current_request_id ~= initial_request_id then
@@ -378,7 +373,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
         attempt_index = attempt_index + 1
 
         local variant_temp = ApiCommon.get_diversity_temperature(base_temp, variant_index, 0.30)
-        local primary_tokens = tonumber(max_predict) + 10
+        local primary_tokens = tonumber(max_predict)
 
         local function request_variant(attempt, tokens, temp, force_line_mode)
             post_and_parse(model_name, system_prompt, full_text, tail_text,
@@ -387,7 +382,6 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                if type(preds) == "table" and type(preds[1]) == "table" then
                                    if #results < requested_predictions then
                                        ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
-                                       -- Display prediction immediately as it arrives (progressive UI update)
                                        local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
                                        if type(on_success) == "function" then pcall(on_success, results, ms, false) end
                                    end
@@ -396,7 +390,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                            end,
                            function()
                                if attempt < 2 then
-                                   local retry_tokens = math.max(28, math.floor(tokens * 0.72))
+                                   local retry_tokens = tokens + 5
                                    local retry_temp = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
                                    Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f", model_name, variant_index, max_attempts, retry_tokens, retry_temp)
                                    request_variant(attempt + 1, retry_tokens, retry_temp, false)

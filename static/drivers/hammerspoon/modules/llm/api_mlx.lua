@@ -62,7 +62,7 @@ end
 -- ======================================
 -- ======================================
 
---- Builds the options payload for the OpenAI API format (MLX Server) - optimized.
+-- Builds the options payload for the OpenAI API format (MLX Server) - optimized
 local STOP_BASE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:" }
 local STOP_LINE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
 
@@ -114,9 +114,8 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		end
 	end
 
-    -- MLX OpenAI-compatible endpoint can reject "system" roles for some models
-    -- (e.g. Mistral) with strict user/assistant alternation checks.
-    -- Fold instructions into a single user message to keep compatibility.
+    -- MLX OpenAI-compatible endpoint can reject system roles for some models
+    -- Fold instructions into a single user message to keep compatibility
     local merged_prompt = user_prompt
     if type(final_sys) == "string" and final_sys ~= "" then
         merged_prompt = final_sys .. "\n\n" .. (user_prompt or "")
@@ -126,7 +125,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
     local t0_req = hs.timer.secondsSinceEpoch()
 
-    -- Advanced mode is only the strict correction profile; basic/raw should remain line mode.
+    -- Advanced mode is only the strict correction profile
     local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("RÈGLES CRITIQUES", 1, true) ~= nil
     local line_mode = (force_line_mode == true) or ((not is_batch) and (not is_advanced_prompt))
 
@@ -136,7 +135,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local prompt_preview = merged_prompt
 
     if line_mode then
-        -- For plain autocomplete, completion endpoint is more reliable than chat formatting.
+        -- For plain autocomplete, completion endpoint is more reliable than chat formatting
         local ctx = type(full_text) == "string" and full_text or ""
         local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
         prompt_preview = prompt
@@ -150,15 +149,11 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         }
     else
         payload = {
-            -- Le serveur MLX identifie le modèle chargé via "default_model" si le champ est absent ;
-            -- envoyer le nom Ollama (ex. "llama3.2:3b") provoque une validation HF → HTTP 404
             messages    = messages,
             stream      = false,
             temperature = opts.temperature,
             max_tokens  = opts.max_tokens,
             stop        = opts.stop,
-            -- Some models (e.g. Qwen3) can emit only `message.reasoning` without
-            -- `message.content` when thinking mode is active, which breaks the pipeline.
             chat_template_kwargs = { enable_thinking = false }
         }
     end
@@ -203,7 +198,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 			local choice = resp.choices[1]
 			local content = nil
 
-			-- OpenAI-like format
+			-- OpenAI-like format extraction
 			if type(choice.message) == "table" then
 				if type(choice.message.content) == "string" then
 					content = choice.message.content
@@ -220,7 +215,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 				end
 			end
 
-			-- Legacy completion fallback
+			-- Legacy completion fallback execution
 			if not content and type(choice.text) == "string" then
 				content = choice.text
 			end
@@ -289,7 +284,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                              
     local effective_temp = tonumber(temperature) or 0.1
     local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-    local tokens         = tonumber(max_predict) * num_predictions + 150
+    local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
     local is_batch       = profile.batch
     local dedup_stats    = ApiCommon.new_dedup_stats()
 
@@ -320,8 +315,8 @@ end
 function M.fetch_parallel(full_text, tail_text, model_name, temperature,
                                 max_predict, num_predictions, profile,
                                 on_success, on_fail, request_id_provider)
-    -- MLX can produce unstable outputs under parallel fan-out with some models (e.g. gemma4:e4b).
-    -- Force sequential dispatch for reliability while keeping the same public API.
+    -- MLX can produce unstable outputs under parallel fan-out with some models
+    -- Force sequential dispatch for reliability while keeping the same public API
     return M.fetch_sequential(full_text, tail_text, model_name, temperature,
                               max_predict, num_predictions, profile,
                               on_success, on_fail, request_id_provider)
@@ -356,7 +351,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
     local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
 
     local function do_next()
-        -- Check if this request batch was cancelled (request_id changed)
+        -- Check if this request batch was cancelled dynamically
         if type(request_id_provider) == "function" then
             local current_request_id = request_id_provider()
             if initial_request_id ~= nil and current_request_id ~= initial_request_id then
@@ -378,7 +373,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
         attempt_index = attempt_index + 1
 
         local variant_temp = ApiCommon.get_diversity_temperature(base_temp, variant_index, 0.30)
-        local primary_tokens = tonumber(max_predict) + 10
+        local primary_tokens = tonumber(max_predict)
 
         local function request_variant(attempt, tokens, temp, force_line_mode)
             post_and_parse(model_name, system_prompt, full_text, tail_text,
@@ -387,7 +382,6 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                if type(preds) == "table" and type(preds[1]) == "table" then
                                    if #results < requested_predictions then
                                        ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
-                                       -- Display prediction immediately as it arrives (progressive UI update)
                                        local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
                                        if type(on_success) == "function" then pcall(on_success, results, ms, false) end
                                    end
@@ -396,7 +390,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                            end,
                            function()
                                if attempt < 2 then
-                                   local retry_tokens = math.max(28, math.floor(tokens * 0.72))
+                                   local retry_tokens = tokens + 5
                                    local retry_temp = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
                                    Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f", model_name, variant_index, max_attempts, retry_tokens, retry_temp)
                                    request_variant(attempt + 1, retry_tokens, retry_temp, false)

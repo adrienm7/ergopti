@@ -549,15 +549,15 @@ function M._perform_llm_check(force_trigger, profile_name)
 		end
 
 		local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "inconnu"
-		
-		-- Give the model plenty of room to respect the user's max_words requirement.
 		local model_to_use = type(core_llm.get_current_model) == "function" and core_llm.get_current_model() or current_llm_model
-		local max_predict_tokens = 150
 		
+		-- Hard token limit buffer: guarantee enough tokens to generate max_words,
+		-- plus an overflow margin so the cut word falls outside the allowed max_words.
+		local max_predict_tokens = 150
 		if backend == "mlx" then
-			max_predict_tokens = llm_max_words > 0 and math.max(60, llm_max_words * 6 + 20) or 100
+			max_predict_tokens = llm_max_words > 0 and math.max(15, math.floor(llm_max_words * 6 + 10)) or 100
 		elseif llm_max_words > 0 then
-			max_predict_tokens = math.max(60, llm_max_words * 6 + 20)
+			max_predict_tokens = math.max(15, math.floor(llm_max_words * 6 + 10))
 		end
 		
 		local effective_num_pred = num_pred
