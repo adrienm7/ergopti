@@ -129,6 +129,24 @@ local function run_tests()
 			expected_chunks = "[=:Gaulle ][+:é][=:tait le plus]",
 			expected_nw = " grand homme",
 			expected_deletes = 12 -- "tait" (4) + " " (1) + "le" (2) + " " (1) + "plus" (4)
+		},
+		{
+			name = "Pure addition without gray anchor (mort en -> 1815)",
+			orig = "napoléon est mort en",
+			tc = "en",
+			nw = "1815",
+			expected_chunks = "",
+			expected_nw = " 1815",
+			expected_deletes = 0
+		},
+		{
+			name = "Perfect match without duplication (mort en 1815 -> est une année)",
+			orig = "napoléon est mort en 1815",
+			tc = "1815",
+			nw = "est une année importante",
+			expected_chunks = "",
+			expected_nw = " est une année importante",
+			expected_deletes = 0
 		}
 	}
 

@@ -360,23 +360,34 @@ function M.process_prediction(full_text, tail_text, block)
 		
 		local nw_norm = nw
 		if needs_space then nw_norm = " " .. nw_norm end
-
-		local full_llm = tc_norm .. nw_norm
 		
 		-- Grab a safe sliding window limit from the user's buffer
 		local window_size = math.min(#normalized_full, math.max(60, #tc_norm + 30))
 		local orig_context = normalized_full:sub(#normalized_full - window_size + 1)
 		
-		-- 1. Generate full diff operations
-		local ops = token_diff_ops(orig_context, full_llm)
+		-- 1. Diff strictly against TAIL_CORRECTED to avoid misaligning new words
+		local ops = token_diff_ops(orig_context, tc_norm)
 
-		-- 2. Strip leading context (unrelated user buffer prior to the correction)
-		while #ops > 0 and ops[1].type == "del" do table.remove(ops, 1) end
-		while #ops > 0 and ops[1].type == "ins" and ops[1].t2:match("^%s+$") do table.remove(ops, 1) end
+		-- 2. Strip leading context but keep a trace of it for dynamic anchor resolution
+		local stripped_ops = {}
+		while #ops > 0 and ops[1].type == "del" do 
+			table.insert(stripped_ops, table.remove(ops, 1))
+		end
+		while #ops > 0 and ops[1].type == "ins" and ops[1].t2:match("^%s+$") do 
+			table.insert(stripped_ops, table.remove(ops, 1))
+		end
+		
+		-- 3. Append NEXT_WORDS strictly as downstream insertions
+		if nw_norm ~= "" then
+			local nw_tokens = tokenize(nw_norm)
+			for _, t in ipairs(nw_tokens) do
+				table.insert(ops, {type="ins", t2=t})
+			end
+		end
 
 		if #ops == 0 then return nil end
 
-		-- 3. Locate the first actual change in the alignment
+		-- 4. Locate the first actual change in the alignment
 		local first_change_idx = -1
 		for i, op in ipairs(ops) do
 			if op.type ~= "equal" then
@@ -390,7 +401,7 @@ function M.process_prediction(full_text, tail_text, block)
 			return { deletes = 0, to_type = "", nw = nw_norm, has_corrections = false, chunks = {}, disable_bold = false }
 		end
 
-		-- 4. Calculate Physical Injection (strictly optimized)
+		-- 5. Calculate Physical Injection (strictly optimized)
 		local physical_ops = {}
 		for i = first_change_idx, #ops do table.insert(physical_ops, ops[i]) end
 
@@ -431,7 +442,7 @@ function M.process_prediction(full_text, tail_text, block)
 		
 		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
 
-		-- 5. Calculate Visual UI (Anchor context + Chunks + Trailing NW)
+		-- 6. Calculate Visual UI (Anchor context + Chunks + Trailing NW)
 		local first_op = ops[first_change_idx]
 		local needs_anchor = false
 		
@@ -451,17 +462,32 @@ function M.process_prediction(full_text, tail_text, block)
 			end
 		end
 
-		local visual_start = first_change_idx
-		if needs_anchor then
+		local visual_ops = {}
+		
+		-- Recover anchor from outside the TC window if it was stripped
+		if needs_anchor and first_change_idx == 1 and #stripped_ops > 0 then
+			local anchor_parts = {}
+			for i = #stripped_ops, 1, -1 do
+				table.insert(anchor_parts, 1, stripped_ops[i].t1)
+				if stripped_ops[i].t1:match("[%w’']") or stripped_ops[i].t1:byte() >= 128 then
+					break
+				end
+			end
+			local anchor_text = table.concat(anchor_parts, "")
+			table.insert(visual_ops, {type="equal", t1=anchor_text, t2=anchor_text})
+		-- Otherwise, find anchor in the remaining visible ops
+		elseif needs_anchor then
 			for i = first_change_idx - 1, 1, -1 do
+				table.insert(visual_ops, 1, ops[i])
 				local is_word = ops[i].t1:match("[%w’']") or ops[i].t1:byte() >= 128
-				visual_start = i
 				if is_word then break end
 			end
 		end
 
-		local visual_ops = {}
-		for i = visual_start, #ops do table.insert(visual_ops, ops[i]) end
+		-- Push physical operations into the visual stack
+		for i = first_change_idx, #ops do 
+			table.insert(visual_ops, ops[i]) 
+		end
 
 		-- Find the boundary where strictly new words (Orange) begin by ignoring trailing DP space matching
 		local last_anchor_idx = 0
@@ -544,6 +570,16 @@ function M.process_prediction(full_text, tail_text, block)
 				table.insert(chunks, {type=c.type, text=c.text})
 			end
 		end
+		
+		-- Clear gray chunks if they are orphaned (no green corrections following them)
+		local only_equals = true
+		for _, c in ipairs(chunks) do
+			if c.type ~= "equal" then
+				only_equals = false
+				break
+			end
+		end
+		if only_equals then chunks = {} end
 		
 		-- Precludes double boldness if orange directly follows a green element
 		local disable_bold = (#chunks > 0 and chunks[#chunks].type == "insert" and display_nw:match("%S") ~= nil)
