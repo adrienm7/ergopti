@@ -554,10 +554,15 @@ function M._perform_llm_check(force_trigger, profile_name)
 		-- Hard token limit buffer: guarantee enough tokens to generate max_words,
 		-- plus an overflow margin so the cut word falls outside the allowed max_words.
 		local max_predict_tokens = 150
+		local effective_max_words = llm_max_words
+		if effective_max_words > 0 and effective_max_words < llm_min_words then
+			effective_max_words = llm_min_words
+		end
+
 		if backend == "mlx" then
-			max_predict_tokens = llm_max_words > 0 and math.max(15, math.floor(llm_max_words * 6 + 10)) or 100
-		elseif llm_max_words > 0 then
-			max_predict_tokens = math.max(15, math.floor(llm_max_words * 6 + 10))
+			max_predict_tokens = effective_max_words > 0 and math.max(15, math.floor(effective_max_words * 6 + 10)) or 100
+		elseif effective_max_words > 0 then
+			max_predict_tokens = math.max(15, math.floor(effective_max_words * 6 + 10))
 		end
 		
 		local effective_num_pred = num_pred

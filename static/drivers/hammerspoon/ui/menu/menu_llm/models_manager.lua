@@ -371,11 +371,11 @@ function M.new(deps)
 	local mlx    = MlxMgr.new(deps, presets)
 
 	local function get_active()
-		return deps.state.llm_use_mlx and mlx or ollama
+		return (deps.state.llm_backend == "mlx") and mlx or ollama
 	end
 
 	function obj.get_presets()
-		if not deps.state.llm_use_mlx then return presets end
+		if deps.state.llm_backend ~= "mlx" then return presets end
 		local filtered = {}
 		for _, provider in ipairs(presets) do
 			local new_provider = { label = provider.label, families = {} }
@@ -395,14 +395,14 @@ function M.new(deps)
 	
 	function obj.get_mlx_repo(name) return mlx.get_mlx_repo(name) end
 	function obj.get_model_info(name) return get_model_info_logic(name, presets) end
-	function obj.get_model_ram(name) return get_model_ram_logic(name, presets, deps.state.llm_use_mlx) end
+	function obj.get_model_ram(name) return get_model_ram_logic(name, presets, deps.state.llm_backend == "mlx") end
 	function obj.get_model_emojis(name) return get_model_info_logic(name, presets).emojis end
 	
 	--- Gets the actual backend-specific model name.
 	--- @param display_name string The display name from llm_models.json.
 	--- @return string The real model name for the active backend.
 	function obj.get_actual_model_name(display_name)
-		return get_actual_model_name(display_name, presets, deps.state.llm_use_mlx)
+		return get_actual_model_name(display_name, presets, deps.state.llm_backend == "mlx")
 	end
 	
 	--- Checks if a display model name is installed, by converting to real backend name.
@@ -413,12 +413,12 @@ function M.new(deps)
 		-- MLX stores by display name (m.name), try that first
 		if installed[display_name] then return true end
 		-- Ollama stores by actual backend name, convert and try
-		local actual_name = get_actual_model_name(display_name, presets, deps.state.llm_use_mlx)
+		local actual_name = get_actual_model_name(display_name, presets, deps.state.llm_backend == "mlx")
 		return installed[actual_name] or installed[actual_name .. ":latest"] or false
 	end
 	
 	function obj.get_installed_models()
-		if deps.state.llm_use_mlx then
+		if deps.state.llm_backend == "mlx" then
 			return mlx.get_installed_models() or {}
 		else
 			return ollama.get_installed_models() or {}
@@ -431,7 +431,7 @@ function M.new(deps)
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(...) return mlx.check_requirements(...) end
 	function obj.open_model_source_page(name)
-		if deps.state.llm_use_mlx and type(mlx.open_model_source_page) == "function" then
+		if deps.state.llm_backend == "mlx" and type(mlx.open_model_source_page) == "function" then
 			return mlx.open_model_source_page(name)
 		end
 		return false
