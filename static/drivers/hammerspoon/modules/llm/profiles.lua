@@ -27,7 +27,8 @@ local RAW_PROMPT_SINGLE = [[{context}]]
 local BASIC_PROMPT_SINGLE = [[Tu es un moteur de complétion clavier ultra-concis.
 Contexte utilisateur : {context}
 
-Donne strictement la suite immédiate du contexte en {min_words} à {max_words} mots maximum.
+Donne strictement la suite immédiate du contexte.
+C’EST UNE LIMITE STRICTE : Tu DOIS générer entre {min_words} et {max_words} mots. PAS UN MOT DE PLUS.
 N’ajoute aucune explication, aucun commentaire, aucune liste, aucune puce, aucun guillemet, aucune reformulation du contexte.
 Retourne uniquement les mots à ajouter.]]
 
@@ -36,7 +37,7 @@ RÈGLES CRITIQUES :
 1. Tu reçois un PREFIX (le contexte complet) et un TAIL (les ~5 à 7 derniers mots).
 2. Format : Deux lignes commençant par "TAIL_CORRECTED:" et "NEXT_WORDS:".
 3. TAIL_CORRECTED : Corrige l’orthographe, la grammaire et les accents UNIQUEMENT dans le TAIL. Ne modifie pas le sens. S’il n’y a pas de faute, recopie le TAIL EXACTEMENT à l’identique sans rien changer.
-4. NEXT_WORDS : Prédis {min_words} à {max_words} mots pour continuer la phrase de façon logique. Laisse vide si la phrase est terminée.
+4. NEXT_WORDS : Prédis STRICTEMENT entre {min_words} et {max_words} mots pour continuer la phrase de façon logique. Laisse vide si la phrase est terminée. Ne dépasse JAMAIS la limite stricte de {max_words} mots.
 
 EXEMPLES :
 
@@ -188,9 +189,14 @@ function M.resolve_system_prompt(profile, n)
 		end
 	end
 
-	-- Dynamically inject the user-configured words limits
-	local min_w = hs.settings.get("llm_min_words")
-	local max_w = hs.settings.get("llm_max_words")
+	-- Lazy load Core module to prevent circular dependency crashes
+	local Core = require("modules.llm.init")
+	local def_min = Core.DEFAULT_STATE.llm_min_words
+	local def_max = Core.DEFAULT_STATE.llm_max_words
+
+	-- Dynamically inject the user-configured words limits and fallback to Core defaults
+	local min_w = tonumber(hs.settings.get("llm_min_words")) or def_min
+	local max_w = tonumber(hs.settings.get("llm_max_words")) or def_max
 	local max_w_str = (max_w > 0) and tostring(max_w) or "illimité"
 	local min_w_str = tostring(min_w)
 	

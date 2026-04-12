@@ -120,6 +120,7 @@ local STOP_LINE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:
 --- @param num_predict_tokens number Max tokens to predict.
 --- @param model_name string Name of the target model.
 --- @param is_batch boolean Whether this request is a batch prompt expecting multiple outputs.
+--- @param line_mode boolean Line mode flag.
 --- @return table The options configuration table.
 local function build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode)
     local opts = {
@@ -146,6 +147,7 @@ end
 --- @param is_batch boolean Flag to determine batch parsing strategy.
 --- @param on_success function Callback triggering on successful parse.
 --- @param on_fail function Callback triggering on failure.
+--- @param dedup_stats table Dedup stats metrics.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, num_predict_tokens, num_predictions, is_batch,
                                on_success, on_fail, dedup_stats)
@@ -291,6 +293,7 @@ end
 --- @param profile table Active profile mapping.
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
+--- @param request_id_provider function Callback returning the current request identifier.
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
                              max_predict, num_predictions, profile,
                              on_success, on_fail, request_id_provider)
@@ -334,6 +337,7 @@ end
 --- @param profile table Active profile mapping.
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
+--- @param request_id_provider function Callback returning the current request identifier.
 function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                   max_predict, num_predictions, profile,
                                   on_success, on_fail, request_id_provider)

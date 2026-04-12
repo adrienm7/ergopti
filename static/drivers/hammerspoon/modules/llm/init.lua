@@ -61,11 +61,11 @@ local CoreState = {
 
 
 
--- =======================================
--- =======================================
--- ======= 2/ Core Orchestration =========
--- =======================================
--- =======================================
+-- =====================================
+-- =====================================
+-- ======= 2/ Core Orchestration =======
+-- =====================================
+-- =====================================
 
 --- Auto-detect best available backend and set it as active.
 --- Uses async HTTP checks — never blocks the main thread.
@@ -266,6 +266,7 @@ end
 --- @param on_fail function Function to execute on timeout, error, or empty output.
 --- @param sequential_mode boolean Flag to enforce sequential API requests instead of parallel.
 --- @param force boolean If true, bypasses application exclusions.
+--- @param request_id_provider function Callback returning the current request identifier.
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
                                   max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider)
 

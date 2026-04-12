@@ -86,6 +86,8 @@ end
 --- @param is_batch boolean True if batch format requested.
 --- @param on_success function Success callback.
 --- @param on_fail function Failure callback.
+--- @param dedup_stats table Dedup stats object.
+--- @param force_line_mode boolean Force line completion parsing.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, num_predict_tokens, num_predictions, is_batch,
                                on_success, on_fail, dedup_stats, force_line_mode)
@@ -280,6 +282,7 @@ end
 --- @param profile table Active profile mapping.
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
+--- @param request_id_provider function Callback returning the current request identifier.
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
                              max_predict, num_predictions, profile,
                              on_success, on_fail, request_id_provider)
@@ -313,6 +316,7 @@ end
 --- @param profile table Active profile mapping.
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
+--- @param request_id_provider function Callback returning the current request identifier.
 function M.fetch_parallel(full_text, tail_text, model_name, temperature,
                                 max_predict, num_predictions, profile,
                                 on_success, on_fail, request_id_provider)
@@ -333,6 +337,7 @@ end
 --- @param profile table Active profile mapping.
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
+--- @param request_id_provider function Callback returning the current request identifier.
 function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                                   max_predict, num_predictions, profile,
                                   on_success, on_fail, request_id_provider)
