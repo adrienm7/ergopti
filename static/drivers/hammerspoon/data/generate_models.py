@@ -9,13 +9,12 @@ and Ollama.
 
 FEATURES & RATIONALE:
 1. Automated Metadata Fetching: Scrapes tags, parameter sizes, and updates.
-2. Hardware Estimation: Intelligently calculates RAM and disk requirements.
+2. Hardware Estimation: Intelligently calculates RAM and download sizes.
 3. Failsafe Parsing: Gracefully handles network timeouts and missing data.
 ==============================================================================
 """
 
 import json
-import math
 import os
 import re
 from typing import Any, Dict, Optional, Union
@@ -49,24 +48,9 @@ def extract_repo_id(url: Optional[str]) -> Optional[str]:
     return url.split("huggingface.co/")[-1].strip("/")
 
 
-def determine_model_type(model_name: str) -> str:
-    """Determines if a model is chat (instruct) or completion (base) based on common naming conventions.
-
-    Args:
-            model_name: The name of the model to evaluate.
-
-    Returns:
-            A string indicating the model type.
-    """
-    name_lower = model_name.lower()
-
-    if re.search(r"(-base|base)$", name_lower):
-        return "completion"
-
-    if re.search(r"(-it|-instruct|-chat|chat|instruct)$", name_lower):
-        return "chat"
-
-    return "chat"
+# =========================================
+# ===== 1.1) HuggingFace API Metadata =====
+# =========================================
 
 
 def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
@@ -118,14 +102,22 @@ def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
         relevant_tags.append("mixture_of_experts")
 
     total_params = "N/A"
-    safetensors = data.get("safetensors", {}).get("parameters", {})
-    for _, val in safetensors.items():
-        if isinstance(val, int):
-            billions = val / 1e9
-            total_params = (
-                f"{round(billions, 1) if billions % 1 != 0 else int(billions)}B"
-            )
-            break
+    safetensors = data.get("safetensors", {})
+    total_p_count = safetensors.get("total")
+
+    # If 'total' is missing, sum the individual parameter counts
+    if not isinstance(total_p_count, int):
+        params_dict = safetensors.get("parameters", {})
+        total_p_count = sum(
+            v for v in params_dict.values() if isinstance(v, int)
+        )
+
+    if total_p_count and total_p_count > 0:
+        billions = total_p_count / 1e9
+        if billions.is_integer():
+            total_params = f"{int(billions)}B"
+        else:
+            total_params = f"{round(billions, 2):g}B"
 
     last_modified = data.get("lastModified")
     created_at = data.get("createdAt")
@@ -144,7 +136,7 @@ def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
         pass
 
     return {
-        "tags": list(set(relevant_tags)),
+        "tags": sorted(list(set(relevant_tags))),
         "total_params": total_params,
         "readme": readme,
         "last_updated": clean_date,
@@ -198,21 +190,46 @@ def get_ollama_size_gb(ollama_url: Optional[str]) -> Optional[float]:
         return None
 
     try:
-        response = requests.get(ollama_url, timeout=REQUEST_TIMEOUT)
+        # Spoofing the User-Agent to prevent 403 Forbidden or bot-blocks from Ollama's CDN
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(
+            ollama_url, headers=headers, timeout=REQUEST_TIMEOUT
+        )
         soup = BeautifulSoup(response.text, "html.parser")
-        for span in soup.find_all("span"):
-            text = span.text.strip()
-            if re.match(r"^\d+(\.\d+)?\s*(GB|MB)$", text, re.IGNORECASE):
+
+        # Look into standard text containers for an exact size match
+        for tag in soup.find_all(["span", "div", "p", "a"]):
+            text = tag.get_text(strip=True)
+            if re.match(r"^\d+(?:\.\d+)?\s*(GB|MB)$", text, re.IGNORECASE):
                 size_matches = re.findall(r"\d+\.\d+|\d+", text)
                 if size_matches:
                     size = float(size_matches[0])
                     if "MB" in text.upper():
                         size /= 1024
                     return round(size, 2)
-    except Exception:
-        pass
+
+        # Fallback: scan the entire text for something like "8B • 4.7 GB"
+        full_text = soup.get_text(separator=" ")
+        fallback_match = re.search(
+            r"(?:^|\s|•|-)(\d+(?:\.\d+)?)\s*(GB|MB)\b", full_text, re.IGNORECASE
+        )
+        if fallback_match:
+            size = float(fallback_match.group(1))
+            if fallback_match.group(2).upper() == "MB":
+                size /= 1024
+            return round(size, 2)
+
+    except Exception as e:
+        print(f"Erreur de récupération pour Ollama ({ollama_url}): {e}")
 
     return None
+
+
+# ==================================
+# ===== 2.1) Parameter Parsing =====
+# ==================================
 
 
 def extract_active_params(
@@ -248,64 +265,56 @@ def extract_active_params(
     return total_params
 
 
-def estimate_ram(download_gb: Optional[float]) -> Optional[int]:
-    """Estimates the required RAM in GB.
+def estimate_ram(total_params_str: str) -> Optional[float]:
+    """Estimates the required RAM in GB based on total parameters.
 
-    Uses a heuristic formula: Model weight size + ~2.5GB for KV Context Cache
-    and Inference Engine overhead. Rounds up to the nearest standard hardware tier.
+    Provides a precise estimation without arbitrary tiers, optimized for
+    4-bit quantization and a very small context window.
 
     Args:
-            download_gb: The size of the model download in GB.
+            total_params_str: A string representing the total parameter count.
 
     Returns:
-            The estimated required RAM tier in GB.
+            The estimated required RAM in GB.
     """
-    if not download_gb:
+    if not total_params_str or total_params_str == "N/A":
         return None
 
-    tiers = [8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512]
-    ram_needed = download_gb + 2.5
+    try:
+        total_params_lower = total_params_str.lower().replace("b", "")
+        if "x" in total_params_lower:
+            parts = total_params_lower.split("x")
+            # MoE heuristic: total params is roughly 85% of experts * size due to shared layers
+            total_p = float(parts[0]) * float(parts[1]) * 0.85
+        else:
+            total_p = float(re.sub(r"[^\d.]", "", total_params_lower))
+    except ValueError:
+        return None
 
-    for tier in tiers:
-        if ram_needed <= tier:
-            return tier
+    # 4-bit weights = ~0.55 GB per billion parameters
+    # Inference engine overhead + small context = ~0.5 GB
+    ram_gb = (total_p * 0.55) + 0.5
 
-    return math.ceil(ram_needed / 32) * 32
+    return round(ram_gb, 1)
 
 
-def calculate_hardware_requirements(download_gb: float) -> Dict[str, float]:
-    """Calculates unified hardware requirements based on the download size.
+def calculate_hardware_requirements(
+    download_gb: Optional[float], params_str: str
+) -> Dict[str, Optional[float]]:
+    """Calculates unified hardware requirements.
 
     Args:
             download_gb: The size of the model download in GB.
+            params_str: A string representing the total parameter count.
 
     Returns:
             A dictionary mapping hardware components to their GB requirements.
     """
+    dl_rounded = round(download_gb, 2) if download_gb else None
     return {
-        "download_gb": round(download_gb, 2),
-        "disk_gb": round(download_gb, 2),
-        "ram_gb": estimate_ram(download_gb),
+        "download_gb": dl_rounded,
+        "ram_gb": estimate_ram(params_str),
     }
-
-
-def estimate_hardware_fallback(params_str: str) -> Dict[str, Optional[float]]:
-    """Estimates hardware requirements based strictly on parameter count.
-
-    Assumes 4-bit quantization (~0.65 GB per 1B parameters).
-
-    Args:
-            params_str: A string representing the total parameter count.
-
-    Returns:
-            A dictionary mapping hardware components to fallback estimates.
-    """
-    try:
-        val = float(re.sub(r"[^\d.]", "", params_str))
-        estimated_download_gb = val * 0.65
-        return calculate_hardware_requirements(estimated_download_gb)
-    except ValueError:
-        return {"disk_gb": None, "download_gb": None, "ram_gb": None}
 
 
 def estimate_speed(active_params_str: str) -> Dict[str, Union[int, str]]:
@@ -334,11 +343,11 @@ def estimate_speed(active_params_str: str) -> Dict[str, Union[int, str]]:
         return {"speed_tok_s": 3, "speed_tier": "Very Slow"}
 
 
-# ==========================================
-# ==========================================
-# ======= 3/ Main Generator Logic ==========
-# ==========================================
-# ==========================================
+# =======================================
+# =======================================
+# ======= 3/ Main Generator Logic =======
+# =======================================
+# =======================================
 
 
 def build_final_json(v0_filepath: str, output_filepath: str) -> None:
@@ -369,31 +378,43 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
                 hf_meta = get_hf_metadata(urls.get("hf"))
 
                 total_p = hf_meta["total_params"]
+
+                # Smart fallback: Parse model name if HuggingFace API lacks the parameter count
+                if total_p in ("N/A", "0.0B", "0B"):
+                    match_b = re.search(
+                        r"(?i)(\d+(?:\.\d+)?(?:x\d+(?:\.\d+)?)?)B", model_name
+                    )
+                    if match_b:
+                        total_p = f"{match_b.group(1).upper()}B"
+                    else:
+                        match_m = re.search(r"(?i)(\d+(?:\.\d+)?)M", model_name)
+                        if match_m:
+                            mb = float(match_m.group(1))
+                            total_p = f"{round(mb / 1000, 2):g}B"
+
                 active_p = extract_active_params(
                     model_name, hf_meta["readme"], total_p
                 )
-                speed_data = estimate_speed(active_p)
-                fallback_hw = estimate_hardware_fallback(total_p)
 
-                model_type = determine_model_type(model_name)
+                if active_p in ("N/A", "0.0B", "0B"):
+                    active_p = total_p
+
+                speed_data = estimate_speed(active_p)
+                model_type = model_item.get("type", "chat")
                 hardware = {}
 
                 mlx_url = urls.get("mlx")
                 mlx_dl = get_hf_repo_size_gb(mlx_url) if mlx_url else None
-                hardware["mlx"] = (
-                    calculate_hardware_requirements(mlx_dl)
-                    if mlx_dl
-                    else fallback_hw
+                hardware["mlx"] = calculate_hardware_requirements(
+                    mlx_dl, total_p
                 )
 
                 ollama_url = urls.get("ollama")
                 ollama_dl = (
                     get_ollama_size_gb(ollama_url) if ollama_url else None
                 )
-                hardware["ollama"] = (
-                    calculate_hardware_requirements(ollama_dl)
-                    if ollama_dl
-                    else fallback_hw
+                hardware["ollama"] = calculate_hardware_requirements(
+                    ollama_dl, total_p
                 )
 
                 new_family["models"].append(

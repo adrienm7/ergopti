@@ -27,8 +27,10 @@ let globalDoneState = false;
  */
 function doCancel() {
 	const cancelButton = document.getElementById('btn-cancel');
-	cancelButton.disabled = true;
-	cancelButton.textContent = 'Annulation…';
+	if (cancelButton) {
+		cancelButton.disabled = true;
+		cancelButton.textContent = 'Annulation…';
+	}
 
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
 		window.webkit.messageHandlers.dl_bridge.postMessage('cancel');
@@ -45,9 +47,6 @@ function doTerm() {
 }
 
 /**
- * Sends a request to resolve gated access directly from the UI.
- */
-/**
  * Sends a retry request to relaunch the download.
  */
 function doRetry() {
@@ -63,40 +62,49 @@ function doRetry() {
 // =============================
 
 /**
+ * Resets the UI to its initial state for a retry, preventing zombie placeholders.
+ */
+function resetUI() {
+	globalLogLines = [];
+	globalDoneState = false;
+
+	const barFill = document.getElementById('bar-fill');
+	barFill.style.width = '0%';
+	barFill.classList.remove('error');
+
+	const pctEl = document.getElementById('pct');
+	pctEl.textContent = '0 %';
+	pctEl.style.color = '#30d158';
+
+	document.getElementById('file-count').style.display = 'none';
+	document.getElementById('file-count').textContent = '';
+
+	document.getElementById('stats-details').style.display = 'none';
+	document.getElementById('eta-container').style.display = 'none';
+	document.getElementById('done-msg').style.display = 'none';
+	document.getElementById('stats-fallback').style.display = 'block';
+
+	const logArea = document.getElementById('log-area');
+	logArea.textContent = '';
+	logArea.style.display = 'none';
+
+	const cancelBtn = document.getElementById('btn-cancel');
+	if (cancelBtn) {
+		cancelBtn.style.display = 'inline-block';
+		cancelBtn.disabled = false;
+		cancelBtn.textContent = '🛑 Annuler';
+	}
+
+	const retryBtn = document.getElementById('btn-retry');
+	if (retryBtn) retryBtn.style.display = 'none';
+}
+
+/**
  * Sets the displayed model name in the UI.
  * @param {string} modelName - The name of the model being downloaded.
  */
 function setModel(modelName) {
 	document.getElementById('model').textContent = modelName;
-}
-
-/**
- * Injects model size parameters safely into the frontend.
- * @param {Object} sizes - Object containing dl, disk, and ram sizes as formatted strings.
- */
-function setSizes(sizes) {
-	const container = document.getElementById('model-sizes');
-	const szDl = document.getElementById('sz-dl');
-	const szDisk = document.getElementById('sz-disk');
-	const szRam = document.getElementById('sz-ram');
-
-	let hasSizes = false;
-	if (sizes.dl) {
-		szDl.textContent = '⬇️ ' + sizes.dl;
-		hasSizes = true;
-	}
-	if (sizes.disk) {
-		szDisk.textContent = '💽 ' + sizes.disk;
-		hasSizes = true;
-	}
-	if (sizes.params) {
-		szRam.textContent = '🧠 ' + sizes.params + ' paramètres';
-		hasSizes = true;
-	}
-
-	if (hasSizes) {
-		container.style.display = 'flex';
-	}
 }
 
 /**
@@ -108,65 +116,44 @@ function setSizes(sizes) {
  * @param {string} fileCount - Optional file progress string (e.g., "47/102").
  */
 function update(percentage, downloadedSize, speed, eta, fileCount) {
-	if (globalDoneState) return;
+	if (globalDoneState) return; // Cap at 99% during download: 100% is reserved exclusively for done()
 
-	// Cap at 99% during download: 100% is reserved exclusively for done()
 	const cappedPercentage = Math.min(Math.max(0, parseInt(percentage) || 0), 99);
 	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
-	document.getElementById('pct').textContent = cappedPercentage + ' %';
+	document.getElementById('pct').textContent = cappedPercentage + ' %'; // Line 1: Fichiers (next to percentage, pushed right by CSS)
 
-	// Update downloaded size next to percentage
 	const fileCountEl = document.getElementById('file-count');
-	if (downloadedSize) {
-		fileCountEl.style.display = 'inline-block';
-		fileCountEl.textContent = downloadedSize;
+	if (fileCount) {
+		fileCountEl.textContent = `📁 Fichiers : ${fileCount}`;
+		fileCountEl.style.display = 'block';
 	} else {
 		fileCountEl.style.display = 'none';
-		fileCountEl.textContent = '';
-	}
+	} // Line 2: Taille & Vitesse
 
-	// Speed and ETA line
-	const speedEtaEl = document.getElementById('speed-eta');
-	const speedEl = document.getElementById('speed');
-	const etaEl = document.getElementById('eta');
-	let hasSpeedEta = false;
-	if (speed) {
-		speedEl.textContent = speed;
-		hasSpeedEta = true;
+	const statsDetails = document.getElementById('stats-details');
+	let detailsParts = [];
+
+	if (downloadedSize) detailsParts.push(`📦 Taille : <b>${downloadedSize}</b>`);
+	if (speed) detailsParts.push(`⚡ Vitesse : <b>${speed}</b>`);
+
+	if (detailsParts.length > 0) {
+		statsDetails.innerHTML = detailsParts.join(
+			'<span class="gap"></span>—<span class="gap"></span>'
+		);
+		statsDetails.style.display = 'block';
+		document.getElementById('stats-fallback').style.display = 'none';
 	} else {
-		speedEl.textContent = '';
-	}
+		statsDetails.style.display = 'none';
+		document.getElementById('stats-fallback').style.display = 'block';
+	} // Line 3: Temps restant
+
+	const etaContainer = document.getElementById('eta-container');
+	const etaEl = document.getElementById('eta');
 	if (eta) {
 		etaEl.textContent = eta;
-		hasSpeedEta = true;
+		etaContainer.style.display = 'block';
 	} else {
-		etaEl.textContent = '';
-	}
-	speedEtaEl.style.display = hasSpeedEta ? 'block' : 'none';
-
-	// Files line
-	const filesLine = document.getElementById('files-line');
-	const fileCur = document.getElementById('file-current');
-	const fileTot = document.getElementById('file-total');
-	if (fileCount) {
-		const parts = String(fileCount).split('/');
-		const cur = parts[0] || fileCount;
-		const tot = parts[1] || '';
-		fileCur.textContent = cur;
-		fileTot.textContent = tot;
-		filesLine.style.display = 'block';
-	} else {
-		fileCur.textContent = '';
-		fileTot.textContent = '';
-		filesLine.style.display = 'none';
-	}
-
-	// Fallback message shown when nothing else
-	const fallback = document.getElementById('stats-fallback');
-	if (!hasSpeedEta && !fileCount) {
-		fallback.style.display = 'block';
-	} else {
-		fallback.style.display = 'none';
+		etaContainer.style.display = 'none';
 	}
 }
 
@@ -186,12 +173,10 @@ function showLog() {
  * @param {string} line - The log string to append.
  */
 function addLog(line) {
-	if (!line) return;
+	if (!line) return; // Strip ANSI colors and control sequences from terminal output
 
-	// Strip ANSI colors and control sequences from terminal output
-	const cleanLine = String(line).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+	const cleanLine = String(line).replace(/\x1b\[[0-9;]*[A-Za-z]/g, ''); // Hide noisy transfer progress bars that visually duplicate the main UI bar
 
-	// Hide noisy transfer progress bars that visually duplicate the main UI bar
 	if (/%\|.*it\/s/.test(cleanLine) || /\|\s*\d+\s*\/\s*\d+\s*\[/.test(cleanLine)) {
 		return;
 	}
@@ -212,7 +197,9 @@ function addLog(line) {
  */
 function done(isSuccess, message, errorKind) {
 	globalDoneState = true;
-	document.getElementById('btn-cancel').style.display = 'none';
+
+	const cancelButton = document.getElementById('btn-cancel');
+	if (cancelButton) cancelButton.style.display = 'none';
 
 	const progressBar = document.getElementById('bar-fill');
 	if (isSuccess) {
@@ -221,36 +208,25 @@ function done(isSuccess, message, errorKind) {
 		document.getElementById('pct').textContent = '100 %';
 	} else {
 		progressBar.classList.add('error');
-		if (
-			!progressBar.style.width ||
-			progressBar.style.width === '0%' ||
-			progressBar.style.width === ''
-		) {
-			progressBar.style.width = '100%';
-		}
+		progressBar.style.width = '100%';
 		document.getElementById('pct').textContent = '❌';
 		document.getElementById('pct').style.color = '#ff453a';
-	}
+	} // Hide specific stats, files count and ETA to make room for the final message
+
+	document.getElementById('file-count').style.display = 'none';
+	document.getElementById('eta-container').style.display = 'none';
+	document.getElementById('stats-details').style.display = 'none';
+	document.getElementById('stats-fallback').style.display = 'none';
 
 	const doneMessageElement = document.getElementById('done-msg');
-	doneMessageElement.textContent = message;
-	doneMessageElement.className = isSuccess ? 'ok' : 'error';
-	doneMessageElement.style.display = 'inline-block';
+	doneMessageElement.textContent =
+		message || (isSuccess ? '✅ Terminé' : 'Échec du téléchargement');
+	doneMessageElement.className = isSuccess ? 'ok' : 'error'; // Show it inline inside the status-line
 
-	const statsElement = document.getElementById('stats');
-	statsElement.textContent = '';
-
-	if (!isSuccess) {
-		// Keep the error label visually attached to the cross icon
-		doneMessageElement.textContent = 'Échec du téléchargement';
-	}
+	doneMessageElement.style.display = 'block';
 
 	if (!isSuccess) {
-		// show retry button in main controls
 		const retryBtn = document.getElementById('btn-retry');
 		if (retryBtn) retryBtn.style.display = 'inline-block';
-	} else {
-		const retryBtn = document.getElementById('btn-retry');
-		if (retryBtn) retryBtn.style.display = 'none';
 	}
 }

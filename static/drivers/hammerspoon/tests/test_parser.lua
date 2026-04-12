@@ -1,0 +1,227 @@
+--- tests/test_parser.lua
+
+--- ==============================================================================
+--- MODULE: Parser Unit Tests
+--- DESCRIPTION:
+--- Validates the fully decoupled 2-tier semantic parser to ensure
+--- accurate NW extraction, correct anchor words, and absolute safety limits.
+--- ==============================================================================
+
+local parser = require("modules.llm.parser")
+
+--- Dummy mock for settings required by the parser
+_G.hs = {
+	settings = { get = function(k) return (k == "llm_min_words" and 1 or 5) end },
+}
+package.loaded["modules.llm.init"] = { DEFAULT_STATE = { llm_min_words = 1, llm_max_words = 5 } }
+
+--- Formats the diff chunks into a readable string for testing assertions.
+--- @param chunks table The array of chunk objects.
+--- @return string A concatenated representation of the diff.
+local function format_chunks(chunks)
+	local result = ""
+	if not chunks then return result end
+	for _, c in ipairs(chunks) do
+		local mark = (c.type == "equal") and "=" or "+"
+		result = result .. string.format("[%s:%s]", mark, c.text)
+	end
+	return result
+end
+
+--- Mock test runner block structure
+local function format_llm_block(tc, nw)
+	return string.format("TAIL_CORRECTED: %s\nNEXT_WORDS: %s\n", tc, nw)
+end
+
+
+
+
+
+-- ==============================
+-- ==============================
+-- ======= 1/ Test Runner =======
+-- ==============================
+-- ==============================
+
+local function run_tests()
+	print("🚀 Starting Parser End-to-End Tests...\n")
+	local passed = 0
+	local failed = 0
+
+	local tests = {
+		{
+			name = "Duplication bug ('est un homme' -> perfectly appended)",
+			orig = "Charles de Gaulle est un homme important de l'histoire",
+			tc = "est un homme important de l'histoire",
+			nw = "qui laisse une trace",
+			expected_chunks = "",
+			expected_nw = " qui laisse une trace",
+			expected_deletes = 0
+		},
+		{
+			name = "Intra-word typing correction (étati -> était le)",
+			orig = "étati",
+			tc = "était",
+			nw = "le général",
+			expected_chunks = "[=:éta][+:it]",
+			expected_nw = " le général",
+			expected_deletes = 2 -- "ti" (optimized physical ops)
+		},
+		{
+			name = "Intra-word with context (étais -> était un personnage)",
+			orig = "Charles de Gaulle étais",
+			tc = "Charles de Gaulle était",
+			nw = "un personnage",
+			expected_chunks = "[=:étai][+:t]",
+			expected_nw = " un personnage",
+			expected_deletes = 1 -- "s"
+		},
+		{
+			name = "Complete word replacement (jamais vu -> jamais su)",
+			orig = "j'ai jamais vu",
+			tc = "j'ai jamais su",
+			nw = "en fait",
+			expected_chunks = "[=:jamais ][+:su]",
+			expected_nw = " en fait",
+			expected_deletes = 2 -- "vu"
+		},
+		{
+			name = "Strict Extraction (New words are ONLY orange)",
+			orig = "le chien",
+			tc = "le chien",
+			nw = "noir et blanc",
+			expected_chunks = "",
+			expected_nw = " noir et blanc",
+			expected_deletes = 0
+		},
+		{
+			name = "Space handling ('était' + 'le plus')",
+			orig = "Charles de Gaulle était",
+			tc = "Charles de Gaulle était",
+			nw = "le plus",
+			expected_chunks = "",
+			expected_nw = " le plus",
+			expected_deletes = 0
+		},
+		{
+			name = "Space handling no double ('était ' + 'le plus')",
+			orig = "Charles de Gaulle était ",
+			tc = "Charles de Gaulle était",
+			nw = "le plus",
+			expected_chunks = "",
+			expected_nw = "le plus",
+			expected_deletes = 0
+		},
+		{
+			name = "Intra-word with context ('étati le plus' -> 'était le plus grand homme')",
+			orig = "Charles de Gaulle étati le plus",
+			tc = "Charles de Gaulle était le plus",
+			nw = "grand homme",
+			expected_chunks = "[=:éta][+:it][=: le plus]",
+			expected_nw = " grand homme",
+			expected_deletes = 10 -- "ti" (2) + " " (1) + "le" (2) + " " (1) + "plus" (4)
+		},
+		{
+			name = "Anchor word inclusion ('tait le plus' -> 'était le plus grand homme')",
+			orig = "Charles de Gaulle tait le plus",
+			tc = "Charles de Gaulle était le plus",
+			nw = "grand homme",
+			expected_chunks = "[=:Gaulle ][+:é][=:tait le plus]",
+			expected_nw = " grand homme",
+			expected_deletes = 12 -- "tait" (4) + " " (1) + "le" (2) + " " (1) + "plus" (4)
+		},
+		{
+			name = "Pure addition without gray anchor (mort en -> 1815)",
+			orig = "napoléon est mort en",
+			tc = "en",
+			nw = "1815",
+			expected_chunks = "",
+			expected_nw = " 1815",
+			expected_deletes = 0
+		},
+		{
+			name = "Perfect match without duplication (mort en 1815 -> est une année)",
+			orig = "napoléon est mort en 1815",
+			tc = "1815",
+			nw = "est une année importante",
+			expected_chunks = "",
+			expected_nw = " est une année importante",
+			expected_deletes = 0
+		},
+		{
+			name = "Stuttering bug via partial overlap (mort en 1815 -> mo 1815)",
+			orig = "napoléon est mort en 1815",
+			tc = "1815",
+			nw = "et a laissé un grand vide",
+			expected_chunks = "",
+			expected_nw = " et a laissé un grand vide",
+			expected_deletes = 0
+		},
+		{
+			name = "Advanced duplication removal (1815 in both tc and nw)",
+			orig = "napoléon est mort en 1815",
+			tc = "1815",
+			nw = "1815 est une année importante",
+			expected_chunks = "",
+			expected_nw = " est une année importante",
+			expected_deletes = 0
+		},
+		{
+			name = "Stale buffer protection ('mort en 1815' with stale tc 'mo')",
+			orig = "napoléon est mort en 1815",
+			tc = "mo",
+			nw = "1815 et a laissé",
+			expected_nil = true
+		}
+	}
+
+	for _, t in ipairs(tests) do
+		local norm_orig = t.orig:gsub("'", "’")
+		local block = format_llm_block(t.tc, t.nw)
+		
+		local res = parser.process_prediction(norm_orig, norm_orig, block)
+		
+		if not res then
+			if t.expected_nil then
+				print(string.format("✅ PASS: %s", t.name))
+				passed = passed + 1
+			else
+				print(string.format("❌ FAIL: %s (returned nil)", t.name))
+				failed = failed + 1
+			end
+		else
+			if t.expected_nil then
+				print(string.format("❌ FAIL: %s (expected nil, got result)", t.name))
+				failed = failed + 1
+			else
+				local res_chunks = format_chunks(res.chunks)
+				local res_nw = res.nw
+				local res_del = res.deletes
+				
+				-- Stale buffer returns exact string as insertion, so we format test comparison accordingly
+				if t.name:find("Stale") then
+					res_chunks = ""
+					for _, c in ipairs(res.chunks) do
+						local mark = (c.type == "equal") and "=" or "+"
+						res_chunks = res_chunks .. string.format("[%s:%s]", mark, c.text)
+					end
+				end
+
+				if res_chunks == t.expected_chunks and res_nw == t.expected_nw and res_del == t.expected_deletes then
+					print(string.format("✅ PASS: %s", t.name))
+					passed = passed + 1
+				else
+					print(string.format("❌ FAIL: %s", t.name))
+					if res_chunks ~= t.expected_chunks then print(string.format("   Chunks Exp: '%s' | Got: '%s'", t.expected_chunks, res_chunks)) end
+					if res_nw ~= t.expected_nw then print(string.format("   NW Exp: '%s' | Got: '%s'", t.expected_nw, res_nw)) end
+					if res_del ~= t.expected_deletes then print(string.format("   Del Exp: %d | Got: %d", t.expected_deletes, res_del)) end
+					failed = failed + 1
+				end
+			end
+		end
+	end
+
+	print(string.format("\n🏁 Tests finished: %d passed, %d failed.", passed, failed))
+end
+
+run_tests()

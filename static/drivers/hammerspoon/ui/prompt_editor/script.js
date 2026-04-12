@@ -1,18 +1,20 @@
 // ui/prompt_editor/script.js
 
-// ===========================================================================
-// Prompt Editor UI Script.
-//
-// Handles the interactive rich-text editor for LLM prompts.
-// Supports visual "chips" for tokens like {context} and custom serialization
-// to convert the DOM state back into raw prompt text.
-// ===========================================================================
+/**
+ * ==============================================================================
+ * MODULE: Prompt Editor UI Script
+ * DESCRIPTION:
+ * Handles the interactive rich-text editor for LLM prompts.
+ * Supports visual "chips" for tokens like {context} and custom serialization
+ * to convert the DOM state back into raw prompt text.
+ * ==============================================================================
+ */
 
-// ====================================
-// ====================================
-// ======= 1/ Chips Engine ============
-// ====================================
-// ====================================
+// ===============================
+// ===============================
+// ======= 1/ Chips Engine =======
+// ===============================
+// ===============================
 
 /**
  * Creates a non-editable visual chip element for a specific token.
@@ -51,7 +53,12 @@ function parseToNodes(text) {
 		var tokenName = match[1].toLowerCase();
 		if (tokenName === 'enter') {
 			nodes.push(document.createElement('br'));
-		} else if (tokenName === 'context' || tokenName === 'n') {
+		} else if (
+			tokenName === 'context' ||
+			tokenName === 'n' ||
+			tokenName === 'min_words' ||
+			tokenName === 'max_words'
+		) {
 			nodes.push(makeChip(tokenName));
 		} else {
 			nodes.push(document.createTextNode(match[0]));
@@ -204,7 +211,7 @@ function tryConvertToken(editorElement) {
 
 	var offset = range.startOffset;
 	var beforeContent = node.textContent.slice(0, offset);
-	var match = beforeContent.match(/\{(context|n)\}$/i);
+	var match = beforeContent.match(/\{(context|n|min_words|max_words)\}$/i);
 	if (!match) return;
 
 	var matchStart = offset - match[0].length;
@@ -227,15 +234,15 @@ function tryConvertToken(editorElement) {
 	checkPlaceholder();
 }
 
-// ====================================
-// ====================================
-// ======= 2/ Autocomplete Engine =====
-// ====================================
-// ====================================
+// ======================================
+// ======================================
+// ======= 2/ Autocomplete Engine =======
+// ======================================
+// ======================================
 
 var acItems = [];
 var acIdx = 0;
-var TOKEN_NAMES = ['context', 'n'];
+var TOKEN_NAMES = ['context', 'n', 'min_words', 'max_words'];
 
 /**
  * Retrieves the context under the cursor to determine if autocomplete should trigger.
@@ -350,11 +357,11 @@ function checkAc() {
 	showAc(matches);
 }
 
-// ====================================
-// ====================================
-// ======= 3/ Events Wiring ===========
-// ====================================
-// ====================================
+// ================================
+// ================================
+// ======= 3/ Events Wiring =======
+// ================================
+// ================================
 
 var editorElement = document.getElementById('e-out');
 
@@ -517,11 +524,11 @@ document.addEventListener('click', function (e) {
 	if (popup && !popup.contains(e.target)) hideAc();
 });
 
-// ====================================
-// ====================================
-// ======= 4/ Main UI API =============
-// ====================================
-// ====================================
+// ==============================
+// ==============================
+// ======= 4/ Main UI API =======
+// ==============================
+// ==============================
 
 /**
  * Initializes the interface with data passed from the Hammerspoon backend.
