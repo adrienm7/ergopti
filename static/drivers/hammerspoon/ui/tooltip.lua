@@ -574,7 +574,10 @@ local function assemble_blocks(raw_preds, current_index, info_bar, shortcut_mod,
 
 		local cmd_str = ""
 		if n > 1 and shortcut_mod ~= "none" then
-			local mod_sym = MOD_SYMBOL and MOD_SYMBOL[shortcut_mod] or "⌃"
+			-- Format dynamically the modifier string to its Mac symbols
+			local mod_sym = tostring(shortcut_mod):gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
+			if mod_sym == "" or mod_sym == "nil" then mod_sym = "⌥" end
+			
 			if i <= 9 then cmd_str = "   " .. mod_sym .. i
 			elseif i == 10 then cmd_str = "   " .. mod_sym .. "0"
 			end

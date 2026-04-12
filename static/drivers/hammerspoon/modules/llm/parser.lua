@@ -87,6 +87,12 @@ end
 --- @return table|nil A table containing prediction data or nil if invalid.
 function M.process_prediction(full_text, tail_text, block)
 	Logger.debug(LOG, "Parsing model output block…")
+	
+	-- Normalize apostrophes to prevent false positive corrections in the diffing engine
+	full_text = type(full_text) == "string" and full_text:gsub("'", "’") or ""
+	tail_text = type(tail_text) == "string" and tail_text:gsub("'", "’") or ""
+	block     = type(block) == "string" and block:gsub("'", "’") or ""
+	
 	block = clean_model_output(block)
 	
 	local is_advanced = block:find("TAIL_CORRECTED") or block:find("NEXT_WORDS")
@@ -219,6 +225,7 @@ function M.process_prediction(full_text, tail_text, block)
 		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
 		nw = nw:gsub("^[-•*]+%s*", "")
 		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		
 		if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
 		
 		-- Robust overlap mitigation using word-by-word comparison for basic models
