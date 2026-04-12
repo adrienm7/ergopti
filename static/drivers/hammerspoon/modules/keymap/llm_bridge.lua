@@ -347,26 +347,32 @@ function M.apply_prediction(idx)
 		keylogger.set_buffer(_state.buffer)
 	end
 
-	-- Dynamically scale the keylogger suppression time to match the length of the injected string.
-	-- keyStrokes emits events asynchronously. We must delay the next LLM request 
-	-- until all synthetic keystrokes have physically reached the OS.
-	-- Otherwise, the LLM responds too fast, the tooltip displays, and the 
-	-- remaining synthetic keystrokes trigger the event tap and hide it immediately.
-	local to_type_len = to_type and text_utils.utf8_len(to_type) or 0
-	local suppress_time = math.max(0.4, (to_type_len * 0.02) + 0.2)
-	_state.suppress_rescan_keep_buffer(suppress_time)
+	-- Temporarily suppress standard auto-rescan while the OS processes the async keystrokes
+	_state.suppress_rescan_keep_buffer(1.5)
 	
-	if M._llm_timer and type(M._llm_timer.stop) == "function" then
-		M._llm_timer:stop()
-	end
-	if M._chain_timer and type(M._chain_timer.stop) == "function" then
-		M._chain_timer:stop()
+	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
+	if M._chain_timer and type(M._chain_timer.stop) == "function" then M._chain_timer:stop() end
+	
+	-- Poll the keylogger's expected queue to know EXACTLY when the OS has finished typing.
+	-- This completely eliminates the race condition where fast AI responses crash against
+	-- residual synthetic keystrokes still being typed by the OS.
+	local attempts = 0
+	local function trigger_when_done()
+		attempts = attempts + 1
+		local pending_dels  = tonumber(_state.expected_synthetic_deletes) or 0
+		local pending_chars = type(_state.expected_synthetic_chars) == "string" and #_state.expected_synthetic_chars or 0
+		
+		if (pending_dels > 0 or pending_chars > 0) and attempts < 40 then
+			M._chain_timer = hs.timer.doAfter(0.05, trigger_when_done)
+		else
+			-- Keystrokes are completely flushed (or max wait reached).
+			-- Restore normal behavior and immediately request the chained prediction.
+			_state.suppress_rescan_keep_buffer(0.1)
+			M._perform_llm_check(true)
+		end
 	end
 	
-	-- Launch the next prediction seamlessly AFTER the synthetic injection completes safely
-	M._chain_timer = hs.timer.doAfter(suppress_time + 0.05, function()
-		M._perform_llm_check(true)
-	end)
+	trigger_when_done()
 	
 	return true
 end
