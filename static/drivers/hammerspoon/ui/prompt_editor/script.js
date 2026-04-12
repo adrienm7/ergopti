@@ -53,7 +53,12 @@ function parseToNodes(text) {
 		var tokenName = match[1].toLowerCase();
 		if (tokenName === 'enter') {
 			nodes.push(document.createElement('br'));
-		} else if (tokenName === 'context' || tokenName === 'n' || tokenName === 'max_words') {
+		} else if (
+			tokenName === 'context' ||
+			tokenName === 'n' ||
+			tokenName === 'min_words' ||
+			tokenName === 'max_words'
+		) {
 			nodes.push(makeChip(tokenName));
 		} else {
 			nodes.push(document.createTextNode(match[0]));
@@ -206,7 +211,7 @@ function tryConvertToken(editorElement) {
 
 	var offset = range.startOffset;
 	var beforeContent = node.textContent.slice(0, offset);
-	var match = beforeContent.match(/\{(context|n|max_words)\}$/i);
+	var match = beforeContent.match(/\{(context|n|min_words|max_words)\}$/i);
 	if (!match) return;
 
 	var matchStart = offset - match[0].length;
@@ -237,7 +242,7 @@ function tryConvertToken(editorElement) {
 
 var acItems = [];
 var acIdx = 0;
-var TOKEN_NAMES = ['context', 'n', 'max_words'];
+var TOKEN_NAMES = ['context', 'n', 'min_words', 'max_words'];
 
 /**
  * Retrieves the context under the cursor to determine if autocomplete should trigger.

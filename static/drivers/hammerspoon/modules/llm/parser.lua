@@ -109,8 +109,8 @@ function M.process_prediction(full_text, tail_text, block)
 
 		if tc == "" and nw == "" then return nil end
 
-		local normalized_full = (full_text or ""):gsub("'", "’")
-		local tc_norm = tc:gsub("'", "’")
+		local normalized_full = (full_text or "")
+		local tc_norm = tc
 		
 		-- Restore trailing spaces entered by the user
 		local tail_trailing_space = normalized_full:match("([%s\194\160\226\128\175]+)$")
@@ -131,7 +131,7 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Build the absolute complete intended string from the LLM
 		local full_llm = tc_norm .. nw_norm
 		
-		-- Sliding window alignment logic against the full intended string
+		-- Sliding window alignment
 		local search_start = math.max(1, #normalized_full - 300)
 		local best_c_len = -1
 		local best_suffix = ""
@@ -149,7 +149,7 @@ function M.process_prediction(full_text, tail_text, block)
 		end
 		
 		if best_c_len < 2 and #full_llm > 5 then
-			best_suffix = (tail_text or ""):gsub("'", "’")
+			best_suffix = (tail_text or "")
 			best_c_len = utils.get_common_prefix_utf8(best_suffix, full_llm)
 		end
 

@@ -99,6 +99,7 @@ local llm_debounce_time        = 0.5
 local llm_context_length       = 500
 local llm_reset_on_nav         = true
 local llm_temperature          = 0.1
+local llm_min_words            = 1
 local llm_max_words            = 5
 local llm_num_predictions      = 3
 local llm_pred_indent          = -3
@@ -154,6 +155,7 @@ function M.set_llm_display_model_name(name)
 end
 function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) end
 function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
+function M.set_llm_min_words(w)           llm_min_words          = math.max(0, tonumber(w) or 1) end
 function M.set_llm_max_words(w)           llm_max_words          = math.max(0, tonumber(w) or 5) end
 function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or 3) end
 function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
@@ -281,7 +283,6 @@ function M.apply_prediction(idx)
 	if not pred then return false end
 	M.reset_predictions()
 
-	-- We trust the parser.lua strictly. No overlap guessing that breaks UTF-8 or spacing.
 	local deletes = pred.deletes or 0
 	local to_type = pred.to_type or ""
 
@@ -370,6 +371,30 @@ end
 -- ======= 4/ Execution Constraints =======
 -- ========================================
 -- ========================================
+
+--- Applies global text formatting rules (like typographic apostrophes) to a prediction.
+--- Executed exactly once upon reception, ensuring consistency across UI and KeyStrokes.
+--- @param pred table The prediction object.
+--- @return table The mutated prediction object.
+local function apply_postprocessing(pred)
+	if type(pred) ~= "table" then return pred end
+	
+	if type(pred.to_type) == "string" then
+		pred.to_type = pred.to_type:gsub("'", "’")
+	end
+	if type(pred.nw) == "string" then
+		pred.nw = pred.nw:gsub("'", "’")
+	end
+	if type(pred.chunks) == "table" then
+		for _, chunk in ipairs(pred.chunks) do
+			if type(chunk.text) == "string" then
+				chunk.text = chunk.text:gsub("'", "’")
+			end
+		end
+	end
+	
+	return pred
+end
 
 --- Builds a stable deduplication key from the final text effectively shown in the tooltip.
 --- @param pred table The final prediction payload.
@@ -635,11 +660,14 @@ function M._perform_llm_check(force_trigger, profile_name)
 				
 				for _, p_raw in ipairs(predictions) do
 					-- Clone the prediction to avoid mutating the API's internal tables
-					-- which is critical if the API streams and updates chunks progressively.
 					local p = {}
 					for k, v in pairs(p_raw) do p[k] = v end
 
 					if p.to_type then
+						-- 1. Apply global post-processing formatting (e.g., typographic apostrophes)
+						apply_postprocessing(p)
+
+						-- 2. Extract for noise checks
 						local tt = p.to_type
 						local tt_norm = tt:lower():gsub("’", "'")
 						local ctx_norm = clean_buffer:lower():gsub("’", "'")

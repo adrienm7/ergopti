@@ -189,6 +189,37 @@ function M.new(deps)
 		reset_to_default(deps, "llm_max_words", llm_mod.DEFAULT_STATE.llm_max_words or 5, "set_llm_max_words") 
 	end
 
+	--- Sets the minimum number of words generated per prediction.
+	function obj.set_min_words()
+		local state = deps.state
+		pcall(hs.focus)
+
+		local current_val = tonumber(state.llm_min_words)
+		local display_val = (current_val and current_val > 0) and tostring(current_val) or "1"
+
+		local full_msg = "Nombre minimum de mots à générer par suggestion :"
+
+		local ok_p, btn, raw = pcall(hs.dialog.textPrompt, "Mots min par suggestion", full_msg, display_val, "OK", "Annuler")
+
+		if ok_p and btn == "OK" then
+			local digits = raw:match("^%s*(%d+)%s*$")
+			if not digits then return end
+			local new_val = tonumber(digits) or 1
+			
+			state.llm_min_words = new_val
+			if deps.keymap and type(deps.keymap.set_llm_min_words) == "function" then
+				pcall(deps.keymap.set_llm_min_words, new_val)
+			end
+			pcall(deps.save_prefs)
+			pcall(deps.update_menu)
+			Logger.info(LOG, "Min words updated successfully.")
+		end
+	end
+	
+	function obj.reset_min_words() 
+		reset_to_default(deps, "llm_min_words", llm_mod.DEFAULT_STATE.llm_min_words, "set_llm_min_words") 
+	end
+
 	--- Sets the AI temperature (creativity vs stability).
 	function obj.set_temperature()
 		generic_numeric_prompt(deps, 

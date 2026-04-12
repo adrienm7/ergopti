@@ -81,6 +81,7 @@ M.DEFAULT_STATE = {
     llm_profile_shortcuts = {},
     llm_trigger_shortcut  = false,
     llm_after_hotstring   = false,
+    llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
 }
 
 
@@ -307,7 +308,9 @@ function M.create(deps)
     if state.llm_max_words ~= nil and keymap and type(keymap.set_llm_max_words) == "function" then
         pcall(keymap.set_llm_max_words, state.llm_max_words)
     end
-
+    if state.llm_min_words ~= nil and keymap and type(keymap.set_llm_min_words) == "function" then
+        pcall(keymap.set_llm_min_words, state.llm_min_words)
+    end
 
 
     -- ======================================
@@ -915,9 +918,18 @@ function M.create(deps)
                         pcall(keymap.set_llm_backend_name, "MLX 🚀")
                     end
 
+                    -- Kill any stray ollama to free RAM
+                    os.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
+
                     local target_model = get_display_model_name(state.llm_model_mlx or M.DEFAULT_STATE.llm_model_mlx or "")
                     if target_model and target_model ~= "" then
                         switch_model(target_model)
+                        -- Force server to start to be certain
+                        if type(models_mgr.force_mlx_check) == "function" then
+                            hs.timer.doAfter(0.5, function()
+                                models_mgr.force_mlx_check(target_model, nil, nil, { silent_notifications = true })
+                            end)
+                        end
                     else
                         state.llm_model = ""
                         if keymap and type(keymap.set_llm_model) == "function" then
@@ -943,6 +955,8 @@ function M.create(deps)
                     state.llm_backend = "ollama"
                     llm_mod.set_backend("ollama")
                     if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
+                    -- Hard kill just in case
+                    os.execute("pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null")
                     Logger.debug(LOG, "MLX server stopped.")
 
                     if keymap and type(keymap.set_llm_backend_name) == "function" then
@@ -1089,6 +1103,12 @@ function M.create(deps)
                 save_prefs(); update_menu()
             end
         })
+
+        local min_words_display = (state.llm_min_words and state.llm_min_words > 0) and tostring(state.llm_min_words) or "1"
+        table.insert(main_menu, { title = "Mots min par suggestion : " .. min_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
+        if state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words then
+            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_min_words) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
+        end
 
         local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or "Illimité"
         table.insert(main_menu, { title = "Mots max par suggestion : " .. max_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_max_words })

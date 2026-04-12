@@ -27,7 +27,7 @@ local RAW_PROMPT_SINGLE = [[{context}]]
 local BASIC_PROMPT_SINGLE = [[Tu es un moteur de complétion clavier ultra-concis.
 Contexte utilisateur : {context}
 
-Donne strictement la suite immédiate du contexte en 1 à {max_words} mots maximum.
+Donne strictement la suite immédiate du contexte en {min_words} à {max_words} mots maximum.
 N’ajoute aucune explication, aucun commentaire, aucune liste, aucune puce, aucun guillemet, aucune reformulation du contexte.
 Retourne uniquement les mots à ajouter.]]
 
@@ -36,7 +36,7 @@ RÈGLES CRITIQUES :
 1. Tu reçois un PREFIX (le contexte complet) et un TAIL (les ~5 à 7 derniers mots).
 2. Format : Deux lignes commençant par "TAIL_CORRECTED:" et "NEXT_WORDS:".
 3. TAIL_CORRECTED : Corrige l’orthographe, la grammaire et les accents UNIQUEMENT dans le TAIL. Ne modifie pas le sens. S’il n’y a pas de faute, recopie le TAIL EXACTEMENT à l’identique sans rien changer.
-4. NEXT_WORDS : Prédis 1 à {max_words} mots pour continuer la phrase de façon logique. Laisse vide si la phrase est terminée.
+4. NEXT_WORDS : Prédis {min_words} à {max_words} mots pour continuer la phrase de façon logique. Laisse vide si la phrase est terminée.
 
 EXEMPLES :
 
@@ -188,10 +188,14 @@ function M.resolve_system_prompt(profile, n)
 		end
 	end
 
-	-- Dynamically inject the user-configured max words limit
-	local max_w = hs.settings.get("llm_max_words") or 5
+	-- Dynamically inject the user-configured words limits
+	local min_w = hs.settings.get("llm_min_words")
+	local max_w = hs.settings.get("llm_max_words")
 	local max_w_str = (max_w > 0) and tostring(max_w) or "illimité"
+	local min_w_str = tostring(min_w)
+	
 	prompt = prompt:gsub("{max_words}", max_w_str)
+	prompt = prompt:gsub("{min_words}", min_w_str)
 	
 	return prompt
 end
