@@ -8,7 +8,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. NFD Normalization: Intercepts decomposed macOS characters (e + ´).
---- 2. Decoupled Pipeline: Separates physical typing ops from UI visual chunks.
+--- 2. Scaled Sliding Window: Prevents massive buffer wipes and 0-match bugs.
 --- 3. Strict NW Extraction: Guarantees invented words are always orange.
 --- ==============================================================================
 
@@ -187,7 +187,6 @@ local function token_sub_cost(t1, t2)
 	local type1 = (t1:match("%s") and 2) or (t1:match("[%w’']") and 1) or 3
 	local type2 = (t2:match("%s") and 2) or (t2:match("[%w’']") and 1) or 3
 	
-	-- Heavy penalty for crossing token types to prevent visual scrambling
 	if type1 ~= type2 then return 1000 end
 	
 	local c1 = get_chars(t1)
@@ -206,7 +205,7 @@ local function token_sub_cost(t1, t2)
 	
 	local dist = matrix[#c1][#c2]
 	local max_len = math.max(#c1, #c2)
-	local threshold = math.max(2, max_len * 0.7) -- Allow up to 70% difference to catch typos like 'étati'->'était'
+	local threshold = math.max(2, max_len * 0.7)
 	
 	if dist > threshold then return 1000 end
 	return dist
@@ -237,6 +236,7 @@ local function intra_word_diff(w1, w2)
 	
 	local chunks = {}
 	if prefix ~= "" then table.insert(chunks, {type="equal", text=prefix}) end
+	if mid == "" and w1 ~= w2 then return {{type="insert", text=w2}} end
 	if mid ~= "" then table.insert(chunks, {type="insert", text=mid}) end
 	if suffix ~= "" then table.insert(chunks, {type="equal", text=suffix}) end
 	
@@ -293,7 +293,6 @@ function M.smart_diff(s1, s2)
 	end
 
 	-- Isolate strictly trailing insertions into display_nw (orange section).
-	-- We stop extracting if the insertion is acting as a 1-to-1 replacement for a deleted token.
 	local extract_ops = {}
 	local k = #ops
 	while k > 0 do
@@ -318,7 +317,6 @@ function M.smart_diff(s1, s2)
 		table.insert(visual_ops, ops[v])
 	end
 
-	-- Transform remaining operations into UI chunks
 	local raw_chunks = {}
 	for _, op in ipairs(visual_ops) do
 		if op.type == "equal" then
@@ -341,7 +339,6 @@ function M.smart_diff(s1, s2)
 		end
 	end
 
-	-- Merge contiguous chunks of the same type
 	local merged = {}
 	for _, c in ipairs(raw_chunks) do
 		local last = merged[#merged]
@@ -436,25 +433,11 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Build the absolute complete intended string from the LLM
 		local full_llm = tc_norm .. nw_norm
 		
-		-- STRICT LIMITER: Prevent massive backwards deletion.
-		-- We restrict the search window to max 3 words ago or 40 chars.
-		local safe_search_start = #normalized_full
-		local space_count = 0
-		for i = #normalized_full, 1, -1 do
-			local c = normalized_full:sub(i, i)
-			if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
-				space_count = space_count + 1
-				if space_count == 3 then
-					safe_search_start = i
-					break
-				end
-			end
-		end
-		safe_search_start = math.max(safe_search_start, #normalized_full - 40)
-		safe_search_start = math.max(1, safe_search_start)
-
-		-- Sliding window alignment safely bounded
-		local search_start = safe_search_start
+		-- SCALED SLIDING WINDOW: Ensure we always look back far enough to match 
+		-- the entire LLM prediction context, completely preventing the 0-match bug.
+		local window_size = math.max(120, #tc_norm + 60)
+		local search_start = math.max(1, #normalized_full - window_size)
+		
 		local best_c_len = -1
 		local best_suffix = ""
 		
@@ -482,9 +465,10 @@ function M.process_prediction(full_text, tail_text, block)
 		local true_deletes = utils.utf8_len(best_suffix) - best_c_len
 		local true_to_type = utils.utf8_sub(full_llm, best_c_len + 1)
 		
-		local max_allowed_dels = tail_len + 15
+		-- SAFETY TRIP: Prevent massive deletions caused by deep context mismatches
+		local max_allowed_dels = math.max(20, utils.utf8_len(tc_norm) + 15)
 		if true_deletes > max_allowed_dels then
-			Logger.warning(LOG, string.format("Safety trip: Blocked deletion of %d chars.", true_deletes))
+			Logger.warning(LOG, string.format("Safety trip: Blocked excessive deletion of %d chars.", true_deletes))
 			return nil
 		end
 
@@ -507,7 +491,8 @@ function M.process_prediction(full_text, tail_text, block)
 			local prefix = utils.utf8_sub(full_llm, 1, best_c_len)
 			local word_start_char = 1
 			
-			-- Look backwards to find the start of the corrected word for visual anchoring
+			-- Look backwards to find the start of the current word ONLY.
+			-- We no longer force the UI to capture the previous word.
 			for i = utils.utf8_len(prefix), 1, -1 do
 				local c = utils.utf8_sub(prefix, i, i)
 				if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
@@ -520,12 +505,9 @@ function M.process_prediction(full_text, tail_text, block)
 			local display_orig = utils.utf8_sub(best_suffix, active_start_char)
 			local display_corr = utils.utf8_sub(full_llm, active_start_char)
 			
-			-- Deploy 2-tier smart semantic diff
 			local visual_ops
 			chunks, display_nw, visual_ops = M.smart_diff(display_orig, display_corr)
 
-			-- Intelligent UI Filtering: If the only modification is a space or punctuation,
-			-- hide the gray anchor entirely so the user only sees the orange NW.
 			local has_visible_correction = false
 			for _, op in ipairs(visual_ops) do
 				if op.type == "sub" then
@@ -542,17 +524,16 @@ function M.process_prediction(full_text, tail_text, block)
 				if c.type == "insert" then has_green = true; break end
 			end
 
+			-- Purge useless gray anchors if no visible correction happened
 			if not has_visible_correction then
-				chunks = {} -- Clear useless gray anchors
+				chunks = {} 
 			elseif has_visible_correction and not has_green then
-				-- If a word was deleted but there is no green insertion to show it,
-				-- force all chunks to green so the user is visually alerted.
 				for _, c in ipairs(chunks) do
 					c.type = "insert"
 				end
 			end
 
-			-- Check if green (insert) directly touches orange (nw). If so, disable bold styling.
+			-- Disable bold styling if the green correction directly touches the orange prediction
 			if #chunks > 0 and chunks[#chunks].type == "insert" and display_nw:match("%S") ~= nil then
 				disable_bold = true
 			end
