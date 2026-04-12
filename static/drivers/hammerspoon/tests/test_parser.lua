@@ -111,6 +111,15 @@ local function run_tests()
 			expected_chunks = "[=:le ][+:chien]",
 			expected_nw = " noir",
 			expected_deletes = 6 -- "chiens"
+		},
+		{
+			name = "Trailing space bug (mot_ -> mot_suite)",
+			orig = "mot ",
+			tc = "mot",
+			nw = "suite",
+			expected_chunks = "",
+			expected_nw = " suite",
+			expected_deletes = 0 -- Trailing space is smartly merged
 		}
 	}
 

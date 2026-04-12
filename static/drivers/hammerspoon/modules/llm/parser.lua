@@ -9,7 +9,7 @@
 --- FEATURES & RATIONALE:
 --- 1. NFD Normalization: Intercepts decomposed macOS characters (e + ´).
 --- 2. Decoupled Pipeline: Separates physical typing ops from UI visual chunks.
---- 3. Strict NW Extraction: Guarantees invented words are always orange.
+--- 3. Visual Filtering: Hides useless gray anchors if no visible correction occurred.
 --- ==============================================================================
 
 local M = {}
@@ -236,19 +236,27 @@ local function intra_word_diff(w1, w2)
 	
 	local chunks = {}
 	if prefix ~= "" then table.insert(chunks, {type="equal", text=prefix}) end
+	
+	-- Force the whole word to green if it's a pure deletion inside a word (e.g. histoires -> histoire)
+	-- This prevents silent/invisible corrections in the UI.
+	if mid == "" and w1 ~= w2 then
+		return {{type="insert", text=w2}}
+	end
+	
 	if mid ~= "" then table.insert(chunks, {type="insert", text=mid}) end
 	if suffix ~= "" then table.insert(chunks, {type="equal", text=suffix}) end
 	
 	return chunks
 end
 
---- Computes a semantic diff ops array between origin and correction.
---- @param orig string The original text.
---- @param corr string The corrected text.
---- @return table Raw diff operations.
-local function token_diff_ops(orig, corr)
-	local tokens1 = tokenize(orig)
-	local tokens2 = tokenize(corr)
+--- Computes a smart semantic diff preventing cross-word character scrambling.
+--- Also cleanly isolates trailing insertions to feed the 'next words' (orange) UI.
+--- @param s1 string The original text context.
+--- @param s2 string The corrected prediction text.
+--- @return table, string, table The chunks, trailing new words, and raw visual ops.
+function M.smart_diff(s1, s2)
+	local tokens1 = tokenize(s1)
+	local tokens2 = tokenize(s2)
 	local len1, len2 = #tokens1, #tokens2
 
 	local d = {}
@@ -289,7 +297,66 @@ local function token_diff_ops(orig, corr)
 			end
 		end
 	end
-	return ops
+
+	-- Isolate strictly trailing insertions into display_nw (orange section).
+	-- Stop extracting if the insertion acts as a replacement for a deleted word.
+	local trailing_nw = ""
+	local last_idx = #ops
+	while last_idx > 0 do
+		if ops[last_idx].type == "ins" then
+			if last_idx > 1 and ops[last_idx-1].type == "del" then
+				break
+			end
+			last_idx = last_idx - 1
+		else
+			break
+		end
+	end
+	
+	for k = last_idx + 1, #ops do
+		trailing_nw = trailing_nw .. ops[k].t2
+	end
+	
+	local visual_ops = {}
+	for k = 1, last_idx do
+		table.insert(visual_ops, ops[k])
+	end
+
+	-- Transform remaining operations into UI chunks
+	local raw_chunks = {}
+	for _, op in ipairs(visual_ops) do
+		if op.type == "equal" then
+			table.insert(raw_chunks, {type="equal", text=op.t2})
+		elseif op.type == "ins" then
+			table.insert(raw_chunks, {type="insert", text=op.t2})
+		elseif op.type == "sub" then
+			local w1, w2 = op.t1, op.t2
+			local is_word1 = w1:match("[%w’']") or w1:byte() >= 128
+			local is_word2 = w2:match("[%w’']") or w2:byte() >= 128
+			
+			if is_word1 and is_word2 then
+				local sub_chunks = intra_word_diff(w1, w2)
+				for _, sc in ipairs(sub_chunks) do
+					table.insert(raw_chunks, sc)
+				end
+			else
+				table.insert(raw_chunks, {type="insert", text=w2})
+			end
+		end
+	end
+
+	-- Merge contiguous chunks of the same type
+	local merged = {}
+	for _, c in ipairs(raw_chunks) do
+		local last = merged[#merged]
+		if last and last.type == c.type then
+			last.text = last.text .. c.text
+		else
+			table.insert(merged, {type=c.type, text=c.text})
+		end
+	end
+
+	return merged, trailing_nw, visual_ops
 end
 
 
@@ -315,7 +382,7 @@ function M.process_prediction(full_text, tail_text, block)
 	local max_w = tonumber(hs.settings.get("llm_max_words")) or Core.DEFAULT_STATE.llm_max_words
 	if max_w > 0 and max_w < min_w then max_w = min_w end
 	
-	-- Strict NFD normalization and typography unification to avoid false positive diffs
+	-- Normalize NFD (macOS decomposed characters) and apostrophes before any diffing
 	full_text = normalize_nfd(type(full_text) == "string" and full_text or ""):gsub("'", "’")
 	tail_text = normalize_nfd(type(tail_text) == "string" and tail_text or ""):gsub("'", "’")
 	block     = normalize_nfd(type(block) == "string" and block or ""):gsub("'", "’")
@@ -328,165 +395,190 @@ function M.process_prediction(full_text, tail_text, block)
 		local tc = block:match("TAIL_CORRECTED%s*:%s*(.-)[\r\n]+") or block:match("TAIL_CORRECTED%s*:%s*(.-)$") or ""
 		local nw = block:match("NEXT_WORDS%s*:%s*(.-)[\r\n]+") or block:match("NEXT_WORDS%s*:%s*(.-)$") or ""
 
-		local function trim(s) return s:match("^%s*(.-)%s*$") or "" end
+		local function trim(s)
+			return s:match("^%s*(.-)%s*$") or ""
+		end
 
 		tc = trim(tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		nw = trim(nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		
+		-- Enforce typography normalisation on model predictions to match input state
 		tc = tc:gsub("'", "’")
 		nw = nw:gsub("'", "’")
+		
 		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
 
+		-- Apply strict maximum word limit before diffing
 		nw = enforce_word_limits(nw, max_w)
 		if nw == "" then return nil end
 
 		if tc == "" and nw ~= "" then
 			tc = trim((tail_text or ""):gsub("^\"", ""):gsub("\"$", ""))
 		end
+
 		if tc == "" and nw == "" then return nil end
 
 		local normalized_full = (full_text or "")
 		local tc_norm = tc
 		
-		-- Match user's trailing spaces to prevent cutting mid-word
+		-- Restore trailing spaces entered by the user
 		local tail_trailing_space = normalized_full:match("([%s\194\160\226\128\175]+)$")
 		if tail_trailing_space and not tc_norm:match("[%s\194\160\226\128\175]$") then
 			tc_norm = tc_norm .. tail_trailing_space
 		end
 
+		-- Smart spacing merge to prevent LLM cutting mid-word without space
 		local last_char = utils.utf8_sub(tc_norm, -1)
 		local first_char = utils.utf8_sub(nw, 1, 1)
 		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
 		
 		local nw_norm = nw
-		if needs_space then nw_norm = " " .. nw_norm end
+		if needs_space then 
+			nw_norm = " " .. nw_norm 
+		end
 
+		-- Build the absolute complete intended string from the LLM
 		local full_llm = tc_norm .. nw_norm
 		
-		-- Grab a safe sliding window limit from the user's buffer
-		local window_size = math.min(#normalized_full, math.max(60, #tc_norm + 30))
-		local orig_context = normalized_full:sub(#normalized_full - window_size + 1)
-		
-		-- 1. Generate full diff operations
-		local ops = token_diff_ops(orig_context, full_llm)
-
-		-- 2. Strip leading context (unrelated user buffer prior to the correction)
-		while #ops > 0 and ops[1].type == "del" do table.remove(ops, 1) end
-		while #ops > 0 and ops[1].type == "ins" and ops[1].t2:match("^%s+$") do table.remove(ops, 1) end
-
-		if #ops == 0 then return nil end
-
-		-- 3. Locate the first actual change in the alignment
-		local first_change_idx = -1
-		for i, op in ipairs(ops) do
-			if op.type ~= "equal" then
-				first_change_idx = i
-				break
+		-- STRICT LIMITER: Prevent massive backwards deletion.
+		-- We restrict the search window to max 2 words ago or 30 chars.
+		local safe_search_start = #normalized_full
+		local space_count = 0
+		for i = #normalized_full, 1, -1 do
+			local c = normalized_full:sub(i, i)
+			if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
+				space_count = space_count + 1
+				if space_count == 2 then
+					safe_search_start = i
+					break
+				end
 			end
 		end
+		safe_search_start = math.max(safe_search_start, #normalized_full - 30)
+		safe_search_start = math.max(1, safe_search_start)
 
-		-- If the LLM matched the context perfectly and only appended words
-		if first_change_idx == -1 then
-			return { deletes = 0, to_type = "", nw = nw_norm, has_corrections = false, chunks = {}, disable_bold = false }
-		end
-
-		-- 4. Calculate Physical Injection (strictly optimized)
-		local physical_ops = {}
-		for i = first_change_idx, #ops do table.insert(physical_ops, ops[i]) end
-
-		local true_deletes = 0
-		local true_to_type = ""
-		for _, op in ipairs(physical_ops) do
-			if op.type == "equal" then
-				true_deletes = true_deletes + utils.utf8_len(op.t1)
-				true_to_type = true_to_type .. op.t2
-			elseif op.type == "del" then
-				true_deletes = true_deletes + utils.utf8_len(op.t1)
-			elseif op.type == "ins" then
-				true_to_type = true_to_type .. op.t2
-			elseif op.type == "sub" then
-				true_deletes = true_deletes + utils.utf8_len(op.t1)
-				true_to_type = true_to_type .. op.t2
+		-- Sliding window alignment safely bounded
+		local search_start = safe_search_start
+		local best_c_len = -1
+		local best_suffix = ""
+		
+		for i = search_start, #normalized_full do
+			local b = normalized_full:byte(i)
+			if b < 0x80 or b >= 0xC0 then
+				local suffix = normalized_full:sub(i)
+				local c_len = utils.get_common_prefix_utf8(suffix, full_llm)
+				if c_len > best_c_len then
+					best_c_len = c_len
+					best_suffix = suffix
+				end
 			end
 		end
 		
-		-- Safety circuit breaker: Prevent massive unprompted deletions
-		local max_allowed_dels = math.max(20, utils.utf8_len(tc_norm) + 10)
-		if true_deletes > max_allowed_dels then
-			Logger.warning(LOG, string.format("Safety trip: Blocked deletion of %d chars.", true_deletes))
-			return nil
+		if best_c_len < 2 and #full_llm > 5 then
+			best_suffix = (tail_text or "")
+			best_c_len = utils.get_common_prefix_utf8(best_suffix, full_llm)
 		end
-		
+
+		local tail_len = utils.utf8_len(tail_text)
+		if best_c_len < tail_len * 0.4 and utils.utf8_len(tc_norm) < tail_len * 0.4 then return nil end
+
+		-- Physical exact limits for OS injection (Decoupled from visual rendering)
+		local true_deletes = utils.utf8_len(best_suffix) - best_c_len
+		local true_to_type = utils.utf8_sub(full_llm, best_c_len + 1)
+
 		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
 
-		-- 5. Calculate Visual UI (Anchor context + Chunks + Trailing NW)
-		local visual_start = first_change_idx
-		for i = first_change_idx - 1, 1, -1 do
-			local is_word = ops[i].t1:match("[%w’']") or ops[i].t1:byte() >= 128
-			visual_start = i
-			if is_word then break end -- Found a preceding gray anchor word
-		end
+		-- Guarantee the final text injected has at least the minimum required words
+		local final_count = 0
+		for _ in true_to_type:gmatch("%S+") do final_count = final_count + 1 end
+		if final_count < min_w then return nil end
 
-		local visual_ops = {}
-		for i = visual_start, #ops do table.insert(visual_ops, ops[i]) end
-
-		-- Extract absolute trailing insertions (Orange text)
-		local display_nw = ""
-		local last_idx = #visual_ops
-		local ins_count = 0
-		while last_idx > 0 and visual_ops[last_idx].type == "ins" do
-			ins_count = ins_count + 1
-			last_idx = last_idx - 1
-		end
-		
-		-- Only extract as NW if it's NOT a replacement for a deleted word
-		local is_replacement = false
-		if ins_count > 0 and last_idx > 0 and visual_ops[last_idx].type == "del" then
-			is_replacement = true
-		end
-		
-		if not is_replacement then
-			for k = last_idx + 1, #visual_ops do display_nw = display_nw .. visual_ops[k].t2 end
-			for k = #visual_ops, last_idx + 1, -1 do table.remove(visual_ops, k) end
-		end
-
-		-- Map Visual Ops to UI Chunks
-		local raw_chunks = {}
 		local has_corr = false
-		for _, op in ipairs(visual_ops) do
-			if op.type == "equal" then
-				table.insert(raw_chunks, {type="equal", text=op.t2})
-			elseif op.type == "ins" then
-				has_corr = true
-				table.insert(raw_chunks, {type="insert", text=op.t2})
-			elseif op.type == "sub" then
-				has_corr = true
-				local w1, w2 = op.t1, op.t2
-				local is_word1 = w1:match("[%w’']") or w1:byte() >= 128
-				local is_word2 = w2:match("[%w’']") or w2:byte() >= 128
-				if is_word1 and is_word2 then
-					local sub_chunks = intra_word_diff(w1, w2)
-					for _, sc in ipairs(sub_chunks) do table.insert(raw_chunks, sc) end
-				else
-					table.insert(raw_chunks, {type="insert", text=w2})
+		local chunks = {}
+		local display_nw = ""
+		local disable_bold = false
+
+		-- If true_deletes > 0, the LLM actively modified or removed a user character
+		if true_deletes > 0 then
+			has_corr = true
+			
+			local prefix = utils.utf8_sub(full_llm, 1, best_c_len)
+			local word_start_char = 1
+			
+			-- Look backwards to find the start of the corrected word for visual anchoring
+			for i = utils.utf8_len(prefix), 1, -1 do
+				local c = utils.utf8_sub(prefix, i, i)
+				if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
+					word_start_char = i + 1
+					break
 				end
-			elseif op.type == "del" then
-				has_corr = true
 			end
+
+			local active_start_char = word_start_char
+			local display_orig = utils.utf8_sub(best_suffix, active_start_char)
+			local display_corr = utils.utf8_sub(full_llm, active_start_char)
+			
+			-- Deploy 2-tier smart semantic diff
+			local visual_ops
+			chunks, display_nw, visual_ops = M.smart_diff(display_orig, display_corr)
+
+			-- Intelligent UI Filtering: If the only modification is a space,
+			-- hide the gray anchor entirely so the user only sees the orange NW.
+			local has_visible_correction = false
+			for _, op in ipairs(visual_ops) do
+				if op.type == "sub" then
+					has_visible_correction = true
+				elseif op.type == "del" and op.t1 and op.t1:match("%S") then
+					has_visible_correction = true
+				elseif op.type == "ins" and op.t2 and op.t2:match("%S") then
+					has_visible_correction = true
+				end
+			end
+
+			local has_green = false
+			for _, c in ipairs(chunks) do
+				if c.type == "insert" then has_green = true; break end
+			end
+
+			if not has_visible_correction then
+				chunks = {} -- Clear useless gray anchors
+			elseif has_visible_correction and not has_green then
+				-- If a word was deleted but there is no green insertion to show it,
+				-- force all chunks to green so the user is visually alerted.
+				for _, c in ipairs(chunks) do
+					c.type = "insert"
+				end
+			end
+
+			-- Check if green (insert) directly touches orange (nw). If so, disable bold styling.
+			if #chunks > 0 and chunks[#chunks].type == "insert" and display_nw:match("%S") ~= nil then
+				disable_bold = true
+			end
+
+		else
+			has_corr = false
+			chunks = {}
+			display_nw = true_to_type
 		end
 
-		-- Merge contiguous chunks
-		local chunks = {}
-		for _, c in ipairs(raw_chunks) do
-			local last = chunks[#chunks]
-			if last and last.type == c.type then
-				last.text = last.text .. c.text
-			else
-				table.insert(chunks, {type=c.type, text=c.text})
+		-- Smart spacing fallback for Advanced Mode to ensure perfect connections
+		if true_deletes == 0 and true_to_type ~= "" and tail_text ~= "" then
+			local t_last = utils.utf8_sub(tail_text, -1)
+			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
+			local is_apos  = t_last:match("['’]")
+			local type_start = utils.utf8_sub(true_to_type, 1, 1)
+			
+			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
+				true_to_type = " " .. true_to_type
+				if display_nw ~= "" and not display_nw:match("^%s") then
+					display_nw = " " .. display_nw
+				end
+			elseif is_space and type_start:match("^%s") then
+				-- Prevent double spaces if both tail_text and to_type have a space
+				true_to_type = true_to_type:gsub("^%s+", "")
+				display_nw = display_nw:gsub("^%s+", "")
 			end
 		end
-		
-		local disable_bold = (#chunks > 0 and chunks[#chunks].type == "insert" and display_nw:match("%S") ~= nil)
 
 		return { 
 			deletes = true_deletes, 
@@ -498,7 +590,7 @@ function M.process_prediction(full_text, tail_text, block)
 		}
 		
 	else
-		-- Basic / Raw Mode Logic remains untouched
+		-- Basic / Raw Mode: Grab only the first line to truncate chatty paragraphs
 		local nw = block:gsub("^%s+", ""):gsub("%s+$", "")
 		nw = nw:match("([^\n\r]+)") or nw
 		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
@@ -510,6 +602,7 @@ function M.process_prediction(full_text, tail_text, block)
 		
 		if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
 		
+		-- Robust overlap mitigation using word-by-word comparison for basic models
 		local full_words = {}
 		for w in (full_text or ""):gmatch("%S+") do table.insert(full_words, w) end
 		
@@ -529,9 +622,12 @@ function M.process_prediction(full_text, tail_text, block)
 						break
 					end
 				end
+				
 				if match then
 					local remaining = {}
-					for j = buf_suffix_count + 1, #nw_words do table.insert(remaining, nw_words[j]) end
+					for j = buf_suffix_count + 1, #nw_words do
+						table.insert(remaining, nw_words[j])
+					end
 					nw = table.concat(remaining, " ")
 					break
 				end
@@ -539,12 +635,15 @@ function M.process_prediction(full_text, tail_text, block)
 		end
 		
 		nw = nw:gsub("%s*%]$", ""):gsub("%s+$", "")
+
+		-- Apply strict max word limits before diffing
 		nw = enforce_word_limits(nw, max_w)
 		if nw == "" then return nil end
 
 		local to_type = nw
 		local deletes = 0
 		
+		-- Smart spacing taking UTF-8 apostrophes and raw bytes into account for basic mode
 		if to_type ~= "" and tail_text ~= "" then
 			local t_last = utils.utf8_sub(tail_text, -1)
 			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
@@ -555,12 +654,15 @@ function M.process_prediction(full_text, tail_text, block)
 				to_type = " " .. to_type
 				nw = " " .. nw
 			elseif is_space and type_start:match("^%s") then
+				-- Prevent double spaces if both tail_text and to_type have a space
 				to_type = to_type:gsub("^%s+", "")
 				nw = nw:gsub("^%s+", "")
 			end
 		end
 
 		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+		
+		-- Guarantee the final text injected has at least the minimum required words
 		local final_count = 0
 		for _ in to_type:gmatch("%S+") do final_count = final_count + 1 end
 		if final_count < min_w then return nil end
