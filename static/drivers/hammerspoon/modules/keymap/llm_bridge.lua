@@ -629,10 +629,6 @@ function M._perform_llm_check(force_trigger, profile_name)
 				
 				local valid_preds = {}
 				local seen_tooltip_texts = {}
-				local ctx_words = {}
-				for w in clean_buffer:lower():gmatch("[%aÀ-ÿ0-9]+") do
-					ctx_words[w] = true
-				end
 				
 				for _, p_raw in ipairs(predictions) do
 					-- Clone the prediction to avoid mutating the API's internal tables
@@ -640,32 +636,21 @@ function M._perform_llm_check(force_trigger, profile_name)
 					for k, v in pairs(p_raw) do p[k] = v end
 
 					if p.to_type then
-						-- 1. Apply global post-processing formatting (e.g., typographic apostrophes)
-						apply_postprocessing(p)
-
-						-- 2. Extract for noise checks
 						local tt = p.to_type
-						local tt_norm = tt:lower():gsub("’", "'")
-						local ctx_norm = clean_buffer:lower():gsub("’", "'")
+						local tt_norm = tt:lower()
+						local clean_norm = clean_buffer:lower()
 						local prev_non_space = clean_buffer:match(".*(%S)")
 						local first_char = tt:match("^%s*(.)") or ""
 						local starts_upper_ascii = first_char:match("[A-Z]") ~= nil
 						local prev_ends_sentence = prev_non_space and prev_non_space:match("[%.%!%?…:;]") ~= nil
-						local generic_pronoun_start = tt_norm:match("^%s*vous%s") and not ctx_norm:match("vous")
-						local has_unrelated_pronoun = tt_norm:match("%f[%a]vous%f[%A]") and not ctx_norm:match("%f[%a]vous%f[%A]")
+						local generic_pronoun_start = tt_norm:match("^%s*vous%s") and not clean_norm:match("vous")
+						local has_unrelated_pronoun = tt_norm:match("%f[%a]vous%f[%A]") and not clean_norm:match("%f[%a]vous%f[%A]")
 						local has_htmlish = tt_norm:find("<", 1, true) or tt_norm:find(">", 1, true) or tt_norm:find("%[user", 1, true)
 						local has_urlish = tt_norm:find("http", 1, true) or tt_norm:find("www", 1, true) or tt_norm:match("%.com") or tt_norm:match("%.net")
 						local has_hashish = tt_norm:match("%x%x%x%x%x%x%x") ~= nil
 						local repeated_word = tt_norm:match("(%a+)%s+%1%s+%1") ~= nil
 						local repeated_syllable = tt_norm:match("^([%aÀ-ÿ][%aÀ-ÿ])%1%1") ~= nil
 							or tt_norm:match("^([%aÀ-ÿ][%aÀ-ÿ][%aÀ-ÿ])%1%1") ~= nil
-						local has_novel_word = false
-						for w in tt_norm:gmatch("[%aÀ-ÿ0-9]+") do
-							if not ctx_words[w] then
-								has_novel_word = true
-								break
-							end
-						end
 
 						local is_noise = tt_norm:match("^%s*suite%s+finale")
 							or tt_norm:match("^%s*</")
@@ -680,7 +665,6 @@ function M._perform_llm_check(force_trigger, profile_name)
 							or has_htmlish
 							or has_urlish
 							or has_hashish
-							or (not has_novel_word)
 							or repeated_word
 							or repeated_syllable
 							or (starts_upper_ascii and not prev_ends_sentence)
