@@ -348,7 +348,16 @@ function M.apply_prediction(idx)
 	end
 
 	_state.suppress_rescan_keep_buffer(0.3)
-	M.start_timer()
+	
+	-- Force the next prediction directly to create a seamless chained experience
+	if M._llm_timer and type(M._llm_timer.stop) == "function" then
+		M._llm_timer:stop()
+	end
+	
+	hs.timer.doAfter(0.01, function()
+		M._perform_llm_check(true)
+	end)
+	
 	return true
 end
 
