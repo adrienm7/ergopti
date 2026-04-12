@@ -70,6 +70,7 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
             -- Reverse the factor if applied
 			local final_val = factor and (new_val / factor) or new_val
 			state[key] = final_val
+			hs.settings.set(key, final_val)
 
             -- Sync with the keymap engine if a function is provided
 			if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
@@ -93,6 +94,7 @@ end
 local function reset_to_default(deps, key, default_val, hs_fn)
 	Logger.debug(LOG, string.format("Resetting %s to default value…", key))
 	deps.state[key] = default_val
+	hs.settings.set(key, default_val)
 	if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
 		pcall(deps.keymap[hs_fn], default_val)
 	end
@@ -144,6 +146,7 @@ function M.new(deps)
 			
 			if new_val then
 				state.llm_debounce = new_val
+				hs.settings.set("llm_debounce", new_val)
 				if deps.keymap and type(deps.keymap.set_llm_debounce) == "function" then
 					pcall(deps.keymap.set_llm_debounce, new_val)
 				end
@@ -176,6 +179,7 @@ function M.new(deps)
 			local new_val = tonumber(digits) or 0
 			
 			state.llm_max_words = new_val
+			hs.settings.set("llm_max_words", new_val)
 			if deps.keymap and type(deps.keymap.set_llm_max_words) == "function" then
 				pcall(deps.keymap.set_llm_max_words, new_val)
 			end
@@ -207,6 +211,7 @@ function M.new(deps)
 			local new_val = tonumber(digits) or 1
 			
 			state.llm_min_words = new_val
+			hs.settings.set("llm_min_words", new_val)
 			if deps.keymap and type(deps.keymap.set_llm_min_words) == "function" then
 				pcall(deps.keymap.set_llm_min_words, new_val)
 			end
@@ -263,6 +268,7 @@ function M.new(deps)
 				checked = (i == current) or nil,
 				fn      = not paused and function()
 					deps.state.llm_pred_indent = i
+					hs.settings.set("llm_pred_indent", i)
 					if deps.keymap and type(deps.keymap.set_llm_pred_indent) == "function" then
 						pcall(deps.keymap.set_llm_pred_indent, i)
 					end
