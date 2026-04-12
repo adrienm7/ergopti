@@ -99,8 +99,8 @@ local llm_debounce_time        = 0.5
 local llm_context_length       = 500
 local llm_reset_on_nav         = true
 local llm_temperature          = 0.1
-local llm_min_words            = 1
-local llm_max_words            = 5
+local llm_min_words            = tonumber(hs.settings.get("llm_min_words")) or core_llm.DEFAULT_STATE.llm_min_words
+local llm_max_words            = tonumber(hs.settings.get("llm_max_words")) or core_llm.DEFAULT_STATE.llm_max_words
 local llm_num_predictions      = 3
 local llm_pred_indent          = -3
 local llm_val_modifiers        = {"alt"}
@@ -155,8 +155,17 @@ function M.set_llm_display_model_name(name)
 end
 function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) end
 function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
-function M.set_llm_min_words(w)           llm_min_words          = math.max(0, tonumber(w) or 1) end
-function M.set_llm_max_words(w)           llm_max_words          = math.max(0, tonumber(w) or 5) end
+
+function M.set_llm_min_words(w)
+	llm_min_words = math.max(0, tonumber(w) or core_llm.DEFAULT_STATE.llm_min_words)
+	hs.settings.set("llm_min_words", llm_min_words)
+end
+
+function M.set_llm_max_words(w)
+	llm_max_words = math.max(0, tonumber(w) or core_llm.DEFAULT_STATE.llm_max_words)
+	hs.settings.set("llm_max_words", llm_max_words)
+end
+
 function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or 3) end
 function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
 function M.set_llm_pred_indent(v)         llm_pred_indent        = math.floor(tonumber(v) or -3) end
