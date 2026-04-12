@@ -195,30 +195,29 @@ function M.process_prediction(full_text, tail_text, block)
 		local tail_len = utils.utf8_len(tail_text)
 		if best_c_len < tail_len * 0.4 and utils.utf8_len(tc_norm) < tail_len * 0.4 then return nil end
 
-		local deletes = utils.utf8_len(best_suffix) - best_c_len
-		local to_type = utils.utf8_sub(full_llm, best_c_len + 1)
+		-- Physical exact limits for OS injection (Decoupled from visual)
+		local true_deletes = utils.utf8_len(best_suffix) - best_c_len
+		local true_to_type = utils.utf8_sub(full_llm, best_c_len + 1)
 
-		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
 
 		-- Guarantee the final text injected has at least the minimum required words
 		local final_count = 0
-		for _ in to_type:gmatch("%S+") do final_count = final_count + 1 end
+		for _ in true_to_type:gmatch("%S+") do final_count = final_count + 1 end
 		if final_count < min_w then return nil end
 
 		local has_corr = false
 		local chunks = {}
 		local display_nw = ""
-		local final_deletes = 0
-		local final_to_type = ""
 
-		-- If deletes > 0, the LLM actively modified or removed a user character
-		if deletes > 0 then
+		-- If true_deletes > 0, the LLM actively modified or removed a user character
+		if true_deletes > 0 then
 			has_corr = true
 			
 			local prefix = utils.utf8_sub(full_llm, 1, best_c_len)
 			local word_start_char = 1
 			
-			-- Look backwards to find the start of the corrected word
+			-- Look backwards to find the start of the corrected word for visual anchoring
 			for i = utils.utf8_len(prefix), 1, -1 do
 				local c = utils.utf8_sub(prefix, i, i)
 				if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
@@ -241,11 +240,10 @@ function M.process_prediction(full_text, tail_text, block)
 			local display_corr = utils.utf8_sub(full_llm, word_start_char, word_end_char)
 			
 			chunks = utils.diff_strings(display_orig, display_corr)
-			
-			local active_start_char = word_start_char
 
 			-- S'il n'y a pas de mot gris avant la correction du premier mot, 
-			-- on recule d'un mot dans le buffer pour forcer son apparition dans le tooltip.
+			-- on recule d'un mot dans le buffer pour forcer son apparition dans le tooltip
+			-- (Uniquement pour le visuel, l'injection physique reste calée sur true_deletes)
 			local has_equal_before_insert = false
 			for _, ch in ipairs(chunks) do
 				if ch.type == "equal" then
@@ -271,47 +269,41 @@ function M.process_prediction(full_text, tail_text, block)
 				end
 				
 				if prev_word_start < word_start_char then
-					active_start_char = prev_word_start
-					display_orig = utils.utf8_sub(best_suffix, active_start_char)
-					display_corr = utils.utf8_sub(full_llm, active_start_char, word_end_char)
+					display_orig = utils.utf8_sub(best_suffix, prev_word_start)
+					display_corr = utils.utf8_sub(full_llm, prev_word_start, word_end_char)
 					chunks = utils.diff_strings(display_orig, display_corr)
 				end
 			end
 
-			-- Align strictly deletes and to_type with the visual chunks start character
-			final_deletes = utils.utf8_len(best_suffix) - (active_start_char - 1)
-			final_to_type = utils.utf8_sub(full_llm, active_start_char)
 			display_nw = utils.utf8_sub(full_llm, word_end_char + 1)
 		else
 			has_corr = false
 			chunks = {}
-			display_nw = to_type
-			final_deletes = deletes
-			final_to_type = to_type
+			display_nw = true_to_type
 		end
 
 		-- Smart spacing fallback for Advanced Mode to ensure perfect connections
-		if final_deletes == 0 and final_to_type ~= "" and tail_text ~= "" then
+		if true_deletes == 0 and true_to_type ~= "" and tail_text ~= "" then
 			local t_last = utils.utf8_sub(tail_text, -1)
 			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
 			local is_apos  = t_last:match("['’]")
-			local type_start = utils.utf8_sub(final_to_type, 1, 1)
+			local type_start = utils.utf8_sub(true_to_type, 1, 1)
 			
 			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
-				final_to_type = " " .. final_to_type
+				true_to_type = " " .. true_to_type
 				if display_nw ~= "" and not display_nw:match("^%s") then
 					display_nw = " " .. display_nw
 				end
 			elseif is_space and type_start:match("^%s") then
 				-- Prevent double spaces if both tail_text and to_type have a space
-				final_to_type = final_to_type:gsub("^%s+", "")
+				true_to_type = true_to_type:gsub("^%s+", "")
 				display_nw = display_nw:gsub("^%s+", "")
 			end
 		end
 
 		return { 
-			deletes = final_deletes, 
-			to_type = final_to_type, 
+			deletes = true_deletes, 
+			to_type = true_to_type, 
 			nw = display_nw, 
 			has_corrections = has_corr, 
 			chunks = chunks 
