@@ -110,6 +110,9 @@ local llm_excluded_apps        = {}
 local llm_show_info_bar        = true
 local llm_sequential_mode      = false
 
+M._llm_chain_pending           = false
+M._chain_timer                 = nil
+
 
 
 
@@ -347,32 +350,25 @@ function M.apply_prediction(idx)
 		keylogger.set_buffer(_state.buffer)
 	end
 
-	-- Temporarily suppress standard auto-rescan while the OS processes the async keystrokes
-	_state.suppress_rescan_keep_buffer(1.5)
+	-- The F20 keystroke acts as an "End of Transmission" flag.
+	-- Because it is sent right after the synthetic text, it sits exactly at the end
+	-- of the OS event queue. When we catch it, we know macOS is fully done typing.
+	M._llm_chain_pending = true
+	_state.suppress_rescan_keep_buffer(2.0) -- Safety max timeout
 	
 	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
 	if M._chain_timer and type(M._chain_timer.stop) == "function" then M._chain_timer:stop() end
 	
-	-- Poll the keylogger's expected queue to know EXACTLY when the OS has finished typing.
-	-- This completely eliminates the race condition where fast AI responses crash against
-	-- residual synthetic keystrokes still being typed by the OS.
-	local attempts = 0
-	local function trigger_when_done()
-		attempts = attempts + 1
-		local pending_dels  = tonumber(_state.expected_synthetic_deletes) or 0
-		local pending_chars = type(_state.expected_synthetic_chars) == "string" and #_state.expected_synthetic_chars or 0
-		
-		if (pending_dels > 0 or pending_chars > 0) and attempts < 40 then
-			M._chain_timer = hs.timer.doAfter(0.05, trigger_when_done)
-		else
-			-- Keystrokes are completely flushed (or max wait reached).
-			-- Restore normal behavior and immediately request the chained prediction.
-			_state.suppress_rescan_keep_buffer(0.1)
+	-- Fallback in case F20 gets mysteriously eaten by another application
+	M._chain_timer = hs.timer.doAfter(2.0, function()
+		if M._llm_chain_pending then
+			M._llm_chain_pending = false
 			M._perform_llm_check(true)
 		end
-	end
+	end)
 	
-	trigger_when_done()
+	-- Fire the EOT flag
+	hs.eventtap.keyStroke({}, "f20", 0)
 	
 	return true
 end
@@ -1026,6 +1022,15 @@ end
 --- @param is_ignored boolean Disables functionality temporarily.
 --- @return boolean Returns true if the key triggers an LLM injection.
 function M.handle_llm_keys(keyCode, flags, is_ignored)
+	-- 90 is F20. This acts as our "End Of Transmission" flag for chained predictions.
+	if keyCode == 90 and M._llm_chain_pending then
+		M._llm_chain_pending = false
+		if M._chain_timer and type(M._chain_timer.stop) == "function" then M._chain_timer:stop() end
+		_state.suppress_rescan_keep_buffer(0.05)
+		M._perform_llm_check(true)
+		return true
+	end
+
 	if is_ignored or not _predictions_active then return false end
 
 	-- Arrow navigation: once user navigates at least once, Enter becomes an accept key.
