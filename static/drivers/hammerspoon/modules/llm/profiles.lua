@@ -9,6 +9,7 @@
 local M = {}
 
 local Logger = require("lib.logger")
+local hs     = hs
 local LOG    = "llm.profiles"
 
 
@@ -26,7 +27,8 @@ local RAW_PROMPT_SINGLE = [[{context}]]
 local BASIC_PROMPT_SINGLE = [[Tu es un moteur de complétion clavier ultra-concis.
 Contexte utilisateur : {context}
 
-Donne strictement la suite immédiate du contexte en 1 à 5 mots maximum.
+Donne strictement la suite immédiate du contexte.
+C’EST UNE OBLIGATION ABSOLUE : Tu DOIS générer AU MINIMUM {min_words} mots et AU MAXIMUM {max_words} mots. PAS UN MOT DE PLUS OU DE MOINS.
 N’ajoute aucune explication, aucun commentaire, aucune liste, aucune puce, aucun guillemet, aucune reformulation du contexte.
 Retourne uniquement les mots à ajouter.]]
 
@@ -35,7 +37,7 @@ RÈGLES CRITIQUES :
 1. Tu reçois un PREFIX (le contexte complet) et un TAIL (les ~5 à 7 derniers mots).
 2. Format : Deux lignes commençant par "TAIL_CORRECTED:" et "NEXT_WORDS:".
 3. TAIL_CORRECTED : Corrige l’orthographe, la grammaire et les accents UNIQUEMENT dans le TAIL. Ne modifie pas le sens. S’il n’y a pas de faute, recopie le TAIL EXACTEMENT à l’identique sans rien changer.
-4. NEXT_WORDS : Prédis 1 à 5 mots pour continuer la phrase de façon logique. Laisse vide si la phrase est terminée.
+4. NEXT_WORDS : Prédis STRICTEMENT la suite pour continuer la phrase de façon logique. OBLIGATION ABSOLUE : Tu DOIS générer AU MINIMUM {min_words} mots et AU MAXIMUM {max_words} mots. Laisse vide si la phrase est terminée. Ne dépasse JAMAIS la limite.
 
 EXEMPLES :
 
@@ -104,7 +106,7 @@ end
 M.BUILTIN_PROFILES = {
 	{
 		id            = "raw",
-		label         = "○○○ Raw — Aucun prompt, juste le contexte",
+		label         = "○○○ Autocomplétion — Aucun prompt, juste le contexte",
 		batch         = false,
 		system_single = RAW_PROMPT_SINGLE,
 		system_multi  = nil,
@@ -169,20 +171,41 @@ end
 --- @param n number The number of predictions expected.
 --- @return string The resolved system prompt.
 function M.resolve_system_prompt(profile, n)
-	if type(profile) ~= "table" then return BASIC_PROMPT_SINGLE end
+	local prompt = ""
 	
-	-- Support for custom profiles built from the Prompt Editor
-	if type(profile.raw_prompt) == "string" and profile.raw_prompt ~= "" then
-		return profile.raw_prompt
+	if type(profile) ~= "table" then 
+		prompt = BASIC_PROMPT_SINGLE 
+	elseif type(profile.raw_prompt) == "string" and profile.raw_prompt ~= "" then
+		prompt = profile.raw_prompt
+	elseif n == 1 then
+		prompt = type(profile.system_single) == "string" and profile.system_single or BASIC_PROMPT_SINGLE
+	else
+		if type(profile.system_multi) == "function" then 
+			prompt = profile.system_multi(n) 
+		elseif type(profile.system_multi) == "string" then 
+			prompt = profile.system_multi    
+		else
+			prompt = BASIC_PROMPT_SINGLE
+		end
 	end
 
-	if n == 1 then
-		return type(profile.system_single) == "string" and profile.system_single or BASIC_PROMPT_SINGLE
-	else
-		if type(profile.system_multi) == "function" then return profile.system_multi(n) end
-		if type(profile.system_multi) == "string"   then return profile.system_multi    end
-	end
-	return BASIC_PROMPT_SINGLE
+	-- Lazy load Core module to prevent circular dependency crashes
+	local Core = require("modules.llm.init")
+	local def_min = Core.DEFAULT_STATE.llm_min_words
+	local def_max = Core.DEFAULT_STATE.llm_max_words
+
+	-- Dynamically inject the user-configured words limits and fallback to Core defaults
+	local min_w = tonumber(hs.settings.get("llm_min_words")) or def_min
+	local max_w = tonumber(hs.settings.get("llm_max_words")) or def_max
+	if max_w > 0 and max_w < min_w then max_w = min_w end
+	
+	local max_w_str = (max_w > 0) and tostring(max_w) or "illimité"
+	local min_w_str = tostring(min_w)
+	
+	prompt = prompt:gsub("{max_words}", max_w_str)
+	prompt = prompt:gsub("{min_words}", min_w_str)
+	
+	return prompt
 end
 
 return M

@@ -128,13 +128,14 @@ function M.new(deps, presets)
 		if obj._mlx_upgrade_in_progress then return end
 		obj._mlx_upgrade_in_progress = true
 
-		local dry_run_cmd =
-			"source ~/.venv/bin/activate 2>/dev/null || true; " ..
-			"python3 -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		local py_detect =
+			"PYTHON_BIN=\"python3\"; " ..
+			"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
+			"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
+			"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; "
 
-		local upgrade_cmd =
-			"source ~/.venv/bin/activate 2>/dev/null || true; " ..
-			"python3 -u -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		local dry_run_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		local upgrade_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore"
 
 		local function finish_upgrade(ok)
 			if ok then
@@ -528,28 +529,6 @@ PY
 			return false
 		end
 
-		if not obj._mlx_upgrade_done and not obj._mlx_upgrade_failed then
-			if not silent_notifications then
-				pcall(notifications.notify, "⚙️ Mise à jour MLX-LM", "Vérification et mise à jour de mlx-lm pour le modèle " .. target_model .. "…")
-			end
-			upgrade_mlx_stack(function(ok)
-				if ok then
-					if not silent_notifications then
-						pcall(notifications.notify, "✅ MLX-LM mis à jour", "Relance du serveur MLX pour le modèle " .. target_model .. "…")
-					end
-					hs.timer.doAfter(0.5, function()
-						obj.start_server(target_model, on_success, opts)
-					end)
-				else
-					if not silent_notifications then
-						pcall(notifications.notify, "⚠️ Mise à jour MLX-LM", "Échec de mise à jour automatique. Les tentatives automatiques sont suspendues pour cette session.")
-					end
-					obj.start_server(target_model, on_success, opts)
-				end
-			end)
-			return
-		end
-
 		if deps.active_tasks and deps.active_tasks["mlx_server"] then
 			local existing = deps.active_tasks["mlx_server"]
 			local running = type(existing.isRunning) == "function" and existing:isRunning()
@@ -566,7 +545,7 @@ PY
 				obj._server_target = target_model
 				Logger.info(LOG, "MLX server already ready for model %s.", tostring(target_model))
 				if not silent_notifications then
-					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif: " .. target_model)
+					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif : " .. target_model)
 				end
 				if on_success then pcall(on_success) end
 				return
@@ -586,7 +565,7 @@ PY
 				if startup_confirmed or startup_closed then return end
 				startup_confirmed = true
 				if not silent_notifications then
-					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif: " .. target_model)
+					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif : " .. target_model)
 				end
 				if on_success then pcall(on_success) on_success = nil end
 			end
@@ -616,15 +595,7 @@ PY
 				"PYTHON_BIN=\"python3\"; " ..
 				"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
 				"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
-				"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
-				"if ! $PYTHON_BIN -m pip --version >/dev/null 2>&1; then $PYTHON_BIN -m ensurepip --upgrade >/dev/null 2>&1 || true; fi; " ..
-				"if ! $PYTHON_BIN -m pip --version >/dev/null 2>&1; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
-				"if ! $PYTHON_BIN -m pip --version >/dev/null 2>&1; then $PYTHON_BIN -m ensurepip --upgrade >/dev/null 2>&1 || true; fi; " ..
-				"if ! $PYTHON_BIN -c 'import mlx_lm, huggingface_hub, truststore' >/dev/null 2>&1; then " ..
-				"echo \"[MLX] Dépendances manquantes: tentative d'installation...\"; " ..
-				"$PYTHON_BIN -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore || " ..
-				"$PYTHON_BIN -m pip install --user --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore || exit 1; " ..
-				"$PYTHON_BIN -c 'import mlx_lm, huggingface_hub, truststore' || exit 1; fi; " ..
+				"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
 				"echo \"[MLX] Python utilisé: $PYTHON_BIN\"; " ..
 				"pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; sleep 0.3; " ..
 				"$PYTHON_BIN -m mlx_lm server --model " .. repo .. " 2>&1 | tee \"" .. server_log_file .. "\""
@@ -684,36 +655,6 @@ PY
 
 					local detail = (error_msg ~= "") and ("\nDetail: " .. error_msg) or ""
 
-					local unsupported_model_backend =
-						((error_msg:lower():match("model type") ~= nil) and (error_msg:lower():match("not supported") ~= nil))
-						or (error_msg:match("No module named 'mlx_lm%.models%.") ~= nil)
-						or (error_msg:match("No module named 'mlx_lm'") ~= nil)
-						or (error_msg:match("No module named 'mlx_ml'") ~= nil)
-
-					if unsupported_model_backend and not obj._mlx_upgrade_attempted[repo] then
-						obj._mlx_upgrade_attempted[repo] = true
-						if not silent_notifications then
-							pcall(notifications.notify, "⚙️ Mise à jour MLX-LM", "Compatibilité détectée pour le modèle " .. target_model .. ". Mise à jour en cours…")
-						end
-						upgrade_mlx_stack(function(ok)
-							if ok then
-								if not silent_notifications then
-									pcall(notifications.notify, "✅ MLX-LM mis à jour", "Redémarrage du serveur MLX pour le modèle " .. target_model .. "…")
-								end
-								hs.timer.doAfter(0.5, function()
-									obj.start_server(target_model, on_success, opts)
-								end)
-							else
-								if not silent_notifications then
-									pcall(notifications.notify, "❌ Échec mise à jour MLX-LM", "La mise à jour automatique a échoué pour le modèle " .. target_model .. ". Lancez : python3 -m pip install --user --upgrade mlx-lm")
-								end
-							end
-						end)
-
-						print("MLX server exited with code " .. code)
-						return
-					end
-
 					if not silent_notifications then
 						pcall(notifications.notify, "❌ Échec serveur MLX", "Modèle " .. target_model .. " non démarré." .. detail)
 					end
@@ -756,313 +697,318 @@ PY
 	-- =====================================
 
 	function obj.pull_model(target_model, repo, on_success)
-		local function do_cancel()
-			local t = deps.active_tasks and deps.active_tasks["download"]
-			if t and type(t) == "userdata" and type(t.terminate) == "function" then pcall(function() t:terminate() end) end
-		end
+		local function _internal_pull()
+			local function do_cancel()
+				local t = deps.active_tasks and deps.active_tasks["download"]
+				if t and type(t) == "userdata" and type(t.terminate) == "function" then pcall(function() t:terminate() end) end
+			end
 
-		local function do_retry()
-			if deps.active_tasks and deps.active_tasks["download"] then return end
-			hs.timer.doAfter(0.05, function()
-				obj.pull_model(target_model, repo, on_success)
-			end)
-		end
+			local function do_retry()
+				if deps.active_tasks and deps.active_tasks["download"] then return end
+				hs.timer.doAfter(0.05, function()
+					obj.pull_model(target_model, repo, on_success)
+				end)
+			end
 
-		local function do_resolve_gated()
-			if type(obj.prompt_hf_login) == "function" then
-				hs.timer.doAfter(0.08, function()
-					obj.prompt_hf_login(function(ok)
-						if ok and type(do_retry) == "function" then
-							hs.timer.doAfter(0.3, do_retry)
-						end
+			local function do_resolve_gated()
+				if type(obj.prompt_hf_login) == "function" then
+					hs.timer.doAfter(0.08, function()
+						obj.prompt_hf_login(function(ok)
+							if ok and type(do_retry) == "function" then
+								hs.timer.doAfter(0.3, do_retry)
+							end
+						end)
 					end)
-				end)
-			end
-		end
-
-		local estimated_bytes_total = 0
-		local m_table = nil
-		
-		for _, provider in ipairs(presets) do
-			for _, family in ipairs(provider.families or {}) do
-				for _, m in ipairs(family.models or {}) do
-					if m.name == target_model then
-						m_table = m
-						local hw = m.hardware_requirements and m.hardware_requirements.mlx or {}
-						if type(hw.download_gb) == "number" then
-							estimated_bytes_total = math.floor(hw.download_gb * 1e9)
-						elseif type(hw.disk_gb) == "number" then
-							estimated_bytes_total = math.floor(hw.disk_gb * 1e9)
-						elseif type(hw.ram_gb) == "number" then
-							estimated_bytes_total = math.floor(hw.ram_gb * 0.14 * 1e9)
-						end
-						break
-					end
 				end
 			end
-		end
 
-		local ui_sizes = nil
-		if m_table then
-			local hw = m_table.hardware_requirements and m_table.hardware_requirements.mlx or {}
-			ui_sizes = {
-				dl     = hw.download_gb and (hw.download_gb .. " Go"),
-				disk   = hw.disk_gb and (hw.disk_gb .. " Go"),
-				params = m_table.parameters and m_table.parameters.total
-			}
-		end
-
-		local clean_repo = repo:gsub("[%c%s]", "")
-		local script_path = "/tmp/hs_mlx_dl_" .. tostring(math.random(1000,9999)) .. ".sh"
-		local script_project_venv_python_escaped = project_venv_python_escaped
-		
-		local f = io.open(script_path, "w")
-		if not f then 
-			pcall(notifications.notify, "Erreur", "Écriture du script Bash impossible dans /tmp")
-			return 
-		end
-		f:write("#!/bin/bash\n")
-		f:write("export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n")
-		f:write("PYTHON_BIN=\"python3\"\n")
-		f:write("if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then\n")
-		f:write("  PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"\n")
-		f:write("elif [ -x \"" .. script_project_venv_python_escaped .. "\" ]; then\n")
-		f:write("  PYTHON_BIN=\"" .. script_project_venv_python_escaped .. "\"\n")
-		f:write("fi\n")
-		f:write("if [ \"$PYTHON_BIN\" = \"python3\" ]; then\n")
-		f:write("  MLX_VENV=\"$HOME/.mlx_py_env\"\n")
-		f:write("  python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true\n")
-		f:write("  if [ -x \"$MLX_VENV/bin/python3\" ]; then\n")
-		f:write("    PYTHON_BIN=\"$MLX_VENV/bin/python3\"\n")
-		f:write("  fi\n")
-		f:write("fi\n")
-		f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
-		f:write("export HF_HUB_DISABLE_SYMLINKS_WARNING=1\n")
-		f:write("export PYTHONUNBUFFERED=1\n")
-		f:write("export SSL_CERT_FILE=/etc/ssl/cert.pem\n")
-		f:write("export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem\n")
-		f:write("export HF_HUB_DISABLE_XET=1\n")
-		f:write("if ! $PYTHON_BIN -c 'import huggingface_hub' >/dev/null 2>&1; then\n")
-		f:write("  echo '[MLX] Dépendances Hugging Face manquantes, installation... '\n")
-		f:write("  if ! $PYTHON_BIN -m pip install --disable-pip-version-check --upgrade huggingface_hub hf_transfer truststore; then\n")
-		f:write("    echo '[MLX] Installation globale impossible, tentative en --user'\n")
-		f:write("    $PYTHON_BIN -m pip install --user --disable-pip-version-check --upgrade huggingface_hub hf_transfer truststore || { echo '[MLX] ❌ Installation huggingface_hub impossible'; exit 1; }\n")
-		f:write("  fi\n")
-		f:write("fi\n")
-		f:write("$PYTHON_BIN -c 'import huggingface_hub, truststore' >/dev/null 2>&1 || { echo '[MLX] ❌ Python utilisé sans huggingface_hub/truststore'; exit 1; }\n")
-		f:write("$PYTHON_BIN -c 'import hf_transfer' 2>/dev/null && export HF_HUB_ENABLE_HF_TRANSFER=1 || export HF_HUB_ENABLE_HF_TRANSFER=0\n")
-		local safe_repo_bash = "models--" .. clean_repo:gsub("/", "--")
-		f:write("HUB_DIR=\"$HOME/.cache/huggingface/hub\"\n")
-		f:write("SNAP_DIR=\"$HUB_DIR/" .. safe_repo_bash .. "/snapshots\"\n")
-		f:write("HAS_WEIGHTS=0\n")
-		f:write("if [ -d \"$SNAP_DIR\" ]; then\n")
-		f:write("  for commit_dir in \"$SNAP_DIR\"/*/; do\n")
-		f:write("    for wf in \"$commit_dir\"*.safetensors \"$commit_dir\"*.bin; do\n")
-		f:write("      [ -s \"$wf\" ] && HAS_WEIGHTS=1 && break 2\n")
-		f:write("    done\n")
-		f:write("  done\n")
-		f:write("fi\n")
-		f:write("if [ \"$HAS_WEIGHTS\" = '0' ] && [ -d \"$HUB_DIR/" .. safe_repo_bash .. "\" ]; then\n")
-		f:write("  echo 'Cache incomplet détecté, nettoyage...'\n")
-		f:write("  rm -rf \"$HUB_DIR/" .. safe_repo_bash .. "\"\n")
-		f:write("fi\n")
-		f:write("echo 'Démarrage du téléchargement de " .. clean_repo .. "...'\n")
-		
-		f:write("$PYTHON_BIN -u - <<'EOF'\n")
-		f:write("import sys, os, threading\n")
-		f:write("try:\n")
-		f:write("    import truststore\n")
-		f:write("    truststore.inject_into_ssl()\n")
-		f:write("except Exception:\n")
-		f:write("    pass\n")
-		f:write("try:\n")
-		f:write("    from huggingface_hub import snapshot_download\n")
-		f:write("except Exception:\n")
-		f:write("    print('--- ERREUR DEPENDANCES ---', flush=True)\n")
-		f:write("    import traceback\n")
-		f:write("    traceback.print_exc()\n")
-		f:write("    sys.exit(1)\n")
-		f:write("_hub_dir = os.path.expanduser('~/.cache/huggingface/hub')\n")
-		f:write("_model_cache = os.path.join(_hub_dir, '" .. safe_repo_bash .. "')\n")
-		f:write("_stop_evt = threading.Event()\n")
-		f:write("def _size_watcher():\n")
-		f:write("    while True:\n")
-		f:write("        try:\n")
-		f:write("            _total = 0\n")
-		f:write("            for _dp, _, _fns in os.walk(_model_cache, followlinks=False):\n")
-		f:write("                for _fn in _fns:\n")
-		f:write("                    _fp = os.path.join(_dp, _fn)\n")
-		f:write("                    if not os.path.islink(_fp):\n")
-		f:write("                        try: _total += os.path.getsize(_fp)\n")
-		f:write("                        except: pass\n")
-		f:write("            print('__BYTES__:' + str(_total), flush=True)\n")
-		f:write("        except Exception as _e:\n")
-		f:write("            print('__BYTES__:ERROR:' + str(_e), flush=True)\n")
-		f:write("        if _stop_evt.wait(2): break\n")
-		f:write("_watcher = threading.Thread(target=_size_watcher, daemon=True)\n")
-		f:write("_watcher.start()\n")
-		f:write("try:\n")
-		f:write("    snapshot_download('" .. clean_repo .. "', max_workers=8)\n")
-		f:write("except Exception as e:\n")
-		f:write("    err_str = str(e).lower()\n")
-		f:write("    if '401' in err_str or '403' in err_str or 'gated' in err_str or 'unauthorized' in err_str:\n")
-		f:write("        print('\\n❌ ERREUR : Ce modèle est PRIVÉ (Gated) par son créateur.')\n")
-		f:write("        print('Pour le télécharger, vous devez :')\n")
-		f:write("        print('1. Créer un compte sur HuggingFace.co et accepter les conditions du modèle.')\n")
-		f:write("        print('2. Dans le menu LLM, utilisez le bouton : 🔑 Connexion HuggingFace.')\n")
-		f:write("        print('   Option manuelle: huggingface-cli login')\n")
-		f:write("    else:\n")
-		f:write("        print('\\n--- ERREUR HUGGINGFACE ---')\n")
-		f:write("        import traceback\n")
-		f:write("        traceback.print_exc()\n")
-		f:write("    _stop_evt.set()\n")
-		f:write("    sys.exit(1)\n")
-		f:write("_stop_evt.set()\n")
-		f:write("EOF\n")
-		
-		f:write("exit_code=$?\n")
-		f:write("if [ $exit_code -eq 0 ]; then\n")
-		f:write("  echo 'Terminé !'\n")
-		f:write("fi\n")
-		f:write("exit $exit_code\n")
-		f:close()
-		
-		os.execute("chmod +x " .. script_path)
-
-		if download_window then 
-			pcall(download_window.show, target_model, do_cancel, script_path, ui_sizes, {
-				on_resolve = do_resolve_gated,
-				on_retry = do_retry,
-			}) 
-		end
-		pcall(deps.update_icon, "📥 0%")
-		
-		local _bytes_done, _bytes_total = 0, estimated_bytes_total
-		local _current_pct = 0
-		local _total_adjusted = false
-		local _stream_tail = ""
-		local _saw_gated_error = false
-
-		local last_progress_time = os.time()
-		local function reset_timeout()
-			last_progress_time = os.time()
-		end
-		local function check_timeout()
-			if deps.active_tasks and deps.active_tasks["download"] then
-				local stall_seconds = os.difftime(os.time(), last_progress_time)
-				local stall_limit = (_current_pct >= 99) and 120 or 300
-				if stall_seconds >= stall_limit then
-					local reason = (_current_pct >= 99)
-						and "Aucun progrès détecté depuis 2 minutes à 99 %. Blocage probable."
-						or "Aucun progrès détecté depuis 5 minutes. Abandon."
-					pcall(notifications.notify, "⏳ Téléchargement MLX bloqué", reason)
-					if download_window then pcall(download_window.complete, false, target_model) end
-					pcall(function() deps.active_tasks["download"]:terminate() end)
-					deps.active_tasks["download"] = nil
-				else
-					hs.timer.doAfter(30, check_timeout)
-				end
-			end
-		end
-		hs.timer.doAfter(30, check_timeout)
-
-		local task = hs.task.new(script_path, function(code)
-			if deps.active_tasks then deps.active_tasks["download"] = nil end
-			pcall(deps.update_icon)
-
-			if _stream_tail ~= "" and download_window then
-				pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, _stream_tail)
-				_stream_tail = ""
-			end
+			local estimated_bytes_total = 0
+			local m_table = nil
 			
-			if code == 15 then
-				pcall(notifications.notify, "🛑 Annulé", "Téléchargement de " .. target_model .. " interrompu.")
-				if download_window then pcall(download_window.complete, false, target_model) end
-				return
-			end
-
-			if code == 0 then
-				pcall(notifications.notify, "🟢 MODÈLE MLX INSTALLÉ", target_model .. " est prêt !")
-				if download_window then pcall(download_window.complete, true, target_model) end
-				deps.state.llm_model = target_model
-				if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
-				pcall(deps.save_prefs)
-				obj.start_server(target_model, function() 
-					if on_success then pcall(on_success) else pcall(hs.reload) end 
-				end)
-			else
-				if download_window then pcall(download_window.complete, false, target_model, _saw_gated_error and "gated" or nil) end
-				pcall(notifications.notify, "❌ Échec MLX", "Vérifiez les logs dans la fenêtre.")
-			end
-		end, function(_, stdout, stderr)
-			local out = (stdout or "") .. (stderr or "")
-			local found_progress = false
-			local out_l = out:lower()
-			if out_l:find("gated", 1, true) or out_l:find("privé", 1, true) or out_l:find("401", 1, true) or out_l:find("403", 1, true) then
-				_saw_gated_error = true
-			end
-
-			local function parse_hf_size(s)
-				if not s then return nil end
-				local val, unit = s:match("([%d%.]+)([kMGT]?B)")
-				val = tonumber(val)
-				if not val then return nil end
-				if unit == "GB" then return val * 1e9
-				elseif unit == "MB" then return val * 1e6
-				elseif unit == "kB" then return val * 1e3 end
-				return val
-			end
-
-			local max_bytes = _bytes_done
-			for b_str in out:gmatch("__BYTES__:(%d+)") do
-				local b = tonumber(b_str)
-				if b and b > max_bytes then
-					max_bytes = b
-				end
-			end
-			if max_bytes > _bytes_done then
-				_bytes_done = max_bytes
-				found_progress = true
-			end
-
-			if _bytes_total > 0 then
-				if _bytes_done > _bytes_total and not _total_adjusted then
-					_total_adjusted = true
-					local headroom = math.max(_bytes_done * 0.15, 500 * 1024 * 1024)
-					_bytes_total = _bytes_done + headroom
-				end
-				_current_pct = math.floor((_bytes_done / _bytes_total) * 100 + 0.5)
-			end
-
-			if out:find("Terminé !", 1, true) then
-				_current_pct = 100
-				found_progress = true
-			end
-
-			if found_progress then reset_timeout() end
-			if download_window and out ~= "" then
-				local merged = (_stream_tail or "") .. out
-				merged = merged:gsub("\r\n", "\n"):gsub("\r", "\n")
-
-				local cut = merged:match(".*()\n")
-				if cut then
-					local complete = merged:sub(1, cut)
-					_stream_tail = merged:sub(cut + 1)
-					if complete ~= "" then
-						pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, complete)
+			for _, provider in ipairs(presets) do
+				for _, family in ipairs(provider.families or {}) do
+					for _, m in ipairs(family.models or {}) do
+						if m.name == target_model then
+							m_table = m
+							local hw = m.hardware_requirements and m.hardware_requirements.mlx or {}
+							if type(hw.download_gb) == "number" then
+								estimated_bytes_total = math.floor(hw.download_gb * 1e9)
+							elseif type(hw.ram_gb) == "number" then
+								estimated_bytes_total = math.floor(hw.ram_gb * 0.14 * 1e9)
+							end
+							break
+						end
 					end
-				else
-					_stream_tail = merged
 				end
 			end
-			if _current_pct > 0 then pcall(deps.update_icon, "📥 " .. _current_pct .. "%") end
-			return true
-		end)
-		
-		if task then
-			deps.active_tasks["download"] = task
-			pcall(function() task:start() end)
+
+			local ui_sizes = nil
+			if m_table then
+				local hw = m_table.hardware_requirements and m_table.hardware_requirements.mlx or {}
+				ui_sizes = {
+					dl     = hw.download_gb and (hw.download_gb .. " Go"),
+					params = m_table.parameters and m_table.parameters.total
+				}
+			end
+
+			local clean_repo = repo:gsub("[%c%s]", "")
+			local script_path = "/tmp/hs_mlx_dl_" .. tostring(math.random(1000,9999)) .. ".sh"
+			local script_project_venv_python_escaped = project_venv_python_escaped
+			
+			local f = io.open(script_path, "w")
+			if not f then 
+				pcall(notifications.notify, "Erreur", "Écriture du script Bash impossible dans /tmp")
+				return 
+			end
+			f:write("#!/bin/bash\n")
+			f:write("export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n")
+			f:write("PYTHON_BIN=\"python3\"\n")
+			f:write("if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then\n")
+			f:write("  PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"\n")
+			f:write("elif [ -x \"" .. script_project_venv_python_escaped .. "\" ]; then\n")
+			f:write("  PYTHON_BIN=\"" .. script_project_venv_python_escaped .. "\"\n")
+			f:write("fi\n")
+			f:write("if [ \"$PYTHON_BIN\" = \"python3\" ]; then\n")
+			f:write("  MLX_VENV=\"$HOME/.mlx_py_env\"\n")
+			f:write("  python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true\n")
+			f:write("  if [ -x \"$MLX_VENV/bin/python3\" ]; then\n")
+			f:write("    PYTHON_BIN=\"$MLX_VENV/bin/python3\"\n")
+			f:write("  fi\n")
+			f:write("fi\n")
+			f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
+			f:write("export HF_HUB_DISABLE_SYMLINKS_WARNING=1\n")
+			f:write("export PYTHONUNBUFFERED=1\n")
+			f:write("export SSL_CERT_FILE=/etc/ssl/cert.pem\n")
+			f:write("export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem\n")
+			f:write("export HF_HUB_DISABLE_XET=1\n")
+			f:write("if ! $PYTHON_BIN -c 'import huggingface_hub, truststore, hf_transfer' >/dev/null 2>&1; then\n")
+			f:write("  echo '[MLX] Dépendances Hugging Face manquantes, installation... '\n")
+			f:write("  if ! $PYTHON_BIN -m pip install --disable-pip-version-check --upgrade huggingface_hub hf_transfer truststore; then\n")
+			f:write("    echo '[MLX] Installation globale impossible, tentative en --user'\n")
+			f:write("    $PYTHON_BIN -m pip install --user --disable-pip-version-check --upgrade huggingface_hub hf_transfer truststore || { echo '[MLX] ❌ Installation huggingface_hub impossible'; exit 1; }\n")
+			f:write("  fi\n")
+			f:write("fi\n")
+			f:write("$PYTHON_BIN -c 'import huggingface_hub, truststore' >/dev/null 2>&1 || { echo '[MLX] ❌ Python utilisé sans huggingface_hub/truststore'; exit 1; }\n")
+			f:write("$PYTHON_BIN -c 'import hf_transfer' 2>/dev/null && export HF_HUB_ENABLE_HF_TRANSFER=1 || export HF_HUB_ENABLE_HF_TRANSFER=0\n")
+			local safe_repo_bash = "models--" .. clean_repo:gsub("/", "--")
+			f:write("HUB_DIR=\"$HOME/.cache/huggingface/hub\"\n")
+			f:write("SNAP_DIR=\"$HUB_DIR/" .. safe_repo_bash .. "/snapshots\"\n")
+			f:write("HAS_WEIGHTS=0\n")
+			f:write("if [ -d \"$SNAP_DIR\" ]; then\n")
+			f:write("  for commit_dir in \"$SNAP_DIR\"/*/; do\n")
+			f:write("    for wf in \"$commit_dir\"*.safetensors \"$commit_dir\"*.bin; do\n")
+			f:write("      [ -s \"$wf\" ] && HAS_WEIGHTS=1 && break 2\n")
+			f:write("    done\n")
+			f:write("  done\n")
+			f:write("fi\n")
+			f:write("if [ \"$HAS_WEIGHTS\" = '0' ] && [ -d \"$HUB_DIR/" .. safe_repo_bash .. "\" ]; then\n")
+			f:write("  echo 'Cache incomplet détecté, nettoyage...'\n")
+			f:write("  rm -rf \"$HUB_DIR/" .. safe_repo_bash .. "\"\n")
+			f:write("fi\n")
+			f:write("echo 'Démarrage du téléchargement de " .. clean_repo .. "...'\n")
+			
+			f:write("$PYTHON_BIN -u - <<'EOF'\n")
+			f:write("import sys, os, threading\n")
+			f:write("try:\n")
+			f:write("    import truststore\n")
+			f:write("    truststore.inject_into_ssl()\n")
+			f:write("except Exception:\n")
+			f:write("    pass\n")
+			f:write("try:\n")
+			f:write("    from huggingface_hub import snapshot_download\n")
+			f:write("except Exception:\n")
+			f:write("    print('--- ERREUR DEPENDANCES ---', flush=True)\n")
+			f:write("    import traceback\n")
+			f:write("    traceback.print_exc()\n")
+			f:write("    sys.exit(1)\n")
+			f:write("_hub_dir = os.path.expanduser('~/.cache/huggingface/hub')\n")
+			f:write("_model_cache = os.path.join(_hub_dir, '" .. safe_repo_bash .. "')\n")
+			f:write("_stop_evt = threading.Event()\n")
+			f:write("def _size_watcher():\n")
+			f:write("    while True:\n")
+			f:write("        try:\n")
+			f:write("            _total = 0\n")
+			f:write("            for _dp, _, _fns in os.walk(_model_cache, followlinks=False):\n")
+			f:write("                for _fn in _fns:\n")
+			f:write("                    _fp = os.path.join(_dp, _fn)\n")
+			f:write("                    if not os.path.islink(_fp):\n")
+			f:write("                        try: _total += os.path.getsize(_fp)\n")
+			f:write("                        except: pass\n")
+			f:write("            print('__BYTES__:' + str(_total), flush=True)\n")
+			f:write("        except Exception as _e:\n")
+			f:write("            print('__BYTES__:ERROR:' + str(_e), flush=True)\n")
+			f:write("        if _stop_evt.wait(2): break\n")
+			f:write("_watcher = threading.Thread(target=_size_watcher, daemon=True)\n")
+			f:write("_watcher.start()\n")
+			f:write("try:\n")
+			f:write("    snapshot_download('" .. clean_repo .. "', max_workers=8)\n")
+			f:write("except Exception as e:\n")
+			f:write("    err_str = str(e).lower()\n")
+			f:write("    if '401' in err_str or '403' in err_str or 'gated' in err_str or 'unauthorized' in err_str:\n")
+			f:write("        print('\\n❌ ERREUR : Ce modèle est PRIVÉ (Gated) par son créateur.')\n")
+			f:write("        print('Pour le télécharger, vous devez :')\n")
+			f:write("        print('1. Créer un compte sur HuggingFace.co et accepter les conditions du modèle.')\n")
+			f:write("        print('2. Dans le menu LLM, utilisez le bouton : 🔑 Connexion HuggingFace.')\n")
+			f:write("        print('   Option manuelle: huggingface-cli login')\n")
+			f:write("    else:\n")
+			f:write("        print('\\n--- ERREUR HUGGINGFACE ---')\n")
+			f:write("        import traceback\n")
+			f:write("        traceback.print_exc()\n")
+			f:write("    _stop_evt.set()\n")
+			f:write("    sys.exit(1)\n")
+			f:write("_stop_evt.set()\n")
+			f:write("EOF\n")
+			
+			f:write("exit_code=$?\n")
+			f:write("if [ $exit_code -eq 0 ]; then\n")
+			f:write("  echo 'Terminé !'\n")
+			f:write("fi\n")
+			f:write("exit $exit_code\n")
+			f:close()
+			
+			os.execute("chmod +x " .. script_path)
+
+			if download_window then 
+				pcall(download_window.show, target_model, do_cancel, script_path, ui_sizes, {
+					on_resolve = do_resolve_gated,
+					on_retry = do_retry,
+				}) 
+			end
+			pcall(deps.update_icon, "📥 0%")
+			
+			local _bytes_done, _bytes_total = 0, estimated_bytes_total
+			local _current_pct = 0
+			local _total_adjusted = false
+			local _stream_tail = ""
+			local _saw_gated_error = false
+
+			local last_progress_time = os.time()
+			local function reset_timeout()
+				last_progress_time = os.time()
+			end
+			local function check_timeout()
+				if deps.active_tasks and deps.active_tasks["download"] then
+					local stall_seconds = os.difftime(os.time(), last_progress_time)
+					local stall_limit = (_current_pct >= 99) and 120 or 300
+					if stall_seconds >= stall_limit then
+						local reason = (_current_pct >= 99)
+							and "Aucun progrès détecté depuis 2 minutes à 99 %. Blocage probable."
+							or "Aucun progrès détecté depuis 5 minutes. Abandon."
+						pcall(notifications.notify, "⏳ Téléchargement MLX bloqué", reason)
+						if download_window then pcall(download_window.complete, false, target_model) end
+						pcall(function() deps.active_tasks["download"]:terminate() end)
+						deps.active_tasks["download"] = nil
+					else
+						hs.timer.doAfter(30, check_timeout)
+					end
+				end
+			end
+			hs.timer.doAfter(30, check_timeout)
+
+			local task = hs.task.new(script_path, function(code)
+				if deps.active_tasks then deps.active_tasks["download"] = nil end
+				pcall(deps.update_icon)
+
+				if _stream_tail ~= "" and download_window then
+					pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, _stream_tail)
+					_stream_tail = ""
+				end
+				
+				if code == 15 then
+					pcall(notifications.notify, "🛑 Annulé", "Téléchargement de " .. target_model .. " interrompu.")
+					if download_window then pcall(download_window.complete, false, target_model) end
+					return
+				end
+
+				if code == 0 then
+					pcall(notifications.notify, "🟢 MODÈLE MLX INSTALLÉ", target_model .. " est prêt !")
+					if download_window then pcall(download_window.complete, true, target_model) end
+					deps.state.llm_model = target_model
+					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
+					pcall(deps.save_prefs)
+					obj.start_server(target_model, function() 
+						if on_success then pcall(on_success) end 
+					end)
+				else
+					if download_window then pcall(download_window.complete, false, target_model, _saw_gated_error and "gated" or nil) end
+					pcall(notifications.notify, "❌ Échec MLX", "Vérifiez les logs dans la fenêtre.")
+				end
+			end, function(_, stdout, stderr)
+				local out = (stdout or "") .. (stderr or "")
+				local found_progress = false
+				local out_l = out:lower()
+				if out_l:find("gated", 1, true) or out_l:find("privé", 1, true) or out_l:find("401", 1, true) or out_l:find("403", 1, true) then
+					_saw_gated_error = true
+				end
+
+				local function parse_hf_size(s)
+					if not s then return nil end
+					local val, unit = s:match("([%d%.]+)([kMGT]?B)")
+					val = tonumber(val)
+					if not val then return nil end
+					if unit == "GB" then return val * 1e9
+					elseif unit == "MB" then return val * 1e6
+					elseif unit == "kB" then return val * 1e3 end
+					return val
+				end
+
+				local max_bytes = _bytes_done
+				for b_str in out:gmatch("__BYTES__:(%d+)") do
+					local b = tonumber(b_str)
+					if b and b > max_bytes then
+						max_bytes = b
+					end
+				end
+				if max_bytes > _bytes_done then
+					_bytes_done = max_bytes
+					found_progress = true
+				end
+
+				if _bytes_total > 0 then
+					if _bytes_done > _bytes_total and not _total_adjusted then
+						_total_adjusted = true
+						local headroom = math.max(_bytes_done * 0.15, 500 * 1024 * 1024)
+						_bytes_total = _bytes_done + headroom
+					end
+					_current_pct = math.floor((_bytes_done / _bytes_total) * 100 + 0.5)
+				end
+
+				if out:find("Terminé !", 1, true) then
+					_current_pct = 100
+					found_progress = true
+				end
+
+				if found_progress then reset_timeout() end
+				if download_window and out ~= "" then
+					local merged = (_stream_tail or "") .. out
+					merged = merged:gsub("\r\n", "\n"):gsub("\r", "\n")
+
+					local cut = merged:match(".*()\n")
+					if cut then
+						local complete = merged:sub(1, cut)
+						_stream_tail = merged:sub(cut + 1)
+						if complete ~= "" then
+							pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, complete)
+						end
+					else
+						_stream_tail = merged
+					end
+				end
+				if _current_pct > 0 then pcall(deps.update_icon, "📥 " .. _current_pct .. "%") end
+				return true
+			end)
+			
+			if task then
+				deps.active_tasks["download"] = task
+				pcall(function() task:start() end)
+			end
 		end
+
+		-- Step 0: Ensure MLX stack is upgraded before starting the download
+		pcall(notifications.notify, "⚙️ Préparation MLX", "Vérification des mises à jour des dépendances…")
+		upgrade_mlx_stack(function()
+			_internal_pull()
+		end)
 	end
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)

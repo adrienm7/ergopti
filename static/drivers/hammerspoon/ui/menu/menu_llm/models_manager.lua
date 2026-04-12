@@ -18,10 +18,21 @@ local hs        = hs
 local OllamaMgr = require("ui.menu.menu_llm.models_manager_ollama")
 local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
 local Logger    = require("lib.logger")
+local llm_mod   = require("modules.llm")
 
 local LOG = "menu_llm.models"
 
 local _model_ram_cache = nil
+
+
+
+
+
+-- ==============================
+-- ==============================
+-- ======= 1/ Extraction ========
+-- ==============================
+-- ==============================
 
 --- Extracts Ollama model name from ollama.com/library URL.
 --- e.g., "https://ollama.com/library/gemma4:e2b" -> "gemma4:e2b"
@@ -74,7 +85,7 @@ end
 
 -- ============================================
 -- ============================================
--- ======= 1/ Logic And Cache Utilities =======
+-- ======= 2/ Logic And Cache Utilities =======
 -- ============================================
 -- ============================================
 
@@ -88,7 +99,6 @@ local function get_model_info_logic(model_name, presets)
 	local p_count_total = 0
 	local p_count_active = 0
 	local m_tags = {}
-	local found = false
 
 	if type(presets) == "table" then
 		for _, provider in ipairs(presets) do
@@ -107,29 +117,9 @@ local function get_model_info_logic(model_name, presets)
 							end
 						end
 						if m.capabilities and type(m.capabilities.tags) == "table" then m_tags = m.capabilities.tags end
-						found = true
 						break
 					end
 				end
-				if found then break end
-			end
-			if found then break end
-		end
-	end
-
-	if not found and model_name ~= "" then
-		if model_name:match("%-base$") or model_name:match("coder") then m_type = "completion" end
-		local experts, size = model_name:lower():match("(%d+)x([%d%.]+)b")
-		if experts and size then
-			local experts_n = tonumber(experts) or 0
-			local size_n = tonumber(size) or 0
-			p_count_total = experts_n * size_n
-			p_count_active = size_n
-		else
-			local num = model_name:lower():match("([%d%.]+)b")
-			if num then
-				p_count_total = tonumber(num) or 0
-				p_count_active = p_count_total
 			end
 		end
 	end
@@ -155,8 +145,6 @@ local function get_model_info_logic(model_name, presets)
 		local oa = EMOJI_ORDER[a] or 99; local ob = EMOJI_ORDER[b] or 99
 		if oa == ob then return a < b end; return oa < ob
 	end)
-
-	-- Instantiate backend managers after injecting wrappers.
 
 	local tag_str = #tag_list > 0 and (" " .. table.concat(tag_list, "")) or ""
 	return {
@@ -214,27 +202,16 @@ local function get_model_ram_logic(model_name, presets, is_mlx)
 		return _model_ram_cache[cache_key][model_name] 
 	end
 	
-	local info = get_model_info_logic(model_name, presets)
-	local total_b = tonumber(info.params_total) or tonumber(info.params) or 0
-	if total_b == 0 then
-		local name = model_name:lower()
-		local experts, size = name:match("(%d+)x([%d%.]+)b")
-		if experts and size then 
-			total_b = tonumber(experts) * tonumber(size) 
-		else 
-			total_b = 8 
-		end
-	end
-	return math.ceil(total_b * 0.7 + 2.0)
+	return 8
 end
 
 --- Extracts explicit size metadata for a model when available.
 --- @param model_name string Name of the model.
 --- @param presets table Global models presets.
 --- @param is_mlx boolean True if MLX is the active engine.
---- @return table Size metadata with download_gb and disk_gb fields.
+--- @return table Size metadata with download_gb and ram_gb fields.
 local function get_model_size_logic(model_name, presets, is_mlx)
-	local out = { download_gb = nil, disk_gb = nil, ram_gb = nil }
+	local out = { download_gb = nil, ram_gb = nil }
 	if type(model_name) ~= "string" or model_name == "" or type(presets) ~= "table" then return out end
 
 	for _, provider in ipairs(presets) do
@@ -244,7 +221,6 @@ local function get_model_size_logic(model_name, presets, is_mlx)
 					local req = m.hardware_requirements or {}
 					local hw = is_mlx and req.mlx or req.ollama or {}
 					if type(hw.download_gb) == "number" then out.download_gb = hw.download_gb end
-					if type(hw.disk_gb) == "number" then out.disk_gb = hw.disk_gb end
 					if type(hw.ram_gb) == "number" then out.ram_gb = hw.ram_gb end
 					return out
 				end
@@ -261,7 +237,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 2/ Manager Initialization =======
+-- ======= 3/ Manager Initialization =======
 -- =========================================
 -- =========================================
 
@@ -292,8 +268,7 @@ function M.new(deps)
 		local is_mlx   = engine_name:lower():find("mlx") ~= nil
 		local ram_req  = get_model_ram_logic(target_model, presets, is_mlx)
 		local size     = get_model_size_logic(target_model, presets, is_mlx)
-		local disk_req = math.ceil((size.disk_gb or (ram_req * 0.7)) * 10) / 10
-		local dl_req   = math.ceil((size.download_gb or size.disk_gb or (ram_req * 0.4)) * 10) / 10
+		local dl_req   = math.ceil((size.download_gb or (ram_req * 0.4)) * 10) / 10
 		
 		local ok_mem, mem_str = pcall(hs.execute, "sysctl -n hw.memsize")
 		local sys_ram_gb      = math.ceil((tonumber(mem_str) or 0) / (1024^3))
@@ -310,18 +285,17 @@ function M.new(deps)
 		end
 		
 		if free_disk_gb > 0 then
-			local rem = free_disk_gb - disk_req
+			local rem = free_disk_gb - dl_req
 			if rem < 2 then
 				is_critical = true
-				table.insert(warnings, string.format("❌ Disque : requis ~%.1f Go (%d Go disponible) — espace insuffisant", disk_req, free_disk_gb))
+				table.insert(warnings, string.format("❌ Disque : requis ~%.1f Go (%d Go disponible) — espace insuffisant", dl_req, free_disk_gb))
 			elseif rem < 15 then 
-				table.insert(warnings, string.format("⚠️ Disque : requis ~%.1f Go (%d Go disponible) — espace limité", disk_req, free_disk_gb))
+				table.insert(warnings, string.format("⚠️ Disque : requis ~%.1f Go (%d Go disponible) — espace limité", dl_req, free_disk_gb))
 			else 
-				table.insert(warnings, string.format("🟢 Disque : requis ~%.1f Go (%d Go disponible)", disk_req, free_disk_gb)) 
+				table.insert(warnings, string.format("🟢 Disque : requis ~%.1f Go (%d Go disponible)", dl_req, free_disk_gb)) 
 			end
 		end
 
-		table.insert(warnings, string.format("📦 Taille du téléchargement (modèle compressé) : ~%.1f Go", dl_req))
 
 		local msg = "Modèle : " .. target_model .. "\n\n" .. table.concat(warnings, "\n")
 		
@@ -359,47 +333,56 @@ function M.new(deps)
 		end)
 	end
 
-		-- Inject minimal wrappers into deps to centralize download abort/reset
-		do
-			deps._orig_update_icon = deps.update_icon
-			deps._orig_reset_menubar = deps.reset_menubar
-			local download_aborted = false
+	-- Inject minimal wrappers into deps to centralize download abort/reset
+	do
+		deps._orig_update_icon = deps.update_icon
+		deps._orig_reset_menubar = deps.reset_menubar
+		local download_aborted = false
 
-			deps.mark_download_aborted = function()
-				download_aborted = true
-				if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) end
-				if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
-			end
-
-			deps.clear_download_abort = function()
-				download_aborted = false
-			end
-
-			deps.update_icon = function(text)
-				if download_aborted then return end
-				if type(deps._orig_update_icon) == "function" then return deps._orig_update_icon(text) end
-			end
-
-			deps.reset_menubar = function()
-				if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) return end
-				if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
-			end
+		deps.mark_download_aborted = function()
+			download_aborted = true
+			if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) end
+			if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
 		end
 
-		-- Expose a simple global hook so the download_window can notify us on user cancel.
-		package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"] = function()
-			if deps and type(deps.mark_download_aborted) == "function" then pcall(deps.mark_download_aborted) end
+		deps.clear_download_abort = function()
+			download_aborted = false
 		end
 
-		local ollama = OllamaMgr.new(deps, presets, get_model_ram_logic)
-		local mlx    = MlxMgr.new(deps, presets)
+		deps.update_icon = function(text)
+			if download_aborted then return end
+			if type(deps._orig_update_icon) == "function" then return deps._orig_update_icon(text) end
+		end
+
+		deps.reset_menubar = function()
+			if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) return end
+			if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
+		end
+	end
+
+	-- Expose global hooks so the download_window can notify us on user cancel or retry.
+	package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"] = function()
+		if deps and type(deps.mark_download_aborted) == "function" then pcall(deps.mark_download_aborted) end
+	end
+	package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"] = function()
+		if deps and type(deps.clear_download_abort) == "function" then pcall(deps.clear_download_abort) end
+	end
+
+	local ollama = OllamaMgr.new(deps, presets, get_model_ram_logic)
+	local mlx    = MlxMgr.new(deps, presets)
 
 	local function get_active()
-		return deps.state.llm_use_mlx and mlx or ollama
+		local active_backend = llm_mod.get_backend()
+		if active_backend == "mlx" then
+			return mlx
+		end
+		return ollama
 	end
 
 	function obj.get_presets()
-		if not deps.state.llm_use_mlx then return presets end
+		local active_backend = llm_mod.get_backend()
+		if active_backend ~= "mlx" then return presets end
+		
 		local filtered = {}
 		for _, provider in ipairs(presets) do
 			local new_provider = { label = provider.label, families = {} }
@@ -419,14 +402,20 @@ function M.new(deps)
 	
 	function obj.get_mlx_repo(name) return mlx.get_mlx_repo(name) end
 	function obj.get_model_info(name) return get_model_info_logic(name, presets) end
-	function obj.get_model_ram(name) return get_model_ram_logic(name, presets, deps.state.llm_use_mlx) end
+	
+	function obj.get_model_ram(name) 
+		local active_backend = llm_mod.get_backend()
+		return get_model_ram_logic(name, presets, active_backend == "mlx") 
+	end
+	
 	function obj.get_model_emojis(name) return get_model_info_logic(name, presets).emojis end
 	
 	--- Gets the actual backend-specific model name.
 	--- @param display_name string The display name from llm_models.json.
 	--- @return string The real model name for the active backend.
 	function obj.get_actual_model_name(display_name)
-		return get_actual_model_name(display_name, presets, deps.state.llm_use_mlx)
+		local active_backend = llm_mod.get_backend()
+		return get_actual_model_name(display_name, presets, active_backend == "mlx")
 	end
 	
 	--- Checks if a display model name is installed, by converting to real backend name.
@@ -434,15 +423,16 @@ function M.new(deps)
 	--- @return boolean True if installed, false otherwise.
 	function obj.is_model_installed(display_name)
 		local installed = obj.get_installed_models()
-		-- MLX stores by display name (m.name), try that first
 		if installed[display_name] then return true end
-		-- Ollama stores by actual backend name, convert and try
-		local actual_name = get_actual_model_name(display_name, presets, deps.state.llm_use_mlx)
+		
+		local active_backend = llm_mod.get_backend()
+		local actual_name = get_actual_model_name(display_name, presets, active_backend == "mlx")
 		return installed[actual_name] or installed[actual_name .. ":latest"] or false
 	end
 	
 	function obj.get_installed_models()
-		if deps.state.llm_use_mlx then
+		local active_backend = llm_mod.get_backend()
+		if active_backend == "mlx" then
 			return mlx.get_installed_models() or {}
 		else
 			return ollama.get_installed_models() or {}
@@ -454,12 +444,15 @@ function M.new(deps)
 	end
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(...) return mlx.check_requirements(...) end
+	
 	function obj.open_model_source_page(name)
-		if deps.state.llm_use_mlx and type(mlx.open_model_source_page) == "function" then
+		local active_backend = llm_mod.get_backend()
+		if active_backend == "mlx" and type(mlx.open_model_source_page) == "function" then
 			return mlx.open_model_source_page(name)
 		end
 		return false
 	end
+	
 	function obj.prompt_hf_login(on_done)
 		if type(mlx.prompt_hf_login) == "function" then
 			return mlx.prompt_hf_login(on_done)

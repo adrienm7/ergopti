@@ -43,9 +43,8 @@ end
 function M.get_common_prefix_utf8(s1, s2)
 	if type(s1) ~= "string" or type(s2) ~= "string" then return 0 end
 	
-	-- Normalize apostrophes to typographic ones for accurate comparison
-	local c1 = M.utf8_chars(s1:gsub("'", "’"))
-	local c2 = M.utf8_chars(s2:gsub("'", "’"))
+	local c1 = M.utf8_chars(s1)
+	local c2 = M.utf8_chars(s2)
 	
 	local i = 1
 	while i <= #c1 and i <= #c2 and c1[i] == c2[i] do
@@ -195,9 +194,8 @@ end
 function M.diff_strings(old_str, new_str)
 	if type(old_str) ~= "string" or type(new_str) ~= "string" then return {} end
 
-	-- Normalize apostrophes to typographic ones to avoid "fake" differences in the UI
-	local t1 = M.utf8_chars(old_str:gsub("'", "’"))
-	local t2 = M.utf8_chars(new_str:gsub("'", "’"))
+	local t1 = M.utf8_chars(old_str)
+	local t2 = M.utf8_chars(new_str)
 	
 	-- Find common prefix
 	local p = 0

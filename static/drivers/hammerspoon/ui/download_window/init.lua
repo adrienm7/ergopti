@@ -24,6 +24,7 @@ local _start_ts  = nil
 local _ready     = false
 local _queued    = {}
 local _log_shown = false
+local _is_hiding = false
 
 local _src  = debug.getinfo(1, "S").source:sub(2)
 local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
@@ -43,7 +44,7 @@ _ucc:setCallback(function(msg)
     if type(msg) ~= "table" then return end
     
     if msg.body == "cancel" then
-        -- Notify central manager hook (if set) so it can mark downloads aborted.
+        -- Notify central manager hook (if set) so it can mark downloads aborted
         local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
         if type(hook) == "function" then pcall(hook) end
         if type(_on_cancel) == "function" then pcall(_on_cancel) end
@@ -52,6 +53,10 @@ _ucc:setCallback(function(msg)
         if type(_on_resolve) == "function" then pcall(_on_resolve) end
 
     elseif msg.body == "retry" then
+        -- Un-abort the menubar icon lock so we can display progress again
+        local retry_hook = package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"]
+        if type(retry_hook) == "function" then pcall(retry_hook) end
+
         if type(_on_retry) == "function" then pcall(_on_retry) end
         
     elseif msg.body == "terminal" then
@@ -109,7 +114,7 @@ end
 local function format_size(val)
     if type(val) == "string" then return val end
     if type(val) == "number" then
-        -- High magnitude means bytes. Low magnitude means GB.
+        -- High magnitude means bytes. Low magnitude means GB
         if val > 1e6 then return fmt_bytes(val) end
         return string.format("%.1f Go", val)
     end
@@ -142,31 +147,6 @@ local function eval(code)
     end
 end
 
---- Injects the target model size metadata safely.
---- @param tgt_model table|string The target model data.
---- @param tgt_sizes table The optionally predefined sizes.
-local function inject_sizes(tgt_model, tgt_sizes)
-    local final_sizes = tgt_sizes
-    if not final_sizes and type(tgt_model) == "table" then
-        local hw = tgt_model.hardware_requirements or {}
-        local hw_spec = hw.mlx_4bit or hw.ollama_q4 or {}
-        final_sizes = {
-            dl     = tgt_model.size_download or tgt_model.download_size or hw_spec.download_gb,
-            disk   = tgt_model.size_disk or tgt_model.disk_size or hw_spec.disk_gb,
-            params = tgt_model.parameters and tgt_model.parameters.total
-        }
-    end
-    
-    if final_sizes then
-        local formatted = {
-            dl     = format_size(final_sizes.dl),
-            disk   = format_size(final_sizes.disk),
-            params = type(final_sizes.params) == "string" and final_sizes.params or nil
-        }
-        eval(string.format("if(window.setSizes) setSizes(%s);", hs.json.encode(formatted)))
-    end
-end
-
 
 
 
@@ -179,17 +159,21 @@ end
 
 --- Hides and destroys the download window.
 function M.hide()
+    _is_hiding = true
     if _wv and type(_wv.delete) == "function" then 
         pcall(function() _wv:delete() end) 
-        _wv = nil 
     end
+    _wv = nil 
     _on_cancel = nil
     _on_resolve = nil
-    _on_retry = nil
+    _on_retry  = nil
     _start_ts  = nil
     _ready     = false
     _queued    = {}
     _log_shown = false
+    _is_hiding = false
+    M._total_files = nil
+    M._last_file_count = nil
 end
 
 --- Shows the download window for a given model.
@@ -199,8 +183,6 @@ end
 --- @param sizes table Optional table explicitly containing the sizes metadata to display.
 --- @param actions table|nil Optional callbacks: on_resolve and on_retry.
 function M.show(model, on_cancel, terminal_cmd, sizes, actions)
-    M.hide()
-    
     local model_name = type(model) == "table" and (model.name or model.repo) or model
     M._current_model = type(model_name) == "string" and model_name or "inconnu"
     M._terminal_cmd  = type(terminal_cmd) == "string" and terminal_cmd or ("ollama pull " .. M._current_model)
@@ -208,17 +190,36 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
     _on_cancel = type(on_cancel) == "function" and on_cancel or nil
     _on_resolve = type(actions) == "table" and type(actions.on_resolve) == "function" and actions.on_resolve or nil
     _on_retry = type(actions) == "table" and type(actions.on_retry) == "function" and actions.on_retry or nil
+    
+    if _wv then
+        -- Window is already open, just reset its state to prevent zombie placeholders
+        _start_ts  = hs.timer.secondsSinceEpoch()
+        _queued    = {}
+        _ready     = true
+        _log_shown = false
+        M._total_files = nil
+        M._last_file_count = nil
+        
+        eval("resetUI()")
+        local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
+        eval("setModel(\"" .. safe .. "\")")
+        return
+    end
+
     _start_ts  = hs.timer.secondsSinceEpoch()
     _ready     = false
     _queued    = {}
+    M._total_files = nil
+    M._last_file_count = nil
 
     local screen = hs.screen.mainScreen()
     local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
     
-    local W, H = 460, math.floor((f.h or 1080) / 3)
+    -- Fixed size perfectly crafted to contain ~7 terminal log lines without overflowing
+    local W, H = 460, 380
     local frame = {
-        x = f.x + f.w - W - 18,
-        y = f.y + f.h - H - 50,
+        x = f.x + f.w - W - 10,
+        y = f.y + f.h - H - 10,
         w = W,
         h = H
     }
@@ -226,7 +227,7 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
     _wv = ui_builder.show_webview({
         frame             = frame,
         title             = "Téléchargement du modèle",
-        style_masks       = {"titled", "closable", "nonactivating"},
+        style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
         level             = hs.drawing.windowLevels.floating,
         allow_text_entry  = false,
         allow_gestures    = false,
@@ -238,7 +239,6 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
                 _ready = true
                 local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
                 eval("setModel(\"" .. safe .. "\")")
-                inject_sizes(model, sizes)
                 
                 for _, q in ipairs(_queued) do eval(q) end
                 _queued = {}
@@ -246,7 +246,16 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
             return true
         end,
         on_close          = function()
+            -- Skip if we are programmatically closing the window via M.hide()
+            if _is_hiding then return end
             _wv = nil
+            M._total_files = nil
+            M._last_file_count = nil
+            
+            -- Auto-abort download and reset menubar if the window is closed natively
+            local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
+            if type(hook) == "function" then pcall(hook) end
+            if type(_on_cancel) == "function" then pcall(_on_cancel) end
         end
     })
 
@@ -255,7 +264,6 @@ function M.show(model, on_cancel, terminal_cmd, sizes, actions)
             _ready = true
             local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
             eval("setModel(\"" .. safe .. "\")")
-            inject_sizes(model, sizes)
             
             for _, q in ipairs(_queued) do eval(q) end
             _queued = {}
@@ -271,9 +279,7 @@ end
 function M.update(pct_str, bytes_done, bytes_total, raw_line)
     if not _wv then return end
     
-    local pct     = tonumber(pct_str) or 0
-    -- Cap at 99% during download: 100% is reserved exclusively for done()
-    pct = math.min(math.max(0, pct), 99)
+    local pct = tonumber(pct_str) or 0
     local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
 
     local dl_str, speed_str, eta_str, file_count_str
@@ -295,18 +301,76 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
         end
     end
 
-    -- Try to extract a file progress like "7/12" from the raw log line.
+    -- Parse file counts for MLX and rich stats for Ollama directly from the logs
     if type(raw_line) == "string" and raw_line ~= "" then
-        local a, b = raw_line:match("(%d+)%s*/%s*(%d+)")
-        if a and b then
-            file_count_str = a .. "/" .. b
-            M._last_file_count = file_count_str
-        elseif M._last_file_count then
+        local clean_line = raw_line:gsub("\27%[[%d;]*%a", "")
+        
+        -- 1. Extract Ollama native progress (Ollama doesn't pass bytes_done via parameters)
+        if not bytes_done then
+            local o_pct = clean_line:match("(%d+)%%")
+            if o_pct and tonumber(o_pct) then pct = tonumber(o_pct) end
+            
+            local o_dl = clean_line:match("(%d+%.?%d*%s*[KMG]?B%s*/%s*%d+%.?%d*%s*[KMG]?B)")
+            if o_dl then dl_str = o_dl end
+            
+            local o_speed = clean_line:match("(%d+%.?%d*%s*[KMG]?B/s)")
+            if o_speed then speed_str = o_speed end
+            
+            local o_eta = clean_line:match("%s+(%d+[hms%d]+)%s*$")
+            if o_eta then eta_str = o_eta end
+        end
+
+        -- 2. MLX / HuggingFace file progress - Extremely strict matching
+        for total in clean_line:gmatch("Fetching (%d+) files") do
+            M._total_files = tonumber(total)
+        end
+        
+        local found_files = false
+        local padded_line = " " .. clean_line .. " "
+        
+        -- Primary match: tqdm format with pipe and bracket, e.g., "| 4/10 ["
+        for a, b in padded_line:gmatch("|%s*(%d+)%s*/%s*(%d+)%s*%[") do
+            if not M._total_files or tonumber(b) == M._total_files then
+                local num_a = tonumber(a) or 0
+                local num_b = tonumber(b) or 1
+                if num_a <= num_b then
+                    local last_a = M._last_file_count and tonumber(M._last_file_count:match("(%d+)%s*/")) or -1
+                    -- Prevent visual regressions if terminal artifacts jump backwards
+                    if num_a >= last_a then
+                        file_count_str = a .. "/" .. b
+                        M._last_file_count = file_count_str
+                        if not M._total_files then M._total_files = num_b end
+                        found_files = true
+                    end
+                end
+            end
+        end
+
+        -- Secondary fallback: Look for X/Y anywhere, BUT strictly bounded to prevent file size collision
+        if not found_files and M._total_files then
+            -- [^%.%w] strictly forbids dots and letters immediately around the numbers
+            for a, b in padded_line:gmatch("[^%.%w](%d+)%s*/%s*(%d+)[^%.%w]") do
+                if tonumber(b) == M._total_files then
+                    local num_a = tonumber(a) or 0
+                    local last_a = M._last_file_count and tonumber(M._last_file_count:match("(%d+)%s*/")) or -1
+                    if num_a >= last_a and num_a <= M._total_files then
+                        file_count_str = a .. "/" .. b
+                        M._last_file_count = file_count_str
+                        found_files = true
+                    end
+                end
+            end
+        end
+
+        if not file_count_str and M._last_file_count then
             file_count_str = M._last_file_count
         end
     elseif M._last_file_count then
         file_count_str = M._last_file_count
     end
+
+    -- Cap at 99% during download: 100% is reserved exclusively for done()
+    pct = math.min(math.max(0, pct), 99)
 
     local js = string.format("update(%d,%s,%s,%s,%s)",
         math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
@@ -362,7 +426,7 @@ function M.complete(success, _model_name, error_kind)
     if not _wv then return end
     
     local is_ok = success == true
-    local msg   = is_ok and "✅ Installation terminée !" or "❌ Échec du téléchargement"
+    local msg   = is_ok and "✅ Installation terminée !" or "Échec du téléchargement"
     local js    = string.format("done(%s,%s,%s); showLog()", is_ok and "true" or "false", js_str(msg), js_str(error_kind))
     
     if _ready then 
