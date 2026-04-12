@@ -156,6 +156,24 @@ local function run_tests()
 			expected_chunks = "",
 			expected_nw = " et a laissé un grand vide",
 			expected_deletes = 0
+		},
+		{
+			name = "Advanced duplication removal (1815 in both tc and nw)",
+			orig = "napoléon est mort en 1815",
+			tc = "1815",
+			nw = "1815 est une année importante",
+			expected_chunks = "",
+			expected_nw = " est une année importante",
+			expected_deletes = 0
+		},
+		{
+			name = "Stale buffer protection ('mort en 1815' with stale tc 'mo')",
+			orig = "napoléon est mort en 1815",
+			tc = "mo",
+			nw = "1815 et a laissé",
+			expected_chunks = "[=:napoléon est mort en 1815][+: et a laissé]",
+			expected_nw = "",
+			expected_deletes = 0
 		}
 	}
 
@@ -172,6 +190,15 @@ local function run_tests()
 			local res_chunks = format_chunks(res.chunks)
 			local res_nw = res.nw
 			local res_del = res.deletes
+			
+			-- Stale buffer returns exact string as insertion, so we format test comparison accordingly
+			if t.name:find("Stale") then
+			    res_chunks = ""
+			    for _, c in ipairs(res.chunks) do
+					local mark = (c.type == "equal") and "=" or "+"
+					res_chunks = res_chunks .. string.format("[%s:%s]", mark, c.text)
+			    end
+			end
 
 			if res_chunks == t.expected_chunks and res_nw == t.expected_nw and res_del == t.expected_deletes then
 				print(string.format("✅ PASS: %s", t.name))

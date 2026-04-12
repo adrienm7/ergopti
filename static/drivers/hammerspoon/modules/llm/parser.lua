@@ -206,7 +206,6 @@ local function token_sub_cost(t1, t2)
 	local dist = matrix[#c1][#c2]
 	local max_len = math.max(#c1, #c2)
 	
-	-- Strict threshold to prevent false positive typo matching on unrelated words
 	local threshold = math.max(1, math.floor(max_len * 0.4))
 	
 	if dist > threshold then return 1000 end
@@ -244,7 +243,8 @@ local function intra_word_diff(w1, w2)
 	return chunks
 end
 
---- Computes a semantic diff ops array between origin and correction.
+--- Computes a semi-global semantic diff ops array between origin and correction.
+--- Free prefix deletion on orig allows perfect overlapping without math artifacts.
 --- @param orig string The original text.
 --- @param corr string The corrected text.
 --- @return table Raw diff operations.
@@ -254,8 +254,13 @@ local function token_diff_ops(orig, corr)
 	local len1, len2 = #tokens1, #tokens2
 
 	local d = {}
-	for i = 0, len1 do d[i] = {[0] = i * 2} end
-	for j = 0, len2 do d[0][j] = j * 2 end
+	for i = 0, len1 do d[i] = {[0] = 0} end
+	
+	local sum2 = 0
+	for j = 1, len2 do
+		sum2 = sum2 + #get_chars(tokens2[j])
+		d[0][j] = sum2
+	end
 
 	for i = 1, len1 do
 		for j = 1, len2 do
@@ -269,25 +274,33 @@ local function token_diff_ops(orig, corr)
 	local i, j = len1, len2
 	local ops = {}
 	while i > 0 or j > 0 do
-		if i > 0 and j > 0 and tokens1[i] == tokens2[j] then
-			table.insert(ops, 1, {type="equal", t1=tokens1[i], t2=tokens2[j]})
-			i, j = i - 1, j - 1
+		if j == 0 then
+			table.insert(ops, 1, {type="del", t1=tokens1[i]})
+			i = i - 1
+		elseif i == 0 then
+			table.insert(ops, 1, {type="ins", t2=tokens2[j]})
+			j = j - 1
 		else
-			local cost_del = i > 0 and (d[i-1][j] + #get_chars(tokens1[i])) or math.huge
-			local cost_ins = j > 0 and (d[i][j-1] + #get_chars(tokens2[j])) or math.huge
-			local cost_sub = (i > 0 and j > 0) and (d[i-1][j-1] + token_sub_cost(tokens1[i], tokens2[j])) or math.huge
-
-			local min_cost = math.min(cost_del, cost_ins, cost_sub)
-
-			if min_cost == cost_sub then
-				table.insert(ops, 1, {type="sub", t1=tokens1[i], t2=tokens2[j]})
+			if tokens1[i] == tokens2[j] then
+				table.insert(ops, 1, {type="equal", t1=tokens1[i], t2=tokens2[j]})
 				i, j = i - 1, j - 1
-			elseif min_cost == cost_del then
-				table.insert(ops, 1, {type="del", t1=tokens1[i]})
-				i = i - 1
 			else
-				table.insert(ops, 1, {type="ins", t2=tokens2[j]})
-				j = j - 1
+				local cost_del = d[i-1][j] + #get_chars(tokens1[i])
+				local cost_ins = d[i][j-1] + #get_chars(tokens2[j])
+				local cost_sub = d[i-1][j-1] + token_sub_cost(tokens1[i], tokens2[j])
+
+				local min_cost = math.min(cost_del, cost_ins, cost_sub)
+
+				if min_cost == cost_sub then
+					table.insert(ops, 1, {type="sub", t1=tokens1[i], t2=tokens2[j]})
+					i, j = i - 1, j - 1
+				elseif min_cost == cost_del then
+					table.insert(ops, 1, {type="del", t1=tokens1[i]})
+					i = i - 1
+				else
+					table.insert(ops, 1, {type="ins", t2=tokens2[j]})
+					j = j - 1
+				end
 			end
 		end
 	end
@@ -355,12 +368,54 @@ function M.process_prediction(full_text, tail_text, block)
 		if tail_trailing_space and not tc_norm:match("[%s\194\160\226\128\175]$") then
 			tc_norm = tc_norm .. tail_trailing_space
 		end
-
-		local last_char = utils.utf8_sub(tc_norm, -1)
-		local first_char = utils.utf8_sub(nw, 1, 1)
-		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw == "")
+		
+		-- Strip overlap between tc_norm and nw_norm to prevent duplicated words
+		local function get_word_tokens(text)
+			local words = {}
+			for w in text:gmatch("[%w’']+") do table.insert(words, w) end
+			return words
+		end
+		
+		local tc_words = get_word_tokens(tc_norm)
+		local nw_words = get_word_tokens(nw)
+		local overlap_words = 0
+		
+		for i = 1, math.min(#tc_words, #nw_words) do
+			local match = true
+			for j = 1, i do
+				if tc_words[#tc_words - i + j]:lower() ~= nw_words[j]:lower() then
+					match = false
+					break
+				end
+			end
+			if match then overlap_words = i end
+		end
 		
 		local nw_norm = nw
+		if overlap_words > 0 then
+			local nw_toks = tokenize(nw_norm)
+			local words_skipped = 0
+			local slice_idx = 1
+			for idx, t in ipairs(nw_toks) do
+				if t:match("[%w’']") then
+					words_skipped = words_skipped + 1
+				end
+				if words_skipped == overlap_words then
+					slice_idx = idx + 1
+					break
+				end
+			end
+			local remaining = {}
+			for j = slice_idx, #nw_toks do table.insert(remaining, nw_toks[j]) end
+			nw_norm = table.concat(remaining, "")
+			nw_norm = nw_norm:gsub("^[%s\194\160\226\128\175]+", "")
+		end
+
+		-- Space handling
+		local last_char = utils.utf8_sub(tc_norm, -1)
+		local first_char = utils.utf8_sub(nw_norm, 1, 1)
+		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw_norm == "")
+		
 		if needs_space then nw_norm = " " .. nw_norm end
 		
 		-- Grab a safe sliding window limit from the user's buffer
