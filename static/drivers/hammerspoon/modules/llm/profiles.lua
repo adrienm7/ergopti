@@ -106,7 +106,7 @@ end
 M.BUILTIN_PROFILES = {
 	{
 		id            = "raw",
-		label         = "○○○ Raw — Aucun prompt, juste le contexte",
+		label         = "○○○ Autocomplétion — Aucun prompt, juste le contexte",
 		batch         = false,
 		system_single = RAW_PROMPT_SINGLE,
 		system_multi  = nil,
