@@ -147,6 +147,15 @@ local function run_tests()
 			expected_chunks = "",
 			expected_nw = " est une année importante",
 			expected_deletes = 0
+		},
+		{
+			name = "Stuttering bug via partial overlap (mort en 1815 -> mo 1815)",
+			orig = "napoléon est mort en 1815",
+			tc = "1815",
+			nw = "et a laissé un grand vide",
+			expected_chunks = "",
+			expected_nw = " et a laissé un grand vide",
+			expected_deletes = 0
 		}
 	}
 

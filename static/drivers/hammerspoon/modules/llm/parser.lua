@@ -205,7 +205,9 @@ local function token_sub_cost(t1, t2)
 	
 	local dist = matrix[#c1][#c2]
 	local max_len = math.max(#c1, #c2)
-	local threshold = math.max(1, max_len * 0.5)
+	
+	-- Strict threshold to prevent false positive typo matching on unrelated words
+	local threshold = math.max(1, math.floor(max_len * 0.4))
 	
 	if dist > threshold then return 1000 end
 	return dist
@@ -365,6 +367,14 @@ function M.process_prediction(full_text, tail_text, block)
 		local window_size = math.min(#normalized_full, math.max(60, #tc_norm + 30))
 		local orig_context = normalized_full:sub(#normalized_full - window_size + 1)
 		
+		-- Snap to the next valid word boundary if we cut the context mid-word to prevent partial token alignments
+		if window_size < #normalized_full and not orig_context:match("^[%s\194\160\226\128\175]") then
+			local snap_idx = orig_context:find("[%s\194\160\226\128\175]")
+			if snap_idx then
+				orig_context = orig_context:sub(snap_idx)
+			end
+		end
+		
 		-- 1. Diff strictly against TAIL_CORRECTED to avoid misaligning new words
 		local ops = token_diff_ops(orig_context, tc_norm)
 
@@ -373,7 +383,7 @@ function M.process_prediction(full_text, tail_text, block)
 		while #ops > 0 and ops[1].type == "del" do 
 			table.insert(stripped_ops, table.remove(ops, 1))
 		end
-		while #ops > 0 and ops[1].type == "ins" and ops[1].t2:match("^%s+$") do 
+		while #ops > 0 and ops[1].type == "ins" and ops[1].t2:match("^[%s\194\160\226\128\175]+$") do 
 			table.insert(stripped_ops, table.remove(ops, 1))
 		end
 		
