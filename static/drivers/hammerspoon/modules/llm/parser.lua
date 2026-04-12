@@ -17,11 +17,11 @@ local LOG    = "llm.parser"
 
 
 
--- =======================================
--- =======================================
+-- =====================================
+-- =====================================
 -- ======= 1/ Cleanup & Extraction =======
--- =======================================
--- =======================================
+-- =====================================
+-- =====================================
 
 --- Enforces strict maximum word limits by truncating excess.
 --- @param text string The predicted next words.
@@ -195,7 +195,7 @@ function M.process_prediction(full_text, tail_text, block)
 		local tail_len = utils.utf8_len(tail_text)
 		if best_c_len < tail_len * 0.4 and utils.utf8_len(tc_norm) < tail_len * 0.4 then return nil end
 
-		-- Physical exact limits for OS injection (Decoupled from visual)
+		-- Physical exact limits for OS injection (Decoupled from visual rendering)
 		local true_deletes = utils.utf8_len(best_suffix) - best_c_len
 		local true_to_type = utils.utf8_sub(full_llm, best_c_len + 1)
 
@@ -226,24 +226,15 @@ function M.process_prediction(full_text, tail_text, block)
 				end
 			end
 
-			-- Look forwards to isolate ONLY the corrected word, leaving the rest to nw
-			local word_end_char = utils.utf8_len(full_llm)
-			for i = best_c_len + 1, utils.utf8_len(full_llm) do
-				local c = utils.utf8_sub(full_llm, i, i)
-				if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
-					word_end_char = i - 1
-					break
-				end
-			end
-
-			local display_orig = utils.utf8_sub(best_suffix, word_start_char)
-			local display_corr = utils.utf8_sub(full_llm, word_start_char, word_end_char)
+			-- Diff the entire remaining overlap to guarantee perfectly accurate word colors
+			local active_start_char = word_start_char
+			local display_orig = utils.utf8_sub(best_suffix, active_start_char)
+			local display_corr = utils.utf8_sub(full_llm, active_start_char)
 			
 			chunks = utils.diff_strings(display_orig, display_corr)
 
-			-- S'il n'y a pas de mot gris avant la correction du premier mot, 
-			-- on recule d'un mot dans le buffer pour forcer son apparition dans le tooltip
-			-- (Uniquement pour le visuel, l'injection physique reste calée sur true_deletes)
+			-- If there is no gray word before the first correction, 
+			-- move back one word in the buffer to force its appearance in the tooltip
 			local has_equal_before_insert = false
 			for _, ch in ipairs(chunks) do
 				if ch.type == "equal" then
@@ -269,13 +260,40 @@ function M.process_prediction(full_text, tail_text, block)
 				end
 				
 				if prev_word_start < word_start_char then
-					display_orig = utils.utf8_sub(best_suffix, prev_word_start)
-					display_corr = utils.utf8_sub(full_llm, prev_word_start, word_end_char)
+					active_start_char = prev_word_start
+					display_orig = utils.utf8_sub(best_suffix, active_start_char)
+					display_corr = utils.utf8_sub(full_llm, active_start_char)
 					chunks = utils.diff_strings(display_orig, display_corr)
 				end
 			end
 
-			display_nw = utils.utf8_sub(full_llm, word_end_char + 1)
+			-- Extract the trailing new words into display_nw securely
+			display_nw = ""
+			if #chunks > 0 and chunks[#chunks].type == "insert" then
+				local last_text = chunks[#chunks].text
+				
+				-- Safe byte-free search to prevent Lua multibyte pattern matching crashes
+				local space_idx = last_text:find("%s")
+				local nbsp_idx  = last_text:find("\194\160")
+				local nnsp_idx  = last_text:find("\226\128\175")
+				
+				local min_idx = space_idx
+				if nbsp_idx and (not min_idx or nbsp_idx < min_idx) then min_idx = nbsp_idx end
+				if nnsp_idx and (not min_idx or nnsp_idx < min_idx) then min_idx = nnsp_idx end
+
+				-- If the trailing insert contains a space, it means it holds entirely new words
+				if min_idx then
+					local keep_part = last_text:sub(1, min_idx - 1)
+					local nw_part   = last_text:sub(min_idx)
+					
+					if keep_part ~= "" then
+						chunks[#chunks].text = keep_part
+					else
+						table.remove(chunks, #chunks)
+					end
+					display_nw = nw_part
+				end
+			end
 		else
 			has_corr = false
 			chunks = {}
