@@ -4,7 +4,7 @@
 --- MODULE: Parser Unit Tests
 --- DESCRIPTION:
 --- Validates the smart 2-tier semantic diffing engine to ensure
---- character-level corrections are cleanly extracted, and massive
+--- character-level corrections are cleanly extracted and massive
 --- buffer wipes are strictly forbidden.
 --- ==============================================================================
 
@@ -74,16 +74,15 @@ local function run_tests()
 			expected_nw = " suite"
 		},
 		{
-			name = "Strict 40% threshold override (chiens -> grand chien noir)",
+			name = "Strict Extraction (All trailing insertions are Orange)",
 			orig = "le chiens",
 			corr = "le grand chien noir",
 			expected_chunks = "[=:le ][+:grand chien]",
-			expected_nw = " noir"
+			expected_nw = " noir" -- Actually "grand chien" isn't trailing, but "noir" is!
 		}
 	}
 
 	for _, t in ipairs(tests) do
-		-- On normalise l'entrée exactement comme le fait le parser
 		local norm_orig = t.orig:gsub("e\204\129", "é")
 		local chunks, nw = parser.smart_diff(norm_orig, t.corr)
 		local res_chunks = format_chunks(chunks)

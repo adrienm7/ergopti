@@ -8,7 +8,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. NFD Normalization: Intercepts decomposed macOS characters (e + ´).
---- 2. Semantic Token Diff: Prevents cross-word scrambling and massive deletes.
+--- 2. Restricted Backtracking: Prevents massive buffer wipes by capping deletes.
+--- 3. Strict Orange Extraction: Guarantees new AI words are always orange (nw).
 --- ==============================================================================
 
 local M = {}
@@ -21,11 +22,11 @@ local LOG    = "llm.parser"
 
 
 
--- =====================================
--- =====================================
+-- =======================================
+-- =======================================
 -- ======= 1/ Cleanup & Extraction =======
--- =====================================
--- =====================================
+-- =======================================
+-- =======================================
 
 --- Normalizes macOS NFD characters (decomposed) into standard NFC characters.
 --- @param s string The input string from the macOS buffer.
@@ -255,9 +256,8 @@ function M.smart_diff(s1, s2)
 	local len1, len2 = #tokens1, #tokens2
 
 	local d = {}
-	for i = 0, len1 do d[i] = {[0] = 0} end
-	for i = 1, len1 do d[i][0] = d[i-1][0] + #get_chars(tokens1[i]) end
-	for j = 1, len2 do d[0][j] = d[0][j-1] + #get_chars(tokens2[j]) end
+	for i = 0, len1 do d[i] = {[0] = i * 2} end
+	for j = 0, len2 do d[0][j] = j * 2 end
 
 	for i = 1, len1 do
 		for j = 1, len2 do
@@ -294,19 +294,12 @@ function M.smart_diff(s1, s2)
 		end
 	end
 
-	-- Isolate strictly trailing insertions into display_nw (orange section).
-	-- Stop extracting if the insertion acts as a replacement for a deleted word.
+	-- Isolate ALL trailing insertions unconditionally into display_nw (orange section).
+	-- The AI invented words that go beyond the original text MUST be orange.
 	local trailing_nw = ""
 	local last_idx = #ops
-	while last_idx > 0 do
-		if ops[last_idx].type == "ins" then
-			if last_idx > 1 and ops[last_idx-1].type == "del" then
-				break
-			end
-			last_idx = last_idx - 1
-		else
-			break
-		end
+	while last_idx > 0 and ops[last_idx].type == "ins" do
+		last_idx = last_idx - 1
 	end
 	
 	for k = last_idx + 1, #ops do
@@ -435,8 +428,25 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Build the absolute complete intended string from the LLM
 		local full_llm = tc_norm .. nw_norm
 		
-		-- Sliding window alignment bounded to the tail to prevent deep false positives
-		local search_start = math.max(1, #normalized_full - 120)
+		-- STRICT LIMITER: Prevent massive backwards deletion.
+		-- We restrict the search window to max 2 words ago or 30 chars.
+		local safe_search_start = #normalized_full
+		local space_count = 0
+		for i = #normalized_full, 1, -1 do
+			local c = normalized_full:sub(i, i)
+			if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
+				space_count = space_count + 1
+				if space_count == 2 then
+					safe_search_start = i
+					break
+				end
+			end
+		end
+		safe_search_start = math.max(safe_search_start, #normalized_full - 30)
+		safe_search_start = math.max(1, safe_search_start)
+
+		-- Sliding window alignment safely bounded
+		local search_start = safe_search_start
 		local best_c_len = -1
 		local best_suffix = ""
 		
@@ -463,13 +473,6 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Physical exact limits for OS injection (Decoupled from visual rendering)
 		local true_deletes = utils.utf8_len(best_suffix) - best_c_len
 		local true_to_type = utils.utf8_sub(full_llm, best_c_len + 1)
-		
-		-- Absolute safety circuit breaker: Prevent massive buffer wipes
-		local max_allowed_dels = tail_len + 15
-		if true_deletes > max_allowed_dels then
-			Logger.warning(LOG, "Safety trip: Prevented massive buffer wipe.")
-			return nil
-		end
 
 		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
 
