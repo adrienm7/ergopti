@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Parser Unit Tests
 --- DESCRIPTION:
---- Validates the behavior of the weighted Wagner-Fischer diffing engine to ensure
---- spaces are correctly penalized and fragments are avoided.
+--- Validates the smart 2-tier semantic diffing engine to ensure
+--- character-level corrections are constrained inside words correctly.
 --- ==============================================================================
 
 local parser = require("modules.llm.parser")
@@ -21,46 +21,62 @@ local function format_chunks(chunks)
 	return result
 end
 
---- ==============================
---- ==============================
---- ======= 1/ Test Runner =======
---- ==============================
---- ==============================
+
+
+
+
+-- ==============================
+-- ==============================
+-- ======= 1/ Test Runner =======
+-- ==============================
+-- ==============================
 
 local function run_tests()
-	print("🚀 Starting Weighted Diff tests...\n")
+	print("🚀 Starting 2-Tier Smart Diff tests...\n")
 	local passed = 0
 	local failed = 0
 
 	local tests = {
 		{
-			name = "Simple substitution (no fragmentation)",
-			orig = "étais",
+			name = "Intra-word typing correction (étati -> était)",
+			orig = "étati",
 			corr = "était",
-			expected = "[=:étai][+:t]"
+			expected = "[=:éta][+:it]"
 		},
 		{
-			name = "Word alignment test (Charles de Gaulle)",
-			orig = "Charles de Gaulle étais le plus",
-			corr = "Charles de Gaulle était le plus",
-			expected = "[=:Charles de Gaulle étai][+:t][=: le plus]"
+			name = "Intra-word correction (étais -> était)",
+			orig = "Charles de Gaulle étais",
+			corr = "Charles de Gaulle était",
+			expected = "[=:Charles de Gaulle étai][+:t]"
 		},
 		{
-			name = "Sentence completely changed",
-			orig = "jamais vu",
-			corr = "jamais su",
-			expected = "[=:jamais ][+:s][=:u]"
+			name = "Sentence completely changed (jamais vu -> jamais su)",
+			orig = "j'ai jamais vu",
+			corr = "j'ai jamais su",
+			expected = "[=:j'ai jamais ][+:su]"
+		},
+		{
+			name = "Mid-word substitution (personage -> personnage)",
+			orig = "un personage important",
+			corr = "un personnage important",
+			expected = "[=:un person][+:n][=:age important]"
+		},
+		{
+			name = "Grammar context (ceci -> cela)",
+			orig = "je pense que ceci",
+			corr = "je pense que cela",
+			expected = "[=:je pense que c][+:el][=:a]"
 		},
 		{
 			name = "Apostrophe substitution",
 			orig = "j'aime",
 			corr = "j'adore",
-			expected = "[=:j'][+:adore]"
+			expected = "[=:j'][+:adore]" 
 		}
 	}
 
 	for _, t in ipairs(tests) do
-		local chunks = parser.weighted_diff(t.orig, t.corr)
+		local chunks = parser.smart_diff(t.orig, t.corr)
 		local result = format_chunks(chunks)
 
 		if result == t.expected then

@@ -3,8 +3,13 @@
 --- ==============================================================================
 --- MODULE: LLM Output Parser
 --- DESCRIPTION:
---- Strips conversational fillers and applies a Wagner-Fischer diffing
+--- Strips conversational fillers and applies a 2-tier semantic diffing
 --- algorithm to align LLM predictions perfectly with the user's active buffer.
+---
+--- FEATURES & RATIONALE:
+--- 1. Two-Tier Smart Diffing: Aligns words first to prevent cross-word
+---    scrambling, then diffs characters within the word to show exact typos.
+--- 2. Physical Decoupling: Separates visual tooltips from OS key injections.
 --- ==============================================================================
 
 local M = {}
@@ -17,11 +22,11 @@ local LOG    = "llm.parser"
 
 
 
---- =====================================
---- =====================================
---- ======= 1/ Cleanup & Extraction =======
---- =====================================
---- =====================================
+-- =====================================
+-- =====================================
+-- ======= 1/ Cleanup & Extraction =======
+-- =====================================
+-- =====================================
 
 --- Enforces strict maximum word limits by truncating excess.
 --- @param text string The predicted next words.
@@ -93,15 +98,15 @@ end
 
 
 
---- =======================================
---- =======================================
---- ======= 2/ Weighted Diff Engine =======
---- =======================================
---- =======================================
+-- =======================================
+-- =======================================
+-- ======= 2/ Two-Tier Smart Diff ========
+-- =======================================
+-- =======================================
 
---- Extracts UTF-8 characters from a string safely.
+--- Extracts UTF-8 characters securely into an array.
 --- @param s string The input string.
---- @return table An array of characters.
+--- @return table Array of characters.
 local function get_chars(s)
 	local chars = {}
 	for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
@@ -110,100 +115,150 @@ local function get_chars(s)
 	return chars
 end
 
---- Applies a Wagner-Fischer diffing algorithm with severe penalties for space
---- manipulation. This ensures diffs remain cleanly aligned to word boundaries.
---- @param s1 string The original text.
---- @param s2 string The corrected text.
---- @return table An array of chunk objects {type, text}.
-function M.weighted_diff(s1, s2)
-	local chars1 = get_chars(s1)
-	local chars2 = get_chars(s2)
-	local len1, len2 = #chars1, #chars2
+--- Tokenizes a string into semantic elements (words, spaces, punctuation).
+--- Keeps typographic apostrophes bound to the word.
+--- @param s string The string to tokenize.
+--- @return table Array of tokens.
+local function tokenize(s)
+	local tokens = {}
+	local current = ""
+	local current_type = 0 -- 1=word, 2=space, 3=punctuation
 
-	local d = {}
-	for i = 0, len1 do
-		d[i] = {}
-		if i == 0 then
-			d[i][0] = 0
+	for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		local t = 0
+		if c:match("%s") or c == "\194\160" or c == "\226\128\175" then
+			t = 2
+		elseif c:match("%w") or c == "’" or c == "'" or c:byte() >= 128 then
+			t = 1
 		else
-			-- Heavily penalize deleting a space to avoid cross-word matching
-			local cost = chars1[i]:match("%s") and 10 or 1
-			d[i][0] = d[i-1][0] + cost
+			t = 3
+		end
+
+		if t == 3 then
+			if current ~= "" then table.insert(tokens, current) end
+			table.insert(tokens, c)
+			current = ""
+			current_type = 0
+		elseif t == current_type then
+			current = current .. c
+		else
+			if current ~= "" then table.insert(tokens, current) end
+			current = c
+			current_type = t
 		end
 	end
+	if current ~= "" then table.insert(tokens, current) end
+	return tokens
+end
 
-	for j = 1, len2 do
-		local cost = chars2[j]:match("%s") and 10 or 1
-		d[0][j] = d[0][j-1] + cost
+--- Performs a precise character-level diff strictly bounded within a single word.
+--- Uses a prefix/suffix isolation method to generate clean typo visualisations.
+--- @param w1 string The original word.
+--- @param w2 string The corrected word.
+--- @return table Array of styled chunks.
+local function intra_word_diff(w1, w2)
+	local c1 = get_chars(w1)
+	local c2 = get_chars(w2)
+	
+	local p_len = 0
+	while p_len < #c1 and p_len < #c2 and c1[p_len+1] == c2[p_len+1] do
+		p_len = p_len + 1
 	end
+	
+	local s_len = 0
+	while s_len < (#c1 - p_len) and s_len < (#c2 - p_len) and c1[#c1 - s_len] == c2[#c2 - s_len] do
+		s_len = s_len + 1
+	end
+	
+	local prefix = table.concat(c2, "", 1, p_len)
+	local mid    = table.concat(c2, "", p_len + 1, #c2 - s_len)
+	local suffix = table.concat(c2, "", #c2 - s_len + 1, #c2)
+	
+	local chunks = {}
+	if prefix ~= "" then table.insert(chunks, {type="equal", text=prefix}) end
+	if mid ~= "" then table.insert(chunks, {type="insert", text=mid}) end
+	if suffix ~= "" then table.insert(chunks, {type="equal", text=suffix}) end
+	
+	return chunks
+end
+
+--- Computes a smart semantic diff preventing cross-word character scrambling.
+--- @param s1 string The original text context.
+--- @param s2 string The corrected prediction text.
+--- @return table The resulting styled chunk array.
+function M.smart_diff(s1, s2)
+	local tokens1 = tokenize(s1)
+	local tokens2 = tokenize(s2)
+	local len1, len2 = #tokens1, #tokens2
+
+	local d = {}
+	for i = 0, len1 do d[i] = {[0] = i} end
+	for j = 0, len2 do d[0][j] = j end
 
 	for i = 1, len1 do
 		for j = 1, len2 do
-			local c1, c2 = chars1[i], chars2[j]
-			local is_space1 = c1:match("%s") ~= nil
-			local is_space2 = c2:match("%s") ~= nil
-
-			local cost_del = d[i-1][j] + (is_space1 and 10 or 1)
-			local cost_ins = d[i][j-1] + (is_space2 and 10 or 1)
-
-			local cost_sub
-			if c1 == c2 then
-				cost_sub = d[i-1][j-1]
-			else
-				-- Substituting a space with a character (or vice versa) is extremely expensive
-				local sub_penalty = (is_space1 or is_space2) and 12 or 2
-				cost_sub = d[i-1][j-1] + sub_penalty
-			end
-
+			local cost_del = d[i-1][j] + 1
+			local cost_ins = d[i][j-1] + 1
+			local cost_sub = d[i-1][j-1] + (tokens1[i] == tokens2[j] and 0 or 2)
 			d[i][j] = math.min(cost_del, cost_ins, cost_sub)
 		end
 	end
 
-	-- Backtrack to build the diff path
 	local i, j = len1, len2
 	local ops = {}
 	while i > 0 or j > 0 do
-		local c1 = i > 0 and chars1[i] or nil
-		local c2 = j > 0 and chars2[j] or nil
-
-		if i > 0 and j > 0 and c1 == c2 then
-			table.insert(ops, 1, {type="equal", text=c1})
-			i = i - 1
-			j = j - 1
+		if i > 0 and j > 0 and tokens1[i] == tokens2[j] then
+			table.insert(ops, 1, {type="equal", t1=tokens1[i], t2=tokens2[j]})
+			i, j = i - 1, j - 1
 		else
-			local is_space1 = c1 and c1:match("%s") ~= nil
-			local is_space2 = c2 and c2:match("%s") ~= nil
-
-			local cost_del = i > 0 and (d[i-1][j] + (is_space1 and 10 or 1)) or math.huge
-			local cost_ins = j > 0 and (d[i][j-1] + (is_space2 and 10 or 1)) or math.huge
-			local sub_penalty = (is_space1 or is_space2) and 12 or 2
-			local cost_sub = (i > 0 and j > 0) and (d[i-1][j-1] + sub_penalty) or math.huge
+			local cost_del = i > 0 and d[i-1][j] or math.huge
+			local cost_ins = j > 0 and d[i][j-1] or math.huge
+			local cost_sub = (i > 0 and j > 0) and d[i-1][j-1] or math.huge
 
 			local min_cost = math.min(cost_del, cost_ins, cost_sub)
 
-			if min_cost == cost_sub and min_cost < math.huge then
-				-- Treat substitutions as insertions of new text (visual green)
-				table.insert(ops, 1, {type="insert", text=c2})
-				i = i - 1
-				j = j - 1
-			elseif min_cost == cost_del and min_cost < math.huge then
-				-- Deletions are physically performed but hidden in the UI chunk stream
+			if min_cost == cost_sub then
+				table.insert(ops, 1, {type="sub", t1=tokens1[i], t2=tokens2[j]})
+				i, j = i - 1, j - 1
+			elseif min_cost == cost_del then
+				table.insert(ops, 1, {type="del", t1=tokens1[i]})
 				i = i - 1
 			else
-				table.insert(ops, 1, {type="insert", text=c2})
+				table.insert(ops, 1, {type="ins", t2=tokens2[j]})
 				j = j - 1
 			end
 		end
 	end
 
-	-- Consolidate contiguous operations of the same type
-	local merged = {}
+	local chunks = {}
 	for _, op in ipairs(ops) do
+		if op.type == "equal" then
+			table.insert(chunks, {type="equal", text=op.t2})
+		elseif op.type == "ins" then
+			table.insert(chunks, {type="insert", text=op.t2})
+		elseif op.type == "sub" then
+			local w1, w2 = op.t1, op.t2
+			local is_word1 = w1:match("[%w’']") or w1:byte() >= 128
+			local is_word2 = w2:match("[%w’']") or w2:byte() >= 128
+			
+			if is_word1 and is_word2 then
+				local sub_chunks = intra_word_diff(w1, w2)
+				for _, sc in ipairs(sub_chunks) do
+					table.insert(chunks, sc)
+				end
+			else
+				table.insert(chunks, {type="insert", text=w2})
+			end
+		end
+	end
+
+	local merged = {}
+	for _, c in ipairs(chunks) do
 		local last = merged[#merged]
-		if last and last.type == op.type then
-			last.text = last.text .. op.text
+		if last and last.type == c.type then
+			last.text = last.text .. c.text
 		else
-			table.insert(merged, {type=op.type, text=op.text})
+			table.insert(merged, {type=c.type, text=c.text})
 		end
 	end
 
@@ -214,11 +269,11 @@ end
 
 
 
---- ========================================
---- ========================================
---- ======= 3/ Core Processing Logic =======
---- ========================================
---- ========================================
+-- ========================================
+-- ========================================
+-- ======= 3/ Core Processing Logic =======
+-- ========================================
+-- ========================================
 
 --- Parses explicit prompt tags to determine insertions and deletions securely.
 --- @param full_text string The full user context provided to the LLM.
@@ -352,7 +407,7 @@ function M.process_prediction(full_text, tail_text, block)
 			local display_orig = utils.utf8_sub(best_suffix, active_start_char)
 			local display_corr = utils.utf8_sub(full_llm, active_start_char)
 			
-			chunks = M.weighted_diff(display_orig, display_corr)
+			chunks = M.smart_diff(display_orig, display_corr)
 
 			-- If there is no gray word before the first correction, 
 			-- move back one word in the buffer to force its appearance in the tooltip
@@ -384,7 +439,7 @@ function M.process_prediction(full_text, tail_text, block)
 					active_start_char = prev_word_start
 					display_orig = utils.utf8_sub(best_suffix, active_start_char)
 					display_corr = utils.utf8_sub(full_llm, active_start_char)
-					chunks = M.weighted_diff(display_orig, display_corr)
+					chunks = M.smart_diff(display_orig, display_corr)
 				end
 			end
 
