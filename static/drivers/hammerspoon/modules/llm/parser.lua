@@ -290,6 +290,25 @@ function M.process_prediction(full_text, tail_text, block)
 			final_to_type = to_type
 		end
 
+		-- Smart spacing fallback for Advanced Mode to ensure perfect connections
+		if final_deletes == 0 and final_to_type ~= "" and tail_text ~= "" then
+			local t_last = utils.utf8_sub(tail_text, -1)
+			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
+			local is_apos  = t_last:match("['’]")
+			local type_start = utils.utf8_sub(final_to_type, 1, 1)
+			
+			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
+				final_to_type = " " .. final_to_type
+				if display_nw ~= "" and not display_nw:match("^%s") then
+					display_nw = " " .. display_nw
+				end
+			elseif is_space and type_start:match("^%s") then
+				-- Prevent double spaces if both tail_text and to_type have a space
+				final_to_type = final_to_type:gsub("^%s+", "")
+				display_nw = display_nw:gsub("^%s+", "")
+			end
+		end
+
 		return { 
 			deletes = final_deletes, 
 			to_type = final_to_type, 
@@ -362,6 +381,10 @@ function M.process_prediction(full_text, tail_text, block)
 			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
 				to_type = " " .. to_type
 				nw = " " .. nw
+			elseif is_space and type_start:match("^%s") then
+				-- Prevent double spaces if both tail_text and to_type have a space
+				to_type = to_type:gsub("^%s+", "")
+				nw = nw:gsub("^%s+", "")
 			end
 		end
 

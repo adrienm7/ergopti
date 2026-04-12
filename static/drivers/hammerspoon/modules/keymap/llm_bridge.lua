@@ -353,15 +353,18 @@ function M.apply_prediction(idx)
 	-- Otherwise, the LLM responds too fast, the tooltip displays, and the 
 	-- remaining synthetic keystrokes trigger the event tap and hide it immediately.
 	local to_type_len = to_type and text_utils.utf8_len(to_type) or 0
-	local suppress_time = math.max(0.3, (to_type_len * 0.015) + 0.15)
+	local suppress_time = math.max(0.4, (to_type_len * 0.02) + 0.2)
 	_state.suppress_rescan_keep_buffer(suppress_time)
 	
 	if M._llm_timer and type(M._llm_timer.stop) == "function" then
 		M._llm_timer:stop()
 	end
+	if M._chain_timer and type(M._chain_timer.stop) == "function" then
+		M._chain_timer:stop()
+	end
 	
-	-- Launch the next prediction seamlessly AFTER the synthetic injection completes
-	hs.timer.doAfter(suppress_time, function()
+	-- Launch the next prediction seamlessly AFTER the synthetic injection completes safely
+	M._chain_timer = hs.timer.doAfter(suppress_time + 0.05, function()
 		M._perform_llm_check(true)
 	end)
 	
