@@ -347,13 +347,17 @@ function M.apply_prediction(idx)
 		keylogger.set_buffer(_state.buffer)
 	end
 
-	_state.suppress_rescan_keep_buffer(0.3)
+	-- Dynamically scale the keylogger suppression time to match the length of the injected string
+	-- This prevents the keylogger from waking up mid-injection and canceling the next chained request
+	local to_type_len = to_type and #to_type or 0
+	local suppress_time = math.max(0.4, (to_type_len * 0.01) + 0.2)
+	_state.suppress_rescan_keep_buffer(suppress_time)
 	
-	-- Force the next prediction directly to create a seamless chained experience
 	if M._llm_timer and type(M._llm_timer.stop) == "function" then
 		M._llm_timer:stop()
 	end
 	
+	-- Delay the subsequent automatic fetch just long enough for the async keyStrokes to flush into the OS
 	hs.timer.doAfter(0.01, function()
 		M._perform_llm_check(true)
 	end)
