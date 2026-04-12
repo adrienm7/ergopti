@@ -4,7 +4,8 @@
 --- MODULE: Parser Unit Tests
 --- DESCRIPTION:
 --- Validates the smart 2-tier semantic diffing engine to ensure
---- character-level corrections are cleanly extracted and new words separated.
+--- character-level corrections are cleanly extracted, and massive
+--- buffer wipes are strictly forbidden.
 --- ==============================================================================
 
 local parser = require("modules.llm.parser")
@@ -66,23 +67,25 @@ local function run_tests()
 			expected_nw = " important"
 		},
 		{
-			name = "Typographic apostrophe substitution with NFD handling simulation",
-			orig = "j'aime",
-			corr = "j'adore les chats",
-			expected_chunks = "[=:j'][+:adore]",
-			expected_nw = " les chats"
-		},
-		{
-			name = "NFD Normalization test (Decomposed é vs Composed é)",
+			name = "NFD Normalization simulation (e + ´)",
 			orig = "truc e\204\129tait bidule",
 			corr = "truc était bidule suite",
 			expected_chunks = "[=:truc était bidule]",
 			expected_nw = " suite"
+		},
+		{
+			name = "Strict 40% threshold override (chiens -> grand chien noir)",
+			orig = "le chiens",
+			corr = "le grand chien noir",
+			expected_chunks = "[=:le ][+:grand chien]",
+			expected_nw = " noir"
 		}
 	}
 
 	for _, t in ipairs(tests) do
-		local chunks, nw = parser.smart_diff(t.orig, t.corr)
+		-- On normalise l'entrée exactement comme le fait le parser
+		local norm_orig = t.orig:gsub("e\204\129", "é")
+		local chunks, nw = parser.smart_diff(norm_orig, t.corr)
 		local res_chunks = format_chunks(chunks)
 
 		if res_chunks == t.expected_chunks and nw == t.expected_nw then

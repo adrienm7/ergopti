@@ -460,6 +460,10 @@ local function build_line(pred, is_sel, total_preds)
 	end
 	
 	local apply_bold = has_corr and has_gray
+	
+	if pred.disable_bold then
+		apply_bold = false
+	end
 
 	local first_done = false
 	local function clean_first(s)

@@ -176,7 +176,7 @@ local function tokenize(s)
 end
 
 --- Calculates the cost of substituting two semantic tokens.
---- Implements a strict 40% similarity threshold to avoid scrambling unrelated words.
+--- Implements a strict similarity threshold to avoid scrambling unrelated words.
 --- @param t1 string The original token.
 --- @param t2 string The target token.
 --- @return number The substitution cost.
@@ -205,7 +205,7 @@ local function token_sub_cost(t1, t2)
 	
 	local dist = matrix[#c1][#c2]
 	local max_len = math.max(#c1, #c2)
-	local threshold = math.max(1, max_len * 0.4)
+	local threshold = math.max(1, max_len * 0.5)
 	
 	-- Forbid substitution if words are too different, ensuring clean insertions
 	if dist > threshold then return 1000 end
@@ -255,8 +255,9 @@ function M.smart_diff(s1, s2)
 	local len1, len2 = #tokens1, #tokens2
 
 	local d = {}
-	for i = 0, len1 do d[i] = {[0] = i * 2} end
-	for j = 0, len2 do d[0][j] = j * 2 end
+	for i = 0, len1 do d[i] = {[0] = 0} end
+	for i = 1, len1 do d[i][0] = d[i-1][0] + #get_chars(tokens1[i]) end
+	for j = 1, len2 do d[0][j] = d[0][j-1] + #get_chars(tokens2[j]) end
 
 	for i = 1, len1 do
 		for j = 1, len2 do
@@ -480,6 +481,7 @@ function M.process_prediction(full_text, tail_text, block)
 		local has_corr = false
 		local chunks = {}
 		local display_nw = ""
+		local disable_bold = false
 
 		-- If true_deletes > 0, the LLM actively modified or removed a user character
 		if true_deletes > 0 then
@@ -539,6 +541,11 @@ function M.process_prediction(full_text, tail_text, block)
 				end
 			end
 
+			-- Check if green (insert) directly touches orange (nw). If so, disable bold styling.
+			if #chunks > 0 and chunks[#chunks].type == "insert" and display_nw:match("%S") then
+				disable_bold = true
+			end
+
 		else
 			has_corr = false
 			chunks = {}
@@ -569,7 +576,8 @@ function M.process_prediction(full_text, tail_text, block)
 			to_type = true_to_type, 
 			nw = display_nw, 
 			has_corrections = has_corr, 
-			chunks = chunks 
+			chunks = chunks,
+			disable_bold = disable_bold
 		}
 		
 	else
@@ -651,7 +659,7 @@ function M.process_prediction(full_text, tail_text, block)
 		if final_count < min_w then return nil end
 		
 		Logger.info(LOG, "Fallback text parsed successfully.")
-		return { deletes = deletes, to_type = to_type, nw = nw, has_corrections = false, chunks = {} }
+		return { deletes = deletes, to_type = to_type, nw = nw, has_corrections = false, chunks = {}, disable_bold = false }
 	end
 end
 
