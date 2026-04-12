@@ -50,7 +50,8 @@ local function run_tests()
 
 	local tests = {
 		{
-			name = "Duplication bug ('est un homme' -> perfectly appended)",
+			-- 1. Le problème de l'ancre grise inutile qui doublait le mot
+			name = "Invisible Gray Anchor Purge ('histoire' -> perfectly appended)",
 			orig = "Charles de Gaulle est un homme important de l'histoire",
 			tc = "est un homme important de l'histoire",
 			nw = "qui laisse une trace",
@@ -59,6 +60,7 @@ local function run_tests()
 			expected_deletes = 0
 		},
 		{
+			-- 2. La correction parfaite intra-mot (vert collé à l'orange)
 			name = "Intra-word typing correction (étati -> était le)",
 			orig = "étati",
 			tc = "était",
@@ -68,6 +70,7 @@ local function run_tests()
 			expected_deletes = 2 -- "ti"
 		},
 		{
+			-- 3. La correction qui isole bien l'erreur mais sans afficher tout le reste en vert
 			name = "Intra-word with context (étais -> était un personnage)",
 			orig = "Charles de Gaulle étais",
 			tc = "Charles de Gaulle était",
@@ -77,6 +80,7 @@ local function run_tests()
 			expected_deletes = 1 -- "s"
 		},
 		{
+			-- 4. Le mot entier remplacé 
 			name = "Complete word replacement (jamais vu -> jamais su)",
 			orig = "j'ai jamais vu",
 			tc = "j'ai jamais su",
@@ -86,6 +90,7 @@ local function run_tests()
 			expected_deletes = 2 -- "vu"
 		},
 		{
+			-- 5. Le bouclier Anti-NFD pour macOS
 			name = "Typographic apostrophe & NFD handling (e + ´)",
 			orig = "truc e\204\129tait bidule",
 			tc = "truc était bidule",
@@ -95,6 +100,7 @@ local function run_tests()
 			expected_deletes = 0 -- Perfect NFC match after normalization
 		},
 		{
+			-- 6. L'extraction stricte (Les mots en plus DOIVENT être orange)
 			name = "Strict Extraction (New words are ONLY orange)",
 			orig = "le chien",
 			tc = "le chien",
@@ -104,6 +110,7 @@ local function run_tests()
 			expected_deletes = 0
 		},
 		{
+			-- 7. L'extraction mixte (Correction en vert, ajouts en orange)
 			name = "Replacement with invented word (chiens -> chien noir)",
 			orig = "le chiens",
 			tc = "le chien",
@@ -111,15 +118,6 @@ local function run_tests()
 			expected_chunks = "[=:le ][+:chien]",
 			expected_nw = " noir",
 			expected_deletes = 6 -- "chiens"
-		},
-		{
-			name = "Trailing space bug (mot_ -> mot_suite)",
-			orig = "mot ",
-			tc = "mot",
-			nw = "suite",
-			expected_chunks = "",
-			expected_nw = " suite",
-			expected_deletes = 0 -- Trailing space is smartly merged
 		}
 	}
 

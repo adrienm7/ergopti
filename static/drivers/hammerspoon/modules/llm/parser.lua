@@ -9,7 +9,7 @@
 --- FEATURES & RATIONALE:
 --- 1. NFD Normalization: Intercepts decomposed macOS characters (e + ´).
 --- 2. Decoupled Pipeline: Separates physical typing ops from UI visual chunks.
---- 3. Visual Filtering: Hides useless gray anchors if no visible correction occurred.
+--- 3. Strict NW Extraction: Guarantees invented words are always orange.
 --- ==============================================================================
 
 local M = {}
@@ -177,7 +177,7 @@ local function tokenize(s)
 end
 
 --- Calculates the cost of substituting two semantic tokens.
---- Implements a strict similarity threshold to avoid scrambling unrelated words.
+--- Implements a generous similarity threshold to allow typo detection inside words.
 --- @param t1 string The original token.
 --- @param t2 string The target token.
 --- @return number The substitution cost.
@@ -187,6 +187,7 @@ local function token_sub_cost(t1, t2)
 	local type1 = (t1:match("%s") and 2) or (t1:match("[%w’']") and 1) or 3
 	local type2 = (t2:match("%s") and 2) or (t2:match("[%w’']") and 1) or 3
 	
+	-- Heavy penalty for crossing token types to prevent visual scrambling
 	if type1 ~= type2 then return 1000 end
 	
 	local c1 = get_chars(t1)
@@ -205,7 +206,7 @@ local function token_sub_cost(t1, t2)
 	
 	local dist = matrix[#c1][#c2]
 	local max_len = math.max(#c1, #c2)
-	local threshold = math.max(1, max_len * 0.5)
+	local threshold = math.max(2, max_len * 0.7) -- Allow up to 70% difference to catch typos like 'étati'->'était'
 	
 	if dist > threshold then return 1000 end
 	return dist
@@ -236,13 +237,6 @@ local function intra_word_diff(w1, w2)
 	
 	local chunks = {}
 	if prefix ~= "" then table.insert(chunks, {type="equal", text=prefix}) end
-	
-	-- Force the whole word to green if it's a pure deletion inside a word (e.g. histoires -> histoire)
-	-- This prevents silent/invisible corrections in the UI.
-	if mid == "" and w1 ~= w2 then
-		return {{type="insert", text=w2}}
-	end
-	
 	if mid ~= "" then table.insert(chunks, {type="insert", text=mid}) end
 	if suffix ~= "" then table.insert(chunks, {type="equal", text=suffix}) end
 	
@@ -299,27 +293,29 @@ function M.smart_diff(s1, s2)
 	end
 
 	-- Isolate strictly trailing insertions into display_nw (orange section).
-	-- Stop extracting if the insertion acts as a replacement for a deleted word.
-	local trailing_nw = ""
-	local last_idx = #ops
-	while last_idx > 0 do
-		if ops[last_idx].type == "ins" then
-			if last_idx > 1 and ops[last_idx-1].type == "del" then
+	-- We stop extracting if the insertion is acting as a 1-to-1 replacement for a deleted token.
+	local extract_ops = {}
+	local k = #ops
+	while k > 0 do
+		if ops[k].type == "ins" then
+			if k > 1 and ops[k-1].type == "del" then
 				break
 			end
-			last_idx = last_idx - 1
+			table.insert(extract_ops, 1, ops[k])
+			k = k - 1
 		else
 			break
 		end
 	end
 	
-	for k = last_idx + 1, #ops do
-		trailing_nw = trailing_nw .. ops[k].t2
+	local trailing_nw = ""
+	for _, op in ipairs(extract_ops) do
+		trailing_nw = trailing_nw .. op.t2
 	end
 	
 	local visual_ops = {}
-	for k = 1, last_idx do
-		table.insert(visual_ops, ops[k])
+	for v = 1, k do
+		table.insert(visual_ops, ops[v])
 	end
 
 	-- Transform remaining operations into UI chunks
@@ -441,20 +437,20 @@ function M.process_prediction(full_text, tail_text, block)
 		local full_llm = tc_norm .. nw_norm
 		
 		-- STRICT LIMITER: Prevent massive backwards deletion.
-		-- We restrict the search window to max 2 words ago or 30 chars.
+		-- We restrict the search window to max 3 words ago or 40 chars.
 		local safe_search_start = #normalized_full
 		local space_count = 0
 		for i = #normalized_full, 1, -1 do
 			local c = normalized_full:sub(i, i)
 			if c == " " or c == "\n" or c == "\t" or c == "\194\160" or c == "\226\128\175" then
 				space_count = space_count + 1
-				if space_count == 2 then
+				if space_count == 3 then
 					safe_search_start = i
 					break
 				end
 			end
 		end
-		safe_search_start = math.max(safe_search_start, #normalized_full - 30)
+		safe_search_start = math.max(safe_search_start, #normalized_full - 40)
 		safe_search_start = math.max(1, safe_search_start)
 
 		-- Sliding window alignment safely bounded
@@ -485,6 +481,12 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Physical exact limits for OS injection (Decoupled from visual rendering)
 		local true_deletes = utils.utf8_len(best_suffix) - best_c_len
 		local true_to_type = utils.utf8_sub(full_llm, best_c_len + 1)
+		
+		local max_allowed_dels = tail_len + 15
+		if true_deletes > max_allowed_dels then
+			Logger.warning(LOG, string.format("Safety trip: Blocked deletion of %d chars.", true_deletes))
+			return nil
+		end
 
 		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
 
@@ -522,7 +524,7 @@ function M.process_prediction(full_text, tail_text, block)
 			local visual_ops
 			chunks, display_nw, visual_ops = M.smart_diff(display_orig, display_corr)
 
-			-- Intelligent UI Filtering: If the only modification is a space,
+			-- Intelligent UI Filtering: If the only modification is a space or punctuation,
 			-- hide the gray anchor entirely so the user only sees the orange NW.
 			local has_visible_correction = false
 			for _, op in ipairs(visual_ops) do
