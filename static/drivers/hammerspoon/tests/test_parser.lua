@@ -71,6 +71,13 @@ local function run_tests()
 			corr = "j'adore les chats",
 			expected_chunks = "[=:j'][+:adore]",
 			expected_nw = " les chats"
+		},
+		{
+			name = "NFD Normalization test (Decomposed é vs Composed é)",
+			orig = "truc e\204\129tait bidule",
+			corr = "truc était bidule suite",
+			expected_chunks = "[=:truc était bidule]",
+			expected_nw = " suite"
 		}
 	}
 

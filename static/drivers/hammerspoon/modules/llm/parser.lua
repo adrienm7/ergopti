@@ -28,6 +28,31 @@ local LOG    = "llm.parser"
 -- =====================================
 -- =====================================
 
+--- Normalizes macOS NFD characters (decomposed) into standard NFC characters.
+--- @param s string The input string from the macOS buffer.
+--- @return string The normalized string.
+local function normalize_nfd(s)
+	if type(s) ~= "string" then return s end
+	local nfd_map = {
+		["a\204\128"] = "à", ["a\204\130"] = "â", ["a\204\136"] = "ä",
+		["e\204\128"] = "è", ["e\204\129"] = "é", ["e\204\130"] = "ê", ["e\204\136"] = "ë",
+		["i\204\130"] = "î", ["i\204\136"] = "ï",
+		["o\204\130"] = "ô", ["o\204\136"] = "ö",
+		["u\204\128"] = "ù", ["u\204\130"] = "û", ["u\204\136"] = "ü",
+		["c\204\167"] = "ç",
+		["A\204\128"] = "À", ["A\204\130"] = "Â", ["A\204\136"] = "Ä",
+		["E\204\128"] = "È", ["E\204\129"] = "É", ["E\204\130"] = "Ê", ["E\204\136"] = "Ë",
+		["I\204\130"] = "Î", ["I\204\136"] = "Ï",
+		["O\204\130"] = "Ô", ["O\204\136"] = "Ö",
+		["U\204\128"] = "Ù", ["U\204\130"] = "Û", ["U\204\136"] = "Ü",
+		["C\204\167"] = "Ç"
+	}
+	for nfd, nfc in pairs(nfd_map) do
+		s = s:gsub(nfd, nfc)
+	end
+	return s
+end
+
 --- Enforces strict maximum word limits by truncating excess.
 --- @param text string The predicted next words.
 --- @param max_w number Maximum allowed words (0 for unlimited).
@@ -45,36 +70,6 @@ local function enforce_word_limits(text, max_w)
 		if count < max_w then rebuilt = rebuilt .. s end
 	end
 	return rebuilt:gsub("%s+$", "")
-end
-
---- Normalizes macOS NFD characters (decomposed) into standard NFC characters.
---- @param s string The input string from the macOS buffer.
---- @return string The normalized string.
-local function normalize_nfd(s)
-	if type(s) ~= "string" then return s end
-	local replacements = {
-		["e\204\129"] = "é",
-		["e\204\128"] = "è",
-		["e\204\130"] = "ê",
-		["e\204\136"] = "ë",
-		["a\204\128"] = "à",
-		["a\204\130"] = "â",
-		["u\204\128"] = "ù",
-		["u\204\130"] = "û",
-		["u\204\136"] = "ü",
-		["i\204\130"] = "î",
-		["i\204\136"] = "ï",
-		["o\204\130"] = "ô",
-		["c\204\167"] = "ç",
-		["E\204\129"] = "É",
-		["E\204\128"] = "È",
-		["C\204\167"] = "Ç",
-		["A\204\128"] = "À"
-	}
-	for nfd, nfc in pairs(replacements) do
-		s = s:gsub(nfd, nfc)
-	end
-	return s
 end
 
 --- Strips conversational filler and markdown from the model’s raw text.
@@ -182,6 +177,7 @@ local function tokenize(s)
 end
 
 --- Calculates the cost of substituting two semantic tokens.
+--- Implements a strict 40% similarity threshold to avoid scrambling unrelated words.
 --- @param t1 string The original token.
 --- @param t2 string The target token.
 --- @return number The substitution cost.
@@ -208,7 +204,14 @@ local function token_sub_cost(t1, t2)
 		end
 	end
 	
-	return matrix[#c1][#c2]
+	local dist = matrix[#c1][#c2]
+	local max_len = math.max(#c1, #c2)
+	local threshold = math.max(1, max_len * 0.4)
+	
+	-- Forbid substitution if words are too different, ensuring clean insertions
+	if dist > threshold then return 1000 end
+	
+	return dist
 end
 
 --- Performs a precise character-level diff strictly bounded within a single word.
@@ -248,6 +251,10 @@ end
 --- @param s2 string The corrected prediction text.
 --- @return table, string The resulting styled chunk array, and the trailing new words.
 function M.smart_diff(s1, s2)
+	-- Normalize NFD characters safely before any logic is applied
+	s1 = normalize_nfd(s1)
+	s2 = normalize_nfd(s2)
+	
 	local tokens1 = tokenize(s1)
 	local tokens2 = tokenize(s2)
 	local len1, len2 = #tokens1, #tokens2
@@ -386,7 +393,7 @@ function M.process_prediction(full_text, tail_text, block)
 		tc = trim(tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		nw = trim(nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		
-		-- Enforce typography normalisation on model predictions
+		-- Enforce typography normalisation on model predictions to match input state
 		tc = tc:gsub("'", "’")
 		nw = nw:gsub("'", "’")
 		
