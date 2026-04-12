@@ -18,6 +18,7 @@ local hs        = hs
 local OllamaMgr = require("ui.menu.menu_llm.models_manager_ollama")
 local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
 local Logger    = require("lib.logger")
+local llm_mod   = require("modules.llm")
 
 local LOG = "menu_llm.models"
 
@@ -371,11 +372,17 @@ function M.new(deps)
 	local mlx    = MlxMgr.new(deps, presets)
 
 	local function get_active()
-		return (deps.state.llm_backend == "mlx") and mlx or ollama
+		local active_backend = llm_mod.get_backend()
+		if active_backend == "mlx" then
+			return mlx
+		end
+		return ollama
 	end
 
 	function obj.get_presets()
-		if deps.state.llm_backend ~= "mlx" then return presets end
+		local active_backend = llm_mod.get_backend()
+		if active_backend ~= "mlx" then return presets end
+		
 		local filtered = {}
 		for _, provider in ipairs(presets) do
 			local new_provider = { label = provider.label, families = {} }
@@ -395,14 +402,20 @@ function M.new(deps)
 	
 	function obj.get_mlx_repo(name) return mlx.get_mlx_repo(name) end
 	function obj.get_model_info(name) return get_model_info_logic(name, presets) end
-	function obj.get_model_ram(name) return get_model_ram_logic(name, presets, deps.state.llm_backend == "mlx") end
+	
+	function obj.get_model_ram(name) 
+		local active_backend = llm_mod.get_backend()
+		return get_model_ram_logic(name, presets, active_backend == "mlx") 
+	end
+	
 	function obj.get_model_emojis(name) return get_model_info_logic(name, presets).emojis end
 	
 	--- Gets the actual backend-specific model name.
 	--- @param display_name string The display name from llm_models.json.
 	--- @return string The real model name for the active backend.
 	function obj.get_actual_model_name(display_name)
-		return get_actual_model_name(display_name, presets, deps.state.llm_backend == "mlx")
+		local active_backend = llm_mod.get_backend()
+		return get_actual_model_name(display_name, presets, active_backend == "mlx")
 	end
 	
 	--- Checks if a display model name is installed, by converting to real backend name.
@@ -410,15 +423,16 @@ function M.new(deps)
 	--- @return boolean True if installed, false otherwise.
 	function obj.is_model_installed(display_name)
 		local installed = obj.get_installed_models()
-		-- MLX stores by display name (m.name), try that first
 		if installed[display_name] then return true end
-		-- Ollama stores by actual backend name, convert and try
-		local actual_name = get_actual_model_name(display_name, presets, deps.state.llm_backend == "mlx")
+		
+		local active_backend = llm_mod.get_backend()
+		local actual_name = get_actual_model_name(display_name, presets, active_backend == "mlx")
 		return installed[actual_name] or installed[actual_name .. ":latest"] or false
 	end
 	
 	function obj.get_installed_models()
-		if deps.state.llm_backend == "mlx" then
+		local active_backend = llm_mod.get_backend()
+		if active_backend == "mlx" then
 			return mlx.get_installed_models() or {}
 		else
 			return ollama.get_installed_models() or {}
@@ -430,12 +444,15 @@ function M.new(deps)
 	end
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(...) return mlx.check_requirements(...) end
+	
 	function obj.open_model_source_page(name)
-		if deps.state.llm_backend == "mlx" and type(mlx.open_model_source_page) == "function" then
+		local active_backend = llm_mod.get_backend()
+		if active_backend == "mlx" and type(mlx.open_model_source_page) == "function" then
 			return mlx.open_model_source_page(name)
 		end
 		return false
 	end
+	
 	function obj.prompt_hf_login(on_done)
 		if type(mlx.prompt_hf_login) == "function" then
 			return mlx.prompt_hf_login(on_done)

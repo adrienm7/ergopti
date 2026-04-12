@@ -23,26 +23,23 @@ local LOG    = "llm.parser"
 -- =======================================
 -- =======================================
 
---- Enforces strict word limits by truncating excess and rejecting if below minimum.
+--- Enforces strict maximum word limits by truncating excess.
 --- @param text string The predicted next words.
---- @param min_w number Minimum allowed words.
 --- @param max_w number Maximum allowed words (0 for unlimited).
---- @return string|nil The processed string, or nil if below minimum.
-local function enforce_word_limits(text, min_w, max_w)
-	if type(text) ~= "string" or text == "" then
-		return (min_w > 0) and nil or ""
-	end
+--- @return string The processed string.
+local function enforce_word_limits(text, max_w)
+	if type(text) ~= "string" or text == "" then return "" end
+	if max_w <= 0 then return text:gsub("%s+$", "") end
+	
 	local count = 0
 	local rebuilt = ""
 	for w, s in text:gmatch("(%S+)(%s*)") do
 		count = count + 1
-		if max_w > 0 and count > max_w then break end
+		if count > max_w then break end
 		rebuilt = rebuilt .. w
-		if max_w <= 0 or count < max_w then rebuilt = rebuilt .. s end
+		if count < max_w then rebuilt = rebuilt .. s end
 	end
-	rebuilt = rebuilt:gsub("%s+$", "")
-	if count < min_w then return nil end
-	return rebuilt
+	return rebuilt:gsub("%s+$", "")
 end
 
 --- Strips conversational filler and markdown from the model’s raw text.
@@ -113,6 +110,7 @@ function M.process_prediction(full_text, tail_text, block)
 	local Core = require("modules.llm.init")
 	local min_w = tonumber(hs.settings.get("llm_min_words")) or Core.DEFAULT_STATE.llm_min_words
 	local max_w = tonumber(hs.settings.get("llm_max_words")) or Core.DEFAULT_STATE.llm_max_words
+	if max_w > 0 and max_w < min_w then max_w = min_w end
 	
 	-- Normalize apostrophes to prevent false positive corrections in the diffing engine
 	full_text = type(full_text) == "string" and full_text:gsub("'", "’") or ""
@@ -140,9 +138,9 @@ function M.process_prediction(full_text, tail_text, block)
 		
 		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
 
-		-- Apply strict word limits before any diffing evaluation
-		nw = enforce_word_limits(nw, min_w, max_w)
-		if not nw then return nil end
+		-- Apply strict maximum word limit before diffing
+		nw = enforce_word_limits(nw, max_w)
+		if nw == "" then return nil end
 
 		if tc == "" and nw ~= "" then
 			tc = trim((tail_text or ""):gsub("^\"", ""):gsub("\"$", ""))
@@ -201,6 +199,11 @@ function M.process_prediction(full_text, tail_text, block)
 		local to_type = utils.utf8_sub(full_llm, best_c_len + 1)
 
 		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+
+		-- Guarantee the final text injected has at least the minimum required words
+		local final_count = 0
+		for _ in to_type:gmatch("%S+") do final_count = final_count + 1 end
+		if final_count < min_w then return nil end
 
 		local has_corr = false
 		local chunks = {}
@@ -298,9 +301,9 @@ function M.process_prediction(full_text, tail_text, block)
 		
 		nw = nw:gsub("%s*%]$", ""):gsub("%s+$", "")
 
-		-- Apply strict word limits before any diffing evaluation
-		nw = enforce_word_limits(nw, min_w, max_w)
-		if not nw then return nil end
+		-- Apply strict max word limits before diffing
+		nw = enforce_word_limits(nw, max_w)
+		if nw == "" then return nil end
 
 		local to_type = nw
 		local deletes = 0
@@ -319,6 +322,11 @@ function M.process_prediction(full_text, tail_text, block)
 		end
 
 		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+		
+		-- Guarantee the final text injected has at least the minimum required words
+		local final_count = 0
+		for _ in to_type:gmatch("%S+") do final_count = final_count + 1 end
+		if final_count < min_w then return nil end
 		
 		Logger.info(LOG, "Fallback text parsed successfully.")
 		return { deletes = deletes, to_type = to_type, nw = nw, has_corrections = false, chunks = {} }
