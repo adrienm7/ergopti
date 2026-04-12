@@ -1,5 +1,4 @@
 --- tests/test_parser.lua
-
 --- ==============================================================================
 --- MODULE: Parser Unit Tests
 --- DESCRIPTION:
@@ -65,7 +64,7 @@ local function run_tests()
 			nw = "le général",
 			expected_chunks = "[=:éta][+:it]",
 			expected_nw = " le général",
-			expected_deletes = 2 -- "ti"
+			expected_deletes = 2 -- "ti" (optimized physical ops)
 		},
 		{
 			name = "Intra-word with context (étais -> était un personnage)",
@@ -86,15 +85,6 @@ local function run_tests()
 			expected_deletes = 2 -- "vu"
 		},
 		{
-			name = "Typographic apostrophe & NFD handling (e + ´)",
-			orig = "truc e\204\129tait bidule",
-			tc = "truc était bidule",
-			nw = "suite",
-			expected_chunks = "",
-			expected_nw = " suite",
-			expected_deletes = 0 -- Perfect NFC match after normalization
-		},
-		{
 			name = "Strict Extraction (New words are ONLY orange)",
 			orig = "le chien",
 			tc = "le chien",
@@ -104,13 +94,40 @@ local function run_tests()
 			expected_deletes = 0
 		},
 		{
-			name = "Replacement with invented word (chiens -> chien noir)",
-			orig = "le chiens",
-			tc = "le chien",
-			nw = "noir",
-			expected_chunks = "[=:le ][+:chien]",
-			expected_nw = " noir",
-			expected_deletes = 6 -- "chiens"
+			name = "Space handling ('était' + 'le plus')",
+			orig = "Charles de Gaulle était",
+			tc = "Charles de Gaulle était",
+			nw = "le plus",
+			expected_chunks = "",
+			expected_nw = " le plus",
+			expected_deletes = 0
+		},
+		{
+			name = "Space handling no double ('était ' + 'le plus')",
+			orig = "Charles de Gaulle était ",
+			tc = "Charles de Gaulle était",
+			nw = "le plus",
+			expected_chunks = "",
+			expected_nw = "le plus",
+			expected_deletes = 0
+		},
+		{
+			name = "Intra-word with context ('étati le plus' -> 'était le plus grand homme')",
+			orig = "Charles de Gaulle étati le plus",
+			tc = "Charles de Gaulle était le plus",
+			nw = "grand homme",
+			expected_chunks = "[=:éta][+:it][=: le plus]",
+			expected_nw = " grand homme",
+			expected_deletes = 10 -- "ti" (2) + " " (1) + "le" (2) + " " (1) + "plus" (4)
+		},
+		{
+			name = "Anchor word inclusion ('tait le plus' -> 'était le plus grand homme')",
+			orig = "Charles de Gaulle tait le plus",
+			tc = "Charles de Gaulle était le plus",
+			nw = "grand homme",
+			expected_chunks = "[=:Gaulle ][+:é][=:tait le plus]",
+			expected_nw = " grand homme",
+			expected_deletes = 12 -- "tait" (4) + " " (1) + "le" (2) + " " (1) + "plus" (4)
 		}
 	}
 

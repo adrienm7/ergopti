@@ -1,5 +1,4 @@
 --- modules/llm/parser.lua
-
 --- ==============================================================================
 --- MODULE: LLM Output Parser
 --- DESCRIPTION:
@@ -22,11 +21,11 @@ local LOG    = "llm.parser"
 
 
 
--- =====================================
--- =====================================
+-- =======================================
+-- =======================================
 -- ======= 1/ Cleanup & Extraction =======
--- =====================================
--- =====================================
+-- =======================================
+-- =======================================
 
 --- Normalizes macOS NFD characters (decomposed) into standard NFC characters.
 --- @param s string The input string from the macOS buffer.
@@ -123,11 +122,11 @@ end
 
 
 
--- =======================================
--- =======================================
--- ======= 2/ Two-Tier Smart Diff ========
--- =======================================
--- =======================================
+-- ======================================
+-- ======================================
+-- ======= 2/ Two-Tier Smart Diff =======
+-- ======================================
+-- ======================================
 
 --- Extracts UTF-8 characters securely into an array.
 --- @param s string The input string.
@@ -396,17 +395,29 @@ function M.process_prediction(full_text, tail_text, block)
 
 		local true_deletes = 0
 		local true_to_type = ""
-		for _, op in ipairs(physical_ops) do
-			if op.type == "equal" then
-				true_deletes = true_deletes + utils.utf8_len(op.t1)
-				true_to_type = true_to_type .. op.t2
-			elseif op.type == "del" then
-				true_deletes = true_deletes + utils.utf8_len(op.t1)
-			elseif op.type == "ins" then
-				true_to_type = true_to_type .. op.t2
-			elseif op.type == "sub" then
-				true_deletes = true_deletes + utils.utf8_len(op.t1)
-				true_to_type = true_to_type .. op.t2
+		for idx, op in ipairs(physical_ops) do
+			-- Optimizes intra-word backspacing so we don't delete shared prefixes
+			if idx == 1 and op.type == "sub" then
+				local c1 = get_chars(op.t1)
+				local c2 = get_chars(op.t2)
+				local p_len = 0
+				while p_len < #c1 and p_len < #c2 and c1[p_len+1] == c2[p_len+1] do
+					p_len = p_len + 1
+				end
+				true_deletes = true_deletes + (#c1 - p_len)
+				true_to_type = true_to_type .. table.concat(c2, "", p_len + 1)
+			else
+				if op.type == "equal" then
+					true_deletes = true_deletes + utils.utf8_len(op.t1)
+					true_to_type = true_to_type .. op.t2
+				elseif op.type == "del" then
+					true_deletes = true_deletes + utils.utf8_len(op.t1)
+				elseif op.type == "ins" then
+					true_to_type = true_to_type .. op.t2
+				elseif op.type == "sub" then
+					true_deletes = true_deletes + utils.utf8_len(op.t1)
+					true_to_type = true_to_type .. op.t2
+				end
 			end
 		end
 		
@@ -420,11 +431,27 @@ function M.process_prediction(full_text, tail_text, block)
 		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
 
 		-- 5. Calculate Visual UI (Anchor context + Chunks + Trailing NW)
+		local first_op = ops[first_change_idx]
+		local needs_anchor = false
+		
+		-- We need the preceding word as an anchor if the modification starts at the very first letter
+		if first_op.type == "del" or first_op.type == "ins" then
+			needs_anchor = true
+		elseif first_op.type == "sub" then
+			local c1 = get_chars(first_op.t1)
+			local c2 = get_chars(first_op.t2)
+			if #c1 > 0 and #c2 > 0 and c1[1] ~= c2[1] then
+				needs_anchor = true
+			end
+		end
+
 		local visual_start = first_change_idx
-		for i = first_change_idx - 1, 1, -1 do
-			local is_word = ops[i].t1:match("[%w’']") or ops[i].t1:byte() >= 128
-			visual_start = i
-			if is_word then break end -- Found a preceding gray anchor word
+		if needs_anchor then
+			for i = first_change_idx - 1, 1, -1 do
+				local is_word = ops[i].t1:match("[%w’']") or ops[i].t1:byte() >= 128
+				visual_start = i
+				if is_word then break end
+			end
 		end
 
 		local visual_ops = {}
@@ -486,6 +513,7 @@ function M.process_prediction(full_text, tail_text, block)
 			end
 		end
 		
+		-- Precludes double boldness if orange directly follows a green element
 		local disable_bold = (#chunks > 0 and chunks[#chunks].type == "insert" and display_nw:match("%S") ~= nil)
 
 		return { 
