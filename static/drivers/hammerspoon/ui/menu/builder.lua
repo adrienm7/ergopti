@@ -33,16 +33,16 @@ local LOG    = "builder"
 --- @return table The assembled menu structure.
 function M.generate(ctx, menu_mods, actions)
 	local items = {}
-	
+
 	-- Helper function to insert only valid components and log errors
-	local function push(label, fn, arg)
+	local function push_into(target, label, fn, arg)
 		local result = Logger.build(LOG, label, fn, arg)
 		if result then
 			if type(result) == "table" and result[1] ~= nil then
 				-- Result is a list (build_groups)
-				for _, it in ipairs(result) do table.insert(items, it) end
+				for _, it in ipairs(result) do table.insert(target, it) end
 			else
-				table.insert(items, result)
+				table.insert(target, result)
 			end
 			Logger.debug(LOG, string.format("Component '%s' added successfully.", label))
 		else
@@ -50,19 +50,67 @@ function M.generate(ctx, menu_mods, actions)
 		end
 	end
 
-	-- Hotstrings zone
-	if type(menu_mods.hotstrings) == "table" then
-		Logger.debug(LOG, "Building hotstrings zone…")
-		push("hotstrings.build_groups",     menu_mods.hotstrings.build_groups,     ctx)
-		table.insert(items, { title = "-" })
-		push("hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
-		push("hotstrings.build_personal",   menu_mods.hotstrings.build_personal,   ctx)
-		push("hotstrings.build_custom",     menu_mods.hotstrings.build_custom,     ctx)
-	else
-		Logger.warn(LOG, "Hotstrings module missing — zone ignored.")
+	local function push(label, fn, arg)
+		push_into(items, label, fn, arg)
 	end
 
-	table.insert(items, { title = "-" })
+	-- Hotstrings zone avec activation globale
+	if type(menu_mods.hotstrings) == "table" then
+		Logger.debug(LOG, "Building hotstrings submenu…")
+		local hotstrings_menu = {}
+		push_into(hotstrings_menu, "hotstrings.build_groups",   menu_mods.hotstrings.build_groups,   ctx)
+		push_into(hotstrings_menu, "hotstrings.build_personal", menu_mods.hotstrings.build_personal, ctx)
+		push_into(hotstrings_menu, "hotstrings.build_custom",   menu_mods.hotstrings.build_custom,   ctx)
+		push_into(hotstrings_menu, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
+
+		-- Détection de l’état global : toutes les hotstrings activées ?
+		local all_enabled = true
+		local any_enabled = false
+		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
+			for _, f in ipairs(ctx.hotfiles) do
+				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				if name ~= "custom" and name ~= "personal" then
+					local enabled = false
+					if ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" then
+						enabled = ctx.keymap.is_group_enabled(name)
+					elseif ctx.state and ctx.state.hotstrings then
+						enabled = ctx.state.hotstrings[name] ~= false
+					end
+					if enabled then any_enabled = true else all_enabled = false end
+				end
+			end
+		end
+
+		local function toggle_all_hotstrings()
+			if not ctx or not ctx.hotfiles or type(ctx.hotfiles) ~= "table" then return end
+			local enable = not all_enabled
+			for _, f in ipairs(ctx.hotfiles) do
+				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				if name ~= "custom" and name ~= "personal" then
+					if ctx.keymap and type(ctx.keymap.enable_group) == "function" and type(ctx.keymap.disable_group) == "function" then
+						if enable then pcall(ctx.keymap.enable_group, name) else pcall(ctx.keymap.disable_group, name) end
+					end
+					if ctx.state and ctx.state.hotstrings then ctx.state.hotstrings[name] = enable end
+				end
+			end
+			ctx.save_prefs()
+			ctx.notify_feature("Hotstrings", enable)
+			ctx.updateMenu()
+		end
+
+		if #hotstrings_menu > 0 then
+			table.insert(items, {
+				title = "Hotstrings ⚡",
+				menu = hotstrings_menu,
+				checked = all_enabled and not ctx.paused or nil,
+				fn = not ctx.paused and toggle_all_hotstrings or nil
+			})
+		else
+			Logger.warn(LOG, "Hotstrings submenu is empty — ignored.")
+		end
+	else
+		Logger.warn(LOG, "Hotstrings module missing — submenu ignored.")
+	end
 
 	-- AI zone
 	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_item) == "function" then
@@ -85,8 +133,6 @@ function M.generate(ctx, menu_mods, actions)
 		Logger.warn(LOG, "Keylogger module missing.")
 	end
 
-	table.insert(items, { title = "-" })
-
 	-- Gestures and shortcuts zone
 	if type(menu_mods.gestures) == "table" then
 		push("gestures.build", menu_mods.gestures.build, ctx)
@@ -95,23 +141,19 @@ function M.generate(ctx, menu_mods, actions)
 		push("shortcuts.build", menu_mods.shortcuts.build, ctx)
 	end
 
-	-- Script control zone (dynamic loading)
-	local ok_sc, script_control_mod = pcall(require, "ui.menu.menu_script_control")
-	if ok_sc and type(script_control_mod) == "table" then
-		push("script_control.build", script_control_mod.build, ctx)
-	else
-		Logger.debug(LOG, "Script control module unavailable — ignored.")
-	end
 
 	table.insert(items, { title = "-" })
-	table.insert(items, { title = "☑ Activer toutes les fonctionnalités", fn = actions.enable_all })
-	table.insert(items, { title = "☐ Désactiver toutes les fonctionnalités", fn = actions.disable_all })
-	table.insert(items, { title = "↺ Réinitialiser les valeurs par défaut", fn = actions.reset_defaults })
-	
-	table.insert(items, { title = "-" })
+	table.insert(items, {
+		title = "Actions globales",
+		menu = {
+			{ title = "☑ Activer toutes les fonctionnalités", fn = actions.enable_all },
+			{ title = "☐ Désactiver toutes les fonctionnalités", fn = actions.disable_all },
+			{ title = "↺ Réinitialiser les valeurs par défaut", fn = actions.reset_defaults }
+		}
+	})
+	table.insert(items, { title = "Préférences", fn = actions.open_prefs })
 	table.insert(items, { title = "Console", fn = actions.open_console })
 	table.insert(items, { title = "Ouvrir init.lua", fn = actions.open_init })
-	table.insert(items, { title = "Préférences", fn = actions.open_prefs })
 	table.insert(items, { title = "Recharger", fn = actions.reload })
 	table.insert(items, { title = "Quitter", fn = actions.quit })
 
@@ -130,12 +172,12 @@ function M.generate(ctx, menu_mods, actions)
 	end
 	
 	-- Create a transparent canvas that spans the available menu width to force centering
-	local canvas_w = math.max(math.ceil(max_text_width + 50), 250)
+	local canvas_w = math.ceil(max_text_width)
 	
 	local paused = ctx and ctx.paused
 	local display_text = paused and "Ergopti + (en pause)" or "Ergopti +"
 	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = 14 })
-	local text_w = (ok and type(size) == "table" and size.w) and size.w or 65
+	local text_w = size.w
 	
 	-- Configure perfectly balanced padding for the pill
 	local pad_x = 8
@@ -144,7 +186,7 @@ function M.generate(ctx, menu_mods, actions)
 	local pill_h = 14 + (pad_y * 2)
 	
 	-- Mathematically center the pill horizontally inside the transparent canvas
-	local pill_x = (canvas_w - pill_w) / 2
+	local pill_x = (canvas_w - pill_w + 2 * pad_x) / 2
 	
 	local is_dark = hs.host.interfaceStyle() == "Dark"
 	local bg_color   = is_dark and { white = 1 } or { white = 0.15 }

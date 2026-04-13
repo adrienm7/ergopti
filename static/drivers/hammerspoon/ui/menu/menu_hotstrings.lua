@@ -589,7 +589,7 @@ function M.build_management(ctx)
 	table.insert(menu, { title = "-" })
 	if bubble_item then table.insert(menu, bubble_item) end
 
-	return { title = "Paramètres Hotstrings", menu = menu }
+	return { title = "Paramètres hotstrings ⚙️", menu = menu }
 end
 
 --- Builds the personal hotstrings section.
