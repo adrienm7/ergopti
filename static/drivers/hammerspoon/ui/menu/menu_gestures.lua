@@ -65,7 +65,7 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = "Gestes",
+		title   = "Gestes 🖐️",
 		checked = (state.gestures and not paused) or nil,
 		fn      = function()
 			state.gestures = not state.gestures

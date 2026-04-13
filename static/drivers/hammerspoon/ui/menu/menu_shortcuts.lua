@@ -38,6 +38,7 @@ M.DEFAULT_STATE = {
 --- Builds the shortcuts sub-menu.
 --- @param ctx table Context.
 --- @return table|nil
+
 function M.build(ctx)
 	local shortcuts = ctx.shortcuts
 	if not shortcuts then return nil end
@@ -46,7 +47,7 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = "Raccourcis",
+		title   = "Raccourcis 🎯",
 		checked = (state.shortcuts and not paused) or nil,
 		fn      = function()
 			state.shortcuts = not state.shortcuts
@@ -68,10 +69,10 @@ function M.build(ctx)
 		local parts = {}
 		for p in id:gmatch("[^_]+") do table.insert(parts, p) end
 		if #parts == 0 then return id end
-		
+        
 		local key = parts[#parts]
 		if key == "star" or key == "asterisk" then key = state.trigger_char end
-		
+        
 		local mods = {}
 		for i = 1, #parts - 1 do
 			local p   = parts[i]
@@ -82,30 +83,22 @@ function M.build(ctx)
 	end
 
 	local s_menu = {}
-	local last_was_non_ctrl, separator_inserted = false, false
-	
+	local ctrl_shortcuts, cmd_shortcuts, other_shortcuts = {}, {}, {}
+	local layer_scroll_item, screenshot_item, after_screenshot = nil, nil, false
+
 	if type(shortcuts.list_shortcuts) == "function" then
 		local ok, list = pcall(shortcuts.list_shortcuts)
 		if ok and type(list) == "table" then
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
 					local is_ctrl = s.id:sub(1, 5) == "ctrl_"
-					if not separator_inserted and last_was_non_ctrl and is_ctrl then
-						table.insert(s_menu, { title = "-" })
-						separator_inserted = true
-					end
-					if not is_ctrl then last_was_non_ctrl = true end
+					local is_cmd = s.id:sub(1, 4) == "cmd_"
+					local is_layer_scroll = (s.id == "layer_scroll" or s.id == "layer+scroll")
+					local is_screenshot = (s.id == "screenshot" or s.id == "capture_ecran" or s.label:lower():find("capture d’écran"))
 
 					local is_on = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(s.id) or s.enabled
 					local desc  = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
-					
-					-- Special case for Layer + Scroll
-					if s.id == "layer_scroll" or s.id == "layer+scroll" then
-						table.insert(s_menu, { title = "-" })
-						desc = desc:gsub("^%l", string.upper)
-					end
-					
-					table.insert(s_menu, {
+					local shortcut_item = {
 						title    = pretty_key(s.id) .. (desc ~= "" and (" : " .. desc) or ""),
 						checked  = (is_on and not paused) or nil,
 						disabled = not state.shortcuts or paused or nil,
@@ -122,10 +115,22 @@ function M.build(ctx)
 								ctx.updateMenu()
 							end 
 						end)(s.id) or nil,
-					})
-					
+					}
+
+					if is_layer_scroll then
+						layer_scroll_item = shortcut_item
+					elseif is_screenshot then
+						screenshot_item = shortcut_item
+					elseif is_ctrl then
+						table.insert(ctrl_shortcuts, shortcut_item)
+					elseif is_cmd then
+						table.insert(cmd_shortcuts, shortcut_item)
+					else
+						table.insert(other_shortcuts, shortcut_item)
+					end
+
 					if s.id == "ctrl_g" then
-						table.insert(s_menu, {
+						table.insert(ctrl_shortcuts, {
 							title    = "   ↳ Modifier l’URL ChatGPT…",
 							disabled = paused or nil,
 							fn       = not paused and function()
@@ -144,7 +149,95 @@ function M.build(ctx)
 			end
 		end
 	end
-	
+
+	-- Ajout dans l’ordre demandé : autres, capture d’écran, layer+scroll, ctrl, --, cmd
+	for _, item in ipairs(other_shortcuts) do
+		table.insert(s_menu, item)
+		if screenshot_item and not after_screenshot and item == screenshot_item then
+			table.insert(s_menu, layer_scroll_item)
+			after_screenshot = true
+		end
+	end
+	if screenshot_item and not after_screenshot then
+		table.insert(s_menu, screenshot_item)
+		table.insert(s_menu, layer_scroll_item)
+		after_screenshot = true
+	end
+
+	-- Bloc Ctrl
+	if #ctrl_shortcuts > 0 then
+		table.insert(s_menu, { title = "-" })
+		for _, item in ipairs(ctrl_shortcuts) do
+			table.insert(s_menu, item)
+		end
+	end
+
+	-- Bloc Cmd
+	if #cmd_shortcuts > 0 then
+		table.insert(s_menu, { title = "-" })
+		for _, item in ipairs(cmd_shortcuts) do
+			table.insert(s_menu, item)
+		end
+	end
+
+	-- Ajout des 3 éléments du contrôle du script à la fin
+	local script_control = ctx.script_control
+	if script_control then
+		local state = ctx.state
+		local enabled = state.script_control_enabled
+		local paused = ctx.paused
+		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
+		local act_labels = type(script_control.ACTION_LABELS) == "table" and script_control.ACTION_LABELS or {}
+		local function get_label(act)
+			return act_labels[act] or act
+		end
+		local function key_submenu(keyname)
+			local current = state.script_control_shortcuts[keyname] or "none"
+			local sub = {}
+			for _, act in ipairs(actions) do
+				table.insert(sub, {
+					title    = get_label(act),
+					checked  = ((current == act) and not paused) or nil,
+					disabled = not enabled or paused or nil,
+					fn       = (enabled and not paused) and (function(a) return function()
+						state.script_control_shortcuts[keyname] = a
+						if type(script_control.set_shortcut_action) == "function" then pcall(script_control.set_shortcut_action, keyname, a) end
+						ctx.save_prefs()
+						ctx.updateMenu()
+					end end)(act) or nil,
+				})
+			end
+			return sub
+		end
+		local cur_return = state.script_control_shortcuts.return_key or "none"
+		local cur_back   = state.script_control_shortcuts.backspace  or "none"
+		table.insert(s_menu, { title = "-" })
+		table.insert(s_menu, {
+			title    = "Option droite + ↩ : " .. get_label(cur_return),
+			disabled = not enabled or paused or nil,
+			menu     = key_submenu("return_key")
+		})
+		table.insert(s_menu, {
+			title    = "Option droite + ⌫ : " .. get_label(cur_back),
+			disabled = not enabled or paused or nil,
+			menu     = key_submenu("backspace")
+		})
+		table.insert(s_menu, {
+			title    = "Chemin du AHK…",
+			disabled = paused or nil,
+			fn       = not paused and function()
+				local ok_p, btn, path = pcall(hs.dialog.textPrompt, "Script AHK",
+					"Chemin du fichier AHK source :",
+					state.ahk_source_path, "OK", "Annuler")
+				if ok_p and btn == "OK" and type(path) == "string" then
+					state.ahk_source_path = path
+					ctx.save_prefs()
+					ctx.updateMenu()
+				end
+			end or nil
+		})
+	end
+
 	item.menu = s_menu
 	return item
 end
