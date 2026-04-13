@@ -501,7 +501,7 @@ function M.process_prediction(full_text, tail_text, block)
 		-- Safety circuit breaker: Prevent massive unprompted deletions
 		local max_allowed_dels = math.max(20, utils.utf8_len(tc_norm) + 10)
 		if true_deletes > max_allowed_dels then
-			Logger.warning(LOG, string.format("Safety trip: Blocked deletion of %d chars.", true_deletes))
+			Logger.warn(LOG, string.format("Safety trip: Blocked deletion of %d chars.", true_deletes))
 			return nil
 		end
 		
@@ -648,7 +648,7 @@ function M.process_prediction(full_text, tail_text, block)
 			chunks = {} 
 			-- Protect against silent deletion if there are no visible corrections
 			if true_deletes > 0 then
-				Logger.warning(LOG, string.format("Safety trip: Blocked silent deletion of %d chars due to orphaned gray chunks.", true_deletes))
+				Logger.warn(LOG, string.format("Safety trip: Blocked silent deletion of %d chars due to orphaned gray chunks.", true_deletes))
 				return nil
 			end
 		end
