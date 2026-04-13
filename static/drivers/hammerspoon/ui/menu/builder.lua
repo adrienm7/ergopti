@@ -132,7 +132,9 @@ function M.generate(ctx, menu_mods, actions)
 	-- Create a transparent canvas that spans the available menu width to force centering
 	local canvas_w = math.max(math.ceil(max_text_width + 50), 250)
 	
-	local ok, size = pcall(hs.drawing.getTextDrawingSize, "Ergopti +", { font = "Helvetica-Bold", size = 14 })
+	local paused = ctx and ctx.paused
+	local display_text = paused and "Ergopti + (en pause)" or "Ergopti +"
+	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = 14 })
 	local text_w = (ok and type(size) == "table" and size.w) and size.w or 65
 	
 	-- Configure perfectly balanced padding for the pill
@@ -147,19 +149,45 @@ function M.generate(ctx, menu_mods, actions)
 	local is_dark = hs.host.interfaceStyle() == "Dark"
 	local bg_color   = is_dark and { white = 1 } or { white = 0.15 }
 	local text_color = is_dark and { white = 0.1 } or { white = 1 }
+	local menu_bg    = is_dark and { white = 0 } or { white = 1 }
+
+	local paused = ctx and ctx.paused
+	local orig_bg = bg_color
+	local orig_text = text_color
+
+	-- By default the pill uses bg_color; when paused we fill with the
+	-- menubar background and add a thin border using a contrasting text color.
+	local rect_fill = bg_color
+	local rect_stroke = nil
+	local rect_stroke_w = nil
+	if paused then
+		-- Fill with the menubar background so the pill blends in
+		rect_fill = menu_bg
+		-- Border/text should match the visible text color: white in Dark, black in Light.
+		rect_stroke = is_dark and { white = 1 } or { white = 0 }
+		text_color = rect_stroke
+		rect_stroke_w = 1
+	end
 	
 	local canvas_obj = hs.canvas.new({ x = 0, y = 0, w = canvas_w, h = pill_h })
+
+	local rect_elem = {
+		type             = "rectangle",
+		action           = rect_stroke and "strokeAndFill" or "fill",
+		fillColor        = rect_fill,
+		roundedRectRadii = { xRadius = 8, yRadius = 8 },
+		frame            = { x = pill_x, y = 0, w = pill_w, h = pill_h }
+	}
+	if rect_stroke then
+		rect_elem.strokeColor = rect_stroke
+		rect_elem.strokeWidth = rect_stroke_w
+	end
+
 	canvas_obj:appendElements(
-		{
-			type             = "rectangle",
-			action           = "fill",
-			fillColor        = bg_color,
-			roundedRectRadii = { xRadius = 8, yRadius = 8 },
-			frame            = { x = pill_x, y = 0, w = pill_w, h = pill_h }
-		},
+		rect_elem,
 		{
 			type          = "text",
-			text          = "Ergopti +",
+			text          = display_text,
 			textColor     = text_color,
 			textAlignment = "center",
 			textSize      = 14,
@@ -172,7 +200,12 @@ function M.generate(ctx, menu_mods, actions)
 	table.insert(items, 1, {
 		title = "",
 		image = canvas_obj:imageFromCanvas(),
-		fn    = function() end,
+		fn    = function()
+			if ctx and ctx.script_control then
+				if type(ctx.script_control.toggle_script_control) == "function" then pcall(ctx.script_control.toggle_script_control) end
+				if type(ctx.script_control.toggle) == "function" then pcall(ctx.script_control.toggle) end
+			end
+		end,
 	})
 	table.insert(items, 2, { title = "-" })
 
