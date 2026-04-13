@@ -89,7 +89,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	Logger.debug(LOG, "Building application exclusion menu…")
 	local apps = type(current_apps) == "table" and current_apps or {}
 	local menu = {}
-	
+
 	for i, app in ipairs(apps) do
 		if type(app) == "table" then
 			local icon = nil
@@ -100,13 +100,13 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 					icon = img 
 				end
 			end
-			
+
 			local idx = i
 			local styled = hs.styledtext.new(
 				(app.name or "?") .. "\t✗",
 				{ paragraphStyle = { tabStops = {{location = 260, alignment = "right"}} } }
 			)
-			
+
 			table.insert(menu, {
 				title = styled, 
 				image = icon,
@@ -120,10 +120,44 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 			})
 		end
 	end
-	
+
 	if #menu > 0 then table.insert(menu, {title = "-"}) end
 
-	-- One-click exclusion of the currently focused application
+	table.insert(menu, {
+		title = "+ Ajouter une autre application…",
+		fn    = function()
+			hs.timer.doAfter(0.1, function()
+				local choices = M.discover_apps()
+				local chooser = hs.chooser.new(function(choice)
+					if not choice then return end
+
+					local already_excluded = false
+					for _, a in ipairs(apps) do
+						if type(a) == "table" and a.appPath == choice.appPath then 
+							already_excluded = true
+							break 
+						end
+					end
+
+					if not already_excluded then
+						local new_apps = {}
+						for _, a in ipairs(apps) do table.insert(new_apps, a) end
+						table.insert(new_apps, {
+							name = choice.text, appPath = choice.appPath, bundleID = choice.bundleID,
+						})
+						on_change(new_apps)
+					end
+				end)
+
+				chooser:placeholderText(placeholder_text or "Rechercher une application…")
+				chooser:choices(choices)
+				chooser:bgDark(false)
+				chooser:show()
+			end)
+		end,
+	})
+
+	-- Static entry to exclude the current frontmost application (always up-to-date if build_menu is called before each display)
 	local frontApp = hs.application.frontmostApplication()
 	if frontApp then
 		local bundleID = type(frontApp.bundleID) == "function" and frontApp:bundleID() or nil
@@ -161,43 +195,12 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 			})
 		end
 	end
-	
-	table.insert(menu, {
-		title = "+ Ajouter une autre application…",
-		fn    = function()
-			hs.timer.doAfter(0.1, function()
-				local choices = M.discover_apps()
-				local chooser = hs.chooser.new(function(choice)
-					if not choice then return end
-					
-					local already_excluded = false
-					for _, a in ipairs(apps) do
-						if type(a) == "table" and a.appPath == choice.appPath then 
-							already_excluded = true
-							break 
-						end
-					end
-					
-					if not already_excluded then
-						local new_apps = {}
-						for _, a in ipairs(apps) do table.insert(new_apps, a) end
-						table.insert(new_apps, {
-							name = choice.text, appPath = choice.appPath, bundleID = choice.bundleID,
-						})
-						on_change(new_apps)
-					end
-				end)
-				
-				chooser:placeholderText(placeholder_text or "Rechercher une application…")
-				chooser:choices(choices)
-				chooser:bgDark(false)
-				chooser:show()
-			end)
-		end,
-	})
-	
+
 	Logger.info(LOG, "Application exclusion menu built successfully.")
-	return menu
+	if #menu == 0 then
+		table.insert(menu, { title = "Aucune application à exclure", disabled = true })
+	end
+	return type(menu) == "table" and menu or {}
 end
 
 return M

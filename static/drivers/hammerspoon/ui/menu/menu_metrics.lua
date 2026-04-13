@@ -370,22 +370,24 @@ function M.build(ctx)
 	local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
 	local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
 
+	local exclusion_menu = AppPickerLib.build_menu(
+		state.keylogger_disabled_apps,
+		function(new_list)
+			state.keylogger_disabled_apps = new_list
+			local Keylogger = require("modules.keylogger")
+			if type(Keylogger.set_disabled_apps) == "function" then
+				pcall(Keylogger.set_disabled_apps, new_list)
+			end
+			pcall(save_prefs)
+			pcall(updateMenu)
+		end,
+		"Exclure des métriques de frappe…"
+	)
+
 	table.insert(menu, {
 		title    = label,
 		disabled = not state.keylogger_enabled,
-		menu  = AppPickerLib.build_menu(
-			state.keylogger_disabled_apps,
-			function(new_list)
-				state.keylogger_disabled_apps = new_list
-				local Keylogger = require("modules.keylogger")
-				if type(Keylogger.set_disabled_apps) == "function" then
-					pcall(Keylogger.set_disabled_apps, new_list)
-				end
-				pcall(save_prefs)
-				pcall(updateMenu)
-			end,
-			"Exclure des métriques de frappe…"
-		)
+		menu     = exclusion_menu
 	})
 
 	table.insert(menu, { title = "-" })
