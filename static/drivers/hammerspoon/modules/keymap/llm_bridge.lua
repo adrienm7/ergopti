@@ -30,7 +30,7 @@ if not ok_kl then keylogger = nil end
 
 local ok_tt, tooltip = pcall(require, "ui.tooltip")
 if not ok_tt then
-	Logger.warning(LOG, "❌ Module ui.tooltip failed to load! LLM predictions will NOT display.")
+	Logger.warn(LOG, "❌ Module ui.tooltip failed to load! LLM predictions will NOT display.")
 	tooltip = { 
 		show = function() end, 
 		hide = function() end,

@@ -172,7 +172,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local timeout_timer = hs.timer.doAfter(8, function()
         if done then return end
         done = true
-        Logger.warning(LOG, "[%s] #%d TIMEOUT after 8s", model_name, req_id)
+        Logger.warn(LOG, "[%s] #%d TIMEOUT after 8s", model_name, req_id)
         if type(on_fail) == "function" then pcall(on_fail) end
     end)
 
